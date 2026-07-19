@@ -4,6 +4,49 @@
 
 ## Current status
 
+**WAVE 3 GATE A CORRECTION BATCH APPLIED — DEC-036 ZERO REMAINING ARCHITECTURE BLOCKERS, NOT YET ACCEPTED — READY FOR FINAL CONTROL-ROOM GATE A REVIEW (2026-07-19, draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177)).**
+Following the 2026-07-18 Gate A session below, the control room issued a
+preliminary review (PR #177 comment
+[`5013028262`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5013028262))
+and then a final consolidated ruling reconciling an independent official-source
+audit ("Session 2") and an independent adversarial architecture audit
+("Session 3") — PR #177 comment
+[`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445).
+This session (Session A) applied every binding decision from that ruling in
+one documentation-only correction batch across the same ten allowed files.
+**Result: all eight items DEC-036 previously carried as explicitly
+BLOCKING are now resolved** — `mutation_attempt.job_id` (Many2one-restrict)
+and C2's cursor placement (dedicated side cursor); the
+open-transaction-vs-network-call question (resolved by construction); the
+disconnect-quiescence interaction (resolved to an awareness-based design,
+not a timeout race); `mutation_domain`'s field ownership (resolved to a
+registry-validated indexed `Char` — a third option the original framing
+omitted); the N=3 inconclusive-cap's persistence scope (resolved
+per-attempt-sufficient); the AST-tooling-maturity contradiction
+(reclassified as implementation sizing, not a blocker); and the
+runtime/concurrency/crash-injection proof requirement (resolved to four
+proof-environment layers, correctly classified as a Stage 0
+merge-acceptance criterion, not a precondition to beginning
+implementation). Additional corrections: the observed-outcome/resolution
+model is now genuinely orthogonal (`observed_outcome` immutable once it
+leaves `pending`); the unsafe single fingerprint is split into
+`business_intent_fingerprint`/`exact_request_fingerprint` (the latter
+including `changeFromQuantity`); two idempotency defect codes route to
+fail-closed manual review instead of auto-retry; retention is now
+indefinite-for-unresolved plus configurable-masking-for-resolved; and
+security installs against the current four-role model (Session 3's
+proposal to install against the future two-role model is rejected), with
+an explicit SEC-2 re-key obligation. Session 3's proposed single six-value
+outcome enum is also rejected. **DEC-036 status: CONTROL-ROOM ACCEPTANCE
+CANDIDATE — CORRECTIONS APPLIED, NOT YET ACCEPTED.** Full reconciliation
+record: DEC-036 Part 0.5. **No implementation authorized. No `addons/**`
+file changed. No Odoo/Odoo.sh run. No Shopify request or mutation
+performed.** PR #177 remains **open, draft and unmerged**; this session
+performed no merge, no ready-marking, and did not accept its own decision
+package. **Wave 3 implementation remains unstarted.** Protected refs
+confirmed unchanged before, during, and after this correction batch.
+Recommendation: **READY FOR FINAL CONTROL-ROOM GATE A REVIEW.**
+
 **WAVE 3 GATE A ACTIVE — DEC-031 LAYER 2 ACCEPTANCE CANDIDATE + STAGE 0 PACKET, NOT YET ACCEPTED (2026-07-18, draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177)).**
 **Wave 2 is MERGED** — PR #176 merged into `mvp/program-integration` with
 merge commit `22bfb9a0e9b1e48b6a664351e2b321d134177110`. **Wave 2 checkpoint
@@ -235,6 +278,45 @@ live `mvp/program-integration` tip substituted for
 `<EXACT_SHA_AT_ISSUANCE>`.
 
 ## Sprint checkpoint log
+
+- **Wave 3 Gate A — final consolidated Sessions-2-and-3 correction batch
+  (2026-07-19):** Resumed on the same branch/draft PR #177, head
+  `c8f091149fd398096901118b44d5c2c1e6df25bc` confirmed preserved before any
+  change. Read the control-room preliminary review
+  ([PR #177 comment `5013028262`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5013028262))
+  and the final consolidated ruling
+  ([PR #177 comment `5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)),
+  which reconciled an independent official-source audit ("Session 2") and
+  an independent adversarial architecture audit ("Session 3"). Applied
+  every binding decision in one documentation-only correction batch across
+  the same ten allowed files: rewrote DEC-036's D2 (schema — `job_id`
+  `Many2one`-restrict, `mutation_domain` registry-validated `Char`), D5
+  (fingerprint split), D6 (idempotency fail-closed routing), D10/D11
+  (orthogonal immutable-`observed_outcome`/`resolution_disposition`
+  model), D14 (reconciliation linkage `Many2one`-restrict), D17 (N=3 cap
+  resolved per-attempt-sufficient), D18/D29 (store-identity/connection-
+  generation), D19–D22 (C1/C2/NET/C3 protocol, C2 resolved to a dedicated
+  side cursor), D28 (disconnect-quiescence resolved to awareness-based
+  finalization), D30/D31 (four-role ACL + SEC-2 re-key obligation), D32
+  (retention resolved to indefinite-for-unresolved +
+  configurable-masking-for-resolved), D35 (added and resolved a third
+  `mutation_domain` ownership option — registry-validated Char), D37/D38
+  (reclassified non-blocking / four proof-environment layers); added a new
+  Part 0.5 explicit Session 2/3 reconciliation record; rewrote Parts 4–6
+  (zero remaining architecture blockers). Corrected the Layer 2 design doc,
+  the DEC-031 addendum, the Stage 0 packet (added
+  `shopify_connector_api_client.py`/`shopify_connector_store.py`/
+  `shopify_connector_job_actions.py` to the allowed-file list; rewrote the
+  hard-stops section to three non-blocking categories), and the locked Sol
+  prompt (same corrections, still locked/not issued) to match. Updated
+  this file's Current status and the Wave 3 DoR §3/§5. **Result: DEC-036
+  status CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET
+  ACCEPTED; zero remaining architecture blockers.** No new file created
+  outside the existing ten-file PR set; no `addons/**`/test/security/
+  XML/manifest file changed; no Odoo/Odoo.sh run; no Shopify request or
+  mutation performed; PR #177 remains open, draft and unmerged; Stage 0
+  not implemented; locked prompt not issued; Wave 3 implementation remains
+  unstarted. Recommendation: READY FOR FINAL CONTROL-ROOM GATE A REVIEW.
 
 - **Wave 3 Gate A — DEC-031 Layer 2 acceptance candidate + Stage 0 packet, session in progress (2026-07-18):** Verified baseline: `mvp/program-integration` tip `aa87ccc971e` exact match to the required starting base; Wave 2 merge commit `22bfb9a0e9b` confirmed in ancestry; Wave 2 checkpoint `checkpoint/wave-2-order-import-2026-07-18` = `22bfb9a0e9b`, zero tree difference from the live tip; four post-checkpoint commits confirmed as two no-op temporary-file add/revert pairs; PR #176 confirmed merged; zero open PRs; Wave 3/DEC-031 Layer 2/Wave 3 DoR all confirmed still Proposed; no Stage 0 packet existed; protected refs unchanged. Created branch `claude/wave-3-gate-dec-031-layer2-q3vwfj` (the harness-designated branch for this session) from the exact verified tip, opened early draft PR [#177](https://github.com/AdamsOdoo/Adams/pull/177). Ran a 27-agent research/audit/adversarial-review workflow: code audit of every named `shopify_connector_core` model/security/data/test file; documentation audit of DEC-031 (Layer 1 + Layer 2), DEC-030, the Wave 3 DoR, Task 013/013B, the inventory operating model, the reconnect policy, the risk register/acceptance matrix/program contract, and a targeted `research-handoff.md` sweep; four dedicated official-Shopify/Odoo-source research agents; eight thematic adversarial-review clusters covering all 35 numbered decisions + 15 lettered risks from this session's task; one consolidation pass. Mid-session, received and incorporated a binding control-room parallel-audit ruling ([PR #177 comment `5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)) correcting the PostgreSQL isolation-level assumption (Odoo 19 = REPEATABLE READ, independently re-verified against `odoo/sql_db.py`, not merely accepted from the ruling text), the CAS field name, THROTTLED fail-closed treatment, the batching default, the clean-cursor invariant, and explicit `sudo()`-based security guards — every point cross-checked against this session's own independent research, which had already reached the same conclusions on several points before the ruling arrived. Produced: `shopify-layer2-mutation-safety-refresh-2026-07-18.md` (new); corrected `dec-031-layer-2-mutation-safety-design.md`; a new dated addendum on `DEC-031-core-r2-job-execution-replay-safety.md` (Layer 1's Accepted status untouched); `DEC-036-wave-3-layer-2-gate.md` (new, the complete `L2-D1`–`L2-D38` decision inventory); `wave-3-stage-0-layer-2-packet.md` (new); `sol-wave-3-stage-0-locked-prompt.md` (new, locked, not issued); corrections to `wave-3-definition-of-ready.md` (CAS preflight closed, batching hedge corrected, Wave 2 dependency closed); this file; and an `architecture-review-log.md` row (below). **Package status: NOT FROZEN** — an externally-tracked "Session C" code/architecture audit is stated by the control room to still require reconciliation; this session's own audit is offered as Session A's independent contribution, not a substitute. Eight DEC-036 decisions remain explicitly BLOCKING. **No implementation authorized; no `addons/**` file changed; no Odoo/Odoo.sh run; no Shopify request or mutation performed; Claude did not accept its own decision package; PR #177 remains open, draft and unmerged; Wave 3 implementation remains unstarted.**
 

@@ -1,24 +1,31 @@
 # Wave 3 — Definition of Ready (Inventory Synchronization: Layer 2 Stage 0 + Task 013/013B)
 
-> **Status: STILL PROPOSED — GATE A COMPLETE, GATE B PENDING (2026-07-18).**
+> **Status: GATE A CORRECTION COMPLETE — CONTROL-ROOM FINAL REVIEW PENDING;
+> GATE B NOT STARTED; IMPLEMENTATION NOT AUTHORIZED (2026-07-19).**
 > Originally proposed, Fable gap-closure mission, 2026-07-16; Gate A
 > (DEC-031 Layer 2 architecture closure + Stage 0 packet preparation,
 > PR #177) corrected this document's CAS-field and batching text on
-> 2026-07-18 — see §5. Docs-only. Acceptance authority: product owner +
+> 2026-07-18, and the DEC-036 consolidated correction batch (2026-07-19)
+> resolved every architecture item this document previously carried as
+> BLOCKING — see §5. Docs-only. Acceptance authority: product owner +
 > Claude control room. **Wave 3 remains unauthorized until this Definition
 > of Ready is accepted and its gate decisions are Accepted. No
 > implementation authorized by this document.**
 >
-> **Current program state (2026-07-18):** Wave 1 and **Wave 2 are both
+> **Current program state (2026-07-19):** Wave 1 and **Wave 2 are both
 > merged** (Wave 2: PR #176, merge commit `22bfb9a0e9b1e48b6a664351e2b321d134177110`)
 > and **SRR-03 is CLOSED**. Wave 3's wave-order dependency on Wave 2 is
 > **CLOSED**. DEC-031 Layer 2 remains Proposed, not Accepted —
-> [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the new
-> normalized acceptance candidate (PROPOSED FOR CONTROL-ROOM ACCEPTANCE),
-> with eight items explicitly BLOCKING. As a Shopify-mutation wave, Wave 3
-> closure requires **genuine (not simulated) dev-store mutation evidence**.
-> Wave 3 introduces **no PII-masking fields** (the MVP has no PII masking;
-> inventory bindings carry no customer PII).
+> [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the
+> normalized acceptance candidate, status **CONTROL-ROOM ACCEPTANCE
+> CANDIDATE — CORRECTIONS APPLIED, NOT YET ACCEPTED**, with zero remaining
+> architecture blockers after the final consolidated Sessions-2-and-3
+> ruling (PR #177 comment
+> [`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)).
+> As a Shopify-mutation wave, Wave 3 closure requires **genuine (not
+> simulated) dev-store mutation evidence**. Wave 3 introduces **no
+> PII-masking fields** (the MVP has no PII masking; inventory bindings
+> carry no customer PII).
 
 Instantiates the 7-field standard of
 [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
@@ -210,7 +217,7 @@ callables registered from the start; control-room wave review; state file
 | **Task 013B packet re-accepted** (confirmed consistent with the operating model; no addendum required unless contradiction found) | 013B packet | Control room gate act |
 | PD-RB inventory slice (reconciliation-read catch-up, no blind push) | reconnect policy §10/§11 | Product owner + control room |
 | **CAS field-name empirical preflight — RESOLVED 2026-07-18 (Wave 3 Gate A).** `changeFromQuantity` is confirmed the correct, current (2026-07) field on `InventoryQuantityInput`; `compareQuantity`/`ignoreCompareQuantity` do not exist as input fields from API 2026-04 onward. Four independent official citations, no conflict found between official Shopify sources (the only conflict was this project's own stale internal documents, now corrected). | [`shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md) §1; [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D12 | Control room — **preflight closed, not itself a Wave 3 authorization act** |
-| **DEC-031 Layer 2 acceptance candidate normalized — Gate A in progress, 2026-07-18.** [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the complete `L2-D1`–`L2-D38` decision inventory, status PROPOSED FOR CONTROL-ROOM ACCEPTANCE — NOT YET ACCEPTED; eight items remain explicitly BLOCKING. Package is explicitly NOT FROZEN pending external "Session C" code/architecture-audit reconciliation. | DEC-036; the Stage 0 packet | Product owner + control room |
+| **DEC-031 Layer 2 acceptance candidate normalized and corrected — Gate A correction complete, 2026-07-19.** [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the complete `L2-D1`–`L2-D38` decision inventory, status CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET ACCEPTED; **zero items remain architecture-blocking** after the final consolidated Sessions-2-and-3 ruling (PR #177 comment [`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)) — remaining items are Stage 0 merge-acceptance/implementation-proof criteria, tunable constants, or narrow verification steps (DEC-036 §5). | DEC-036; the Stage 0 packet | Product owner + control room |
 | Wave 2 accepted and merged (program wave order; Area-6 full trigger set unblocked) | program §4 | Control room |
 
 Open questions to answer or defer-fail-closed at the gate sitting:
@@ -235,9 +242,10 @@ is live-validated before Stage 0's evidence is accepted.
 
 ## 5. Current-status conclusion
 
-**READY once gate decisions are Accepted.** As of 2026-07-18 (Wave 3 Gate A
-session, PR #177), Wave 3 is **STILL NOT ready — Gate A complete, Gate B
-pending**; outstanding:
+**READY once gate decisions are Accepted.** As of 2026-07-19 (Wave 3 Gate A
+correction batch, PR #177), Wave 3 is **STILL NOT ready — Gate A correction
+complete, control-room final review pending, Gate B not started**;
+outstanding:
 
 1. **Wave 2 is now MERGED** (PR #176, merge commit
    `22bfb9a0e9b1e48b6a664351e2b321d134177110`, into `mvp/program-integration`
@@ -245,23 +253,30 @@ pending**; outstanding:
    **CLOSED**. Wave 1 remains merged and SRR-03 remains closed.
 2. **DEC-031 Layer 2 design remains Proposed, not Accepted.** Gate A
    (2026-07-18) produced a complete, normalized acceptance candidate —
-   [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md), status
-   PROPOSED FOR CONTROL-ROOM ACCEPTANCE — and the
-   [Wave 3 Stage 0 packet](wave-3-stage-0-layer-2-packet.md), status
-   PROPOSED — LOCKED PROMPT NOT ISSUED. Neither is accepted. Eight items
-   are explicitly BLOCKING (DEC-036 §5); the package is explicitly **NOT
-   FROZEN** pending an external "Session C" code/architecture-audit
-   reconciliation (control-room ruling, PR #177 comment
-   [`5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)).
+   [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md), and the
+   final consolidated Sessions-2-and-3 correction batch (2026-07-19, PR
+   #177 comment
+   [`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445))
+   resolved every item DEC-036 previously carried as BLOCKING — status is
+   now **CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET
+   ACCEPTED**. The [Wave 3 Stage 0 packet](wave-3-stage-0-layer-2-packet.md)
+   is correspondingly corrected, status **PROPOSED — LOCKED PROMPT NOT
+   ISSUED**. Neither DEC-036 nor the packet is yet accepted by the control
+   room — this correction batch supplies the binding architecture choices,
+   it does not itself constitute acceptance.
 3. Inventory-operating-model PDs and the PD-RB inventory slice remain
    Proposed. **Note:** `inventory-operating-model.md` §4.4 still references
    the stale `compareQuantity` field name and requires correction in a
-   future session with that file in its allowed list, before Task 013
-   re-acceptance.
-4. Task 013 re-acceptance with the 2026-07-16 addendum, and Task 013B
-   re-acceptance, not yet performed; §8/§9 prompt gate acts not performed.
-   `task-013-inventory-sync-implementation-packet.md`'s CAS-heading text
-   also needs the same out-of-scope correction as item 3 above.
+   future Gate B session with that file in its allowed list, before Task
+   013 re-acceptance.
+4. Task 013 re-acceptance, not yet performed; §8/§9 prompt gate acts not
+   performed. Gate B must additionally replace all stale
+   `compareQuantity`/`ignoreCompareQuantity` language with
+   `changeFromQuantity`; supersede binding-owned idempotency with
+   attempt-owned idempotency; adopt review-case-first handling for
+   unexplained Shopify drift; confirm one pair per request for MVP; and
+   confirm Task 013B does not use Layer 2 and remains a separate Stage 2
+   packet — see DEC-036 Part 0.5's Gate B carry-forward list.
 5. **CAS field-name empirical preflight — RESOLVED 2026-07-18** (see the
    gate-decision table above). `changeFromQuantity` is confirmed correct;
    no conflict between official Shopify sources.
@@ -270,12 +285,17 @@ pending**; outstanding:
    product-owner ruling. This is not a *readiness* blocker but a *closure*
    requirement. Unaffected by Gate A.
 7. This Definition of Ready itself remains Proposed, not accepted — this
-   session's own corrections (items 1, 3's flag, 5, and the batching/CAS
-   text above) do not self-accept it.
-8. **New, Gate-A-specific outstanding item:** every DEC-036 BLOCKING item
-   (job_id field type + C2 cursor placement; open-transaction proof;
-   disconnect-quiescence interaction; `mutation_domain` ownership; N=3 cap
-   persistence scope; AST-tooling-maturity finding; the full
-   runtime/concurrency/crash-injection proof plan) must be resolved or
-   explicitly risk-accepted before Stage 0 implementation — tracked in the
+   session's own corrections (items 1, 2, 3's flag, 4, 5, and the
+   batching/CAS text above) do not self-accept it.
+8. **Gate-A architecture status, corrected 2026-07-19:** DEC-036 carries
+   **zero remaining architecture blockers** after the consolidated
+   Sessions-2-and-3 ruling. What remains before Stage 0 implementation's
+   *merge* (not its start) is Stage 0 packet §17's three categories:
+   (I) implementation-proof requirements (the four-layer
+   runtime/concurrency/crash-injection plan; the `pg_stat_activity`
+   open-transaction proof; the AST-tooling-maturity inspection finding —
+   none blocks *beginning* implementation); (II) tunable-constant
+   ratifications (sweep timeout, idempotency-key margin, retention
+   masking window); (III) one narrow implementation-time field-name
+   verification. None is an architecture blocker; all are tracked in the
    Stage 0 packet §17, not duplicated here.

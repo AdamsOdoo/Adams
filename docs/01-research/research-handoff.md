@@ -1,3 +1,158 @@
+### Wave 3 Gate A — final consolidated Sessions-2-and-3 correction batch — compact handoff (2026-07-19)
+
+- **Branch / PR:** `claude/wave-3-gate-dec-031-layer2-q3vwfj`; draft PR
+  [#177](https://github.com/AdamsOdoo/Adams/pull/177) → `mvp/program-integration`,
+  **open, draft, unmerged.**
+- **Files changed:** the same ten allowed files as the 2026-07-18 session
+  below — `docs/04-decisions/DEC-036-wave-3-layer-2-gate.md` (major
+  correction: D2/D5/D6/D10/D11/D14/D17/D18/D19/D20/D21/D22/D28/D29/D30/D31/D32/D34/D35/D37/D38
+  rewritten, new Part 0.5, Parts 4–6 rewritten); `docs/03-architecture/dec-031-layer-2-mutation-safety-design.md`
+  (schema, fingerprint, outcome/resolution model, C2 cursor, retention,
+  wrapper/proof-plan sections corrected, new 2026-07-19 correction
+  summary); `docs/04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`
+  (new dated addendum appended, Layer 1 Accepted status untouched);
+  `docs/07-implementation-plan/wave-3-stage-0-layer-2-packet.md` (allowed-file
+  list expanded — `shopify_connector_api_client.py`/`shopify_connector_store.py`/
+  `shopify_connector_job_actions.py` added; §17 hard-stops rewritten to
+  three non-blocking categories; schema/protocol/tests sections corrected);
+  `docs/06-prompts/sol-wave-3-stage-0-locked-prompt.md` (same corrections,
+  still `ISSUED-NOT-EXECUTED: NO` / `LOCKED: YES`); `docs/07-implementation-plan/wave-3-definition-of-ready.md`
+  (status banner, gate-decision table row, §5 current-status conclusion
+  corrected — zero remaining architecture blockers); `docs/07-implementation-plan/mvp-program-state.md`
+  (new prepended status entry + Sprint checkpoint log entry);
+  `docs/05-qa/architecture-review-log.md` (AR-058 added); this handoff
+  entry. **No `addons/**` file. No test/security/XML/manifest file. No new
+  file outside the existing ten-file PR set.**
+- **Baseline verified before any change:** current head
+  `c8f091149fd398096901118b44d5c2c1e6df25bc` confirmed exact match to the
+  expected preserved head from the prior (paused) session; clean working
+  tree (`git status --short` empty); PR #177 confirmed open, draft,
+  unmerged; base `mvp/program-integration`@`aa87ccc971eb9ab500911948e0e751136453cbc2`
+  confirmed unchanged; exactly ten documentation files changed (`git diff
+  --stat` against the base); comments `5012854989`, `5013028262`, and
+  `5014689445` all confirmed to exist and were read in full before any
+  edit.
+- **What changed / work performed:** read the control-room's final
+  consolidated ruling (PR #177 comment `5014689445`), which reconciles an
+  independent official-source audit ("Session 2") and an independent
+  adversarial architecture audit ("Session 3") against this package,
+  following a preliminary review (comment `5013028262`) that found ten
+  further corrections beyond the prior session's own eight BLOCKING items.
+  Applied every binding architecture decision in one documentation-only
+  batch: the observed-outcome/resolution model made genuinely orthogonal
+  (`observed_outcome` immutable once it leaves `pending`, a new
+  `resolution_source` field, a shared effective-disposition helper,
+  replacing the "resolution forces outcome" mechanism found to violate the
+  model's own three-layer separation); the single, unsafe fingerprint
+  split into `business_intent_fingerprint`/`exact_request_fingerprint`
+  (the latter including `changeFromQuantity` and the idempotency key —
+  correcting a design that would have made forensic replay proof and
+  idempotency-key reuse unreliable); two idempotency defect error codes
+  routed to fail-closed manual review instead of ordinary auto-retry; the
+  core schema resolved (`job_id` `Many2one`-restrict, `mutation_domain`
+  registry-validated `Char` — a third field-ownership option this
+  session's prior framing omitted, closing what was previously the
+  single most contested BLOCKING item); the reconciliation-job linkage
+  corrected from a non-FK Char to a required `Many2one`-restrict; C2
+  resolved onto a dedicated side cursor (closing the cursor-placement
+  BLOCKING item and narrowing the main-cursor write-isolation invariant's
+  scope to the C1 claim-commit window only); the open-transaction-vs-
+  network-call question resolved by construction, its runtime proof
+  correctly reclassified as a Stage 0 merge-acceptance criterion, not an
+  architecture blocker; the disconnect-quiescence interaction resolved to
+  an awareness-based finalization design (never clearing credentials
+  while a mutation attempt is unresolved), replacing a timeout-race
+  framing found inadequate even in its "shrink the timeout" form; the N=3
+  inconclusive-reconciliation cap resolved as per-attempt-sufficient,
+  given the retry-eligibility sequencing guarantee that no new attempt can
+  exist while the current one is unresolved; retention resolved to
+  indefinite-for-unresolved plus configurable-masking-for-resolved-terminal,
+  correcting an earlier unconditional retain-forever design that itself
+  over-corrected the original design's ungrounded 180-day-sweep claim;
+  security confirmed installing against the current four-role model (not
+  Session 3's proposed future two-role model) with an explicit SEC-2
+  re-key obligation; the AST-tooling-maturity contradiction and the
+  runtime/concurrency/crash-injection proof plan (now four
+  proof-environment layers, not three, explicitly decoupling genuine
+  process-death evidence from the specific question of Odoo.sh's own
+  process-control capability) both reclassified as non-blocking
+  implementation-sizing/proof work. The mutation-wrapper/API-client
+  runtime fail-closed guard (new — a GraphQL document containing a
+  mutation cannot be sent without a valid Layer 2 attempt context) and its
+  home file, `shopify_connector_api_client.py`, were added to the Stage 0
+  allowed-file list, previously an omission. All corrections were mirrored
+  into the design doc, the Stage 0 packet, and the locked (still-unissued)
+  Sol prompt for consistency.
+- **Items deferred:** the control room's own independent review and
+  acceptance act on this corrected DEC-036 package remains the next
+  required step — this session does not accept its own decision package.
+  Gate B (Task 013's own `compareQuantity`→`changeFromQuantity` and
+  operating-model corrections, out of this session's allowed-files list)
+  remains unstarted, per DEC-036 Part 0.5's carry-forward list. Three
+  tunable-constant ratifications remain open (sweep timeout, idempotency
+  safety margin, retention masking window) — non-blocking, Category II
+  items per DEC-036 §5.
+- **Learning feedback loop:**
+  - New issues discovered: none beyond what the control room's own two
+    review comments already identified — this session's role was applying
+    the ruling, not independently discovering new defects.
+  - Repeated issue patterns: a design correction can itself over-correct
+    (this session's own prior retain-forever retention design, and its
+    "resolution forces outcome" model, are both examples of a first
+    correction pass swinging too far in the opposite direction from the
+    original defect) — future correction sessions should explicitly check
+    whether a proposed fix reintroduces a *different* version of the
+    problem it's fixing, not just whether it removes the originally-flagged
+    symptom.
+  - Rules/checklists updated: none (docs-only; no `CLAUDE.md`/quality-loop
+    process change proposed by this session).
+  - New rejected approaches: Session 3's single six-value outcome enum and
+    Session 3's pre-emptive two-role-model ACL installation are both
+    explicitly rejected by the consolidated ruling — recorded in DEC-036
+    Part 0.5, not the rejected-approaches log (these are ruling
+    dispositions on externally-sourced recommendations, not this
+    project's own previously-attempted approaches).
+  - New technical debt: none new — the two out-of-scope stale-`compareQuantity`
+    documents remain the same flagged technical debt as the prior session.
+  - Architecture concerns: none remaining at the blocking level — see
+    DEC-036 §5/§6 for the complete, corrected accounting.
+  - Tests or review gates needed: the four-layer proof plan (DEC-036 D38)
+    and the `pg_stat_activity` open-transaction test (D22) remain new test
+    infrastructure to be built at implementation time, now correctly
+    scoped as merge-acceptance criteria rather than pre-implementation
+    blockers.
+  - Should future prompts change? No — the locked Sol prompt's existing
+    preflight clause (requiring a cited, dated control-room resolution for
+    every hard-stop item before writing code) already covers this
+    correction batch's outcome correctly; no further prompt change is
+    needed.
+- **Quality gate confirmation:** handoff updated (this entry) · feedback
+  loop checked (above) · learning captured in this entry · no new rejected
+  approach to log beyond the ruling-disposition note above · no new
+  technical debt logged · no repeated-issue escalation beyond the
+  informational note above.
+- **What ChatGPT should review:** DEC-036's overall ACCEPT / ACCEPT WITH
+  CORRECTIONS / REVISE / REJECT disposition now that every previously
+  BLOCKING item is resolved; whether the corrected package matches the
+  consolidated ruling's intent in every particular (this session applied
+  the ruling, but did not itself originate these architecture choices);
+  the three open tunable-constant ratifications; confirmation that Gate B
+  is correctly scoped as a Task-013-only prerequisite, not a Stage 0
+  blocker.
+- **Recommended next session:** the control room's own final Gate A
+  acceptance review of this corrected DEC-036 package — if accepted (or
+  accepted with corrections), the next session opens Gate B (correcting
+  the two out-of-scope `compareQuantity` documents) and, separately, the
+  Stage 0 implementation session using the locked prompt at
+  [`../06-prompts/sol-wave-3-stage-0-locked-prompt.md`](../06-prompts/sol-wave-3-stage-0-locked-prompt.md).
+- **Stop condition:** this session stops after applying the consolidated
+  correction batch and producing the 30-point final report. **No
+  implementation authorized. No `addons/**` file changed. No Odoo/Odoo.sh
+  run performed. No Shopify request or mutation performed. No Stage 0/Task
+  013 implementation. Locked Sol prompt not issued. Claude did not accept
+  its own decision package. PR #177 remains draft and unmerged. Wave 3
+  implementation remains unstarted.**
+
 ### Wave 3 Gate A — DEC-031 Layer 2 acceptance candidate + Stage 0 packet, session in progress — Claude control-room (2026-07-18)
 
 - **Branch / PR:** `claude/wave-3-gate-dec-031-layer2-q3vwfj`; draft PR

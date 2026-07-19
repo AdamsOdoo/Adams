@@ -1,22 +1,25 @@
 # DEC-036 — Wave 3 Gate A: DEC-031 Layer 2 Acceptance Candidate
 
-- **Status: PROPOSED FOR CONTROL-ROOM ACCEPTANCE — NOT YET ACCEPTED.**
-  Claude does not accept its own decision package (see this session's
-  governing task, §8). This record is a candidate for independent
+- **Status: CONTROL-ROOM ACCEPTANCE CANDIDATE — CORRECTIONS APPLIED, NOT YET
+  ACCEPTED.** Claude does not accept its own decision package (see this
+  session's governing task, §8). This record is a candidate for independent
   control-room review only.
-- **Package status: NOT FROZEN.** Per the control-room parallel-audit ruling
-  on PR #177 comment
-  [`5012854989`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5012854989)
-  point 8, this package explicitly remains open: an external, independently
-  tracked "Session C" code/architecture audit is stated by the control room
-  to still require reconciliation against this package before any freeze.
-  This session (Session A) cannot access Session C's content directly and
-  makes no claim to have reconciled with it — it contributes its **own**
-  independent, extremely thorough code/architecture audit (27-agent
-  workflow, full read of every named core model file, all 17 test files
-  surveyed, the complete Layer 1 and Layer 2 design documents read in full)
-  as this session's evidence base, clearly attributed as Session A's work,
-  not Session C's.
+- **Package status: CORRECTIONS APPLIED PER THE FINAL CONSOLIDATED
+  SESSIONS-2-AND-3 RULING.** Per the control-room's consolidated ruling on
+  PR #177 comment
+  [`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)
+  ("Sessions 2 + 3 reconciled; one correction batch authorized"), every
+  binding architecture decision in that ruling is applied in this revision.
+  **After this correction batch, no genuinely unresolved architecture
+  blocker remains preventing Stage 0 implementation from beginning once
+  DEC-036 itself is independently accepted** — see Part 0.5 and the revised
+  Part 5/Part 6 below. Remaining open items are either (a) implementation
+  proof/sizing work correctly classified as Stage 0 merge-acceptance
+  criteria, not pre-implementation blockers, or (b) Gate B prerequisites
+  scoped to Task 013, out of this session's allowed-files list. This
+  session (Session A) still does not accept its own decision package — the
+  control room's consolidated ruling supplies the binding architecture
+  choices; DEC-036's overall acceptance is a separate, still-pending act.
 - **Decision owner (candidate author, not acceptor):** Claude control room,
   under DEC-032 / `CLAUDE.md` §13, per the task's explicit "Claude must not
   accept its own decision package" rule (task §8).
@@ -76,6 +79,123 @@ independently, before the ruling was read,** identified the same
 underlying risk (see Part 2 item 4 and D21/D22 below) — the ruling and this
 session's own research converge, they do not merely defer to each other.
 
+A second, preliminary control-room review followed on PR #177 comment
+[`5013028262`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5013028262)
+("REVISION REQUIRED; package remains unfrozen"), identifying ten further
+mandatory corrections not fully captured by this session's own original
+BLOCKING-item list, and instructing that no further commits be made until
+an independent "Session 3" adversarial architecture audit was returned and
+the control room issued one consolidated correction instruction. That
+instruction arrived as PR #177 comment
+[`5014689445`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5014689445)
+("Sessions 2 + 3 reconciled; one correction batch authorized") and is
+applied throughout this revision — see Part 0.5 immediately below for the
+full reconciliation record and Part 3 for the corrected per-decision text.
+
+---
+
+## 0.5 Sessions 2 + 3 reconciliation and final consolidated ruling (2026-07-19)
+
+This section records, per the consolidated ruling's explicit requirement,
+how the two independent, externally-tracked audit workstreams this session
+could not itself perform were each dispositioned by the control room, and
+what changed in this document as a result. Neither audit is adopted
+wholesale; each finding was independently accepted, rejected, or carried
+forward, per the control room's own text.
+
+### Session 2 (official-source audit) reconciliation
+
+- **Accepted with a correction already recorded in Part 0 above:** Session
+  2's finding that `changeFromQuantity` is the correct current CAS field,
+  that `@idempotent` is mandatory with 24h retention, that `cr.commit()` is
+  cursor-wide (clean-cursor invariant needed), that THROTTLED's
+  non-execution guarantee is unestablished, and that batch partial-success
+  semantics are undocumented — all accepted and already incorporated (Part
+  0 table, points 1–7).
+- **Session 2's own conclusion that Odoo uses PostgreSQL default Read
+  Committed isolation was explicitly REJECTED** by the control room and
+  corrected: **Odoo 19 governs the design under PostgreSQL `REPEATABLE
+  READ`** (`odoo/sql_db.py`, `ISOLATION_LEVEL_REPEATABLE_READ`, set on
+  every cursor). This correction was independently re-verified by this
+  session against the primary source, not merely accepted from either the
+  ruling or Session 2's own (incorrect) claim — see the source-materials
+  refresh §5 and D21 below.
+
+### Session 3 (adversarial architecture audit) reconciliation
+
+- **Accepted as evidence and contradiction discovery.** Session 3's
+  contradiction inventory — the D5 fingerprint-safety gap, the D10/D11
+  three-layer-model violation, the D6 idempotency-defect mis-routing, the
+  D35 missing third `mutation_domain` option, the D32 retain-forever
+  over-reach, the D20 combined-decision problem, the D22/D37
+  non-architecture-blocker mis-framing, the D38 proof-environment
+  conflation, and the D28 timeout-race framing — is accepted and drives
+  every corrected decision in Part 3 below.
+- **Session 3's proposed single six-value outcome enum is REJECTED.** The
+  control room retains the strict two-layer separation: a closed 4-value
+  `observed_outcome` (`pending`/`succeeded`/`failed_clean`/`uncertain`,
+  immutable once left `pending`) plus an orthogonal, nullable
+  `resolution_disposition` (`applied`/`not_applied`). Collapsing these into
+  one six-value enum would re-introduce exactly the outcome/resolution
+  conflation D10 exists to prevent — see D10 below for the corrected
+  design.
+- **Session 3's proposal to install Stage 0 ACLs directly against the
+  future SEC-2 two-role model is REJECTED.** Stage 0 installs cleanly under
+  the **current, accepted four-role model** (Auditor/Operator/Reviewer/
+  Administrator) and carries an explicit SEC-2 migration follow-up
+  obligation instead — see D30/D31 below. Pre-emptively coding against a
+  not-yet-existing role model was already rejected once in D31's original
+  text for the same reason (the group does not exist in code yet); this
+  ruling extends that same reasoning to the ACL installation shape itself,
+  not merely to pre-emptive rows.
+
+### Binding architecture decisions now applied
+
+Every numbered point in the consolidated ruling (attempt granularity/
+batching; the orthogonal observed-outcome/resolution model; the two-hash
+fingerprint split; the idempotency fail-closed routing; the corrected core
+schema; the C1/C2/NET/C3 protocol with C2 as a side-cursor commit; the
+reconciliation contract; THROTTLED; disconnect/quiescence
+awareness-over-timeout-race; store identity/connection generation; the
+retention/lifecycle policy; the four-role security model; the wrapper/API
+enforcement guard; the four-layer proof-environment plan; the corrected
+Stage 0 allowed-file list; and the Gate B carry-forward list) is applied in
+the corresponding Part 3 decision entry below, and reflected in the Part 2
+status table, the revised Part 4/5 (no remaining architecture blocker), and
+Part 6 (status).
+
+One-pair-per-request removes multi-pair batching from Wave 3 MVP scope
+entirely (D4, unchanged in substance, restated precisely as "MVP Stage 1"
+per the ruling's own wording).
+
+### Gate B / Task 013 corrections carried forward
+
+Per the consolidated ruling, before Task 013 inventory implementation is
+authorized, a Gate B session (with Task 013's own packet and the inventory
+operating model in its allowed-files list — neither is in this session's
+allowed list) must:
+
+1. Replace all stale `compareQuantity`/`ignoreCompareQuantity` language
+   with `changeFromQuantity` (D12's factual correction, already applied
+   in-scope everywhere this session's allowed files reach; the two
+   out-of-scope documents named in §5 item 11 still need it).
+2. Explicitly supersede binding-owned idempotency with attempt-owned
+   idempotency (D6, already the binding design in this package — Gate B
+   propagates it into Task 013's own text).
+3. Adopt review-case-first handling for unexplained Shopify drift, rather
+   than automatic overwrite, as the final unexplained-drift posture.
+4. State one pair per mutation request for MVP (D4, already binding here
+   — Gate B propagates it into Task 013's own text).
+5. State that Task 013B does not use Layer 2, because it performs Shopify
+   reads plus guarded local Odoo writes, never a Shopify mutation (already
+   stated in the Stage 0 packet §2/closing note, out of DEC-036's own
+   scope to restate for Task 013B's own packet).
+6. Keep Task 013B as a separate Stage 2 packet, unchanged.
+
+These six items must be completed before Task 013 implementation
+authorization; none of them blocks Stage 0, which carries no
+inventory-domain code.
+
 ---
 
 ## 1. Numbering-scheme note
@@ -97,44 +217,44 @@ M splits into D9/D16).
 
 | # | Title | Status | Source items |
 |---|---|---|---|
-| D1 | Job-row durability fields | Candidate | 1, 18 |
-| D2 | `mutation.attempt` core schema | Candidate | 2 |
+| D1 | Job-row durability fields (`current_attempt_token` naming) | Candidate, corrected naming | 1, 18 |
+| D2 | `mutation.attempt` core schema | **RESOLVED** — `job_id` Many2one-restrict, `mutation_domain` Char, two fingerprints, `observed_outcome`/`resolution_*` fields, per consolidated ruling §5/§8 | 2 |
 | D3 | `store_id` denormalization + multi-company scope | Candidate, one sub-gap open | 3 |
-| D4 | Attempt granularity = one business pair; batching deferred | Candidate | K, L, 33 |
-| D5 | Request-fingerprint normalization | Candidate | 6 |
-| D6 | Idempotency-key lifecycle | Candidate, margin value non-binding | 7, N |
+| D4 | Attempt granularity = exactly one business pair per request; batching excluded from MVP | **RESOLVED** | K, L, 33 |
+| D5 | Two-hash fingerprint split (`business_intent_fingerprint` / `exact_request_fingerprint`) | **RESOLVED** — corrected per consolidated ruling §3 | 6 |
+| D6 | Idempotency-key lifecycle + fail-closed defect-code routing | **RESOLVED** — corrected per consolidated ruling §4 | 7, N |
 | D7 | `preconditions_snapshot` allowlist | Candidate | 8, 28 |
 | D8 | `remote_evidence_refs` structured JSON | Candidate | 9 |
 | D9 | Outcome taxonomy stays 4-value; THROTTLED→`uncertain` | Candidate | 9, M |
-| D10 | Three-layer state model (Job / Outcome / Resolution) | Candidate | 4, 5, A |
-| D11 | Administrator-only resolution-override action | Candidate, naming open | 5, 25, H |
+| D10 | Observed-outcome/resolution orthogonal model (immutable `observed_outcome`) | **RESOLVED** — corrected per consolidated ruling §2 | 4, 5, A |
+| D11 | Administrator-only resolution-override action | **RESOLVED**, naming ratified as `resolution_disposition`/`action_resolve_mutation_attempt` | 5, 25, H |
 | D12 | CAS field-name correction | **RESOLVED** (source conflict), applying it is a Candidate correction | cross-cutting |
 | D13 | Job-layer reconciliation-pending gate | Candidate | F, 23 |
-| D14 | Reconciliation-job linkage | Candidate | 10, E |
-| D15 | Reconciliation-strategy registry | Candidate, owning-model gap open | 11, O |
-| D16 | Domain-registration fail-closed runtime gate | Candidate | 12 |
-| D17 | Inconclusive-reconciliation cap (N=3) | Candidate, **BLOCKING sub-question** | 24 |
-| D18 | Store-identity-change detection | Candidate, residual gap disclosed | 22, G |
-| D19 | Transaction/commit-point protocol (C1/C2/NET/C3) | Candidate | 13 |
-| D20 | C2 cursor placement + `job_id` field type | **BLOCKED** | 14 |
-| D21 | Main-cursor write-isolation invariant | Candidate, needs new tests | C |
-| D22 | Lock-vs-open-transaction distinction | **BLOCKED** | D |
+| D14 | Reconciliation-job linkage (`mutation_attempt_id` Many2one-restrict, required) | **RESOLVED** — corrected per consolidated ruling §5/§8 | 10, E |
+| D15 | Reconciliation-strategy registry | Candidate, owning-model gap open (non-blocking — resolved by direct inspection at implementation time) | 11, O |
+| D16 | Domain-registration fail-closed runtime gate + mutation-wrapper/API-client enforcement | **RESOLVED** — extended per consolidated ruling §14 | 12 |
+| D17 | Inconclusive-reconciliation cap (N=3), per-attempt scope | **RESOLVED — not blocking** — per-uncertain-attempt scope is sufficient, per consolidated ruling §7 | 24 |
+| D18 | Store-identity + connection-generation snapshot and mismatch routing | **RESOLVED** — corrected per consolidated ruling §10 | 22, G |
+| D19 | Transaction/commit-point protocol (C1/C2/NET/C3) | **RESOLVED** | 13 |
+| D20 | C2 cursor placement (side cursor) | **RESOLVED — not blocking** — split from `job_id` field type (now D2), per consolidated ruling §6 | 14 |
+| D21 | Main-cursor write-isolation invariant | Candidate, needs new tests (runtime acceptance criterion, not a blocker) | C |
+| D22 | Open-transaction-spans-network-call discipline | **RESOLVED — not blocking** — implementation invariant + runtime acceptance criterion, per consolidated ruling §6/§9 | D |
 | D23 | Crash-window C2→NET recovery | Candidate | 15, B |
 | D24 | Crash-window NET→C3 recovery | Candidate, one orphaned question | 16 |
 | D25 | Claimability-gate widening for 40001/lock-timeout recovery | Candidate | 17 |
 | D26 | Stale-owner sweep mechanism | Candidate | 18 |
 | D27 | Sweep cadence & timeout constants | Candidate, values provisional | 19 |
-| D28 | Disconnect-quiescence interaction fix | **BLOCKING — control-room choice required** | 20 |
+| D28 | Disconnect-quiescence: awareness-based finalization (not a timeout race) | **RESOLVED — not blocking** — per consolidated ruling §9 | 20 |
 | D29 | Credential-rotation mid-attempt handling | Candidate | 21 |
-| D30 | ACL for `mutation.attempt` | Candidate | 26, H |
-| D31 | SEC-2 two-role-migration compatibility | Candidate, non-blocking-now | 27 |
-| D32 | Retention — retain forever, no deletion | Candidate | 29 |
+| D30 | ACL for `mutation.attempt` (current four-role model) + duplicate-risk bypass guard | **RESOLVED** — extended per consolidated ruling §12 | 26, H |
+| D31 | SEC-2 two-role-migration compatibility + explicit re-key follow-up | Candidate, non-blocking-now | 27 |
+| D32 | Retention — indefinite for unresolved, configurable pruning for resolved terminal | **RESOLVED** — corrected per consolidated ruling §11 | 29 |
 | D33 | Upgrade path | Candidate | 30 |
 | D34 | Uninstall behavior | Candidate | 31, J |
-| D35 | `mutation_domain` field ownership | **BLOCKING — control-room choice required** | I, O |
+| D35 | `mutation_domain` field ownership — registry-validated indexed Char | **RESOLVED — not blocking** — per consolidated ruling §5 | I, O |
 | D36 | Rollback procedure (two-phase) | Candidate | 32 |
-| D37 | Repo-wide AST/source guard | **BLOCKING — effort-sizing gap** | 34 |
-| D38 | Runtime/concurrency/crash-injection proof requirements | **BLOCKING** | 35 |
+| D37 | Repo-wide AST/source guard + mutation-wrapper transport guard | **RESOLVED — not blocking** — effort-sizing by direct inspection, per consolidated ruling §14 | 34 |
+| D38 | Runtime/concurrency/crash-injection proof requirements — four proof-environment layers | **RESOLVED — Stage 0 merge-acceptance criterion, not a pre-implementation blocker** — per consolidated ruling §15 | 35 |
 
 ---
 
@@ -157,60 +277,135 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Inference:** A durable, crash-surviving ownership signal requires new
   fields distinct from `started_at` (which must keep its existing,
   different meaning).
-- **Recommendation:** add four additive fields to `shopify.connector.job`.
-- **Accepted-candidate wording:** add `attempt_id` (Char, UUIDv4,
-  regenerated per attempt — the CAS/finalize token), `owner_worker_ref`
-  (Char, diagnostic, mirrors `call.lease.worker_ref` vocabulary),
-  `transport_attempted` (Boolean, default False, committed before any
-  network send), and `running_since` (Datetime, set once per claim at C1,
-  **never aliased to `started_at`**). All four join `PROTECTED_JOB_FIELDS`,
-  writable only via `env.su`.
+- **Recommendation:** add three core additive fields to
+  `shopify.connector.job` (plus D13's/D14's own separate gating/linkage
+  fields).
+- **Accepted-candidate wording:** add `current_attempt_token` (Char,
+  UUIDv4, regenerated per attempt — the CAS/finalize token; **corrected
+  naming, 2026-07-19, per the consolidated ruling §5/§8** — previously
+  drafted as `attempt_id`, renamed to avoid colliding with
+  `mutation.attempt`'s own per-row `attempt_token` field and to read
+  correctly as "the token of the attempt this job currently owns"),
+  `owner_worker_ref` (Char, diagnostic, mirrors `call.lease.worker_ref`
+  vocabulary), `transport_attempted` (Boolean, default False, committed
+  before any network send — **this field lives on the attempt row only,
+  per D2; it is not duplicated here**, correcting this entry's own earlier
+  drafting, which listed it on both), and `running_since` (Datetime, set
+  once per claim at C1, **never aliased to `started_at`**). All fields join
+  `PROTECTED_JOB_FIELDS`, writable only via `env.su`. `mutation_attempt_id`
+  (D14) is a fifth, reconciliation-job-side field, listed separately there.
 - **Alternatives considered:** reuse `started_at` as the staleness clock
   (rejected — proven not-reset-on-retry, already load-bearing for the
   24h retry-window clock; aliasing would make every retried job appear
   instantly stale to the sweep).
-- **Risk:** four new protected fields widen the sudo-write surface; must be
+- **Risk:** new protected fields widen the sudo-write surface; must be
   covered by the existing AST guard pattern that already inventories sudo
   sites.
 - **Rollback:** additive fields, droppable pre-ship; see D33/D36.
 - **Exact implementation impact:** `shopify_connector_job.py` field list +
   `PROTECTED_JOB_FIELDS` + `write()` guard; one migration-free upgrade
   (D33).
-- **Exact tests:** unit test asserting all four fields reject non-`su`
+- **Exact tests:** unit test asserting all three fields reject non-`su`
   writes from every role; unit test asserting `running_since` is set once
   per claim and not mutated by `started_at`'s own logic.
 - **Unresolved question:** None.
 
 ### D2 — `mutation.attempt` core schema
-*(Item 2)*
+*(Item 2 — RESOLVED 2026-07-19 per the consolidated Sessions-2-and-3 ruling
+§5/§8, superseding this entry's original drafting)*
 
 - **Fact:** No mutation-attempt model exists today. Odoo 19's
   `_sql_constraints` is confirmed silently inert (logs a warning, enforces
   nothing); `models.UniqueIndex` is the current mechanism.
 - **Inference:** A dedicated model is required for per-attempt forensics
   beyond what job-row fields alone can carry (real mutation audit trail).
-- **Recommendation:** new model `shopify.connector.mutation.attempt`.
-- **Accepted-candidate wording:** fields — `job_id` (type: see D20, **BLOCKED**),
-  `attempt_id` (Char UUID, required), `mutation_domain` (Selection,
-  ownership: see D35, **BLOCKING**), `remote_mutation_intent` (Char/JSON,
-  identifiers only), `preconditions_snapshot` (JSON, allowlisted — D7),
-  `request_fingerprint` (Char SHA-256 — D5), `shopify_idempotency_key`
-  (Char UUID, nullable — D6), `transport_attempted` (Boolean), `outcome`
-  (Selection, 4 values — D9/D10), `remote_evidence_refs` (JSON — D8),
-  `created_at`/`transport_at`/`resolved_at` (Datetime). Uniqueness on
-  `(job_id, attempt_id)` via `models.UniqueIndex`.
+  The two previously-BLOCKED sub-questions this entry deferred to D20
+  (`job_id` field type, `mutation_domain` ownership/type) are resolved by
+  the consolidated ruling directly, not by this session's own inference —
+  recorded here as binding, not re-derived.
+- **Recommendation:** new model `shopify.connector.mutation.attempt`, exact
+  field list below.
+- **Accepted-candidate wording — RESOLVED:**
+  - `job_id`: `Many2one('shopify.connector.job', required=True, index=True,
+    ondelete='restrict')`. **Resolved, not Integer** — the
+    `call_lease.job_id`-style lock-contention concern that motivated the
+    non-FK alternative does not apply here: writes to `mutation.attempt`
+    come from the single worker that already holds the owning job's claim
+    lock (C2/C3), the same sequential-single-writer pattern that already
+    makes `job_log.job_id`'s FK+`ondelete='restrict'` safe today.
+  - `attempt_token` (Char UUID, required) — the per-row attempt identity,
+    unique per job/attempt; matches the job's `current_attempt_token` (D1)
+    for the currently-owned attempt.
+  - `mutation_domain` (Char, required, indexed) — **resolved, not a
+    Selection of either kind.** Validated fail-closed against the
+    reconciliation/mutation registry (D15/D16); an unregistered value is
+    rejected, never silently accepted. See D35 for the full reasoning —
+    this is D35's third option, now the accepted one.
+  - `store_id` (Many2one, `related`, stored, indexed, readonly) — D3;
+    "derived/stored where supported by the actual job schema" per the
+    ruling; verify the exact `job` field name before implementing (D3's own
+    disclosed gap).
+  - `expected_connection_generation` (Integer, snapshotted at C2) — D18/D29.
+  - `expected_store_identity` (Char, `myshopifyDomain` snapshotted at C2) —
+    D18, new field this correction adds (previously only compared at
+    reconciliation time against the live store record; now also
+    snapshotted on the attempt itself for forensic completeness).
+  - `remote_mutation_intent` (Char/JSON, identifiers only) — D7 allowlist.
+  - `preconditions_snapshot` (JSON, allowlisted) — D7.
+  - `business_intent_fingerprint` (Char SHA-256) — D5, new split field.
+  - `exact_request_fingerprint` (Char SHA-256) — D5, new split field,
+    **includes** `changeFromQuantity` and the idempotency key/directive.
+  - `shopify_idempotency_key` (Char UUID, nullable) — D6.
+  - `idempotency_valid_until` (Datetime, nullable) — D6, the locally-derived
+    boundary (Shopify's 24h window minus the configurable safety margin),
+    replacing this entry's earlier unnamed "local staleness window"
+    framing with an explicit, queryable field.
+  - `transport_attempted` (Boolean, default False) — **lives here only**,
+    not duplicated on `job` (corrects D1's earlier drafting).
+  - `observed_outcome` (Selection, 4 values, machine-observed only,
+    immutable once left `pending`) — **renamed from `outcome`**, D9/D10.
+  - `resolution_disposition` (Selection, 2 values, nullable:
+    `applied`/`not_applied`) — D10/D11.
+  - `resolution_source` (Selection, 2 values, nullable:
+    `reconciliation_read`/`manual_admin`) — **new field this correction
+    adds**, D10/D11.
+  - `resolution_reason` (Text, mandatory when `resolution_disposition` set)
+    — D11.
+  - `resolution_uid` (Many2one `res.users`) — D11.
+  - `resolution_at` (Datetime) — D11.
+  - `inconclusive_reconciliation_count` (Integer, default 0) — D17,
+    per-attempt scope, resolved sufficient (D17 below).
+  - `remote_evidence_refs` (JSON) — D8.
+  - `created_at`/`transport_at`/`resolved_at` (Datetime) — commit-point
+    timestamps.
+
+  Uniqueness on `(job_id, attempt_token)` via `models.UniqueIndex` (never
+  `_sql_constraints`, confirmed silently inert). `transport_attempted` is
+  never duplicated independently on both `job` and `mutation.attempt`, per
+  the ruling's explicit instruction.
 - **Alternatives considered:** fields-on-job only, no dedicated model
   (rejected — insufficient for per-attempt forensics once multiple attempts
-  per job exist across retries; weaker audit shape).
+  per job exist across retries; weaker audit shape). For `job_id`: plain
+  Integer mirroring `call_lease.job_id` (rejected — that field's
+  concurrent, multi-worker admission-check access pattern does not apply
+  to a single-owner-writes-sequentially model). For `mutation_domain`: both
+  a core-fixed Selection and a domain-`selection_add` Selection (both
+  rejected — see D35).
 - **Risk:** new model = new ACL surface (D30) and new join cost on every
-  reconciliation read.
+  reconciliation read. `ondelete='restrict'` on `job_id` means a job row
+  can never be deleted while any attempt references it — acceptable, since
+  neither model is ever deleted under D32's retention policy.
 - **Rollback:** pre-ship, drop model cleanly (D36 phase 1); post-ship,
   retained as evidence (D32/D36 phase 2).
 - **Exact implementation impact:** new Python model file, new ACL rows
   (D30), new migration-free upgrade entry (D33).
-- **Exact tests:** `(job_id, attempt_id)` uniqueness enforcement test
-  (concurrent insert attempt); field-type/selection validation tests.
-- **Unresolved question:** `job_id`'s field type is **BLOCKED** — see D20.
+- **Exact tests:** `(job_id, attempt_token)` uniqueness enforcement test
+  (concurrent insert attempt); field-type/registry-validation tests
+  (`mutation_domain` fail-closed on an unregistered value); a test
+  asserting `transport_attempted` exists on `mutation.attempt` only, not on
+  `job`.
+- **Unresolved question:** None — both sub-questions this entry previously
+  deferred to D20 are resolved above.
 
 ### D3 — `store_id` denormalization + multi-company scope
 *(Item 3)*
@@ -240,7 +435,11 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   Stage 0 implementation, not assumed.
 
 ### D4 — Attempt granularity = one business pair; batching deferred
-*(Items K, L, 33 — directly implements ruling point 5)*
+*(Items K, L, 33 — directly implements ruling point 5; restated as binding
+by the consolidated Sessions-2-and-3 ruling §1, 2026-07-19: "MVP Stage 1
+uses exactly one Shopify mutation request per (inventory_item, location)
+business pair; one mutation job maps to one mutation-attempt row;
+multi-pair batching is excluded from Wave 3 MVP")*
 
 - **Fact:** `InventorySetQuantitiesInput.quantities` is a list — Shopify's
   own schema supports multi-entry batched requests; the CAS field
@@ -290,34 +489,73 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   open, non-blocking for Stage 0/1 (batching is simply excluded), blocking
   only for a *future* batching proposal.
 
-### D5 — Request-fingerprint normalization
-*(Item 6)*
+### D5 — Two-hash fingerprint split: `business_intent_fingerprint` /
+`exact_request_fingerprint`
+*(Item 6 — CORRECTED 2026-07-19 per the control-room preliminary review,
+PR #177 comment 5013028262 point 1, and bound by the consolidated
+Sessions-2-and-3 ruling §3. This entry's original single-fingerprint design
+was unsafe as written and is fully superseded below, not merely amended.)*
 
-- **Fact:** No fingerprinting mechanism exists today.
-- **Inference:** A forensic identical-request detector is useful but must
-  not double as the primary dedup mechanism (that role belongs to
-  `operation_scope_key`, unchanged).
-- **Recommendation:** SHA-256 over a canonical form.
-- **Accepted-candidate wording:** `request_fingerprint` = SHA-256 over a
-  canonical JSON serialization of `{mutation_name, sorted variable
-  keys/values}`, with the GraphQL document normalized to parsed/re-serialized
-  AST form (not raw string). `changeFromQuantity` is explicitly **excluded**
-  from the hashed variables (it is a volatile fresh-read CAS value, not a
-  business-intent parameter — including it would make every attempt
-  fingerprint-unique by construction, defeating the field's purpose).
-- **Alternatives considered:** hash the raw request string (rejected —
-  whitespace/key-order noise defeats identical-request detection).
-- **Risk:** low — forensic-only field, not safety-load-bearing.
-- **Rollback:** field inert, droppable.
-- **Exact implementation impact:** one normalization helper function, unit
-  tested for stability across key order.
-- **Exact tests:** fingerprint stability test (same logical request, two
-  different key orders → same hash); fingerprint difference test
-  (`changeFromQuantity` changes alone → same hash, since it's excluded).
+- **Fact:** No fingerprinting mechanism exists today. `changeFromQuantity`
+  is a value this connector actually transmits as a GraphQL variable on
+  every `inventorySetQuantities` call (source-materials refresh §1) — it is
+  part of "the exact normalized GraphQL operation and exact variables
+  transmitted," not a value external to the request.
+- **Inference:** **this entry's original design was unsafe.** Excluding
+  `changeFromQuantity` from the *only* fingerprint field, as originally
+  drafted, meant that field could never be used for forensic replay proof
+  or exact-parameter-match verification — a fingerprint that omits a
+  transmitted request parameter cannot prove what was actually sent, and
+  reusing an idempotency key keyed off such a fingerprint risks masking a
+  genuine parameter change. Two genuinely different needs were conflated
+  into one field: (a) detecting *stable business intent* across retries
+  (which legitimately should not vary with the fresh CAS read), and (b)
+  proving *exactly what was transmitted* for forensic/idempotency purposes
+  (which must include every transmitted variable, CAS value included).
+- **Recommendation:** two distinct SHA-256 hashes, one per need, never
+  merged back into one field.
+- **Accepted-candidate wording:**
+  - `business_intent_fingerprint` = SHA-256 over the stable business intent
+    only: `{mutation_domain, inventory_item_id, location_id,
+    target_quantity}` for the inventory domain (and the domain's own
+    declared equivalent for any future domain) — explicitly **excludes**
+    transport and idempotency mechanics (`changeFromQuantity`, the
+    idempotency key/directive, any timestamp). Purpose: detect that two
+    attempts share the same underlying business goal, for audit/dedup
+    reasoning that must not vary with a fresh CAS read.
+  - `exact_request_fingerprint` = SHA-256 over the exact normalized
+    GraphQL operation document (parsed/re-serialized AST form, not raw
+    string) and the exact variables actually transmitted, **including**
+    `changeFromQuantity` and the idempotency key/directive. This is the
+    field Shopify-parameter-matching and forensic replay proof rely on —
+    **never** the business-intent fingerprint. Never reuse an idempotency
+    key based on a hash that omits a transmitted request parameter.
+- **Alternatives considered:** one merged fingerprint excluding
+  `changeFromQuantity` (this entry's original design — **rejected**, unsafe
+  per the Inference above); hash the raw request string for either field
+  (rejected — whitespace/key-order noise defeats identical-request
+  detection).
+- **Risk:** low for `business_intent_fingerprint` (forensic-only, not
+  safety-load-bearing); `exact_request_fingerprint` is safety-relevant for
+  idempotency-key reuse decisions (D6) but is deterministic per attempt, so
+  correctly implemented it carries no new risk beyond the hashing itself.
+- **Rollback:** both fields inert, droppable.
+- **Exact implementation impact:** two normalization helper functions
+  (business-intent scope narrower than exact-request scope), unit tested
+  for stability across key order.
+- **Exact tests:** stability test per fingerprint (same logical request,
+  different key orders → same hash); a test asserting
+  `exact_request_fingerprint` **changes** when `changeFromQuantity` changes
+  (proving it is not excluded); a test asserting
+  `business_intent_fingerprint` does **not** change when only
+  `changeFromQuantity`/the idempotency key change (proving business intent
+  is stable across a fresh CAS read).
 - **Unresolved question:** None.
 
-### D6 — Idempotency-key lifecycle
-*(Items 7, N)*
+### D6 — Idempotency-key lifecycle + fail-closed defect-code routing
+*(Items 7, N — CORRECTED 2026-07-19 per the control-room preliminary
+review, PR #177 comment 5013028262 point 3, and bound by the consolidated
+Sessions-2-and-3 ruling §4)*
 
 - **Fact:** `@idempotent` is mandatory for `inventorySetQuantities`/
   `inventoryActivate` from API 2026-04; 24-hour retention (source-materials
@@ -326,40 +564,68 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   absent from the current design's outcome taxonomy.
 - **Inference:** the key must be persisted before use (survives crash),
   reused verbatim only within a provably-safe local window, and never
-  reused past staleness.
-- **Recommendation:** `uuid.uuid4().hex`, persisted at C2, local staleness
-  window with a safety margin below Shopify's 24h.
+  reused past staleness. `IDEMPOTENCY_KEY_PARAMETER_MISMATCH`/
+  `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` are **tracking/invariant defect
+  signals**, not ordinary transient failures — this entry's original
+  routing to `failed_clean`'s normal DEC-009 auto-retry class was wrong:
+  auto-retrying a state that indicates the connector's own key/attempt
+  bookkeeping is already broken risks compounding the defect rather than
+  surfacing it.
+- **Recommendation:** `uuid.uuid4().hex`, persisted at C2, request-level and
+  attempt-owned (never binding-owned), local staleness window with a
+  configurable safety margin below Shopify's 24h; fail-closed routing for
+  the two defect-signal codes.
 - **Accepted-candidate wording:** `shopify_idempotency_key` validated
   well-formed before interpolation into `@idempotent(key:"...")`, persisted
-  at C2. Reused verbatim on retry of the *same* attempt within the local
-  staleness window (clock = `mutation_attempt.transport_at`, **not**
-  `created_at`); a fresh attempt (new CAS cycle) gets a fresh key and a
-  fresh attempt row. `IDEMPOTENCY_CONCURRENT_REQUEST` → `outcome='uncertain'`;
-  `IDEMPOTENCY_KEY_PARAMETER_MISMATCH`/`IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED`
-  → `outcome='failed_clean'` with the code recorded and logged at elevated
-  severity (tracking-defect signal — these codes should never occur under
-  correct key management). A mandatorily-`@idempotent` mutation's automatic
-  retry (including a THROTTLED-driven retry) **must** carry the prior key
-  forward verbatim within-window; past-window retries route through
-  reconciliation first, never a blind fresh-key resend.
+  at C2. The key is **request-level and attempt-owned** — never
+  binding-owned after Layer 2 adoption; a fresh attempt (new CAS cycle)
+  always gets a fresh key and a fresh attempt row. Reused verbatim only for
+  an **identical exact request** (same `exact_request_fingerprint`, D5) on
+  retry of the *same* attempt, within `idempotency_valid_until`
+  (Datetime field on `mutation.attempt`, D2 — Shopify's confirmed 24h
+  window minus a **configurable** local safety margin; the margin is an
+  **implementation choice, not a Shopify fact**, and must be documented as
+  such, not hardcoded silently). Past `idempotency_valid_until`:
+  reconciliation runs first, **never** a blind fresh-key resend.
+  Classification: `IDEMPOTENCY_CONCURRENT_REQUEST` →
+  `observed_outcome='uncertain'` (unchanged from this entry's original
+  design). `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` and
+  `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → **corrected**: both route to a
+  new terminal classification, `idempotency_contract_violation`
+  (recorded in `remote_evidence_refs`, D8), which sets the job to
+  `blocked_manual_review` with a dedicated subreason and is **never
+  auto-retried** — these codes should never occur under correct key
+  management, and treating them as ordinary `failed_clean` would silently
+  mask a real defect behind DEC-009's normal bounded-retry class.
 - **Alternatives considered:** always mint a fresh key per HTTP-level retry
-  (rejected — defeats the purpose of `@idempotent`, which exists precisely
-  to make retries safe under the *same* key).
+  (rejected — defeats the purpose of `@idempotent`). Routing the two defect
+  codes through ordinary `failed_clean` auto-retry (this entry's original
+  design — **rejected**, per the control-room correction above: a defect
+  signal must surface for manual review, not be silently retried).
 - **Risk:** a wrongly-sized local margin could either reuse a key Shopify
   has already expired (loses idempotency protection silently) or discard a
-  still-valid key too early (unnecessary reconciliation reads).
-- **Rollback:** field inert, droppable pre-ship.
+  still-valid key too early (unnecessary reconciliation reads) — this risk
+  is unchanged by this correction and remains explicitly control-room-owned
+  (see Unresolved question).
+- **Rollback:** fields inert, droppable pre-ship.
 - **Exact implementation impact:** key-generation/validation helper;
-  key-carry-forward flag `idempotency_key_carried_forward` (Boolean) on the
-  attempt or job retry path.
-- **Exact tests:** key reuse within window; key non-reuse past window
-  (routes to reconciliation, not fresh resend); all three idempotency
-  error codes correctly classified.
-- **Unresolved question:** **the 23-hour local safety margin proposed here
-  is this session's own Recommendation/inference, with zero source support
-  for the specific number** — needs explicit control-room ratification and,
-  ideally, empirical Shopify round-trip-latency validation before Stage 0
-  ships with a hardcoded value.
+  `idempotency_valid_until` computed and persisted at C2;
+  `idempotency_contract_violation` added to the manual-review-subreason
+  vocabulary (Part 4 item 8's consolidated list).
+- **Exact tests:** key reuse within window (same `exact_request_fingerprint`
+  only); key non-reuse past `idempotency_valid_until` (routes to
+  reconciliation, not fresh resend); `IDEMPOTENCY_CONCURRENT_REQUEST` →
+  `uncertain`; both `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` and
+  `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → `blocked_manual_review` with
+  `idempotency_contract_violation`, asserting no automatic retry occurs.
+- **Unresolved question:** the exact numeric safety-margin value (this
+  session's original recommendation was 23h) remains this session's own
+  Recommendation/inference, with zero source support for the specific
+  number — needs explicit control-room ratification and, ideally,
+  empirical Shopify round-trip-latency validation before Stage 0 ships
+  with a hardcoded default. This is a **tunable-constant question, not an
+  architecture blocker** — the mechanism (configurable margin,
+  `idempotency_valid_until` field) is fully resolved above.
 
 ### D7 — `preconditions_snapshot` allowlist
 *(Items 8, 28)*
@@ -438,12 +704,19 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   question, and practically unsafe if the inference is wrong.
 - **Recommendation:** reclassify `THROTTLED` to `uncertain` for every
   mutation domain.
-- **Accepted-candidate wording:** `outcome` remains the closed 4-value
-  Selection `pending`/`succeeded`/`failed_clean`/`uncertain`. `THROTTLED`
+- **Accepted-candidate wording:** `observed_outcome` (**renamed from
+  `outcome`, D10 — see below**) remains the closed 4-value Selection
+  `pending`/`succeeded`/`failed_clean`/`uncertain`. `THROTTLED`
   (HTTP 429 or GraphQL-body error) is reclassified from `failed_clean` to
   **`uncertain`**, routed through reconciliation like any other ambiguous
   outcome, for every `mutation_domain`, pending an explicit Shopify
-  non-execution guarantee (none found as of 2026-07-18).
+  non-execution guarantee (none found as of 2026-07-18). **Re-affirmed by
+  the consolidated Sessions-2-and-3 ruling §8:** mutation-side THROTTLED
+  remains `uncertain` and reconciliation-first until Shopify provides a
+  binding non-execution guarantee; the "recommended backoff time is one
+  second" language must never be cited as an established fact without a
+  precise official source — it remains a stated recommendation, not a
+  documented contractual minimum.
 - **Alternatives considered:** keep `failed_clean` (rejected — the ruling
   and this session's independent research agree no such guarantee exists;
   treating an unproven claim as fact risks a real duplicate-mutation
@@ -466,8 +739,16 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   the underlying fact is not resolved (source-materials refresh Part 7
   item 8 equivalent).
 
-### D10 — Three-layer state model (Job / Outcome / Resolution)
-*(Items 4, 5, A)*
+### D10 — Observed-outcome/resolution orthogonal model (immutable
+`observed_outcome`)
+*(Items 4, 5, A — CORRECTED 2026-07-19. The control-room preliminary
+review, PR #177 comment 5013028262 point 2, found this entry's original
+"Layer R forces Layer O" design **contradicted the three-layer model this
+same entry itself introduced** — a human/machine resolution must never
+rewrite a machine-observed outcome. The consolidated Sessions-2-and-3
+ruling §2 makes the corrected design below binding, and explicitly rejects
+Session 3's alternative proposal of one merged six-value enum — see Part
+0.5.)*
 
 - **Fact:** The current design doc uses `pending`/`succeeded`/`failed_clean`/
   `uncertain` in its outcome taxonomy (§5.1) but separately describes an
@@ -475,93 +756,162 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   (§6) — two vocabularies for what reads like the same concept, never
   reconciled in the source document.
 - **Inference:** these are not the same concept — one is a machine-observed
-  outcome, the other is a human judgment recorded only when the machine
-  path is exhausted. Conflating them into one flat enum is the actual
-  defect, not either vocabulary individually.
-- **Recommendation:** a strict three-layer hierarchy, the natural extension
-  of a pattern this codebase already uses (`state` + orthogonal qualifier,
-  e.g. `manual_review_subreason`).
-- **Accepted-candidate wording:** **Layer J (Job)** —
-  `shopify.connector.job.state`: unchanged 10-value machine, zero new
-  states/transitions. **Layer O (Outcome)** —
-  `mutation.attempt.outcome`: closed 4-value Selection (D9), machine-observed
-  only; the *only* field any retry-eligibility logic may read. **Layer R
-  (Resolution)** — `mutation.attempt.resolution_disposition`: new, separate,
-  nullable 2-value Selection (`applied`/`not_applied`), human-asserted only
-  via D11's override. Setting it atomically forces `outcome` to
-  `succeeded`/`failed_clean` via the same shared helper the reconciliation-read
-  path uses. `resolved_applied`/`resolved_not_applied` as free-floating
-  string values are retired — they exist only as `resolution_disposition`'s
-  two values. Full transition table: Part 5 below.
+  outcome, the other is a human or reconciliation-derived judgment recorded
+  only when the machine path is exhausted. Conflating them into one flat
+  enum is the actual defect, not either vocabulary individually. **This
+  entry's own first-drafted correction repeated a milder version of the
+  same defect**: having a resolution action "atomically force `outcome` to
+  `succeeded`/`failed_clean`" still lets a human/machine judgment overwrite
+  the machine-observed record, destroying the historical fact of what was
+  actually observed. The two must instead stay genuinely orthogonal, with a
+  third, derived concept (effective disposition) computed from both without
+  mutating either.
+- **Recommendation:** two orthogonal fields plus a shared, side-effect-free
+  derivation helper — not a hierarchy where one layer overwrites another.
+- **Accepted-candidate wording — RESOLVED:**
+  - **Layer J (Job)** — `shopify.connector.job.state`: unchanged 10-value
+    machine, zero new states/transitions.
+  - **`observed_outcome`** (renamed from `outcome`) —
+    `mutation.attempt.observed_outcome`: closed 4-value Selection
+    (`pending`/`succeeded`/`failed_clean`/`uncertain`, D9), **machine-observed
+    only**. **Immutable once it leaves `pending`** — no code path, including
+    D11's override action and the reconciliation-read path, may ever write
+    to this field again after its first non-`pending` value is committed. It
+    remains the *only* field recording what transport evidence actually
+    showed.
+  - **`resolution_disposition`** — `mutation.attempt.resolution_disposition`:
+    new, separate, nullable 2-value Selection (`applied`/`not_applied`),
+    set only by (a) a reconciliation-read verdict or (b) D11's Admin-only
+    override — **never** by direct assignment elsewhere. Paired with two new
+    fields: `resolution_source` (nullable, `reconciliation_read` /
+    `manual_admin`) and the existing `resolution_reason`/`resolution_uid`/
+    `resolution_at`.
+  - **Shared effective-disposition helper** (new, replaces the old
+    "atomically force outcome" mechanism): a pure function of both fields,
+    computing the disposition any job-consequence logic must read —
+    - `observed_outcome == 'succeeded'` → **applied**
+    - `observed_outcome == 'failed_clean'` → **not_applied**
+    - `observed_outcome == 'uncertain'` and `resolution_disposition ==
+      'applied'` → **applied**
+    - `observed_outcome == 'uncertain'` and `resolution_disposition ==
+      'not_applied'` → **not_applied**
+    - `observed_outcome == 'uncertain'` and `resolution_disposition` is
+      null → **unresolved**
+    Job consequences: effective **applied** → the original mutation job
+    completes without resend; effective **not_applied** → the original job
+    becomes retry-eligible, and a **new** attempt is created only on its
+    next dispatch (never by mutating the resolved attempt row); effective
+    **unresolved** → reconciliation or manual review only, no other path.
+    `resolved_applied`/`resolved_not_applied` as free-floating string
+    values are retired — they exist only as `resolution_disposition`'s two
+    values, read exclusively through the helper above, never directly.
+  - Manual resolution (D11) requires Administrator, a mandatory reason,
+    full actor/time audit, and **never** performs a Shopify mutation itself
+    — it only ever sets `resolution_disposition`/`resolution_source=
+    'manual_admin'`/`resolution_reason`/`resolution_uid`/`resolution_at`.
+  Full transition table: Part 5 below (updated to reflect the immutable
+  `observed_outcome`, not the retired force-overwrite mechanism).
 - **Alternatives considered:** one flat enum spanning both machine and
-  human states (rejected — this is exactly the original design's own
-  internal inconsistency; conflating "what happened" with "what a human
-  decided happened" is the root defect).
-- **Risk:** three-layer models are more complex to reason about than one
-  flat enum — mitigated by the fact this codebase already uses the
-  `state`+qualifier pattern elsewhere (`manual_review_subreason`), so this
-  is consistent, not novel.
+  human states (rejected — the original design's own internal
+  inconsistency). This entry's own first-drafted "resolution forces
+  outcome" correction (rejected on preliminary review — still a form of
+  overwrite). Session 3's proposed single six-value outcome enum spanning
+  both machine and human/reconciliation dispositions (rejected by the
+  consolidated ruling §2 — would re-introduce exactly the same conflation
+  this decision exists to prevent, just with more values).
+- **Risk:** an orthogonal two-field model is more complex to query than one
+  flat enum — mitigated by the shared effective-disposition helper being
+  the single, mandatory read path for any consequence logic, so no call
+  site needs to reason about the two fields directly.
 - **Rollback:** additive fields, droppable pre-ship; post-ship, retained
   per D32.
-- **Exact implementation impact:** new `resolution_disposition`/
-  `resolution_reason`/`resolution_uid`/`resolution_at` fields; a shared
-  helper method used by both the reconciliation-read path and D11's
-  override action.
-- **Exact tests:** full state-machine unit test covering all 11 transition
-  steps in Part 5; test asserting no code path reads `resolution_disposition`
-  for retry-eligibility (only `outcome` may be read for that purpose).
-- **Unresolved question:** the canonical field/action **names**
-  (`resolution_disposition` vs. `resolution` vs. others) were proposed
-  differently across this session's own review clusters — see Part 3 item 2
-  — not a substantive gap, but the control room should ratify the name
-  deliberately.
+- **Exact implementation impact:** `observed_outcome`/`resolution_disposition`/
+  `resolution_source`/`resolution_reason`/`resolution_uid`/`resolution_at`
+  fields; one new shared, pure (no side effects) effective-disposition
+  helper method used by every consequence-reading call site (retry
+  eligibility, job completion, reporting).
+- **Exact tests:** full state-machine unit test covering all transition
+  steps in Part 5; a test asserting `observed_outcome` is rejected as
+  read-only/immutable by any write attempt after it first leaves `pending`
+  (including from D11's override action); a test asserting the
+  effective-disposition helper is the *only* code path any
+  retry-eligibility or job-completion logic reads (`observed_outcome`/
+  `resolution_disposition` are never read directly for that purpose); a
+  test covering all five helper branches above.
+- **Unresolved question:** None — the canonical names
+  (`resolution_disposition`/`resolution_source`/`action_resolve_mutation_attempt`)
+  are ratified by the consolidated ruling itself, closing the naming
+  question this entry previously carried open.
 
 ### D11 — Administrator-only resolution-override action
-*(Items 5, 25, H.3)*
+*(Items 5, 25, H.3 — CORRECTED 2026-07-19: field names updated to match
+D10's immutable-`observed_outcome` model, and the overlap this entry left
+open against the two pre-existing `blocked_manual_review→queued` actions is
+now closed per the consolidated Sessions-2-and-3 ruling §12.)*
 
 - **Fact:** `action_manual_retry` (job_actions.py) and
   `action_resolve_manual_review` (job.py) already exist, both
   Reviewer/Admin-gated, both reaching `blocked_manual_review→queued`,
   neither requiring a mandatory reason.
 - **Inference:** D11 adds a **third** mechanism reaching a related job-state
-  transition, which was never checked against the two pre-existing ones for
-  overlap (Part 3 item 9).
+  transition. Left unreconciled, either pre-existing action could be used
+  as a bypass around this action's stricter Admin-only/mandatory-reason
+  gate for a duplicate-risk, mutation-attempt-linked job — the exact
+  higher-stakes case this action's stricter gate exists for.
 - **Recommendation:** a single sanctioned action, deliberately stricter
-  than the two existing mechanisms.
+  than the two existing mechanisms, **and** an explicit guard closing the
+  bypass the two existing mechanisms would otherwise leave open.
 - **Accepted-candidate wording:** `action_resolve_mutation_attempt`,
   restricted to `group_shopify_connector_admin` only, **no Reviewer
   bypass** (matching `action_mask_customer_pii`'s precedent, not
   `action_manual_retry`'s — justified because a wrong call causes silent,
   permanent Odoo/Shopify divergence with no automatic re-check, a
-  materially higher-stakes error class). Gated on `outcome=='uncertain'`
-  and the job being `blocked_manual_review`/`manual_review_subreason='duplicate_risk'`;
+  materially higher-stakes error class). Gated on
+  `observed_outcome=='uncertain'` and the job being
+  `blocked_manual_review`/`manual_review_subreason='duplicate_risk'`;
   requires a mandatory, redaction-passed reason (`UserError` otherwise).
-  One narrow `sudo()` write sets `resolution_disposition`/`resolution_reason`/
-  `resolution_uid`/`resolution_at` **and** the corresponding `outcome`,
-  paired atomically with the job's existing sanctioned
-  `blocked_manual_review→queued` transition and exactly one `job.log` row
-  (`event_type='manual_action'`). The override never edits remote Shopify
-  state — any correction is a new, ordinary, fully-wrapped mutation job.
+  One narrow `sudo()` write sets `resolution_disposition`/
+  `resolution_source='manual_admin'`/`resolution_reason`/`resolution_uid`/
+  `resolution_at` — **`observed_outcome` is never written by this action**
+  (D10's immutability rule) — paired atomically with the job's existing
+  sanctioned `blocked_manual_review→queued` transition and exactly one
+  `job.log` row (`event_type='manual_action'`). The override never edits
+  remote Shopify state — any correction is a new, ordinary, fully-wrapped
+  mutation job. **Closed bypass (new, per the consolidated ruling §12):**
+  both pre-existing generic actions, `action_manual_retry` and
+  `action_resolve_manual_review`, are updated to explicitly **refuse** any
+  job whose `manual_review_subreason == 'duplicate_risk'` and which is
+  linked to a `mutation.attempt` row — raising a `UserError` directing the
+  operator to `action_resolve_mutation_attempt` instead. This closes the
+  overlap this entry previously left open (Part 4 item 9) by making the
+  two older, less-strict actions structurally incapable of touching a
+  mutation-attempt-linked duplicate-risk job, rather than merely
+  documenting a precedence convention.
 - **Alternatives considered:** reuse `action_manual_retry` or
   `action_resolve_manual_review` directly (rejected — neither requires a
-  mandatory reason nor is Admin-only, both too permissive for a
-  divergence-risk decision).
+  mandatory reason nor is Admin-only). Leaving the two older actions
+  untouched and merely documenting precedence (this entry's original
+  approach — rejected: a documented convention does not stop a Reviewer
+  from calling the less-strict action directly; only an explicit code-level
+  refusal does).
 - **Risk:** operator error (wrong disposition) causes silent Odoo/Shopify
-  divergence — mitigated by mandatory reason + audit row + Admin-only gate,
-  not eliminated.
+  divergence — mitigated by mandatory reason + audit row + Admin-only gate
+  + the closed bypass, not eliminated.
 - **Rollback:** remove the action; underlying jobs remain
-  `blocked_manual_review` (no data loss, just no override path).
+  `blocked_manual_review` (no data loss, just no override path); the two
+  older actions' refusal guard is a safety addition, not itself rollback
+  candidate.
 - **Exact implementation impact:** one new server action method, ACL
-  restricted to Admin group (D30), one `job.log` write.
+  restricted to Admin group (D30), one `job.log` write; one guard clause
+  added to each of the two pre-existing actions.
 - **Exact tests:** Reviewer-denied test; missing-reason `UserError` test;
-  atomic-commit test (resolution fields + outcome + job transition + log
-  row all-or-nothing).
-- **Unresolved question:** the overlap between this new action and the two
-  pre-existing `blocked_manual_review→queued` mechanisms is **not resolved**
-  by this decision alone — carried to Part 7 as a genuine gap requiring
-  control-room attention (should the two older actions be scoped to
-  exclude `duplicate_risk`/mutation-attempt-linked jobs, or left as-is with
-  documented precedence?).
+  atomic-commit test (resolution fields + job transition + log row
+  all-or-nothing, `observed_outcome` untouched); a test asserting
+  `observed_outcome`'s value is byte-identical before and after the
+  override action runs; a test asserting both pre-existing actions raise
+  `UserError` on a `duplicate_risk` mutation-attempt-linked job.
+- **Unresolved question:** None — the overlap this entry previously left
+  open is closed above.
 
 ### D12 — CAS field-name correction
 *(Cross-cutting — directly implements ruling point 3)*
@@ -615,7 +965,7 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Recommendation:** a new Datetime gating field, not a new job state.
 - **Accepted-candidate wording:** add `reconciliation_pending_until`
   (Datetime, nullable, protected) to `shopify.connector.job`. Set in the
-  same transaction as the `outcome='uncertain'` attempt commit and
+  same transaction as the `observed_outcome='uncertain'` attempt commit and
   reconciliation-job creation (D14). `_claim_for_dispatch`'s WHERE clause
   excludes any job with a non-null, non-expired value. The reconciliation
   job's successful commit clears the field in the same transaction it
@@ -642,41 +992,52 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   and its "reconcile-then-retry only" requirement, independently discovered
   by two separate review clusters (strong convergent evidence).
 
-### D14 — Reconciliation-job linkage
-*(Items 10, E)*
+### D14 — Reconciliation-job linkage (Many2one-restrict, required)
+*(Items 10, E — CORRECTED 2026-07-19 per the consolidated Sessions-2-and-3
+ruling §5/§8, which overrides this entry's original non-FK design)*
 
 - **Fact:** `call.lease.job_id` is a deliberate non-FK Integer, specifically
   to avoid `FOR KEY SHARE`/`FOR NO KEY UPDATE` lock contention with
-  `_claim_for_dispatch`.
-- **Inference:** a reconciliation job needs to reference its target attempt
-  precisely (not "most recent attempt for job_id," which is unsafe under
-  retries/races), and should follow the same non-FK precedent for the same
-  contention-avoidance reason.
-- **Recommendation:** a new non-FK Char field on the reconciliation job.
-- **Accepted-candidate wording:** a reconciliation-read job links to its
-  target attempt via a new non-FK Char field `mutation_attempt_id` on
-  `shopify.connector.job` (storing the target `attempt_id` UUID). **Frozen
-  at creation, never lazily resolved**: the same commit that sets
-  `outcome='uncertain'` (C3) creates the reconciliation job with
-  `mutation_attempt_id` set to that exact `attempt_id`. The reconciliation
-  handler looks up by the compound `(job_id, attempt_id)` key and fails
-  closed to `blocked_manual_review` if the target row's `outcome` is no
+  `_claim_for_dispatch`'s *concurrent, multi-worker admission-check* access
+  pattern. A reconciliation job's linkage is a fundamentally different
+  access shape: created once, at C3, by the single worker that owns the
+  originating attempt, and read once at reconciliation dispatch — never
+  concurrently admission-checked the way `call_lease` rows are.
+- **Inference:** the lock-contention concern that justified `call_lease`'s
+  non-FK Integer does not transfer to this field — this entry's original
+  non-FK design over-applied that precedent to an access pattern it does
+  not fit, the same correction D2 makes for `mutation_attempt.job_id`.
+- **Recommendation:** a required Many2one, matching D2's `job_id`
+  correction.
+- **Accepted-candidate wording — RESOLVED:** a reconciliation-read job
+  links to its target attempt via `mutation_attempt_id`:
+  `Many2one('shopify.connector.mutation.attempt', required=True (for
+  reconciliation jobs), index=True, ondelete='restrict')` on
+  `shopify.connector.job`. **Frozen at creation, never lazily resolved**:
+  the same commit that sets `observed_outcome='uncertain'` (C3) creates the
+  reconciliation job with `mutation_attempt_id` set to that exact attempt
+  record. The reconciliation handler looks up the linked record directly
+  (no compound-key lookup needed, since the FK is precise) and fails closed
+  to `blocked_manual_review` if the target row's `observed_outcome` is no
   longer `uncertain` at dispatch time. A new `operation_scope_key`
   convention is needed for reconciliation jobs (e.g.
-  `reconcile:{store}:{mutation_domain}:{attempt_id}`), since `enqueue()`
+  `reconcile:{store}:{mutation_domain}:{attempt_token}`), since `enqueue()`
   has no idempotency/scope-key mechanism of its own for this job type.
-- **Alternatives considered:** FK reference (rejected for the same
-  lock-contention reason `call_lease.job_id` was made an Integer);
+- **Alternatives considered:** non-FK Char storing the attempt token (this
+  entry's original design — **rejected**, over-applied the `call_lease`
+  lock-contention precedent to a non-concurrent access pattern);
   "most recent attempt for job_id" lookup (rejected — unsafe under
   retries/races, the exact scenario reconciliation exists to handle).
-- **Risk:** a non-FK reference relies on application-level consistency, not
-  database-level referential integrity — mitigated by the fail-closed
-  dispatch-time check.
+- **Risk:** `ondelete='restrict'` means a `mutation.attempt` row can never
+  be deleted while any reconciliation job still references it — acceptable
+  under D32's retention policy, since attempt rows are never hard-deleted.
 - **Rollback:** additive field, droppable pre-ship.
-- **Exact implementation impact:** one new Char field + one new
+- **Exact implementation impact:** one new Many2one field + one new
   `operation_scope_key` convention + one dispatch-time consistency check.
 - **Exact tests:** test asserting a reconciliation job created for a
-  superseded attempt_id fails closed at dispatch, not silently proceeding.
+  superseded attempt fails closed at dispatch, not silently proceeding;
+  test asserting `ondelete='restrict'` prevents deleting a referenced
+  attempt row.
 - **Unresolved question:** None for the linkage mechanism itself; see D24
   for an orphaned question about reconciliation-verdict evidence priority
   that touches this area but is not resolved here.
@@ -722,8 +1083,12 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   by this review) and must be settled by the control room before Stage 0
   implementation.
 
-### D16 — Domain-registration fail-closed runtime gate
-*(Item 12)*
+### D16 — Domain-registration fail-closed runtime gate + mutation-wrapper/
+API-client enforcement
+*(Item 12 — EXTENDED 2026-07-19 per the consolidated Sessions-2-and-3
+ruling §14, which requires an explicit relationship between Layer 2 and
+`execute_business` and a runtime API-client-level guard, in addition to
+this entry's original C2 registry gate)*
 
 - **Fact:** Layer 1's existing fail-closed mechanism (`_get_replay_policy`)
   is a runtime *default value* (undeclared → conservative default), not an
@@ -755,8 +1120,36 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   describe an implementable, let alone safe, strategy, and must be treated
   as functionally unregistered until D12's correction lands in the matrix.
 
-### D17 — Inconclusive-reconciliation cap (N=3)
-*(Item 24)*
+**Extension — mutation-wrapper/API-client enforcement (new, 2026-07-19,
+consolidated ruling §14):** the C2 registry gate above stops an
+*unregistered domain* from reaching transport; a second, independent guard
+is required to stop *any* mutation call — registered domain or not — from
+reaching transport outside the C1/C2/NET/C3 wrapper entirely. **Accepted-
+candidate wording:** `shopify_connector_api_client.py`'s send path must
+fail closed — raise, never silently proceed — when a GraphQL document
+containing a `mutation` operation is submitted without a valid Layer 2
+attempt context/token (the current attempt's `attempt_token`, verified
+against the job's `current_attempt_token`). This is a **runtime** check
+inside the API client itself, independent of and complementary to (a) this
+decision's own C2 registry gate (stops unregistered domains) and (b) D37's
+repo-wide AST transport guard (stops call sites bypassing the wrapper
+entirely, at build/CI time). The three layers are defense in depth, not
+redundant: the AST guard catches a bypass statically before merge; the
+API-client runtime guard catches it if the AST guard is ever bypassed or a
+call site it doesn't cover is added; the C2 registry gate catches an
+unregistered domain even when a valid attempt context exists.
+`shopify_connector_api_client.py` is therefore added to the Stage 0 allowed
+files (previously absent — corrected in the Stage 0 packet, §18 below).
+- **Exact tests (extension):** a test asserting the API client raises when
+  a mutation document is submitted with no attempt context; a test
+  asserting a valid attempt context permits the call to proceed to
+  transport; a test asserting a read-only (non-mutation) document is
+  unaffected by this guard.
+
+### D17 — Inconclusive-reconciliation cap (N=3), per-attempt scope
+*(Item 24 — RESOLVED 2026-07-19 per the consolidated Sessions-2-and-3
+ruling §7, closing this entry's own previously-BLOCKING unresolved
+question)*
 
 - **Fact:** the original design's "N=3" language never distinguished
   consecutive-inconclusive-verdicts from total-retry-cycles.
@@ -766,37 +1159,56 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   could accumulate 3 inconclusive verdicts *per attempt row* without ever
   tripping the cap across the full retry chain — silently defeating its
   purpose.
-- **Recommendation:** add the counter, explicit about what increments it,
-  but leave the cross-attempt persistence question open for control-room
-  decision.
-- **Accepted-candidate wording:** add `inconclusive_reconciliation_count`
-  (Integer, default 0, protected) to `mutation.attempt`. Incremented only
-  on a literal reconciliation-read verdict of **"inconclusive"** (not
-  "not-applied," a different, fully-resolving verdict). Increment happens
-  under a re-acquired row lock (mirroring `_recover_after_concurrency_conflict`'s
-  discipline) so two racing reconciliation jobs cannot both silently
-  increment past the cap; reaching 3 transitions the job to
-  `blocked_manual_review`/`duplicate_risk` in the same commit.
+- **Recommendation:** add the counter, per-attempt scope, resolved as
+  sufficient rather than left open.
+- **Accepted-candidate wording — RESOLVED:** add
+  `inconclusive_reconciliation_count` (Integer, default 0, protected) to
+  `mutation.attempt`, **scoped per uncertain mutation attempt** (resets on
+  each new `attempt_token`, as originally schema'd). Incremented only on a
+  literal reconciliation-read verdict of **"inconclusive"** (not
+  "not-applied," a different, fully-resolving verdict), under a re-acquired
+  row lock (mirroring `_recover_after_concurrency_conflict`'s discipline)
+  so two racing reconciliation jobs cannot both silently increment past the
+  cap. At exactly 3 inconclusive verdicts on the same attempt row: the
+  original job transitions to `blocked_manual_review` with
+  `manual_review_subreason='duplicate_risk'`, in the same atomic commit as
+  the resolution write and audit log entry — retried on a PostgreSQL
+  serialization-conflict failure, never silently dropped. **Why per-attempt
+  scope is sufficient, closing this entry's original concern:** the
+  original concern was that alternating THROTTLED-triggered retries with
+  genuine `uncertain` outcomes across *different* attempt rows could let
+  the cap "never fire" if scoped per-attempt. This concern does not hold
+  under this design's own retry-eligibility rule (D10): **no new mutation
+  attempt may be created until the current `uncertain` attempt reaches a
+  resolved effective disposition** (`applied` or `not_applied`) — there is
+  no path by which a fresh attempt row's counter resets while the prior
+  attempt is still accumulating inconclusive verdicts, because the prior
+  attempt must itself resolve (including, if necessary, via this very cap)
+  before a new attempt can exist at all. The cap is therefore
+  cross-retry-effective without needing cross-attempt persistence.
 - **Alternatives considered:** track the count at job level instead
-  (survives `attempt_id` regeneration) — this is in fact the **recommended**
-  resolution direction (see unresolved question below), not fully rejected,
-  but not adopted outright because it requires a product-owner safety-property
-  decision, not an inference.
-- **Risk:** as currently schema'd (per-attempt), the cap may functionally
-  never fire for a mutation that alternates retry types — a real safety
-  gap if left unresolved.
+  (surviving `attempt_token` regeneration) — this entry's own earlier
+  Recommendation direction, **rejected** by the resolution above: it is
+  unnecessary once the retry-eligibility rule's sequencing guarantee is
+  applied, and job-level tracking would require reconciling the counter
+  against manual interventions and job-level retries for no additional
+  safety benefit.
+- **Risk:** none beyond the accepted operational cost of routing to manual
+  review after 3 inconclusive reads on a single attempt — the scoping
+  concern that motivated this entry's original "BLOCKING" framing is
+  resolved above, not merely accepted as residual risk.
 - **Rollback:** additive field, droppable pre-ship.
 - **Exact implementation impact:** one Integer field + one row-locked
-  increment path.
+  increment path; one atomic-commit routine spanning the resolution write,
+  the job transition, and the audit log entry, with retry-on-serialization-
+  failure.
 - **Exact tests:** concurrent-increment race test (two reconciliation jobs
   racing to increment, cap must not be bypassable); cap-trip test at
-  exactly 3.
-- **Unresolved question:** **BLOCKING, genuinely undecidable from
-  precedent alone.** Whether the cap persists across `attempt_id`
-  regeneration (tracked at job level, surviving retries) or resets per
-  `attempt_id` (as currently schema'd) is a product-owner safety-property
-  decision that materially changes the guarantee, and must be made
-  explicitly before Stage 0 ships this field.
+  exactly 3; a test proving the sequencing guarantee itself — no new
+  attempt row can be created while a prior attempt's
+  `inconclusive_reconciliation_count` is still below 3 and unresolved;
+  serialization-conflict retry test for the atomic cap-trip commit.
+- **Unresolved question:** None — resolved above.
 
 ### D18 — Store-identity-change detection
 *(Items 22, G)*
@@ -809,20 +1221,33 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   definitions with no grounding-material evidence justifying the second
   one.
 - **Recommendation:** reuse the existing check, apply it as the first step
-  of every reconciliation read.
-- **Accepted-candidate wording:** reconciliation reads (D14) query
-  `shop { myshopifyDomain }` alongside domain-specific selection, as the
-  **first** evaluation step, before interpreting any other response data.
-  Comparison reuses the existing single-field string-equality check
-  verbatim. On mismatch: route directly to
-  `blocked_manual_review`/`manual_review_subreason='store_identity_mismatch'`
+  of every reconciliation read, and snapshot both identity and generation
+  on the attempt itself for forensic completeness.
+- **Accepted-candidate wording — EXTENDED 2026-07-19 per the consolidated
+  Sessions-2-and-3 ruling §10:** each attempt record snapshots
+  `expected_connection_generation` (D2/D29) and `expected_store_identity`
+  (D2, new field — the `myshopifyDomain` value in effect when the request
+  was sent) at C2. Every reconciliation read begins by verifying the
+  **current** `myshopifyDomain` (queried via `shop { myshopifyDomain }`
+  alongside domain-specific selection) against the attempt's snapshotted
+  `expected_store_identity`, as the **first** evaluation step, before
+  interpreting any other response data. Comparison reuses the existing
+  single-field string-equality check verbatim. On mismatch: route directly
+  to `blocked_manual_review`/`manual_review_subreason='store_identity_mismatch'`
   (new, distinct from `duplicate_risk`), bypassing the normal `uncertain`
-  reconcile-then-retry flow entirely. No new check is added to
-  `_admit`/ordinary mutation-send admission — cost is scoped to
-  reconciliation only. **Companion fix:** `_run_connection_probe`'s
-  existing domain-mismatch branch must additionally call
-  `action_mark_reconnect_needed` (closing a pre-existing asymmetry with the
-  auth-failure path).
+  reconcile-then-retry flow entirely, and **never** retry the mutation on a
+  store-identity mismatch. No new check is added to `_admit`/ordinary
+  mutation-send admission — cost is scoped to reconciliation only.
+  **Companion fix:** `_run_connection_probe`'s existing domain-mismatch
+  branch must additionally call `action_mark_reconnect_needed` (closing a
+  pre-existing asymmetry with the auth-failure path). **Correction to a
+  stale claim (ruling §10):** `_mutate_token`'s existing behavior already,
+  correctly, bumps `connection_generation` atomically on any credential
+  set/replace while `connected` (verified directly against code, D29) —
+  any prior document text implying `connection_generation` is *not*
+  already bumped by lifecycle actions is stale and is corrected here: the
+  bump is confirmed existing, current behavior, not a gap this decision
+  needs to close.
 - **Alternatives considered:** a new multi-field identity fingerprint
   (rejected — no grounding-material evidence justifies it over the
   existing single-field check; would create two divergent identity
@@ -843,7 +1268,8 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
   assumed closed.
 
 ### D19 — Transaction/commit-point protocol (C1/C2/NET/C3)
-*(Item 13)*
+*(Item 13 — RESOLVED 2026-07-19, protocol content bound by the
+consolidated Sessions-2-and-3 ruling §6)*
 
 - **Fact:** the original design doc justifies its C2 choice by citing
   Odoo's `_commit_progress()` API as the pattern `_drain_one` "exactly"
@@ -855,77 +1281,105 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Recommendation:** replace the single-commit dispatch transaction, for
   mutation-domain job types only, with four discrete, sequential,
   independently-recoverable commits/windows.
-- **Accepted-candidate wording:** see Part 6 below for the complete
-  protocol. Non-mutation job types (`local_only`, `remote_read_replay_safe`)
-  retain the existing single-commit `_drain_one` path unchanged.
+- **Accepted-candidate wording — RESOLVED:**
+  ```
+  C1: main-cursor claim commit — lock job; set state='running';
+      set current_attempt_token; set owner_worker_ref;
+      set running_since → COMMIT.
+  C2: dedicated side-cursor attempt-intent commit — create the
+      mutation.attempt row; record allowlisted intent/preconditions
+      (D7); record both fingerprints (D5); record the idempotency key
+      (D6); conservatively set transport_attempted=True → COMMIT,
+      strictly before any network call. All request data needed for
+      the mutation body is materialized into plain, immutable Python
+      values before this commit — never re-derived after it.
+  NET: bounded network call only — no main-cursor ORM or SQL
+      operation occurs; no open main-cursor transaction spans this
+      window; no PostgreSQL lock is held; the side cursor from C2 is
+      already committed and closed.
+  C3: fresh main transaction — invalidate/re-browse (Odoo REPEATABLE
+      READ requires this, D21); re-lock the job; verify
+      current_attempt_token matches the attempt this worker holds;
+      write response evidence and observed_outcome (D9/D10); apply the
+      corresponding job transition atomically → COMMIT.
+  ```
+  Non-mutation job types (`local_only`, `remote_read_replay_safe`) retain
+  the existing single-commit `_drain_one` path unchanged. **C2's use of a
+  dedicated side cursor (not the main cursor) is now the accepted design —
+  see D20.**
 - **Alternatives considered:** keep the single-commit path for mutation
   types too (rejected — provides no crash-recoverable intermediate state,
-  the entire reason Layer 2 exists).
+  the entire reason Layer 2 exists); C2 on the main cursor (this entry's
+  original open alternative — rejected, see D20).
 - **Risk:** ~2 extra commits per mutation attempt (C1 already exists in the
-  job-claim design; C2 and the C3 re-lock are new) — small, bounded, and
-  dwarfed by the network round-trip.
+  job-claim design; C2 on its own side cursor, and the C3 re-lock, are new)
+  — small, bounded, and dwarfed by the network round-trip.
 - **Rollback:** scoped to mutation job types only; non-mutation types are
   unaffected and require no rollback consideration.
 - **Exact implementation impact:** `_dispatch_one`/`_invoke_handler`
   branch by job-type class (mutation vs. non-mutation), each with its own
-  commit-point implementation.
+  commit-point implementation; C2 opens and uses its own side cursor,
+  distinct from `self.env.cr`.
 - **Exact tests:** see D38 for the full runtime/concurrency/crash-injection
   test requirements.
-- **Unresolved question:** C2's exact cursor placement — see D20, BLOCKED.
+- **Unresolved question:** None — C2's cursor placement is resolved (D20).
 
-### D20 — C2 cursor placement + `job_id` field type
-*(Item 14 — BLOCKED)*
+### D20 — C2 cursor placement (side cursor)
+*(Item 14 — RESOLVED, not blocking, 2026-07-19 per the consolidated
+Sessions-2-and-3 ruling §6, which also SPLITS this entry: the `job_id`
+field-type sub-question this entry originally combined with cursor
+placement is now resolved separately under D2, per the control-room
+preliminary review's point 6 requiring the split)*
 
-- **Fact:** two unresolved, load-bearing conflicts exist: (a) whether C2
-  commits on the main cursor or a side cursor mirroring `call_lease`'s
-  `_admit` pattern; (b) `mutation_attempt.job_id`'s field type, where this
-  session's own review clusters reached three-way-conflicting conclusions
-  (Many2one-FK-restrict for uninstall-safety per D34's precedent vs. plain
-  Integer per `call_lease.job_id`'s lock-contention-avoidance precedent).
+- **Fact:** `call_lease`'s `_admit` pattern already proves a side-cursor
+  commit-before-network model works in this codebase: admitted under `FOR
+  SHARE`, committed on a dedicated cursor **before** the network call, with
+  no dependency on the main cursor's state.
 - **Inference:** the design's original justification for main-cursor C2
-  rests on the now-corrected false `_commit_progress()` citation (D19) and
-  does not engage with the actual isolation property the side-cursor
-  alternative exists to provide. On (b), `call_lease`'s need for Integer
-  stems from its *concurrent, multi-worker admission-check* access pattern;
-  `job_log.job_id`'s FK+restrict is safe today because writes come from the
-  single worker that already holds the job's claim lock, appending
-  sequentially — a pattern C1/C2/C3 shares. This suggests FK+`ondelete='restrict'`
-  is likely compatible with D25's widened claimability-gate access pattern,
-  but this is a **reasoned bridging observation, not a proof**.
-- **Recommendation:** do not accept either sub-question as settled; require
-  D38's genuine-concurrency test to prove which access pattern
-  `mutation.attempt`'s actual read/write behavior resembles before choosing
-  the field type, and require a proven, tested "no non-connector-model
-  write pending on the main cursor at C2 time" invariant (D21) before
-  accepting main-cursor C2.
-- **Accepted-candidate wording:** **Not accepted as proven safe.** Two
-  candidate mechanisms remain open for C2: (a) main-cursor pre-network
-  commit, contingent on D21's proven invariant; or (b) a side-cursor commit
-  mirroring `call_lease`'s `_admit` pattern, which structurally eliminates
-  the "unrelated business changes committed prematurely" risk rather than
-  merely testing for it. `job_id`'s field type is similarly open pending
-  D38's proof.
-- **Alternatives considered:** both live options are stated above; no
-  third alternative was found with independent support.
-- **Risk:** shipping either choice unproven risks either (main cursor)
-  accidentally co-committing unrelated business state at C2, or (side
-  cursor, wrong field type) reproducing `call_lease`'s known lock-contention
-  class under D25's widened access pattern.
-- **Rollback:** N/A — this is a pre-implementation design gate, not a
-  shipped feature.
-- **Exact implementation impact:** Stage 0 implementation **cannot begin
-  the C2 code path** until this is resolved — a hard prerequisite, carried
-  into the Stage 0 packet's hard-stops.
-- **Exact tests:** D38's genuine-concurrency suite must be designed to
-  produce evidence for this decision, not merely validate a decision
-  already made.
-- **Unresolved question:** **BLOCKING.** Both the cursor-placement and
-  field-type sub-questions require empirical proof (D38) or an explicit
-  control-room risk-acceptance choice before Stage 0 implementation of the
-  C2 code path may begin.
+  rested on the now-corrected false `_commit_progress()` citation (D19)
+  and never engaged with the actual isolation property a side cursor
+  provides: committing C2 on a side cursor **structurally eliminates** the
+  "unrelated main-cursor business changes accidentally co-committed at C2"
+  risk, rather than merely requiring a test to catch it after the fact
+  (D21's original framing).
+- **Recommendation:** adopt the side-cursor design, mirroring `call_lease`'s
+  proven `_admit` pattern.
+- **Accepted-candidate wording — RESOLVED:** C2 commits on a **dedicated
+  side cursor**, not the main cursor, mirroring `call_lease`'s `_admit`
+  pattern exactly. This is a structural choice, not merely a
+  tested-safe one: because C2 never touches the main cursor at all, D21's
+  clean-cursor invariant is only relevant to the **C1→C2 window** (nothing
+  unrelated is dirty on the main cursor before C1's own commit, and the
+  main cursor performs no writes at all during C2/NET, since C2 lives on
+  its own cursor) — the invariant no longer has to guard against C2
+  *itself* accidentally co-committing anything, since C2 has no access to
+  the main cursor's pending writes by construction. `job_id`'s field type
+  is a **separate decision, resolved under D2** (Many2one-FK-restrict) —
+  no longer entangled with this decision, per the control-room's explicit
+  split instruction.
+- **Alternatives considered:** main-cursor pre-network commit (this
+  entry's original open alternative — **rejected**: even with D21's
+  invariant proven, it only tests for correctness after the fact; the
+  side-cursor design removes the risk class structurally, the stronger and
+  simpler guarantee, consistent with `call_lease`'s own precedent).
+- **Risk:** none beyond the ordinary cost of managing a second cursor
+  (already a proven, existing pattern via `call_lease`).
+- **Rollback:** N/A — this is a pre-implementation design resolution, not a
+  shipped feature; the side cursor itself is simply not opened if Layer 2
+  is rolled back.
+- **Exact implementation impact:** C2's implementation opens a side cursor
+  (mirroring the `call_lease._admit` code path) instead of using
+  `self.env.cr`.
+- **Exact tests:** a test asserting C2's commit occurs on a distinct
+  cursor object from the main cursor; the D21 dirty-state inspection test
+  now scoped correctly to the C1→C2 window only.
+- **Unresolved question:** None — resolved above; `job_id`'s field type is
+  tracked under D2, not here.
 
-### D21 — Main-cursor write-isolation invariant
-*(Item C — directly implements ruling point 6)*
+### D21 — Main-cursor write-isolation invariant (scoped to the C1→C2
+window)
+*(Item C — directly implements ruling point 6; scope narrowed 2026-07-19
+now that C2 is resolved onto a side cursor, D20)*
 
 - **Fact:** between C1 and C2, today's architecture happens to make "only
   `shopify.connector.job`/`mutation.attempt` writes occur on the main
@@ -934,27 +1388,37 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Inference:** this is currently an unstated, unproven assumption riding
   on accident, not design. Odoo 19's REPEATABLE READ isolation
   (source-materials refresh §5) makes violating this invariant
-  particularly dangerous: a stray write between C1/C2 would be silently
-  co-committed at C2, and under REPEATABLE READ, any code relying on
-  "freshly committed" visibility after that point could observe stale
-  snapshot data unless it explicitly starts a new transaction.
-- **Recommendation:** state the invariant explicitly and prove it with a
-  new test class.
-- **Accepted-candidate wording:** between C1 and C2 inclusive, the only ORM
-  writes permitted on the main cursor are to `shopify.connector.job` and
-  `shopify.connector.mutation.attempt`; `preconditions_snapshot` gathering
-  is read-only by contract. This is the **clean-cursor / no-unrelated-dirty-state
-  invariant** the control-room ruling requires — enforced by a genuinely
-  new test pattern (inspecting ORM dirty-state / `env.all.towrite`
-  immediately before the C2 commit), which does not exist anywhere in the
-  current 17-file test inventory and must be built, not assumed to already
-  exist. Additionally, per the REPEATABLE READ consequences recorded in
-  the source-materials refresh §5: any recovery/reconciliation code that
-  re-reads a job or attempt row after a crash or a sibling worker's commit
-  must force a fresh read via `invalidate_recordset()` + re-`browse()`/
-  re-`search()`, mirroring the existing `_claim_for_dispatch` precedent,
-  at every point in the C1/C2/C3 protocol that depends on cross-transaction
-  visibility.
+  particularly dangerous: a stray write between C1 and C1's own commit
+  boundary would be silently co-committed, and under REPEATABLE READ, any
+  code relying on "freshly committed" visibility after that point could
+  observe stale snapshot data unless it explicitly starts a new
+  transaction. **Scope correction (D20):** because C2 now commits on its
+  own dedicated side cursor rather than the main cursor, this invariant's
+  live risk window is narrower than originally framed — it governs the
+  **C1 claim-commit itself and any main-cursor activity before it**, not a
+  "C1 through C2" main-cursor window, since the main cursor performs no
+  writes during C2 at all (C2 has no access to the main cursor's pending
+  state by construction, D20).
+- **Recommendation:** state the invariant explicitly, scoped correctly, and
+  prove it with a new test class.
+- **Accepted-candidate wording:** on the main cursor, the only ORM writes
+  permitted in the claim-commit (C1) transaction are to
+  `shopify.connector.job` and `shopify.connector.mutation.attempt`;
+  `preconditions_snapshot` gathering is read-only by contract and occurs
+  before C1 commits or on the C2 side cursor, never interleaved with
+  uncommitted main-cursor state. This is the **clean-cursor /
+  no-unrelated-dirty-state invariant** the control-room ruling requires —
+  enforced by a genuinely new test pattern (inspecting ORM dirty-state /
+  `env.all.towrite` immediately before the C1 commit), which does not
+  exist anywhere in the current 17-file test inventory and must be built,
+  not assumed to already exist. Additionally, per the REPEATABLE READ
+  consequences recorded in the source-materials refresh §5: any
+  recovery/reconciliation code that re-reads a job or attempt row after a
+  crash or a sibling worker's commit must force a fresh read via
+  `invalidate_recordset()` + re-`browse()`/re-`search()`, mirroring the
+  existing `_claim_for_dispatch` precedent, at every point in the
+  C1/C2/C3 protocol that depends on cross-transaction visibility
+  (including C3's re-lock and re-verification of `current_attempt_token`).
 - **Alternatives considered:** trust the current architecture's accidental
   correctness without a new test (rejected — "happens to be true today"
   is not a basis for a safety invariant that must hold as the codebase
@@ -973,10 +1437,15 @@ Each entry gives: **Fact**, **Inference**, **Recommendation**,
 - **Unresolved question:** None for the invariant's statement; its **proof**
   is new work required before Stage 0 acceptance (tracked as part of D38).
 
-### D22 — Lock-vs-open-transaction distinction
-*(Item D — BLOCKED, flagged by this session's own review cluster as the
-single most significant unresolved item in the entire transaction-protocol
-review)*
+### D22 — Open-transaction-spans-network-call discipline
+*(Item D — RECLASSIFIED 2026-07-19, not an architecture blocker, per the
+control-room preliminary review PR #177 comment 5013028262 point 7 and the
+consolidated Sessions-2-and-3 ruling §6/§9. This entry's original "BLOCKED"
+framing treated an implementation coding-discipline-plus-test requirement
+as if it were an undecided design question; the design is not in question
+here — only its runtime proof is outstanding, correctly classified as a
+Stage 0 merge-acceptance criterion, not a precondition to beginning
+implementation.)*
 
 - **Fact:** every documented admission path (`_admit`/`_admit_lifecycle`)
   commits and releases its lock before the network call — "no PostgreSQL
@@ -996,34 +1465,49 @@ review)*
   lock question.
 - **Recommendation:** split the claim explicitly into two, require an
   explicit coding discipline plus a new runtime test class for the
-  unproven half.
-- **Accepted-candidate wording:** **[BLOCKED — insufficient evidence, fails
-  closed per this review].** No PostgreSQL row/table lock is held across
-  the network call in any documented mutation admission path (proven).
-  Whether a bare open (lock-free) transaction on the main cursor spans the
-  network call is **not proven** for the C1–C2–NET path and must be closed
-  with (a) an explicit "nothing on the main cursor between C2 and NET"
-  coding rule — all data needed for the mutation body must be resolved and
-  captured into plain Python values before C2, never re-derived after it —
-  and (b) a genuine `pg_stat_activity`-based runtime test, before this item
-  can be marked closed.
+  unproven half — implementable immediately as a coding rule, verified at
+  merge time.
+- **Accepted-candidate wording — RESOLVED as an implementation invariant
+  and runtime acceptance criterion, not a design blocker.** No PostgreSQL
+  row/table lock is held across the network call in any documented
+  mutation admission path (proven). Whether a bare open (lock-free)
+  transaction on the main cursor spans the network call is closed by
+  design, given D20's resolution: the main cursor's last statement before
+  NET is C1's own commit (C2 lives entirely on a side cursor, D20), so
+  there is no main-cursor statement between C1's commit and C3's re-lock
+  to accidentally open a new transaction on. The **coding discipline**
+  that guarantees this in practice: (a) all data needed for the mutation
+  body must be resolved and captured into plain, immutable Python values
+  before C2's commit, never re-derived from the main cursor after it; (b)
+  no `self.env.cr` statement of any kind executes between C1's commit and
+  C3's re-lock. This discipline is now implementable and enforceable
+  immediately — it was never actually undecided, only unproven at runtime.
 - **Alternatives considered:** assume the risk away because no lock is
   held (rejected — the operational hazard is at the connection/transaction
   level, invisible to ORM-level lock analysis).
 - **Risk:** an idle-in-transaction connection holding a REPEATABLE READ
   snapshot across a 20-second network read timeout is a documented general
   PostgreSQL operational hazard (vacuum/xmin horizon impact) independent of
-  correctness — a real production risk if left unaddressed at scale.
-- **Rollback:** N/A — pre-implementation gate.
+  correctness — a real production risk if the coding discipline above is
+  ever violated; mitigated structurally by D20's side-cursor resolution,
+  which removes the main cursor from the NET window entirely by
+  construction, not merely by convention.
+- **Rollback:** N/A — a coding discipline and its runtime proof, not a
+  design choice to roll back.
 - **Exact implementation impact:** Stage 0's NET-window handler code must
-  be written under the explicit "nothing on `self.env.cr` between C2 and
-  NET" discipline from day one; this is a coding-review-enforced rule, not
-  optional guidance.
+  be written under the explicit "nothing on `self.env.cr` between C1's
+  commit and C3's re-lock" discipline from day one; this is a
+  coding-review-enforced rule, not optional guidance, and may begin
+  immediately — it does not require D38's runtime proof to exist first.
 - **Exact tests:** a new `pg_stat_activity`-based test class asserting no
   open transaction is observed on the connection during the simulated
-  network-call window — does not exist anywhere in-repo today.
-- **Unresolved question:** **BLOCKING.** No open-transaction-spans-network-call
-  proof exists; required before Stage 0 acceptance (tracked in D38).
+  network-call window — does not exist anywhere in-repo today; this is a
+  **Stage 0 merge-acceptance criterion** (D38), not a precondition to
+  beginning implementation of the C1/C2/NET/C3 code path.
+- **Unresolved question:** None for the design — resolved above. The
+  `pg_stat_activity`-based runtime proof remains outstanding **implementation
+  work**, tracked under D38, correctly classified as a merge-acceptance
+  requirement rather than an architecture blocker.
 
 ### D23 — Crash-window C2→NET recovery
 *(Items 15, B — B's accepted wording is identical to 15's per this
@@ -1111,11 +1595,11 @@ rule)*
 - **Recommendation:** widen the gate additively.
 - **Accepted-candidate wording:** for mutation job types only, the
   claimability filter is widened to accept a `running` job whose
-  currently-committed `attempt_id` matches the value the recovering
-  transaction itself holds — in **addition to**, not instead of, the
-  existing `queued`/due-`retry_waiting` branch. A `running` row with a
-  non-matching or absent locally-held `attempt_id` remains excluded,
-  exactly as today.
+  currently-committed `current_attempt_token` matches the value the
+  recovering transaction itself holds — in **addition to**, not instead
+  of, the existing `queued`/due-`retry_waiting` branch. A `running` row
+  with a non-matching or absent locally-held `current_attempt_token`
+  remains excluded, exactly as today.
 - **Alternatives considered:** leave the gate unmodified and route all
   mutation-type recovery through a separate function (rejected — creates
   two divergent recovery code paths for no benefit; the additive widening
@@ -1130,8 +1614,8 @@ rule)*
   job-type class.
 - **Exact tests:** **must be proven by a genuine multi-connection
   concurrency test (D38), not accepted by inspection** — a test asserting
-  the widened branch only matches on exact `attempt_id`, and that a
-  non-matching `running` row remains correctly excluded.
+  the widened branch only matches on exact `current_attempt_token`, and
+  that a non-matching `running` row remains correctly excluded.
 - **Unresolved question:** None for the design; proof is required (D38)
   before acceptance.
 
@@ -1186,27 +1670,38 @@ rule)*
   cadence. Timeout: separately-named, tunable constant, provisional default
   30 minutes, **explicitly provisional pending Odoo.sh runtime measurement**
   of worst-case handler duration — this repository's own already-disclosed
-  pattern for this class of constant. **Acceptance of any specific timeout
-  value is conditioned on D28 being resolved.**
+  pattern for this class of constant. **Correction, 2026-07-19:** this
+  value is no longer conditioned on D28, since D28's resolved design
+  (awareness-based disconnect finalization) removes the timeout-race
+  dependency this entry originally flagged — the sweep timeout is now an
+  ordinary, independently tunable operational constant.
 - **Alternatives considered:** derive cadence from the disconnect-quiescence
   cadence directly (rejected — no coupling requirement exists; matching by
   convention is sufficient and simpler).
-- **Risk:** a timeout value accepted before D28 is resolved could be unsafe
-  regardless of its numeric value — see D28.
+- **Risk:** none beyond ordinary tunable-constant risk (too-short risks
+  premature takeover of a legitimately slow handler; too-long delays
+  crash-backlog recovery) — no longer entangled with D28's disconnect
+  interaction.
 - **Rollback:** cron interval/timeout are ordinary tunable config, not
   structural.
 - **Exact implementation impact:** two named constants in the sweep cron
   implementation.
 - **Exact tests:** N/A directly (measurement-driven, not test-driven);
   covered indirectly by D38's runtime proof.
-- **Unresolved question:** exact numeric timeout value is an **empirical-measurement
-  gap**, not a design gap — provisional 30 minutes pending Odoo.sh
-  worst-case handler-duration measurement, and contingent on D28.
+- **Unresolved question:** exact numeric timeout value is an
+  **empirical-measurement gap**, not a design gap — provisional 30 minutes
+  pending Odoo.sh worst-case handler-duration measurement. No longer
+  contingent on D28 (resolved above).
 
-### D28 — Disconnect-quiescence interaction fix
-*(Item 20 — BLOCKING, flagged by this session's own review cluster as the
-single highest-severity gap in that cluster, confirmed by direct three-file
-code reading, not inferred)*
+### D28 — Disconnect-quiescence: awareness-based finalization (not a
+timeout race)
+*(Item 20 — RESOLVED 2026-07-19, not blocking. This entry's original
+framing offered a binary choice between two timeout-ordering remediations;
+the control-room preliminary review, PR #177 comment 5013028262 point 9,
+and the consolidated Sessions-2-and-3 ruling §9 reject that framing
+entirely in favor of a safety choice: disconnect finalization must be
+*aware* of unresolved mutation attempts, not merely race a shrunk timeout
+against them.)*
 
 - **Fact:** `_finalize_disconnect_timed_out()` unconditionally clears the
   store credential and deletes the lease at `DISCONNECT_QUIESCE_TIMEOUT`
@@ -1215,40 +1710,70 @@ code reading, not inferred)*
   quiesced store) has **no dedicated handling anywhere in `_invoke_handler`
   today** — it falls to the generic `unknown_system_error` safety net.
 - **Inference:** the design's claim that "the sweep defers to quiescence...
-  resolved by timeout ordering alone" is **not adequately supported**. An
-  orphaned lease from a crashed mutation attempt is invisible to the sweep
-  until t=30min (D27's provisional timeout), but credentials are cleared at
-  t=15min — stranding the eventual reconciliation attempt, which then fails
-  via `ShopifyQuiescedError` and is misleadingly logged as
-  `unknown_system_error`, corrupting the audit trail.
-- **Recommendation:** two remediations exist; the control room must choose
-  explicitly.
-- **Accepted-candidate wording:** **(a)** set the sweep timeout strictly
-  *less than* `DISCONNECT_QUIESCE_TIMEOUT` (proposed 10 < 15 min, still
-  subject to D27's "exceeds worst-case handler duration" floor); or **(b)**
-  extend `_finalize_disconnect_timed_out` to check for open mutation jobs
-  bound to the store and defer credential-clearing. Regardless of which,
-  `ShopifyQuiescedError` **must** be wired into an explicit `except` branch
-  in `_invoke_handler`, routed to a dedicated `blocked_manual_review`
-  subreason distinguishing "store disconnected mid-attempt" from genuine
-  outcome ambiguity — this fix is shared with D29 and is not itself in
-  dispute, only (a) vs (b) is.
-- **Alternatives considered:** leave the interaction as originally
-  designed, relying on timeout-ordering alone (rejected — proven
-  inadequate by direct code reading, not merely theorized).
-- **Risk:** shipping without resolving this strands reconciliation attempts
-  for any mutation crashing near the quiescence boundary — a real,
-  demonstrated gap, not speculative.
-- **Rollback:** N/A — pre-implementation gate.
-- **Exact implementation impact:** either a timeout-constant change (a) or
-  a new open-mutation-job check in `_finalize_disconnect_timed_out` (b);
-  either way, one new `except ShopifyQuiescedError` branch in
-  `_invoke_handler`.
+  resolved by timeout ordering alone" is **not adequately supported**, and
+  this entry's own original remediation (a) (shrink the sweep timeout below
+  15 minutes) does not actually fix the underlying problem — it only
+  narrows the race window, since a sufficiently slow reconciliation cycle
+  or a sufficiently large crash backlog could still lose the race under any
+  fixed timeout pairing. The correct fix is for disconnect finalization
+  itself to check state, not for the sweep to try to always win a race
+  against it.
+- **Recommendation:** make `_finalize_disconnect_timed_out` aware of
+  unresolved mutation attempts and linked reconciliation jobs — remediation
+  (b) from this entry's original framing, now the sole accepted design, not
+  one of two options.
+- **Accepted-candidate wording — RESOLVED:** new mutation admissions stop
+  immediately when disconnect/quiescence begins (existing `_admit` gate
+  behavior, unchanged). `_finalize_disconnect_timed_out` is extended to
+  check, before clearing credentials or deleting the lease, whether any
+  `mutation.attempt` row bound to the store has an unresolved effective
+  disposition (D10's helper returns `unresolved`) or any linked
+  reconciliation job (D14) is still pending/running. If so: **credentials
+  are preserved**, the disconnect is kept **pending/blocked** rather than
+  finalized, and Administrator-visible manual-review evidence is created —
+  the automatic timeout path never silently finalizes over an unresolved
+  mutation attempt. Any **force-disconnect** path remains available but is
+  Administrator-only, requires a mandatory reason, is fully audited, and
+  routes any still-unresolved attempts to manual review rather than
+  pretending they are resolved — it never silently marks an attempt
+  applied/not-applied as a side effect of forcing the disconnect. Once no
+  unresolved attempt or pending reconciliation job remains, the ordinary
+  timeout finalization proceeds unchanged. `ShopifyQuiescedError` is wired
+  into an explicit `except` branch in `_invoke_handler` regardless (shared
+  fix with D29), routed to a dedicated `blocked_manual_review` subreason
+  distinguishing "store disconnected mid-attempt" from genuine outcome
+  ambiguity. D27's sweep-timeout value is now an ordinary, independently
+  tunable operational constant — it no longer needs to be jointly sized
+  against `DISCONNECT_QUIESCE_TIMEOUT`, since disconnect finalization
+  itself defers to any unresolved attempt regardless of the sweep's own
+  cadence.
+- **Alternatives considered:** shrinking the sweep timeout below 15 minutes
+  (this entry's original remediation (a) — **rejected**: narrows but does
+  not eliminate the race, and re-couples D27's timeout value to
+  `DISCONNECT_QUIESCE_TIMEOUT` for no structural safety gain); leaving the
+  interaction as originally designed, relying on timeout-ordering alone
+  (rejected — proven inadequate by direct code reading).
+- **Risk:** none beyond the added cost of one open-attempt/reconciliation
+  check inside `_finalize_disconnect_timed_out` — negligible, and strictly
+  safer than either of this entry's originally-proposed timeout-race
+  remediations.
+- **Rollback:** the awareness check is a safety addition; removing it
+  reverts to the original (proven-inadequate) timeout-only behavior — not
+  recommended, but structurally simple to revert if ever needed.
+- **Exact implementation impact:** one new open-attempt/reconciliation-job
+  check inside `_finalize_disconnect_timed_out`, gating credential-clearing
+  and lease deletion; one new `except ShopifyQuiescedError` branch in
+  `_invoke_handler` (shared with D29); the existing force-disconnect action
+  extended to require Administrator + mandatory reason + audit + route
+  unresolved attempts to manual review.
 - **Exact tests:** a test reproducing the exact strand scenario (crash near
-  the quiescence boundary, verify the chosen remediation prevents the
-  stranded-reconciliation failure mode).
-- **Unresolved question:** **BLOCKING — explicit control-room choice
-  required between (a) and (b)**, not inferable from precedent alone.
+  the quiescence boundary) and asserting the awareness check prevents
+  credential-clearing while the attempt is unresolved; a test asserting the
+  ordinary timeout finalization still proceeds once no unresolved attempt
+  remains; a test asserting force-disconnect requires Administrator +
+  reason and routes any still-unresolved attempt to manual review, never
+  silently resolving it.
+- **Unresolved question:** None — resolved above.
 
 ### D29 — Credential-rotation mid-attempt handling
 *(Item 21)*
@@ -1285,8 +1810,12 @@ code reading, not inferred)*
   test in the audit log.
 - **Unresolved question:** None.
 
-### D30 — ACL for `mutation.attempt`
-*(Items 26, H.1, H.2, H.4, H.5 — directly implements ruling point 7)*
+### D30 — ACL for `mutation.attempt` (current four-role model)
+*(Items 26, H.1, H.2, H.4, H.5 — directly implements ruling point 7;
+confirmed installing under the current, accepted four-role model per the
+consolidated Sessions-2-and-3 ruling §12, which explicitly rejects Session
+3's proposal to install Stage 0 ACLs directly against the future SEC-2
+two-role model — see Part 0.5)*
 
 - **Fact:** `shopify.connector.job.log`'s existing ACL posture is pure
   audit trail — no role gets write/create/unlink via ACL, all writes are
@@ -1298,14 +1827,21 @@ code reading, not inferred)*
   outside one sanctioned action (D11) — `job.log`'s posture is the correct
   precedent, not `job`'s blanket-grant-plus-Python-classifier posture.
 - **Recommendation:** four read-only ACL rows, all mutation via `sudo()`.
-- **Accepted-candidate wording:** four ACL rows, one per current role
+- **Accepted-candidate wording:** four ACL rows, one per **current** role
   (Auditor/Operator/Reviewer/Admin), each `perm_read=1, perm_write=0,
   perm_create=0, perm_unlink=0` — **including Admin**, no role gets
-  write/create/unlink via ACL. All creation/write happens exclusively via
-  `sudo()` at C2, C3, and D11's override action — a **closed sudo-site
-  inventory** (exactly 3 sites) enforced by an AST test that fails the
-  build on a 4th. Unlink is permanently denied to all roles including
-  Admin (ties to D32's retain-forever retention).
+  write/create/unlink via ACL, subject to current connector access rules.
+  All creation/write happens exclusively via `sudo()` at C2, C3, and D11's
+  override action — a **closed sudo-site inventory** (exactly 3 sites)
+  enforced by an AST test that fails the build on a 4th. Unlink is
+  permanently denied to all roles including Admin (ties to D32's retention
+  policy — masked-in-place after the configurable window, never deleted).
+  **SEC-2 follow-up obligation (new, per the consolidated ruling §12):**
+  these four ACL rows are explicitly flagged for re-keying during the
+  later two-role migration (SEC-2) — installing against the current model
+  now does not pre-judge that migration's shape, but does create a named,
+  tracked obligation to revisit these exact rows when SEC-2 ships (see
+  D31).
 - **Alternatives considered:** `job`'s blanket-grant-plus-Python-classifier
   posture (rejected — unnecessary added attack surface for a model with no
   legitimately-mixed editable field set, unlike `job` which has genuine
@@ -1322,8 +1858,13 @@ code reading, not inferred)*
   is not a substantive ACL gap, only a naming one — the mechanism (Admin-only
   `sudo()` write via one sanctioned action) is settled.
 
-### D31 — SEC-2 two-role-migration compatibility
-*(Item 27)*
+### D31 — SEC-2 two-role-migration compatibility + explicit re-key
+obligation
+*(Item 27 — EXTENDED 2026-07-19 per the consolidated Sessions-2-and-3
+ruling §12, which rejects Session 3's proposal to install Stage 0 directly
+against the future two-role model and instead requires Stage 0 to install
+cleanly under the current model with a named SEC-2 follow-up obligation —
+see Part 0.5)*
 
 - **Fact:** `mutation.attempt` under D30 is read-only for all four current
   groups; the future `group_shopify_connector_user`'s `implied_ids`
@@ -1350,19 +1891,37 @@ code reading, not inferred)*
 - **Alternatives considered:** pre-emptively add explicit ACL rows for the
   not-yet-existing `group_shopify_connector_user` (rejected — the group
   doesn't exist yet; premature rows would be untested and possibly wrong).
+  **Session 3's proposal to write Stage 0's ACLs directly against the
+  future SEC-2 two-role model** (rejected by the consolidated ruling §12
+  — Part 0.5: Stage 0 must install cleanly under the current, accepted
+  four-role model; a not-yet-existing role model must not gate what can
+  ship now, for the same "the group doesn't exist yet" reasoning this
+  entry's own original alternative was already rejected for, now applied
+  to the ACL *installation shape* itself, not merely to pre-emptive rows).
 - **Risk:** if `implied_ids` inheritance does not work as assumed, SEC-2
   could ship with an accidental ACL gap for the new roles — mitigated by
   flagging this as blocking *for the SEC-2 packet specifically*, not for
-  Wave 3.
+  Wave 3, and by the explicit re-key obligation below.
 - **Rollback:** N/A.
 - **Exact implementation impact:** none for Wave 3; a verification task for
-  the future SEC-2 implementation session.
+  the future SEC-2 implementation session. **Explicit re-key obligation
+  (new):** D30's four ACL rows are a named, tracked item on the SEC-2
+  migration's own scope — the SEC-2 session must re-key (not merely
+  re-verify) these rows against whatever the two-role model's actual
+  `implied_ids` behavior turns out to be, not assume today's rows carry
+  forward unexamined.
 - **Exact tests:** deferred to the SEC-2 packet's own test requirements.
 - **Unresolved question:** the `implied_ids` inheritance mechanic itself is
   unverified — non-blocking now, blocking at SEC-2 time.
 
-### D32 — Retention: retain forever, no deletion
-*(Item 29)*
+### D32 — Retention: indefinite for unresolved, configurable pruning for
+resolved terminal
+*(Item 29 — CORRECTED 2026-07-19. The control-room preliminary review, PR
+#177 comment 5013028262 point 5, rejected this entry's original
+retain-forever design as creating unbounded database growth and
+contradicting the project's own earlier configurable-retention posture.
+The consolidated Sessions-2-and-3 ruling §11 makes the corrected policy
+below binding.)*
 
 - **Fact:** the original design's "pruned by existing retention sweep,
   default 180 days, aligned with job retention" claim refers to no
@@ -1374,44 +1933,78 @@ code reading, not inferred)*
   anywhere.
 - **Inference:** the original design's retention claim was aspirational,
   not grounded — a real documentation-accuracy defect, independent of
-  whether retention-forever or time-bounded pruning is the right policy.
-- **Recommendation:** retain indefinitely, mirroring `job`/`job.log`'s
-  proven append-only posture, rather than inventing a new, unprecedented
-  delete-based sweep for this specific model.
-- **Accepted-candidate wording:** `mutation.attempt` rows are retained
-  **indefinitely** — no cron, sweep, or manual action defined in Wave 3
-  Stage 0 ever deletes a row — mirroring `job`/`job.log`'s append-only,
-  `ondelete='restrict'`-anchored posture (DEC-030). If storage growth later
-  requires actual deletion, that is an explicitly new, separately-decided,
-  separately-tested superuser-only cron capability — out of scope for
-  Stage 0.
-- **Alternatives considered:** the original design's claimed 180-day sweep
-  (rejected — no such mechanism exists to align with or extend; would
-  require inventing an entirely new delete-based capability this
-  connector's audit trail has never had, for its single highest-value
-  forensic record).
-- **Risk:** unbounded storage growth over time — an accepted, explicit
-  trade-off favoring forensic completeness over storage efficiency for
-  Stage 0; revisit if storage becomes a measured problem.
-- **Rollback:** N/A — retention posture, not a droppable feature; a
-  future deletion capability would be its own separately-reviewed change.
+  retention policy. **This entry's own first-drafted correction
+  (retain-forever, no deletion ever) over-corrected**: forensic
+  completeness for genuinely unresolved evidence does not require
+  unbounded retention of evidence that has *already resolved* and reached
+  a terminal state — the two cases carry different retention needs and
+  conflating them (as both the original design and this entry's first
+  correction did, in opposite directions) is itself the defect.
+- **Recommendation:** two-tier policy: indefinite for anything not yet
+  resolved, configurable pruning (masking bulky fields, never deleting the
+  row) for terminal resolved attempts after an accepted window.
+- **Accepted-candidate wording — RESOLVED:** **unresolved, uncertain, or
+  manual-review attempts are retained indefinitely** — no cron, sweep, or
+  manual action ever deletes or masks these rows while their effective
+  disposition (D10's helper) is `unresolved`. **Resolved terminal attempts**
+  (effective disposition `applied` or `not_applied`) retain **full,
+  allowlisted evidence for a configurable period, default candidate 180
+  days**; after that period, a new sweep **masks bulky evidence fields**
+  (`preconditions_snapshot`, `remote_mutation_intent`, `remote_evidence_refs`
+  payload-shaped content) **in place** — mirroring the existing
+  `pii_retention.run_sweep()` mask-not-delete pattern — while permanently
+  keeping the row itself, its identifiers (`job_id`, `attempt_token`,
+  `mutation_domain`), both fingerprints, `observed_outcome`,
+  `resolution_disposition`/`resolution_source`/`resolution_reason`/
+  `resolution_uid`/`resolution_at`, and all timestamps — the durable audit
+  trail is never lost, only the bulkier forensic payload content. **The
+  row is never `.unlink()`d by this or any Stage 0 mechanism**, mirroring
+  `job`/`job.log`'s append-only, `ondelete='restrict'`-anchored posture
+  (DEC-030) — this part of the original retain-forever framing is retained
+  for the row itself, only the *field-masking* dimension is new.
+- **Alternatives considered:** the original design's claimed 180-day
+  delete-based sweep (rejected — no such mechanism exists to align with or
+  extend, and deletion of the single highest-value forensic record is
+  unnecessary once masking achieves the storage-bound goal). This entry's
+  own first-drafted retain-forever-with-no-masking-either design (rejected
+  by the control-room correction above — creates genuinely unbounded
+  growth for terminal, already-resolved evidence that no longer needs its
+  full bulky payload retained).
+- **Risk:** unbounded storage growth for the **unresolved** tier remains an
+  accepted, explicit trade-off (forensic completeness while a case is
+  still open outweighs storage cost); the **resolved-terminal** tier's
+  growth is now bounded by the configurable masking window, closing the
+  risk the control room flagged.
+- **Rollback:** N/A — retention posture, not a droppable feature; the
+  masking sweep itself is a new, separately-tested capability, droppable
+  independently of the row-retention guarantee.
 - **Exact implementation impact:** `unlink()` permanently denied to all
-  roles via ACL (D30); no cron created for this model.
+  roles via ACL (D30) for this model, unconditionally; a new masking sweep
+  (mirroring `pii_retention.run_sweep()`'s pattern) scoped to
+  resolved-terminal attempt rows older than the configurable window.
 - **Exact tests:** test asserting no code path ever calls `.unlink()` on
-  this model (AST or runtime assertion).
-- **Unresolved question:** None.
+  this model (AST or runtime assertion); test asserting an unresolved
+  attempt is never touched by the masking sweep regardless of age; test
+  asserting a resolved-terminal attempt past the window has its bulky
+  fields masked while its identifiers/outcome/resolution/timestamps remain
+  intact.
+- **Unresolved question:** the exact numeric masking-window default (180
+  days, mirroring the original design's own aspirational value) is a
+  tunable-constant question, not an architecture blocker — control-room
+  ratification of the specific number is still open but does not block
+  Stage 0 implementation of the mechanism itself.
 
 ### D33 — Upgrade path
 *(Item 30)*
 
-- **Fact:** none of D1's four new job fields has a computable historical
+- **Fact:** none of D1's three new job fields has a computable historical
   value for pre-existing rows (unlike LC-1's `original_job_type`, which
   does).
 - **Inference:** no `post-migrate.py` backfill is required — pre-Layer-2
   rows correctly resolve to their declared defaults.
 - **Recommendation:** a standard additive upgrade, but with the full
   surface enumerated explicitly, not understated.
-- **Accepted-candidate wording:** the four D1 job fields require **no**
+- **Accepted-candidate wording:** the three D1 job fields require **no**
   backfill. The upgrade surface must be enumerated in full: it also
   includes one new `ir.model.access.csv` block (D30) and one new `ir.cron`
   XML record (D26/D27, wrapped `noupdate="1"`), not merely "3 fields + 1
@@ -1473,65 +2066,91 @@ code reading, not inferred)*
   mis-implemented.
 - **Rollback:** N/A — classification decision, not a feature.
 - **Exact implementation impact:** design doc §12's "Uninstall" bullet is
-  corrected in this session's update (done); no code change required
-  beyond what LC-1's existing mechanism already provides, contingent on
-  D35.
+  corrected in this session's update (done); no code change required. **D35
+  is now resolved** (registry-validated indexed `Char`, not a Selection of
+  either kind) — since `mutation_domain` has no selection-uninstall
+  lifecycle at all, this decision's classification is simpler than
+  originally framed: `mutation.attempt` rows survive a domain uninstall
+  automatically, with no historic-conversion helper needed, because there
+  is no enumerated Selection value to become orphaned.
 - **Exact tests:** an uninstall-simulation test asserting `mutation.attempt`
-  rows survive a domain-only uninstall and are correctly retyped/queryable
-  afterward.
-- **Unresolved question:** **contingent on D35** — an incorrectly
-  domain-owned `mutation_domain` selection field without an LC-1-style
-  historic-conversion mechanism would reintroduce the exact failure DEC-030
-  already fixed once; this decision is only fully safe once D35 is
-  resolved.
+  rows survive a domain-only uninstall and remain queryable by
+  `mutation_domain` (a plain string comparison, not a retyped Selection
+  lookup) afterward.
+- **Unresolved question:** None — D35's resolution (Char, not Selection)
+  removes the contingency this entry originally carried.
 
-### D35 — `mutation_domain` field ownership
-*(Items I, O — BLOCKING, genuinely unresolved in either direction)*
+### D35 — `mutation_domain` field ownership — registry-validated indexed
+Char
+*(Items I, O — RESOLVED, not blocking, 2026-07-19. The control-room
+preliminary review, PR #177 comment 5013028262 point 4, found this entry's
+original two-option framing omitted a material third option; the
+consolidated Sessions-2-and-3 ruling §5 selects that third option as
+binding, closing what this entry originally called "genuinely blocking.")*
 
-- **Fact:** two live, precedent-supported options exist, pulling in
-  opposite directions. `job_type`'s ownership rule (whichever module owns a
-  mutation's handler also owns its domain-vocabulary value, via
-  `selection_add`) is DEC-008-consistent, proven precedent. DEC-030's
-  Option D (core carrying domain vocabulary directly) was explicitly
-  rejected once already, for reasons that would recur if `mutation_domain`
-  is made core-fixed.
-- **Inference:** neither option is inferable from precedent alone — they
-  are both legitimate readings of different, real precedents, and getting
-  this wrong reproduces the same class of "documented failure discovered
-  at first uninstall" DEC-030 was written to prevent.
-- **Recommendation:** present both options fully, require an explicit
-  control-room choice.
-- **Accepted-candidate wording:** **Not resolved by this record — genuinely
-  blocking.** Option (a): domain-`selection_add` (mirrors `job_type`'s
-  proven ownership rule) — requires a `mutation.attempt`-scoped analogue of
-  `_reassign_to_historic_job_type()` to be shipped in **core, before Stage 1**
-  registers its first value, exactly mirroring LC-1's proven "ship the
-  generic mechanism before the first consumer" sequencing. Option (b):
-  core-fixed, non-extensible Selection enumerating the closed MVP set
-  directly (consistent with the original L2-D6's "closed set... never an
-  implicit inheritance" framing) — sidesteps the uninstall problem entirely
-  but reintroduces exactly the "core carries domain vocabulary" pattern
-  DEC-030's Option D was already explicitly rejected for.
-- **Alternatives considered:** the two options above are the only two with
-  real precedent support found in this session's research; no third
-  alternative was identified.
-- **Risk:** choosing (b) without acknowledging the DEC-030 precedent
-  conflict, or choosing (a) without shipping the historic-conversion
-  mechanism first, both reproduce known failure classes.
-- **Rollback:** N/A — foundational schema decision, must be made before
-  Stage 0 implementation of the field.
-- **Exact implementation impact:** determines whether Stage 0 must ship a
-  new core historic-conversion helper (option a) or not (option b) —
-  materially different Stage 0 scope depending on the choice.
-- **Exact tests:** whichever option is chosen, an uninstall-simulation test
-  proving D34's classification holds under that specific mechanism.
-- **Unresolved question:** **BLOCKING — explicit control-room decision
-  required, not inferable from precedent alone.** O's attached validation
-  note: whichever option is chosen, D15's registry, D30's read-only ACL,
-  and this field's ownership together are the complete mechanism keeping
-  core domain-agnostic; a build-time/AST guard (folded into D37) must
-  assert zero literal domain-specific branching in core dispatch/job/attempt
+- **Fact:** two live, precedent-supported options were originally
+  presented, pulling in opposite directions. `job_type`'s ownership rule
+  (whichever module owns a mutation's handler also owns its
+  domain-vocabulary value, via `selection_add`) is DEC-008-consistent,
+  proven precedent — call this option (a). DEC-030's Option D (core
+  carrying domain vocabulary directly, as a core-fixed Selection) was
+  explicitly rejected once already — this entry's original option (b)
+  would have reintroduced that same rejected pattern. **A third option
+  exists and was omitted from this entry's original framing:** (c) a
+  registry-validated, indexed `Char` field — not a Selection of either
+  kind. Its values are never enumerated in the field's own type
+  declaration; validity is enforced entirely by D15's reconciliation
+  registry (fail-closed on an unregistered value) and D16's runtime gate,
+  both of which already exist as this design's own mechanism for keeping
+  core domain-agnostic.
+- **Inference:** option (c) achieves both goals options (a) and (b) each
+  achieved only one of: it keeps core domain-agnostic (like (a)) **and**
+  avoids any domain-selection uninstall coupling or LC-1-style
+  historic-conversion mechanism (like (b) claimed to, without actually
+  reintroducing DEC-030's rejected pattern, unlike (b)). A `Char` field has
+  no `selection_add` lifecycle to reconcile with LC-1 at all — there is no
+  "historic value" problem for D34's uninstall classification to solve,
+  because there is no Selection whose enumerated values could become
+  orphaned by an uninstalled domain module in the first place.
+- **Recommendation:** adopt option (c), closing this entry's original
+  either/or framing.
+- **Accepted-candidate wording — RESOLVED:** `mutation_domain` is a
+  **required, indexed `Char`** field on `mutation.attempt` (per D2's
+  schema). It is **not** a core-fixed Selection (rejects original option
+  (b)) and **not** a domain-`selection_add` Selection (rejects original
+  option (a)) — both alternatives are superseded by option (c). Validity
+  is enforced fail-closed against D15's reconciliation-strategy registry
+  (and D16's runtime gate before every C2 commit): an unregistered value
+  is rejected at write time, never silently accepted. Together with D15's
+  registry, D30's read-only ACL, and this field's Char ownership, this is
+  the complete mechanism keeping core domain-agnostic (O's original
+  validation note, now satisfied by option (c) rather than by whichever of
+  (a)/(b) might have been chosen) — a build-time/AST guard (D37) asserts
+  zero literal domain-specific branching in core dispatch/job/attempt
   files.
+- **Alternatives considered:** option (a), domain-`selection_add`
+  (rejected — unnecessary lifecycle complexity once option (c) achieves
+  the same domain-agnostic goal without it); option (b), core-fixed
+  Selection (rejected — reintroduces DEC-030's Option D pattern, exactly as
+  this entry originally found). Both remain documented here as the two
+  options this entry originally presented, now both superseded.
+- **Risk:** a `Char` field is weaker than a Selection at the database-schema
+  level (no enum constraint) — mitigated by the registry-validation
+  fail-closed gate being the actual enforcement mechanism in both cases;
+  the original Selection options never relied on database-level enum
+  enforcement either (Odoo Selections are not database-level enums).
+- **Rollback:** N/A — foundational schema decision, resolved above; no
+  longer a precondition to beginning Stage 0 implementation of the field.
+- **Exact implementation impact:** `mutation_domain` implemented as
+  `Char(required=True, index=True)` with a registry-validation write-time
+  check (D15/D16) — no historic-conversion helper is needed (unlike option
+  (a) would have required), simplifying Stage 0's scope relative to either
+  original option.
+- **Exact tests:** a registry-fail-closed test (write with an unregistered
+  `mutation_domain` value is rejected); an uninstall-simulation test
+  proving D34's classification holds — trivially, since a `Char` field has
+  no selection-uninstall coupling to test against in the first place.
+- **Unresolved question:** None — resolved above.
 
 ### D36 — Rollback procedure (two-phase)
 *(Item 32)*
@@ -1571,8 +2190,14 @@ code reading, not inferred)*
   starts, while the joint mechanism succeeds.
 - **Unresolved question:** None.
 
-### D37 — Repo-wide AST/source guard
-*(Item 34 — BLOCKING for effort-sizing)*
+### D37 — Repo-wide AST/source guard + mutation-wrapper transport guard
+*(Item 34 — RECLASSIFIED 2026-07-19, not an architecture blocker. The
+control-room preliminary review, PR #177 comment 5013028262 point 7, and
+the consolidated Sessions-2-and-3 ruling §14 find that whether existing AST
+tooling can be extended is implementation sizing, resolvable by direct
+inspection at implementation time — not a reason to keep architecture
+undecided. This entry's design itself was never in question; only its
+effort-sizing was.)*
 
 - **Fact:** existing file-scoped guards (`test_read_only_guarantee`,
   `test_public_surface_adds_only_execute_business`, a hand-maintained
@@ -1586,37 +2211,62 @@ code reading, not inferred)*
   in files a maintainer remembered to add to the guard list.
 - **Recommendation:** add a genuine `ast.parse`/`ast.walk`-based repo-wide
   guard, retain the existing file-scoped guards as a second layer.
-- **Accepted-candidate wording:** a genuine `ast`-module parse across every
-  `.py` file under `addons/shopify_connector_*/` must fail the build on any
+- **Accepted-candidate wording — RESOLVED as design, sizing deferred to
+  implementation time:** a genuine `ast`-module parse across every `.py`
+  file under `addons/shopify_connector_*/` must fail the build on any
   `ast.Call` resolving to a raw HTTP-transport call
   (`requests.get/post/request`, etc.) outside `_send()` and an explicit,
   individually justified allowlist (seeded with the existing
   `product_importer.py:1958` CDN bypass). Existing file-scoped guards are
-  retained, not replaced.
+  retained, not replaced. **Extended per D16:** this guard must also cover
+  the mutation-wrapper transport requirement — any GraphQL document
+  containing a `mutation` operation issued from a call site outside the
+  attempt wrapper fails the build, complementing (not duplicating) D16's
+  runtime API-client-level guard. **Whether the underlying `ast.parse`/
+  `ast.walk` scanning infrastructure already exists repo-wide, or must be
+  built new, is determined by direct inspection at implementation time —
+  this is implementation sizing, not an architecture blocker**, per the
+  consolidated ruling: the guard's required behavior (fail the build on a
+  bypass, cover the mutation-wrapper case) is fully specified above
+  regardless of which sizing outcome direct inspection finds.
 - **Alternatives considered:** rely on code review alone (rejected — proven
   insufficient by the existing tolerated bypass, which presumably passed
   review once already); regex-based scanning (rejected — less reliable
-  than genuine AST parsing for detecting call-site patterns robustly).
+  than genuine AST parsing for detecting call-site patterns robustly);
+  treating the tooling-maturity question as a precondition to deciding the
+  guard's design (this entry's original framing — rejected: the design
+  does not depend on the answer, only the implementation effort does).
 - **Risk:** none beyond normal CI-time cost of an additional static-analysis
   pass.
 - **Rollback:** N/A — a test/CI addition, not a runtime feature.
-- **Exact implementation impact:** one new static-analysis test module.
+- **Exact implementation impact:** one new or extended static-analysis test
+  module, scope determined by the direct-inspection finding at
+  implementation time (see below).
 - **Exact tests:** the guard itself is the test; additionally, a
   negative-control test asserting the guard actually fails the build when
   a deliberately-introduced bypass is present (proves the guard isn't a
-  no-op).
-- **Unresolved question:** **BLOCKING for effort-sizing, not just design.**
-  This session's own grounding material contains a direct, unresolved
-  contradiction between two source audits over whether repo-wide
+  no-op); a test asserting the mutation-wrapper-transport case specifically
+  (D16's extension) is caught.
+- **Unresolved question:** this session's own grounding material contains a
+  direct contradiction between two source audits over whether repo-wide
   `ast.parse`/`ast.walk` tooling **already exists**: one audit found zero
   matches repo-wide; another cited specific `ast.parse`/`ast.walk` usage
-  with line numbers across 8 named test files. **This must be closed by
-  direct file inspection before Stage 0 is sized** — if the tooling already
-  exists, D37 is an extension task; if not, it is new infrastructure. Not
-  resolved by this record.
+  with line numbers across 8 named test files. **Resolved to a sizing task,
+  not a blocker**: this is closed by direct file inspection at the start of
+  Stage 0 implementation itself — if the tooling already exists, D37 is an
+  extension task; if not, it is new infrastructure. Either way, Stage 0
+  implementation may begin; this only affects how much of it is spent on
+  this guard specifically.
 
-### D38 — Runtime/concurrency/crash-injection proof requirements
-*(Item 35 — BLOCKING)*
+### D38 — Runtime/concurrency/crash-injection proof requirements — four
+proof-environment layers
+*(Item 35 — RESOLVED as a Stage 0 merge-acceptance criterion, not a
+pre-implementation architecture blocker, 2026-07-19. The control-room
+preliminary review, PR #177 comment 5013028262 point 8, and the
+consolidated Sessions-2-and-3 ruling §15 require distinguishing four
+proof-environment layers, not three, and explicitly reject making
+Odoo.sh-internal `SIGKILL` the sole acceptable crash-proof route without
+first proving that capability exists.)*
 
 - **Fact:** the only genuine-concurrency test pattern proven anywhere
   in-repo (the `db_connect`+`registry.cursor`-monkey-patch+`threading.Thread`
@@ -1624,71 +2274,108 @@ code reading, not inferred)*
   and has never been pointed at `job.py`/`dispatch.py`'s claim logic. No
   genuine OS-process-level crash-injection pattern (real `SIGKILL` or
   equivalent, not a same-process exception) exists anywhere across all 17
-  existing test files.
-- **Inference:** three distinct proof layers exist and must not be
-  conflated — logical/simulated unit tests prove the *design* is
-  internally consistent; genuine multi-connection concurrency tests prove
-  the *claim/lock/commit-point* mechanics hold under real concurrent
-  access; genuine OS-level crash injection proves the *recovery tables*
-  (D23/D24) hold against an actual process death, not a simulated one.
-  Accepting Layer 2 as "runtime-proven" on the strength of only the first
-  layer, while the foundational claim-lock mechanism itself is still only
-  "REDUCED, not closed" per the risk register's own open SRR-04/SRR-09
-  entries, would be evidence-inverted.
-- **Recommendation:** require all three layers explicitly, with SRR-04/SRR-09
-  resolved or explicitly carried forward as named residual risk.
-- **Accepted-candidate wording:** three **distinct** proof layers required
-  before Stage 0 is declared "runtime-proven": **(1)** logical/simulated
-  unit tests over the C1/C2/NET/C3 sequence; **(2)** a genuine
-  multi-connection concurrency suite (extending the proven
-  `db_connect`+monkey-patch+`threading.Thread` technique to
-  `job.py`/`dispatch.py`'s claim logic together with the new commit points),
-  with at least one test per row of D19/D23/D24's crash-window recovery
-  table; **(3)** a genuine **OS-process-level** crash-injection test (real
-  `SIGKILL`/equivalent) against a real hosted-Postgres target, covering at
-  minimum a kill between C2→NET and NET→C3. **If genuine OS-level crash
-  injection is infeasible on the target Odoo.sh environment — a capability
-  entirely unestablished by any source in this session's research — this
-  is Wave-3-DoR hard-stop 6/10: stop, do not substitute simulation,
-  escalate for an explicit, separately-logged product-owner risk-acceptance
-  decision.**
+  existing test files. Whether genuine OS-process-level crash injection is
+  feasible **specifically inside the Odoo.sh multi-worker environment** is
+  unestablished by any source in this session's research — but that
+  question does not need to gate Stage 0's crash-injection evidence,
+  because Odoo.sh feasibility is not the only route to that evidence.
+- **Inference:** this entry's original framing conflated two different
+  questions — "is genuine process-death evidence required" (yes, settled)
+  and "must it come from inside Odoo.sh specifically" (no — a dedicated
+  real-Postgres process-kill harness, run outside or alongside Odoo.sh
+  where process control is actually available, can supply the
+  crash-injection evidence, while Odoo.sh separately supplies
+  registry/multi-worker evidence a standalone harness cannot). Treating
+  Odoo.sh-internal `SIGKILL` as the *only* acceptable crash-proof route
+  was an unproven assumption about environment capability, not a
+  requirement of the underlying safety property.
+- **Recommendation:** four distinct, separately-evidenced proof layers,
+  none substitutable by simulation, with the OS-process-crash layer
+  explicitly decoupled from the multi-worker-validation layer.
+- **Accepted-candidate wording — RESOLVED:**
+  - **Layer 1 — static/unit/logical:** state-machine tests over the
+    C1/C2/NET/C3 sequence, proving the design is internally consistent.
+  - **Layer 2 — genuine PostgreSQL multi-connection concurrency:**
+    extending the proven `db_connect`+monkey-patch+`threading.Thread`
+    technique to `job.py`/`dispatch.py`'s claim logic together with the new
+    commit points, under genuine Odoo REPEATABLE READ, with at least one
+    test per row of D19/D23/D24's crash-window recovery table.
+  - **Layer 3 — controlled real process-death/crash harness:** genuine
+    OS-process-level crash injection (real `SIGKILL`/equivalent, never a
+    same-process exception) against a real PostgreSQL target, run
+    **outside or alongside Odoo.sh, wherever process control is actually
+    available** — not conditioned on Odoo.sh itself supporting it. Covers
+    at minimum a kill between C1→C2, C2→NET, during NET, NET→C3, and
+    during C3.
+  - **Layer 4 — exact-head Odoo.sh multi-worker validation:** residue,
+    lock, session, credential, and redaction proof on the target
+    hosting environment, at exact committed head, proving Worker B cannot
+    execute a handler Worker A durably owns and that sweep-driven
+    reconciliation is observed on a real killed worker — this layer
+    supplies multi-worker/environment evidence Layer 3's standalone
+    harness cannot, and does not itself need to be the source of the
+    OS-process-crash evidence.
+  All four layers are required; none is substitutable by simulation; **no
+  layer may substitute for another** — Layer 4 does not need to reproduce
+  Layer 3's crash-injection technique internally, and Layer 3 does not need
+  to run inside Odoo.sh. **This is a Stage 0 merge-acceptance criterion,
+  not a precondition to beginning Stage 0 implementation** — implementation
+  of the C1/C2/NET/C3 code path may begin immediately once DEC-036 itself
+  is accepted; these four layers gate the wave's *merge*, not its start.
 - **Alternatives considered:** accept simulated/logical proof alone as
-  sufficient for acceptance (rejected — explicitly forbidden by this
-  decision's own reasoning and by Wave-3-DoR hard-stop 6/10; simulation is
-  never a substitute for genuine crash injection when feasible).
-- **Risk:** shipping Stage 0 without all three proof layers risks exactly
+  sufficient for acceptance (rejected — simulation is never a substitute
+  for genuine crash injection when feasible); requiring OS-level crash
+  injection to occur specifically inside Odoo.sh, with no alternative route
+  (this entry's original framing — **rejected**: over-conditions a
+  provable safety property on one specific environment's unverified
+  process-control capability, when a dedicated external harness can supply
+  equivalent evidence).
+- **Risk:** shipping Stage 0 without all four proof layers risks exactly
   the failure class Layer 2 exists to prevent going unverified in
-  production.
+  production; this risk is unchanged by the four-layer correction — only
+  the *routing* of where Layer 3's evidence comes from is corrected.
 - **Rollback:** N/A — an acceptance-gate requirement, not a feature.
 - **Exact implementation impact:** determines the Stage 0 packet's entire
-  test/runtime-plan section (see the Stage 0 packet document).
+  test/runtime-plan section (see the Stage 0 packet document, corrected to
+  four layers below); Stage 0 implementation itself is not blocked by
+  this decision — only its merge is.
 - **Exact tests:** enumerated above; see the Stage 0 packet for the full
   test-file-level breakdown.
-- **Unresolved question:** **BLOCKING.** Whether genuine OS-process-level
-  crash injection is feasible on the target Odoo.sh hosting environment is
-  entirely unestablished by any source across this session's entire
-  research — must be determined empirically before Stage 0's runtime plan
-  can be finalized, per the hard-stop above.
+- **Unresolved question:** whether Odoo.sh itself supports genuine
+  OS-process-level crash injection remains factually open, but is **no
+  longer blocking** — Layer 3's evidence can be produced by a dedicated
+  external harness regardless of that answer, and Layer 4's Odoo.sh
+  evidence does not depend on Odoo.sh supporting process-kill internally.
+  If, at implementation time, no environment anywhere can supply genuine
+  Layer 3 evidence at all (not merely "not inside Odoo.sh"), that remains a
+  Wave-3-DoR hard-stop 6/10 escalation — but this is now a narrow,
+  concretely-scoped residual case, not the default expectation.
 
 ---
 
 ## 4. Cross-cluster contradictions, gaps, and inconsistencies
 
 (Full detail in the underlying workflow consolidation; summarized here for
-the acceptance record.)
+the acceptance record. **Updated 2026-07-19** — items 1 and 9 are now
+resolved per the consolidated Sessions-2-and-3 ruling; all others unchanged
+from Session A's original consolidation.)
 
 1. **`mutation_attempt.job_id` field type** — three-way conflict
-   (Many2one-FK-restrict vs. plain Integer); folded into D20, **BLOCKING**.
+   (Many2one-FK-restrict vs. plain Integer); **RESOLVED under D2** —
+   `Many2one('shopify.connector.job', required=True, index=True,
+   ondelete='restrict')`, binding per the consolidated ruling §5/§8.
 2. **Resolution-field/action naming** — three different names proposed for
-   the same settled mechanism (D10/D11); an editorial call, not a
-   substantive gap — canonicalized here as `resolution_disposition` /
-   `action_resolve_mutation_attempt`, flagged for deliberate control-room
-   ratification.
-3. **`attempt_id` regeneration-per-attempt vs. cross-retry tracking** — one
-   root cause behind three separately-raised "unresolved question" markers
-   (D6, D17, D14); resolving `attempt_id`'s scope (a single control-room
-   decision) would close all three at once. The N=3 cap's persistence scope
-   (D17) is the sharpest unresolved instance.
+   the same settled mechanism (D10/D11); **RESOLVED** — the consolidated
+   ruling itself uses and ratifies `resolution_disposition`/
+   `action_resolve_mutation_attempt` (plus the new `resolution_source`),
+   closing the naming question this item originally left open for
+   deliberate ratification.
+3. **`attempt_token` regeneration-per-attempt vs. cross-retry tracking** —
+   one root cause behind three separately-raised "unresolved question"
+   markers (D6, D17, D14); **RESOLVED** — D17's per-attempt scope is
+   confirmed sufficient given the retry-eligibility sequencing guarantee
+   (no new attempt can exist while the current one is unresolved), closing
+   all three markers this item pointed at.
 4. **`running_since` vs. `started_at`** — caught by only one review cluster;
    the cluster that designed the commit protocol (D19) never named the
    staleness-clock field the sweep (D26) actually depends on. Resolved at
@@ -1698,7 +2385,9 @@ the acceptance record.)
 5. **Reconciliation-verdict evidence priority** (idempotency-key replay vs.
    quantity read) — raised by the transaction-protocol review, squarely
    inside the reconciliation-framework review's domain, never connected.
-   Orphaned; carried to Part 5 below (D24's unresolved question).
+   Orphaned; carried to Part 5 below (D24's unresolved question) — genuinely
+   unresolved, narrow-scope, non-blocking for Stage 0 (D24's core recovery
+   handling does not depend on the answer).
 6. **Batching (K/L vs. 33)** — the two clusters that examined it converge
    cleanly (exclude it, D4); the actual gap is between that converged
    conclusion and the Wave 3 DoR's own still-hedging text ("batching...
@@ -1707,78 +2396,89 @@ the acceptance record.)
    not a true contradiction; resolved at D7 by adopting the general,
    per-domain-declared-allowlist framing with the inventory domain's
    concrete shape as one instance of it.
-8. **`manual_review_subreason` new values** — four different new values
-   proposed independently across three review areas
-   (`no_reconciliation_strategy` D16, an unnamed "store disconnected
-   mid-attempt" value D28/D29, `store_identity_mismatch` D18, plus reuse of
-   existing `duplicate_risk` D17) never assembled into one consolidated
-   diff before this record — this is the first place all four appear
-   together; the control room should treat this list as the single source
-   for that field's extension.
+8. **`manual_review_subreason` new values** — five values now assembled
+   into one consolidated list across all review areas
+   (`no_reconciliation_strategy` D16, a dedicated "store disconnected
+   mid-attempt" value D28/D29, `store_identity_mismatch` D18,
+   `idempotency_contract_violation` D6, plus reuse of existing
+   `duplicate_risk` D17) — this is the single source for that field's
+   extension.
 9. **Two pre-existing, overlapping `blocked_manual_review→queued`
-   mechanisms** (`action_resolve_manual_review`, `action_manual_retry`)
-   never reconciled with D11's new third mechanism — genuinely unresolved,
-   carried to Part 5 below.
+   mechanisms** (`action_resolve_manual_review`, `action_manual_retry`) —
+   **RESOLVED under D11** — both are extended with an explicit refusal
+   guard for any `duplicate_risk`, mutation-attempt-linked job, closing the
+   bypass this item originally left open.
 10. **AST-tooling-maturity contradiction** — whether repo-wide
     `ast.parse`/`ast.walk` infrastructure already exists is asserted both
-    ways within this session's own grounding material; affects D37's
-    effort-sizing directly; resolvable by direct inspection, not yet
-    resolved.
+    ways within this session's own grounding material; **RECLASSIFIED under
+    D37** — this affects D37's effort-sizing only, resolvable by direct
+    inspection at implementation time, and does not block Stage 0
+    implementation from beginning.
 
 ---
 
-## 5. Genuinely unresolved / blocking items after this consolidation
+## 5. Remaining items after the consolidated Sessions-2-and-3 ruling
+(2026-07-19)
 
-These could **not** be forced to a false resolution — each requires either
-a control-room/product-owner decision not inferable from precedent, or
-direct empirical/environmental verification not available from
-documentation alone.
+**No item below is a pre-implementation architecture blocker.** Every item
+that this record originally marked **BLOCKING** is resolved in Part 3
+above per the consolidated ruling. What remains falls into three
+non-blocking categories: (I) Stage 0 merge-acceptance/implementation-proof
+requirements (already correctly scoped as such, not preconditions to
+starting); (II) tunable-constant/empirical-measurement gaps; (III) narrow,
+genuinely open questions with no bearing on Stage 0's own scope. None
+prevents Stage 0 implementation from beginning once DEC-036 is accepted.
 
-1. `mutation_attempt.job_id` field type (§4 item 1) — **BLOCKING (D20)**.
-2. C2 cursor placement (main vs. side cursor) — **BLOCKING (D20)**.
-3. Open-transaction-spans-network-call proof — **BLOCKING (D22)**.
-4. Disconnect-quiescence/sweep-timeout interaction — **BLOCKING (D28)**,
-   explicit control-room choice between remediation (a) and (b).
-5. `mutation_domain` field ownership — **BLOCKING (D35)**, explicit
-   control-room choice between option (a) and (b).
-6. Reconciliation-strategy registry's owning model — never named in the
-   original design; must be fixed before D15 can be implemented.
-7. N=3 inconclusive-cap persistence scope — **BLOCKING (D17)**, product-owner
-   safety-property decision.
+**Category I — Stage 0 merge-acceptance criteria (implementation proof,
+not architecture):**
+
+1. D38's four-layer runtime/concurrency/crash-injection proof — required
+   before Stage 0 **merges**, not before it begins.
+2. D22's `pg_stat_activity`-based open-transaction runtime proof — same.
+3. D37's AST-tooling-maturity direct-inspection finding — implementation
+   sizing, resolved at the start of implementation, not before.
+
+**Category II — tunable constants / empirical-measurement gaps (not design
+gaps):**
+
+4. Sweep cadence/timeout exact numeric values (D27) — provisional 30
+   minutes, pending Odoo.sh worst-case handler-duration measurement; no
+   longer contingent on D28 (resolved).
+5. Local idempotency-key safety-margin exact value (D6) — this session's
+   own Recommendation (23h), zero source support for the specific number;
+   needs explicit control-room ratification of the number, not the
+   mechanism (resolved).
+6. Retention masking-window exact value (D32) — provisional 180 days;
+   needs explicit control-room ratification of the number, not the
+   mechanism (resolved).
+
+**Category III — narrow, genuinely open, non-blocking questions:**
+
+7. Reconciliation-verdict evidence priority (idempotency-key-replay read
+   vs. independent quantity read) — orphaned between review areas (D24);
+   does not block D24's core recovery handling, which does not depend on
+   the answer.
 8. Whether Shopify's THROTTLED response ever has a genuine server-side
    execution effect — factually open; the conservative `uncertain`
-   classification (D9) is safe to *ship* without resolving this, but the
-   fact itself remains open.
-9. Two pre-existing, overlapping `blocked_manual_review→queued` mechanisms
-   never reconciled with D11's new third mechanism.
-10. Reconciliation-verdict evidence priority (idempotency-key-replay read
-    vs. independent quantity read) — orphaned between review areas (D24).
-11. Whether Shopify's `UserError` shape carries a per-entry field-path
-    index sufficient for any future batching design — blocking only for
-    *future* batching work, not for Stage 0/1 (D4 excludes batching
-    entirely).
-12. AST-tooling-maturity contradiction — resolvable by direct inspection,
-    not yet resolved; blocks D37's effort-sizing.
-13. Genuine OS-process-level crash-injection feasibility on the target
-    Odoo.sh hosting environment — entirely unestablished; **BLOCKING (D38)**,
-    invokes Wave-3-DoR hard-stop 6/10 if infeasible.
-14. Literal field name for job→store linkage on `shopify.connector.job` —
-    never confirmed by direct quote; blocks D3's `related=` field until
-    verified against the actual field list.
-15. Sweep cadence/timeout exact numeric values — empirical-measurement gap,
-    not a design gap (D27).
-16. Local idempotency-key safety margin (23h vs. Shopify's confirmed 24h) —
-    this session's own Recommendation, zero source support for the
-    specific margin value; needs explicit control-room ratification (D6).
-17. `resolution_disposition`/`action_resolve_mutation_attempt` naming — not
-    a substantive ambiguity, needs deliberate ratification (D10/D11).
-18. **Out-of-scope document corrections** (not this session's to fix, but
-    blocking before Stage 1 begins): `inventory-operating-model.md` §4.4
-    and `task-013-inventory-sync-implementation-packet.md`'s CAS-heading
-    text still reference `compareQuantity` as primary and must be corrected
-    to `changeFromQuantity` in a session with those files in its allowed
-    list, before the locked Stage 1 prompt (not this session's Stage 0
-    prompt) can be issued.
+   classification (D9) is safe to *ship* without resolving this.
+9. Whether Shopify's `UserError` shape carries a per-entry field-path
+   index sufficient for any future batching design — blocking only for
+   *future* batching work, never for Stage 0/1 (D4 excludes batching
+   entirely).
+10. Literal field name for job→store linkage on `shopify.connector.job` —
+    never confirmed by direct quote; blocks only D3's `related=` field
+    until verified against the actual field list — a narrow,
+    implementation-time verification step.
+
+**Out-of-scope document corrections (Gate B, not Stage 0):**
+
+11. `inventory-operating-model.md` §4.4 and
+    `task-013-inventory-sync-implementation-packet.md`'s CAS-heading text
+    still reference `compareQuantity` as primary and must be corrected to
+    `changeFromQuantity` in a Gate B session with those files in its
+    allowed list, before Task 013 implementation is authorized — see Part
+    0.5's Gate B carry-forward list. This does not block Stage 0, which
+    carries no inventory-domain code.
 
 ---
 
@@ -1790,15 +2490,26 @@ specifies. **This record does not accept anything.** The control room's
 possible dispositions, per this session's governing task: **ACCEPT**,
 **ACCEPT WITH CORRECTIONS**, **REVISE**, **REJECT**.
 
-Given the number of genuinely blocking items in §5 above (eight items
-marked **BLOCKING** at the individual-decision level: D17, D20, D22, D28,
-D35, D37, D38, plus the cross-cutting D12 implementation-prerequisite and
-the out-of-scope document corrections), this session's own assessment —
-offered as a Recommendation, not a self-acceptance — is that the package is
-well-suited to **ACCEPT WITH CORRECTIONS** treatment for the *non-blocking*
-majority of decisions (D1–D11, D13–D16, D18–D19, D21, D23–D27, D29–D34,
-D36), with the **BLOCKING** items requiring explicit control-room decisions
-before Stage 0 implementation of the affected pieces may begin. This
+**Status after this correction batch (2026-07-19):** every decision this
+record previously marked **BLOCKING** at the individual level (D17, D20,
+D22, D28, D35, D37, D38) is now resolved in Part 3, per the binding
+consolidated Sessions-2-and-3 ruling (PR #177 comment 5014689445). The
+cross-cutting D12 implementation prerequisite (correct the CAS field name
+in code from day one) remains a hard implementation prerequisite, not an
+architecture blocker — it was never blocking Stage 0's *design*, only
+flagging a factual correction that must land in code. The two out-of-scope
+document corrections remain a named Gate B prerequisite (Part 5, item 11),
+outside this session's allowed-files list, not a Stage 0 blocker.
+
+**This session's own assessment — offered as a Recommendation, not a
+self-acceptance —** is that DEC-036, as corrected in this batch, is now
+suitable for **ACCEPT WITH CORRECTIONS** treatment across its full
+decision inventory (D1–D38): no decision remains genuinely undecided at
+the architecture level. What remains is (a) the control room's own
+independent review and acceptance act on this corrected package, (b)
+Category I's implementation-proof work (Stage 0 merge-acceptance
+criteria, not a precondition to starting), (c) Category II's
+tunable-constant ratifications, and (d) Gate B's out-of-scope document
+corrections before Task 013 implementation specifically. This
 recommendation is not binding and is subject to the control room's own
-independent judgment, including whatever Session C's code/architecture
-audit surfaces that this session could not see.
+independent judgment.
