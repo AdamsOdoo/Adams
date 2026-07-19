@@ -1,7 +1,14 @@
 # Wave 3 Dev-Store Mutation-Validation Plan — Task 013/013B Inventory
 
-> **Status: GATE B ACCEPTANCE CANDIDATE — PLANNING ONLY. NOT EXECUTED. NO
-> GATE OPENED.** Produced 2026-07-19, Wave 3 Gate B session, per
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 3) — PLANNING ONLY. NOT
+> EXECUTED. NO GATE OPENED.** Produced 2026-07-19, Wave 3 Gate B session,
+> corrected Revision 3 same date per control-room comment `5015830229`:
+> scenarios 3/5/9 corrected for the one-job/one-attempt-lifetime job
+> model (a CAS retry or an activation handoff creates a **new**, atomic
+> job — never a same-job redispatch or a later scan/trigger dependency);
+> scenario 19's error-class value corrected to the fixed vocabulary; two
+> new scenarios (20, 21) cover `blocked_manual_review` non-automatic-child
+> behavior and the `action_recheck_inventory_pair` release action; per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md). This
 > document defines the exact scenarios, preconditions, and evidence
 > capture for the genuine dev-store mutation evidence Wave 3 requires
@@ -137,10 +144,12 @@ expected logs, cleanup, stop conditions.
 
 - **Preconditions:** binding confirmed (scenario 2); scenario 9
   (activation, its own separate job) has already gone terminal
-  `succeeded`, and a **fresh** `inventory_push_sync` orchestration
-  dispatch (a distinct job from scenario 9's activation job, admitted
-  only after activation went terminal, DEC-037 §5.2 step 7) has re-read
-  Shopify, found the level at `available=0`, and enqueued this
+  `succeeded`, and — **atomically, in the same transaction that
+  terminalized the activation job** (DEC-037 §5.2 step 7/§5.4 handoff B;
+  Revision 3: this is not a later, separately-admitted scan/manual
+  trigger) — a fresh `inventory_push_sync` orchestration dispatch (a
+  distinct job from scenario 9's activation job) was enqueued, has
+  re-read Shopify, found the level at `available=0`, and enqueued this
   scenario's `inventory_set_quantities` job.
 - **Permitted mutations:** 1 (`inventorySetQuantities`, target quantity
   7).
@@ -199,13 +208,15 @@ expected logs, cleanup, stop conditions.
   should not be, since no concurrent writer exists) → stop, investigate
   the fresh-read mechanism.
 
-### Scenario 5 — Deliberately provoked `CHANGE_FROM_QUANTITY_STALE`
+### Scenario 5 — Deliberately provoked `CHANGE_FROM_QUANTITY_STALE`, replacement-job model (corrected, Revision 3, DEC-037 §4 row 1/§5.4 handoff C)
 
-- **Preconditions:** Shopify `available=4` (scenario 4). Immediately
-  before the connector's push fires, the **operator manually** changes
-  the Shopify level via the Shopify Admin UI (or a separate, out-of-band
-  API call the operator makes directly, not through the connector) to a
-  different value (e.g. `9`), simulating a concurrent external writer.
+- **Preconditions:** Shopify `available=4` (scenario 4); the confirmed
+  pair's `inventory_set_quantities` job at `cas_retry_ordinal=0`.
+  Immediately before the connector's push fires, the **operator
+  manually** changes the Shopify level via the Shopify Admin UI (or a
+  separate, out-of-band API call the operator makes directly, not
+  through the connector) to a different value (e.g. `9`), simulating a
+  concurrent external writer.
 - **Permitted mutations:** 1 connector mutation attempt (which is
   expected to fail with `CHANGE_FROM_QUANTITY_STALE`) + 1 operator-made
   out-of-band mutation (the provoking change, made directly via Shopify
@@ -214,23 +225,50 @@ expected logs, cleanup, stop conditions.
 - **Operator approval:** the operator explicitly performs the
   out-of-band change and then allows the connector's queued push to
   proceed.
-- **Odoo action:** the connector's stale attempt sends
+- **Odoo action:** the `cas_retry_ordinal=0` job's single attempt sends
   `changeFromQuantity=4` (its last fresh read, now stale).
 - **Shopify request:** `inventorySetQuantities(..., changeFromQuantity: 4)`
   against a level now at `9` → `CHANGE_FROM_QUANTITY_STALE` `userError`.
-- **Expected Odoo result:** attempt `observed_outcome='failed_clean'`
-  (clean rejection); routes to a **new** bounded retry attempt (1 of 3)
-  with a fresh `changeFromQuantity` read (`9`).
-- **Expected Shopify result:** the retry succeeds, setting the intended
-  target against the now-current `9` basis.
-- **Expected job state:** `done` after the successful retry.
-- **Expected attempt state:** first attempt `failed_clean`; second
-  attempt (new `attempt_token`) `succeeded`.
-- **Expected logs:** both attempts logged distinctly; retry count = 1.
+- **Expected Odoo result:** the `cas_retry_ordinal=0` job's attempt
+  observes `observed_outcome='failed_clean'`,
+  `error_class='concurrency_race_conflict'`. **Revision 3 correction:**
+  this job then **terminalizes** — `superseded_by_job_id` set,
+  `cancel_reason='cas_stale_bounded_replacement'` — atomically, in the
+  same transaction, with a **new**, separate `inventory_set_quantities`
+  job created at `cas_retry_ordinal=1`, carrying its own fresh job ID,
+  `attempt_token`, idempotency key, and a fresh `changeFromQuantity`
+  read (`9`). This job is **never redispatched** to make a second
+  attempt itself.
+- **Expected Shopify result:** the ordinal-1 job's attempt succeeds,
+  setting the intended target against the now-current `9` basis.
+- **Expected job state:** the `cas_retry_ordinal=0` job is terminal
+  (`failed_clean`, superseded); the `cas_retry_ordinal=1` job is `done`
+  after its own successful attempt.
+- **Expected attempt state:** exactly one `mutation.attempt` row on the
+  ordinal-0 job (`failed_clean`); exactly one `mutation.attempt` row on
+  the distinct ordinal-1 job (`succeeded`) — never two attempt rows on
+  one job.
+- **Expected logs:** both jobs' single attempts logged distinctly, plus
+  the `superseded_by_job_id` lineage linking ordinal 0 → ordinal 1.
 - **Cleanup:** none.
-- **Stop conditions:** more than 3 bounded retries needed → stop
+- **Stop conditions:** the ordinal-0 job is found to make a second
+  attempt itself (redispatched) rather than terminalizing and handing
+  off to a new ordinal-1 job → stop immediately, this is the exact
+  same-job-redispatch defect binding correction 1 (control-room comment
+  `5015830229`) forbids; more than 3 bounded replacements needed → stop
   (indicates a persistent divergence the design did not anticipate for
-  this scenario); no retry attempted at all → stop (guard defect).
+  this scenario, and would exercise the ordinal-3 exhaustion path
+  instead — see the note below); no replacement job created at all →
+  stop (guard defect).
+- **Note (ordinal-3 exhaustion, not separately re-run in this
+  scenario):** were a 4th `CHANGE_FROM_QUANTITY_STALE` to occur on the
+  job at `cas_retry_ordinal=3`, no further replacement job would be
+  created — that job terminalizes `blocked_manual_review`/
+  `binding_conflict` instead, and the pending target stays coalesced on
+  the binding. Implementation evidence must include this exhaustion path
+  as part of the genuine-concurrency/unit test matrix (DEC-037 §4 row 1
+  exact tests), even though this dev-store scenario exercises only the
+  ordinal 0→1 replacement.
 
 ### Scenario 6 — Same-key exact-request idempotent replay
 
@@ -353,10 +391,12 @@ expected logs, cleanup, stop conditions.
   `available=0`, `on_hand=0`.
 - **Expected job state:** this `inventory_activate` job goes **terminal**
   (`succeeded`) on its own — it does **not** enqueue, dispatch, or
-  contain any `inventorySetQuantities` call. Only afterward does the
-  normal scan/manual trigger admit a **fresh, separate**
-  `inventory_push_sync` orchestration job for the pair (per DEC-037 §5.2
-  step 7), which re-reads Shopify (now `available=0`) and enqueues the
+  contain any `inventorySetQuantities` call. **Revision 3 correction:**
+  atomically, in the **same transaction** that terminalizes this job as
+  `succeeded` (DEC-037 §5.2 step 7/§5.4 handoff B) — not dependent on a
+  later, separately-admitted scan or manual trigger — a **fresh,
+  separate** `inventory_push_sync` orchestration job is enqueued for the
+  pair, which re-reads Shopify (now `available=0`) and enqueues the
   `inventory_set_quantities` job exercised in scenario 3.
 - **Expected attempt state:** exactly one `mutation.attempt` row for this
   job (domain `inventory_activate`); its `job_type`/job ID/`attempt_token`/
@@ -647,7 +687,9 @@ expected logs, cleanup, stop conditions.
 - **Shopify request:** `inventorySetQuantities(...)` against a pair whose
   level no longer exists → `ITEM_NOT_STOCKED_AT_LOCATION` `userError`.
 - **Expected Odoo result:** `observed_outcome='failed_clean'`,
-  `error_class='remote_precondition_mismatch'`, routes to
+  `error_class='inventory_location_missing'` (Revision 3 — the fixed
+  vocabulary value; corrects the earlier draft's invented
+  `remote_precondition_mismatch`), routes to
   `blocked_manual_review`/`inventory_location_missing` — **this job issues
   no `inventoryActivate` call, inline or otherwise, in any form.** The
   pending target stays coalesced on the binding.
@@ -676,6 +718,86 @@ expected logs, cleanup, stop conditions.
   immediately, this is the exact defect binding correction 1 (control-room
   comment `5015619162`) forbids.
 
+### Scenario 20 — `blocked_manual_review` is not terminal; no automatic child (new, Revision 3, DEC-037 §5.5)
+
+- **Preconditions:** scenario 19 complete — the pair's
+  `inventory_set_quantities` job is `blocked_manual_review`
+  (`inventory_location_missing`), holding the pair's
+  `operation_scope_key`. No review action has yet been performed.
+- **Permitted mutations:** 0.
+- **Operator approval:** none — this scenario proves the *absence* of
+  automatic action while blocked.
+- **Odoo action:** the normal scheduled push-scan cron fires for the
+  store while the pair remains blocked; separately, a normal Odoo stock
+  move changes `free_qty` for the same pair (simulating ordinary
+  business activity continuing while the pair is under review).
+- **Shopify request:** none for this pair (the scan skips pairs whose
+  `operation_scope_key` is already held).
+- **Expected Odoo result:** no new `inventory_push_sync`,
+  `inventory_activate`, or `inventory_set_quantities` job is created for
+  this pair by the scan or by the stock-move trigger; the new `free_qty`
+  instead coalesces onto the binding's `pending_target_available`
+  (DEC-037 §10), to be read once the pair is released.
+- **Expected Shopify result:** unchanged.
+- **Expected job state:** the blocked job remains the pair's sole
+  non-terminal job; no sibling or child job exists for the pair.
+- **Expected attempt state:** unchanged from scenario 19 — no new
+  attempt created.
+- **Expected logs:** the scan's own log shows the pair skipped
+  (blocked), not silently ignored.
+- **Cleanup:** none; feeds scenario 21.
+- **Stop conditions:** any new job of any of the three inventory job
+  types is created for this pair while it remains `blocked_manual_review`
+  → stop immediately, this is the exact automatic-child-from-blocked-review
+  defect DEC-037 §5.5 forbids.
+
+### Scenario 21 — `action_recheck_inventory_pair` release (new, Revision 3, DEC-037 §5.5)
+
+- **Preconditions:** scenario 20 complete — the pair remains
+  `blocked_manual_review`, attempt `failed_clean`/effective disposition
+  `not_applied`-equivalent for `inventory_location_missing` (the safe,
+  enumerated release case).
+- **Permitted mutations:** 0 (this action is a local Odoo service call;
+  it does not itself contact Shopify).
+- **Operator approval:** a Reviewer/Administrator explicitly calls
+  `action_recheck_inventory_pair(reason="location re-stocked, re-run")`
+  after confirming out of band (e.g. via Shopify Admin) that the
+  location is stocked again.
+- **Odoo action:** the action acquires the pair's row lock; confirms
+  exactly one active `blocked_manual_review` inventory job for the pair
+  with the required subreason; atomically terminalizes/supersedes that
+  job (`cancel_reason='manual_review_release'`, `superseded_by_job_id`
+  set) and enqueues exactly one fresh `inventory_push_sync` job — all in
+  one transaction.
+- **Shopify request:** none from the action itself; the newly-enqueued
+  `inventory_push_sync` job performs its own fresh read afterward
+  (exercising the same path as scenario 3/10).
+- **Expected Odoo result:** the old job is terminal, `superseded_by_job_id`
+  pointing at the new orchestration job; `observed_outcome` and
+  `resolution_disposition` on the old attempt are **unchanged** by this
+  action; actor UID, reason, old job ID, and new job ID are recorded in
+  the audit log.
+- **Expected Shopify result:** unchanged until the new orchestration
+  job's own read.
+- **Expected job state:** exactly one new `inventory_push_sync` job
+  created; the pair's `operation_scope_key` transfers to it atomically —
+  never a window where the pair is unheld.
+- **Expected attempt state:** no new `mutation.attempt` row from the
+  action itself (it is not a mutation job).
+- **Expected logs:** the release action's actor/reason/old-job-ID/
+  new-job-ID logged; no credential or PII present (this domain carries
+  none).
+- **Cleanup:** allow the new orchestration job to run to completion,
+  restoring the pair to a known state.
+- **Stop conditions:** the action modifies `observed_outcome` or
+  `resolution_disposition` → stop immediately, this is forbidden by
+  DEC-037 §5.5; the action succeeds for an `uncertain`,
+  `duplicate_risk`, `idempotency_contract_violation`, or
+  `store_identity_mismatch` job → stop immediately, this action is
+  explicitly forbidden for those cases; more than one new job is created,
+  or the old job's `operation_scope_key` is not held continuously through
+  the handoff → stop, this is an atomicity defect.
+
 ---
 
 ## 5. No silent caps
@@ -687,12 +809,26 @@ run). No scenario's mutation count or coverage may be silently reduced
 without recording the reduction and its reason in the eventual validation
 results document.
 
+**Error-class vocabulary check (Revision 3, DEC-037 §7/§9):** the
+evidence captured for every scenario above must show only `error_class`
+values from the fixed set (`shopify_user_errors_validation`,
+`inventory_location_missing`, `concurrency_race_conflict`,
+`shopify_throttling_rate_limit`, `shopify_temporary_server_network`,
+`data_shape_schema_mismatch`, `idempotency_contract_violation`,
+`no_reconciliation_strategy`, `store_identity_mismatch`). If any
+evidence file records `remote_validation_rejected`,
+`remote_precondition_mismatch`, `transport_ambiguous`, or
+`clean_rejection` (the withdrawn Revision 2 values), that is a defect to
+report, not a value to accept as observed.
+
 ---
 
 *References: DEC-036 (Layer 2 substrate, ACCEPTED), DEC-037 (Gate B —
-this plan's own decision basis), the Task 013/013B packets, the
-inventory operating model, the reconnect/backfill policy, the Wave 3
-Definition of Ready §2.6. Execution produces
-`docs/05-qa/task-013-inventory-sync-validation-results.md` and
+this plan's own decision basis, Revision 3), the Task 013/013B packets,
+the inventory operating model, the reconnect/backfill policy, the Wave 3
+Definition of Ready §2.6. This plan is now 21 scenarios (20 and 21 added
+Revision 3: `blocked_manual_review` non-automatic-child behavior and the
+`action_recheck_inventory_pair` release action, DEC-037 §5.5). Execution
+produces `docs/05-qa/task-013-inventory-sync-validation-results.md` and
 `docs/05-qa/task-013b-validation-results.md` (created at implementation
 time, not by this plan).*

@@ -6,7 +6,14 @@
 > draft, ready-to-copy template prepared during the Wave 3 Gate B session
 > (2026-07-19; corrected to Revision 2, same date, per control-room
 > comment `5015619162` on PR #179 — the job model below is now three
-> standalone job types, not one job owning two sequential attempts), per
+> standalone job types, not one job owning two sequential attempts;
+> further corrected to Revision 3, same date, per control-room comment
+> `5015830229` — every mutation job now makes at most one attempt for
+> its entire lifetime, CAS/`not_applied` retries create a **new** job
+> rather than redispatching the old one, the activation→orchestration
+> handoff is atomic, `blocked_manual_review` is not terminal, the error
+> vocabulary is fixed, and the ROLE section below is corrected to the
+> current role model), per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) and the
 > corrected
 > [Task 013 packet](../07-implementation-plan/task-013-inventory-sync-implementation-packet.md).
@@ -60,10 +67,16 @@ ROLE
 ======================================================================
 
 You are GPT-5.6 Sol, the primary autonomous research/implementation
-worker for this MVP program (DEC-032). Claude is the control room and
-the only party authorized to merge your wave PR, and independently
-verifies your runtime evidence after you freeze your candidate. You do
-not merge your own PR. You do not mark this PR ready for review.
+worker for this MVP program (DEC-032). ChatGPT is the strategic control
+room and the acceptance authority for this wave. Claude is the planner,
+independent reviewer, and Odoo.sh runtime verifier — Claude reviews your
+diff and independently verifies your runtime evidence after you freeze
+your candidate, and may perform a controlled merge of your wave PR only
+after explicit ChatGPT authorization; Claude is not the control room and
+is not the sole or default merge authority (corrected, Revision 3,
+control-room comment `5015830229` binding correction 6 — every prior
+statement to the contrary is withdrawn). You do not merge your own PR.
+You do not mark this PR ready for review.
 
 ======================================================================
 IDENTITY GATE (verify before writing any code)
@@ -118,7 +131,17 @@ three-job model — §5 — and the consequence contract — §9).
 orchestration/read-only job (no Shopify mutation, no `mutation.attempt`
 row); `inventory_activate` and `inventory_set_quantities` are each their
 own standalone mutation job (`job_type == mutation_domain`). No job may
-execute two Shopify mutations.
+execute two Shopify mutations. **Revision 3 job-lifetime and handoff
+corrections, binding (control-room comment `5015830229`):** no mutation
+job may own more than one `mutation.attempt` row for its entire
+lifetime — a CAS-stale or reconciliation-`not_applied` outcome
+terminalizes that job and creates a **new**, separate job (never a
+same-job redispatch); the activation→fresh-orchestration handoff is
+**atomic** (same transaction as the activation job's own
+terminalization, never dependent on a later scan/manual trigger);
+`blocked_manual_review` is not terminal and is released only by
+`action_recheck_inventory_pair(reason)`; every `error_class` value is
+one of the fixed set in DEC-037 §7/§9.
 
 ======================================================================
 ALLOWED FILES (exhaustive)
@@ -141,11 +164,15 @@ addons/shopify_connector_inventory/** (NEW module):
     wrapper integration per D-013-9 and DEC-037 §4/§5/§9 lives here —
     inventory_set_quantities and inventory_activate are each registered
     as their OWN standalone mutation job type (job_type ==
-    mutation_domain), never combined; inventory_push_sync itself issues
+    mutation_domain), each making at most one mutation.attempt for its
+    entire lifetime, never combined; inventory_push_sync itself issues
     no Shopify mutation and enqueues at most one mutation job per
     dispatch; the fresh changeFromQuantity read into
     preconditions_snapshot at each mutation job's own C2; the
-    pair-serialization admission/handoff mechanics per DEC-037 §5.3)
+    pair-serialization admission/atomic-handoff mechanics per DEC-037
+    §5.3/§5.4 (handoffs A-D, cas_retry_ordinal/superseded_by_job_id/
+    cancel_reason job-lineage fields); the action_recheck_inventory_pair
+    review-release action per DEC-037 §5.5)
   models/shopify_connector_store_settings.py (the two new store settings
     per Task 013 §4: inventory_scheduled_sync_enabled,
     inventory_last_push_scan_at)
@@ -157,20 +184,34 @@ addons/shopify_connector_inventory/** (NEW module):
   tests/test_inventory_level_binding.py (NEW)
   tests/test_inventory_first_push_guard.py (NEW)
   tests/test_inventory_push_mechanics.py (NEW — extended per DEC-037
-    §4/§5/§9: CAS bounded-3-retry test (same-job redispatch, never a new
-    job), fresh-CAS-pre-read-per-retry test, activation/set-quantities
+    §4/§5/§9: CAS bounded-3-replacement test asserting FOUR DISTINCT job
+    records (cas_retry_ordinal 0->1->2->3, connected only by
+    superseded_by_job_id) -- NEVER a redispatch of any prior job -- then
+    blocked_manual_review with no replacement on the 4th mismatch,
+    fresh-CAS-pre-read-per-replacement test, activation/set-quantities
     distinct-JOB test (distinct job_type/job ID/attempt_token/idempotency
-    key, connected only by a fresh orchestration handoff — never two
-    attempts inside one job), static/AST guard that no
-    inventory_set_quantities code path calls inventoryActivate (and vice
-    versa), job_type==mutation_domain invariant test, genuine
+    key, connected only by a fresh, ATOMIC orchestration handoff -- never
+    two attempts inside one job, never a same-job redispatch), static/AST
+    guard that no inventory_set_quantities code path calls
+    inventoryActivate (and vice versa), job_type==mutation_domain
+    invariant test, a reconciliation not_applied verdict (either domain)
+    creates a NEW same-domain job test (never redispatches the resolved
+    one), a blocked_manual_review job creates no automatic child test,
+    action_recheck_inventory_pair release test (authorized reason
+    required, creates exactly one fresh inventory_push_sync job, never
+    rewrites observed_outcome/resolution_disposition), genuine
     independent-PostgreSQL-connection concurrency test proving duplicate
-    phase jobs cannot be created for one pair, THROTTLED classification
-    test, reconciliation applied/not-applied/inconclusive tests for BOTH
-    mutation domains INCLUDING an ABA/freshness fixture (value changes
-    away and back with a later updatedAt -> inconclusive, never
-    not_applied), static/AST guard that no code path matches on
-    UserError.message text for inventoryActivate classification,
+    phase jobs (including a CAS/not_applied replacement job) cannot be
+    created for one pair, THROTTLED classification test, reconciliation
+    applied (asserting NO updatedAt condition)/not-applied/inconclusive
+    tests for BOTH mutation domains INCLUDING an ABA/freshness fixture
+    (value changes away and back with a later updatedAt -> inconclusive,
+    never not_applied), static/AST guard that no code path matches on
+    UserError.message text for inventoryActivate classification, a
+    static/AST guard that no error_class value outside the fixed
+    vocabulary (DEC-037 §7/§9) appears anywhere in the module (in
+    particular none of remote_validation_rejected/
+    remote_precondition_mismatch/transport_ambiguous/clean_rejection),
     store-identity-mismatch test, explicit available:0 activation test,
     no-quantities-array-length->1 static guard)
   tests/test_inventory_triggers.py (NEW)
@@ -218,35 +259,93 @@ HARD CONSTRAINTS
   fingerprints. A mutation job may only enqueue nothing; only
   inventory_push_sync enqueues mutation jobs, and only after its own
   fresh read.
+- ONE MUTATION JOB OWNS EXACTLY ONE mutation.attempt FOR ITS ENTIRE
+  LIFETIME (DEC-037 §5.1/§9, control-room comment `5015830229` binding
+  correction 1). A mutation job is NEVER redispatched to make a second
+  attempt. Every CAS-stale retry and every reconciliation not_applied
+  retry creates a NEW, separate job of the same domain — the old job
+  terminalizes (failed_clean, or resolved not_applied) and is never
+  reused for a further attempt.
 - changeFromQuantity is captured FRESH immediately before each mutation
   job's own C2 — never read from the binding's last_known_shopify_available
   field (informational/display only).
-- CHANGE_FROM_QUANTITY_STALE -> bounded re-read/re-derive, exactly 3
-  retries, each a REDISPATCH of the SAME inventory_set_quantities job
-  (not a new job) with a new attempt (new fingerprints, new key, a fresh
-  narrow CAS pre-read of available/updatedAt, and a fresh read of the
-  binding's coalesced pending target); the 4th mismatch ->
+- CHANGE_FROM_QUANTITY_STALE -> observed_outcome=failed_clean,
+  error_class=concurrency_race_conflict; bounded re-read/re-derive,
+  exactly 3 replacement jobs (cas_retry_ordinal 0->1->2->3), EACH A NEW,
+  SEPARATE inventory_set_quantities job — NEVER a redispatch of the job
+  whose attempt just failed. The failing job terminalizes atomically
+  (superseded_by_job_id set on it, cancel_reason=
+  'cas_stale_bounded_replacement', DEC-037 §5.4 handoff C) in the same
+  transaction that creates the new job (new fingerprints, new key, a
+  fresh narrow CAS pre-read of available/updatedAt, and a fresh read of
+  the binding's coalesced pending target); the 4th mismatch (ordinal 3)
+  creates NO replacement job -> that job terminalizes
   blocked_manual_review/binding_conflict, never a further silent retry.
+- A reconciliation not_applied verdict (either mutation domain) follows
+  the identical pattern: the resolved job terminalizes
+  (superseded_by_job_id set, cancel_reason=
+  'reconciliation_not_applied_replacement', DEC-037 §5.4 handoff D) and a
+  NEW same-domain job is created for the next attempt — never a same-job
+  redispatch.
 - ITEM_NOT_STOCKED_AT_LOCATION observed by inventory_set_quantities is a
   race/contract exception, NOT an inline activation trigger -> routes
-  failed_clean/inventory_location_missing, blocked_manual_review; this
-  job issues NO inventoryActivate call, inline or otherwise, in any form
-  (static/AST-guarded). The pending target stays coalesced; only a
-  LATER, separate, fresh inventory_push_sync orchestration dispatch may
-  find the level genuinely absent and enqueue a new inventory_activate
-  job (DEC-037 §5.2 step 8).
+  failed_clean, error_class=inventory_location_missing,
+  blocked_manual_review; this job issues NO inventoryActivate call,
+  inline or otherwise, in any form (static/AST-guarded). The pending
+  target stays coalesced; only a LATER, separate, fresh
+  inventory_push_sync orchestration dispatch may find the level
+  genuinely absent and enqueue a new inventory_activate job (DEC-037
+  §5.2 step 8).
 - inventory_activate always sends explicit available:0 (never omitted or
-  nonzero); after its effective disposition is applied, it does NOT
-  enqueue inventory_set_quantities itself — the pending target stays
-  coalesced and only a fresh, independently-admitted inventory_push_sync
-  orchestration dispatch (after the activation job has gone terminal) may
-  re-read Shopify and enqueue inventory_set_quantities (DEC-037 §5.2 step
-  7).
+  nonzero); when its own reconciliation read confirms applied, it does
+  NOT enqueue inventory_set_quantities itself — in the SAME transaction
+  that terminalizes inventory_activate as succeeded, a fresh
+  inventory_push_sync job is enqueued ATOMICALLY (DEC-037 §5.2 step
+  7/§5.4 handoff B) — this does NOT wait for an unrelated later scan or
+  manual trigger. The pending target stays coalesced; the
+  atomically-enqueued fresh inventory_push_sync job still performs its
+  own full fresh Shopify read and gates before, in turn, enqueueing
+  inventory_set_quantities.
+- blocked_manual_review is NOT a terminal state for pair admission: a
+  blocked inventory job retains the pair's operation_scope_key,
+  preventing any new job (of any of the three types) from being admitted
+  for the same pair, and preventing any automatic child job. It is
+  released ONLY by action_recheck_inventory_pair(reason) — Reviewer or
+  Administrator only, mandatory non-empty reason, allowed only when the
+  blocked job's attempt is failed_clean with resolved disposition
+  not_applied and subreason inventory_location_missing or an
+  enumerated-safe binding_conflict case (never uncertain,
+  duplicate_risk, idempotency_contract_violation, unresolved
+  reconciliation, or store_identity_mismatch — those remain resolvable
+  only through the Stage 0 Administrator-only manual resolution path).
+  This action never rewrites observed_outcome or resolution_disposition;
+  it atomically terminalizes/supersedes the blocked job
+  (cancel_reason='manual_review_release') and enqueues exactly one fresh
+  inventory_push_sync job, logging actor/reason/old-job-ID/new-job-ID
+  (DEC-037 §5.5). The generic core job manual-retry/manual-review
+  actions remain forbidden for any mutation-evidence-linked job.
+- Job-lineage fields (new, domain-owned): cas_retry_ordinal (Integer,
+  default 0, inventory_set_quantities only), superseded_by_job_id
+  (Many2one, nullable), cancel_reason (Char, nullable, fixed vocabulary:
+  cas_stale_bounded_replacement / reconciliation_not_applied_replacement
+  / manual_review_release). None of these adds a new value to the job
+  model's core state Selection — no new core job state is introduced
+  anywhere in this module (DEC-037 §5.4).
+- error_class is FIXED VOCABULARY ONLY (DEC-037 §7/§9):
+  shopify_user_errors_validation, inventory_location_missing,
+  concurrency_race_conflict, shopify_throttling_rate_limit,
+  shopify_temporary_server_network, data_shape_schema_mismatch,
+  idempotency_contract_violation, no_reconciliation_strategy,
+  store_identity_mismatch. NEVER produce
+  remote_validation_rejected/remote_precondition_mismatch/
+  transport_ambiguous/clean_rejection (Revision 2 values, withdrawn) or
+  any other value not in this list.
 - inventoryActivate's userErrors carry NO error code (field+message
   only) -> classify by payload shape only (non-empty userErrors + null
-  inventoryLevel = failed_clean/blocked_manual_review/binding_conflict;
-  non-empty userErrors + non-null inventoryLevel = uncertain). NEVER
-  match on UserError.message text to select an error class, retry
+  inventoryLevel = failed_clean, error_class=shopify_user_errors_validation,
+  blocked_manual_review/binding_conflict; non-empty userErrors + non-null
+  inventoryLevel = uncertain, error_class=data_shape_schema_mismatch).
+  NEVER match on UserError.message text to select an error class, retry
   decision, or manual-review subreason for any mutation in this module
   (DEC-037 §4 row 2) — message text may be captured as redacted
   diagnostic evidence only.
@@ -267,21 +366,27 @@ HARD CONSTRAINTS
   pair, last-value-wins; operation_scope_key = the frozen pair-serialization
   literal inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}
   (DEC-037 §5.3) serializes ALL THREE job types per pair — only one
-  non-terminal inventory job per pair at a time; terminalization and next
-  -phase-job enqueue are atomic, under a row lock on the binding; a
-  genuine concurrent-transaction test is required proving duplicate phase
-  jobs cannot be created.
+  non-terminal inventory job per pair at a time (a job in
+  blocked_manual_review is NOT terminal for this purpose and continues to
+  hold the pair); terminalization and next-phase-job enqueue (including a
+  CAS/not_applied replacement job) are atomic, under a row lock on the
+  binding (DEC-037 §5.4 handoffs A-D); a genuine concurrent-transaction
+  test is required proving duplicate phase jobs cannot be created.
 - First-push guard per pair with recorded confirmation (actor/time/preview
   qty), checked by inventory_push_sync at enqueue time; no write for an
   unconfirmed row (destructive_write_guard_blocked); activation never
   creates an unreviewed nonzero stock state.
-- Job-source/job-type/manual-review-subreason/pair-serialization-identity
-  vocabulary is FROZEN per DEC-037 §7 — do not invent additional values.
+- Job-source/job-type/error-class/manual-review-subreason/
+  pair-serialization-identity/job-lineage-field vocabulary is FROZEN per
+  DEC-037 §7 — do not invent additional values; action_recheck_inventory_pair
+  is the only new domain action.
 - Every mutation outcome resolves to a row in DEC-037 §9's consequence
   contract (observed_outcome/error_class/manual_review_subreason/retry
   eligibility/reconciliation requirement/next orchestration behavior);
   unknown or malformed consequence data NEVER defaults to automatic
-  retry — fail closed to uncertain/manual review.
+  retry — fail closed to uncertain/manual review. Every CAS-stale and
+  not_applied retry in that table creates a NEW job, never a same-job
+  redispatch.
 - Reconnect: no push/activation admitted for a pair until that pair's
   post-reconnect reconciliation read (store-identity check first,
   DEC-036 D18) has completed; this gate is enforced by inventory_push_sync
@@ -293,8 +398,8 @@ HARD CONSTRAINTS
 - No flag bypasses any guard above.
 - Odoo.sh green before merge review (verbatim quote) — genuine
   PostgreSQL concurrency proof for the coalescing/operation_scope_key
-  dedup and the two-sequential-attempt sequencing (not same-process
-  simulation).
+  dedup and the atomic phase-handoff/replacement-job sequencing (DEC-037
+  §5.4, not same-process simulation).
 - Dev-store mutation-validation plan
   (docs/05-qa/wave-3-dev-store-mutation-validation-plan.md) scenarios
   1-8, 9 (activation, its own job), 10-12, 17-19 (17: throughput; 18:
@@ -319,8 +424,13 @@ credentials/tokens in preconditions_snapshot/remote_mutation_intent/
 remote_evidence_refs (this module's own allowlist declarations, alongside
 its D-015 reconciliation-strategy registration); zero duplicate mutation
 attempts recorded for a single successful Shopify effect across the CAS-
-retry and reconciliation test matrix; zero cases of two mutation jobs
-non-terminal for the same pair-serialization identity simultaneously.
+replacement and reconciliation test matrix; zero jobs anywhere in the
+test matrix that own more than one mutation.attempt row over their
+lifetime; zero cases of two mutation jobs non-terminal for the same
+pair-serialization identity simultaneously; zero cases of an orphaned
+replacement job (superseded_by_job_id set with no corresponding new job,
+or a new job created with no superseded predecessor terminalized in the
+same transaction).
 
 ======================================================================
 ROLLBACK NOTES
@@ -349,8 +459,8 @@ DEFINITION OF DONE
   stated fail-closed default).
 - Static, unit, and genuine-concurrency tests green (Stage 0's proven
   multi-connection technique, extended to this module's pair-serialization
-  claims and the three-job-type handoff/admission mechanics, DEC-037
-  §5.3).
+  claims and the three-job-type atomic handoff/admission/replacement-job
+  mechanics, DEC-037 §5.3/§5.4/§5.5).
 - Odoo.sh fresh-install + focused-class + full regression + residue
   audit green.
 - Dev-store validation plan scenarios executed (or explicitly,
@@ -383,6 +493,17 @@ past any of these)
    scenario not already flagged as possibly-not-executable (scenario 8)
    — escalate, do not substitute simulation.
 8. Every Wave-3-DoR program-level hard stop (1-10) applies verbatim.
+9. Any code path found that would redispatch a mutation job to make a
+   second mutation.attempt (a CAS-stale or not_applied retry must create
+   a NEW job, never reuse the old one); any activation-to-orchestration
+   handoff found NOT atomic with the activation job's own
+   terminalization (e.g. dependent on a later scan/manual trigger); any
+   automatic child job created from a blocked_manual_review job; any
+   error_class value produced outside the fixed vocabulary (DEC-037
+   §7/§9); or any Stage 0 extension found to require modifying Stage 0's
+   own architecture, schema, or protocol rather than using the existing
+   seam (report as a DEC-037 §13A prerequisite gap, do not work around
+   it).
 ```
 
 ---

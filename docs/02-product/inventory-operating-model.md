@@ -1,6 +1,6 @@
 # Inventory Operating Model — Odoo 19 ↔ Shopify Connector (MVP)
 
-> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 2) — NOT IMPLEMENTATION
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 3) — NOT IMPLEMENTATION
 > AUTHORIZED.** Originally Proposed, Fable gap-closure mission, 2026-07-16;
 > corrected 2026-07-19 (Wave 3 Gate B session) per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md): CAS field
@@ -12,7 +12,12 @@
 > corrects §4.2/§4.5/§6: `inventoryActivate` and `inventorySetQuantities`
 > are each a standalone mutation job, never two attempts inside one push
 > job; reconciliation `not-applied` verdicts now require freshness/ABA
-> evidence (DEC-037 §4).** This document consolidates and closes the MVP
+> evidence (DEC-037 §4).** **Revision 3 (control-room comment
+> `5015830229`) further corrects §6: a CAS-stale or `not_applied` retry
+> now creates a new, separate job — never a redispatch of the job whose
+> attempt failed/resolved — and the `applied` verdict no longer carries a
+> timestamp condition (DEC-037 §4/§5.4).** This document consolidates and
+> closes the MVP
 > inventory model on top of accepted
 > [DEC-010](../04-decisions/DEC-010-inventory-architecture-strategy.md) and the
 > Part-C blueprint
@@ -144,14 +149,21 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   converges). [Fact] Shopify itself directs systems that "act as the source
   of truth" to `inventorySetQuantities`, not the delta mutation
   ([shopify captures §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
-- **[Proposed product decision — active-job dedup, Revision 2 pair scope]**
-  While any inventory job (orchestration, activation, or set-quantities —
-  Task 013 D-013-6/7) for a pair is non-terminal, the shared
-  pair-serialization `operation_scope_key`
-  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.3)
-  prevents a second concurrent job of any of the three types for the same
-  pair; new events only refresh the pending target consumed by the next
-  `inventory_push_sync` dispatch.
+- **[Proposed product decision — active-job dedup, Revision 2 pair scope,
+  Revision 3 non-terminal correction]** While any inventory job
+  (orchestration, activation, or set-quantities — Task 013 D-013-6/7) for
+  a pair is non-terminal — **including a job blocked in
+  `blocked_manual_review`, which is not terminal for this purpose and
+  continues to hold the pair until released by
+  `action_recheck_inventory_pair`**
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.5) —
+  the shared pair-serialization `operation_scope_key` (§5.3) prevents a
+  second concurrent job of any of the three types for the same pair; new
+  events only refresh the pending target consumed by the next
+  `inventory_push_sync` dispatch. A bounded CAS-stale or `not_applied`
+  replacement job is created atomically as part of the same handoff that
+  terminalizes the job it replaces (§5.4) — it is a new job, not a second
+  concurrent one.
 
 ### 4.3 Batching — excluded from Wave 3 MVP [Gate B-corrected, 2026-07-19]
 
@@ -281,8 +293,12 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   the attempt is applied and the job closes without resend; if it shows
   the pre-attempt value **and** freshness evidence (`updatedAt` vs.
   `transport_at`, where present) does not show a later change, the
-  attempt is not-applied and a **new** attempt (fresh CAS cycle, fresh
-  key) may be issued on next dispatch; if neither, **or** if the
+  attempt is not-applied — the job terminalizes (it is **never**
+  redispatched to make a second attempt) and a **new**, separate job of
+  the same mutation domain is created (fresh CAS cycle, fresh key), per
+  the atomic handoff contract
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.4);
+  if neither, **or** if the
   pre-attempt value is shown but `updatedAt` is later than the attempt
   (an ABA round-trip cannot be ruled out), the read is inconclusive and a
   further reconciliation read is scheduled (capped at 3 inconclusive

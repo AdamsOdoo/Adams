@@ -1,6 +1,6 @@
 # Task 013 — Inventory Synchronization: Implementation-Ready Planning Packet
 
-> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 2) — NOT IMPLEMENTATION
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 3) — NOT IMPLEMENTATION
 > AUTHORIZED.** Corrected 2026-07-19 (Wave 3 Gate B session) per
 > [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md): CAS
 > field name (`changeFromQuantity` throughout, §A.2/D-013-3), idempotency
@@ -12,7 +12,19 @@
 > `inventory_set_quantities` are each a standalone mutation job
 > (`job_type == mutation_domain`), never two attempts inside
 > `inventory_push_sync`, which is orchestration/read-only; see DEC-037
-> §5/§9 for the corrected job model and consequence contract.** **The §8
+> §5/§9 for the corrected job model and consequence contract.**
+> **Revision 3 (control-room comment `5015830229` on PR #179) further
+> corrects D-013-3/D-013-6/D-013-9: a bounded CAS-stale retry and a
+> reconciliation `not_applied` retry each create a **new**, separate
+> mutation job (never a redispatch of the job whose attempt
+> failed/resolved — every mutation job makes at most one attempt for its
+> entire lifetime), the activation→orchestration handoff is atomic (not
+> dependent on a later scan/manual trigger), `blocked_manual_review` is
+> not terminal and is released only by the new
+> `action_recheck_inventory_pair(reason)` action, and the `error_class`
+> vocabulary is the fixed set in DEC-037 §7/§9 — see DEC-037 §5.4/§5.5/§9
+> for the corrected atomic-handoff contract, review-release action, and
+> consequence contract.** **The §8
 > inline prompt is superseded — use
 > [`../06-prompts/sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md)
 > (LOCKED, unissued) instead.** Task 013 implementation requires Gate B
@@ -128,40 +140,60 @@ idempotency key, `transport_attempted=true`) → **NET** → **C3** (outcome
 commit). The Shopify idempotency key and both fingerprints live
 **exclusively on `shopify.connector.mutation.attempt`** — request-level
 and attempt-owned, **never** on the binding, and **never** the retry
-authority via any binding field (DEC-036 D6; DEC-037 §1 item C5). A retry
-reuses the persisted key verbatim only for an identical
-`exact_request_fingerprint` within `idempotency_valid_until`; a CAS-stale
-fresh read necessarily changes `changeFromQuantity` (part of
-`exact_request_fingerprint`), so a CAS retry is always a **new** attempt
-with a new key, never a reuse. **This job is never enqueued directly by
+authority via any binding field (DEC-036 D6; DEC-037 §1 item C5). This
+job makes **at most one** mutation attempt for its entire lifetime
+(Revision 3, DEC-037 §5.1/§9 — a job is never redispatched to make a
+second attempt); a CAS-stale outcome terminalizes this job and a
+**new**, separate `inventory_set_quantities` job (own job ID,
+`cas_retry_ordinal + 1`, own fresh fingerprints, own fresh key) is
+created instead (DEC-037 §5.4 handoff C) — never a same-job redispatch
+and never a key reuse. **This job is never enqueued directly by
 `inventory_activate`** — it is enqueued only by a fresh `inventory_push_sync`
 orchestration dispatch (DEC-037 §5.2). See DEC-037 §4 row 1 and §9 for
 the complete matrix and consequence contract.
 
-**Error routing (Gate B-corrected, Revision 2):**
-`CHANGE_FROM_QUANTITY_STALE` → bounded re-read/re-derive, **3** attempts
-maximum, each a **redispatch of this same job** (not a new job — new
-fingerprints, new key, a narrow fresh CAS pre-read of the pair's current
+**Error routing (Gate B-corrected, Revision 3 — DEC-037 §4 row 1/§9):**
+`CHANGE_FROM_QUANTITY_STALE` → `observed_outcome='failed_clean'`,
+`error_class='concurrency_race_conflict'`; bounded re-read/re-derive,
+**3** replacements maximum, each a **new, separate `inventory_set_quantities`
+job** — **never a redispatch of the job whose attempt just failed**
+(Revision 3 correction: Revision 2's "redispatch of this same job"
+design is withdrawn — it left one job accumulating multiple
+`mutation.attempt` rows, which the control room rejected as a
+continuing violation of Gate A's one-job/one-attempt rule). The failing
+job terminalizes (`superseded_by_job_id` set, `cancel_reason=
+'cas_stale_bounded_replacement'`); the new job carries an incremented
+`cas_retry_ordinal` (0→1→2→3), its own fresh fingerprints, its own fresh
+idempotency key, a narrow fresh CAS pre-read of the pair's current
 `available`/`updatedAt`, and a fresh read of the binding's coalesced
-pending target; DEC-037 §4 row 1); on the 4th mismatch →
-`blocked_manual_review`/`binding_conflict` (persistent divergence, review
-case, never a further silent retry). **`ITEM_NOT_STOCKED_AT_LOCATION` →
+pending target (DEC-037 §4 row 1/§5.4 handoff C); on the 4th mismatch
+(`cas_retry_ordinal=3`) → no replacement job is created, that job
+terminalizes `blocked_manual_review`/`binding_conflict` (persistent
+divergence, review case, never a further silent retry). **`ITEM_NOT_STOCKED_AT_LOCATION` →
 Revision 2 correction: this is a race/contract exception, not an inline
-activation trigger.** It routes `failed_clean`/`inventory_location_missing`,
-`blocked_manual_review` — this job **never** issues `inventoryActivate`
-inline, in any form, from any code path (static/AST-guarded, §5 tests
-below). The pending target stays coalesced on the binding; a later,
-fresh `inventory_push_sync` orchestration dispatch re-reads Shopify and,
-finding the level genuinely absent for a `first_push_state='confirmed'`
-row, enqueues a separate `inventory_activate` job (DEC-037 §5.2 step 8).
+activation trigger.** It routes `failed_clean`, `error_class=
+'inventory_location_missing'` (Revision 3 — the fixed vocabulary value;
+also the `manual_review_subreason`), `blocked_manual_review` — this job
+**never** issues `inventoryActivate` inline, in any form, from any code
+path (static/AST-guarded, §5 tests below). The pending target stays
+coalesced on the binding; a later, fresh `inventory_push_sync`
+orchestration dispatch re-reads Shopify and, finding the level genuinely
+absent for a `first_push_state='confirmed'` row, enqueues a separate
+`inventory_activate` job (DEC-037 §5.2 step 8). Ordinary validation
+errors (`INVALID_*`, `NO_DUPLICATE_...`, `NON_MUTABLE_INVENTORY_ITEM`) →
+`error_class='shopify_user_errors_validation'` (Revision 3 — the fixed
+vocabulary value), `manual_review_subreason='binding_conflict'`.
 `INVALID_QUANTITY_NEGATIVE` cannot occur (clamped before send).
-`IDEMPOTENCY_CONCURRENT_REQUEST` → `observed_outcome='uncertain'`
-(reconcile-first, never auto-retried directly). `IDEMPOTENCY_KEY_PARAMETER_MISMATCH`
+`IDEMPOTENCY_CONCURRENT_REQUEST` → `observed_outcome='uncertain'`,
+`error_class='concurrency_race_conflict'` (reconcile-first, never
+auto-retried directly). `IDEMPOTENCY_KEY_PARAMETER_MISMATCH`
 / `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → `idempotency_contract_violation`
-(`blocked_manual_review`, no automatic retry — DEC-036 D6).
-`NON_MUTABLE_INVENTORY_ITEM` (bundles) → `blocked_manual_review` /
-`binding_conflict`. `THROTTLED` → `uncertain`, reconcile-first, never
-`failed_clean` (DEC-036 D9). `InventoryItem.tracked = false` → job
+(`blocked_manual_review`, no automatic retry — DEC-036 D6). `THROTTLED`
+→ `uncertain`, `error_class='shopify_throttling_rate_limit'`,
+reconcile-first, never `failed_clean` (DEC-036 D9). Network
+timeout/HTTP 5xx → `uncertain`, `error_class='shopify_temporary_server_network'`.
+No `error_class` value outside this fixed set (DEC-037 §7) is ever
+produced by this module. `InventoryItem.tracked = false` → job
 `skipped` with note via the `JobPolicySkip` dispatcher seam that Task
 012 adds (sequencing guarantees it exists; the connector never mutates
 `tracked`).
@@ -264,22 +296,26 @@ unchanged) is not drift and resumes normally. **Superseded text
 (2026-07-10, do not implement):** ~~unexplained Shopify-side drift...
 is pushed over only after being logged as a drift note (Odoo-SoT), so
 drift is visible in logs while the standing direction is preserved~~.
-**Coalescing (Gate B addition, Revision 2, DEC-037 §10):** one
-pending-update target (`pending_target_available`) per (item, location)
-pair, held on the binding row; `operation_scope_key =
+**Coalescing (Gate B addition, Revision 2, mechanics corrected Revision
+3, DEC-037 §10):** one pending-update target (`pending_target_available`)
+per (item, location) pair, held on the binding row; `operation_scope_key =
 inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`
 (DEC-037 §5.3) serializes concurrent inventory jobs for the same pair
 across all three job types; while any inventory job for that pair is
-non-terminal (orchestration, activation, or set-quantities — including
-a set-quantities job's own bounded CAS-retry redispatches), no new pair
-job is admitted and no second mutation attempt is created outside that
-job's own bounded retry mechanism — the next `inventory_push_sync`
-dispatch, once admitted, reads the latest coalesced
-`pending_target_available` rather than a possibly-stale value. Throughput
-note: per-pair jobs at batch 20/5 min are an accepted MVP simplification;
-multi-entry batching is explicitly **out of scope for Wave 3 MVP**
-(DEC-036 D4) — a future separately-gated optimization, not a
-release-hardening detail to assume.
+non-terminal (orchestration, activation, set-quantities, **or a job
+blocked in `blocked_manual_review`, which is not terminal for this
+purpose, DEC-037 §5.5**), no new pair job is admitted and no second
+mutation attempt is created for the pair — a bounded CAS-stale or
+reconciliation `not_applied` retry is a **new, separate job**, created
+atomically in the same transaction that terminalizes the job it
+replaces (DEC-037 §5.4 handoffs C/D), never a second attempt on the
+still-non-terminal job. The next `inventory_push_sync` dispatch, once
+admitted, reads the latest coalesced `pending_target_available` rather
+than a possibly-stale value. Throughput note: per-pair jobs at batch
+20/5 min are an accepted MVP simplification; multi-entry batching is
+explicitly **out of scope for Wave 3 MVP** (DEC-036 D4) — a future
+separately-gated optimization, not a release-hardening detail to
+assume.
 
 **D-013-7 — Concurrency.** CAS + mandatory `@idempotent` +
 `operation_scope_key` collectively make the push race-safe **at the
@@ -319,30 +355,52 @@ the two mutation job types, `_get_reconciliation_strategies()` seams:
   combined with the set-quantities job** — own job record, own
   `attempt_token`, own idempotency key, own fingerprints; the handoff
   from activation to a set-quantities push always passes back through a
-  fresh `inventory_push_sync` orchestration dispatch (DEC-037 §5.2 step
-  7) — it is never enqueued directly by the activation job.
+  fresh `inventory_push_sync` orchestration dispatch, created **atomically**
+  in the same transaction that terminalizes the activation job
+  (DEC-037 §5.2 step 7/§5.4 handoff B — Revision 3: this does not wait
+  for a later scan or manual trigger) — it is never enqueued directly by
+  the activation job.
 
-**Pair serialization:** all three job types share one
+**Pair serialization and atomic handoffs:** all three job types share one
 `operation_scope_key` per pair (the frozen literal, DEC-037 §5.3); only
-one of the three may be non-terminal for a given pair at a time; handoff
-between phases is atomic with terminalization, under a row lock on the
-binding (DEC-037 §5.3) — implementation must include the named genuine
-concurrency test proving duplicate phase jobs cannot be created.
+one of the three may be non-terminal for a given pair at a time — **a
+job in `blocked_manual_review` is not terminal for this purpose and
+continues to hold the pair (DEC-037 §5.5)**; handoff between phases,
+including a bounded CAS-stale/`not_applied` replacement job's creation,
+is atomic with the prior job's terminalization, under a row lock on the
+binding (DEC-037 §5.4, four named handoffs A–D) — implementation must
+include the named genuine concurrency test proving duplicate phase jobs
+cannot be created. A blocked pair is released **only** by the new
+`action_recheck_inventory_pair(reason)` domain action (Reviewer/Admin
+only, DEC-037 §5.5) — never by a generic core manual-retry/manual-review
+action.
+
+**Job-lineage fields (new, Revision 3):** `cas_retry_ordinal` (Integer,
+default 0, `inventory_set_quantities` only), `superseded_by_job_id`
+(Many2one, nullable), `cancel_reason` (Char, nullable, fixed vocabulary
+— DEC-037 §5.4/§5.5). None of these adds a new core job state.
 
 **Consequence contract:** every mutation outcome this module's Layer 2
 wrapper reports must resolve to one of the rows in DEC-037 §9
 (`observed_outcome`/`error_class`/`manual_review_subreason`/retry
 eligibility/reconciliation requirement/next orchestration behavior) —
 unknown or malformed consequence data must never default to automatic
-retry; it routes fail-closed to `uncertain`/manual review. No domain code
+retry; it routes fail-closed to `uncertain`/manual review. Every
+`error_class` value is one of the fixed set in DEC-037 §7/§9
+(`shopify_user_errors_validation`, `inventory_location_missing`,
+`concurrency_race_conflict`, `shopify_throttling_rate_limit`,
+`shopify_temporary_server_network`, `data_shape_schema_mismatch`,
+`idempotency_contract_violation`, `no_reconciliation_strategy`,
+`store_identity_mismatch`) — no other value is authorized. No domain code
 writes job state outside the accepted Layer 2 consequence interface.
 
-Frozen job contract (job_type/job_source/manual-review-subreason/
-pair-serialization-identity/domain-enable-flag vocabulary): DEC-037 §7 —
-this module must not invent additional values without a further Gate
-decision. `shopify.connector.mutation.attempt` (core, Stage 0) is the
-sole holder of the Shopify idempotency key and both fingerprints for
-every push/activation attempt; the binding's `last_pushed_available`/
+Frozen job contract (job_type/job_source/error-class/manual-review-subreason/
+pair-serialization-identity/domain-enable-flag vocabulary, job-lineage
+fields, `action_recheck_inventory_pair`): DEC-037 §7 — this module must
+not invent additional values without a further Gate decision.
+`shopify.connector.mutation.attempt` (core, Stage 0) is the sole holder
+of the Shopify idempotency key and both fingerprints for every
+push/activation attempt; the binding's `last_pushed_available`/
 `last_pushed_at`/`last_known_shopify_available`/`pending_target_available`
 are informational/coalescing only (D-013-1(b), D-013-3, DEC-037 §10).
 
@@ -398,31 +456,49 @@ class = destructive_write_guard_blocked);
 `test_inventory_push_mechanics.py` (CAS value threading using a fresh
 pre-attempt read, never the binding's informational field; idempotency
 key persisted on `mutation.attempt` only, never on the binding;
-same-attempt retry reuse vs. regenerated-on-CAS-refresh; 3-strikes
-CAS-stale bounded retry (`cas_mismatch_count`) is a **redispatch of the
-same `inventory_set_quantities` job**, then `blocked_manual_review`/
-`binding_conflict` on the 4th mismatch [Gate B, Revision 2, DEC-037 §4
-row 1]; **`inventory_activate` and `inventory_set_quantities` are two
-distinct job records (`job_type`, job ID, `attempt_token`, idempotency
-key each), never two attempts inside one job — a static/AST guard
-asserts the `inventory_set_quantities` handler contains no
-`inventoryActivate` call site, and vice versa** [Gate B, Revision 2,
-DEC-037 §5]; the activation-to-set handoff always passes through a fresh
-`inventory_push_sync` orchestration dispatch, never a direct enqueue
-[Gate B, Revision 2, DEC-037 §5.2]; `job_type == mutation_domain`
-invariant test for both mutation job types [Gate B, Revision 2, DEC-037
-§7]; activation always sends explicit `available: 0` [Gate B, DEC-037 §4
-row 2]; **no code path matches on `UserError.message` text for
-`inventoryActivate` classification** (static/AST guard) [Gate B,
-Revision 2, DEC-037 §4 row 2]; `THROTTLED`/both idempotency-defect codes
-classified per DEC-036 D6/D9; reconciliation-verdict tests
+same-attempt retry reuse vs. regenerated-on-CAS-refresh; 3-replacement
+CAS-stale bounded sequence (`cas_retry_ordinal` 0→1→2→3) creates **four
+distinct job records — never a redispatch of any prior one** — each with
+its own job ID/`attempt_token`/idempotency key, connected only by
+`superseded_by_job_id`, then `blocked_manual_review`/`binding_conflict`
+on the 4th mismatch with no replacement job created [Gate B, Revision 3,
+DEC-037 §4 row 1/§5.4 handoff C — corrects Revision 2's now-withdrawn
+same-job-redispatch design]; **`inventory_activate` and
+`inventory_set_quantities` are two distinct job records (`job_type`, job
+ID, `attempt_token`, idempotency key each), never two attempts inside
+one job — a static/AST guard asserts the `inventory_set_quantities`
+handler contains no `inventoryActivate` call site, and vice versa**
+[Gate B, Revision 2, DEC-037 §5]; the activation-to-set handoff always
+passes through a fresh `inventory_push_sync` orchestration dispatch,
+created **atomically** in the same transaction that terminalizes the
+activation job, never a direct enqueue and never dependent on a later
+scan/manual trigger [Gate B, Revision 3, DEC-037 §5.2/§5.4 handoff B];
+`job_type == mutation_domain` invariant test for both mutation job types
+[Gate B, Revision 2, DEC-037 §7]; activation always sends explicit
+`available: 0` [Gate B, DEC-037 §4 row 2]; **no code path matches on
+`UserError.message` text for `inventoryActivate` classification**
+(static/AST guard) [Gate B, Revision 2, DEC-037 §4 row 2]; a reconciliation
+`not_applied` verdict (either domain) creates a **new** same-domain job,
+never redispatches the resolved one [Gate B, Revision 3, DEC-037 §4
+rows 1–2/§5.4 handoff D]; a `blocked_manual_review` job creates no
+automatic child job, and `action_recheck_inventory_pair` is the only
+path that releases one, requiring an authorized reason and creating
+exactly one fresh `inventory_push_sync` job [Gate B, Revision 3, DEC-037
+§5.5]; `THROTTLED`/both idempotency-defect codes classified per DEC-036
+D6/D9; **every `error_class` value observed anywhere in this module's
+tests is one of the fixed set in DEC-037 §7/§9 — a static/AST guard
+asserts none of `remote_validation_rejected`/`remote_precondition_mismatch`/
+`transport_ambiguous`/`clean_rejection` (Revision 2, withdrawn) appears
+in the module** [Gate B, Revision 3]; reconciliation-verdict tests
 (applied/not-applied/inconclusive) for both mutation domains **including
 an induced ABA/freshness fixture (value changes away and back with a
-later `updatedAt`) asserting `inconclusive`, never `not_applied`** [Gate
-B, Revision 2, DEC-037 §4 row 1]; **genuine independent-PostgreSQL-
+later `updatedAt`) asserting `inconclusive`, never `not_applied`, and
+asserting the `applied` verdict never depends on `updatedAt`** [Gate B,
+Revision 3, DEC-037 §4 row 1]; **genuine independent-PostgreSQL-
 connection concurrency test proving two concurrent transactions cannot
-both create the next phase job for the same pair** [Gate B, Revision 2,
-DEC-037 §5.3]; store-identity-mismatch routing; clamp-to-0;
+both create the next phase job (including a CAS/`not_applied`
+replacement job) for the same pair** [Gate B, Revision 3, DEC-037
+§5.3/§5.4]; store-identity-mismatch routing; clamp-to-0;
 tracked-false skip; reason/referenceDocumentUri; **source-level guard:
 the string `committed` never appears as a quantity name, and only
 `inventorySetQuantities`/`inventoryActivate` mutations exist in the
@@ -571,7 +647,9 @@ Per [`../02-product/inventory-operating-model.md`](../02-product/inventory-opera
 - **CAS via `changeFromQuantity` [Gate B-corrected, 2026-07-19 — the
   naming conflict below is resolved, not open].** The operating model's
   read→compare→set flow with bounded retries (**3**, now binding — Gate
-  B closes the "proposed" hedge, DEC-037 §1 item C7) and never
+  B closes the "proposed" hedge, DEC-037 §1 item C7), each retry a
+  **new, separate job** (Revision 3, DEC-037 §5.4 handoff C — never a
+  redispatch of the job whose attempt failed), and never
   `ignoreCompareQuantity`, which does not exist as a current input field.
   **Superseded text (retained for history only):** ~~D-013-3 above
   records the 2026-07 CAS shape as `changeFromQuantity`
@@ -612,11 +690,14 @@ Per [`../02-product/inventory-operating-model.md`](../02-product/inventory-opera
 ### A.3 Re-acceptance
 
 This addendum, together with the Gate B corrections above (D-013-9 and
-the superseded-text markers throughout §2, now at Revision 2 per DEC-037),
-is the current `GATE B ACCEPTANCE CANDIDATE` — **NOT IMPLEMENTATION
-AUTHORIZED**. Task
+the superseded-text markers throughout §2, now at Revision 3 per
+DEC-037 — the one-job/one-attempt-lifetime job model, the atomic
+handoff contract, the review-release action, and the fixed error
+vocabulary), is the current `GATE B ACCEPTANCE CANDIDATE` — **NOT
+IMPLEMENTATION AUTHORIZED**. Task
 013 implementation requires both: (1) this Gate B package accepted and
-merged, and (2) Stage 0 merged and runtime-proven (per PR #177 comment
+merged, and (2) Stage 0 merged and runtime-proven and providing the
+correction prerequisites DEC-037 §13A now records (per PR #177 comment
 `5015174971`'s sequencing guard). The §8 inline prompt remains superseded
 and unusable; the current locked prompt is
 [`../06-prompts/sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md),

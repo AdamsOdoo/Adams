@@ -1,3 +1,125 @@
+### Wave 3 Gate B Revision 3 — job-lifetime/atomic-handoff/error-vocabulary correction per second control-room REVISE ruling — compact handoff (2026-07-19)
+
+- **Branch / PR:** same as Revisions 1/2 below — `claude/wave-3-gate-b-inventory-2m5jcl`,
+  draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179) →
+  `mvp/program-integration`. No new branch/PR created.
+- **Trigger:** the control room reviewed Revision 2 (immediately below)
+  at head `a88d5416c46662de1b15f5490b743a553185dc0a` and returned
+  **REVISE** a second time (PR #179 comment
+  [`5015830229`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015830229)):
+  Revision 2's same-job CAS/reconciliation-`not_applied` redispatch
+  design still let one mutation job accumulate more than one
+  `mutation.attempt` row — a continuing violation of Gate A's
+  one-job/one-attempt rule; the activation→orchestration handoff
+  depended on an unrelated later scan/manual trigger rather than being
+  atomic; `blocked_manual_review`'s non-terminal status and its release
+  path were undefined; the matrix/consequence contract used four
+  invented `error_class` values (`remote_validation_rejected`/
+  `remote_precondition_mismatch`/`transport_ambiguous`/`clean_rejection`);
+  the `inventory_set_quantities` `applied` verdict carried an inverted
+  timestamp condition; and the locked prompts called Claude the control
+  room/sole merge authority.
+- **Identity gate (re-verified live before any edit):** PR #179
+  open/draft/unmerged at the exact expected head
+  `a88d5416c46662de1b15f5490b743a553185dc0a`; base unchanged
+  (`mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`);
+  `git diff --name-only` confirmed exactly the same 15 authorized files;
+  no addon/test/security/XML/manifest/CI file changed; comment
+  `5015830229` read in full; PR #178 confirmed still open, draft,
+  unmerged, head `644853a68b3497c134ee648ce7399e50d30ff397`; protected
+  refs (`main`, `Shopify-connector`, both checkpoints,
+  `mvp/program-integration`) all confirmed unchanged.
+- **This session's work — one coherent documentation-only correction
+  batch, all 7 binding corrections from comment `5015830229` applied:**
+  1. **One mutation job owns exactly one attempt for its entire
+     lifetime.** Every CAS-stale retry and every reconciliation
+     `not_applied` retry now creates a **new**, separate job of the same
+     domain — the old job terminalizes and is never redispatched. New
+     job-lineage fields: `cas_retry_ordinal` (Integer, default 0,
+     `inventory_set_quantities` only — 0 = original job, 1/2/3 =
+     successive replacement jobs), `superseded_by_job_id` (Many2one,
+     nullable), `cancel_reason` (Char, fixed vocabulary:
+     `cas_stale_bounded_replacement`/`reconciliation_not_applied_replacement`/
+     `manual_review_release`).
+  2. **Atomic handoff contract (new DEC-037 §5.4).** Under a row lock on
+     the pair's binding, one transaction per handoff: (A) orchestration
+     success → mutation child; (B) activation `applied` → **atomically**
+     enqueued fresh `inventory_push_sync` (never waiting for a later
+     scan/manual trigger); (C) CAS-stale → replacement job with
+     incremented `cas_retry_ordinal`; (D) reconciliation `not_applied` →
+     replacement same-domain job. No new core job state — only the three
+     new lineage fields above.
+  3. **`blocked_manual_review` is not terminal** — it retains the pair's
+     `operation_scope_key` and blocks all new-job admission; released
+     only by the new **`action_recheck_inventory_pair(reason)`** action
+     (Reviewer/Administrator only, mandatory reason, allowed only for
+     `failed_clean`/resolved-`not_applied` with subreason
+     `inventory_location_missing` or an enumerated safe `binding_conflict`
+     case — never for `uncertain`/`duplicate_risk`/
+     `idempotency_contract_violation`/`store_identity_mismatch`; never
+     rewrites `observed_outcome`/`resolution_disposition`).
+  4. **Fixed error-class vocabulary** — the four invented Revision 2
+     values withdrawn, replaced everywhere by:
+     `shopify_user_errors_validation`, `inventory_location_missing`,
+     `concurrency_race_conflict`, `shopify_throttling_rate_limit`,
+     `shopify_temporary_server_network`, `data_shape_schema_mismatch`,
+     `idempotency_contract_violation`, `no_reconciliation_strategy`,
+     `store_identity_mismatch`.
+  5. **Corrected `applied` verdict** — `inventory_set_quantities`
+     `applied` no longer requires `updatedAt <= transport_at`; that
+     condition, which would have made a genuinely successful attempt
+     read as non-applied, is removed. Freshness/`updatedAt` protects only
+     the `not_applied` verdict.
+  6. **Corrected locked-prompt role model** — ChatGPT is the strategic
+     control room and acceptance authority; Claude is the planner,
+     independent reviewer, and Odoo.sh runtime verifier (may merge only
+     after explicit ChatGPT authorization); Sol is the implementation
+     worker. Every prior statement calling Claude the control room or
+     sole merge authority is withdrawn.
+  7. **New DEC-037 §13A** — exact Stage 0 (PR #178) correction
+     prerequisites Task 013 needs before issuance (structural one-job/
+     one-attempt enforcement, a validated fixed-vocabulary consequence
+     interface, no unconditional same-job `retry_waiting` transitions,
+     atomic C3 outcome/audit/job-consequence commit, a domain seam for
+     the replacement-job/handoff behavior without modifying Stage 0's
+     own architecture, the proven `store_identity_mismatch` route,
+     proven fail-closed-on-unknown-data, proven blocking of generic
+     manual actions on mutation-evidence-linked jobs).
+- **Dev-store plan:** now 21 scenarios — scenarios 3/5/9/19 corrected for
+  the new job-lifetime/atomic-handoff/vocabulary model (scenario 5 is a
+  full rewrite showing the CAS ordinal-0→1 replacement); new scenario 20
+  (`blocked_manual_review` non-automatic-child) and scenario 21
+  (`action_recheck_inventory_pair` release).
+- **Official-source verification:** none performed this revision — every
+  correction is to this record's own design, not a new Shopify API
+  claim; the three Revision 1/2 verifications remain the evidence base.
+- **Validation performed:** `git diff --name-only` against base confirms
+  exactly the same 15 files; `git diff --check` clean; no addon/test/
+  security/XML/manifest/CI change; literal searches for same-job-redispatch
+  phrasing, the four invented `error_class` values, `blocked_manual_review
+  is terminal` phrasing, and the corrected/withdrawn Claude-as-control-room
+  wording — every remaining occurrence confirmed properly
+  historical/superseded/negated; relative links checked; no
+  credentials/PII.
+- **Status:** DEC-037 **REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B
+  RE-REVIEW (Revision 3)**. Task 013 packet: GATE B ACCEPTANCE CANDIDATE
+  (Revision 3) — NOT IMPLEMENTATION AUTHORIZED. Task 013B packet:
+  unaffected in substance, role-model cross-reference corrected. Both
+  locked Sol prompts: LOCKED, unissued, corrected. **Claude did not
+  accept its own package, in any revision.** No `addons/**` change; no
+  Odoo/Odoo.sh run; no Shopify mutation, no new Shopify read. PR #179
+  remains open, draft, unmerged. **Recommendation: READY FOR FINAL
+  CONTROL-ROOM WAVE 3 GATE B REVIEW.**
+- **Next-session prompt:** await the control room's Revision 3 re-review
+  ruling on PR #179. If REVISE again, apply the new binding corrections
+  the same way as this and the prior two rounds (identity gate first,
+  exactly the 15 authorized files, one coherent commit, no implementation/
+  Odoo/Shopify-mutation, no self-acceptance). If ACCEPTED, await explicit
+  authorization before any further action — this session does not
+  self-authorize a phase transition.
+
+---
+
 ### Wave 3 Gate B Revision 2 — job-model correction per control-room REVISE ruling — compact handoff (2026-07-19)
 
 - **Branch / PR:** same as Revision 1 below — `claude/wave-3-gate-b-inventory-2m5jcl`,

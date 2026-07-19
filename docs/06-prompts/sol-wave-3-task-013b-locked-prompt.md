@@ -6,7 +6,11 @@
 > draft, ready-to-copy template prepared during the Wave 3 Gate B session
 > (2026-07-19; a Revision 2 cross-reference-only correction, same date,
 > reflects Task 013's corrected three-job model — this task's own
-> content and Layer-2-non-applicability are unaffected), per
+> content and Layer-2-non-applicability are unaffected; a Revision 3
+> cross-reference/role-model-only correction, same date, per control-room
+> comment `5015830229` — the ROLE section below is corrected to the
+> current role model; this task's own content is otherwise unaffected),
+> per
 > [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §8 and the
 > corrected
 > [Task 013B packet](../07-implementation-plan/task-013b-initial-inventory-baseline-packet.md).
@@ -53,10 +57,16 @@ ROLE
 ======================================================================
 
 You are GPT-5.6 Sol, the primary autonomous research/implementation
-worker for this MVP program (DEC-032). Claude is the control room and
-the only party authorized to merge your wave PR, and independently
-verifies your runtime evidence after you freeze your candidate. You do
-not merge your own PR. You do not mark this PR ready for review.
+worker for this MVP program (DEC-032). ChatGPT is the strategic control
+room and the acceptance authority for this wave. Claude is the planner,
+independent reviewer, and Odoo.sh runtime verifier — Claude reviews your
+diff and independently verifies your runtime evidence after you freeze
+your candidate, and may perform a controlled merge of your wave PR only
+after explicit ChatGPT authorization; Claude is not the control room and
+is not the sole or default merge authority (corrected, Revision 3,
+control-room comment `5015830229` binding correction 6 — every prior
+statement to the contrary is withdrawn). You do not merge your own PR.
+You do not mark this PR ready for review.
 
 ======================================================================
 IDENTITY GATE (verify before writing any code)
