@@ -1,6 +1,7 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** STATICALLY REVISED — FINAL CONTROL-ROOM PRE-RUNTIME REVIEW REQUIRED
+- **Status:** RUNTIME CAMPAIGN 1 CORRECTED STATICALLY — INDEPENDENT
+  FRESH-BUILD ODOO.SH RERUN REQUIRED
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
@@ -9,6 +10,11 @@
 - **Bounded correction starting head:**
   `8915a2c36738d76e73723c003204b97b0b2f4e24`
 - **Binding control-room review:** PR #178 comment `5016571203`
+- **Runtime Campaign 1 tested SHA:**
+  `033858b8cab5761d1c7959dd4e2e194b819856ff`
+- **Runtime Campaign 1 build / database:** `35125006` /
+  `adamsmen-sol-wave-3-stage-0-layer2-35125006`
+- **Runtime-correction ruling:** PR #178 comment `5016941832`
 - **Frozen candidate:** the commit containing this record; its exact SHA is
   recorded in the final PR body and control-room report because a Git commit
   cannot embed its own SHA.
@@ -97,6 +103,45 @@ evidence, no transport replay, one reconciliation job, owner cleanup,
 successful applied/not-applied recording, original-job consequence, and the
 explicit reconciliation-job state.
 
+## 2B. Runtime Campaign 1 and consolidated correction
+
+Independent Runtime Campaign 1 executed exact SHA `033858b8` on Odoo 19 build
+`35125006`. Clean installation, registry, model, fields, indexes, ACL loading,
+cron loading, and zero-real-Shopify proof passed. The focused Stage 0 suite and
+full regression were not green. The child-process death harness and a separate
+baseline-to-candidate upgrade were not executed.
+
+Control-room ruling `5016941832` classified the deterministic findings before
+correction. The synthetic classifier was a production defect: idempotency
+concurrency and throttling now route to uncertainty and reconciliation with
+their exact registered error classes, while parameter mismatch and previous
+attempt failure block as idempotency-contract violations. Redispatch evidence
+preflight was extracted without changing its commit boundary, allowing a
+TransactionCase unit proof plus a genuine post-install owned-cursor proof.
+
+The remaining deterministic failures were stale or invalid test contracts.
+API and lifecycle guards now preserve read-only `execute()` and lifecycle
+probes while recognizing only guarded Layer 2 mutation admission through
+`execute_business(..., mutation_context=...)`. Dispatcher creation is limited
+to `_ensure_reconciliation_job` creating one linked reconciliation job. The
+repository sudo inventory is method-, receiver-, ordinal-, and
+purpose-qualified. Mutation-literal and attempt-write guards use target-aware
+AST analysis and include adversarial detector fixtures.
+
+The success sequence is proven by control-flow AST and a post-install genuine
+cursor fixture: `prepare_local -> C1 commit -> prepare_preconditions -> C2
+commit -> NET -> fresh C3`. Historic conversion uses
+`_reassign_to_historic_job_type`; manual-resolution fixtures use a real
+connector Administrator; service-level `ValidationError` and structural SQL
+uniqueness are proven separately.
+
+The reused-database `res_partner.autopost_bills` failures are recorded as
+environment artifacts and caused no dependency or product-scope change. The
+shared-live-database concurrency cluster and scheduled-drain transport count
+remain unresolved pending an isolated, quiesced fresh-build rerun. Separate
+upgrade proof is deferred to Wave 6. The process-death harness remains pending
+safe child-process control; neither deferred item is reported passed.
+
 ## 3. Binding A–N traceability
 
 | Binding | Production method(s) | Exact test evidence | Runtime proof | Rollback / fail-closed behavior |
@@ -164,6 +209,31 @@ Read-only API behavior and the intentional API context-manager
    transition, atomic reconciliation admission, and evidence normalization.
 7. `5c2b6996f60d13eac56ac258f05572d013bc5f23` — complete nine-module
    fixture audit and end-to-end recovered reconciliation proofs.
+8. `15adde70c81ff9254ad9a338e23eeaf028aecb90` — classifier and redispatch
+   preflight correction.
+9. `30185c06d29b72d74ca48d330f95957fa6c8ebff` — valid mutation API
+   admission proof.
+10. `d04450618b3cb51d5a29d9f53fb1e5e1b7754438` — classifier and transaction
+    sequence proof.
+11. `776827c555edd6d1e21903ab4e3c86c31bd9618f` — target-aware mutation
+    source guards.
+12. `8833885060c02cef94fe509e2daab36123c9361f` — owned-cursor runtime
+    boundary proofs.
+13. `4e77aa4c10c897653faf5f7116791652af2950b9` — service/index uniqueness
+    separation.
+14. `baa8182b59e3884b359470ce3ece968dcc6aac0f` — lifecycle historic
+    conversion proof.
+15. `e10c68375a79a17acbae5d1ec399ac04eabe8a84` — administrator retention
+    fixture.
+16. `4b82c3d26ae6f41c4c25b82bc82b9aa7a9e1d0d3` — manual resolution role
+    matrix.
+17. `700eefaad336ce47faf0cccdf021c1439d314fed` — API legacy guard correction.
+18. `62890dcd122135660d757b4aa966a358ddde275a` — dispatcher create/sudo
+    guard correction.
+19. `5dd5323848c0607333fdabbee0b10258371a3d90` — complete qualified sudo
+    inventory.
+20. `d58005e5a756461bd3040ded745b299a662477a7` — lifecycle legacy guard
+    correction.
 
 The correction commits modify 17 of the already-authorized paths: eight model
 files and the nine existing Stage 0 test modules. No new production, test, or
@@ -173,6 +243,12 @@ authorized 23 paths.
 The bounded campaign after `8915a2c` modifies exactly 13 authorized paths:
 three production models, all nine existing Stage 0 test modules, and this
 validation record. It creates no file.
+
+Runtime Campaign 1 correction after `033858b8` modifies exactly 14 authorized
+paths: one production dispatcher, eight Stage 0 test modules, the four
+authorized legacy regression modules, and this validation record. The
+cumulative PR contains exactly the authorized maximum of 27 existing paths;
+it creates no file.
 
 ## 6. Static validation actually executed
 
@@ -193,6 +269,10 @@ validation record. It creates no file.
 | Nine-module job-type/job-source fixture audit | PASS |
 | Six-window harness source and assertion audit | PASS |
 | Invalid `job_type='setup_readiness_check'` search | PASS — absent |
+| Runtime Campaign 1 deterministic/stale finding traceability | PASS |
+| Exact dispatcher create-site inventory | PASS — one sanctioned site |
+| Exact method/receiver/purpose sudo inventory | PASS — 48 sites |
+| Thirteen-file fixture and tag audit | PASS |
 
 Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
 install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
@@ -234,4 +314,5 @@ Task 013/013B implementation. PR #178 must remain open, draft, and unmerged.
 
 ## 9. Recommendation
 
-**READY FOR FINAL CONTROL-ROOM PRE-RUNTIME RE-REVIEW**
+**STATICALLY CORRECTED AFTER RUNTIME CAMPAIGN 1 — READY FOR INDEPENDENT
+FRESH-BUILD ODOO.SH RERUN**
