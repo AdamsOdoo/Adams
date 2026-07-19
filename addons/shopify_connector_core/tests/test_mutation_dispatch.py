@@ -1,4 +1,6 @@
+import ast
 import inspect
+import textwrap
 import uuid
 from unittest.mock import patch
 
@@ -86,21 +88,35 @@ class TestMutationDispatch(TransactionCase):
         )
 
     def test_idempotency_and_throttle_classification(self):
-        for code in ('IDEMPOTENCY_CONCURRENT_REQUEST', 'THROTTLED'):
-            self.assertEqual(
-                self.Dispatch._classify_direct_mutation_selftest(
-                    {'error_code': code}
-                )['observed_outcome'], 'uncertain',
-            )
-        for code in (
-            'IDEMPOTENCY_KEY_PARAMETER_MISMATCH',
-            'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED',
-        ):
-            self.assertEqual(
-                self.Dispatch._classify_direct_mutation_selftest(
-                    {'error_code': code}
-                )['action'], 'block_manual_review',
-            )
+        cases = {
+            'IDEMPOTENCY_CONCURRENT_REQUEST': (
+                'uncertain', 'concurrency_race_conflict', False, 'reconcile',
+            ),
+            'THROTTLED': (
+                'uncertain', 'shopify_throttling_rate_limit',
+                False, 'reconcile',
+            ),
+            'IDEMPOTENCY_KEY_PARAMETER_MISMATCH': (
+                'uncertain', 'idempotency_contract_violation',
+                'idempotency_contract_violation', 'block_manual_review',
+            ),
+            'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED': (
+                'uncertain', 'idempotency_contract_violation',
+                'idempotency_contract_violation', 'block_manual_review',
+            ),
+        }
+        for code, expected in cases.items():
+            evidence = {'request_id': code.lower()}
+            result = self.Dispatch._classify_direct_mutation_selftest({
+                'error_code': code,
+                'evidence': evidence,
+            })
+            self.assertEqual((
+                result['observed_outcome'], result['error_class'],
+                result['manual_review_subreason'], result['action'],
+            ), expected)
+            self.assertEqual(result['evidence'], evidence)
+            self.assertNotIn('retry', result['action'])
 
     def test_malformed_strategy_and_consequence_fail_closed(self):
         with patch.object(
@@ -143,16 +159,72 @@ class TestMutationDispatch(TransactionCase):
         self.assertNotIn('retry', dispatch_module.RECONCILIATION_ACTIONS)
 
     def test_layer2_sequence_commits_before_precondition_and_transport(self):
-        source = inspect.getsource(
+        source = textwrap.dedent(inspect.getsource(
             dispatch_module.ShopifyConnectorJobDispatch._drain_mutation_one
+        ))
+        fn = ast.parse(source).body[0]
+
+        def statement_with_call(predicate, direct=False):
+            matches = []
+            for index, statement in enumerate(fn.body):
+                nodes = (
+                    [statement.value]
+                    if direct and isinstance(statement, ast.Expr)
+                    else ast.walk(statement)
+                )
+                if any(
+                    isinstance(node, ast.Call) and predicate(node)
+                    for node in nodes
+                ):
+                    matches.append(index)
+            return matches
+
+        def call_line(predicate):
+            matches = [
+                node.lineno for node in ast.walk(fn)
+                if isinstance(node, ast.Call) and predicate(node)
+            ]
+            self.assertEqual(len(matches), 1)
+            return matches[0]
+
+        strategy_call = lambda key: (
+            lambda call: isinstance(call.func, ast.Subscript)
+            and isinstance(call.func.slice, ast.Constant)
+            and call.func.slice.value == key
         )
-        positions = [source.index(token) for token in (
-            "strategy['prepare_local']", 'self.env.cr.commit()',
-            "strategy['prepare_preconditions']",
-            'self._commit_attempt_intent_c2', "strategy['transport']",
-            'self._commit_mutation_outcome_c3',
-        )]
+        direct_commit = statement_with_call(
+            lambda call: isinstance(call.func, ast.Attribute)
+            and call.func.attr == 'commit',
+            direct=True,
+        )
+        self.assertEqual(len(direct_commit), 1)
+        positions = [
+            call_line(strategy_call('prepare_local')),
+            fn.body[direct_commit[0]].lineno,
+            call_line(strategy_call('prepare_preconditions')),
+            call_line(
+                lambda call: isinstance(call.func, ast.Attribute)
+                and call.func.attr == '_commit_attempt_intent_c2'
+            ),
+            call_line(strategy_call('transport')),
+            call_line(
+                lambda call: isinstance(call.func, ast.Attribute)
+                and call.func.attr == '_commit_mutation_outcome_c3'
+            ),
+        ]
         self.assertEqual(positions, sorted(positions))
+        self.assertEqual(len(set(positions)), len(positions))
+        DispatchClass = dispatch_module.ShopifyConnectorJobDispatch
+        c2_source = inspect.getsource(
+            DispatchClass._commit_attempt_intent_c2
+        )
+        c3_source = inspect.getsource(
+            DispatchClass._commit_mutation_outcome_c3
+        )
+        self.assertIn('self.env.registry.cursor()', c2_source)
+        self.assertIn('side_cr.commit()', c2_source)
+        self.assertIn('side_cr.close()', c2_source)
+        self.assertIn('self.env.transaction.reset()', c3_source)
         self.assertNotIn('except BaseException', source)
 
     def test_reconciliation_pending_gate_blocks_claim(self):
@@ -181,7 +253,16 @@ class TestMutationDispatch(TransactionCase):
             'expected_store_identity': self.store.shop_domain,
             'shopify_idempotency_key': uuid.uuid4().hex,
         })
-        self.Dispatch._drain_mutation_one(job)
+        with patch.object(
+            type(self.Dispatch), '_transport_mutation_dispatch_selftest',
+            side_effect=AssertionError('transport must not run'),
+        ) as transport:
+            blocked = self.Dispatch._preflight_existing_attempt_evidence(job)
+        self.assertTrue(blocked)
+        transport.assert_not_called()
+        self.assertEqual(self.env[
+            'shopify.connector.mutation.attempt'
+        ].search_count([('job_id', '=', job.id)]), 1)
         self.assertEqual(job.state, 'blocked_manual_review')
         self.assertEqual(job.manual_review_subreason, 'duplicate_risk')
 
