@@ -53,6 +53,11 @@ class TestMutationAttempt(TransactionCase):
         self.assertEqual(attempt.observed_outcome, 'pending')
         self.assertTrue(attempt.transport_at)
         self.assertTrue(attempt.idempotency_valid_until)
+        self.assertEqual(
+            attempt.idempotency_valid_until - attempt.transport_at,
+            fields.Datetime.to_datetime('1970-01-01 23:00:00')
+            - fields.Datetime.to_datetime('1970-01-01 00:00:00'),
+        )
 
     def test_canonical_fingerprint_is_key_order_independent(self):
         self.assertEqual(
