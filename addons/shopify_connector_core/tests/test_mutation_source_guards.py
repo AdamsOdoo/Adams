@@ -10,6 +10,133 @@ from ..models import shopify_connector_mutation_attempt
 
 
 RAW_HTTP_METHODS = {'get', 'post', 'put', 'patch', 'delete', 'request'}
+GRAPHQL_MUTATION_LITERAL = re.compile(
+    r'(?:^|[\r\n])\s*mutation\s+[A-Za-z_][A-Za-z0-9_]*\s*[({]'
+)
+
+
+def _parent_map(tree):
+    parents = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+    return parents
+
+
+def _owning_method(node, parents):
+    owner = parents.get(node)
+    while owner and not isinstance(owner, ast.FunctionDef):
+        owner = parents.get(owner)
+    return owner
+
+
+def _mutation_literal_violations(source, relative):
+    tree = ast.parse(source, filename=relative)
+    parents = _parent_map(tree)
+    violations = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and GRAPHQL_MUTATION_LITERAL.search(node.value)
+        ):
+            continue
+        owner = _owning_method(node, parents)
+        owner_name = owner.name if owner else False
+        selftest = (
+            relative.endswith(
+                'shopify_connector_core/models/'
+                'shopify_connector_job_dispatch.py'
+            )
+            and owner_name == '_prepare_preconditions_mutation_selftest'
+        )
+        owner_calls = list(ast.walk(owner)) if owner else []
+        guarded = any(
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr == 'execute_business'
+            and any(
+                keyword.arg == 'mutation_context'
+                for keyword in call.keywords
+            )
+            for call in owner_calls
+        )
+        forbidden = any(
+            isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Attribute)
+            and call.func.attr in {'execute', '_send'}
+            for call in owner_calls
+        )
+        if not selftest and (not guarded or forbidden):
+            violations.append((relative, node.lineno, owner_name))
+    return violations
+
+
+def _contains_attempt_env_lookup(node):
+    return any(
+        isinstance(part, ast.Subscript)
+        and isinstance(part.slice, ast.Constant)
+        and part.slice.value == 'shopify.connector.mutation.attempt'
+        for part in ast.walk(node)
+    )
+
+
+def _attempt_write_violations(source, relative):
+    tree = ast.parse(source, filename=relative)
+    parents = _parent_map(tree)
+    allowed = {
+        'create', 'write', '_create_attempt_intent',
+        '_record_direct_outcome', '_record_recovery_uncertain',
+        '_record_reconciliation_result',
+        '_record_inconclusive_reconciliation',
+        'action_resolve_mutation_attempt', '_mask_terminal_evidence',
+    }
+    violations = []
+    attempt_model_file = relative.endswith(
+        'shopify_connector_core/models/'
+        'shopify_connector_mutation_attempt.py'
+    )
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {'create', 'write', 'unlink'}
+        ):
+            continue
+        target = node.func.value
+        target_source = ast.unparse(target)
+        root_names = {
+            part.id.lower() for part in ast.walk(target)
+            if isinstance(part, ast.Name)
+        }
+        is_attempt_target = (
+            bool(root_names & {'attempt', 'attempts'})
+            or _contains_attempt_env_lookup(target)
+            or '._surface(' in target_source
+            or (
+                attempt_model_file
+                and ('self' in root_names or target_source.startswith('super()'))
+            )
+        )
+        if not is_attempt_target:
+            continue
+        owner = _owning_method(node, parents)
+        owner_name = owner.name if owner else False
+        if node.func.attr == 'create':
+            sanctioned = (
+                owner_name == '_create_attempt_intent'
+                or (attempt_model_file and owner_name == 'create')
+            )
+        elif node.func.attr == 'write':
+            sanctioned = owner_name in allowed
+        else:
+            sanctioned = False
+        if not sanctioned:
+            violations.append((
+                relative, node.lineno, owner_name,
+                node.func.attr, target_source,
+            ))
+    return violations
 
 
 class TestMutationSourceGuards(TransactionCase):
@@ -69,52 +196,38 @@ class TestMutationSourceGuards(TransactionCase):
 
     def test_mutation_literals_require_guarded_transport_or_selftest(self):
         violations = []
-        pattern = re.compile(r'\bmutation\s+[A-Za-z_][A-Za-z0-9_]*\s*[({]')
         for path in self._python_files():
-            tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
-            parents = {}
-            for parent in ast.walk(tree):
-                for child in ast.iter_child_nodes(parent):
-                    parents[child] = parent
-            for node in ast.walk(tree):
-                if (
-                    isinstance(node, ast.Constant)
-                    and isinstance(node.value, str)
-                    and pattern.search(node.value)
-                ):
-                    relative = str(path.relative_to(self._addon_root()))
-                    owner = parents.get(node)
-                    while owner and not isinstance(owner, ast.FunctionDef):
-                        owner = parents.get(owner)
-                    selftest = (
-                        relative.endswith(
-                            'shopify_connector_core/models/'
-                            'shopify_connector_job_dispatch.py'
-                        )
-                        and owner
-                        and owner.name
-                        == '_prepare_preconditions_mutation_selftest'
-                    )
-                    owner_calls = list(ast.walk(owner)) if owner else []
-                    guarded = any(
-                        isinstance(call, ast.Call)
-                        and isinstance(call.func, ast.Attribute)
-                        and call.func.attr == 'execute_business'
-                        and any(
-                            keyword.arg == 'mutation_context'
-                            for keyword in call.keywords
-                        )
-                        for call in owner_calls
-                    )
-                    legacy = any(
-                        isinstance(call, ast.Call)
-                        and isinstance(call.func, ast.Attribute)
-                        and call.func.attr == 'execute'
-                        for call in owner_calls
-                    )
-                    if not selftest and (not guarded or legacy):
-                        violations.append((relative, node.lineno))
+            relative = str(path.relative_to(self._addon_root()))
+            violations.extend(_mutation_literal_violations(
+                path.read_text(encoding='utf-8'), relative,
+            ))
         self.assertFalse(violations, violations)
+
+    def test_mutation_literal_detector_rejects_unguarded_paths(self):
+        for call in (
+            "return self.execute(store, operation)",
+            "return self._send(store, {'query': operation})",
+            'return operation',
+        ):
+            source = (
+                'def unsafe(self, store):\n'
+                "    operation = 'mutation Unsafe($id: ID!) { x }'\n"
+                '    %s\n' % call
+            )
+            self.assertTrue(_mutation_literal_violations(
+                source, 'shopify_connector_core/models/unsafe.py',
+            ))
+        guarded = (
+            'def guarded(self, client, job, store, context):\n'
+            "    operation = 'mutation Guarded($id: ID!) { x }'\n"
+            '    with client.execute_business(\n'
+            '        job, store, operation, {}, mutation_context=context,\n'
+            '    ):\n'
+            '        pass\n'
+        )
+        self.assertFalse(_mutation_literal_violations(
+            guarded, 'shopify_connector_domain/models/exporter.py',
+        ))
 
     def test_no_production_direct_send_caller(self):
         violations = []
@@ -163,55 +276,34 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertIn('can never be deleted', source)
 
     def test_no_attempt_direct_write_call_outside_closed_surface(self):
-        allowed_attempt_methods = {
-            'create', 'write',
-            '_create_attempt_intent',
-            '_record_direct_outcome',
-            '_record_recovery_uncertain',
-            '_record_reconciliation_result',
-            '_record_inconclusive_reconciliation',
-            'action_resolve_mutation_attempt',
-            '_mask_terminal_evidence',
-        }
         violations = []
         for path in self._python_files():
-            source = path.read_text(encoding='utf-8')
-            tree = ast.parse(source, filename=str(path))
-            parents = {}
-            for parent in ast.walk(tree):
-                for child in ast.iter_child_nodes(parent):
-                    parents[child] = parent
-            for node in ast.walk(tree):
-                if not (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr in {'create', 'write', 'unlink'}
-                ):
-                    continue
-                target = node.func.value
-                target_name = target.id if isinstance(target, ast.Name) else ''
-                target_source = ast.unparse(target)
-                is_attempt_target = target_name.lower() in {
-                    'attempt', 'attempts', 'self',
-                } or '._surface(' in target_source
-                if path.name == 'shopify_connector_mutation_attempt.py':
-                    is_attempt_target = is_attempt_target or target_source.startswith(
-                        'super()'
-                    )
-                if not is_attempt_target:
-                    continue
-                owner = parents.get(node)
-                while owner and not isinstance(owner, ast.FunctionDef):
-                    owner = parents.get(owner)
-                owner_name = owner.name if owner else False
-                if owner_name not in allowed_attempt_methods:
-                    violations.append((
-                        str(path.relative_to(self._addon_root())),
-                        node.lineno,
-                        owner_name,
-                        node.func.attr,
-                    ))
+            relative = str(path.relative_to(self._addon_root()))
+            violations.extend(_attempt_write_violations(
+                path.read_text(encoding='utf-8'), relative,
+            ))
         self.assertFalse(violations, violations)
+
+    def test_attempt_write_detector_distinguishes_real_targets(self):
+        bad_sources = (
+            "def bad(self, attempt):\n    attempt.write({'x': 1})\n",
+            "def bad(self, attempts):\n    attempts.unlink()\n",
+            "def bad(self):\n"
+            "    self.env['shopify.connector.mutation.attempt'].create({})\n",
+            "def bad(self, other):\n"
+            "    other._surface('forged').write({'x': 1})\n",
+        )
+        for source in bad_sources:
+            self.assertTrue(_attempt_write_violations(
+                source, 'shopify_connector_core/models/unsafe.py',
+            ))
+        unrelated = (
+            "def ok(self):\n"
+            "    self.write({'state': 'connected'})\n"
+        )
+        self.assertFalse(_attempt_write_violations(
+            unrelated, 'shopify_connector_core/models/store.py',
+        ))
 
     def test_write_surface_inventory_is_exact(self):
         self.assertEqual(
