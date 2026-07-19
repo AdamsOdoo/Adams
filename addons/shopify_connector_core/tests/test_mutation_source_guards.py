@@ -124,11 +124,11 @@ def _attempt_write_violations(source, relative):
         owner_name = owner.name if owner else False
         if node.func.attr == 'create':
             sanctioned = (
-                owner_name == '_create_attempt_intent'
-                or (attempt_model_file and owner_name == 'create')
+                attempt_model_file
+                and owner_name in {'create', '_create_attempt_intent'}
             )
         elif node.func.attr == 'write':
-            sanctioned = owner_name in allowed
+            sanctioned = attempt_model_file and owner_name in allowed
         else:
             sanctioned = False
         if not sanctioned:
@@ -304,6 +304,23 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertFalse(_attempt_write_violations(
             unrelated, 'shopify_connector_core/models/store.py',
         ))
+
+    def test_attempt_write_detector_rejects_external_same_named_methods(self):
+        external = (
+            "def _record_direct_outcome(self, attempt):\n"
+            "    attempt.write({'observed_outcome': 'succeeded'})\n",
+            "def action_resolve_mutation_attempt(self, attempt):\n"
+            "    attempt._surface('forged').write({'resolved_at': None})\n",
+            "def _create_attempt_intent(self):\n"
+            "    return self.env[\n"
+            "        'shopify.connector.mutation.attempt'\n"
+            "    ].create({})\n",
+        )
+        for source in external:
+            violations = _attempt_write_violations(
+                source, 'shopify_connector_other/models/external.py',
+            )
+            self.assertTrue(violations, source)
 
     def test_write_surface_inventory_is_exact(self):
         self.assertEqual(

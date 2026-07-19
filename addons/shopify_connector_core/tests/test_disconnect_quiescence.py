@@ -46,6 +46,7 @@ import threading
 import traceback
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 import psycopg2
@@ -94,6 +95,38 @@ MAGIC_FIELDS = {
     'id', 'display_name', 'create_uid', 'create_date', 'write_uid',
     'write_date', '__last_update',
 }
+
+
+def _duplicate_test_methods(source, relative):
+    """Return duplicate direct method definitions from every test class."""
+    tree = ast.parse(source, filename=relative)
+    violations = []
+    for class_node in ast.walk(tree):
+        if not isinstance(class_node, ast.ClassDef):
+            continue
+        methods = [
+            node for node in class_node.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        is_test_class = (
+            class_node.name.startswith('Test')
+            or any(method.name.startswith('test_') for method in methods)
+        )
+        if not is_test_class:
+            continue
+        first_lines = {}
+        for method in methods:
+            if method.name in first_lines:
+                violations.append((
+                    relative,
+                    class_node.name,
+                    method.name,
+                    first_lines[method.name],
+                    method.lineno,
+                ))
+            else:
+                first_lines[method.name] = method.lineno
+    return violations
 
 
 def _ok_send(captured):
@@ -232,6 +265,34 @@ def guard_min_call_lineno(fn, attr, receiver_name=None):
 
 
 class TestCallLeaseModelSchema(TransactionCase):
+
+    def test_connector_tests_have_no_duplicate_class_methods(self):
+        addon_root = Path(__file__).resolve().parents[2]
+        violations = []
+        for path in sorted(addon_root.glob(
+            'shopify_connector_*/tests/**/*.py'
+        )):
+            relative = str(path.relative_to(addon_root))
+            violations.extend(_duplicate_test_methods(
+                path.read_text(encoding='utf-8'), relative,
+            ))
+        self.assertFalse(violations, violations)
+
+    def test_duplicate_class_method_detector_is_adversarially_proven(self):
+        source = (
+            'class TestAdversarial:\n'
+            '    def test_same_name(self):\n'
+            '        return 1\n'
+            '    def test_same_name(self):\n'
+            '        return 2\n'
+        )
+        self.assertEqual(
+            _duplicate_test_methods(source, 'synthetic_duplicate.py'),
+            [(
+                'synthetic_duplicate.py', 'TestAdversarial',
+                'test_same_name', 2, 4,
+            )],
+        )
     """The lease table shape + the client source-level guards."""
 
     @classmethod
@@ -327,15 +388,6 @@ class TestCallLeaseModelSchema(TransactionCase):
         self.assertNotIn('_admit_mutation', guard_called_names(
             guard_fn_ast(ClientClass._send_lifecycle)
         ))
-
-    # API-parity source guards (review 4680664964, blocker 1): execute_business
-    # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
-    # captured token, and carries the RRequestException->temporary taxonomy.
-    def test_execute_business_source_normalizes_and_preserves_seam(self):
-        source = inspect.getsource(client_module)
-        self.assertIn('_normalize_response(store, response)', source)
-        self.assertIn('self._send(store, body)', source)          # legacy 2-arg
-        self.assertIn('self._send(store, body, token)', source)   # business 3-arg
 
     # API-parity source guards (review 4680664964, blocker 1): execute_business
     # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit

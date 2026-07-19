@@ -1,8 +1,10 @@
+import queue
 import threading
 import uuid
 from unittest.mock import patch
 
 import psycopg2
+import psycopg2.errorcodes
 
 from odoo import SUPERUSER_ID, api, fields
 from odoo.exceptions import ValidationError
@@ -304,11 +306,11 @@ class TestMutationConcurrency(TransactionCase):
     def test_concurrent_second_attempt_with_different_tokens_is_rejected(self):
         _store_id, job_id = self._durable_fixture()
         barrier = threading.Barrier(2)
-        results = []
+        results = queue.Queue()
 
         def insert_attempt():
-            with db_connect(self.env.cr.dbname).cursor() as cr:
-                try:
+            try:
+                with db_connect(self.env.cr.dbname).cursor() as cr:
                     barrier.wait(timeout=10)
                     cr.execute(
                         'INSERT INTO shopify_connector_mutation_attempt '
@@ -324,17 +326,47 @@ class TestMutationConcurrency(TransactionCase):
                         ),
                     )
                     cr.commit()
-                    results.append('created')
-                except Exception:
-                    cr.rollback()
-                    results.append('rejected')
+                    results.put(('created', None, None))
+            except psycopg2.IntegrityError as exc:
+                results.put(('rejected', exc, exc.pgcode))
+            except BaseException as exc:
+                results.put((
+                    'unexpected', exc,
+                    getattr(exc, 'pgcode', None),
+                ))
 
         threads = [threading.Thread(target=insert_attempt) for _ in range(2)]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join(timeout=20)
-        self.assertEqual(sorted(results), ['created', 'rejected'])
+        self.assertTrue(
+            all(not thread.is_alive() for thread in threads),
+            'both concurrent attempt threads must terminate within 20 seconds',
+        )
+        outcomes = []
+        while not results.empty():
+            outcomes.append(results.get_nowait())
+        self.assertEqual(
+            len(outcomes), 2,
+            'each thread must report exactly one outcome: %r' % outcomes,
+        )
+        unexpected = [row for row in outcomes if row[0] == 'unexpected']
+        self.assertFalse(
+            unexpected,
+            'unexpected concurrent exception(s): %r' % unexpected,
+        )
+        created = [row for row in outcomes if row[0] == 'created']
+        rejected = [row for row in outcomes if row[0] == 'rejected']
+        self.assertEqual(len(created), 1, outcomes)
+        self.assertEqual(len(rejected), 1, outcomes)
+        loser = rejected[0]
+        self.assertIsInstance(loser[1], psycopg2.IntegrityError)
+        self.assertEqual(
+            loser[2], psycopg2.errorcodes.UNIQUE_VIOLATION,
+            'losing SQLSTATE must be 23505; outcomes=%r' % outcomes,
+        )
+        self.assertEqual(loser[2], '23505', outcomes)
         with db_connect(self.env.cr.dbname).cursor() as cr:
             cr.execute(
                 'SELECT count(*) FROM shopify_connector_mutation_attempt '
