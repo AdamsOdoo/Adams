@@ -1,6 +1,7 @@
 import uuid
 
 from odoo import fields
+from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase
 
 
@@ -80,7 +81,7 @@ class TestMutationReconciliation(TransactionCase):
         self.assertFalse(attempt.resolution_disposition)
 
     def test_exact_reconciliation_link_is_required(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValidationError):
             self.Job.sudo().create({
                 'store_id': self.store.id,
                 'job_source': 'reconciliation',
