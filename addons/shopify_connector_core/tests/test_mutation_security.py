@@ -4,6 +4,11 @@ from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 
+from ..models.shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+)
+
 
 class TestMutationSecurity(TransactionCase):
 
@@ -45,9 +50,9 @@ class TestMutationSecurity(TransactionCase):
             'owner_worker_ref': 'test:1',
             'running_since': fields.Datetime.now(),
         })
-        attempt = self.Attempt.with_context(
-            shopify_layer2_c2_side_cursor=True,
-        )._create_attempt_intent({
+        attempt = self.Attempt.with_context(**{
+            C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+        })._create_attempt_intent({
             'job_id': job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
@@ -99,3 +104,5 @@ class TestMutationSecurity(TransactionCase):
             job.with_user(self.roles['admin']).action_manual_retry()
         with self.assertRaises(UserError):
             job.with_user(self.roles['admin']).action_resolve_manual_review()
+        with self.assertRaises(UserError):
+            job.with_user(self.roles['admin']).action_cancel('No resend')

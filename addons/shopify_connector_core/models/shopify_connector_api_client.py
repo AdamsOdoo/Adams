@@ -849,7 +849,10 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         extensions = first_error.get('extensions') or {}
         code = extensions.get('code')
         request_id = extensions.get('requestId')
-        extra = 'requestId=%s' % request_id if request_id else first_error.get('message')
+        extra = (
+            'requestId=%s' % request_id
+            if request_id else first_error.get('message')
+        )
         technical_detail = self._technical_detail(response, extra=extra)
         if code == 'ACCESS_DENIED':
             return ShopifyClientError(

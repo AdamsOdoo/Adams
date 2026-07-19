@@ -9,6 +9,11 @@ from odoo import SUPERUSER_ID, api, fields
 from odoo.sql_db import db_connect
 from odoo.tests.common import TransactionCase
 
+from ..models.shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+)
+
 
 def _layer2_death_worker(dbname, job_id, phase, ready):
     """Real child process: commit boundaries survive os._exit/terminate."""
@@ -19,7 +24,7 @@ def _layer2_death_worker(dbname, job_id, phase, ready):
         strategy = Dispatch._get_reconciliation_strategies()[
             'mutation_dispatch_selftest'
         ]
-        request = strategy['prepare'](job)
+        local = strategy['prepare_local'](job)
         token = uuid.uuid4().hex
         job.sudo().write({
             'state': 'running',
@@ -32,6 +37,11 @@ def _layer2_death_worker(dbname, job_id, phase, ready):
         if phase == 'after_c1':
             ready.set()
             os._exit(71)
+        owner = {'job_id': job.id, 'attempt_token': token}
+        if phase == 'during_precondition':
+            ready.set()
+            time.sleep(300)
+        request = strategy['prepare_preconditions'](local, owner)
         attempt_id = Dispatch._commit_attempt_intent_c2(
             job_id, token, request,
         )
@@ -98,9 +108,9 @@ class TestMutationRecovery(TransactionCase):
         })
         attempt = False
         if with_attempt:
-            attempt = self.Attempt.with_context(
-                shopify_layer2_c2_side_cursor=True,
-            )._create_attempt_intent({
+            attempt = self.Attempt.with_context(**{
+                C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+            })._create_attempt_intent({
                 'job_id': job.id,
                 'attempt_token': token,
                 'mutation_domain': 'mutation_dispatch_selftest',
@@ -123,6 +133,8 @@ class TestMutationRecovery(TransactionCase):
         ])
         self.assertEqual(len(reconciliations), 1)
         self.assertEqual(job.state, 'running')
+        self.assertFalse(job.current_attempt_token)
+        self.assertFalse(job.owner_worker_ref)
 
     def test_disconnect_preserves_credentials_for_unresolved_attempt(self):
         self.env['shopify.connector.store.credential'].action_set_token(
@@ -175,7 +187,8 @@ class TestMutationRecovery(TransactionCase):
     )
     def test_real_process_death_harness(self):
         phases = (
-            'after_c1', 'after_c2', 'during_net', 'after_net', 'during_c3',
+            'after_c1', 'during_precondition', 'after_c2', 'during_net',
+            'after_net', 'during_c3',
         )
         dbname = self.env.cr.dbname
         durable = []
@@ -214,7 +227,7 @@ class TestMutationRecovery(TransactionCase):
                     env = api.Environment(cr, SUPERUSER_ID, {})
                     env['shopify.connector.stale.owner.sweep'].run_sweep()
                     recovered = env['shopify.connector.job'].browse(job.id)
-                    if phase == 'after_c1':
+                    if phase in ('after_c1', 'during_precondition'):
                         self.assertEqual(recovered.state, 'retry_waiting')
                     else:
                         self.assertEqual(recovered.state, 'running')

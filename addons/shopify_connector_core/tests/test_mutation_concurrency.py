@@ -9,6 +9,11 @@ from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
+from ..models.shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+)
+
 
 @tagged('post_install', '-at_install')
 class TestMutationConcurrency(TransactionCase):
@@ -153,9 +158,9 @@ class TestMutationConcurrency(TransactionCase):
             })
             attempt = env[
                 'shopify.connector.mutation.attempt'
-            ].with_context(
-                shopify_layer2_c2_side_cursor=True,
-            )._create_attempt_intent({
+            ].with_context(**{
+                C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+            })._create_attempt_intent({
                 'job_id': job_id,
                 'attempt_token': token,
                 'mutation_domain': 'mutation_dispatch_selftest',
@@ -187,9 +192,40 @@ class TestMutationConcurrency(TransactionCase):
                 )
             cr.rollback()
 
-    def test_concurrent_attempt_token_uniqueness(self):
+    def test_c3_local_store_identity_mismatch_blocks_without_resend(self):
+        store_id, job_id, attempt_id, token = self._durable_owned_attempt()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'UPDATE shopify_connector_store SET shop_domain = %s '
+                'WHERE id = %s',
+                ('changed-identity.myshopify.com', store_id),
+            )
+            cr.commit()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            Dispatch = env['shopify.connector.job.dispatch']
+            strategy = Dispatch._get_reconciliation_strategies()[
+                'mutation_dispatch_selftest'
+            ]
+            Dispatch._commit_mutation_outcome_c3(
+                job_id, attempt_id, token,
+                strategy['classify_direct_result']({
+                    'outcome': 'succeeded', 'evidence': {},
+                }),
+                strategy,
+            )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT state, error_class, current_attempt_token '
+                'FROM shopify_connector_job WHERE id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone(), (
+                'blocked_manual_review', 'store_identity_mismatch', None,
+            ))
+
+    def test_concurrent_second_attempt_with_different_tokens_is_rejected(self):
         _store_id, job_id = self._durable_fixture()
-        token = uuid.uuid4().hex
         barrier = threading.Barrier(2)
         results = []
 
@@ -205,7 +241,8 @@ class TestMutationConcurrency(TransactionCase):
                         "VALUES (%s, %s, %s, TRUE, 'pending', NOW(), "
                         '%s, NOW(), %s, NOW())',
                         (
-                            job_id, token, 'mutation_dispatch_selftest',
+                            job_id, uuid.uuid4().hex,
+                            'mutation_dispatch_selftest',
                             SUPERUSER_ID, SUPERUSER_ID,
                         ),
                     )
@@ -401,4 +438,3 @@ class TestMutationConcurrency(TransactionCase):
             claimed = env['shopify.connector.job']._claim_for_dispatch(20)
             self.assertNotIn(job_id, claimed.ids)
             cr.rollback()
-

@@ -92,7 +92,8 @@ class TestMutationSourceGuards(TransactionCase):
                             'shopify_connector_job_dispatch.py'
                         )
                         and owner
-                        and owner.name == '_prepare_mutation_dispatch_selftest'
+                        and owner.name
+                        == '_prepare_preconditions_mutation_selftest'
                     )
                     if not allowed:
                         violations.append((relative, node.lineno))
@@ -182,3 +183,29 @@ class TestMutationSourceGuards(TransactionCase):
         self.assertNotIn('inventoryActivate', source)
         self.assertNotIn('fulfillmentCreate', source)
         self.assertIn("'transport': 'synthetic_stub'", source)
+
+    def test_exact_strategy_shape_and_process_death_escape(self):
+        source = Path(
+            shopify_connector_job_dispatch.__file__
+        ).read_text(encoding='utf-8')
+        tree = ast.parse(source)
+        expected = {
+            'reconciliation_job_type', 'prepare_local',
+            'prepare_preconditions', 'transport',
+            'classify_direct_result', 'reconcile', 'apply_consequence',
+        }
+        self.assertEqual(
+            shopify_connector_job_dispatch.MUTATION_STRATEGY_KEYS,
+            frozenset(expected),
+        )
+        wrapper = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_drain_mutation_one'
+        )
+        caught = {
+            ast.unparse(handler.type)
+            for handler in ast.walk(wrapper)
+            if isinstance(handler, ast.ExceptHandler) and handler.type
+        }
+        self.assertNotIn('BaseException', caught)

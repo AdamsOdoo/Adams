@@ -4,7 +4,14 @@ from odoo import fields
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tests.common import TransactionCase
 
-from ..models.shopify_connector_mutation_attempt import canonical_sha256
+from ..models.shopify_connector_mutation_attempt import (
+    ATTEMPT_WRITE_CONTEXT,
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+    CREATE_SURFACE,
+    WRITE_SURFACES,
+    canonical_sha256,
+)
 
 
 class TestMutationAttempt(TransactionCase):
@@ -30,9 +37,9 @@ class TestMutationAttempt(TransactionCase):
         cls.Attempt = cls.env['shopify.connector.mutation.attempt']
 
     def _create(self, token='attempt-token'):
-        return self.Attempt.with_context(
-            shopify_layer2_c2_side_cursor=True,
-        )._create_attempt_intent({
+        return self.Attempt.with_context(**{
+            C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+        })._create_attempt_intent({
             'job_id': self.job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
@@ -92,16 +99,63 @@ class TestMutationAttempt(TransactionCase):
             self.Attempt.create(values)
         attempt = self._create()
         with self.assertRaises(AccessError):
+            attempt.sudo().with_context(**{
+                ATTEMPT_WRITE_CONTEXT: CREATE_SURFACE,
+            }).write({'resolution_reason': 'create surface bypass'})
+        with self.assertRaises(AccessError):
             attempt.write({'resolution_reason': 'forged'})
         with self.assertRaises(AccessError):
             attempt.unlink()
         self.assertTrue(attempt.exists())
 
+    def test_identity_is_immutable_through_every_write_surface(self):
+        attempt = self._create()
+        for surface in WRITE_SURFACES:
+            with self.assertRaises(ValidationError, msg=surface):
+                attempt._surface(surface).write({
+                    'attempt_token': uuid.uuid4().hex,
+                })
+
+    def test_same_job_with_different_token_is_structurally_rejected(self):
+        self._create()
+        self.job.sudo().write({'current_attempt_token': 'second-token'})
+        with self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                self._create('second-token')
+
+    def test_c2_validates_job_token_state_and_domain(self):
+        for values in (
+            {'state': 'queued'},
+            {'current_attempt_token': 'wrong-token'},
+            {'job_type': 'setup_readiness_check'},
+        ):
+            original = {key: self.job[key] for key in values}
+            self.job.sudo().write(values)
+            with self.assertRaises(ValidationError):
+                self._create()
+            self.job.sudo().write(original)
+
+    def test_resolution_tuple_and_effective_timestamp_are_atomic(self):
+        attempt = self._create()
+        attempt._record_direct_outcome('uncertain')
+        self.assertFalse(attempt.resolved_at)
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                attempt._surface(
+                    'action_resolve_mutation_attempt'
+                ).write({
+                    'resolution_disposition': 'applied',
+                })
+        attempt.action_resolve_mutation_attempt(
+            'applied', 'Synthetic external verification.'
+        )
+        self.assertTrue(attempt.resolved_at)
+
     def test_unknown_mutation_domain_fails_before_c2(self):
         with self.assertRaises(ValidationError):
-            self.Attempt.with_context(
-                shopify_layer2_c2_side_cursor=True,
-            )._create_attempt_intent({
+            self.Attempt.with_context(**{
+                C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+            })._create_attempt_intent({
                 'job_id': self.job.id,
                 'attempt_token': uuid.uuid4().hex,
                 'mutation_domain': 'inventory_real_domain_forbidden',

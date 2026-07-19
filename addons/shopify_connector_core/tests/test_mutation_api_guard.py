@@ -1,8 +1,15 @@
 import uuid
+from datetime import timedelta
 
 from odoo import fields
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
+
+from ..models.shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+    canonical_sha256,
+)
 
 
 class TestMutationApiGuard(TransactionCase):
@@ -26,15 +33,21 @@ class TestMutationApiGuard(TransactionCase):
             'owner_worker_ref': 'test:1',
             'running_since': fields.Datetime.now(),
         })
+        cls.operation = 'mutation DoThing { shop { id } }'
+        cls.variables = {'synthetic': True}
         cls.attempt = cls.env[
             'shopify.connector.mutation.attempt'
-        ].with_context(
-            shopify_layer2_c2_side_cursor=True,
-        )._create_attempt_intent({
+        ].with_context(**{
+            C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+        })._create_attempt_intent({
             'job_id': cls.job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
             'shopify_idempotency_key': uuid.uuid4().hex,
+            'exact_request_fingerprint': canonical_sha256({
+                'operation': cls.operation,
+                'variables': cls.variables,
+            }),
         })
         cls.context = {
             'job_id': cls.job.id,
@@ -51,7 +64,7 @@ class TestMutationApiGuard(TransactionCase):
 
     def test_query_and_false_positive_text_are_unaffected(self):
         self.assertTrue(self.Client._validate_graphql_operation(
-            'query { shop { id } }'
+            'query { shop { id } }', {},
         ))
         self.assertFalse(self.Client._graphql_contains_mutation(
             'query { shop { name(arg: "mutation { fake }") } } '
@@ -61,13 +74,46 @@ class TestMutationApiGuard(TransactionCase):
     def test_mutation_without_context_fails_closed(self):
         with self.assertRaises(UserError):
             self.Client._validate_graphql_operation(
-                'mutation DoThing { shop { id } }'
+                self.operation, self.variables,
             )
 
     def test_valid_exact_attempt_context_is_accepted(self):
         self.assertTrue(self.Client._validate_graphql_operation(
-            'mutation DoThing { shop { id } }', self.context,
+            self.operation, self.variables, self.context,
         ))
+
+    def test_operation_and_variable_mismatch_are_refused_exactly(self):
+        for operation, variables in (
+            ('mutation  DoThing { shop { id } }', self.variables),
+            (self.operation, {'synthetic': False}),
+        ):
+            with self.assertRaises(UserError):
+                self.Client._validate_graphql_operation(
+                    operation, variables, self.context,
+                )
+
+    def test_expired_and_nonrunning_contexts_are_refused(self):
+        self.env.cr.execute(
+            'UPDATE shopify_connector_mutation_attempt '
+            'SET idempotency_valid_until = %s WHERE id = %s',
+            (fields.Datetime.now(), self.attempt.id),
+        )
+        self.attempt.invalidate_recordset()
+        with self.assertRaises(UserError):
+            self.Client._validate_graphql_operation(
+                self.operation, self.variables, self.context,
+            )
+        self.env.cr.execute(
+            'UPDATE shopify_connector_mutation_attempt '
+            'SET idempotency_valid_until = %s WHERE id = %s',
+            (fields.Datetime.now() + timedelta(hours=1), self.attempt.id),
+        )
+        self.attempt.invalidate_recordset()
+        self.job.sudo().write({'state': 'failed_final'})
+        with self.assertRaises(UserError):
+            self.Client._validate_graphql_operation(
+                self.operation, self.variables, self.context,
+            )
 
     def test_token_or_domain_mismatch_is_refused(self):
         for key, value in (
@@ -78,5 +124,5 @@ class TestMutationApiGuard(TransactionCase):
             context[key] = value
             with self.assertRaises(UserError):
                 self.Client._validate_graphql_operation(
-                    'mutation DoThing { shop { id } }', context,
+                    self.operation, self.variables, context,
                 )

@@ -5,6 +5,11 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.tests.common import TransactionCase
 
+from ..models.shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+)
+
 
 class TestMutationRetention(TransactionCase):
 
@@ -30,9 +35,9 @@ class TestMutationRetention(TransactionCase):
             'payload_hash': uuid.uuid4().hex,
             'current_attempt_token': token,
         })
-        attempt = self.Attempt.with_context(
-            shopify_layer2_c2_side_cursor=True,
-        )._create_attempt_intent({
+        attempt = self.Attempt.with_context(**{
+            C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+        })._create_attempt_intent({
             'job_id': job.id,
             'attempt_token': token,
             'mutation_domain': 'mutation_dispatch_selftest',
@@ -58,16 +63,24 @@ class TestMutationRetention(TransactionCase):
         after = attempt.read(list(identity))[0]
         self.assertEqual(identity, after)
 
-    def test_uncertain_attempt_is_never_masked_even_after_resolution(self):
+    def test_resolved_uncertain_is_masked_after_window(self):
+        attempt = self._attempt('uncertain')
+        attempt.action_resolve_mutation_attempt(
+            'applied', 'Synthetic external evidence.'
+        )
+        self.env.cr.execute(
+            'UPDATE shopify_connector_mutation_attempt '
+            'SET resolved_at = %s WHERE id = %s',
+            (fields.Datetime.now() - timedelta(days=181), attempt.id),
+        )
+        attempt.invalidate_recordset()
+        self.assertEqual(self.Retention._run_attempt_evidence_masking(), 1)
+        self.assertEqual(attempt.remote_mutation_intent, {'masked': True})
+        self.assertTrue(attempt.exists())
+
+    def test_unresolved_uncertain_is_never_masked(self):
         attempt = self._attempt('uncertain')
         before = attempt.remote_mutation_intent
-        attempt._surface('action_resolve_mutation_attempt').write({
-            'resolution_disposition': 'applied',
-            'resolution_source': 'manual_admin',
-            'resolution_reason': 'synthetic evidence',
-            'resolution_uid': self.env.uid,
-            'resolution_at': fields.Datetime.now(),
-        })
         attempt._mask_terminal_evidence()
         self.assertEqual(attempt.remote_mutation_intent, before)
 
