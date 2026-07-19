@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from datetime import timedelta
 
 from odoo import api, fields, models
@@ -14,6 +15,22 @@ C2_SIDE_CURSOR_SENTINEL = object()
 IDEMPOTENCY_VALIDITY_HOURS = 23
 INCONCLUSIVE_RECONCILIATION_CAP = 3
 EVIDENCE_MASKED = {'masked': True}
+RECOVERY_EVIDENCE_CAP = 4
+RECONCILIATION_EVIDENCE_CAP = 4
+MANUAL_RESOLUTION_EVIDENCE_CAP = 1
+RECOVERY_WINDOWS = frozenset((
+    'c2_discovered_during_pre_c2_recovery',
+    'post_c2_owner_recovery',
+    'stale_owner_post_c2',
+))
+RECOVERY_SOURCES = frozenset((
+    'dispatcher_recovery',
+    'stale_owner_sweep',
+))
+EMAIL_PATTERN = re.compile(
+    r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b'
+)
+PHONE_PATTERN = re.compile(r'(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)')
 
 OBSERVED_OUTCOME_SELECTION = [
     ('pending', 'Pending'),
@@ -32,6 +49,7 @@ RESOLUTION_SOURCE_SELECTION = [
 CREATE_SURFACE = '_create_attempt_intent'
 WRITE_SURFACES = frozenset((
     '_record_direct_outcome',
+    '_record_recovery_uncertain',
     '_record_reconciliation_result',
     '_record_inconclusive_reconciliation',
     'action_resolve_mutation_attempt',
@@ -45,6 +63,13 @@ def canonical_sha256(value):
         value, sort_keys=True, separators=(',', ':'), ensure_ascii=False,
     )
     return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+
+def _redact_manual_reason(value):
+    safe = redact(value)
+    safe = EMAIL_PATTERN.sub('***', safe)
+    safe = PHONE_PATTERN.sub('***', safe)
+    return safe[:512]
 
 
 class ShopifyConnectorMutationAttempt(models.Model):
@@ -269,7 +294,9 @@ class ShopifyConnectorMutationAttempt(models.Model):
             'observed_outcome': outcome,
             'remote_evidence_refs': {
                 'direct': dict(evidence or {}),
+                'recovery': [],
                 'reconciliation': [],
+                'manual_resolution': [],
             },
             'resolved_at': (
                 fields.Datetime.now()
@@ -291,17 +318,117 @@ class ShopifyConnectorMutationAttempt(models.Model):
             return self.resolution_disposition
         return 'unresolved'
 
-    def _evidence_with_reconciliation(self, verdict, evidence):
+    def _evidence_sections(self):
+        """Return the four bounded evidence sections, including old rows."""
         self.ensure_one()
         current = dict(self.remote_evidence_refs or {})
+        known = {
+            'direct', 'recovery', 'reconciliation', 'manual_resolution',
+        }
         direct = dict(current.get('direct') or {})
-        entries = list(current.get('reconciliation') or [])
+        if not direct and current and not (set(current) & known):
+            direct = current
+        return {
+            'direct': direct,
+            'recovery': list(current.get('recovery') or [])[
+                -RECOVERY_EVIDENCE_CAP:
+            ],
+            'reconciliation': list(
+                current.get('reconciliation') or []
+            )[-RECONCILIATION_EVIDENCE_CAP:],
+            'manual_resolution': list(
+                current.get('manual_resolution') or []
+            )[-MANUAL_RESOLUTION_EVIDENCE_CAP:],
+        }
+
+    def _evidence_with_recovery(self, recovery_window, recovery_source):
+        self.ensure_one()
+        if recovery_window not in RECOVERY_WINDOWS:
+            raise ValidationError('Unknown Layer 2 recovery window.')
+        if recovery_source not in RECOVERY_SOURCES:
+            raise ValidationError('Unknown Layer 2 recovery source.')
+        sections = self._evidence_sections()
+        identity = {
+            'window': redact(recovery_window),
+            'source': redact(recovery_source),
+            'job_id': self.job_id.id,
+            'attempt_id': self.id,
+        }
+        if any(
+            all(entry.get(key) == value for key, value in identity.items())
+            for entry in sections['recovery']
+            if isinstance(entry, dict)
+        ):
+            return sections
+        entry = dict(identity)
+        entry['at'] = fields.Datetime.to_string(fields.Datetime.now())
+        sections['recovery'] = (
+            sections['recovery'] + [entry]
+        )[-RECOVERY_EVIDENCE_CAP:]
+        return sections
+
+    def _record_recovery_uncertain(
+        self, recovery_window, recovery_source,
+    ):
+        """Closed recovery-only pending -> uncertain transition."""
+        self.ensure_one()
+        locked = self.try_lock_for_update()
+        if not locked:
+            raise UserError('The mutation attempt is owned by another worker.')
+        locked.invalidate_recordset()
+        if locked.observed_outcome in ('succeeded', 'failed_clean'):
+            raise ValidationError(
+                'A resolved direct mutation attempt cannot be recovered.'
+            )
+        if (
+            locked.observed_outcome != 'pending'
+            and not (
+                locked.observed_outcome == 'uncertain'
+                and not locked.resolution_disposition
+            )
+        ):
+            raise ValidationError(
+                'Only pending or unresolved uncertain attempts may recover.'
+            )
+        evidence = locked._evidence_with_recovery(
+            recovery_window, recovery_source,
+        )
+        values = {'remote_evidence_refs': evidence}
+        if locked.observed_outcome == 'pending':
+            values.update({
+                'observed_outcome': 'uncertain',
+                'resolved_at': False,
+            })
+        if evidence != locked.remote_evidence_refs or len(values) > 1:
+            locked._surface('_record_recovery_uncertain').write(values)
+        return locked
+
+    def _evidence_with_reconciliation(self, verdict, evidence):
+        self.ensure_one()
+        sections = self._evidence_sections()
+        entries = sections['reconciliation']
         entries.append({
             'verdict': verdict,
             'at': fields.Datetime.to_string(fields.Datetime.now()),
             'evidence': dict(evidence or {}),
         })
-        return {'direct': direct, 'reconciliation': entries[-4:]}
+        sections['reconciliation'] = entries[
+            -RECONCILIATION_EVIDENCE_CAP:
+        ]
+        return sections
+
+    def _evidence_with_manual_resolution(
+        self, disposition, safe_reason,
+    ):
+        self.ensure_one()
+        sections = self._evidence_sections()
+        sections['manual_resolution'] = [{
+            'actor_uid': self.env.uid,
+            'disposition': disposition,
+            'at': fields.Datetime.to_string(fields.Datetime.now()),
+            'reason': safe_reason,
+        }][-MANUAL_RESOLUTION_EVIDENCE_CAP:]
+        return sections
 
     def _record_reconciliation_result(
         self, disposition, evidence=None,
@@ -379,7 +506,7 @@ class ShopifyConnectorMutationAttempt(models.Model):
         if attempt.resolution_disposition:
             raise UserError('This mutation attempt is already resolved.')
         now = fields.Datetime.now()
-        safe_reason = redact(reason.strip())
+        safe_reason = _redact_manual_reason(reason.strip())
         attempt._surface('action_resolve_mutation_attempt').write({
             'resolution_disposition': disposition,
             'resolution_source': 'manual_admin',
@@ -387,6 +514,10 @@ class ShopifyConnectorMutationAttempt(models.Model):
             'resolution_uid': self.env.uid,
             'resolution_at': now,
             'resolved_at': now,
+            'remote_evidence_refs':
+                attempt._evidence_with_manual_resolution(
+                    disposition, safe_reason,
+                ),
         })
         strategy = self.env[
             'shopify.connector.job.dispatch'

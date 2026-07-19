@@ -5,7 +5,7 @@ import random
 import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from ..tools.redaction import redact
@@ -364,10 +364,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 ('attempt_token', '=', locked.current_attempt_token),
             ], limit=1)
             if attempt and attempt.transport_attempted:
-                locked.sudo().write({
-                    'reconciliation_pending_until': fields.Datetime.now(),
-                })
-                self._ensure_reconciliation_job(locked, attempt)
+                self._recover_committed_attempt_to_reconciliation(
+                    locked,
+                    attempt,
+                    'post_c2_owner_recovery',
+                    'dispatcher_recovery',
+                )
                 self.env.cr.commit()
                 return
             # C1 committed but C2 did not: no transport was possible.
@@ -839,6 +841,17 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
         original = attempt.job_id
+        if attempt.observed_outcome == 'pending':
+            self._block_original_job(
+                original,
+                'data_shape_schema_mismatch',
+                'duplicate_risk',
+                'Pending attempt reached reconciliation without recovery.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Pending reconciliation attempt was refused.'
+            )
+            return
         if attempt.effective_disposition() != 'unresolved':
             self._complete_reconciliation_job(
                 job, 'Mutation attempt was already resolved.'
@@ -1142,8 +1155,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         ], limit=1)
         if attempt:
             if attempt.attempt_token == token:
-                self._ensure_reconciliation_job(job, attempt)
-                job.sudo().write(self._owner_cleanup_values())
+                self._recover_committed_attempt_to_reconciliation(
+                    job,
+                    attempt,
+                    'c2_discovered_during_pre_c2_recovery',
+                    'dispatcher_recovery',
+                )
             else:
                 self._block_original_job(
                     job,
@@ -1178,10 +1195,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             ('job_id', '=', job_id),
         ], limit=1)
         if attempt and attempt.transport_attempted:
-            attempt = attempt.try_lock_for_update()
-            if attempt and attempt.effective_disposition() == 'unresolved':
-                self._ensure_reconciliation_job(job, attempt)
-                job.sudo().write(self._owner_cleanup_values())
+            self._recover_committed_attempt_to_reconciliation(
+                job,
+                attempt,
+                'post_c2_owner_recovery',
+                'dispatcher_recovery',
+            )
         elif job.current_attempt_token == token and job.state == 'running':
             job.sudo().write(self._owner_cleanup_values())
             self._schedule_retry_or_fail(
@@ -1192,6 +1211,29 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 max_attempts=RETRY_MAX_ATTEMPTS,
             )
         self.env.cr.commit()
+
+    @api.model
+    def _recover_committed_attempt_to_reconciliation(
+        self, job, attempt, recovery_window, recovery_source,
+    ):
+        """Atomically own recovery evidence, one read job, and cleanup."""
+        try:
+            attempt = attempt._record_recovery_uncertain(
+                recovery_window, recovery_source,
+            )
+        except (ValidationError, UserError):
+            if job.state == 'running':
+                self._block_original_job(
+                    job,
+                    'data_shape_schema_mismatch',
+                    'duplicate_risk',
+                    'Committed attempt had an invalid recovery state.',
+                )
+            return self.env['shopify.connector.job']
+        reconciliation = self._ensure_reconciliation_job(job, attempt)
+        if job.state == 'running':
+            job.sudo().write(self._owner_cleanup_values())
+        return reconciliation
 
     @api.model
     def _commit_attempt_intent_c2(self, job_id, token, request):

@@ -71,14 +71,15 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
                 existing = Job.search([
                     ('mutation_attempt_id', '=', attempt.id),
                 ], limit=1)
-                job.sudo().write({
-                    'reconciliation_pending_until': False,
-                    'current_attempt_token': False,
-                    'owner_worker_ref': False,
-                    'running_since': False,
-                })
-                Dispatch._ensure_reconciliation_job(job, attempt)
-                if not existing:
+                reconciliation = (
+                    Dispatch._recover_committed_attempt_to_reconciliation(
+                        job,
+                        attempt,
+                        'stale_owner_post_c2',
+                        'stale_owner_sweep',
+                    )
+                )
+                if reconciliation and not existing:
                     job._log_transition(
                         'manual_action',
                         'Stale Layer 2 owner recovered through reconciliation; '
