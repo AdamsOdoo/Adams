@@ -37,7 +37,7 @@ LEGAL_JOB_TRANSITIONS = {
     'failed_retryable': frozenset(('queued', 'cancelled')),
     'failed_final': frozenset(('queued',)),
     'blocked_manual_review': frozenset((
-        'queued', 'cancelled', 'succeeded', 'retry_waiting',
+        'queued', 'cancelled', 'succeeded',
     )),
     'skipped': frozenset(('queued',)),
     'succeeded': frozenset(),
@@ -73,6 +73,7 @@ MANUAL_REVIEW_SUBREASON_SELECTION = [
     ('duplicate_risk', 'Duplicate Risk'),
     ('no_reconciliation_strategy', 'No Reconciliation Strategy'),
     ('idempotency_contract_violation', 'Idempotency Contract Violation'),
+    ('store_identity_mismatch', 'Store Identity Mismatch'),
     ('destructive_write_guard_blocked', 'Destructive-Write Guard Blocked'),
     ('inventory_location_missing', 'Inventory Location Missing'),
     (
@@ -363,12 +364,9 @@ class ShopifyConnectorJob(models.Model):
 
     def action_resolve_manual_review(self):
         self.ensure_one()
-        if (
-            self._has_mutation_attempt_evidence()
-            or self.manual_review_subreason == 'duplicate_risk'
-        ):
+        if self._has_mutation_attempt_evidence():
             raise UserError(
-                'Mutation duplicate-risk jobs may only be resolved through '
+                'Mutation-evidence-linked jobs may only be resolved through '
                 'action_resolve_mutation_attempt.'
             )
         if not (
@@ -772,10 +770,18 @@ class ShopifyConnectorJob(models.Model):
         }
         for job in self:
             is_layer2_reconciliation = job.job_type in reconciliation_types
-            if is_layer2_reconciliation != bool(job.mutation_attempt_id):
+            may_retain_historic_link = (
+                job.job_type == 'historic_domain_job'
+                and bool(job.mutation_attempt_id)
+            )
+            if (
+                is_layer2_reconciliation
+                != bool(job.mutation_attempt_id)
+                and not may_retain_historic_link
+            ):
                 raise ValidationError(
                     'A Layer 2 reconciliation job requires one exact mutation '
-                    'attempt, and only such jobs may carry that link.'
+                    'attempt; only historic domain jobs may retain that link.'
                 )
             if (
                 job.mutation_attempt_id

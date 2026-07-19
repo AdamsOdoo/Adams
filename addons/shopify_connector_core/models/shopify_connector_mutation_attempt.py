@@ -4,10 +4,13 @@ from datetime import timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
+
+from ..tools.redaction import redact
 
 
 ATTEMPT_WRITE_CONTEXT = 'shopify_layer2_attempt_write_surface'
+C2_SENTINEL_CONTEXT = 'shopify_layer2_c2_internal_sentinel'
+C2_SIDE_CURSOR_SENTINEL = object()
 IDEMPOTENCY_VALIDITY_HOURS = 23
 INCONCLUSIVE_RECONCILIATION_CAP = 3
 EVIDENCE_MASKED = {'masked': True}
@@ -26,8 +29,8 @@ RESOLUTION_SOURCE_SELECTION = [
     ('reconciliation_read', 'Reconciliation Read'),
     ('manual_admin', 'Manual Administrator'),
 ]
+CREATE_SURFACE = '_create_attempt_intent'
 WRITE_SURFACES = frozenset((
-    '_create_attempt_intent',
     '_record_direct_outcome',
     '_record_reconciliation_result',
     '_record_inconclusive_reconciliation',
@@ -107,6 +110,10 @@ class ShopifyConnectorMutationAttempt(models.Model):
         '(job_id, attempt_token)',
         'The attempt token must be unique for this job.',
     )
+    _one_attempt_per_job = models.UniqueIndex(
+        '(job_id)',
+        'A mutation job may own only one attempt for its entire lifetime.',
+    )
     _non_negative_reconciliation_count = models.Constraint(
         'CHECK(inconclusive_reconciliation_count >= 0)',
         'The inconclusive reconciliation count cannot be negative.',
@@ -114,7 +121,7 @@ class ShopifyConnectorMutationAttempt(models.Model):
 
     @api.model
     def _surface(self, name):
-        if name not in WRITE_SURFACES:
+        if name != CREATE_SURFACE and name not in WRITE_SURFACES:
             raise AccessError('Unknown mutation-attempt write surface.')
         return self.sudo().with_context(**{ATTEMPT_WRITE_CONTEXT: name})
 
@@ -122,8 +129,9 @@ class ShopifyConnectorMutationAttempt(models.Model):
     def create(self, vals_list):
         if (
             not self.env.su
-            or self.env.context.get(ATTEMPT_WRITE_CONTEXT)
-            != '_create_attempt_intent'
+            or self.env.context.get(ATTEMPT_WRITE_CONTEXT) != CREATE_SURFACE
+            or self.env.context.get(C2_SENTINEL_CONTEXT)
+            is not C2_SIDE_CURSOR_SENTINEL
         ):
             raise AccessError(
                 'Mutation attempts can only be created by the Layer 2 service.'
@@ -137,6 +145,15 @@ class ShopifyConnectorMutationAttempt(models.Model):
                 'Mutation attempts can only be changed by a sanctioned '
                 'Layer 2 service.'
             )
+        immutable = {
+            'job_id', 'attempt_token', 'mutation_domain', 'store_id',
+            'expected_connection_generation', 'expected_store_identity',
+            'business_intent_fingerprint', 'exact_request_fingerprint',
+            'shopify_idempotency_key', 'idempotency_valid_until',
+            'transport_attempted', 'created_at', 'transport_at',
+        }
+        if set(vals) & immutable:
+            raise ValidationError('Mutation-attempt identity is immutable.')
         if 'observed_outcome' in vals:
             for attempt in self:
                 if attempt.observed_outcome != 'pending':
@@ -147,35 +164,83 @@ class ShopifyConnectorMutationAttempt(models.Model):
                     raise ValidationError(
                         'A direct outcome must leave the pending state.'
                     )
-        immutable = {
-            'job_id', 'attempt_token', 'mutation_domain', 'store_id',
-            'expected_connection_generation', 'expected_store_identity',
-            'business_intent_fingerprint', 'exact_request_fingerprint',
-            'shopify_idempotency_key', 'idempotency_valid_until',
-            'transport_attempted', 'created_at', 'transport_at',
-        }
-        if surface != '_create_attempt_intent' and set(vals) & immutable:
-            raise ValidationError('Mutation-attempt identity is immutable.')
         return super().write(vals)
 
     def unlink(self):
         raise AccessError('Mutation-attempt evidence can never be deleted.')
 
+    @api.constrains(
+        'observed_outcome', 'resolution_disposition', 'resolution_source',
+        'resolution_reason', 'resolution_uid', 'resolution_at', 'resolved_at',
+    )
+    def _check_resolution_consistency(self):
+        for attempt in self:
+            resolution_values = (
+                attempt.resolution_disposition,
+                attempt.resolution_source,
+                attempt.resolution_reason,
+                attempt.resolution_uid,
+                attempt.resolution_at,
+            )
+            has_any_resolution = any(resolution_values)
+            has_complete_resolution = all(resolution_values)
+            if has_any_resolution != has_complete_resolution:
+                raise ValidationError(
+                    'Mutation resolution fields must be complete or empty.'
+                )
+            if has_complete_resolution and attempt.observed_outcome != 'uncertain':
+                raise ValidationError(
+                    'Only an uncertain mutation attempt may carry a resolution.'
+                )
+            should_be_resolved = attempt.observed_outcome in (
+                'succeeded', 'failed_clean',
+            ) or (
+                attempt.observed_outcome == 'uncertain'
+                and has_complete_resolution
+            )
+            if bool(attempt.resolved_at) != bool(should_be_resolved):
+                raise ValidationError(
+                    'resolved_at must reflect the effective disposition.'
+                )
+
     @api.model
     def _create_attempt_intent(self, values):
-        """C2-only durable intent creation on an owned side cursor."""
-        if not self.env.context.get('shopify_layer2_c2_side_cursor'):
+        """C2-only durable intent creation on the internal side cursor."""
+        if (
+            self.env.context.get(C2_SENTINEL_CONTEXT)
+            is not C2_SIDE_CURSOR_SENTINEL
+        ):
             raise ValidationError(
-                'Mutation intent creation requires the dedicated C2 side cursor.'
+                'Mutation intent creation requires the internal C2 sentinel.'
             )
         values = dict(values)
+        job_id = values.get('job_id')
         domain = values.get('mutation_domain')
+        token = values.get('attempt_token')
         strategies = self.env[
             'shopify.connector.job.dispatch'
         ]._get_reconciliation_strategies()
         if domain not in strategies:
             raise ValidationError(
                 'No reconciliation strategy is registered for this mutation.'
+            )
+        job = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not job:
+            raise ValidationError('The mutation job is unavailable at C2.')
+        job.invalidate_recordset()
+        if (
+            job.state != 'running'
+            or job.current_attempt_token != token
+            or job.job_type != domain
+        ):
+            raise ValidationError(
+                'C2 job state, owner token, and mutation domain must match.'
+            )
+        if self.search_count([('job_id', '=', job.id)]):
+            raise ValidationError(
+                'A mutation attempt already exists for this job.'
             )
         now = fields.Datetime.now()
         values.update({
@@ -187,11 +252,12 @@ class ShopifyConnectorMutationAttempt(models.Model):
                 values.get('idempotency_valid_until')
                 or now + timedelta(hours=IDEMPOTENCY_VALIDITY_HOURS)
             ),
+            'resolved_at': False,
         })
-        return self._surface('_create_attempt_intent').create(values)
+        return self._surface(CREATE_SURFACE).create(values)
 
     def _record_direct_outcome(self, outcome, evidence=None):
-        """C3-only immutable machine outcome."""
+        """C3-only immutable machine outcome with separate evidence."""
         self.ensure_one()
         if outcome not in ('succeeded', 'failed_clean', 'uncertain'):
             raise ValidationError('Unknown direct mutation outcome.')
@@ -201,8 +267,14 @@ class ShopifyConnectorMutationAttempt(models.Model):
         locked.invalidate_recordset()
         locked._surface('_record_direct_outcome').write({
             'observed_outcome': outcome,
-            'remote_evidence_refs': evidence or {},
-            'resolved_at': fields.Datetime.now(),
+            'remote_evidence_refs': {
+                'direct': dict(evidence or {}),
+                'reconciliation': [],
+            },
+            'resolved_at': (
+                fields.Datetime.now()
+                if outcome in ('succeeded', 'failed_clean') else False
+            ),
         })
         return locked
 
@@ -219,42 +291,20 @@ class ShopifyConnectorMutationAttempt(models.Model):
             return self.resolution_disposition
         return 'unresolved'
 
-    def _apply_disposition_to_job(self, source_message):
+    def _evidence_with_reconciliation(self, verdict, evidence):
         self.ensure_one()
-        disposition = self.effective_disposition()
-        job = self.job_id
-        now = fields.Datetime.now()
-        if disposition == 'applied':
-            from_state = job.state
-            job.sudo().write({
-                'state': 'succeeded',
-                'finished_at': now,
-                'reconciliation_pending_until': False,
-            })
-            job._log_transition(
-                'state_change',
-                source_message,
-                from_state=from_state,
-                to_state='succeeded',
-            )
-        elif disposition == 'not_applied':
-            from_state = job.state
-            job.sudo().write({
-                'state': 'retry_waiting',
-                'next_retry_at': now,
-                'finished_at': False,
-                'reconciliation_pending_until': False,
-            })
-            job._log_transition(
-                'state_change',
-                source_message,
-                from_state=from_state,
-                to_state='retry_waiting',
-            )
-        return disposition
+        current = dict(self.remote_evidence_refs or {})
+        direct = dict(current.get('direct') or {})
+        entries = list(current.get('reconciliation') or [])
+        entries.append({
+            'verdict': verdict,
+            'at': fields.Datetime.to_string(fields.Datetime.now()),
+            'evidence': dict(evidence or {}),
+        })
+        return {'direct': direct, 'reconciliation': entries[-4:]}
 
     def _record_reconciliation_result(
-        self, disposition, reconciliation_job, evidence=None,
+        self, disposition, evidence=None,
     ):
         self.ensure_one()
         if disposition not in ('applied', 'not_applied'):
@@ -277,83 +327,33 @@ class ShopifyConnectorMutationAttempt(models.Model):
             'resolution_uid': self.env.uid,
             'resolution_at': now,
             'resolved_at': now,
-            'remote_evidence_refs': evidence or {},
+            'remote_evidence_refs': locked._evidence_with_reconciliation(
+                disposition, evidence,
+            ),
         })
-        locked._apply_disposition_to_job(
-            'Mutation attempt resolved by read-only reconciliation: %s.'
-            % disposition
-        )
-        if reconciliation_job:
-            from_state = reconciliation_job.state
-            reconciliation_job.sudo().write({
-                'state': 'succeeded',
-                'finished_at': now,
-                'reconciliation_pending_until': False,
-            })
-            reconciliation_job._log_transition(
-                'state_change',
-                'Reconciliation verdict recorded for mutation attempt %d.'
-                % locked.id,
-                from_state=from_state,
-                to_state='succeeded',
-            )
-        return True
+        return locked
 
-    def _record_inconclusive_reconciliation(self, reconciliation_job):
+    def _record_inconclusive_reconciliation(self, evidence=None):
         self.ensure_one()
-        for attempt_index in range(3):
-            try:
-                locked = self.try_lock_for_update()
-                if not locked:
-                    raise UserError(
-                        'The mutation attempt is owned by another worker.'
-                    )
-                locked.invalidate_recordset()
-                if locked.observed_outcome != 'uncertain':
-                    raise ValidationError(
-                        'Only an uncertain attempt may remain inconclusive.'
-                    )
-                count = locked.inconclusive_reconciliation_count + 1
-                locked._surface(
-                    '_record_inconclusive_reconciliation'
-                ).write({
-                    'inconclusive_reconciliation_count': count,
-                })
-                now = fields.Datetime.now()
-                if count >= INCONCLUSIVE_RECONCILIATION_CAP:
-                    original = locked.job_id
-                    from_state = original.state
-                    original.sudo().write({
-                        'state': 'blocked_manual_review',
-                        'error_class': 'duplicate_risk',
-                        'manual_review_subreason': 'duplicate_risk',
-                        'finished_at': now,
-                        'reconciliation_pending_until': False,
-                    })
-                    original._log_transition(
-                        'state_change',
-                        'Mutation reconciliation remained inconclusive at '
-                        'the safety cap; manual review is required.',
-                        from_state=from_state,
-                        to_state='blocked_manual_review',
-                    )
-                    if reconciliation_job:
-                        reconciliation_job.sudo().write({
-                            'state': 'succeeded',
-                            'finished_at': now,
-                        })
-                elif reconciliation_job:
-                    reconciliation_job.sudo().write({
-                        'state': 'retry_waiting',
-                        'next_retry_at': now + timedelta(minutes=5),
-                    })
-                return count
-            except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
-                self.env.cr.rollback()
-                self.env.transaction.reset()
-                if attempt_index == 2:
-                    raise
-        return False
+        locked = self.try_lock_for_update()
+        if not locked:
+            raise UserError('The mutation attempt is owned by another worker.')
+        locked.invalidate_recordset()
+        if (
+            locked.observed_outcome != 'uncertain'
+            or locked.resolution_disposition
+        ):
+            raise ValidationError(
+                'Only an unresolved uncertain attempt may remain inconclusive.'
+            )
+        count = locked.inconclusive_reconciliation_count + 1
+        locked._surface('_record_inconclusive_reconciliation').write({
+            'inconclusive_reconciliation_count': count,
+            'remote_evidence_refs': locked._evidence_with_reconciliation(
+                'inconclusive', evidence,
+            ),
+        })
+        return count
 
     def action_resolve_mutation_attempt(self, disposition, reason):
         self.ensure_one()
@@ -379,18 +379,41 @@ class ShopifyConnectorMutationAttempt(models.Model):
         if attempt.resolution_disposition:
             raise UserError('This mutation attempt is already resolved.')
         now = fields.Datetime.now()
+        safe_reason = redact(reason.strip())
         attempt._surface('action_resolve_mutation_attempt').write({
             'resolution_disposition': disposition,
             'resolution_source': 'manual_admin',
-            'resolution_reason': reason.strip(),
+            'resolution_reason': safe_reason,
             'resolution_uid': self.env.uid,
             'resolution_at': now,
             'resolved_at': now,
         })
-        attempt._apply_disposition_to_job(
-            'Mutation attempt manually resolved by actor_uid=%d; '
-            'disposition=%s; reason=%s.'
-            % (self.env.uid, disposition, reason.strip())
+        strategy = self.env[
+            'shopify.connector.job.dispatch'
+        ]._validated_mutation_strategy(attempt.mutation_domain)
+        consequence = {
+            'observed_outcome': 'uncertain',
+            'error_class': (
+                False if disposition == 'applied' else 'duplicate_risk'
+            ),
+            'manual_review_subreason': (
+                False if disposition == 'applied' else 'duplicate_risk'
+            ),
+            'action': (
+                'succeed' if disposition == 'applied'
+                else 'block_manual_review'
+            ),
+            'message': 'Mutation attempt manually resolved by actor_uid=%d.'
+            % self.env.uid,
+            'evidence': {},
+            'domain_payload': {'disposition': disposition},
+        }
+        self.env['shopify.connector.job.dispatch']._apply_validated_consequence(
+            attempt.job_id,
+            attempt,
+            'manual_resolution',
+            consequence,
+            strategy,
         )
         reconciliation_jobs = self.env['shopify.connector.job'].search([
             ('mutation_attempt_id', '=', attempt.id),
@@ -413,7 +436,12 @@ class ShopifyConnectorMutationAttempt(models.Model):
 
     def _mask_terminal_evidence(self):
         for attempt in self:
-            if attempt.observed_outcome not in ('succeeded', 'failed_clean'):
+            if (
+                not attempt.resolved_at
+                or attempt.effective_disposition() not in (
+                    'applied', 'not_applied',
+                )
+            ):
                 continue
             if (
                 attempt.remote_mutation_intent == EVIDENCE_MASKED
