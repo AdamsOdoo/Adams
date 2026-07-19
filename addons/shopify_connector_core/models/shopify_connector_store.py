@@ -935,6 +935,7 @@ class ShopifyConnectorStore(models.Model):
             )
         if not isinstance(reason, str) or not reason.strip():
             raise UserError('A non-empty force-disconnect reason is required.')
+        safe_reason = redact(reason.strip())
         self._lock_store_for_lifecycle()
         attempts, reconciliations = self._layer2_disconnect_blockers()
         leases = self.env['shopify.connector.call.lease'].search([
@@ -950,6 +951,9 @@ class ShopifyConnectorStore(models.Model):
                     'manual_review_subreason': 'duplicate_risk',
                     'finished_at': fields.Datetime.now(),
                     'reconciliation_pending_until': False,
+                    'current_attempt_token': False,
+                    'owner_worker_ref': False,
+                    'running_since': False,
                 })
                 job._log_transition(
                     'manual_action',
@@ -963,7 +967,7 @@ class ShopifyConnectorStore(models.Model):
             'unresolved_attempt_count=%d reconciliation_job_count=%d. '
             'Credentials preserved pending explicit attempt resolution.'
             % (
-                self.env.uid, reason.strip(), len(attempts),
+                self.env.uid, safe_reason, len(attempts),
                 len(reconciliations),
             )
         )

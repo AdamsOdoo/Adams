@@ -105,7 +105,6 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                 self.env.uid,
             )
         )
-        self._run_attempt_evidence_masking()
         return True
 
     @api.model
@@ -129,9 +128,6 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
         attempts = Attempt.search([
             ('resolved_at', '!=', False),
             ('resolved_at', '<', cutoff),
-            '|',
-            ('observed_outcome', '=', 'succeeded'),
-            ('observed_outcome', '=', 'failed_clean'),
         ], order='store_id, id')
         counts = {}
         for attempt in attempts:
