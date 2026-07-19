@@ -331,6 +331,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 ('attempt_token', '=', locked.current_attempt_token),
             ], limit=1)
             if attempt and attempt.transport_attempted:
+                locked.sudo().write({
+                    'reconciliation_pending_until': fields.Datetime.now(),
+                })
                 self._ensure_reconciliation_job(locked, attempt)
                 self.env.cr.commit()
                 return
@@ -480,6 +483,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     @api.model
     def _handle_mutation_dispatch_selftest_reconcile(self, job):
         attempt = job.mutation_attempt_id
+        if attempt.effective_disposition() != 'unresolved':
+            return
         strategy = self._get_reconciliation_strategies().get(
             attempt.mutation_domain
         )
@@ -536,14 +541,22 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         # C1: durable exact owner.
         from_state = job.state
-        job.sudo().write({
-            'state': 'running',
-            'started_at': job.started_at or fields.Datetime.now(),
-            'current_attempt_token': token,
-            'owner_worker_ref': '%s:%s' % (self.env.cr.dbname, os.getpid()),
-            'running_since': fields.Datetime.now(),
-            'reconciliation_pending_until': False,
-        })
+        try:
+            job.sudo().write({
+                'state': 'running',
+                'started_at': job.started_at or fields.Datetime.now(),
+                'current_attempt_token': token,
+                'owner_worker_ref': '%s:%s' % (self.env.cr.dbname, os.getpid()),
+                'running_since': fields.Datetime.now(),
+                'reconciliation_pending_until': False,
+            })
+        except ValidationError as exc:
+            job._transition_failed_retryable(
+                'odoo_validation_configuration',
+                'Mutation admission was refused before C1: %s' % exc,
+            )
+            self.env.cr.commit()
+            return
         job._log_transition(
             'attempt',
             'Layer 2 mutation claim committed.',
@@ -559,9 +572,13 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         self.env.cr.commit()
 
         # C2: independent committed attempt intent.
-        attempt_id = self._commit_attempt_intent_c2(
-            job_id, token, request,
-        )
+        try:
+            attempt_id = self._commit_attempt_intent_c2(
+                job_id, token, request,
+            )
+        except BaseException:
+            self._recover_layer2_owner(job_id, token)
+            return
 
         # NET: plain immutable values only; no main-cursor access.
         try:
@@ -584,9 +601,57 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             }
 
         # C3: fresh snapshot, exact token lock/CAS, outcome + job consequence.
-        self._commit_mutation_outcome_c3(
-            job_id, attempt_id, token, result, strategy,
-        )
+        try:
+            self._commit_mutation_outcome_c3(
+                job_id, attempt_id, token, result, strategy,
+            )
+        except BaseException:
+            self._recover_layer2_owner(job_id, token)
+            return
+
+    @api.model
+    def _recover_layer2_owner(self, job_id, token):
+        """Fresh-transaction recovery for every post-C1 failure window."""
+        self.env.cr.rollback()
+        self.env.transaction.reset()
+        job = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not job:
+            self.env.cr.commit()
+            return
+        job.invalidate_recordset()
+        attempt = self.env[
+            'shopify.connector.mutation.attempt'
+        ].search([
+            ('job_id', '=', job_id),
+            ('attempt_token', '=', token),
+        ], limit=1)
+        if attempt and attempt.transport_attempted:
+            attempt = attempt.try_lock_for_update()
+            if attempt:
+                job.sudo().write({
+                    'reconciliation_pending_until': fields.Datetime.now(),
+                })
+                self._ensure_reconciliation_job(job, attempt)
+        elif job.current_attempt_token == token and job.state == 'running':
+            from_state = job.state
+            job.sudo().write({
+                'state': 'retry_waiting',
+                'next_retry_at': fields.Datetime.now(),
+                'current_attempt_token': False,
+                'owner_worker_ref': False,
+                'running_since': False,
+                'reconciliation_pending_until': False,
+            })
+            job._log_transition(
+                'state_change',
+                'Recovered a pre-C2 Layer 2 failure; no transport attempt '
+                'was committed.',
+                from_state=from_state,
+                to_state='retry_waiting',
+            )
+        self.env.cr.commit()
 
     @api.model
     def _commit_attempt_intent_c2(self, job_id, token, request):
@@ -724,9 +789,19 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         existing = Job.search([
             ('mutation_attempt_id', '=', attempt.id),
             ('job_type', '=', strategy['reconciliation_job_type']),
-            ('state', 'not in', ('succeeded', 'failed_final', 'cancelled')),
         ], limit=1)
         if existing:
+            if (
+                existing.state in ('succeeded', 'failed_final', 'cancelled')
+                and attempt.effective_disposition() == 'unresolved'
+                and original_job.state != 'blocked_manual_review'
+            ):
+                original_job._transition_blocked_manual_review(
+                    'duplicate_risk',
+                    'duplicate_risk',
+                    'The only reconciliation job is terminal while the '
+                    'mutation attempt remains unresolved.',
+                )
             return existing
         return Job.sudo().create({
             'store_id': original_job.store_id.id,
