@@ -6,6 +6,11 @@ from odoo.exceptions import AccessError, UserError
 
 
 MASKED_PII_VALUE = '***'
+ATTEMPT_EVIDENCE_RETENTION_DAYS = 180
+ATTEMPT_EVIDENCE_RETENTION_PARAM = (
+    'shopify_connector.layer2_attempt_evidence_retention_days'
+)
+
 PII_KEY_PARTS = (
     'email',
     'phone',
@@ -100,7 +105,65 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                 self.env.uid,
             )
         )
+        self._run_attempt_evidence_masking()
         return True
+
+    @api.model
+    def _attempt_evidence_retention_days(self):
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            ATTEMPT_EVIDENCE_RETENTION_PARAM,
+            ATTEMPT_EVIDENCE_RETENTION_DAYS,
+        )
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return ATTEMPT_EVIDENCE_RETENTION_DAYS
+        return value if value > 0 else ATTEMPT_EVIDENCE_RETENTION_DAYS
+
+    @api.model
+    def _run_attempt_evidence_masking(self):
+        cutoff = fields.Datetime.now() - timedelta(
+            days=self._attempt_evidence_retention_days(),
+        )
+        Attempt = self.env['shopify.connector.mutation.attempt']
+        attempts = Attempt.search([
+            ('resolved_at', '!=', False),
+            ('resolved_at', '<', cutoff),
+            '|',
+            '|',
+            ('observed_outcome', '=', 'succeeded'),
+            ('observed_outcome', '=', 'failed_clean'),
+            '&',
+            ('observed_outcome', '=', 'uncertain'),
+            ('resolution_disposition', '!=', False),
+        ], order='store_id, id')
+        counts = {}
+        for attempt in attempts:
+            if attempt.effective_disposition() == 'unresolved':
+                continue
+            before = (
+                attempt.remote_mutation_intent,
+                attempt.preconditions_snapshot,
+                attempt.remote_evidence_refs,
+            )
+            attempt._mask_terminal_evidence()
+            after = (
+                attempt.remote_mutation_intent,
+                attempt.preconditions_snapshot,
+                attempt.remote_evidence_refs,
+            )
+            if before != after:
+                counts[attempt.store_id.id] = (
+                    counts.get(attempt.store_id.id, 0) + 1
+                )
+        for store_id, count in counts.items():
+            self.env['shopify.connector.store'].browse(
+                store_id
+            )._create_lifecycle_audit_job(
+                'Layer 2 attempt evidence retention store_id=%d '
+                'masked_attempt_count=%d' % (store_id, count)
+            )
+        return sum(counts.values())
 
     @api.model
     def run_sweep(self):
@@ -176,4 +239,5 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                         masked_field_count,
                     )
                 )
+        self._run_attempt_evidence_masking()
         return True
