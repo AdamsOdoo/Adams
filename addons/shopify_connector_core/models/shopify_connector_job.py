@@ -36,7 +36,9 @@ LEGAL_JOB_TRANSITIONS = {
     )),
     'failed_retryable': frozenset(('queued', 'cancelled')),
     'failed_final': frozenset(('queued',)),
-    'blocked_manual_review': frozenset(('queued', 'cancelled')),
+    'blocked_manual_review': frozenset((
+        'queued', 'cancelled', 'succeeded', 'retry_waiting',
+    )),
     'skipped': frozenset(('queued',)),
     'succeeded': frozenset(),
     'cancelled': frozenset(),
@@ -758,15 +760,24 @@ class ShopifyConnectorJob(models.Model):
 
     @api.constrains('job_type', 'mutation_attempt_id')
     def _check_reconciliation_attempt_link(self):
+        strategies = self.env[
+            'shopify.connector.job.dispatch'
+        ]._get_reconciliation_strategies()
+        reconciliation_types = {
+            item['reconciliation_job_type']
+            for item in strategies.values()
+        }
         for job in self:
-            is_reconciliation = (
-                job.job_type == 'mutation_dispatch_selftest_reconcile'
-            )
-            if is_reconciliation and not job.mutation_attempt_id:
+            is_layer2_reconciliation = job.job_type in reconciliation_types
+            if is_layer2_reconciliation != bool(job.mutation_attempt_id):
                 raise ValidationError(
-                    'A reconciliation job requires one exact mutation attempt.'
+                    'A Layer 2 reconciliation job requires one exact mutation '
+                    'attempt, and only such jobs may carry that link.'
                 )
-            if job.mutation_attempt_id and job.store_id != job.mutation_attempt_id.store_id:
+            if (
+                job.mutation_attempt_id
+                and job.store_id != job.mutation_attempt_id.store_id
+            ):
                 raise ValidationError(
                     'A reconciliation job and its mutation attempt must share a store.'
                 )
