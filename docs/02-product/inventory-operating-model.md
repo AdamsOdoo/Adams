@@ -1,14 +1,32 @@
 # Inventory Operating Model — Odoo 19 ↔ Shopify Connector (MVP)
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16.** This document
-> consolidates and closes the MVP inventory model on top of accepted
+> **Status: GATE B ACCEPTANCE CANDIDATE (Revision 3) — NOT IMPLEMENTATION
+> AUTHORIZED.** Originally Proposed, Fable gap-closure mission, 2026-07-16;
+> corrected 2026-07-19 (Wave 3 Gate B session) per
+> [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md): CAS field
+> name (`changeFromQuantity` throughout, §4.4), batching removed as an
+> assumed MVP behavior (§4.3/§9/§10 — DEC-036 D4 makes one-pair-per-request
+> binding), idempotency reworded attempt-owned not binding-owned (§4.5),
+> and unexplained drift made explicitly review-case-first, blocking, never
+> auto-overwritten (§5). **Revision 2 (control-room comment `5015619162`)
+> corrects §4.2/§4.5/§6: `inventoryActivate` and `inventorySetQuantities`
+> are each a standalone mutation job, never two attempts inside one push
+> job; reconciliation `not-applied` verdicts now require freshness/ABA
+> evidence (DEC-037 §4).** **Revision 3 (control-room comment
+> `5015830229`) further corrects §6: a CAS-stale or `not_applied` retry
+> now creates a new, separate job — never a redispatch of the job whose
+> attempt failed/resolved — and the `applied` verdict no longer carries a
+> timestamp condition (DEC-037 §4/§5.4).** This document consolidates and
+> closes the MVP
+> inventory model on top of accepted
 > [DEC-010](../04-decisions/DEC-010-inventory-architecture-strategy.md) and the
 > Part-C blueprint
 > ([master-blueprint-inventory-fulfillment.md](../03-architecture/master-blueprint-inventory-fulfillment.md));
 > it feeds the revised Task 013/013B packets (Wave 3). Acceptance authority:
-> product owner + Claude control room. **No implementation authorized.**
-> Inventory *mutation* implementation stays unauthorized until DEC-031 Layer 2
-> is accepted AND implemented (see §7).
+> product owner + ChatGPT control room. **No implementation authorized.**
+> Inventory *mutation* implementation stays unauthorized until this Gate B
+> package is accepted and merged **and** DEC-031 Layer 2 (Stage 0) is
+> merged and runtime-proven (see §6).
 
 Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
 [Recommendation], [Proposed product decision], [Open question].
@@ -131,43 +149,77 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   converges). [Fact] Shopify itself directs systems that "act as the source
   of truth" to `inventorySetQuantities`, not the delta mutation
   ([shopify captures §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
-- **[Proposed product decision — active-job dedup]** While a push job for a
-  pair is queued/running, its `operation_scope_key` (per Task 013 D-013-6/7)
-  prevents a second concurrent job for the same pair; new events only refresh
-  the pending target consumed by the next run.
+- **[Proposed product decision — active-job dedup, Revision 2 pair scope,
+  Revision 3 non-terminal correction]** While any inventory job
+  (orchestration, activation, or set-quantities — Task 013 D-013-6/7) for
+  a pair is non-terminal — **including a job blocked in
+  `blocked_manual_review`, which is not terminal for this purpose and
+  continues to hold the pair until released by
+  `action_recheck_inventory_pair`**
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.5) —
+  the shared pair-serialization `operation_scope_key` (§5.3) prevents a
+  second concurrent job of any of the three types for the same pair; new
+  events only refresh the pending target consumed by the next
+  `inventory_push_sync` dispatch. A bounded CAS-stale or `not_applied`
+  replacement job is created atomically as part of the same handoff that
+  terminalizes the job it replaces (§5.4) — it is a new job, not a second
+  concurrent one.
 
-### 4.3 Batching
+### 4.3 Batching — excluded from Wave 3 MVP [Gate B-corrected, 2026-07-19]
 
-- **[Proposed product decision]** Pushes use `inventorySetQuantities` with a
-  multi-entry `quantities[]` input where several pairs are due for the same
-  store, within batch-size limits (§9); per-entry `userErrors` keep batching
-  compatible with per-record failure routing (§10). Task 013's one-pair-per-job
-  baseline (D-013-6) remains valid as the conservative floor; batching is the
-  revised-packet refinement.
+- **[Fact — binding, DEC-036 D4]** Pushes use `inventorySetQuantities`
+  with exactly **one** `(inventory_item_id, location_id)` pair per
+  request, per job, per Layer 2 attempt. Multi-entry `quantities[]`
+  batching is **explicitly excluded from Wave 3 MVP** — no source
+  confirms Shopify's per-entry `userErrors` carry a field-path index
+  sufficient to build reliable per-entry evidence, and no source confirms
+  partial-batch atomicity semantics. Task 013's one-pair-per-job design
+  (D-013-6) is the **binding MVP behavior**, not a conservative floor
+  awaiting a richer default.
+- **Superseded text (retained for history only, do not implement):**
+  ~~Pushes use `inventorySetQuantities` with a multi-entry `quantities[]`
+  input where several pairs are due for the same store, within
+  batch-size limits (§9); per-entry `userErrors` keep batching compatible
+  with per-record failure routing (§10)~~ — batching may be proposed
+  later only as a separately-reviewed follow-up decision, once Shopify's
+  per-entry error-path shape and partial-batch atomicity are proven; it
+  is not an assumed Wave 3 refinement.
 
-### 4.4 compareQuantity CAS
+### 4.4 changeFromQuantity CAS [Gate B-resolved, 2026-07-19]
 
-> **Evidence-conflict note (2026-07-16):** the 2026-07-16 live capture
-> verified `compareQuantity`/`ignoreCompareQuantity` on the 2026-07 API page,
-> but Task 013's earlier D-013-3 closure records the CAS shape as
-> `changeFromQuantity` (with `compareQuantity` removed in 2026-04). The two
-> Tier-1 records conflict; **mandatory re-verification against the raw
-> 2026-07 schema is a Wave 3 preflight hard-stop item** (recorded in the
-> Task 013 packet addendum §A and the consolidated decision pack). The CAS
-> *mechanism* (compare-and-set with an ignore override) is consistent across
-> both records; only the field name is in question.
+> **Resolution of the 2026-07-16 evidence conflict (closed, not open).**
+> The 2026-07-16 live capture read `compareQuantity`/`ignoreCompareQuantity`
+> off a page that, as of 2026-07-18's Gate A official-source refresh
+> ([`shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md)
+> §1), is confirmed stale: `InventoryQuantityInput`'s current (2026-07)
+> fields are `changeFromQuantity`, `inventoryItemId`, `locationId`,
+> `quantity` — no `compareQuantity`/`ignoreCompareQuantity` input field
+> exists from API 2026-04 onward (four independent official citations,
+> no conflict between official Shopify sources — the conflict was this
+> project's own stale internal documents). `changeFromQuantity` is the
+> sole current-facing CAS field name everywhere in this document,
+> confirmed by [DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)
+> D12 and [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md).
 
-- **[Fact — field name subject to the conflict note above]** `inventorySetQuantities` supports per-entry `compareQuantity`:
-  "the mutation will only update the quantity if the persisted quantity
-  matches the `compareQuantity` value", and omitting it "can lead to
-  inaccurate inventory quantities if multiple requests are made concurrently"
-  ([shopify captures §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
-- **[Proposed product decision — flow]** Every push is **read → compare →
-  set**: read the current Shopify `available` (or use the reconciliation-read
-  value), send it as `compareQuantity` with the Odoo target. On CAS mismatch:
-  **re-read, re-derive the Odoo target, retry** with bounded attempts
-  (proposed: 3). Persistent divergence after retries → **review case** (§5),
-  never `ignoreCompareQuantity`.
+- **[Fact]** `inventorySetQuantities` supports per-entry
+  `changeFromQuantity`: *"The quantity currently expected at this
+  location, before setting the new quantity"* — the current mechanism for
+  optimistic concurrency; omitting it (passing `null`) bypasses the CAS
+  check, replacing the retired `ignoreCompareQuantity` boolean. Mismatch
+  error code: `CHANGE_FROM_QUANTITY_STALE`.
+- **[Proposed product decision — flow, bounded retry now binding]** Every
+  push is **read → compare → set**: a **fresh** Shopify read (captured
+  into the Layer 2 attempt's `preconditions_snapshot` immediately before
+  that attempt's C2, never from a stored/cached field) is sent as
+  `changeFromQuantity` with the Odoo target. On `CHANGE_FROM_QUANTITY_STALE`:
+  **re-read, re-derive the Odoo target, retry** — bounded at **3**
+  attempts, each a fresh Layer 2 attempt with its own idempotency key
+  (the CAS value is part of the exact-request fingerprint, so it can
+  never be reused verbatim across a CAS-driven retry). Persistent
+  divergence after 3 retries → **review case** (§5,
+  `blocked_manual_review`/`binding_conflict`), never a 4th silent retry,
+  never `ignoreCompareQuantity` (retired, does not exist as an input
+  field).
 
 ### 4.5 Mandatory idempotency key
 
@@ -178,12 +230,24 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   and duplicates within the window return the cached response without
   re-executing
   ([shopify captures §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)).
-- **[Proposed product decision]** One fresh UUID **per mutation attempt**,
-  persisted on the attempt record *before* the call (see §6), so a network
-  retry replays the same key while a deliberate new attempt uses a new key.
-  [Inference] The 24-hour window bounds how long a stored key is replayable;
-  after 24h a stale attempt must go through reconciliation (§6), not key
-  replay.
+- **[Proposed product decision — attempt-owned, Gate B-confirmed]** One
+  fresh UUID **per mutation attempt**, persisted **exclusively** on
+  `shopify.connector.mutation.attempt` (Layer 2, core) *before* the call
+  (see §6) — **never on the inventory-level binding**, and never the
+  binding's own retry/dedup authority ([DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)
+  D6; [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §1
+  item C5). A network retry of the *same* attempt replays the same key;
+  a deliberate new attempt (including every CAS-driven retry, since
+  `changeFromQuantity` changes) always gets a new key. [Inference] The
+  24-hour window (minus a configurable local safety margin) bounds how
+  long a stored key is replayable; after that window a stale attempt must
+  go through reconciliation (§6), not key replay. `inventoryActivate`
+  (when first-push requires it) runs as its **own standalone mutation
+  job**, with its **own**, independently-tracked idempotency key — never
+  combined with the `inventory_set_quantities` job's attempt or key; the
+  handoff back to a set-quantities push always passes through a fresh
+  orchestration read, never a direct enqueue
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5).
 
 ## 5. Shopify→Odoo behavior (MVP)
 
@@ -193,11 +257,19 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   divergence**. **No automatic Odoo stock writes from Shopify data** —
   autonomous bidirectional conflict resolution is rejected
   ([RA-020](../05-qa/rejected-approaches-log.md)).
-- **[Proposed product decision]** Each divergence produces a **review case**
-  carrying the three values and a proposed explanation ([Inference]-labelled
-  in the UI, e.g. "Shopify order committed stock between pushes", "manual
-  Shopify adjustment"). The operator resolves by triggering a fresh
-  Odoo→Shopify push or acting in Odoo; the connector never guesses.
+- **[Proposed product decision — review-case-first, binding]** Each
+  unexplained divergence produces a **review case** carrying the three
+  values and a proposed explanation ([Inference]-labelled in the UI, e.g.
+  "Shopify order committed stock between pushes", "manual Shopify
+  adjustment") and **blocks the pending push for that pair** until the
+  case clears or is superseded by a fresh, explained state — **never an
+  automatic or silent overwrite of unexplained Shopify-side drift**
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §1 item
+  C6, superseding any earlier "push over after logging a drift note"
+  framing carried in the Task 013 packet's history). A **known** local
+  Odoo-only change (Shopify unchanged) is not drift and is not blocked.
+  The operator resolves by triggering a fresh, confirmed Odoo→Shopify
+  push or acting in Odoo; the connector never guesses.
 
 ## 6. Uncertainty after mutation + reconciliation before replay
 
@@ -206,21 +278,45 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   a mutation job whose outcome is uncertain (timeout, ambiguous response) is
   **not auto-replayed**: it fails closed as `remote_effect_not_replay_safe`
   and waits for review.
-- **[Proposed product decision — Layer 2 contract]** When DEC-031 Layer 2 is
-  accepted and implemented, each mutation attempt is preceded by a persisted
-  **attempt record** (pair identity, target value, `compareQuantity` basis,
-  idempotency UUID, timestamp). After an uncertain outcome, a
-  **reconciliation read** (`InventoryLevel.quantities` query) decides
-  **applied / not-applied** *before* any retry: if Shopify already shows the
-  target, the attempt is marked applied and closed; if not, a retry may be
-  issued (same key within 24h, else fresh CAS cycle). Design detail lives in
-  the Layer 2 design doc:
-  [dec-031-layer-2-mutation-safety-design.md](../03-architecture/dec-031-layer-2-mutation-safety-design.md)
-  (companion gap-closure deliverable). [Inference] For an absolute CAS set,
-  the reconciliation read is decisive — the observed quantity either equals
-  the attempted target or the attempt cannot have been the last write.
-- **Gate:** inventory mutation implementation (Task 013/013B code) remains
-  **unauthorized until DEC-031 Layer 2 is accepted AND implemented**.
+- **[Fact — Layer 2 contract, ACCEPTED — CONTROL-ROOM GATE A]** DEC-031
+  Layer 2 is accepted
+  ([DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md), D1–D38).
+  Each mutation attempt is preceded by a persisted **attempt record**
+  (`shopify.connector.mutation.attempt`: pair identity, target value, the
+  fresh `changeFromQuantity` basis, idempotency UUID, both fingerprints,
+  timestamps — attempt-owned, never binding-owned). After a machine-observed
+  `uncertain` outcome, a **reconciliation read** (`InventoryLevel.quantities`
+  query, beginning with a store-identity check) decides **applied /
+  not-applied / inconclusive** *before* any retry, recorded as an
+  orthogonal `resolution_disposition` that never overwrites the immutable
+  `observed_outcome` (DEC-036 D10): if Shopify already shows the target,
+  the attempt is applied and the job closes without resend; if it shows
+  the pre-attempt value **and** freshness evidence (`updatedAt` vs.
+  `transport_at`, where present) does not show a later change, the
+  attempt is not-applied — the job terminalizes (it is **never**
+  redispatched to make a second attempt) and a **new**, separate job of
+  the same mutation domain is created (fresh CAS cycle, fresh key), per
+  the atomic handoff contract
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §5.4);
+  if neither, **or** if the
+  pre-attempt value is shown but `updatedAt` is later than the attempt
+  (an ABA round-trip cannot be ruled out), the read is inconclusive and a
+  further reconciliation read is scheduled (capped at 3 inconclusive
+  verdicts, then manual review) — a same-value read is never, by itself,
+  proof of not-applied
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §4 row
+  1). Design detail: the Layer 2 design doc
+  ([dec-031-layer-2-mutation-safety-design.md](../03-architecture/dec-031-layer-2-mutation-safety-design.md))
+  and the domain-specific matrix in
+  [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §4.
+  [Inference] For an absolute CAS set, the reconciliation read is
+  decisive — the observed quantity either equals the attempted target or
+  the attempt cannot have been the last write (barring a genuinely
+  concurrent third-party change, handled as inconclusive, never guessed).
+- **Gate:** inventory mutation implementation (Task 013/013B code)
+  remains **unauthorized** — Layer 2 (Stage 0) is accepted but not yet
+  merged/runtime-proven, and this Gate B package is itself a
+  `GATE B ACCEPTANCE CANDIDATE`, not an implementation authorization.
 
 ## 7. Edge cases
 
@@ -260,8 +356,9 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   cron-cadence caveat, exact default to Task 013 revision); event-driven
   pushes need no schedule.
 - **[Proposed product decision — audit]** Every push leaves job-log evidence:
-  pair identity, **old value → new value**, the `compareQuantity` basis, the
-  idempotency key, trigger origin (odoo_event / scheduled_sync / manual_sync),
+  pair identity, **old value → new value**, the `changeFromQuantity` basis,
+  the idempotency key (read from the Layer 2 attempt record, never from
+  the binding), trigger origin (odoo_event / scheduled_sync / manual_sync),
   and outcome — enough to reconstruct any storefront quantity after the fact.
 
 ## 9. Large-catalog performance
@@ -272,23 +369,39 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   (Note: the mission brief cited PB-22/PB-23; in the budgets file those cover
   media export and the 011B backfill — the inventory row is **PB-20**. This
   document aligns to the file.)
-- **[Proposed product decision]** Batch sizing: multi-entry
-  `inventorySetQuantities` batches sized to stay under GraphQL cost limits
-  (start conservative, e.g. 25–50 entries; tune in the Task 013 dev-store
-  run). Reads paginate with cursor-based pagination. The client's existing
-  `throttleStatus` pacing governs send rate.
+- **[Fact — binding, Gate B-corrected]** No multi-entry batching exists in
+  Wave 3 MVP ([DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)
+  D4) — throughput comes from request **volume** (one
+  `inventorySetQuantities` call per pair) against PB-20's ≥300
+  pushes/hour target, paced by the client's existing `throttleStatus`
+  pacing, not from batch size. Reads (location cache, reconciliation)
+  paginate with cursor-based pagination, unaffected by this correction.
+  The one-pair-per-request throughput cost against PB-20 is measured on
+  the dev store (see the dev-store mutation-validation plan, scenario
+  17) as a Stage-1 sizing question, not assumed adequate in advance.
 - **[Proposed product decision — backlog behavior]** Under backlog,
   last-value-wins coalescing (§4.2) means the queue depth is bounded by the
   number of *pairs*, not the number of stock events; the sweep re-verifies
   convergence. Backlog age is surfaced per store.
 
-## 10. Partial failures
+## 10. Partial failures [Gate B-corrected, 2026-07-19 — no batching exists]
 
-- **[Proposed product decision]** `inventorySetQuantities` returns per-entry
-  `userErrors`: a failed entry routes **only that pair's record** to
-  retry/review with the error captured; the rest of the batch's successes are
-  committed and logged normally. Store-level failures (auth, throttle
-  exhaustion) fail the batch as one unit into the standard job retry path.
+- **[Fact — binding]** Because Wave 3 MVP issues exactly one
+  `(inventory_item_id, location_id)` pair per `inventorySetQuantities`
+  request ([DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D4),
+  there is no "rest of the batch" — a request either succeeds, fails
+  cleanly, or is uncertain, classified per the mutation-domain matrix in
+  [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) §4. Any
+  `userErrors` returned route that one pair's job to retry/review with
+  the error captured (`failed_clean`) or to reconciliation (`uncertain`
+  — ambiguous/partial response). Store-level failures (auth, throttle
+  exhaustion) fail the individual job into the standard job retry path,
+  exactly as any other single-pair request would.
+- **Superseded text (retained for history only, do not implement):**
+  ~~`inventorySetQuantities` returns per-entry `userErrors`: a failed
+  entry routes only that pair's record to retry/review... the rest of
+  the batch's successes are committed and logged normally~~ — this
+  assumed multi-entry batching, which does not exist in Wave 3 MVP.
 
 ## 11. Reconnect catch-up
 
@@ -299,8 +412,11 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
   connector performs a **reconciliation read of all mapped InventoryLevels
   before resuming any pushes**: stale pending targets are recomputed against
   fresh Shopify values so the first post-reconnect writes carry valid
-  `compareQuantity` bases. No stored pre-disconnect mutation is replayed
-  blind (§6).
+  `changeFromQuantity` bases. The reconciliation read begins with a
+  store-identity check (current `myshopifyDomain` vs. the last-known
+  identity, [DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)
+  D18) before interpreting any quantity. No stored pre-disconnect
+  mutation is replayed blind (§6).
 
 ## 12. Test/UAT hooks, wave allocation, decisions, open questions
 
@@ -330,33 +446,45 @@ Labels follow [CLAUDE.md](../../CLAUDE.md) §8: [Fact], [Inference],
 2. Location-mapping uniqueness constraints + overlap validation (§2).
 3. Inactive-location suspension + review (§2, §7).
 4. Coalesced absolute last-value-wins pending-update design (§4.2).
-5. Read→compare→set CAS flow, bounded retries, no `ignoreCompareQuantity` (§4.4).
-6. Per-attempt UUID persisted before the call (§4.5, §6).
-7. Shopify→Odoo = read/verify + review cases only (§5).
-8. Layer 2 attempt-record + reconciliation-before-replay contract (§6).
+5. Read→compare→set `changeFromQuantity` CAS flow, bounded (3) retries, no `ignoreCompareQuantity` — does not exist as an input field (§4.4).
+6. Per-attempt UUID, attempt-owned on `mutation.attempt`, never binding-owned, persisted before the call (§4.5, §6).
+7. Shopify→Odoo = read/verify + review-case-first (blocking, never auto-overwritten) (§5).
+8. Layer 2 attempt-record + reconciliation-before-replay contract, ACCEPTED per DEC-036 (§6).
 9. Negative-quantity clamp+warn default (§7).
 10. Manual preview-first push, per-store schedule, old→new audit evidence (§8).
-11. Batched multi-entry sets with per-entry error routing (§9, §10).
-12. Reconnect reconciliation-read-before-push (§11).
+11. One pair per `inventorySetQuantities` request — multi-entry batching excluded from Wave 3 MVP, a future separately-gated optimization (§9, §10, DEC-036 D4).
+12. Reconnect reconciliation-read-before-push, store-identity check first (§11).
 
 ### Open questions
 
 - [Open question] Does Shopify accept/render negative `available` via
   `inventorySetQuantities`? Verify before offering the push-negative option (§7).
-- [Open question] Exact batch size vs GraphQL cost for multi-entry
-  `inventorySetQuantities` — measure in the Task 013 dev-store run (§9).
+- [Open question] One-pair-per-request throughput against PB-20 (≥300
+  pushes/hour) — measure in the Task 013 dev-store run (§9; batching itself
+  is not an open question, it is excluded from MVP per DEC-036 D4).
 - [Open question] Expiry-date (`with_expiration`) interaction with `free_qty`
   (carried from the Odoo capture §3).
 - [Open question] Default reconciliation-sweep cadence (DEC-010 caveat;
-  Task 013 revision to propose).
+  provisionally 5 minutes per DEC-036 D27 for the generic Layer 2 sweep —
+  confirm whether the inventory reconciliation-read cadence should match
+  or differ, at Stage 1 implementation time).
 
 ---
 
 *Sources relied on: [DEC-010](../04-decisions/DEC-010-inventory-architecture-strategy.md)
 (Accepted), [DEC-018](../04-decisions/DEC-018-mbq-decision-batch-1.md) (MBQ-33/34),
-[DEC-031](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md),
+[DEC-031](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)
+(Layer 1 Accepted; Layer 2 ACCEPTED — CONTROL-ROOM GATE A per
+[DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)),
+[DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) (Gate B —
+CAS field name, idempotency ownership, batching exclusion, drift
+handling, complete mutation-domain matrix),
 [Shopify captures 2026-07-16 §9](../00-source-materials/shopify-orders-cod-abandoned-fulfillment-captures-2026-07-16.md)
-(Accessible, 2026-07-16),
+(Accessible, 2026-07-16; CAS/idempotency field names superseded by the
+2026-07-18 Gate A refresh below),
+[Shopify Layer 2 official-source refresh 2026-07-18](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md)
+(Accessible, 2026-07-18 — authoritative for `changeFromQuantity`,
+`@idempotent` mandatory scope, THROTTLED non-guarantee),
 [Odoo captures 2026-07-16 §3](../00-source-materials/odoo19-sale-stock-security-captures-2026-07-16.md)
 (Accessible, 2026-07-16),
 [Task 013](../07-implementation-plan/task-013-inventory-sync-implementation-packet.md) /

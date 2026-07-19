@@ -1,18 +1,72 @@
 # Wave 3 — Definition of Ready (Inventory Synchronization: Layer 2 Stage 0 + Task 013/013B)
 
-> **Status: GATE A ACCEPTED; GATE B NOT STARTED; STAGE 0 IMPLEMENTATION NOT
-> YET STARTED (2026-07-19).** Originally proposed, Fable gap-closure
-> mission, 2026-07-16; Gate A (DEC-031 Layer 2 architecture closure + Stage
-> 0 packet preparation, PR #177) corrected this document's CAS-field and
-> batching text on 2026-07-18, the DEC-036 consolidated correction batch
-> (2026-07-19) resolved every architecture item this document previously
-> carried as BLOCKING, and the control room accepted the complete Gate A
-> package by PR #177 comment
+> **Status: GATE A ACCEPTED (merged); GATE B ACCEPTED (Revision 3,
+> control-room comment `5016117207`, PR #179, docs-only merge-closure
+> normalization applied and merge authorized); STAGE 0 PR #178 HELD FOR
+> CORRECTION/SYNCHRONIZATION; TASK 013 NOT AUTHORIZED; TASK 013B NOT
+> AUTHORIZED.** Originally proposed, Fable gap-closure mission,
+> 2026-07-16; Gate A (DEC-031 Layer 2 architecture closure + Stage 0
+> packet preparation, PR #177) corrected this document's CAS-field
+> and batching text on 2026-07-18, the DEC-036 consolidated correction
+> batch (2026-07-19) resolved every architecture item this document
+> previously carried as BLOCKING, and the control room accepted the
+> complete Gate A package by PR #177 comment
 > [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)
-> — see §5. Docs-only. Acceptance authority: product owner + Claude control
-> room. **Gate A is accepted; Wave 3 Stage 1/2 implementation still
-> requires Gate B and the separately-issued Stage 0 prompt. No
-> implementation authorized by this document.**
+> and merged it (merge commit `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`,
+> verified live in PR #177 comment `5015174971`) — see §5. **Gate B
+> Revision 1 (2026-07-19, draft PR
+> [#179](https://github.com/AdamsOdoo/Adams/pull/179)) was returned
+> REVISE, NOT REJECTED by the control room (PR #179 comment
+> [`5015619162`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015619162)):
+> the same-job, two-sequential-mutation-attempt design was rejected in
+> favor of three standalone job types. Gate B Revision 2 (same date)
+> applied every binding correction from that comment, and was itself
+> returned REVISE a second time (PR #179 comment
+> [`5015830229`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015830229)):
+> Revision 2's same-job CAS-redispatch design still let one mutation job
+> accumulate more than one attempt, so Revision 3 (same date) corrected the
+> job model so every mutation job makes at most one attempt for its
+> entire lifetime (a CAS-stale or `not_applied` retry now creates a new,
+> separate job), froze an exact atomic handoff contract, froze the
+> `blocked_manual_review` review-release path, fixed the error-class
+> vocabulary, corrected the `applied` reconciliation verdict, and corrected
+> the locked prompts' role model. Revision 3 was **ACCEPTED IN SUBSTANCE**
+> by control-room comment
+> [`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207),
+> conditioned on one further docs-only merge-closure normalization commit
+> (job-state/attempt-outcome distinction, predecessor-replacement
+> transition to the existing `cancelled` state, existing-vs-new
+> job-lineage field ownership, `blocked_manual_review`/review-release
+> wording) — applied and merge-authorized, DEC-037 §1C** —
+> [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) now
+> closes every remaining inventory-planning contradiction (item 3 below is
+> **resolved**, not merely flagged) with the corrected job-lifetime model,
+> the complete `inventorySetQuantities`/`inventoryActivate` Layer 2 matrix,
+> the job/mutation-consequence contract, and both locked (unissued) Sol
+> prompts. **Claude did not accept its own package, in any revision, and
+> did not self-accept the merge-closure normalization** — acceptance
+> authority is comment `5016117207`, product owner + ChatGPT control
+> room. **Gate B's acceptance and merge do not by themselves authorize
+> Task 013/013B implementation — that additionally requires Stage 0
+> (PR #178) independently merged and runtime-proven, providing the
+> correction prerequisites DEC-037 §13A records. No implementation
+> authorized by this document or by Gate B's acceptance.**
+>
+> **Stage 0 factual status (reported, not inferred):** Sol's
+> implementation branch (`sol/wave-3-stage-0-layer2`) has an open draft
+> **pull request, #178** (head `644853a68b3497c134ee648ce7399e50d30ff397`)
+> — **not merged**, and remains **held** pending the post-Gate-B-merge
+> integration SHA and a consolidated synchronization/correction prompt
+> (per DEC-037 §13A's Stage 0 correction prerequisites). PR #178's own
+> body reports implementation complete and static validation passing, by
+> its own report; Odoo was not installed in that session's workspace, so
+> genuine PostgreSQL runtime tests, the process-death harness,
+> install/upgrade, and full regression were **not run there** — no
+> runtime-pass claim is made by that PR. Task 013 implementation
+> authorization requires Stage 0 independently merged and runtime-proven,
+> providing the correction prerequisites in DEC-037 §13A (PR #177 comment
+> `5015174971`'s sequencing guard). See DEC-037 §13/§13A for the full
+> statement.
 >
 > **Current program state (2026-07-19):** Wave 1 and **Wave 2 are both
 > merged** (Wave 2: PR #176, merge commit `22bfb9a0e9b1e48b6a664351e2b321d134177110`)
@@ -215,11 +269,11 @@ callables registered from the start; control-room wave review; state file
 | --- | --- | --- |
 | **DEC-031 Layer 2 design ACCEPTED** — complete DEC-036 D1–D38 decision set, accepted by control-room comment [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226) | [`dec-031-layer-2-mutation-safety-design.md`](../03-architecture/dec-031-layer-2-mutation-safety-design.md) | Product owner + control room |
 | **Layer 2 implemented + runtime-proven** (Stage 0 complete, evidence accepted) before any Stage 1/2 mutation | this DoR §4 | Control room (evidence gate) |
-| Inventory-operating-model PDs 1–12 (free_qty+context source, mapping constraints, coalescing last-value-wins, CAS flow, per-attempt UUID, read/verify-only reverse direction, Layer-2 attempt contract, clamp+warn, preview-first manual, one pair per mutation request for MVP — multi-entry batching excluded, a future separately-gated optimization, reconnect read-first) | inventory-operating-model §12 | Product owner + control room |
+| Inventory-operating-model PDs 1–12 (free_qty+context source, mapping constraints, coalescing last-value-wins, `changeFromQuantity` CAS flow with bounded 3 retries, per-attempt UUID attempt-owned on `mutation.attempt`, read/verify-only reverse direction with review-case-first drift blocking, Layer-2 attempt contract ACCEPTED per DEC-036, clamp+warn, preview-first manual, one pair per mutation request for MVP — multi-entry batching excluded, a future separately-gated optimization, reconnect read-first with store-identity check) | inventory-operating-model §12 (Gate B ACCEPTED, DEC-037) | Product owner + control room — **Gate B ACCEPTED (comment `5016117207`); Task 013/013B implementation still not authorized** |
 | Location-mapping model (D-013-1 manual-only mapping, dual uniqueness, ancestor-overlap constraint, third sanctioned sudo for cache upsert) | Task 013 D-013-1/5 | Control room (sudo elevation explicitly) |
-| **Task 013 packet re-accepted with its 2026-07-16 addendum**; §8 prompt gate act separate | packet + addendum | Control room gate act |
-| **Task 013B packet re-accepted** (confirmed consistent with the operating model; no addendum required unless contradiction found) | 013B packet | Control room gate act |
-| PD-RB inventory slice (reconciliation-read catch-up, no blind push) | reconnect policy §10/§11 | Product owner + control room |
+| **Task 013 packet — Gate B ACCEPTED** (CAS/idempotency/drift/batching corrected, new D-013-9 Layer 2 integration decision, complete `inventorySetQuantities`/`inventoryActivate` matrix in DEC-037 §4); §8 prompt superseded by the dedicated locked prompt (unissued, not usable until Stage 0 merged/runtime-proven and a separate ChatGPT issuance) | packet + DEC-037 | Control room — **Gate B ACCEPTED; implementation still not authorized** |
+| **Task 013B packet — Gate B ACCEPTED, no contradiction found**; new explicit Layer-2-non-applicability §0 added; §9 prompt superseded by the dedicated locked prompt (unissued, not usable until Task 013 merged/accepted and a separate ChatGPT issuance) | 013B packet + DEC-037 §8 | Control room — **Gate B ACCEPTED; implementation still not authorized** |
+| PD-RB inventory slice (reconciliation-read catch-up, no blind push, store-identity check first) | reconnect policy §10/§11 (field-name corrected 2026-07-19) | Product owner + control room |
 | **CAS field-name empirical preflight — RESOLVED 2026-07-18 (Wave 3 Gate A).** `changeFromQuantity` is confirmed the correct, current (2026-07) field on `InventoryQuantityInput`; `compareQuantity`/`ignoreCompareQuantity` do not exist as input fields from API 2026-04 onward. Four independent official citations, no conflict found between official Shopify sources (the only conflict was this project's own stale internal documents, now corrected). | [`shopify-layer2-mutation-safety-refresh-2026-07-18.md`](../00-source-materials/shopify-layer2-mutation-safety-refresh-2026-07-18.md) §1; [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D12 | Control room — **preflight closed, not itself a Wave 3 authorization act** |
 | **DEC-031 Layer 2 acceptance candidate normalized, corrected, and ACCEPTED — Gate A accepted, 2026-07-19.** [`DEC-036`](../04-decisions/DEC-036-wave-3-layer-2-gate.md) is the complete D1–D38 decision inventory, status **ACCEPTED — CONTROL-ROOM GATE A** (PR #177 comment [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)); **zero items remain architecture-blocking**; remaining items are Stage 0 merge-acceptance/implementation-proof criteria, tunable constants, or narrow verification steps (DEC-036 §5). | DEC-036; the Stage 0 packet | Product owner + control room |
 | Wave 2 accepted and merged (program wave order; Area-6 full trigger set unblocked) | program §4 | Control room |
@@ -246,11 +300,16 @@ is live-validated before Stage 0's evidence is accepted.
 
 ## 5. Current-status conclusion
 
-**READY once gate decisions are Accepted.** As of 2026-07-19 (Wave 3 Gate A
-acceptance act, PR #177 comment
-[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)),
-**Gate A is ACCEPTED. Wave 3 is STILL NOT ready for Stage 1/2 implementation
-— Gate B not started, Stage 0 implementation not yet started**; outstanding:
+**READY once gate decisions are Accepted.** As of 2026-07-19, **Gate A is
+ACCEPTED** (PR #177 comment
+[`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226))
+and **Gate B is ACCEPTED** (Revision 3, PR #179 comment
+[`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207),
+docs-only merge-closure normalization applied and merge authorized).
+**Wave 3 is STILL NOT ready for Stage 1/2 implementation** — Stage 0
+remains held at PR #178, unmerged and not runtime-proven, pending the
+post-Gate-B-merge integration SHA and a consolidated
+synchronization/correction prompt (DEC-037 §13A); outstanding:
 
 1. **Wave 2 is now MERGED** (PR #176, merge commit
    `22bfb9a0e9b1e48b6a664351e2b321d134177110`, into `mvp/program-integration`
@@ -271,19 +330,25 @@ acceptance act, PR #177 comment
    locked Sol prompt remains locked and unissued, ready for separate
    control-room issuance only after this PR merges and the new integration
    SHA is verified.
-3. Inventory-operating-model PDs and the PD-RB inventory slice remain
-   Proposed. **Note:** `inventory-operating-model.md` §4.4 still references
-   the stale `compareQuantity` field name and requires correction in a
-   future Gate B session with that file in its allowed list, before Task
-   013 re-acceptance.
-4. Task 013 re-acceptance, not yet performed; §8/§9 prompt gate acts not
-   performed. Gate B must additionally replace all stale
-   `compareQuantity`/`ignoreCompareQuantity` language with
-   `changeFromQuantity`; supersede binding-owned idempotency with
-   attempt-owned idempotency; adopt review-case-first handling for
-   unexplained Shopify drift; confirm one pair per request for MVP; and
-   confirm Task 013B does not use Layer 2 and remains a separate Stage 2
-   packet — see DEC-036 Part 0.5's Gate B carry-forward list.
+3. **RESOLVED (2026-07-19, Gate B ACCEPTED).** `inventory-operating-model.md`
+   §4.4 no longer references `compareQuantity` — corrected to
+   `changeFromQuantity` throughout, per
+   [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md). With
+   Gate B now accepted (comment `5016117207`), the inventory-operating-model
+   PDs and the PD-RB inventory slice move to accepted alongside it.
+4. Task 013 re-acceptance: **Gate B ACCEPTED** — `changeFromQuantity` CAS
+   throughout; binding-owned idempotency superseded by attempt-owned
+   idempotency (`shopify.connector.mutation.attempt`, never the binding);
+   unexplained Shopify drift is review-case-first and blocking, never
+   auto-overwritten; one pair per request is binding, not a floor;
+   Task 013B carries an explicit Layer-2-non-applicability statement and
+   remains a separate Stage 2 packet — see
+   [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) (full
+   disposition of every DEC-036 Part 0.5 Gate B carry-forward item). §8/§9
+   prompt gate acts (the two dedicated locked-prompt files, both
+   `LOCKED`/unissued) remain not performed — Task 013/013B implementation
+   is not authorized until Stage 0 is separately merged and runtime-proven,
+   providing the DEC-037 §13A correction prerequisites.
 5. **CAS field-name empirical preflight — RESOLVED 2026-07-18** (see the
    gate-decision table above). `changeFromQuantity` is confirmed correct;
    no conflict between official Shopify sources.
@@ -294,9 +359,11 @@ acceptance act, PR #177 comment
 7. **This Definition of Ready's Wave 3 Gate A portion is ACCEPTED** (PR
    #177 comment
    [`5015044226`](https://github.com/AdamsOdoo/Adams/pull/177#issuecomment-5015044226)).
-   Item 3's flag and items 4/6 above remain open Gate B / closure items;
-   the document as a whole is not fully "ready" for Stage 1/2 until Gate B
-   completes and Task 013 is re-accepted.
+   Gate B is now also ACCEPTED (comment `5016117207`) and Task 013/013B
+   are re-accepted alongside it (item 4 above); item 6's dev-store
+   evidence requirement remains open. The document as a whole is not
+   fully "ready" for Stage 1/2 until Stage 0 is separately merged and
+   runtime-proven.
 8. **Gate-A architecture status, accepted 2026-07-19:** DEC-036 carries
    **zero remaining architecture blockers** after the consolidated
    Sessions-2-and-3 ruling. What remains before Stage 0 implementation's

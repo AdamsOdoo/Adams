@@ -1,6 +1,8 @@
 # Reconnect, Catch-Up & Backfill Policy — Per-Domain Recovery After Disconnection
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16.** This document
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16; §4.4
+> Inventory field-name corrected 2026-07-19 (Wave 3 Gate B session,
+> `compareQuantity` → `changeFromQuantity`, no other change).** This document
 > closes gap P-7 of
 > [`../01-research/mvp-remaining-gap-inventory.md`](../01-research/mvp-remaining-gap-inventory.md)
 > (reconnect/catch-up/backfill under-specified per domain). Acceptance
@@ -222,12 +224,21 @@ bucket, `THROTTLED` + `throttleStatus` backoff — capture §11).
   mandatory `@idempotent` UUID key ([Fact — capture §9], 24 h retention).
 - **Must NOT happen — no blind push after reconnect.** Any pre-disconnect
   computed quantities are stale. The first post-reconnect inventory action
-  is always a **reconciliation read**; only then may pushes resume, using
-  `inventorySetQuantities` with `compareQuantity` optimistic concurrency
-  ([Fact — capture §9]) so a concurrent remote change fails closed. This is
-  a DEC-031 **Layer 2** consumer: inventory mutation resumption after
-  reconnect is gated on the accepted Layer 2 design
-  ([`../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md`](../04-decisions/DEC-031-core-r2-job-execution-replay-safety.md)).
+  is always a **reconciliation read**, beginning with a store-identity
+  check (current `myshopifyDomain` vs. the last-known identity,
+  [DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md) D18); only
+  then may pushes resume, using `inventorySetQuantities` with
+  `changeFromQuantity` optimistic concurrency **[corrected 2026-07-19,
+  Gate B — `changeFromQuantity` is the current (2026-04+) CAS field name;
+  `compareQuantity` does not exist as an input field, see
+  `shopify-layer2-mutation-safety-refresh-2026-07-18.md` §1 and
+  [DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md)]** so a
+  concurrent remote change fails closed. This is a DEC-031 **Layer 2**
+  consumer: inventory mutation resumption after reconnect is gated on the
+  accepted Layer 2 design (ACCEPTED — CONTROL-ROOM GATE A,
+  [DEC-036](../04-decisions/DEC-036-wave-3-layer-2-gate.md)) and this Gate
+  B package
+  ([DEC-037](../04-decisions/DEC-037-wave-3-inventory-gate-b.md)).
 - **Review triggers**: negative/implausible remote quantities; unmapped
   locations that appeared while disconnected; per
   [`inventory-operating-model.md`](inventory-operating-model.md).
