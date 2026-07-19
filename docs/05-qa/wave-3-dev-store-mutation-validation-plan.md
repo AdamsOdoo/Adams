@@ -232,17 +232,20 @@ expected logs, cleanup, stop conditions.
 - **Expected Odoo result:** the `cas_retry_ordinal=0` job's attempt
   observes `observed_outcome='failed_clean'`,
   `error_class='concurrency_race_conflict'`. **Revision 3 correction:**
-  this job then **terminalizes** — `superseded_by_job_id` set,
-  `cancel_reason='cas_stale_bounded_replacement'` — atomically, in the
-  same transaction, with a **new**, separate `inventory_set_quantities`
-  job created at `cas_retry_ordinal=1`, carrying its own fresh job ID,
-  `attempt_token`, idempotency key, and a fresh `changeFromQuantity`
-  read (`9`). This job is **never redispatched** to make a second
-  attempt itself.
+  the **job itself** then transitions to the existing terminal state
+  `cancelled` (its attempt's `failed_clean` outcome is preserved
+  unchanged — `failed_clean` is the attempt's outcome, never the job's
+  state) — `superseded_by_job_id` set, `cancel_reason=
+  'cas_stale_bounded_replacement'` — atomically, in the same transaction,
+  with a **new**, separate `inventory_set_quantities` job created at
+  `cas_retry_ordinal=1`, carrying its own fresh job ID, `attempt_token`,
+  idempotency key, and a fresh `changeFromQuantity` read (`9`). This job
+  is **never redispatched** to make a second attempt itself.
 - **Expected Shopify result:** the ordinal-1 job's attempt succeeds,
   setting the intended target against the now-current `9` basis.
-- **Expected job state:** the `cas_retry_ordinal=0` job is terminal
-  (`failed_clean`, superseded); the `cas_retry_ordinal=1` job is `done`
+- **Expected job state:** the `cas_retry_ordinal=0` job is terminal —
+  job state `cancelled` (its attempt's `observed_outcome` remains
+  `failed_clean`, superseded); the `cas_retry_ordinal=1` job is `done`
   after its own successful attempt.
 - **Expected attempt state:** exactly one `mutation.attempt` row on the
   ordinal-0 job (`failed_clean`); exactly one `mutation.attempt` row on
@@ -263,9 +266,12 @@ expected logs, cleanup, stop conditions.
 - **Note (ordinal-3 exhaustion, not separately re-run in this
   scenario):** were a 4th `CHANGE_FROM_QUANTITY_STALE` to occur on the
   job at `cas_retry_ordinal=3`, no further replacement job would be
-  created — that job terminalizes `blocked_manual_review`/
-  `binding_conflict` instead, and the pending target stays coalesced on
-  the binding. Implementation evidence must include this exhaustion path
+  created — that job instead transitions to the existing
+  **non-terminal** `blocked_manual_review` state (`binding_conflict`),
+  which continues to hold `operation_scope_key` until an authorized
+  `action_recheck_inventory_pair` release, and the pending target stays
+  coalesced on the binding. Implementation evidence must include this
+  exhaustion path
   as part of the genuine-concurrency/unit test matrix (DEC-037 §4 row 1
   exact tests), even though this dev-store scenario exercises only the
   ordinal 0→1 replacement.
@@ -695,11 +701,15 @@ expected logs, cleanup, stop conditions.
   pending target stays coalesced on the binding.
 - **Expected Shopify result:** unchanged by this job (no activation, no
   set-quantities value recorded).
-- **Expected job state:** the `inventory_set_quantities` job goes terminal
-  `blocked_manual_review`. Only a later, independently-triggered fresh
-  `inventory_push_sync` orchestration dispatch (not created by this job)
-  re-reads Shopify, correctly finds the level absent, and — since
-  `first_push_state='confirmed'` — enqueues a new `inventory_activate`
+- **Expected job state:** the `inventory_set_quantities` job transitions
+  to the existing **non-terminal** `blocked_manual_review` state,
+  continuing to hold the pair's `operation_scope_key`. No automatic
+  child job is created from it — scenario 20 exercises this directly.
+  The pair is released only via an authorized
+  `action_recheck_inventory_pair` (scenario 21); only then does the
+  resulting fresh `inventory_push_sync` orchestration dispatch re-read
+  Shopify, correctly find the level absent, and — since
+  `first_push_state='confirmed'` — enqueue a new `inventory_activate`
   job (exercising the same path as scenario 9).
 - **Expected attempt state:** one `mutation.attempt` row, domain
   `inventory_set_quantities`, `failed_clean`; no `inventory_activate`
@@ -710,8 +720,10 @@ expected logs, cleanup, stop conditions.
   any error class, retry decision, or manual-review subreason (DEC-037 §4
   row 2's uniform-classification rule applies to message-text handling
   generally in this module).
-- **Cleanup:** resolve the review case (operator re-confirms and lets the
-  next scan re-orchestrate), restoring the pair to a known state.
+- **Cleanup:** resolve the review case via an authorized
+  `action_recheck_inventory_pair` call (scenario 21) — no scan or manual
+  trigger re-orchestrates this pair automatically while blocked —
+  restoring the pair to a known state.
 - **Stop conditions:** this job issues `inventoryActivate` in any form
   (inline call, direct enqueue from within this job, or reuse of this
   job's own attempt/idempotency key for an activation call) → stop
@@ -754,8 +766,9 @@ expected logs, cleanup, stop conditions.
 ### Scenario 21 — `action_recheck_inventory_pair` release (new, Revision 3, DEC-037 §5.5)
 
 - **Preconditions:** scenario 20 complete — the pair remains
-  `blocked_manual_review`, attempt `failed_clean`/effective disposition
-  `not_applied`-equivalent for `inventory_location_missing` (the safe,
+  `blocked_manual_review`, attempt `observed_outcome='failed_clean'` with
+  `effective_disposition() == 'not_applied'` for `inventory_location_missing`
+  (the safe,
   enumerated release case).
 - **Permitted mutations:** 0 (this action is a local Odoo service call;
   it does not itself contact Shopify).
@@ -772,8 +785,10 @@ expected logs, cleanup, stop conditions.
 - **Shopify request:** none from the action itself; the newly-enqueued
   `inventory_push_sync` job performs its own fresh read afterward
   (exercising the same path as scenario 3/10).
-- **Expected Odoo result:** the old job is terminal, `superseded_by_job_id`
-  pointing at the new orchestration job; `observed_outcome` and
+- **Expected Odoo result:** the old job transitions from
+  `blocked_manual_review` to the existing terminal state `cancelled`,
+  `superseded_by_job_id` pointing at the new orchestration job;
+  `observed_outcome` and
   `resolution_disposition` on the old attempt are **unchanged** by this
   action; actor UID, reason, old job ID, and new job ID are recorded in
   the audit log.

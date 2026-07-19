@@ -143,8 +143,9 @@ and attempt-owned, **never** on the binding, and **never** the retry
 authority via any binding field (DEC-036 D6; DEC-037 §1 item C5). This
 job makes **at most one** mutation attempt for its entire lifetime
 (Revision 3, DEC-037 §5.1/§9 — a job is never redispatched to make a
-second attempt); a CAS-stale outcome terminalizes this job and a
-**new**, separate `inventory_set_quantities` job (own job ID,
+second attempt); a CAS-stale outcome transitions this job to the
+existing terminal state `cancelled` and a **new**, separate
+`inventory_set_quantities` job (own job ID,
 `cas_retry_ordinal + 1`, own fresh fingerprints, own fresh key) is
 created instead (DEC-037 §5.4 handoff C) — never a same-job redispatch
 and never a key reuse. **This job is never enqueued directly by
@@ -161,25 +162,34 @@ job** — **never a redispatch of the job whose attempt just failed**
 design is withdrawn — it left one job accumulating multiple
 `mutation.attempt` rows, which the control room rejected as a
 continuing violation of Gate A's one-job/one-attempt rule). The failing
-job terminalizes (`superseded_by_job_id` set, `cancel_reason=
-'cas_stale_bounded_replacement'`); the new job carries an incremented
-`cas_retry_ordinal` (0→1→2→3), its own fresh fingerprints, its own fresh
-idempotency key, a narrow fresh CAS pre-read of the pair's current
-`available`/`updatedAt`, and a fresh read of the binding's coalesced
-pending target (DEC-037 §4 row 1/§5.4 handoff C); on the 4th mismatch
-(`cas_retry_ordinal=3`) → no replacement job is created, that job
-terminalizes `blocked_manual_review`/`binding_conflict` (persistent
-divergence, review case, never a further silent retry). **`ITEM_NOT_STOCKED_AT_LOCATION` →
+job's own single attempt keeps `observed_outcome='failed_clean'`
+unchanged; the **job itself** transitions to the existing core job state
+`cancelled` (never a new state) — `superseded_by_job_id` set,
+`cancel_reason='cas_stale_bounded_replacement'`; the new job carries an
+incremented `cas_retry_ordinal` (0→1→2→3), its own fresh fingerprints, its
+own fresh idempotency key, a narrow fresh CAS pre-read of the pair's
+current `available`/`updatedAt`, and a fresh read of the binding's
+coalesced pending target (DEC-037 §4 row 1/§5.4 handoff C); on the 4th
+mismatch (`cas_retry_ordinal=3`) → no replacement job is created, that
+job instead transitions to the existing **non-terminal**
+`blocked_manual_review` state (`binding_conflict`), which continues to
+hold `operation_scope_key` until an authorized `action_recheck_inventory_pair`
+release (persistent divergence, review case, never a further silent
+retry). **`ITEM_NOT_STOCKED_AT_LOCATION` →
 Revision 2 correction: this is a race/contract exception, not an inline
 activation trigger.** It routes `failed_clean`, `error_class=
 'inventory_location_missing'` (Revision 3 — the fixed vocabulary value;
-also the `manual_review_subreason`), `blocked_manual_review` — this job
-**never** issues `inventoryActivate` inline, in any form, from any code
-path (static/AST-guarded, §5 tests below). The pending target stays
-coalesced on the binding; a later, fresh `inventory_push_sync`
-orchestration dispatch re-reads Shopify and, finding the level genuinely
-absent for a `first_push_state='confirmed'` row, enqueues a separate
-`inventory_activate` job (DEC-037 §5.2 step 8). Ordinary validation
+also the `manual_review_subreason`), the non-terminal
+`blocked_manual_review` state — this job **never** issues
+`inventoryActivate` inline, in any form, from any code path
+(static/AST-guarded, §5 tests below). The pending target stays coalesced
+on the binding; the pair's `operation_scope_key` remains held and no new
+job of any of the three inventory job types is admitted for it until an
+authorized `action_recheck_inventory_pair` release (DEC-037 §5.5); only
+then does the resulting fresh `inventory_push_sync` orchestration
+dispatch re-read Shopify and, finding the level genuinely absent for a
+`first_push_state='confirmed'` row, enqueue a separate `inventory_activate`
+job (DEC-037 §5.2 step 8/§9). Ordinary validation
 errors (`INVALID_*`, `NO_DUPLICATE_...`, `NON_MUTABLE_INVENTORY_ITEM`) →
 `error_class='shopify_user_errors_validation'` (Revision 3 — the fixed
 vocabulary value), `manual_review_subreason='binding_conflict'`.
@@ -375,10 +385,12 @@ cannot be created. A blocked pair is released **only** by the new
 only, DEC-037 §5.5) — never by a generic core manual-retry/manual-review
 action.
 
-**Job-lineage fields (new, Revision 3):** `cas_retry_ordinal` (Integer,
-default 0, `inventory_set_quantities` only), `superseded_by_job_id`
-(Many2one, nullable), `cancel_reason` (Char, nullable, fixed vocabulary
-— DEC-037 §5.4/§5.5). None of these adds a new core job state.
+**Job-lineage fields:** `cas_retry_ordinal` (Integer, default 0,
+`inventory_set_quantities` only) is the **only new, domain-owned** field
+this task introduces. `superseded_by_job_id` (Many2one, nullable) and
+`cancel_reason` (Char, nullable, fixed vocabulary — DEC-037 §5.4/§5.5)
+are **existing core** `shopify.connector.job` fields, reused here, not
+new domain schema. None of the three adds a new core job state.
 
 **Consequence contract:** every mutation outcome this module's Layer 2
 wrapper reports must resolve to one of the rows in DEC-037 §9

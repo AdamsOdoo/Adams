@@ -135,8 +135,9 @@ execute two Shopify mutations. **Revision 3 job-lifetime and handoff
 corrections, binding (control-room comment `5015830229`):** no mutation
 job may own more than one `mutation.attempt` row for its entire
 lifetime — a CAS-stale or reconciliation-`not_applied` outcome
-terminalizes that job and creates a **new**, separate job (never a
-same-job redispatch); the activation→fresh-orchestration handoff is
+transitions that job to the existing terminal state `cancelled` and
+creates a **new**, separate job (never a same-job redispatch); the
+activation→fresh-orchestration handoff is
 **atomic** (same transaction as the activation job's own
 terminalization, never dependent on a later scan/manual trigger);
 `blocked_manual_review` is not terminal and is released only by
@@ -263,9 +264,10 @@ HARD CONSTRAINTS
   LIFETIME (DEC-037 §5.1/§9, control-room comment `5015830229` binding
   correction 1). A mutation job is NEVER redispatched to make a second
   attempt. Every CAS-stale retry and every reconciliation not_applied
-  retry creates a NEW, separate job of the same domain — the old job
-  terminalizes (failed_clean, or resolved not_applied) and is never
-  reused for a further attempt.
+  retry creates a NEW, separate job of the same domain — the old job's
+  attempt keeps its failed_clean or resolved not_applied outcome
+  unchanged while the job itself transitions to the existing terminal
+  state cancelled, and is never reused for a further attempt.
 - changeFromQuantity is captured FRESH immediately before each mutation
   job's own C2 — never read from the binding's last_known_shopify_available
   field (informational/display only).
@@ -273,29 +275,38 @@ HARD CONSTRAINTS
   error_class=concurrency_race_conflict; bounded re-read/re-derive,
   exactly 3 replacement jobs (cas_retry_ordinal 0->1->2->3), EACH A NEW,
   SEPARATE inventory_set_quantities job — NEVER a redispatch of the job
-  whose attempt just failed. The failing job terminalizes atomically
-  (superseded_by_job_id set on it, cancel_reason=
-  'cas_stale_bounded_replacement', DEC-037 §5.4 handoff C) in the same
+  whose attempt just failed. The failing job's own single attempt keeps
+  observed_outcome=failed_clean unchanged; the JOB ITSELF transitions
+  atomically to the EXISTING CORE JOB STATE cancelled (never a new
+  state) — superseded_by_job_id set on it, cancel_reason=
+  'cas_stale_bounded_replacement', DEC-037 §5.4 handoff C — in the same
   transaction that creates the new job (new fingerprints, new key, a
   fresh narrow CAS pre-read of available/updatedAt, and a fresh read of
   the binding's coalesced pending target); the 4th mismatch (ordinal 3)
-  creates NO replacement job -> that job terminalizes
-  blocked_manual_review/binding_conflict, never a further silent retry.
+  creates NO replacement job -> that job instead transitions to the
+  EXISTING NON-TERMINAL blocked_manual_review state (binding_conflict),
+  which continues to hold operation_scope_key until an authorized
+  action_recheck_inventory_pair release, never a further silent retry.
 - A reconciliation not_applied verdict (either mutation domain) follows
-  the identical pattern: the resolved job terminalizes
-  (superseded_by_job_id set, cancel_reason=
-  'reconciliation_not_applied_replacement', DEC-037 §5.4 handoff D) and a
-  NEW same-domain job is created for the next attempt — never a same-job
-  redispatch.
+  the identical pattern: the resolved job's attempt keeps its uncertain/
+  not_applied outcome unchanged while the JOB ITSELF transitions to the
+  existing core job state cancelled (superseded_by_job_id set,
+  cancel_reason='reconciliation_not_applied_replacement', DEC-037 §5.4
+  handoff D) and a NEW same-domain job is created for the next attempt —
+  never a same-job redispatch.
 - ITEM_NOT_STOCKED_AT_LOCATION observed by inventory_set_quantities is a
   race/contract exception, NOT an inline activation trigger -> routes
-  failed_clean, error_class=inventory_location_missing,
-  blocked_manual_review; this job issues NO inventoryActivate call,
-  inline or otherwise, in any form (static/AST-guarded). The pending
-  target stays coalesced; only a LATER, separate, fresh
-  inventory_push_sync orchestration dispatch may find the level
+  failed_clean, error_class=inventory_location_missing, to the
+  EXISTING NON-TERMINAL blocked_manual_review state; this job issues NO
+  inventoryActivate call, inline or otherwise, in any form
+  (static/AST-guarded). The pending target stays coalesced; the pair's
+  operation_scope_key remains held and NO new job of any of the three
+  inventory job types is admitted for it — no scan or manual trigger
+  admits one automatically — until an authorized
+  action_recheck_inventory_pair release; only then does the resulting
+  fresh inventory_push_sync orchestration dispatch find the level
   genuinely absent and enqueue a new inventory_activate job (DEC-037
-  §5.2 step 8).
+  §5.2 step 8/§9/§5.5).
 - inventory_activate always sends explicit available:0 (never omitted or
   nonzero); when its own reconciliation read confirms applied, it does
   NOT enqueue inventory_set_quantities itself — in the SAME transaction
@@ -312,25 +323,31 @@ HARD CONSTRAINTS
   for the same pair, and preventing any automatic child job. It is
   released ONLY by action_recheck_inventory_pair(reason) — Reviewer or
   Administrator only, mandatory non-empty reason, allowed only when the
-  blocked job's attempt is failed_clean with resolved disposition
-  not_applied and subreason inventory_location_missing or an
-  enumerated-safe binding_conflict case (never uncertain,
-  duplicate_risk, idempotency_contract_violation, unresolved
-  reconciliation, or store_identity_mismatch — those remain resolvable
-  only through the Stage 0 Administrator-only manual resolution path).
-  This action never rewrites observed_outcome or resolution_disposition;
-  it atomically terminalizes/supersedes the blocked job
-  (cancel_reason='manual_review_release') and enqueues exactly one fresh
-  inventory_push_sync job, logging actor/reason/old-job-ID/new-job-ID
-  (DEC-037 §5.5). The generic core job manual-retry/manual-review
-  actions remain forbidden for any mutation-evidence-linked job.
-- Job-lineage fields (new, domain-owned): cas_retry_ordinal (Integer,
-  default 0, inventory_set_quantities only), superseded_by_job_id
-  (Many2one, nullable), cancel_reason (Char, nullable, fixed vocabulary:
+  blocked job's attempt has observed_outcome=failed_clean AND
+  effective_disposition() == 'not_applied' (the effective-disposition
+  helper, DEC-036 D10 — NOT a requirement that the raw
+  resolution_disposition field itself be populated) with subreason
+  inventory_location_missing or an enumerated-safe binding_conflict case
+  (never uncertain, duplicate_risk, idempotency_contract_violation,
+  unresolved reconciliation, or store_identity_mismatch — those remain
+  resolvable only through the Stage 0 Administrator-only manual
+  resolution path). This action never rewrites observed_outcome or
+  resolution_disposition; it atomically transitions the blocked job from
+  blocked_manual_review to the EXISTING CORE JOB STATE cancelled
+  (cancel_reason='manual_review_release', superseded_by_job_id set) and
+  enqueues exactly one fresh inventory_push_sync job, logging
+  actor/reason/old-job-ID/new-job-ID (DEC-037 §5.5). The generic core job
+  manual-retry/manual-review actions remain forbidden for any
+  mutation-evidence-linked job.
+- Job-lineage fields: cas_retry_ordinal (Integer, default 0,
+  inventory_set_quantities only) is the ONLY NEW, domain-owned field this
+  task introduces. superseded_by_job_id (Many2one, nullable) and
+  cancel_reason (Char, nullable, fixed vocabulary:
   cas_stale_bounded_replacement / reconciliation_not_applied_replacement
-  / manual_review_release). None of these adds a new value to the job
-  model's core state Selection — no new core job state is introduced
-  anywhere in this module (DEC-037 §5.4).
+  / manual_review_release) are EXISTING CORE shopify.connector.job
+  fields, reused here, not new domain schema. None of the three adds a
+  new value to the job model's core state Selection — no new core job
+  state is introduced anywhere in this module (DEC-037 §5.4).
 - error_class is FIXED VOCABULARY ONLY (DEC-037 §7/§9):
   shopify_user_errors_validation, inventory_location_missing,
   concurrency_race_conflict, shopify_throttling_rate_limit,

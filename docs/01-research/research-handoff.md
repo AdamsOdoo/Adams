@@ -1,3 +1,80 @@
+### Wave 3 Gate B ACCEPTED — merge-closure normalization and merge — compact handoff (2026-07-19)
+
+- **Branch / PR:** same as Revision 3 below — `claude/wave-3-gate-b-inventory-2m5jcl`,
+  PR [#179](https://github.com/AdamsOdoo/Adams/pull/179) →
+  `mvp/program-integration`. No new branch/PR created.
+- **Trigger:** the control room reviewed Revision 3 (immediately below)
+  at head `565d3daefdf0c87c46ffaf7a6d52f63841b1e770` and, by PR #179
+  comment [`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207),
+  ruled **Wave 3 Gate B ACCEPTED IN SUBSTANCE**, conditioned on one
+  further docs-only merge-closure normalization commit.
+- **Identity gate (independently re-verified live before any edit):** PR
+  #179 open/draft/unmerged at the exact expected head
+  `565d3daefdf0c87c46ffaf7a6d52f63841b1e770`; base unchanged
+  (`mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`);
+  cumulative changes exactly the same 15 authorized documentation files;
+  no addon/test/security/XML/manifest/CI file changed; comment
+  `5016117207` read in full; PR #178 confirmed still open/draft/unmerged
+  at head `644853a68b3497c134ee648ce7399e50d30ff397`; protected refs
+  unchanged.
+- **Eleven corrections applied** (DEC-037 §1C has the full disposition
+  table): (1) attempt outcome (`failed_clean`/`uncertain`/`applied`/
+  `not_applied`) is never a job state — existing terminal states remain
+  `succeeded`/`failed_final`/`skipped`/`cancelled`; (2) a replaced
+  predecessor job transitions to the existing terminal state `cancelled`,
+  attempt outcome/resolution preserved; (3) successful phase handoffs use
+  `succeeded` and never set `superseded_by_job_id`/`cancel_reason` —
+  Revision 3's own text had incorrectly included the activation→
+  orchestration handoff among the superseding ones, now corrected; (4)
+  `superseded_by_job_id`/`cancel_reason` are existing core
+  `shopify.connector.job` fields, reused, not new schema —
+  `cas_retry_ordinal` is the only new domain-owned field; (5)
+  `blocked_manual_review` remains non-terminal everywhere; (6) no
+  scan/manual trigger admits a new job for a blocked pair — only
+  `action_recheck_inventory_pair` releases it; (7)/(9) exact
+  review-release owner/transition wording tightened; (8) the release
+  action's precondition is `effective_disposition() == 'not_applied'`,
+  not a raw `resolution_disposition` check; (10) `store_identity_mismatch`
+  stays a Stage 0 correction prerequisite; (11) applied consistently
+  across DEC-037, the Task 013 packet, the locked Task 013 prompt, the
+  dev-store plan, and the shared trackers.
+- **Files touched this round:** the same 15 cumulative authorized files;
+  this round's actual edits landed in DEC-037, the Task 013 packet, the
+  locked Task 013 prompt, the dev-store validation plan, and the shared
+  trackers (this file, `mvp-acceptance-matrix.md`, `mvp-program-state.md`,
+  `wave-3-definition-of-ready.md`, `architecture-review-log.md`) — no new
+  file, no addon/test/security/XML/manifest/CI file.
+- **Validation performed:** the full 23-item literal-validation/consistency
+  sweep from the closure prompt (job-state/attempt-outcome separation,
+  cancelled-transition wording, field-ownership, no-auto-admission,
+  effective-disposition wording, exact file scope, `git diff --check`,
+  link resolution, credential/PII scan) — see the PR body for the
+  detailed results.
+- **Commit / push:** one documentation-only commit,
+  `docs(wave3): accept and normalize gate-b contracts`, on
+  `claude/wave-3-gate-b-inventory-2m5jcl`, pushed (no amend/force-push/
+  rebase).
+- **Merge:** PR #179 marked ready and merged into
+  `mvp/program-integration` with a normal merge commit, expected-head
+  protection used — exact merge SHA recorded in the PR/final report.
+- **Status:** DEC-037 **ACCEPTED — CONTROL-ROOM GATE B**. Task 013/013B
+  packets: GATE B ACCEPTED, implementation still not authorized. Both
+  locked Sol prompts: LOCKED, unissued. Stage 0 (PR #178) remains held,
+  unmerged, not runtime-proven, pending the post-merge integration SHA
+  and a consolidated synchronization/correction prompt. Claude did not
+  accept its own package in any revision and did not self-accept this
+  normalization — acceptance authority is comment `5016117207`, product
+  owner + ChatGPT control room. No implementation, no Odoo/Odoo.sh run,
+  no Shopify request or mutation.
+- **Next-session prompt guidance:** the next control-room action is a
+  consolidated Stage 0 (PR #178) synchronization/correction prompt —
+  Sol's Stage 0 branch must resume only once the post-merge
+  `mvp/program-integration` integration SHA is verified and the DEC-037
+  §13A correction prerequisites are named explicitly in that prompt. Do
+  not begin Task 013 or issue either locked prompt before then.
+
+---
+
 ### Wave 3 Gate B Revision 3 — job-lifetime/atomic-handoff/error-vocabulary correction per second control-room REVISE ruling — compact handoff (2026-07-19)
 
 - **Branch / PR:** same as Revisions 1/2 below — `claude/wave-3-gate-b-inventory-2m5jcl`,

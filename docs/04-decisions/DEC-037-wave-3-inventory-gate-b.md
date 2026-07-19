@@ -1,25 +1,34 @@
 # DEC-037 — Wave 3 Gate B: Task 013/013B Inventory Readiness
 
-- **Status: REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B ACCEPTANCE
-  (Revision 3, 2026-07-19).** Originally produced 2026-07-19 by the Gate B
+- **Status: ACCEPTED — CONTROL-ROOM GATE B (Revision 3; accepted in
+  substance, with a mandatory docs-only merge-closure normalization
+  applied 2026-07-19).** Originally produced 2026-07-19 by the Gate B
   planning session (this session), based on `mvp/program-integration` @
   `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9` (PR #177 merge commit).
   Revision 1 was returned **REVISE, NOT REJECTED** (comment
   [`5015619162`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015619162)).
   Revision 2 applied those six corrections and was itself returned
-  **REVISE** a second time — "materially improved... but not yet
-  accepted or merge-authorized" — by comment
-  [`5015830229`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015830229),
+  **REVISE** a second time (comment
+  [`5015830229`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5015830229)),
   which found the same-job CAS-redispatch mechanism still conflicted
   with Gate A's one-job/one-attempt rule, required an explicit atomic
   handoff contract, required the blocked-review release path to be
   frozen, required the invented error-vocabulary values withdrawn,
   corrected the `applied` reconciliation verdict, corrected the locked
   prompts' role model, and required explicit Stage 0 prerequisites.
-  This revision applies every one of those seven binding corrections.
-  **Claude did not accept its own package** in Revision 1, Revision 2,
-  or Revision 3. Acceptance authority: product owner + ChatGPT control
-  room, exactly as DEC-036.
+  Revision 3 applied every one of those seven binding corrections and was
+  **ACCEPTED IN SUBSTANCE** by comment
+  [`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207)
+  — conditioned on one further docs-only merge-closure normalization
+  commit, applied here (§1C): the attempt-outcome/job-state distinction
+  (`failed_clean`/`uncertain`/`applied`/`not_applied` are never job
+  states), the predecessor-replacement transition (the existing terminal
+  state `cancelled`, never a new state), correct existing-vs-new
+  job-lineage field ownership, and the `blocked_manual_review`/
+  review-release wording. **Claude did not accept its own package** in
+  Revision 1, Revision 2, or Revision 3, and did not self-accept this
+  normalization — acceptance authority is comment `5016117207`, product
+  owner + ChatGPT control room, exactly as DEC-036.
 - **Decision owner (candidate author, not acceptor):** Claude, the Gate B
   planning/contradiction-resolution/documentation worker, per this
   session's governing tasks and CLAUDE.md §13. Sol/"GPT-5.6 Sol" is the
@@ -27,21 +36,21 @@
   [`../06-prompts/sol-wave-3-task-013-locked-prompt.md`](../06-prompts/sol-wave-3-task-013-locked-prompt.md)
   and
   [`../06-prompts/sol-wave-3-task-013b-locked-prompt.md`](../06-prompts/sol-wave-3-task-013b-locked-prompt.md),
-  both LOCKED, unissued). **Role model, corrected Revision 3 (comment
-  `5015830229` binding correction 6):** ChatGPT is the strategic control
-  room and acceptance authority; Claude is the planner, independent
-  reviewer, and Odoo.sh runtime verifier; Sol is the implementation
-  worker. Claude is not the control room, not the sole acceptance
-  authority, and may perform a controlled merge only after explicit
-  ChatGPT authorization — every current-facing statement to the
-  contrary in either locked prompt is corrected by this revision.
+  both LOCKED, unissued). **Role model (comment `5015830229` binding
+  correction 6):** ChatGPT is the strategic control room and acceptance
+  authority; Claude is the planner, independent reviewer, and Odoo.sh
+  runtime verifier; Sol is the implementation worker. Claude is not the
+  control room, not the sole acceptance authority, and may perform a
+  controlled merge only after explicit ChatGPT authorization.
 - **Scope:** closes every remaining inventory-planning contradiction named
   by DEC-036 Part 0.5 ("Gate B / Task 013 corrections carried forward")
   and Part 5 item 11 ("Out-of-scope document corrections"), the
   contradictions this session found in Revision 1 by direct inspection of
   the Task 013/013B packets and the inventory operating model, the six
-  binding corrections in comment `5015619162` (Revision 2), and — in
-  this revision — the seven binding corrections in comment `5015830229`.
+  binding corrections in comment `5015619162` (Revision 2), the seven
+  binding corrections in comment `5015830229` (Revision 3), and — closing
+  this record's acceptance — the eleven merge-closure normalization
+  corrections in comment `5016117207` (§1C).
   This record does **not** reopen any DEC-036 decision (D1–D38) and does
   **not** reopen Gate A — it propagates those decisions, unchanged, into
   the inventory domain's own documents, and settles the domain-specific
@@ -91,7 +100,7 @@ Revision 3.**
 | C11 | Task 013B packet did not explicitly state its own Layer-2-non-applicability | This session's governing task | Explicit statement added to the Task 013B packet itself | `task-013b-initial-inventory-baseline-packet.md` (§0) | N/A — documentation completeness |
 | C12 | `reconnect-catchup-backfill-policy.md` §4.4 (Inventory): "pushes resume only with fresh `compareQuantity` bases" | DEC-036 D12 | `changeFromQuantity` | `reconnect-catchup-backfill-policy.md` §4.4 | Same static test as C1 |
 | C13 | `reconnect-backfill-uat-matrix.md` UAT-RB-2.6: "pushes resume only with fresh `compareQuantity` bases" | DEC-036 D12 | `changeFromQuantity` | `reconnect-backfill-uat-matrix.md` UAT-RB-2.6 | Same static test as C1 |
-| C14 | DEC-037 §4 row 1 (Revision 2): a `CHANGE_FROM_QUANTITY_STALE`/reconciliation-`not_applied` retry described as "a new job dispatch of this same job... the job is not re-created, it is redispatched" — i.e. one job accumulating multiple `mutation.attempt` rows over its lifetime | Gate A D4; control-room ruling (comment `5015830229` binding correction 1): one mutation job → one Shopify mutation request → one `mutation.attempt` row, **for that job's entire lifetime** — Revision 2's same-job redispatch design still violated this | ~~Every retry is a new job dispatch of this same job (Revision 2 §4 row 1/§5.1).~~ **Superseded, Revision 3 (comment `5015830229` binding correction 1):** every CAS-stale retry and every reconciliation `not_applied` retry creates a **new**, separate mutation job of the same domain — the old job terminalizes (`failed_clean` or resolved `not_applied`) and is never redispatched. New job-lineage fields `cas_retry_ordinal`/`superseded_by_job_id`/`cancel_reason` track the replacement chain (§5.1, §5.4) | `task-013-inventory-sync-implementation-packet.md` D-013-3/D-013-9 (rewritten, Revision 3); DEC-037 §4 rows 1–2, §5.4, §9 | Test: a CAS-stale/`not_applied` fixture asserts a **new job record** (new job ID, new `attempt_token`, new idempotency key) is created for each replacement — never a second attempt on the same job ID |
+| C14 | DEC-037 §4 row 1 (Revision 2): a `CHANGE_FROM_QUANTITY_STALE`/reconciliation-`not_applied` retry described as "a new job dispatch of this same job... the job is not re-created, it is redispatched" — i.e. one job accumulating multiple `mutation.attempt` rows over its lifetime | Gate A D4; control-room ruling (comment `5015830229` binding correction 1): one mutation job → one Shopify mutation request → one `mutation.attempt` row, **for that job's entire lifetime** — Revision 2's same-job redispatch design still violated this | ~~Every retry is a new job dispatch of this same job (Revision 2 §4 row 1/§5.1).~~ **Superseded, Revision 3 (comment `5015830229` binding correction 1):** every CAS-stale retry and every reconciliation `not_applied` retry creates a **new**, separate mutation job of the same domain — the old job's attempt keeps its `failed_clean`/resolved-`not_applied` outcome unchanged while the **job itself** transitions to the existing terminal state `cancelled`, and is never redispatched. The new domain-owned `cas_retry_ordinal` field, plus the existing core `superseded_by_job_id`/`cancel_reason` fields (reused, not new), track the replacement chain (§5.1, §5.4) | `task-013-inventory-sync-implementation-packet.md` D-013-3/D-013-9 (rewritten, Revision 3); DEC-037 §4 rows 1–2, §5.4, §9 | Test: a CAS-stale/`not_applied` fixture asserts a **new job record** (new job ID, new `attempt_token`, new idempotency key) is created for each replacement — never a second attempt on the same job ID |
 
 No contradiction above disappears without the recorded resolution in its
 row; every corrected document is listed in this session's governing
@@ -132,6 +141,36 @@ design.
 | 5 | Correct the `inventory_set_quantities` applied reconciliation verdict — do not require `updatedAt <= transport_at` for `applied`; use freshness only to protect `not_applied` | Applied. §4 row 1 `applied`-verdict cell — the erroneous timestamp condition is removed |
 | 6 | Correct the locked-prompt role model — ChatGPT = control room/acceptance authority; Claude = planner/independent reviewer/Odoo.sh runtime verifier; Sol = implementation worker; remove wording calling Claude the control room or sole merge authority | Applied. Both locked Sol prompts corrected (ROLE sections); this record's own header/decision-owner text corrected to match |
 | 7 | Record exact Stage 0 (PR #178) correction prerequisites for Task 013 issuance | Applied. New §13A |
+
+---
+
+## 1C. Acceptance normalization — control-room final decision (Pass 5, closes acceptance comment `5016117207`)
+
+Comment
+[`5016117207`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5016117207)
+**accepted Revision 3 in substance** — the separate orchestration/
+activation/set-quantities job model, one mutation job/one attempt for the
+job's entire lifetime, replacement-job retries, atomic handoffs, the
+fixed error vocabulary, freshness-safe reconciliation, explicit Stage 0
+prerequisites, and the current role model — conditioned on eleven
+docs-only merge-closure normalization corrections, applied in this pass.
+None of these reopen Gate A, DEC-036, or any substantive Revision 3
+design decision; all are wording/consistency corrections closing residual
+contradictions the acceptance review found in this record's own text.
+
+| # | Binding correction (comment `5016117207`) | Disposition |
+|---|---|---|
+| 1 | Attempt outcome is not a job state — `failed_clean`/`uncertain`/`applied`/`not_applied` must never appear as `shopify.connector.job.state` values or as "terminal job states"; existing terminal states remain `succeeded`, `failed_final`, `skipped`, `cancelled` | Applied. §5.3 handoff rule, §5.4 intro, §9 table rows corrected to attribute these values only to `mutation.attempt`'s `observed_outcome`/`resolution_disposition` |
+| 2 | Replacement predecessor state is the existing terminal state `cancelled`, preserving attempt outcome/resolution; set `superseded_by_job_id`/`cancel_reason`, flush the scope key, then create the child in the same transaction | Applied. §4 rows 1–2, §5.4 handoffs C/D, §9 table |
+| 3 | Successful phase handoffs (A, B) use `succeeded`; log both job IDs; never set `superseded_by_job_id`/`cancel_reason` on a successful handoff | Applied. §5.4 job-lineage-fields paragraph corrected — Revision 3's text incorrectly listed handoff B among the superseding handoffs; it is a successful completion, not a replacement, and now reads accordingly |
+| 4 | `superseded_by_job_id`/`cancel_reason` are existing core fields, reused, not new domain schema; the only new domain-owned field is `cas_retry_ordinal` | Applied. §5.4, §7 job-lineage-fields text corrected throughout |
+| 5 | `blocked_manual_review` remains non-terminal; removed from every terminal-state list and every automatic-handoff rule | Applied. §5.3, §5.4, §9 table, §4 rows 1–2 |
+| 6 | No automatic post-review orchestration — `ITEM_NOT_STOCKED_AT_LOCATION` and ordinary clean-validation rejections stay blocked until `action_recheck_inventory_pair` releases them; no scan/manual trigger admits a new job while blocked | Applied. §4 row 1, §5.2 step 8, §9 table — the erroneous "admitted normally by scan/manual trigger" wording is removed |
+| 7 | Exact review-release public owner: `shopify.connector.inventory.level.binding.action_recheck_inventory_pair(reason)`, may delegate to a private service helper | Already correct in §5.5/§7 — no change needed beyond the effective-disposition wording in item 8 |
+| 8 | Effective-disposition check: `observed_outcome='failed_clean'` and `effective_disposition() == 'not_applied'`, not raw `resolution_disposition='not_applied'` | Applied. §5.5 |
+| 9 | Review-release transition: `blocked_manual_review` → `cancelled`, `cancel_reason='manual_review_release'`, `superseded_by_job_id` set, scope key cleared, exactly one fresh `inventory_push_sync` job created atomically | Already correct in substance in §5.5; wording tightened to name the `cancelled` transition explicitly |
+| 10 | `store_identity_mismatch` remains the accepted manual-review route Stage 0 must add/prove — not an already-existing current core error class unless Stage 0 actually adds it | Already correct — §7/§13A already state this as a Stage 0 correction prerequisite; no change needed |
+| 11 | Apply consistently to DEC-037, Task 013 packet, locked Task 013 prompt, dev-store plan, acceptance matrix/DoR/program state/handoff/log wherever current-facing | Applied — see each document's own change for this pass |
 
 ---
 
@@ -257,14 +296,14 @@ says "implementation choice," "TBD," or equivalent.
 | Job-lineage field — **`cas_retry_ordinal`** (Revision 3, replaces Revision 2's `cas_mismatch_count`; closes binding correction 1) | Integer, default 0. Identifies this job's generation number in a bounded CAS-replacement chain for one pair: `0` = the original job; `1`/`2`/`3` = the first/second/third **replacement** job (a distinct job record, never the same job redispatched). Checked once, at job creation, against the ordinal of the job it replaces (`ordinal = predecessor.cas_retry_ordinal + 1`); never incremented mid-job, because a job created at a given ordinal makes **at most one** mutation attempt for its entire lifetime |
 | Direct `succeeded` evidence | Response has no `userErrors` and the mutation's own returned quantity data reflects the requested `quantity` → `observed_outcome='succeeded'` |
 | Direct `failed_clean` evidence — validation/binding codes | `userErrors` containing one of: `INVALID_INVENTORY_ITEM`, `INVALID_LOCATION`, `INVALID_NAME`, `INVALID_QUANTITY_TOO_HIGH`, `INVALID_QUANTITY_TOO_LOW`, `INVALID_REASON`, `INVALID_REFERENCE_DOCUMENT`, `NO_DUPLICATE_INVENTORY_ITEM_ID_GROUP_ID_PAIR`, `NON_MUTABLE_INVENTORY_ITEM` (all confirmed live on `InventorySetQuantitiesUserErrorCode`, §2 item 3) → `observed_outcome='failed_clean'`, **`error_class='shopify_user_errors_validation'`** (Revision 3 — replaces the invented `remote_validation_rejected`), `manual_review_subreason='binding_conflict'`. `INVALID_QUANTITY_NEGATIVE` is confirmed-existing but never-triggerable under this connector's clamp-before-send discipline — a defensive test asserts it is never observed. No blind automatic retry for any of these (§9) |
-| Direct `failed_clean` evidence — CAS stale | `CHANGE_FROM_QUANTITY_STALE` → `observed_outcome='failed_clean'`, `error_class='concurrency_race_conflict'`. Bounded retry **permitted**, maximum **3** replacement jobs (`cas_retry_ordinal < 3` on the job that just failed). **Revision 3 correction (binding correction 1, replaces Revision 2's same-job-redispatch design entirely): every retry creates a NEW job, never a redispatch of the job that failed.** This failing job terminalizes with its own single attempt's `failed_clean` disposition, `superseded_by_job_id` set to the new job, `cancel_reason='cas_stale_bounded_replacement'` (§5.4 handoff C); a new `inventory_set_quantities` job is created with `cas_retry_ordinal` incremented by one, its own fresh `mutation.attempt` row, a fresh, narrow, single-purpose Shopify read of the pair's current `available`/`updatedAt` (a `remote_read_replay_safe` read performed by the new job's own dispatch handler, not a re-run of full `inventory_push_sync` orchestration — this is a CAS pre-read, not a reconnect/drift classification, and does not re-derive the target or re-run first-push/drift/reconnect gates), a fresh `changeFromQuantity`, a fresh exact-request fingerprint, and a fresh idempotency key. The new job also re-reads the binding's current coalesced `pending_target_available` (§10) rather than resending a possibly-stale target. After 3 replacements (the 4th `CHANGE_FROM_QUANTITY_STALE`, on the job at `cas_retry_ordinal=3`) → no further replacement job is created; that job terminalizes `blocked_manual_review`/`binding_conflict` |
-| Direct `failed_clean` evidence — `ITEM_NOT_STOCKED_AT_LOCATION` | **[Fact, §2 item 3]** Confirmed on `InventorySetQuantitiesUserErrorCode`. This is a race/contract exception, not an inline activation trigger — `inventory_push_sync`'s own prior read found (or believed it found) an existing level, but the level was not actually stocked at send time. → `observed_outcome='failed_clean'`, **`error_class='inventory_location_missing'`** (Revision 3 — replaces the invented `remote_precondition_mismatch`; the same value is also the `manual_review_subreason`), routes to `blocked_manual_review`/`inventory_location_missing`. This job **never** issues `inventoryActivate` inline or in any form. The pending target remains coalesced (§10) unresolved; the pair's next `inventory_push_sync` orchestration job (admitted normally by scan/manual trigger, §5) re-reads Shopify, correctly detects the level is genuinely absent, and — only if `first_push_state='confirmed'` — enqueues a fresh `inventory_activate` job |
+| Direct `failed_clean` evidence — CAS stale | `CHANGE_FROM_QUANTITY_STALE` → `observed_outcome='failed_clean'`, `error_class='concurrency_race_conflict'`. Bounded retry **permitted**, maximum **3** replacement jobs (`cas_retry_ordinal < 3` on the job that just failed). **Revision 3 correction (binding correction 1, replaces Revision 2's same-job-redispatch design entirely): every retry creates a NEW job, never a redispatch of the job that failed.** This failing job's own single attempt keeps `observed_outcome='failed_clean'` unchanged; the **job itself** transitions to the existing core job state `cancelled` (never a new state) — `superseded_by_job_id` set to the new job, `cancel_reason='cas_stale_bounded_replacement'` (§5.4 handoff C); a new `inventory_set_quantities` job is created with `cas_retry_ordinal` incremented by one, its own fresh `mutation.attempt` row, a fresh, narrow, single-purpose Shopify read of the pair's current `available`/`updatedAt` (a `remote_read_replay_safe` read performed by the new job's own dispatch handler, not a re-run of full `inventory_push_sync` orchestration — this is a CAS pre-read, not a reconnect/drift classification, and does not re-derive the target or re-run first-push/drift/reconnect gates), a fresh `changeFromQuantity`, a fresh exact-request fingerprint, and a fresh idempotency key. The new job also re-reads the binding's current coalesced `pending_target_available` (§10) rather than resending a possibly-stale target. After 3 replacements (the 4th `CHANGE_FROM_QUANTITY_STALE`, on the job at `cas_retry_ordinal=3`) → no further replacement job is created; that job instead transitions to the existing **non-terminal** `blocked_manual_review` state (`binding_conflict`), which continues to hold `operation_scope_key` until an authorized §5.5 release |
+| Direct `failed_clean` evidence — `ITEM_NOT_STOCKED_AT_LOCATION` | **[Fact, §2 item 3]** Confirmed on `InventorySetQuantitiesUserErrorCode`. This is a race/contract exception, not an inline activation trigger — `inventory_push_sync`'s own prior read found (or believed it found) an existing level, but the level was not actually stocked at send time. → `observed_outcome='failed_clean'`, **`error_class='inventory_location_missing'`** (Revision 3 — replaces the invented `remote_precondition_mismatch`; the same value is also the `manual_review_subreason`), routes the job to the existing **non-terminal** `blocked_manual_review` state (`inventory_location_missing`) — which continues to hold the pair's `operation_scope_key` and blocks any new job of any of the three inventory job types for that pair until an authorized `action_recheck_inventory_pair` release (§5.5); **no scan or manual trigger admits a new orchestration job while the pair remains blocked**. This job **never** issues `inventoryActivate` inline or in any form. The pending target remains coalesced (§10) unresolved; only after that authorized release does the resulting fresh `inventory_push_sync` job re-read Shopify, correctly detect the level is genuinely absent, and — only if `first_push_state='confirmed'` — enqueue a fresh `inventory_activate` job |
 | Direct `uncertain` evidence | Network timeout after send (`error_class='shopify_temporary_server_network'`); HTTP 5xx (same); `THROTTLED` (`error_class='shopify_throttling_rate_limit'`); ambiguous/partial `userErrors` (data + errors both present — does not apply cleanly to this mutation's error shape, retained for completeness; `error_class='data_shape_schema_mismatch'`); `IDEMPOTENCY_CONCURRENT_REQUEST` (`error_class='concurrency_race_conflict'`, Revision 3 — this structured code is a concurrency signal, not a generic transport-ambiguity one); worker crash between send and outcome commit (DEC-036 D9/D19/D23/D24) |
 | `THROTTLED` handling | `uncertain`, `error_class='shopify_throttling_rate_limit'`, reconcile-first, never auto-classified `failed_clean` (DEC-036 D9) |
 | Idempotency-error handling | `IDEMPOTENCY_CONCURRENT_REQUEST` → `uncertain`, `error_class='concurrency_race_conflict'`; `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` / `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` → `error_class='idempotency_contract_violation'`, `manual_review_subreason='idempotency_contract_violation'`, `blocked_manual_review`, no automatic retry (DEC-036 D6). These are structured codes on this mutation's own error enum (§2 item 3) — no message-text matching is needed or used for this row |
 | Reconciliation read | `InventoryLevel.quantities(names: ["available"])` for the exact pair, including `updatedAt` where the schema exposes it on the returned `InventoryQuantity`; **first** step is the store-identity check (DEC-036 D18) |
 | `applied` verdict — **corrected, Revision 3, binding correction 5** | Current Shopify `available` equals this attempt's `target_quantity` → `resolution_disposition='applied'`; no resend. **Revision 2's additional condition — requiring `InventoryQuantity.updatedAt` not later than `transport_at` — is withdrawn**: the mutation's own successful update normally occurs *after* `transport_at`, so that condition would have made a genuinely successful attempt read as non-applied. `applied` is about the achieved business state, not attribution of which attempt produced it; freshness/`updatedAt` evidence is used **only** to protect the `not_applied` verdict below, never to gate `applied` |
-| `not-applied` verdict — freshness/ABA-safe (Revision 2, binding correction 4; job-lineage mechanics corrected Revision 3) | Current Shopify `available` equals this attempt's own pre-attempt `changeFromQuantity` **and** freshness evidence does **not** show a post-transport change: i.e., `updatedAt`, where present, is **not later than** `transport_at`, and no other evidence (a differing `myshopifyDomain`, a third-party attribution signal) indicates an ABA round-trip or third-party write → `resolution_disposition='not_applied'`. **Revision 3 correction:** this job then terminalizes — it is never redispatched — with `superseded_by_job_id` set and `cancel_reason='reconciliation_not_applied_replacement'` (§5.4 handoff D); a **new** `inventory_set_quantities` job is created, which makes the next attempt through its own normal dispatch |
+| `not-applied` verdict — freshness/ABA-safe (Revision 2, binding correction 4; job-lineage mechanics corrected Revision 3) | Current Shopify `available` equals this attempt's own pre-attempt `changeFromQuantity` **and** freshness evidence does **not** show a post-transport change: i.e., `updatedAt`, where present, is **not later than** `transport_at`, and no other evidence (a differing `myshopifyDomain`, a third-party attribution signal) indicates an ABA round-trip or third-party write → `resolution_disposition='not_applied'`. **Revision 3 correction:** the **job itself** then transitions to the existing core job state `cancelled` — never redispatched, never given a new core state — with `superseded_by_job_id` set and `cancel_reason='reconciliation_not_applied_replacement'` (§5.4 handoff D); a **new** `inventory_set_quantities` job is created, which makes the next attempt through its own normal dispatch |
 | Inconclusive verdict — freshness/ABA-safe (Revision 2) | Any of: (a) current `available` equals **neither** the pre- nor post-attempt value; (b) current `available` equals the pre-attempt value **but** `updatedAt` is **later** than `transport_at` (an ABA round-trip cannot be ruled out — the value could have changed away and back); (c) freshness evidence is unavailable and attribution to this attempt cannot otherwise be established. **No verdict may depend only on response absence, and a same-value read is never, by itself, treated as proof of not-applied** → `inconclusive_reconciliation_count` increments under a re-acquired row lock (DEC-036 D17); next reconciliation read scheduled |
 | Manual-review subreason | `duplicate_risk` (N=3 inconclusive cap); `store_identity_mismatch`; `idempotency_contract_violation`; `binding_conflict` (`NON_MUTABLE_INVENTORY_ITEM`; persistent CAS divergence once all 3 bounded replacements are exhausted); `inventory_location_missing` (`ITEM_NOT_STOCKED_AT_LOCATION`); `no_reconciliation_strategy` (registry lookup failure, should never fire) |
 | Retry eligibility | Per the effective-disposition helper (DEC-036 D10), see §9 for the full consequence table |
@@ -299,7 +338,7 @@ says "implementation choice," "TBD," or equivalent.
 | Idempotency-error handling | Folded into the uniform clean-rejection rule above (`shopify_user_errors_validation`/`binding_conflict`); no separate handling, no message matching — there is nothing left to verify, since the uniform rule requires no cause-specific classification |
 | Reconciliation read | `InventoryLevel.quantities(names: ["available", "on_hand"])` for the pair; same store-identity-first check as row 1 |
 | `applied` verdict — explicit three-way (Revision 2, binding correction 4) | The level exists (non-null `InventoryLevel`) **and** `available == 0` **and** `on_hand == 0` → `resolution_disposition='applied'` |
-| `not-applied` verdict — job-lineage mechanics corrected Revision 3 | The level still does not exist for the pair (query returns null/absent) → `resolution_disposition='not_applied'`. **Revision 3 correction:** this job then terminalizes — it is never redispatched — with `superseded_by_job_id` set and `cancel_reason='reconciliation_not_applied_replacement'` (§5.4 handoff D); a **new** `inventory_activate` job is created, which makes the next activation attempt through its own normal dispatch |
+| `not-applied` verdict — job-lineage mechanics corrected Revision 3 | The level still does not exist for the pair (query returns null/absent) → `resolution_disposition='not_applied'`. **Revision 3 correction:** the **job itself** then transitions to the existing core job state `cancelled` — never redispatched, never given a new core state — with `superseded_by_job_id` set and `cancel_reason='reconciliation_not_applied_replacement'` (§5.4 handoff D); a **new** `inventory_activate` job is created, which makes the next activation attempt through its own normal dispatch |
 | Inconclusive verdict | The level exists but `available`/`on_hand` are **not both** 0 — an unexplained non-zero quantity reached the pair between this attempt and the read → `inconclusive_reconciliation_count` increments; **never auto-corrected** |
 | Manual-review subreason | `duplicate_risk` (N=3 cap); `store_identity_mismatch`; `binding_conflict` (clean rejection; a nonzero level found during reconciliation) |
 | Retry eligibility | Per the effective-disposition helper (DEC-036 D10), see §9 |
@@ -350,9 +389,10 @@ No matrix cell above is "TBD" or "implementation choice."
   mutation_domain`.
 - One job, one Shopify request, one Layer 2 attempt — **for this job's
   entire lifetime** (Revision 3, binding correction 1). **A bounded
-  CAS-stale retry never redispatches this job** — it terminalizes this
-  job and creates a **new**, separate `inventory_set_quantities` job
-  carrying an incremented `cas_retry_ordinal` (§4 row 1, §5.4 handoff
+  CAS-stale retry never redispatches this job** — it transitions this
+  job to the terminal state `cancelled` and creates a **new**, separate
+  `inventory_set_quantities` job carrying an incremented
+  `cas_retry_ordinal` (§4 row 1, §5.4 handoff
   C). This corrects Revision 2's design, which described the bounded
   retry as "a new job dispatch of this same job" — that phrasing
   permitted one job to accumulate multiple `mutation.attempt` rows over
@@ -416,9 +456,10 @@ genuinely new, separate job record — is withdrawn (Revision 3).
    before, per step 4, enqueueing `inventory_set_quantities` — atomicity
    guarantees the handoff, not a skipped read.
 8. `ITEM_NOT_STOCKED_AT_LOCATION` received by `inventory_set_quantities`
-   is not an inline activation trigger — it routes fail-closed to review
-   /re-orchestration (§4 row 1, §9), never issuing `inventoryActivate`
-   from the same job.
+   is not an inline activation trigger — it routes fail-closed to the
+   non-terminal `blocked_manual_review` state (§4 row 1, §9), released
+   only via §5.5's `action_recheck_inventory_pair`, never issuing
+   `inventoryActivate` from the same job.
 
 No direct mutation chaining is permitted — a mutation job never enqueues
 another mutation job; only `inventory_push_sync` enqueues mutation jobs,
@@ -443,12 +484,19 @@ and only after its own fresh read and gates.
   this purpose (§5.5) — it continues to hold the pair's
   `operation_scope_key` and continues to block new-job admission for the
   pair.**
-- **Handoff rule:** the current job must transition to a terminal state
-  (`succeeded`, `failed_clean` exhausted-and-routed to review, or
-  `blocked_manual_review`) **before** the next phase job (an
-  orchestration re-read after activation, a mutation job enqueued by an
-  orchestration read, or a CAS/`not_applied` replacement job) is
-  created. Terminalization of the current job and enqueue of the next
+- **Handoff rule:** the current job must reach a stopping point — the
+  terminal state `succeeded`, the terminal state `cancelled` (when
+  superseded by a replacement job, §5.4), or the **non-terminal**
+  `blocked_manual_review` state (which continues to hold the pair's
+  `operation_scope_key` until an authorized release, §5.5) — **before**
+  the next phase job (an orchestration re-read after activation, a
+  mutation job enqueued by an orchestration read, or a CAS/`not_applied`
+  replacement job) is created. `failed_clean`/`uncertain`/`applied`/
+  `not_applied` are mutation-**attempt** outcome/resolution values (DEC-036
+  D9/D10) — they are never values of `shopify.connector.job.state` and
+  never appear in this job-state list. Terminalization of the current job
+  (or its transition to the non-terminal `blocked_manual_review` state)
+  and enqueue of the next
   phase job occur **atomically**, in the same database transaction,
   under a row lock on the pair's binding record
   (`shopify.connector.inventory.level.binding`), held for the duration of
@@ -481,8 +529,12 @@ and only after its own fresh read and gates.
 Under a row lock on `shopify.connector.inventory.level.binding`, held for
 the duration of the handoff, each of the following four handoffs occurs
 in **one** database transaction. No new core job state is introduced by
-any of them — each uses only the job states this record already relies
-on (`succeeded`, `failed_clean`, `blocked_manual_review`).
+any of them — each uses only the existing terminal states `succeeded` and
+`cancelled`, plus, where a replacement is not created, the existing
+**non-terminal** `blocked_manual_review` state (§5.5). `failed_clean` is
+never a job state: it is the mutation attempt's own `observed_outcome`
+(DEC-036 D9), preserved unchanged when its job transitions to
+`cancelled`.
 
 - **A. Orchestration → mutation.** `inventory_push_sync` completes its
   read and all gates (§5.1.A); terminalizes as `succeeded`, which clears
@@ -499,44 +551,59 @@ on (`succeeded`, `failed_clean`, `blocked_manual_review`).
   gates before creating `inventory_set_quantities`.
 - **C. CAS-stale replacement.** On a `CHANGE_FROM_QUANTITY_STALE` outcome
   for an `inventory_set_quantities` job at `cas_retry_ordinal` N (N ∈
-  {0, 1, 2}): the job's own single attempt records `failed_clean`
-  (`error_class='concurrency_race_conflict'`); the job terminalizes using
-  that same existing terminal disposition — it is **not** given a new
-  core state — with `superseded_by_job_id` set to the replacement job's
-  ID and `cancel_reason='cas_stale_bounded_replacement'`; its hold on
+  {0, 1, 2}): the job's own single attempt keeps `observed_outcome=
+  'failed_clean'` (`error_class='concurrency_race_conflict'`) unchanged;
+  the **job itself** transitions to the existing core job state
+  `cancelled` — **not** a new core state — with `superseded_by_job_id`
+  set to the replacement job's ID and
+  `cancel_reason='cas_stale_bounded_replacement'`; flush so its hold on
   `operation_scope_key` clears; a **new** `inventory_set_quantities` job
-  is created with `cas_retry_ordinal = N + 1`; both job IDs logged. At
-  N=3 (the 4th mismatch): no replacement job is created; that job
-  terminalizes `blocked_manual_review`/`binding_conflict` instead.
+  is created, in the same transaction, with `cas_retry_ordinal = N + 1`;
+  both job IDs logged. At N=3 (the 4th mismatch): no replacement job is
+  created; that job instead transitions to the existing **non-terminal**
+  `blocked_manual_review` state (`manual_review_subreason='binding_conflict'`),
+  which continues to hold `operation_scope_key` until an authorized §5.5
+  release.
 - **D. Reconciliation `not_applied` replacement.** For either mutation
   domain: the old attempt's `uncertain` `observed_outcome` and its
   resolved `not_applied` `resolution_disposition` are preserved,
-  immutable (DEC-036 D9/D10); the job terminalizes using that same
-  resolved disposition, with `superseded_by_job_id` set and
-  `cancel_reason='reconciliation_not_applied_replacement'`; its hold on
-  `operation_scope_key` clears; a **new** same-domain job is created; the
-  new job makes the next attempt later through its own normal dispatch;
-  both job IDs logged.
+  immutable (DEC-036 D9/D10); the **job itself** transitions to the
+  existing core job state `cancelled` — **not** a new core state — with
+  `superseded_by_job_id` set and
+  `cancel_reason='reconciliation_not_applied_replacement'`; flush so its
+  hold on `operation_scope_key` clears; a **new** same-domain job is
+  created, in the same transaction; the new job makes the next attempt
+  later through its own normal dispatch; both job IDs logged.
 
-**Job-lineage fields (domain-owned, new, Revision 3):**
+**Job-lineage fields used by this contract:**
 
 - `cas_retry_ordinal` (Integer, default 0; `inventory_set_quantities`
-  only) — §4 row 1.
-- `superseded_by_job_id` (Many2one to the job model, nullable) — set
-  only on a job terminalized because a replacement/next-phase job was
-  created for the same mutation on the same pair (handoffs B, C, D, and
-  the review-release action, §5.5). Not set for a plain `succeeded`
-  terminal state that has no successor (e.g. an `inventory_set_quantities`
-  job with nothing left to coalesce).
-- `cancel_reason` (Char, nullable, fixed vocabulary:
+  only) — the **only new, domain-owned** job-lineage field this Gate B
+  package introduces, added to `shopify.connector.job` through the
+  inventory addon's own `_inherit` extension. §4 row 1.
+- `superseded_by_job_id` — an **existing core** `shopify.connector.job`
+  field (Many2one to the job model, nullable), reused here, not new
+  domain schema. Set only when a job **transitions to `cancelled`**
+  because a replacement/next-phase job was created in its place
+  (handoffs C, D, and the review-release action, §5.5). **Not** set on a
+  `succeeded` terminal state reached by ordinary successful phase
+  completion (handoffs A and B) — those log both job IDs but set neither
+  `superseded_by_job_id` nor `cancel_reason`, because nothing was
+  cancelled or replaced; a plain `succeeded` job with no successor at all
+  (e.g. an `inventory_set_quantities` job with nothing left to coalesce)
+  also leaves it unset.
+- `cancel_reason` — an **existing core** `shopify.connector.job` field
+  (Char, nullable), reused here with a fixed domain vocabulary:
   `cas_stale_bounded_replacement` / `reconciliation_not_applied_replacement`
-  / `manual_review_release`) — set together with `superseded_by_job_id`.
+  / `manual_review_release`. Set together with `superseded_by_job_id`, on
+  the same `cancelled` transition.
 
-These three fields are the **only** new schema this domain adds for
-job-lineage tracking; none of them adds a new value to the job model's
-core state Selection, and none of them is read as transport-replay or
-idempotency authority (that remains exclusively `mutation.attempt`, C5,
-unchanged).
+`cas_retry_ordinal` is the only new schema this domain adds for
+job-lineage tracking, and it does not add a new value to the job model's
+core state Selection. `superseded_by_job_id` and `cancel_reason` are
+existing core fields — reusing them adds no new schema at all. None of
+the three is read as transport-replay or idempotency authority (that
+remains exclusively `mutation.attempt`, C5, unchanged).
 
 - **Rollback guarantee:** if the handoff transaction rolls back for any
   reason, both the old job's terminal state/lineage fields **and** the
@@ -568,8 +635,11 @@ unchanged).
   - Requires exactly one active `blocked_manual_review` inventory job
     for the pair.
   - Requires that job's linked attempt to have
-    `observed_outcome='failed_clean'` **and** effective
-    `resolution_disposition='not_applied'`.
+    `observed_outcome='failed_clean'` **and**
+    `effective_disposition() == 'not_applied'` — the effective-disposition
+    helper (DEC-036 D10), not a requirement that the raw
+    `resolution_disposition` field itself be populated; a direct
+    `failed_clean` attempt normally has no separate resolution row.
   - **Allowed** only when `manual_review_subreason` is
     `inventory_location_missing`, or an explicitly enumerated safe
     `binding_conflict` clean-rejection case (an ordinary Shopify
@@ -584,11 +654,12 @@ unchanged).
     Administrator-only manual resolution), never through this action.
   - **Never** modifies `observed_outcome`. **Never** writes
     `resolution_disposition`.
-  - Atomically, in one transaction under the row lock: terminalizes/
-    supersedes the blocked job (`cancel_reason='manual_review_release'`,
-    `superseded_by_job_id` set to the new job), clears its hold on
-    `operation_scope_key`, and enqueues exactly one fresh
-    `inventory_push_sync` job.
+  - Atomically, in one transaction under the row lock: the blocked job
+    transitions from `blocked_manual_review` to the existing core job
+    state `cancelled` (`cancel_reason='manual_review_release'`,
+    `superseded_by_job_id` set to the new job); flush so its hold on
+    `operation_scope_key` clears; and exactly one fresh
+    `inventory_push_sync` job is enqueued, in the same transaction.
   - Records the acting user's ID, the reason, the old job ID, and the
     new job ID. No credential or PII enters this log (this domain
     carries none).
@@ -670,10 +741,12 @@ unchanged).
     `binding_conflict`'s uniform clean-rejection rule, §4 row 2)
   - `no_reconciliation_strategy` (DEC-036 D16, generic — should never
     fire once both matrix rows are registered)
-- **Job-lineage fields (domain-owned, new, Revision 3):**
-  `cas_retry_ordinal` (Integer, default 0, `inventory_set_quantities`
-  only), `superseded_by_job_id` (Many2one, nullable), `cancel_reason`
-  (Char, nullable, fixed vocabulary — §5.4/§5.5). None of these adds a
+- **Job-lineage fields:** `cas_retry_ordinal` (Integer, default 0,
+  `inventory_set_quantities` only) is the **only new, domain-owned**
+  field this Gate B package introduces. `superseded_by_job_id`
+  (Many2one, nullable) and `cancel_reason` (Char, nullable, fixed
+  vocabulary — §5.4/§5.5) are **existing core** `shopify.connector.job`
+  fields, reused here, not new domain schema. None of the three adds a
   new value to the job model's core state Selection.
 - **Domain action (new, Revision 3):** `action_recheck_inventory_pair(reason)`
   — §5.5; Reviewer/Administrator only; the sole authorized release path
@@ -742,22 +815,22 @@ never redispatches the job whose attempt failed/resolved.**
 | Outcome | `observed_outcome` | `error_class` | `manual_review_subreason` | Auto-retry | Retry class / bound | Retry counter source | Retry-delay source | Reconciliation required | Next orchestration behavior |
 |---|---|---|---|---|---|---|---|---|---|
 | `inventory_set_quantities` succeeded | `succeeded` | — | — | No | — | — | — | No (evidence is direct) | Job terminal `succeeded`; binding's `last_pushed_available`/`last_pushed_at` refreshed |
-| CAS stale, ordinal 0/1/2 (replacement permitted) | `failed_clean` | `concurrency_race_conflict` | — | No (not on this job) | New replacement job, bounded max 3 replacements | `cas_retry_ordinal` (job field, §4 row 1) | Existing generic bounded-retry backoff policy applied to the new job's dispatch timing (DEC-009 pattern; no new backoff mechanism) | No (fresh CAS pre-read on the new job substitutes) | This job terminalizes (`superseded_by_job_id` set, `cancel_reason='cas_stale_bounded_replacement'`); a **new** `inventory_set_quantities` job is created with `cas_retry_ordinal + 1` (§5.4 handoff C) |
-| CAS stale, ordinal 3 (4th mismatch) | `failed_clean` | `concurrency_race_conflict` | `binding_conflict` | No | Exhausted | `cas_retry_ordinal == 3` | — | No | Job terminal `blocked_manual_review`; no replacement job; pending target stays coalesced |
-| Validation/binding code (`INVALID_*`, `NON_MUTABLE_INVENTORY_ITEM`, `NO_DUPLICATE_...`) | `failed_clean` | `shopify_user_errors_validation` | `binding_conflict` | No | — | — | — | No | Job terminal `blocked_manual_review` |
-| `ITEM_NOT_STOCKED_AT_LOCATION` | `failed_clean` | `inventory_location_missing` | `inventory_location_missing` | No (not by this job) | — | — | — | No (this job); a fresh `inventory_push_sync` orchestration read is required | Job terminal `blocked_manual_review`/routed-for-re-orchestration; pending target stays coalesced; next scan/manual trigger admits a fresh `inventory_push_sync` |
+| CAS stale, ordinal 0/1/2 (replacement permitted) | `failed_clean` | `concurrency_race_conflict` | — | No (not on this job) | New replacement job, bounded max 3 replacements | `cas_retry_ordinal` (job field, §4 row 1) | Existing generic bounded-retry backoff policy applied to the new job's dispatch timing (DEC-009 pattern; no new backoff mechanism) | No (fresh CAS pre-read on the new job substitutes) | This job transitions to the terminal state `cancelled` (`superseded_by_job_id` set, `cancel_reason='cas_stale_bounded_replacement'`); a **new** `inventory_set_quantities` job is created with `cas_retry_ordinal + 1` (§5.4 handoff C) |
+| CAS stale, ordinal 3 (4th mismatch) | `failed_clean` | `concurrency_race_conflict` | `binding_conflict` | No | Exhausted | `cas_retry_ordinal == 3` | — | No | Job transitions to the non-terminal `blocked_manual_review` state (holds `operation_scope_key` until an authorized §5.5 release); no replacement job; pending target stays coalesced |
+| Validation/binding code (`INVALID_*`, `NON_MUTABLE_INVENTORY_ITEM`, `NO_DUPLICATE_...`) | `failed_clean` | `shopify_user_errors_validation` | `binding_conflict` | No | — | — | — | No | Job transitions to the non-terminal `blocked_manual_review` state |
+| `ITEM_NOT_STOCKED_AT_LOCATION` | `failed_clean` | `inventory_location_missing` | `inventory_location_missing` | No (not by this job) | — | — | — | No (this job); a fresh `inventory_push_sync` orchestration read is required | Job transitions to the non-terminal `blocked_manual_review` state, holding `operation_scope_key`; pending target stays coalesced; released **only** by an authorized `action_recheck_inventory_pair` (§5.5), which then enqueues the fresh `inventory_push_sync` job — no scan or manual trigger admits one automatically while blocked |
 | `IDEMPOTENCY_CONCURRENT_REQUEST` | `uncertain` | `concurrency_race_conflict` | — | No (reconcile first) | — | — | — | Yes | Reconciliation read scheduled; retry only after resolution |
-| `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` / `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` | `uncertain` (until reconciled) | `idempotency_contract_violation` | `idempotency_contract_violation` | No | — | — | — | Yes | Job terminal `blocked_manual_review`, no automatic retry |
+| `IDEMPOTENCY_KEY_PARAMETER_MISMATCH` / `IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED` | `uncertain` (until reconciled) | `idempotency_contract_violation` | `idempotency_contract_violation` | No | — | — | — | Yes | Job transitions to the non-terminal `blocked_manual_review` state, no automatic retry |
 | `THROTTLED` (either domain) | `uncertain` | `shopify_throttling_rate_limit` | — | No (reconcile first) | — | — | — | Yes | Reconciliation read scheduled |
 | Network timeout / HTTP 5xx ambiguity (either domain) | `uncertain` | `shopify_temporary_server_network` | — | No (reconcile first) | — | — | — | Yes | Reconciliation read scheduled |
 | Malformed/partial response; `inventory_activate` ambiguous (`userErrors`+non-null `inventoryLevel`) | `uncertain` | `data_shape_schema_mismatch` | — | No (reconcile first) | — | — | — | Yes | Reconciliation read scheduled |
-| `inventory_set_quantities` reconciliation → `not_applied` | (resolved) `not_applied` | — | — | No (not the same job) | New replacement job | `superseded_by_job_id` lineage | Existing generic backoff applied to the new job | Already performed | Old job terminalizes (`cancel_reason='reconciliation_not_applied_replacement'`); a **new** `inventory_set_quantities` job is created with a fresh attempt (§5.4 handoff D) |
-| `inventory_set_quantities` reconciliation → inconclusive | (unresolved) | — | `duplicate_risk` (at N=3 cap) | No | — | `inconclusive_reconciliation_count` | — | Yes, repeat | Next reconciliation read scheduled; at cap, `blocked_manual_review` |
-| `inventory_activate` succeeded | `succeeded` | — | — | No | — | — | — | No | Job terminal `succeeded`; triggers §5.4 handoff B (atomic fresh-orchestration enqueue) |
-| `inventory_activate` clean rejection (any `userErrors`+null `inventoryLevel`) | `failed_clean` | `shopify_user_errors_validation` | `binding_conflict` | No | — | — | — | No | Job terminal `blocked_manual_review` |
-| `inventory_activate` reconciliation → `not_applied` | (resolved) `not_applied` | — | — | No (not the same job) | New replacement job | `superseded_by_job_id` lineage | Existing generic backoff applied to the new job | Already performed | Old job terminalizes (`cancel_reason='reconciliation_not_applied_replacement'`); a **new** `inventory_activate` job is created with a fresh attempt (§5.4 handoff D) |
-| `inventory_activate` reconciliation → inconclusive | (unresolved) | — | `duplicate_risk` (at N=3 cap) | No | — | `inconclusive_reconciliation_count` | — | Yes, repeat | Next reconciliation read scheduled; at cap, `blocked_manual_review` |
-| `blocked_manual_review` release via `action_recheck_inventory_pair` | unchanged (the action never rewrites `observed_outcome`/disposition) | — | — | N/A (an authorized manual action, not an automatic retry) | — | — | — | No (release requires an already-resolved `not_applied` disposition) | Old job terminalizes (`cancel_reason='manual_review_release'`, `superseded_by_job_id` set); exactly one fresh `inventory_push_sync` job enqueued atomically (§5.5) |
+| `inventory_set_quantities` reconciliation → `not_applied` | (resolved) `not_applied` | — | — | No (not the same job) | New replacement job | `superseded_by_job_id` lineage | Existing generic backoff applied to the new job | Already performed | Old job transitions to the terminal state `cancelled` (`cancel_reason='reconciliation_not_applied_replacement'`); a **new** `inventory_set_quantities` job is created with a fresh attempt (§5.4 handoff D) |
+| `inventory_set_quantities` reconciliation → inconclusive | (unresolved) | — | `duplicate_risk` (at N=3 cap) | No | — | `inconclusive_reconciliation_count` | — | Yes, repeat | Next reconciliation read scheduled; at cap, job transitions to the non-terminal `blocked_manual_review` state |
+| `inventory_activate` succeeded | `succeeded` | — | — | No | — | — | — | No | Job transitions to the terminal state `succeeded`; triggers §5.4 handoff B (atomic fresh-orchestration enqueue) |
+| `inventory_activate` clean rejection (any `userErrors`+null `inventoryLevel`) | `failed_clean` | `shopify_user_errors_validation` | `binding_conflict` | No | — | — | — | No | Job transitions to the non-terminal `blocked_manual_review` state |
+| `inventory_activate` reconciliation → `not_applied` | (resolved) `not_applied` | — | — | No (not the same job) | New replacement job | `superseded_by_job_id` lineage | Existing generic backoff applied to the new job | Already performed | Old job transitions to the terminal state `cancelled` (`cancel_reason='reconciliation_not_applied_replacement'`); a **new** `inventory_activate` job is created with a fresh attempt (§5.4 handoff D) |
+| `inventory_activate` reconciliation → inconclusive | (unresolved) | — | `duplicate_risk` (at N=3 cap) | No | — | `inconclusive_reconciliation_count` | — | Yes, repeat | Next reconciliation read scheduled; at cap, job transitions to the non-terminal `blocked_manual_review` state |
+| `blocked_manual_review` release via `action_recheck_inventory_pair` | unchanged (the action never rewrites `observed_outcome`/disposition) | — | — | N/A (an authorized manual action, not an automatic retry) | — | — | — | No (release requires `effective_disposition() == 'not_applied'`) | Old job transitions from the non-terminal `blocked_manual_review` state to the terminal state `cancelled` (`cancel_reason='manual_review_release'`, `superseded_by_job_id` set); exactly one fresh `inventory_push_sync` job enqueued atomically (§5.5) |
 | Unknown/malformed consequence data | `uncertain` (fail-closed default) | `data_shape_schema_mismatch` | `no_reconciliation_strategy` (if a registry lookup also fails) | No | — | — | — | Yes | Reconciliation/manual review scheduled; never automatic retry |
 
 ---
@@ -786,8 +859,9 @@ never redispatches the job whose attempt failed/resolved.**
   creation is itself part of the same atomic handoff that terminalizes
   the job it replaces, §5.4, so the pair is never briefly held by two
   non-terminal jobs at once).
-- **After the active job finishes** (goes terminal — `succeeded`, or
-  `blocked_manual_review` released via §5.5): the next
+- **After the active job reaches a stopping point** (the terminal state
+  `succeeded`, or the non-terminal `blocked_manual_review` state being
+  released via §5.5): the next
   `inventory_push_sync` orchestration dispatch reads the latest coalesced
   `pending_target_available` — a stale target (one superseded by a later
   Odoo change while the prior job ran) is never pushed; the fresh read
@@ -967,12 +1041,16 @@ tracked separately in §13A, not restated in this traceability chain.
 
 ## 15. Status
 
-**REVISED — RESUBMITTED FOR CONTROL-ROOM GATE B ACCEPTANCE (Revision 3).**
-No decision in this record has been self-accepted, in Revision 1,
-Revision 2, or Revision 3. No DEC-036 decision is reopened. Gate A is not
-reopened. No `addons/**` file was created or modified. No Odoo/Odoo.sh
-run occurred. No Shopify mutation was issued, and no new Shopify **read**
-was performed in Revision 3 either — this revision corrects this
-record's own job-lifecycle/handoff/vocabulary/role-model design in
-response to comment `5015830229`, without any new claim about Shopify's
-API surface.
+**ACCEPTED — CONTROL-ROOM GATE B (Revision 3, accepted in substance by
+comment `5016117207`; docs-only merge-closure normalization applied,
+§1C).** No decision in this record has been self-accepted, in Revision 1,
+Revision 2, Revision 3, or this normalization pass. No DEC-036 decision is
+reopened. Gate A is not reopened. No `addons/**` file was created or
+modified. No Odoo/Odoo.sh run occurred. No Shopify mutation was issued,
+and no new Shopify **read** was performed in this pass either — every
+correction is a wording/consistency fix to this record's own
+job-state/field-ownership/blocked-review text in response to comment
+`5016117207`, without any new claim about Shopify's API surface. Stage 0
+(PR #178) remains held at `644853a68b3497c134ee648ce7399e50d30ff397`
+until the post-merge integration SHA is verified and a consolidated
+synchronization/correction prompt is issued.

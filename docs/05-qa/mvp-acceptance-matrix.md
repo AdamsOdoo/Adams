@@ -55,30 +55,36 @@
 > `mvp/program-integration` (merge commit
 > `3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`). DEC-036 (the complete Layer
 > 2 D1–D38 decision set) is **ACCEPTED — CONTROL-ROOM GATE A**. **Wave 3
-> Gate B correction candidate produced the same day** (draft PR
-> [#179](https://github.com/AdamsOdoo/Adams/pull/179)); **Revision 1 was
-> returned REVISE, NOT REJECTED by the control room** (PR #179 comment
-> `5015619162`) — the same-job, two-sequential-mutation-attempt design
-> was rejected in favor of three standalone job types. **Revision 2**
-> applied every binding correction from that comment and was itself
-> **returned REVISE a second time** (PR #179 comment `5015830229`) —
-> Revision 2's same-job CAS-redispatch design still let one mutation job
-> accumulate more than one attempt. **Revision 3** corrects the job model
-> so every mutation job makes at most one attempt for its entire
-> lifetime, freezes the atomic handoff contract and the
-> `blocked_manual_review` review-release path, fixes the error-class
-> vocabulary, corrects the `applied` reconciliation verdict, and corrects
-> the locked prompts' role model:
+> Gate B, draft PR [#179](https://github.com/AdamsOdoo/Adams/pull/179),
+> is now ACCEPTED (2026-07-19):** Revision 1 was returned REVISE, NOT
+> REJECTED (comment `5015619162`) — the same-job, two-sequential-mutation-
+> attempt design was rejected in favor of three standalone job types.
+> Revision 2 applied every binding correction from that comment and was
+> itself returned REVISE a second time (comment `5015830229`) — Revision
+> 2's same-job CAS-redispatch design still let one mutation job accumulate
+> more than one attempt. Revision 3 corrected the job model so every
+> mutation job makes at most one attempt for its entire lifetime, froze
+> the atomic handoff contract and the `blocked_manual_review`
+> review-release path, fixed the error-class vocabulary, corrected the
+> `applied` reconciliation verdict, and corrected the locked prompts' role
+> model. Revision 3 was **ACCEPTED IN SUBSTANCE** by comment `5016117207`,
+> conditioned on one further docs-only merge-closure normalization commit
+> (applied, DEC-037 §1C) and merge into `mvp/program-integration`:
 > [`DEC-037`](../04-decisions/DEC-037-wave-3-inventory-gate-b.md) closes
 > every remaining Task 013/013B contradiction and completes the corrected
 > `inventorySetQuantities`/`inventoryActivate` Layer 2 mutation-domain
-> matrix and job/mutation-consequence contract — **not yet
-> control-room-accepted; Claude did not accept its own package, in any
-> revision.** Stage 0 (Layer 2 core substrate) has a Sol implementation
-> branch (`sol/wave-3-stage-0-layer2`) with an open draft **PR #178**
-> (head `644853a68b3497c134ee648ce7399e50d30ff397`) — **not merged, not
-> runtime-proven** — rows 10/11 below reflect this factual state, not an
-> inference of progress.
+> matrix and job/mutation-consequence contract. **Claude did not accept
+> its own package, in any revision, and did not self-accept the
+> merge-closure normalization** — acceptance authority is comment
+> `5016117207`, product owner + ChatGPT control room. Stage 0 (Layer 2
+> core substrate) has a Sol implementation branch
+> (`sol/wave-3-stage-0-layer2`) with an open draft **PR #178** (head
+> `644853a68b3497c134ee648ce7399e50d30ff397`) — **not merged, not
+> runtime-proven**, and remains **held** pending the post-Gate-B-merge
+> integration SHA and a consolidated synchronization/correction prompt —
+> rows 10/11 below reflect this factual state, not an inference of
+> progress. Task 013/013B implementation remains **not authorized** until
+> Stage 0 is separately merged and runtime-proven.
 >
 
 | # | MVP item | Module(s) | Requirement (accepted source) | Test type | Expected runtime/UAT evidence | Current status | Blocking issue | Release criterion |
@@ -92,8 +98,8 @@
 | 7 | First-sync product matching and duplicate prevention | `shopify_connector_product` | AR-045/046-adjacent, Task 010B | Unit (`test_product_duplicate_prevention.py`, `test_product_import_matching.py`) | Odoo.sh green (obtained) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
 | 8 | Customer import and matching | `shopify_connector_sale` | Task 011/011B; AR-045 | Unit (5 files, incl. `test_customer_matching_scalability.py`) | Odoo.sh green + 100k-partner benchmark (obtained: build `34863138`) | Already complete at checkpoint | None | Carried into Wave 6 dev-store UAT re-confirmation only |
 | 9 | Shopify order import into Odoo sales orders | `shopify_connector_sale` order capability | Task 012 packet (RE-ACCEPTED 2026-07-17); DEC-033 reconciliation (accepted); DEC-034 binding-extension contract (accepted); DEC-035 open-question dispositions (accepted); Area-6 order-scan slice (accepted) | 86 authored order tests across the locked 11 files, including two genuine independent-connection concurrency tests; static/source guards green | Odoo.sh clean/full install, isolated baseline-upgrade, isolated uninstall/reinstall lifecycle, focused, full-suite, concurrency, residue and security evidence **not yet obtained at the corrected head** | Corrected-head runtime campaign 3 (SHA `2525447`, build `35095228`) EXECUTED — **CORRECTION REQUIRED**: clean/full fresh install is not green (`0 failed, 3 errors of 728`, all `TestOrderTotalsGuard` `account_tax.tax_group_id`/`country_id` NOT-NULL); fixture correction `6f32e4c` closed finding #5 in `test_order_tax_resolution.py` only, leaving the same defect unpatched in `test_order_totals_guard.py`; concurrency 3/3, residue/security clean; two earlier failed campaigns (`2e1b1eb`/`35080469`, `d1af6d0`/`35088811`) preserved | PR #176 remains draft/unmerged and is not release-ready; the clean/full matrix is not green (finding #5 open in `test_order_totals_guard.py`); under revised ruling `5010851668` the isolated-upgrade (B) and isolated-lifecycle (C) databases are deferred release-readiness evidence (not Wave 2 blockers, not ENVIRONMENT BLOCKED); read-only dev-store proof honestly deferred to Wave 6 | Packet re-accepted; `remote_read_replay_safe` registered; SRR-03 closed; order binding declares and tests complete stored-field classification/protection per DEC-034/SEC-1; corrected-head Odoo.sh matrix green; dev-store UAT obtained or honestly deferred to Wave 6 |
-| 10 | Basic inventory synchronization | New `shopify_connector_inventory` | Task 013/013B packet (Gate B correction candidate, draft PR #179, DEC-037); DEC-010 (accepted architecture); DEC-036 (Layer 2, ACCEPTED — CONTROL-ROOM GATE A, merged) | New unit + concurrency suite | Odoo.sh green; genuine multi-worker concurrency proof; dev-store mutation-validation plan (21 scenarios, `wave-3-dev-store-mutation-validation-plan.md`) executed | Remaining implementation | Gate B candidate not yet control-room-accepted; Stage 0 (Layer 2 core substrate) not yet merged/runtime-proven — Task 013 implementation requires both | Gate B accepted and merged; Layer 2 (Stage 0) merged and runtime-proven; packet implemented, Odoo.sh-green, dev-store UAT evidence obtained per the validation plan |
-| 11 | Required bidirectional inventory behavior per accepted product rules | New `shopify_connector_inventory` | DEC-010, DEC-015 (MBQ-32/33/34 partial); DEC-037 (Gate B — one-pair-per-request binding, review-case-first drift, reconnect store-identity check) | New unit suite | Same as #10 | Remaining implementation | Gate B candidate not yet accepted (closes the ongoing apply-mode MBQs' remaining ambiguity — batching explicitly excluded, drift handling explicitly review-case-first) | Bidirectional behavior matches the accepted rule set (as corrected by DEC-037) with regression tests |
+| 10 | Basic inventory synchronization | New `shopify_connector_inventory` | Task 013/013B packet (Gate B ACCEPTED, PR #179, DEC-037); DEC-010 (accepted architecture); DEC-036 (Layer 2, ACCEPTED — CONTROL-ROOM GATE A, merged) | New unit + concurrency suite | Odoo.sh green; genuine multi-worker concurrency proof; dev-store mutation-validation plan (21 scenarios, `wave-3-dev-store-mutation-validation-plan.md`) executed | Remaining implementation | Gate B ACCEPTED (comment `5016117207`) and merged; Stage 0 (Layer 2 core substrate) not yet merged/runtime-proven — Task 013 implementation additionally requires Stage 0 | Layer 2 (Stage 0) merged and runtime-proven, providing DEC-037 §13A's correction prerequisites; packet implemented, Odoo.sh-green, dev-store UAT evidence obtained per the validation plan |
+| 11 | Required bidirectional inventory behavior per accepted product rules | New `shopify_connector_inventory` | DEC-010, DEC-015 (MBQ-32/33/34 partial); DEC-037 (Gate B — one-pair-per-request binding, review-case-first drift, reconnect store-identity check) | New unit suite | Same as #10 | Remaining implementation | Gate B ACCEPTED (closes the ongoing apply-mode MBQs' remaining ambiguity — batching explicitly excluded, drift handling explicitly review-case-first); Stage 0 still required before implementation | Bidirectional behavior matches the accepted rule set (as corrected by DEC-037) with regression tests |
 | 12 | Fulfillment and tracking updates from Odoo to Shopify | New `shopify_connector_fulfillment` | Task 014; DEC-011; D-014-2 | New unit + concurrency suite | Odoo.sh green; dev-store FulfillmentOrder UAT | Remaining implementation | Layer 2 first; readiness scope still needs code correction | FulfillmentOrder-only packet implemented; scope uses `read_merchant_managed_fulfillment_orders` and conditional `write_merchant_managed_fulfillment_orders`; runtime/UAT green |
 | 13 | Scheduled synchronization | `shopify_connector_core` base crons (merged); `shopify_connector_sale` Area-6 order-scan slice (draft PR #176) | DEC-005, DEC-025; accepted Area-6 order-scan packet | Existing core dispatch tests plus authored order scan/watermark/duplicate/concurrency suites | Base cron evidence inherited; new order-scan cron and gates are static-green; first exact-head Odoo.sh campaign (build `35080469`) executed and failed on the documented eleven findings (preserved); corrected-head rerun not yet obtained | Order backend and runtime-correction batch implemented and complete; first runtime campaign failed and is preserved; corrected-head runtime pending; later domains not started | `sale_domain_enabled` and per-store `order_scheduled_sync_enabled` gate a 15-minute enqueue-only cron; no inline import and no Wave 3+ scan; not complete or release-ready until the corrected-head rerun passes | All domains scan/enqueue on schedule with operator-visible cadence |
 | 14 | Manual synchronization | `shopify_connector_sale` Area-6 order backend actions (draft PR #176); Wave 5 UI remains future scope | DEC-005, DEC-025; accepted Area-6 order-scan packet | Authored store/binding role-gate, collision, preview/confirm and concurrency tests; Administrator backfill preview/confirmation tests corrected under ruling `5006941549`; non-admin denial tests preserved | Static/source guards green; first exact-head Odoo.sh campaign failed on the documented eleven findings (preserved); corrected-head runtime and later operator UI UAT pending | Backend actions implemented and corrected; corrected-head runtime pending; not complete or release-ready | Operator/Admin backend enqueue paths exist for whole-store and selected-order refresh; backfill requires Administrator preview plus exact confirmation token; no UI implemented in Wave 2; Wave 5 UI remains future work | Operator triggers a sync from the UI and observes the result |
