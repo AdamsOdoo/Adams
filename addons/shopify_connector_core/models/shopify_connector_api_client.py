@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from contextlib import contextmanager
 from datetime import timedelta
@@ -154,6 +155,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         error). Raises `ShopifyClientError` on any transport or
         GraphQL-level failure.
         """
+        self._validate_graphql_operation(query, mutation_context=None)
         if not store.shop_domain or not store.api_version:
             raise UserError(
                 'A shop domain and API version are required before '
@@ -323,6 +325,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         here; the post-network revalidation lives in the store's probe. Public
         `execute()` (still the two-arg `_send(store, body)` seam) is unchanged.
         """
+        self._validate_graphql_operation(query, mutation_context=None)
         if not store.shop_domain or not store.api_version:
             raise UserError(
                 'A shop domain and API version are required before '
@@ -342,7 +345,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         return self._normalize_response(store, response)
 
     @contextmanager
-    def execute_business(self, job, store, query, variables=None):
+    def execute_business(
+        self, job, store, query, variables=None, mutation_context=None,
+    ):
         """Admit and issue one business Shopify call as a context manager (CORE-R2).
 
         The single guarded entry point for domain-handler Shopify calls
@@ -396,6 +401,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         """
         # Same configuration precondition as execute() -- fail before any
         # admission, lease, or transport (no lease, no _send).
+        self._validate_graphql_operation(query, mutation_context)
         if not store.shop_domain or not store.api_version:
             raise UserError(
                 'A shop domain and API version are required before '
@@ -409,7 +415,12 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         try:
             body = {'query': query, 'variables': variables or {}}
             try:
-                response = self._send(store, body, token)
+                if mutation_context is None:
+                    response = self._send(store, body, token)
+                else:
+                    response = self._send(
+                        store, body, token, mutation_context=mutation_context,
+                    )
             except ShopifyClientError:
                 raise
             except requests.exceptions.RequestException as exc:
@@ -572,7 +583,70 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         return '%s:%s' % (self.env.cr.dbname, os.getpid())
 
     @api.model
-    def _send(self, store, body, token=None):
+    def _graphql_contains_mutation(self, document):
+        """Conservative operation detector, not a string-prefix check."""
+        if not isinstance(document, str):
+            return False
+        # Remove GraphQL comments and string literals so a word inside an
+        # argument/comment cannot create a false operation classification.
+        cleaned = re.sub(r'#[^\\r\\n]*', ' ', document)
+        cleaned = re.sub(r'""".*?"""', ' ', cleaned, flags=re.S)
+        cleaned = re.sub(r'"(?:\\\\.|[^"\\\\])*"', ' ', cleaned)
+        return bool(re.search(r'(?<![A-Za-z0-9_])mutation(?![A-Za-z0-9_])', cleaned))
+
+    @api.model
+    def _validate_graphql_operation(self, document, mutation_context=None):
+        if not self._graphql_contains_mutation(document):
+            return True
+        context = dict(mutation_context or {})
+        required = {
+            'job_id', 'attempt_id', 'attempt_token', 'mutation_domain',
+        }
+        if required - set(context):
+            raise UserError(
+                'A GraphQL mutation requires a valid Layer 2 attempt context.'
+            )
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT j.current_attempt_token, a.attempt_token, "
+                "a.mutation_domain, a.transport_attempted "
+                "FROM shopify_connector_job j "
+                "JOIN shopify_connector_mutation_attempt a "
+                "ON a.job_id = j.id "
+                "WHERE j.id = %s AND a.id = %s",
+                (context['job_id'], context['attempt_id']),
+            )
+            row = side_cr.fetchone()
+            if (
+                not row
+                or row[0] != context['attempt_token']
+                or row[1] != context['attempt_token']
+                or row[2] != context['mutation_domain']
+                or not row[3]
+            ):
+                raise UserError(
+                    'The Layer 2 mutation attempt context is stale or invalid.'
+                )
+            side_env = api.Environment(
+                side_cr, self.env.uid, self.env.context,
+            )
+            if context['mutation_domain'] not in side_env[
+                'shopify.connector.job.dispatch'
+            ]._get_reconciliation_strategies():
+                raise UserError(
+                    'The mutation domain has no reconciliation strategy.'
+                )
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return True
+
+    @api.model
+    def _send(self, store, body, token=None, mutation_context=None):
         """The only method containing an actual HTTP call.
 
         Sends an HTTPS POST to the store's versioned GraphQL endpoint
@@ -590,6 +664,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         once, preserving the pre-existing transport-seam signature that tests
         patch as `_send(store, body)`.
         """
+        self._validate_graphql_operation(
+            body.get('query', ''), mutation_context,
+        )
         if token is None:
             token = self.env[
                 'shopify.connector.store.credential'
