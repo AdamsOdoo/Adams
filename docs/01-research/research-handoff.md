@@ -1,3 +1,66 @@
+### Task 013 correction cycle — control-room REVISE applied to the same draft PR — compact handoff (2026-07-20)
+
+- **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) →
+  `mvp/program-integration`, base unchanged at
+  `8f5f421e2110c2e805460ea75fb519e48013e0f7`. This is a correction cycle
+  on the same draft PR, not a new branch/PR.
+- **Authority:** PR #182 comment
+  [`5025765389`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5025765389)
+  (binding REVISE ruling against the previously-frozen head
+  `2c6c551391cc00602ca74ebebb7b20c39ab58a74`, disposition 1 explicitly
+  re-affirming Claude Code as the accepted implementation-worker
+  exception for **Task 013 / PR #182 only**) and its addendum
+  [`5025803697`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5025803697).
+- **Corrected:** the Shopify 2026-07 read/mutation request shapes
+  (nested `inventoryItem(id:){inventoryLevel(locationId:)}` read,
+  `@idempotent(key:)` on both mutations, `changeFromQuantity` not
+  `compareQuantity`, a database-UUID reference URI); direct-success
+  evidence for both mutations now requires more than an empty
+  `userErrors` list; freshness/ABA evidence is now parsed as real
+  datetimes; ordinary job admission now routes through the core's
+  sanctioned `shopify.connector.job.enqueue` service; coalescing now
+  swallows only the exact operation-scope collision; `operation_scope_key`
+  now equals the exact frozen literal for the three pair-execution job
+  types; `cas_retry_ordinal` is now protected and range-validated; the
+  scheduled scan now enqueues a typed per-store job instead of scanning
+  inline; the drift matrix no longer blocks a pair Shopify already
+  matches; a fresh pre-C2 missing level now fails closed instead of
+  becoming quantity zero; new sanctioned backend creation/admission
+  services exist for both models and the two previously-dead job types;
+  a new SEC-1 company-consistency constraint exists on the inventory-
+  level binding; a new fail-closed integral-quantity gate exists. **One
+  further defect, not named by either review comment, was found and
+  fixed while building the `operation_scope_key` tests:**
+  `_handle_inventory_push_sync` created its child mutation job before
+  terminalizing itself, which would have collided the still-`running`
+  orchestration job's own `operation_scope_key` against the child's
+  insert — every push_sync→mutation handoff would have failed at
+  runtime. Fixed by reordering to terminalize-then-create.
+- **Governing-document amendments (control-room ratified, exactly two,
+  no other Gate B decision reopened):** the shared read-only
+  `inventory_mutation_reconcile` job type (job-type count six → seven)
+  and the fail-closed integral-quantity rule, applied to `DEC-037` §7,
+  the Task 013 packet, and the locked prompt.
+- **Status: CORRECTED IMPLEMENTATION CANDIDATE FROZEN — NOT
+  RUNTIME-PROVEN.** Same external-evidence gaps as before (no Odoo/
+  PostgreSQL runtime, no dev-store credentials, no child-process-
+  capable concurrency runner in this workspace) — Odoo.sh, dev-store,
+  and external-concurrency-proof evidence remain pending, none claimed
+  as passed. PR #182 remains **draft, unmerged, not marked ready**; no
+  self-acceptance, no self-merge, no protected reference changed, zero
+  Task 013B code, no Odoo.sh run, no live Shopify mutation.
+- **Next-session prompt guidance:** control-room re-review of this
+  corrected candidate, followed by dedicated Odoo.sh, dev-store, and
+  external-concurrency-runner sessions before any final merge
+  authorization. Do not begin Task 013B before Task 013 itself is
+  merged and runtime-proven.
+
+Full detail: `docs/05-qa/task-013-inventory-sync-validation-results.md`,
+`docs/05-qa/architecture-review-log.md` AR-065.
+
+---
+
 ### Task 013 inventory synchronization — implementation candidate frozen — compact handoff (2026-07-20)
 
 - **Branch / PR:** `claude/wave-3-task-013-2g0ul0` (harness-provisioned
