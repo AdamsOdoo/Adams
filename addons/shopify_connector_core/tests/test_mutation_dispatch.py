@@ -244,7 +244,18 @@ class TestMutationDispatch(TransactionCase):
             and call.func.attr == 'commit',
         )
         self.assertEqual(matches, [1])
-        self.assertEqual(fn.body[matches[0]].lineno, 3)
+        direct_statement = fn.body[matches[0]]
+        self.assertIsInstance(direct_statement, ast.Expr)
+        self.assertEqual(
+            ast.unparse(direct_statement.value), 'self.env.cr.commit()'
+        )
+        all_commit_calls = [
+            node for node in ast.walk(fn)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == 'commit'
+        ]
+        self.assertEqual(len(all_commit_calls), 4)
 
     def test_reconciliation_pending_gate_blocks_claim(self):
         job = self._job(

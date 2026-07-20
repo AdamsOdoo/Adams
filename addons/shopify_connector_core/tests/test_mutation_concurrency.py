@@ -4,6 +4,7 @@ import queue
 import threading
 import textwrap
 import uuid
+from pathlib import Path
 from unittest.mock import patch
 
 import psycopg2
@@ -13,7 +14,7 @@ from odoo import SUPERUSER_ID, api, fields
 from odoo.exceptions import UserError, ValidationError
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
-from odoo.tests.common import TransactionCase, release_test_lock
+from odoo.tests.common import TransactionCase
 
 from ..models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
@@ -25,8 +26,8 @@ from ..models.shopify_connector_mutation_attempt import (
 class TestMutationConcurrency(TransactionCase):
     """Genuine PostgreSQL independent-connection proof, never simulation."""
 
-    def _run_workers(self, worker_functions, timeout=20):
-        """Run independent-cursor workers under the Odoo 19 test lock seam."""
+    def _run_raw_sql_workers(self, worker_functions, timeout=20):
+        """Run the SQL-only structural uniqueness proof."""
         channels = {
             name: queue.Queue(maxsize=1) for name, _worker in worker_functions
         }
@@ -51,22 +52,21 @@ class TestMutationConcurrency(TransactionCase):
 
         threads = [
             threading.Thread(
-                name='layer2-%s' % name,
+                name='layer2-sql-%s' % name,
                 target=invoke,
                 args=(name, worker),
             )
             for name, worker in worker_functions
         ]
-        with release_test_lock():
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join(timeout=timeout)
-            alive = [thread.name for thread in threads if thread.is_alive()]
-            self.assertFalse(
-                alive,
-                'worker threads exceeded %ss: %s' % (timeout, alive),
-            )
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=timeout)
+        alive = [thread.name for thread in threads if thread.is_alive()]
+        self.assertFalse(
+            alive,
+            'SQL worker threads exceeded %ss: %s' % (timeout, alive),
+        )
 
         records = []
         for name, _worker in worker_functions:
@@ -80,17 +80,53 @@ class TestMutationConcurrency(TransactionCase):
             if record['outcome'] == 'unexpected_exception'
         ]
         self.assertFalse(unexpected, 'worker failure(s): %r' % unexpected)
-        self._assert_no_worker_threads()
         return records
 
-    def _assert_no_worker_threads(self):
-        alive = [
-            thread.name for thread in threading.enumerate()
-            if thread.name.startswith('layer2-') and thread.is_alive()
-        ]
-        self.assertFalse(alive, 'surviving Layer 2 workers: %s' % alive)
+    def test_external_concurrency_harness_contract(self):
+        harness_path = Path(__file__).with_name(
+            'runtime_layer2_concurrency_harness.py'
+        )
+        source = harness_path.read_text(encoding='utf-8')
+        tree = ast.parse(source, filename=str(harness_path))
+        methods = {
+            node.name for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+        }
+        self.assertTrue({
+            'run_c1_ownership_race',
+            'run_concurrent_inconclusive_increment',
+            'run_concurrent_stale_sweep',
+        } <= methods)
+        self.assertIn("get_context('spawn')", source)
+        self.assertNotIn('fork', source.lower())
+        child = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_child_entry'
+        )
+        child_source = ast.unparse(child)
+        new_environment = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_new_environment'
+        )
+        runtime = next(
+            node for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_runtime'
+        )
+        self.assertIn('_new_environment(settings)', child_source)
+        self.assertIn('_runtime(settings)', ast.unparse(new_environment))
+        self.assertIn("runtime['api'].Environment", ast.unparse(
+            new_environment
+        ))
+        self.assertIn('Registry(settings[\'database\'])', ast.unparse(runtime))
+        package_init = Path(__file__).with_name('__init__.py').read_text(
+            encoding='utf-8'
+        )
+        self.assertNotIn('runtime_layer2_concurrency_harness', package_init)
 
-    def test_thread_start_and_join_are_centralized(self):
+    def test_standard_worker_threads_are_sql_only(self):
         source = textwrap.dedent(inspect.getsource(type(self)))
         tree = ast.parse(source)
         parents = {}
@@ -108,9 +144,29 @@ class TestMutationConcurrency(TransactionCase):
             owner = parents.get(node)
             while owner and not isinstance(owner, ast.FunctionDef):
                 owner = parents.get(owner)
-            if not owner or owner.name != '_run_workers':
+            if not owner or owner.name != '_run_raw_sql_workers':
                 violations.append((node.func.attr, node.lineno))
         self.assertFalse(violations, violations)
+        runner = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_run_raw_sql_workers'
+        )
+        uniqueness = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == (
+                'test_concurrent_second_attempt_with_different_tokens_'
+                'is_rejected'
+            )
+        )
+        worker = next(
+            node for node in uniqueness.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == 'insert_attempt'
+        )
+        self.assertNotIn('api.Environment', ast.unparse(runner))
+        self.assertNotIn('api.Environment', ast.unparse(worker))
 
     def _durable_fixture(self):
         domain = 'layer2-concurrency-%s.myshopify.com' % uuid.uuid4().hex
@@ -217,51 +273,6 @@ class TestMutationConcurrency(TransactionCase):
                     store_id, job_id, attempt_ids, child_job_ids, residue,
                 ),
             )
-
-    def test_c1_token_ownership_race_has_one_winner(self):
-        _store_id, job_id = self._durable_fixture()
-        start = threading.Barrier(2)
-        loser_reported = threading.Event()
-
-        def contender():
-            cr = db_connect(self.env.cr.dbname).cursor()
-            try:
-                env = api.Environment(cr, SUPERUSER_ID, {})
-                start.wait(timeout=10)
-                locked = env['shopify.connector.job'].browse(
-                    job_id
-                ).try_lock_for_update()
-                if locked:
-                    if not loser_reported.wait(timeout=10):
-                        raise AssertionError('loser did not report in time')
-                    return {'outcome': 'winner'}
-                loser_reported.set()
-                return {'outcome': 'loser'}
-            finally:
-                cr.rollback()
-                cr.close()
-
-        records = self._run_workers([
-            ('c1-contender-1', contender),
-            ('c1-contender-2', contender),
-        ])
-        self.assertEqual(
-            sorted(record['outcome'] for record in records),
-            ['loser', 'winner'],
-        )
-        with db_connect(self.env.cr.dbname).cursor() as cr:
-            cr.execute(
-                'SELECT state, current_attempt_token, owner_worker_ref, '
-                'running_since FROM shopify_connector_job WHERE id = %s',
-                (job_id,),
-            )
-            self.assertEqual(cr.fetchone(), ('queued', None, None, None))
-            cr.execute(
-                'SELECT count(*) FROM shopify_connector_mutation_attempt '
-                'WHERE job_id = %s',
-                (job_id,),
-            )
-            self.assertEqual(cr.fetchone()[0], 0)
 
     def test_repeatable_read_requires_fresh_transaction_for_c2_visibility(self):
         store_id, job_id = self._durable_fixture()
@@ -498,7 +509,7 @@ class TestMutationConcurrency(TransactionCase):
                 cr.rollback()
                 cr.close()
 
-        records = self._run_workers([
+        records = self._run_raw_sql_workers([
             ('unique-insert-1', insert_attempt),
             ('unique-insert-2', insert_attempt),
         ])
@@ -661,78 +672,6 @@ class TestMutationConcurrency(TransactionCase):
             )
             self.assertEqual(cr.fetchone()[0], 'succeeded')
 
-    def test_concurrent_stale_sweeps_create_one_reconciliation_job(self):
-        store_id, job_id, attempt_id, _token = self._durable_owned_attempt()
-        with db_connect(self.env.cr.dbname).cursor() as cr:
-            cr.execute(
-                'UPDATE shopify_connector_job '
-                "SET running_since = NOW() - INTERVAL '1 hour' "
-                'WHERE id = %s',
-                (job_id,),
-            )
-            cr.commit()
-
-        start = threading.Barrier(2)
-
-        def sweep():
-            cr = db_connect(self.env.cr.dbname).cursor()
-            try:
-                env = api.Environment(cr, SUPERUSER_ID, {})
-                start.wait(timeout=10)
-                value = env[
-                    'shopify.connector.stale.owner.sweep'
-                ].run_sweep()
-                cr.commit()
-                return {'outcome': 'sweep', 'value': value}
-            finally:
-                cr.rollback()
-                cr.close()
-
-        DispatchClass = type(self.env['shopify.connector.job.dispatch'])
-        with patch.object(
-            DispatchClass, '_transport_mutation_dispatch_selftest',
-            side_effect=AssertionError('mutation transport must not replay'),
-        ) as transport:
-            records = self._run_workers([
-                ('stale-sweep-1', sweep),
-                ('stale-sweep-2', sweep),
-            ])
-            transport.assert_not_called()
-        self.assertEqual(
-            sorted(record['value'] for record in records), [0, 1], records,
-        )
-        with db_connect(self.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            attempt = env[
-                'shopify.connector.mutation.attempt'
-            ].browse(attempt_id)
-            original = env['shopify.connector.job'].browse(job_id)
-            reconciliations = env['shopify.connector.job'].search([
-                ('mutation_attempt_id', '=', attempt_id),
-            ])
-            self.assertEqual(len(reconciliations), 1)
-            self.assertEqual(attempt.observed_outcome, 'uncertain')
-            self.assertFalse(attempt.resolved_at)
-            self.assertEqual(len(attempt.remote_evidence_refs['recovery']), 1)
-            self.assertEqual(
-                attempt.remote_evidence_refs['recovery'][0]['source'],
-                'stale_owner_sweep',
-            )
-            self.assertFalse(original.current_attempt_token)
-            self.assertFalse(original.owner_worker_ref)
-            self.assertFalse(original.running_since)
-            reconciliations.sudo().write({
-                'state': 'running',
-                'started_at': fields.Datetime.now(),
-            })
-            env[
-                'shopify.connector.job.dispatch'
-            ]._handle_mutation_dispatch_selftest_reconcile(reconciliations)
-            self.assertEqual(attempt.effective_disposition(), 'applied')
-            self.assertEqual(original.state, 'succeeded')
-            self.assertEqual(reconciliations.state, 'succeeded')
-            cr.commit()
-
     def test_pre_c2_recovery_that_discovers_c2_marks_uncertain(self):
         _store_id, job_id, attempt_id, token = (
             self._durable_owned_attempt()
@@ -761,37 +700,148 @@ class TestMutationConcurrency(TransactionCase):
                 ('mutation_attempt_id', '=', attempt_id),
             ]), 1)
 
-    def test_invalid_recovery_state_blocks_without_rewriting_attempt(self):
-        self._assert_no_worker_threads()
+    def _assert_invalid_recovery_blocks_without_rewrite(self, outcome):
         _store_id, job_id, attempt_id, token = (
-            self._durable_owned_attempt('succeeded')
+            self._durable_owned_attempt(outcome)
         )
+        attempt_fields = [
+            'attempt_token', 'mutation_domain', 'observed_outcome',
+            'resolved_at', 'remote_evidence_refs',
+        ]
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            before_evidence = dict(env[
+            before = env[
                 'shopify.connector.mutation.attempt'
-            ].browse(attempt_id).remote_evidence_refs)
+            ].browse(attempt_id).read(attempt_fields)[0]
             cr.rollback()
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            env[
+            job = env['shopify.connector.job'].browse(job_id)
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            reconciliation = env[
                 'shopify.connector.job.dispatch'
-            ]._recover_layer2_owner(job_id, token)
+            ]._recover_committed_attempt_to_reconciliation(
+                job,
+                attempt,
+                'post_c2_owner_recovery',
+                'dispatcher_recovery',
+            )
+            self.assertFalse(reconciliation)
+            cr.commit()
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             attempt = env[
                 'shopify.connector.mutation.attempt'
             ].browse(attempt_id)
             original = env['shopify.connector.job'].browse(job_id)
-            self.assertEqual(attempt.observed_outcome, 'succeeded')
+            self.assertEqual(attempt.observed_outcome, outcome)
             self.assertTrue(attempt.resolved_at)
             self.assertEqual(original.state, 'blocked_manual_review')
             self.assertEqual(
-                original.manual_review_subreason, 'duplicate_risk',
+                original.error_class, 'data_shape_schema_mismatch',
             )
             self.assertEqual(
-                attempt.remote_evidence_refs, before_evidence,
+                original.manual_review_subreason, 'duplicate_risk',
             )
+            self.assertFalse(original.current_attempt_token)
+            self.assertFalse(original.owner_worker_ref)
+            self.assertEqual(attempt.read(attempt_fields)[0], before)
+            self.assertFalse(env['shopify.connector.job'].search_count([
+                ('mutation_attempt_id', '=', attempt_id),
+            ]))
+            logs = env['shopify.connector.job.log'].search([
+                ('job_id', '=', job_id),
+                ('to_state', '=', 'blocked_manual_review'),
+            ])
+            self.assertEqual(len(logs), 1)
+            self.assertEqual(
+                logs.message,
+                'Committed attempt had an invalid recovery state.',
+            )
+            cr.rollback()
+
+    def test_succeeded_recovery_blocks_without_rewriting_attempt(self):
+        self._assert_invalid_recovery_blocks_without_rewrite('succeeded')
+
+    def test_failed_clean_recovery_blocks_without_rewriting_attempt(self):
+        self._assert_invalid_recovery_blocks_without_rewrite('failed_clean')
+
+    def test_valid_recovery_still_admits_one_reconciliation(self):
+        for outcome in ('pending', 'uncertain'):
+            _store_id, job_id, attempt_id, _token = (
+                self._durable_owned_attempt(outcome)
+            )
+            with db_connect(self.env.cr.dbname).cursor() as cr:
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                job = env['shopify.connector.job'].browse(job_id)
+                attempt = env[
+                    'shopify.connector.mutation.attempt'
+                ].browse(attempt_id)
+                reconciliation = env[
+                    'shopify.connector.job.dispatch'
+                ]._recover_committed_attempt_to_reconciliation(
+                    job,
+                    attempt,
+                    'post_c2_owner_recovery',
+                    'dispatcher_recovery',
+                )
+                self.assertEqual(len(reconciliation), 1)
+                self.assertEqual(
+                    reconciliation.mutation_attempt_id, attempt,
+                )
+                self.assertEqual(attempt.observed_outcome, 'uncertain')
+                self.assertFalse(attempt.resolved_at)
+                self.assertTrue(attempt.remote_evidence_refs['recovery'])
+                self.assertFalse(job.current_attempt_token)
+                self.assertFalse(job.owner_worker_ref)
+                self.assertFalse(job.running_since)
+                self.assertEqual(env['shopify.connector.job'].search_count([
+                    ('mutation_attempt_id', '=', attempt_id),
+                ]), 1)
+                cr.commit()
+
+    def test_recovery_user_error_preserves_single_writer_refusal(self):
+        _store_id, job_id, attempt_id, token = self._durable_owned_attempt()
+        attempt_fields = [
+            'attempt_token', 'mutation_domain', 'observed_outcome',
+            'resolved_at', 'remote_evidence_refs',
+        ]
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            before = attempt.read(attempt_fields)[0]
+            with patch.object(
+                type(attempt),
+                '_record_recovery_uncertain',
+                side_effect=UserError(
+                    'The mutation attempt is owned by another worker.'
+                ),
+            ) as recovery:
+                reconciliation = env[
+                    'shopify.connector.job.dispatch'
+                ]._recover_committed_attempt_to_reconciliation(
+                    job,
+                    attempt,
+                    'post_c2_owner_recovery',
+                    'dispatcher_recovery',
+                )
+            recovery.assert_called_once()
+            self.assertFalse(reconciliation)
+            cr.commit()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            attempt = env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id)
+            original = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(original.state, 'running')
+            self.assertEqual(original.current_attempt_token, token)
+            self.assertEqual(attempt.read(attempt_fields)[0], before)
             self.assertFalse(env['shopify.connector.job'].search_count([
                 ('mutation_attempt_id', '=', attempt_id),
             ]))
@@ -829,106 +879,6 @@ class TestMutationConcurrency(TransactionCase):
             observer.rollback()
             worker.close()
             observer.close()
-
-    def test_concurrent_reconciliation_increments_respect_cap(self):
-        _store_id, job_id, attempt_id, _token = (
-            self._durable_owned_attempt('uncertain')
-        )
-        start = threading.Barrier(2)
-
-        def increment():
-            start.wait(timeout=10)
-            retry_reasons = []
-            for _retry in range(5):
-                cr = db_connect(self.env.cr.dbname).cursor()
-                try:
-                    env = api.Environment(cr, SUPERUSER_ID, {})
-                    count = env[
-                        'shopify.connector.mutation.attempt'
-                    ].browse(
-                        attempt_id
-                    )._record_inconclusive_reconciliation(False)
-                    cr.commit()
-                    return {
-                        'outcome': 'counted',
-                        'value': count,
-                        'retry_reasons': tuple(retry_reasons),
-                    }
-                except UserError as exc:
-                    cr.rollback()
-                    if str(exc) != (
-                        'The mutation attempt is owned by another worker.'
-                    ):
-                        raise
-                    retry_reasons.append('production_lock_not_acquired')
-                except psycopg2.errors.SerializationFailure:
-                    cr.rollback()
-                    retry_reasons.append('postgres_serialization_failure')
-                finally:
-                    cr.rollback()
-                    cr.close()
-                threading.Event().wait(0.05)
-            raise AssertionError(
-                'increment retry budget exhausted: %s' % retry_reasons
-            )
-
-        records = self._run_workers([
-            ('inconclusive-increment-1', increment),
-            ('inconclusive-increment-2', increment),
-        ])
-        self.assertEqual(
-            sorted(record['value'] for record in records), [1, 2], records,
-        )
-        with db_connect(self.env.cr.dbname).cursor() as cr:
-            env = api.Environment(cr, SUPERUSER_ID, {})
-            attempt = env[
-                'shopify.connector.mutation.attempt'
-            ].browse(attempt_id)
-            original = env['shopify.connector.job'].browse(job_id)
-            reconciliation = env['shopify.connector.job'].sudo().create({
-                'store_id': original.store_id.id,
-                'job_source': 'reconciliation',
-                'job_type': 'mutation_dispatch_selftest_reconcile',
-                'state': 'running',
-                'payload_hash': 'cap:%s' % attempt.attempt_token,
-                'mutation_attempt_id': attempt.id,
-                'expected_connection_generation':
-                    attempt.expected_connection_generation,
-            })
-            Dispatch = env['shopify.connector.job.dispatch']
-            strategy = dict(Dispatch._get_reconciliation_strategies()[
-                attempt.mutation_domain
-            ])
-            strategy['reconcile'] = lambda _attempt: {
-                'verdict': 'inconclusive',
-                'observed_store_identity':
-                    attempt.expected_store_identity,
-                'action': 'reconcile',
-                'error_class': 'shopify_temporary_server_network',
-                'manual_review_subreason': False,
-                'message': 'Concurrent read remains inconclusive.',
-                'evidence': {'read': 'concurrent-cap'},
-            }
-            with patch.object(
-                type(Dispatch), '_get_reconciliation_strategies',
-                return_value={attempt.mutation_domain: strategy},
-            ):
-                Dispatch._handle_mutation_dispatch_selftest_reconcile(
-                    reconciliation
-                )
-            self.assertEqual(
-                attempt.inconclusive_reconciliation_count, 3,
-            )
-            self.assertEqual(original.state, 'blocked_manual_review')
-            self.assertEqual(
-                original.manual_review_subreason, 'duplicate_risk',
-            )
-            self.assertEqual(reconciliation.state, 'succeeded')
-            self.assertEqual(env['shopify.connector.job.log'].search_count([
-                ('job_id', '=', original.id),
-                ('to_state', '=', 'blocked_manual_review'),
-            ]), 1)
-            cr.commit()
 
     def test_serialization_failure_recovers_to_reconciliation(self):
         _store_id, job_id, attempt_id, token = (
