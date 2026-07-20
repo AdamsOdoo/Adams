@@ -3,6 +3,7 @@ import os
 import re
 from pathlib import Path
 
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import TransactionCase
 
 from ..models import shopify_connector_job_dispatch
@@ -13,6 +14,15 @@ RAW_HTTP_METHODS = {'get', 'post', 'put', 'patch', 'delete', 'request'}
 GRAPHQL_MUTATION_LITERAL = re.compile(
     r'(?:^|[\r\n])\s*mutation\s+[A-Za-z_][A-Za-z0-9_]*\s*[({]'
 )
+EXCEPTION_SUPERCLASSES = {
+    'ValidationError': frozenset({'UserError', 'Exception', 'BaseException'}),
+    'AccessError': frozenset({'UserError', 'Exception', 'BaseException'}),
+    'UserError': frozenset({'Exception', 'BaseException'}),
+    'Exception': frozenset({'BaseException'}),
+}
+BASE_EXCEPTION_ONLY = frozenset({
+    'BaseException', 'GeneratorExit', 'KeyboardInterrupt', 'SystemExit',
+})
 
 
 def _parent_map(tree):
@@ -136,6 +146,45 @@ def _attempt_write_violations(source, relative):
                 relative, node.lineno, owner_name,
                 node.func.attr, target_source,
             ))
+    return violations
+
+
+def _exception_handler_names(handler_type):
+    if handler_type is None:
+        return ('BaseException',)
+    if isinstance(handler_type, ast.Tuple):
+        return tuple(
+            name
+            for item in handler_type.elts
+            for name in _exception_handler_names(item)
+        )
+    return (ast.unparse(handler_type),)
+
+
+def _exception_handler_shadows(earlier, later):
+    if earlier == later or earlier == 'BaseException':
+        return True
+    if earlier == 'Exception' and later not in BASE_EXCEPTION_ONLY:
+        return True
+    return earlier in EXCEPTION_SUPERCLASSES.get(later, frozenset())
+
+
+def _exception_shadowing_violations(source, relative):
+    tree = ast.parse(source, filename=relative)
+    violations = []
+    for try_node in ast.walk(tree):
+        if not isinstance(try_node, (ast.Try, ast.TryStar)):
+            continue
+        earlier_names = []
+        for handler in try_node.handlers:
+            later_names = _exception_handler_names(handler.type)
+            for later in later_names:
+                for earlier in earlier_names:
+                    if _exception_handler_shadows(earlier, later):
+                        violations.append((
+                            relative, handler.lineno, earlier, later,
+                        ))
+            earlier_names.extend(later_names)
     return violations
 
 
@@ -360,6 +409,44 @@ class TestMutationSourceGuards(TransactionCase):
             '_apply_validated_consequence',
             '_recover_committed_attempt_to_reconciliation',
         })
+
+    def test_dispatch_exception_handlers_are_not_shadowed(self):
+        path = Path(shopify_connector_job_dispatch.__file__)
+        self.assertFalse(_exception_shadowing_violations(
+            path.read_text(encoding='utf-8'), str(path),
+        ))
+
+    def test_exception_shadowing_detector_rejects_superclass_first(self):
+        self.assertTrue(issubclass(ValidationError, UserError))
+        self.assertTrue(issubclass(AccessError, UserError))
+        invalid = '''
+try:
+    recover()
+except UserError:
+    refuse_owner()
+except ValidationError:
+    block_invalid_state()
+'''
+        violations = _exception_shadowing_violations(
+            invalid, 'synthetic_invalid_recovery.py',
+        )
+        self.assertEqual(len(violations), 1)
+        self.assertEqual(violations[0][2:], ('UserError', 'ValidationError'))
+
+    def test_exception_shadowing_detector_accepts_specific_first(self):
+        valid = '''
+try:
+    recover()
+except (ValidationError, AccessError):
+    block_invalid_state()
+except UserError:
+    refuse_owner()
+except Exception:
+    fail_closed()
+'''
+        self.assertFalse(_exception_shadowing_violations(
+            valid, 'synthetic_valid_recovery.py',
+        ))
 
     def test_zero_real_mutation_domain_and_calls(self):
         source = Path(

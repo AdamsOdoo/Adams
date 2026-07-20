@@ -1246,8 +1246,6 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             attempt = attempt._record_recovery_uncertain(
                 recovery_window, recovery_source,
             )
-        except UserError:
-            return self.env['shopify.connector.job']
         except ValidationError:
             if job.state == 'running':
                 self._block_original_job(
@@ -1256,6 +1254,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                     'duplicate_risk',
                     'Committed attempt had an invalid recovery state.',
                 )
+            return self.env['shopify.connector.job']
+        except UserError:
             return self.env['shopify.connector.job']
         reconciliation = self._ensure_reconciliation_job(job, attempt)
         if job.state == 'running':
