@@ -1,7 +1,6 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** RUNTIME CAMPAIGN 2 CORRECTED STATICALLY — CAMPAIGN 3
-  TARGETED-FIRST RUNTIME REQUIRED
+- **Status:** CAMPAIGN 3 DIAGNOSIS CORRECTED — FINAL RUNTIME CLOSURE REQUIRED
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
@@ -21,6 +20,11 @@
 - **Runtime Campaign 2 build / database:** `35127417` /
   `adamsmen-sol-wave-3-stage-0-layer2-35127417`
 - **Runtime Campaign 2 ruling:** PR #178 comment `5018637342`
+- **Campaign 3 diagnostic tested SHA:**
+  `a0d4f927f195158edd95dca3f4f56d1cb8b15e1c`
+- **Campaign 3 diagnostic build / database:** `35135587` /
+  `adamsmen-sol-wave-3-stage-0-layer2-35135587`
+- **Campaign 3 diagnostic ruling:** PR #178 comment `5020095555`
 - **Frozen candidate:** the commit containing this record; its exact SHA is
   recorded in the final PR body and control-room report because a Git commit
   cannot embed its own SHA.
@@ -31,7 +35,7 @@
 The historical pre-synchronization identity gate verified PR #178 open, draft,
 unmerged, at its then-current 23-path scope. The pre-correction Campaign 2
 identity gate found 27 paths; this correction brings the current cumulative
-scope to 30 paths. PR #179 was closed and merged at the accepted Gate B
+scope to 31 paths. PR #179 was closed and merged at the accepted Gate B
 integration SHA.
 Binding comments `5016117207`, `5016274358`, and `5016306005` existed and were
 read in full.
@@ -241,6 +245,55 @@ passes. If Stage B fails, stop before full regression.
 
 **Stage C — full connector regression:** run only after Stages A and B pass.
 
+## 2E. Campaign 3 diagnosis and final bounded correction
+
+Campaign 3 tested exact SHA
+`a0d4f927f195158edd95dca3f4f56d1cb8b15e1c` on build `35135587`, database
+`adamsmen-sol-wave-3-stage-0-layer2-35135587`. Clean install and same-SHA
+update passed. Stage A was **RED**; Stages B and C were not started. Retention
+and the sudo inventory passed in the fresh-build phase. The SQL uniqueness
+proof passed independently with one committed attempt and one SQLSTATE `23505`
+loser. Process death produced the expected environment limitation, and the
+zero-real-Shopify proof passed.
+
+Ruling `5020095555` established that the C1 race, concurrent inconclusive
+increment, and concurrent stale sweep never reached connector code. Their
+worker threads stopped while constructing `api.Environment` at the
+process-global Odoo Registry lock. They are invalid standard-test designs, not
+production failures. Their proof now lives in the non-discovered external
+`runtime_layer2_concurrency_harness.py`, using spawned OS processes whose
+children initialize their own Odoo configuration, cursor, Registry, and
+Environment.
+
+The same diagnosis proved one production defect: `ValidationError` is a
+`UserError` subclass, so the superclass-first handler made invalid committed
+attempt recovery return without blocking the original job. Handler order is
+now specific-to-general. Succeeded and failed-clean attempts preserve their
+state, resolution timestamp, and evidence; the running original job blocks as
+`blocked_manual_review / data_shape_schema_mismatch / duplicate_risk`; no
+reconciliation job is created. Pending and unresolved-uncertain recovery, plus
+the genuine temporary `UserError` ownership refusal, retain their prior
+contracts.
+
+The bounded correction commits are:
+
+1. `fe3eb18860500f900a0ea51cb618be360c3b83e7` — invalid-recovery exception
+   routing and exception-shadowing source guard;
+2. `be687bcd028b6046de0bc2fd946f78aaf27586a0` — spawned-process harness,
+   standard-test migration, behavioral recovery proofs, and structural commit
+   detector correction;
+3. the commit containing this record — lessons, Campaign 3 evidence, and
+   final candidate freeze; its exact SHA is recorded in the PR body and final
+   control-room report.
+
+### Final runtime execution order
+
+1. Invalid-recovery targeted regression.
+2. AST and exception-shadowing targeted tests.
+3. External multiprocess concurrency harness.
+4. All nine Stage 0 standard modules.
+5. Full connector regression.
+
 ## 3. Binding A–N traceability
 
 | Binding | Production method(s) | Exact test evidence | Runtime proof | Rollback / fail-closed behavior |
@@ -352,16 +405,16 @@ historical candidate the cumulative PR contained 27 existing paths.
 
 | Check | Result |
 |---|---|
-| Python compile/AST parse of all 31 available addon Python files | PASS |
+| Python compile/AST parse of all 32 available addon Python files | PASS |
 | XML parse of the stale-owner cron | PASS |
 | Manifest literal parse and model/ACL/cron registration audit | PASS |
 | CSV parse of 26 ACL rows | PASS |
-| 88-character line scan of the six corrected Python files | PASS |
+| 88-character line scan of the five corrected Python files | PASS |
 | Legacy marker/strategy/call literal scans | PASS |
 | GraphQL/raw-transport/source-guard audit | PASS (static source inspection; Odoo test execution pending) |
 | Credential, token, real-domain, and PII/logging audit | PASS — no real value or call |
 | Git patch trailing-whitespace / diff-check audit | PASS |
-| Integration comparison | PASS — zero behind; candidate scope exactly 30 PR paths |
+| Integration comparison | PASS — zero behind; candidate scope exactly 31 PR paths |
 | Gate B byte-preservation audit | PASS |
 | Recovery-state/admission AST ownership audit | PASS |
 | Nine-module job-type/job-source fixture audit | PASS |
@@ -378,13 +431,17 @@ historical candidate the cumulative PR contained 27 existing paths.
 | Attempt-write positive/negative fixtures | PASS |
 | External same-name attempt-write bypass fixtures | PASS — all rejected |
 | Direct-statement commit detector adversarial proof | PASS — nested commits ignored |
-| Central worker-runner AST audit | PASS — only runner starts/joins threads |
-| Odoo test-lock harness audit | PASS — `release_test_lock()` encloses worker lifetime |
+| Standard SQL-thread AST audit | PASS — only the `23505` runner starts/joins threads |
 | Concurrent uniqueness source audit | PASS — exact `23505`; arbitrary failures rejected |
 | Ownership-key cleanup source audit | PASS — job/attempt/child/log/store residue checked |
 | Resolved-retention source audit | PASS — ORM flush and eligibility precede masking |
-| Runtime lessons register/checklist audit | PASS — LL-001 through LL-012 present |
-| Current cumulative changed-file comparison | PASS — zero behind, exactly 30 paths |
+| Dispatcher exception-handler hierarchy audit | PASS — no shadowed handlers |
+| Synthetic exception-shadowing fixtures | PASS — invalid rejected; valid accepted |
+| External harness CLI/import audit | PASS — no scenario executed |
+| Process-model audit | PASS — spawn; independent child Registry/Environment |
+| Standard-thread audit | PASS — SQL-only; no worker ORM Environment |
+| Runtime lessons register/checklist audit | PASS — LL-001 through LL-013 present |
+| Current cumulative changed-file comparison | PASS — zero behind, exactly 31 paths |
 
 Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
 install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
@@ -420,7 +477,7 @@ contains no inventory, fulfillment, refund, or payout mutation implementation.
 No Shopify token was read, no credential-backed request was made, and no real
 Shopify mutation was executed.
 
-The PR changes exactly these 30 authorized paths:
+The PR changes exactly these 31 authorized paths:
 
 1. `addons/shopify_connector_core/__manifest__.py`
 2. `addons/shopify_connector_core/data/shopify_connector_stale_owner_sweep_cron.xml`
@@ -452,14 +509,16 @@ The PR changes exactly these 30 authorized paths:
 28. `addons/shopify_connector_core/tests/test_job_log_system_append.py`
 29. `addons/shopify_connector_core/tests/test_readiness_slot_closure.py`
 30. `docs/05-qa/runtime-lessons-learned.md`
+31. `addons/shopify_connector_core/tests/runtime_layer2_concurrency_harness.py`
 
-No production code changed in the Runtime Campaign 2 correction. No Gate B
-document, decision record, inventory addon, other addon, CI/workflow, Wave 3
-handoff, or Task 013/013B implementation changed. PR #178 remains open, draft,
-and unmerged. Odoo/PostgreSQL runtime remains pending independent fresh-build
-execution; runtime green is not claimed.
+The final diagnosis-driven campaign changed production only by reversing the
+two diagnosed exception handlers in `shopify_connector_job_dispatch.py`. No
+other production behavior, Gate B document, decision record, inventory addon,
+other addon, CI/workflow, Wave 3 handoff, or Task 013/013B implementation
+changed. PR #178 remains open, draft, and unmerged. Odoo/PostgreSQL runtime
+remains pending independent fresh-build execution; runtime green is not
+claimed.
 
 ## 9. Recommendation
 
-**RUNTIME CAMPAIGN 2 CORRECTED STATICALLY — READY FOR TARGETED-FIRST
-CAMPAIGN 3**
+**CAMPAIGN 3 DIAGNOSIS CORRECTED — READY FOR FINAL RUNTIME CLOSURE**
