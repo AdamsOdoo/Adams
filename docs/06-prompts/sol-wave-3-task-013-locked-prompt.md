@@ -158,7 +158,13 @@ addons/shopify_connector_inventory/** (NEW module):
     Gate B-corrected schema: NO last_push_idempotency_key,
     NO last_push_params_hash fields — those are retired, superseded by
     Layer 2's attempt-owned idempotency; only last_pushed_available,
-    last_pushed_at, last_known_shopify_available as informational fields)
+    last_pushed_at, last_known_shopify_available as informational fields;
+    OWNS the public review-release RPC/action method
+    action_recheck_inventory_pair(reason) (Reviewer/Administrator only)
+    per DEC-037 §5.5 and §1C item 7 — the public action surface lives on
+    THIS binding model exclusively; it may delegate to a private helper on
+    shopify_connector_inventory_service.py, but the service never exposes
+    or owns the public method)
   models/shopify_connector_inventory_service.py (NEW — orchestration
     (inventory_push_sync)/preview service, job seams, hooks,
     location-cache sync with the ONE named sudo per D-013-5; the Layer 2
@@ -172,8 +178,12 @@ addons/shopify_connector_inventory/** (NEW module):
     preconditions_snapshot at each mutation job's own C2; the
     pair-serialization admission/atomic-handoff mechanics per DEC-037
     §5.3/§5.4 (handoffs A-D, cas_retry_ordinal/superseded_by_job_id/
-    cancel_reason job-lineage fields); the action_recheck_inventory_pair
-    review-release action per DEC-037 §5.5)
+    cancel_reason job-lineage fields); a PRIVATE review-release helper
+    only — the PUBLIC action_recheck_inventory_pair(reason) method is
+    owned exclusively by shopify_connector_inventory_level_binding.py
+    (DEC-037 §5.5/§1C item 7); this service may host a private delegate
+    the binding calls, but MUST NEVER expose or own the public RPC/action
+    surface)
   models/shopify_connector_store_settings.py (the two new store settings
     per Task 013 §4: inventory_scheduled_sync_enabled,
     inventory_last_push_scan_at)
@@ -483,8 +493,7 @@ DEFINITION OF DONE
 - Dev-store validation plan scenarios executed (or explicitly,
   recorded-ly waived) with redacted evidence in
   docs/05-qa/task-013-inventory-sync-validation-results.md.
-- mvp-program-state.md, mvp-acceptance-matrix.md, and
-  research-handoff.md updated.
+- research-handoff.md updated.
 - Zero Task 014/015/UI/webhook code anywhere in the diff.
 
 ======================================================================

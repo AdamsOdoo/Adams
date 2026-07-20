@@ -39,7 +39,7 @@
 
 ## 1. Objective, scope, non-goals
 
-Create `shopify_connector_inventory` (new module, Full edition; depends
+Create `shopify_connector_inventory` (new module, Full edition, LGPL-3; depends
 `['shopify_connector_core', 'shopify_connector_product', 'stock']`):
 explicit location mapping, per-location inventory-level bindings,
 first-push guard, and the Odoo→Shopify `available`-quantity push via

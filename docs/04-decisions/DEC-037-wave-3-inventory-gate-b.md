@@ -626,8 +626,13 @@ remains exclusively `mutation.attempt`, C5, unchanged).
   child may ever be created directly from a `blocked_manual_review` job.
 - **`action_recheck_inventory_pair(reason)`** — the one domain action
   that releases a blocked inventory pair:
-  - **Owner:** `shopify.connector.inventory.level.binding`, or the
-    accepted inventory service acting on that binding.
+  - **Public owner:** the public RPC/action surface is exactly
+    `shopify.connector.inventory.level.binding.action_recheck_inventory_pair(reason)`,
+    owned exclusively by the `shopify.connector.inventory.level.binding`
+    model. The public binding action may delegate to a private
+    helper on the accepted inventory service; the inventory service
+    must never expose or own the public RPC/action method (DEC-037 §1C
+    item 7).
   - **Reviewer or Administrator** group only.
   - Requires a mandatory, non-empty `reason`.
   - Acquires the pair's row lock (the same lock used by §5.4's
@@ -707,9 +712,11 @@ remains exclusively `mutation.attempt`, C5, unchanged).
   (`trigger_origin='inventory_stock_change'`), `scheduled_sync`,
   `manual_sync`, `export_preview_dry_run`.
 - **Error-class vocabulary (frozen, Revision 3 — closes binding
-  correction 4):** `shopify_user_errors_validation` (ordinary Shopify
-  validation/clean rejection, both domains), `inventory_location_missing`
-  (also an `error_class` value here, not only a subreason —
+  correction 4; enumeration reconciled to the canonical nine-value set
+  of §1B item 4, the Task 013 packet, and the locked prompt):**
+  `shopify_user_errors_validation` (ordinary Shopify validation/clean
+  rejection, both domains), `inventory_location_missing` (also an
+  `error_class` value here, not only a subreason —
   `ITEM_NOT_STOCKED_AT_LOCATION`), `concurrency_race_conflict`
   (`CHANGE_FROM_QUANTITY_STALE`; structured
   `IDEMPOTENCY_CONCURRENT_REQUEST`), `shopify_throttling_rate_limit`
@@ -717,11 +724,22 @@ remains exclusively `mutation.attempt`, C5, unchanged).
   timeout/HTTP 5xx), `data_shape_schema_mismatch` (malformed/partial
   response; `inventory_activate`'s ambiguous non-empty-`userErrors`-plus-
   non-null-`inventoryLevel` case), `idempotency_contract_violation`
-  (structured idempotency mismatch/previous-attempt-failed). **No other
-  `error_class` value is authorized without a further Gate decision.**
+  (structured idempotency mismatch/previous-attempt-failed),
+  `no_reconciliation_strategy` (reconciliation-strategy registry lookup
+  failure, DEC-036 D16 — should never fire once both matrix rows are
+  registered), `store_identity_mismatch` (store-identity check failure,
+  DEC-036 D18). These nine values are the complete frozen `error_class`
+  vocabulary; no other `error_class` value is authorized without a
+  further Gate decision. `error_class` and `manual_review_subreason`
+  are independent taxonomies: a literal that also appears in the
+  manual-review-subreason list below (`inventory_location_missing`,
+  `idempotency_contract_violation`, `no_reconciliation_strategy`,
+  `store_identity_mismatch`) is a legitimate `error_class` value in its
+  own right and must not be removed from this vocabulary merely
+  because a related manual-review routing reuses the same literal.
   The four values `remote_validation_rejected`/`remote_precondition_mismatch`/
   `transport_ambiguous`/`clean_rejection`, used in Revision 2, are
-  **withdrawn** and must not appear current-facing anywhere in this
+  withdrawn and must not appear current-facing anywhere in this
   document set.
 - **Manual-review-subreason vocabulary:**
   - `inventory_location_missing` (existing — unmapped item/location;
