@@ -183,7 +183,17 @@ addons/shopify_connector_inventory/** (NEW module):
     owned exclusively by shopify_connector_inventory_level_binding.py
     (DEC-037 §5.5/§1C item 7); this service may host a private delegate
     the binding calls, but MUST NEVER expose or own the public RPC/action
-    surface)
+    surface; [NEW, this correction batch, PR #182 comment `5025765389`
+    disposition 2] registers the ONE shared, read-only
+    inventory_mutation_reconcile job type as the
+    reconciliation_job_type for BOTH mutation domains — it is never a
+    mutation domain itself, never holds the pair-serialization scope,
+    creates no mutation.attempt of its own, and dispatches purely on the
+    one existing attempt it links to; this brings the module's total
+    registered job_type count to SEVEN: inventory_push_sync,
+    inventory_push_scan, inventory_first_push_preview,
+    inventory_location_sync, inventory_activate,
+    inventory_set_quantities, inventory_mutation_reconcile)
   models/shopify_connector_store_settings.py (the two new store settings
     per Task 013 §4: inventory_scheduled_sync_enabled,
     inventory_last_push_scan_at)
@@ -239,7 +249,18 @@ addons/shopify_connector_inventory/** (NEW module):
     particular none of remote_validation_rejected/
     remote_precondition_mismatch/transport_ambiguous/clean_rejection),
     store-identity-mismatch test, explicit available:0 activation test,
-    no-quantities-array-length->1 static guard)
+    no-quantities-array-length->1 static guard) [NEW, this correction
+    batch, scoped strictly to the two control-room-authorized governing
+    amendments (PR #182 comment `5025765389` dispositions 2/16 — every
+    other code-level correction in this batch is reflected only in the
+    module/tests themselves, not in this governing-text annotation):
+    integral-quantity boundary tests (10.0/0/negative-clamped/harmless
+    floating-noise accepted, a 10.5-class fraction rejected before any
+    Shopify mutation attempt, no mutation.attempt row created); and a
+    test that the shared inventory_mutation_reconcile job type is
+    read-only/attempt-linked, is never redispatched once its linked
+    attempt is already resolved, and is never used as a template for a
+    second, per-domain reconciliation job type)
   tests/test_inventory_triggers.py (NEW)
   tests/test_inventory_location_cache_sync.py (NEW)
 
@@ -442,6 +463,18 @@ HARD CONSTRAINTS
   alone — no mutation job performs reconnect classification itself.
 - Negative free_qty -> clamp to 0 + divergence warning carrying the true
   value; never send a negative available.
+- [NEW, this correction batch, PR #182 comment `5025765389` item 16]
+  Fail-closed integral-quantity rule: Shopify's quantity/
+  changeFromQuantity fields are integers, free_qty is a float. After
+  the clamp-to-0 step, send an actual Python int to Shopify only when
+  the target is integral within an accepted floating-point-noise
+  tolerance (e.g. 10.0/0/harmless noise around a whole number). A
+  genuinely fractional target is NEVER rounded or truncated — it fails
+  closed BEFORE any Shopify mutation attempt (no C2, no
+  mutation.attempt row), routed as
+  error_class='data_shape_schema_mismatch' /
+  manual_review_subreason='binding_conflict'. No new error_class/
+  manual_review_subreason value is introduced.
 - Unmapped items/locations -> skipped with surfaced counts, never a
   silent drop.
 - No flag bypasses any guard above.
