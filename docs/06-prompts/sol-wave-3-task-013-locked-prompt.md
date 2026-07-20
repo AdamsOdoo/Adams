@@ -208,9 +208,24 @@ addons/shopify_connector_inventory/** (NEW module):
     invariant test, a reconciliation not_applied verdict (either domain)
     creates a NEW same-domain job test (never redispatches the resolved
     one), a blocked_manual_review job creates no automatic child test,
-    action_recheck_inventory_pair release test (authorized reason
-    required, creates exactly one fresh inventory_push_sync job, never
-    rewrites observed_outcome/resolution_disposition), genuine
+    action_recheck_inventory_pair release test covering all three
+    positive release classes — (a) inventory_location_missing, (b) an
+    ordinary Shopify-validation or NON_MUTABLE_INVENTORY_ITEM
+    binding_conflict, and (c) ordinal-3 bounded CAS exhaustion
+    (error_class=concurrency_race_conflict,
+    manual_review_subreason=binding_conflict, cas_retry_ordinal == 3,
+    fourth CHANGE_FROM_QUANTITY_STALE clean rejection) — with the
+    CAS-exhaustion case additionally asserting: the blocked job holds
+    the pair scope before release; a mandatory reason is required;
+    exactly one fresh inventory_push_sync job is created; the old job
+    transitions to cancelled with cancel_reason='manual_review_release'
+    and superseded_by_job_id pointing to the fresh job; the attempt's
+    observed_outcome/resolution_disposition are unchanged; and no second
+    fresh job can be created concurrently — plus negative-denial
+    assertions that the action remains refused for uncertain,
+    duplicate_risk, idempotency_contract_violation, unresolved
+    reconciliation, store_identity_mismatch, unexplained drift, and
+    unexplained nonzero post-activation level, genuine
     independent-PostgreSQL-connection concurrency test proving duplicate
     phase jobs (including a CAS/not_applied replacement job) cannot be
     created for one pair, THROTTLED classification test, reconciliation
@@ -332,23 +347,30 @@ HARD CONSTRAINTS
   preventing any new job (of any of the three types) from being admitted
   for the same pair, and preventing any automatic child job. It is
   released ONLY by action_recheck_inventory_pair(reason) — Reviewer or
-  Administrator only, mandatory non-empty reason, allowed only when the
-  blocked job's attempt has observed_outcome=failed_clean AND
-  effective_disposition() == 'not_applied' (the effective-disposition
-  helper, DEC-036 D10 — NOT a requirement that the raw
-  resolution_disposition field itself be populated) with subreason
-  inventory_location_missing or an enumerated-safe binding_conflict case
-  (never uncertain, duplicate_risk, idempotency_contract_violation,
-  unresolved reconciliation, or store_identity_mismatch — those remain
-  resolvable only through the Stage 0 Administrator-only manual
-  resolution path). This action never rewrites observed_outcome or
-  resolution_disposition; it atomically transitions the blocked job from
-  blocked_manual_review to the EXISTING CORE JOB STATE cancelled
-  (cancel_reason='manual_review_release', superseded_by_job_id set) and
-  enqueues exactly one fresh inventory_push_sync job, logging
-  actor/reason/old-job-ID/new-job-ID (DEC-037 §5.5). The generic core job
-  manual-retry/manual-review actions remain forbidden for any
-  mutation-evidence-linked job.
+  Administrator only, mandatory non-empty reason, requires exactly one
+  active blocked_manual_review inventory job for the pair whose attempt
+  has observed_outcome=failed_clean AND effective_disposition() ==
+  'not_applied' (the effective-disposition helper, DEC-036 D10 — NOT a
+  requirement that the raw resolution_disposition field itself be
+  populated), and allowed only for exactly one of: (a)
+  manual_review_subreason=inventory_location_missing; (b) an ordinary
+  Shopify-validation or NON_MUTABLE_INVENTORY_ITEM binding_conflict; or
+  (c) bounded CAS exhaustion — subreason binding_conflict,
+  error_class=concurrency_race_conflict, cas_retry_ordinal == 3, on the
+  job that recorded the fourth CHANGE_FROM_QUANTITY_STALE clean
+  rejection (releasable because the stale-CAS response is a direct
+  failed_clean precondition rejection with no Shopify mutation effect).
+  NEVER released for: uncertain, duplicate_risk,
+  idempotency_contract_violation, unresolved reconciliation, or
+  store_identity_mismatch — those remain resolvable only through the
+  Stage 0 Administrator-only manual resolution path. This action never
+  rewrites observed_outcome or resolution_disposition; it atomically
+  transitions the blocked job from blocked_manual_review to the EXISTING
+  CORE JOB STATE cancelled (cancel_reason='manual_review_release',
+  superseded_by_job_id set) and enqueues exactly one fresh
+  inventory_push_sync job, logging actor/reason/old-job-ID/new-job-ID
+  (DEC-037 §5.5). The generic core job manual-retry/manual-review actions
+  remain forbidden for any mutation-evidence-linked job.
 - Job-lineage fields: cas_retry_ordinal (Integer, default 0,
   inventory_set_quantities only) is the ONLY NEW, domain-owned field this
   task introduces. superseded_by_job_id (Many2one, nullable) and

@@ -495,7 +495,15 @@ never redispatches the resolved one [Gate B, Revision 3, DEC-037 §4
 rows 1–2/§5.4 handoff D]; a `blocked_manual_review` job creates no
 automatic child job, and `action_recheck_inventory_pair` is the only
 path that releases one, requiring an authorized reason and creating
-exactly one fresh `inventory_push_sync` job [Gate B, Revision 3, DEC-037
+exactly one fresh `inventory_push_sync` job, covering all three positive
+release classes — (1) `inventory_location_missing`; (2) an ordinary
+Shopify-validation or `NON_MUTABLE_INVENTORY_ITEM` `binding_conflict`;
+and (3) bounded CAS exhaustion with `error_class='concurrency_race_conflict'`,
+`manual_review_subreason='binding_conflict'`, and `cas_retry_ordinal == 3`
+— plus denial tests for the existing forbidden classes (`uncertain`,
+`duplicate_risk`, `idempotency_contract_violation`, unresolved
+reconciliation, `store_identity_mismatch`, unexplained drift, and
+unexplained nonzero post-activation level) [Gate B, Revision 3, DEC-037
 §5.5]; `THROTTLED`/both idempotency-defect codes classified per DEC-036
 D6/D9; **every `error_class` value observed anywhere in this module's
 tests is one of the fixed set in DEC-037 §7/§9 — a static/AST guard
