@@ -646,11 +646,16 @@ remains exclusively `mutation.attempt`, C5, unchanged).
     `resolution_disposition` field itself be populated; a direct
     `failed_clean` attempt normally has no separate resolution row.
   - **Allowed** only when `manual_review_subreason` is
-    `inventory_location_missing`, or an explicitly enumerated safe
-    `binding_conflict` clean-rejection case (an ordinary Shopify
-    validation rejection, or `NON_MUTABLE_INVENTORY_ITEM`) — **never**
-    an unexplained non-zero post-activation level, which remains a
-    genuine data-integrity concern requiring the Stage 0
+    `inventory_location_missing`, or when it is `binding_conflict` and
+    the case is exactly one of: (a) an ordinary Shopify validation clean
+    rejection; (b) `NON_MUTABLE_INVENTORY_ITEM`; or (c) bounded CAS
+    exhaustion after the fourth `CHANGE_FROM_QUANTITY_STALE` clean
+    rejection, with `error_class='concurrency_race_conflict'` and
+    `cas_retry_ordinal == 3`. The CAS-exhaustion case is releasable
+    because the stale-CAS response is a direct `failed_clean`
+    precondition rejection with no Shopify mutation effect. **Never**
+    allow this action for an unexplained non-zero post-activation level,
+    which remains a genuine data-integrity concern requiring the Stage 0
     Administrator-only manual resolution path instead.
   - **Forbidden** for: `uncertain` attempts, `duplicate_risk`,
     `idempotency_contract_violation`, any unresolved reconciliation, and
@@ -769,8 +774,13 @@ remains exclusively `mutation.attempt`, C5, unchanged).
 - **Domain action (new, Revision 3):** `action_recheck_inventory_pair(reason)`
   — §5.5; Reviewer/Administrator only; the sole authorized release path
   for a `blocked_manual_review` inventory job whose attempt is
-  `failed_clean`/`not_applied` with subreason `inventory_location_missing`
-  or an enumerated safe `binding_conflict` case.
+  `failed_clean`/`not_applied` with either:
+  `manual_review_subreason='inventory_location_missing'`; an ordinary
+  Shopify-validation or `NON_MUTABLE_INVENTORY_ITEM`
+  `binding_conflict`; or the bounded CAS-exhaustion
+  `binding_conflict` with `error_class='concurrency_race_conflict'` and
+  `cas_retry_ordinal == 3` after the fourth
+  `CHANGE_FROM_QUANTITY_STALE` clean rejection.
 - **Pair-serialization identity convention:** §5.3, frozen literal
   `inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`
   for all three inventory job types on a pair; reconciliation jobs use
