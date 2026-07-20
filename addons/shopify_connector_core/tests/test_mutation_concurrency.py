@@ -1,5 +1,8 @@
+import ast
+import inspect
 import queue
 import threading
+import textwrap
 import uuid
 from unittest.mock import patch
 
@@ -7,10 +10,10 @@ import psycopg2
 import psycopg2.errorcodes
 
 from odoo import SUPERUSER_ID, api, fields
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, release_test_lock
 
 from ..models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
@@ -21,6 +24,93 @@ from ..models.shopify_connector_mutation_attempt import (
 @tagged('post_install', '-at_install')
 class TestMutationConcurrency(TransactionCase):
     """Genuine PostgreSQL independent-connection proof, never simulation."""
+
+    def _run_workers(self, worker_functions, timeout=20):
+        """Run independent-cursor workers under the Odoo 19 test lock seam."""
+        channels = {
+            name: queue.Queue(maxsize=1) for name, _worker in worker_functions
+        }
+
+        def invoke(name, worker):
+            try:
+                result = dict(worker())
+                result.setdefault('outcome', 'completed')
+                result.setdefault('exception_class', False)
+                result.setdefault('sqlstate', False)
+                result.setdefault('retry_reasons', ())
+            except BaseException as exc:
+                result = {
+                    'outcome': 'unexpected_exception',
+                    'exception_class': type(exc).__name__,
+                    'sqlstate': getattr(exc, 'pgcode', False),
+                    'retry_reasons': (),
+                    'exception': repr(exc),
+                }
+            result['worker'] = name
+            channels[name].put_nowait(result)
+
+        threads = [
+            threading.Thread(
+                name='layer2-%s' % name,
+                target=invoke,
+                args=(name, worker),
+            )
+            for name, worker in worker_functions
+        ]
+        with release_test_lock():
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=timeout)
+            alive = [thread.name for thread in threads if thread.is_alive()]
+            self.assertFalse(
+                alive,
+                'worker threads exceeded %ss: %s' % (timeout, alive),
+            )
+
+        records = []
+        for name, _worker in worker_functions:
+            self.assertEqual(
+                channels[name].qsize(), 1,
+                'worker %s must report exactly once' % name,
+            )
+            records.append(channels[name].get_nowait())
+        unexpected = [
+            record for record in records
+            if record['outcome'] == 'unexpected_exception'
+        ]
+        self.assertFalse(unexpected, 'worker failure(s): %r' % unexpected)
+        self._assert_no_worker_threads()
+        return records
+
+    def _assert_no_worker_threads(self):
+        alive = [
+            thread.name for thread in threading.enumerate()
+            if thread.name.startswith('layer2-') and thread.is_alive()
+        ]
+        self.assertFalse(alive, 'surviving Layer 2 workers: %s' % alive)
+
+    def test_thread_start_and_join_are_centralized(self):
+        source = textwrap.dedent(inspect.getsource(type(self)))
+        tree = ast.parse(source)
+        parents = {}
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                parents[child] = parent
+        violations = []
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr in {'start', 'join'}
+            ):
+                continue
+            owner = parents.get(node)
+            while owner and not isinstance(owner, ast.FunctionDef):
+                owner = parents.get(owner)
+            if not owner or owner.name != '_run_workers':
+                violations.append((node.func.attr, node.lineno))
+        self.assertFalse(violations, violations)
 
     def _durable_fixture(self):
         domain = 'layer2-concurrency-%s.myshopify.com' % uuid.uuid4().hex
@@ -49,58 +139,129 @@ class TestMutationConcurrency(TransactionCase):
     def _cleanup_fixture(self, store_id, job_id):
         with db_connect(self.env.cr.dbname).cursor() as cr:
             cr.execute(
-                'DELETE FROM shopify_connector_job_log WHERE store_id = %s',
-                (store_id,),
+                'SELECT id FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
+            )
+            attempt_ids = [row[0] for row in cr.fetchall()]
+            child_job_ids = []
+            if attempt_ids:
+                cr.execute(
+                    'SELECT id FROM shopify_connector_job '
+                    'WHERE mutation_attempt_id = ANY(%s)',
+                    (attempt_ids,),
+                )
+                child_job_ids = [row[0] for row in cr.fetchall()]
+            fixture_job_ids = sorted(set([job_id] + child_job_ids))
+            cr.execute(
+                'DELETE FROM shopify_connector_job_log '
+                'WHERE store_id = %s OR job_id = ANY(%s)',
+                (store_id, fixture_job_ids),
+            )
+            if child_job_ids:
+                cr.execute(
+                    'DELETE FROM shopify_connector_job '
+                    'WHERE id = ANY(%s)',
+                    (child_job_ids,),
+                )
+            cr.execute(
+                'DELETE FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
             )
             cr.execute(
                 'DELETE FROM shopify_connector_job '
-                'WHERE mutation_attempt_id IN ('
-                'SELECT id FROM shopify_connector_mutation_attempt '
-                'WHERE store_id = %s)',
-                (store_id,),
-            )
-            cr.execute(
-                'DELETE FROM shopify_connector_mutation_attempt '
-                'WHERE store_id = %s',
-                (store_id,),
-            )
-            cr.execute(
-                'DELETE FROM shopify_connector_job WHERE store_id = %s',
-                (store_id,),
+                'WHERE id = %s OR store_id = %s',
+                (job_id, store_id),
             )
             cr.execute(
                 'DELETE FROM shopify_connector_store WHERE id = %s',
                 (store_id,),
             )
             cr.commit()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            checks = {
+                'stores': (
+                    'SELECT count(*) FROM shopify_connector_store '
+                    'WHERE id = %s', (store_id,),
+                ),
+                'original_jobs': (
+                    'SELECT count(*) FROM shopify_connector_job '
+                    'WHERE id = %s', (job_id,),
+                ),
+                'attempts': (
+                    'SELECT count(*) '
+                    'FROM shopify_connector_mutation_attempt '
+                    'WHERE job_id = %s OR id = ANY(%s)',
+                    (job_id, attempt_ids),
+                ),
+                'logs': (
+                    'SELECT count(*) FROM shopify_connector_job_log '
+                    'WHERE store_id = %s OR job_id = ANY(%s)',
+                    (store_id, fixture_job_ids),
+                ),
+            }
+            if child_job_ids:
+                checks['child_jobs'] = (
+                    'SELECT count(*) FROM shopify_connector_job '
+                    'WHERE id = ANY(%s)', (child_job_ids,),
+                )
+            residue = {}
+            for label, (query, params) in checks.items():
+                cr.execute(query, params)
+                residue[label] = cr.fetchone()[0]
+            self.assertFalse(
+                any(residue.values()),
+                'fixture cleanup failed store_id=%s job_id=%s '
+                'attempt_ids=%s child_job_ids=%s counts=%s' % (
+                    store_id, job_id, attempt_ids, child_job_ids, residue,
+                ),
+            )
 
     def test_c1_token_ownership_race_has_one_winner(self):
         _store_id, job_id = self._durable_fixture()
-        barrier = threading.Barrier(2)
-        results = []
-        errors = []
+        start = threading.Barrier(2)
+        loser_reported = threading.Event()
 
         def contender():
+            cr = db_connect(self.env.cr.dbname).cursor()
             try:
-                with db_connect(self.env.cr.dbname).cursor() as cr:
-                    env = api.Environment(cr, SUPERUSER_ID, {})
-                    barrier.wait(timeout=10)
-                    locked = env['shopify.connector.job'].browse(
-                        job_id
-                    ).try_lock_for_update()
-                    results.append(bool(locked))
-                    barrier.wait(timeout=10)
-                    cr.rollback()
-            except BaseException as exc:
-                errors.append(exc)
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                start.wait(timeout=10)
+                locked = env['shopify.connector.job'].browse(
+                    job_id
+                ).try_lock_for_update()
+                if locked:
+                    if not loser_reported.wait(timeout=10):
+                        raise AssertionError('loser did not report in time')
+                    return {'outcome': 'winner'}
+                loser_reported.set()
+                return {'outcome': 'loser'}
+            finally:
+                cr.rollback()
+                cr.close()
 
-        threads = [threading.Thread(target=contender) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=20)
-        self.assertFalse(errors)
-        self.assertEqual(sorted(results), [False, True])
+        records = self._run_workers([
+            ('c1-contender-1', contender),
+            ('c1-contender-2', contender),
+        ])
+        self.assertEqual(
+            sorted(record['outcome'] for record in records),
+            ['loser', 'winner'],
+        )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT state, current_attempt_token, owner_worker_ref, '
+                'running_since FROM shopify_connector_job WHERE id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone(), ('queued', None, None, None))
+            cr.execute(
+                'SELECT count(*) FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
+            )
+            self.assertEqual(cr.fetchone()[0], 0)
 
     def test_repeatable_read_requires_fresh_transaction_for_c2_visibility(self):
         store_id, job_id = self._durable_fixture()
@@ -305,68 +466,57 @@ class TestMutationConcurrency(TransactionCase):
 
     def test_concurrent_second_attempt_with_different_tokens_is_rejected(self):
         _store_id, job_id = self._durable_fixture()
-        barrier = threading.Barrier(2)
-        results = queue.Queue()
+        start = threading.Barrier(2)
 
         def insert_attempt():
+            cr = db_connect(self.env.cr.dbname).cursor()
             try:
-                with db_connect(self.env.cr.dbname).cursor() as cr:
-                    barrier.wait(timeout=10)
-                    cr.execute(
-                        'INSERT INTO shopify_connector_mutation_attempt '
-                        '(job_id, attempt_token, mutation_domain, '
-                        'transport_attempted, observed_outcome, created_at, '
-                        'create_uid, create_date, write_uid, write_date) '
-                        "VALUES (%s, %s, %s, TRUE, 'pending', NOW(), "
-                        '%s, NOW(), %s, NOW())',
-                        (
-                            job_id, uuid.uuid4().hex,
-                            'mutation_dispatch_selftest',
-                            SUPERUSER_ID, SUPERUSER_ID,
-                        ),
-                    )
-                    cr.commit()
-                    results.put(('created', None, None))
+                start.wait(timeout=10)
+                cr.execute(
+                    'INSERT INTO shopify_connector_mutation_attempt '
+                    '(job_id, attempt_token, mutation_domain, '
+                    'transport_attempted, observed_outcome, created_at, '
+                    'create_uid, create_date, write_uid, write_date) '
+                    "VALUES (%s, %s, %s, TRUE, 'pending', NOW(), "
+                    '%s, NOW(), %s, NOW())',
+                    (
+                        job_id, uuid.uuid4().hex,
+                        'mutation_dispatch_selftest',
+                        SUPERUSER_ID, SUPERUSER_ID,
+                    ),
+                )
+                cr.commit()
+                return {'outcome': 'created'}
             except psycopg2.IntegrityError as exc:
-                results.put(('rejected', exc, exc.pgcode))
-            except BaseException as exc:
-                results.put((
-                    'unexpected', exc,
-                    getattr(exc, 'pgcode', None),
-                ))
+                cr.rollback()
+                return {
+                    'outcome': 'unique_violation',
+                    'exception_class': type(exc).__name__,
+                    'sqlstate': exc.pgcode,
+                }
+            finally:
+                cr.rollback()
+                cr.close()
 
-        threads = [threading.Thread(target=insert_attempt) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=20)
-        self.assertTrue(
-            all(not thread.is_alive() for thread in threads),
-            'both concurrent attempt threads must terminate within 20 seconds',
-        )
-        outcomes = []
-        while not results.empty():
-            outcomes.append(results.get_nowait())
-        self.assertEqual(
-            len(outcomes), 2,
-            'each thread must report exactly one outcome: %r' % outcomes,
-        )
-        unexpected = [row for row in outcomes if row[0] == 'unexpected']
-        self.assertFalse(
-            unexpected,
-            'unexpected concurrent exception(s): %r' % unexpected,
-        )
-        created = [row for row in outcomes if row[0] == 'created']
-        rejected = [row for row in outcomes if row[0] == 'rejected']
-        self.assertEqual(len(created), 1, outcomes)
-        self.assertEqual(len(rejected), 1, outcomes)
+        records = self._run_workers([
+            ('unique-insert-1', insert_attempt),
+            ('unique-insert-2', insert_attempt),
+        ])
+        created = [row for row in records if row['outcome'] == 'created']
+        rejected = [
+            row for row in records if row['outcome'] == 'unique_violation'
+        ]
+        self.assertEqual(len(created), 1, records)
+        self.assertEqual(len(rejected), 1, records)
         loser = rejected[0]
-        self.assertIsInstance(loser[1], psycopg2.IntegrityError)
-        self.assertEqual(
-            loser[2], psycopg2.errorcodes.UNIQUE_VIOLATION,
-            'losing SQLSTATE must be 23505; outcomes=%r' % outcomes,
+        self.assertIn(
+            loser['exception_class'], {'IntegrityError', 'UniqueViolation'},
         )
-        self.assertEqual(loser[2], '23505', outcomes)
+        self.assertEqual(
+            loser['sqlstate'], psycopg2.errorcodes.UNIQUE_VIOLATION,
+            'losing SQLSTATE must be 23505; records=%r' % records,
+        )
+        self.assertEqual(loser['sqlstate'], '23505', records)
         with db_connect(self.env.cr.dbname).cursor() as cr:
             cr.execute(
                 'SELECT count(*) FROM shopify_connector_mutation_attempt '
@@ -522,25 +672,35 @@ class TestMutationConcurrency(TransactionCase):
             )
             cr.commit()
 
-        barrier = threading.Barrier(2)
-        errors = []
+        start = threading.Barrier(2)
 
         def sweep():
+            cr = db_connect(self.env.cr.dbname).cursor()
             try:
-                with db_connect(self.env.cr.dbname).cursor() as cr:
-                    env = api.Environment(cr, SUPERUSER_ID, {})
-                    barrier.wait(timeout=10)
-                    env['shopify.connector.stale.owner.sweep'].run_sweep()
-                    cr.commit()
-            except BaseException as exc:
-                errors.append(exc)
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                start.wait(timeout=10)
+                value = env[
+                    'shopify.connector.stale.owner.sweep'
+                ].run_sweep()
+                cr.commit()
+                return {'outcome': 'sweep', 'value': value}
+            finally:
+                cr.rollback()
+                cr.close()
 
-        threads = [threading.Thread(target=sweep) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=20)
-        self.assertFalse(errors)
+        DispatchClass = type(self.env['shopify.connector.job.dispatch'])
+        with patch.object(
+            DispatchClass, '_transport_mutation_dispatch_selftest',
+            side_effect=AssertionError('mutation transport must not replay'),
+        ) as transport:
+            records = self._run_workers([
+                ('stale-sweep-1', sweep),
+                ('stale-sweep-2', sweep),
+            ])
+            transport.assert_not_called()
+        self.assertEqual(
+            sorted(record['value'] for record in records), [0, 1], records,
+        )
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             attempt = env[
@@ -553,7 +713,7 @@ class TestMutationConcurrency(TransactionCase):
             self.assertEqual(len(reconciliations), 1)
             self.assertEqual(attempt.observed_outcome, 'uncertain')
             self.assertFalse(attempt.resolved_at)
-            self.assertTrue(attempt.remote_evidence_refs['recovery'])
+            self.assertEqual(len(attempt.remote_evidence_refs['recovery']), 1)
             self.assertEqual(
                 attempt.remote_evidence_refs['recovery'][0]['source'],
                 'stale_owner_sweep',
@@ -602,9 +762,16 @@ class TestMutationConcurrency(TransactionCase):
             ]), 1)
 
     def test_invalid_recovery_state_blocks_without_rewriting_attempt(self):
+        self._assert_no_worker_threads()
         _store_id, job_id, attempt_id, token = (
             self._durable_owned_attempt('succeeded')
         )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            before_evidence = dict(env[
+                'shopify.connector.mutation.attempt'
+            ].browse(attempt_id).remote_evidence_refs)
+            cr.rollback()
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             env[
@@ -622,9 +789,13 @@ class TestMutationConcurrency(TransactionCase):
             self.assertEqual(
                 original.manual_review_subreason, 'duplicate_risk',
             )
+            self.assertEqual(
+                attempt.remote_evidence_refs, before_evidence,
+            )
             self.assertFalse(env['shopify.connector.job'].search_count([
                 ('mutation_attempt_id', '=', attempt_id),
             ]))
+            cr.rollback()
 
     def test_no_open_transaction_or_owner_lock_across_net_window(self):
         _store_id, job_id = self._durable_fixture()
@@ -663,36 +834,51 @@ class TestMutationConcurrency(TransactionCase):
         _store_id, job_id, attempt_id, _token = (
             self._durable_owned_attempt('uncertain')
         )
-        barrier = threading.Barrier(2)
-        results = []
-        errors = []
+        start = threading.Barrier(2)
 
         def increment():
-            barrier.wait(timeout=10)
+            start.wait(timeout=10)
+            retry_reasons = []
             for _retry in range(5):
-                with db_connect(self.env.cr.dbname).cursor() as cr:
+                cr = db_connect(self.env.cr.dbname).cursor()
+                try:
                     env = api.Environment(cr, SUPERUSER_ID, {})
-                    try:
-                        count = env[
-                            'shopify.connector.mutation.attempt'
-                        ].browse(
-                            attempt_id
-                        )._record_inconclusive_reconciliation(False)
-                        cr.commit()
-                        results.append(count)
-                        return
-                    except Exception:
-                        cr.rollback()
+                    count = env[
+                        'shopify.connector.mutation.attempt'
+                    ].browse(
+                        attempt_id
+                    )._record_inconclusive_reconciliation(False)
+                    cr.commit()
+                    return {
+                        'outcome': 'counted',
+                        'value': count,
+                        'retry_reasons': tuple(retry_reasons),
+                    }
+                except UserError as exc:
+                    cr.rollback()
+                    if str(exc) != (
+                        'The mutation attempt is owned by another worker.'
+                    ):
+                        raise
+                    retry_reasons.append('production_lock_not_acquired')
+                except psycopg2.errors.SerializationFailure:
+                    cr.rollback()
+                    retry_reasons.append('postgres_serialization_failure')
+                finally:
+                    cr.rollback()
+                    cr.close()
                 threading.Event().wait(0.05)
-            errors.append('increment retry budget exhausted')
+            raise AssertionError(
+                'increment retry budget exhausted: %s' % retry_reasons
+            )
 
-        threads = [threading.Thread(target=increment) for _ in range(2)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=20)
-        self.assertFalse(errors)
-        self.assertEqual(sorted(results), [1, 2])
+        records = self._run_workers([
+            ('inconclusive-increment-1', increment),
+            ('inconclusive-increment-2', increment),
+        ])
+        self.assertEqual(
+            sorted(record['value'] for record in records), [1, 2], records,
+        )
         with db_connect(self.env.cr.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
             attempt = env[

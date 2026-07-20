@@ -16,6 +16,18 @@ from ..models.shopify_connector_mutation_attempt import (
 )
 
 
+def _direct_statement_call_indices(function_node, predicate):
+    """Return only direct expression-statement calls in a function body."""
+    matches = []
+    for index, statement in enumerate(function_node.body):
+        if not isinstance(statement, ast.Expr):
+            continue
+        value = statement.value
+        if isinstance(value, ast.Call) and predicate(value):
+            matches.append(index)
+    return matches
+
+
 class TestMutationDispatch(TransactionCase):
 
     @classmethod
@@ -164,21 +176,6 @@ class TestMutationDispatch(TransactionCase):
         ))
         fn = ast.parse(source).body[0]
 
-        def statement_with_call(predicate, direct=False):
-            matches = []
-            for index, statement in enumerate(fn.body):
-                nodes = (
-                    [statement.value]
-                    if direct and isinstance(statement, ast.Expr)
-                    else ast.walk(statement)
-                )
-                if any(
-                    isinstance(node, ast.Call) and predicate(node)
-                    for node in nodes
-                ):
-                    matches.append(index)
-            return matches
-
         def call_line(predicate):
             matches = [
                 node.lineno for node in ast.walk(fn)
@@ -192,10 +189,10 @@ class TestMutationDispatch(TransactionCase):
             and isinstance(call.func.slice, ast.Constant)
             and call.func.slice.value == key
         )
-        direct_commit = statement_with_call(
+        direct_commit = _direct_statement_call_indices(
+            fn,
             lambda call: isinstance(call.func, ast.Attribute)
             and call.func.attr == 'commit',
-            direct=True,
         )
         self.assertEqual(len(direct_commit), 1)
         positions = [
@@ -226,6 +223,28 @@ class TestMutationDispatch(TransactionCase):
         self.assertIn('side_cr.close()', c2_source)
         self.assertIn('self.env.transaction.reset()', c3_source)
         self.assertNotIn('except BaseException', source)
+
+    def test_direct_commit_detector_ignores_nested_recovery_commits(self):
+        fn = ast.parse(textwrap.dedent('''
+            def sample(self):
+                self.prepare_local()
+                self.env.cr.commit()
+                try:
+                    self.prepare_preconditions()
+                except Exception:
+                    self.env.cr.commit()
+                if self.needs_recovery:
+                    self.env.cr.commit()
+                with self.recovery_context():
+                    self.env.cr.commit()
+        ''')).body[0]
+        matches = _direct_statement_call_indices(
+            fn,
+            lambda call: isinstance(call.func, ast.Attribute)
+            and call.func.attr == 'commit',
+        )
+        self.assertEqual(matches, [1])
+        self.assertEqual(fn.body[matches[0]].lineno, 3)
 
     def test_reconciliation_pending_gate_blocks_claim(self):
         job = self._job(

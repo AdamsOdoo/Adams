@@ -90,6 +90,16 @@ class TestMutationRetention(TransactionCase):
         attempt.with_user(self.admin).action_resolve_mutation_attempt(
             'applied', 'Synthetic external evidence.'
         )
+        self.env.flush_all()
+        self.env.cr.execute(
+            'SELECT resolution_disposition, resolution_source, '
+            'resolution_reason, resolution_uid, resolution_at, resolved_at '
+            'FROM shopify_connector_mutation_attempt WHERE id = %s',
+            (attempt.id,),
+        )
+        resolution_row = self.env.cr.fetchone()
+        self.assertEqual(resolution_row[0], 'applied')
+        self.assertTrue(all(resolution_row[1:]))
         before = attempt.remote_evidence_refs
         self.assertEqual(set(before), {
             'direct', 'recovery', 'reconciliation', 'manual_resolution',
@@ -102,7 +112,15 @@ class TestMutationRetention(TransactionCase):
             'SET resolved_at = %s WHERE id = %s',
             (fields.Datetime.now() - timedelta(days=181), attempt.id),
         )
-        attempt.invalidate_recordset()
+        attempt.invalidate_recordset(['resolved_at'])
+        cutoff = fields.Datetime.now() - timedelta(
+            days=self.Retention._attempt_evidence_retention_days(),
+        )
+        eligible = self.Attempt.search([
+            ('resolved_at', '!=', False),
+            ('resolved_at', '<', cutoff),
+        ], order='store_id, id')
+        self.assertEqual(eligible, attempt)
         preserved_fields = [
             'job_id', 'attempt_token', 'mutation_domain',
             'business_intent_fingerprint', 'exact_request_fingerprint',
@@ -113,6 +131,8 @@ class TestMutationRetention(TransactionCase):
         preserved = attempt.read(preserved_fields)[0]
         self.assertEqual(self.Retention._run_attempt_evidence_masking(), 1)
         self.assertEqual(attempt.remote_mutation_intent, {'masked': True})
+        self.assertEqual(attempt.preconditions_snapshot, {'masked': True})
+        self.assertEqual(attempt.remote_evidence_refs, {'masked': True})
         self.assertEqual(attempt.read(preserved_fields)[0], preserved)
         self.assertTrue(attempt.exists())
 
