@@ -1,7 +1,7 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** FINAL STATIC ADVERSARIAL GATE PASSED — INDEPENDENT FRESH-BUILD
-  ODOO.SH RERUN REQUIRED
+- **Status:** RUNTIME CAMPAIGN 2 CORRECTED STATICALLY — CAMPAIGN 3
+  TARGETED-FIRST RUNTIME REQUIRED
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
@@ -16,6 +16,11 @@
   `adamsmen-sol-wave-3-stage-0-layer2-35125006`
 - **Runtime-correction ruling:** PR #178 comment `5016941832`
 - **Final adversarial review:** PR #178 comment `5017091126`
+- **Runtime Campaign 2 tested SHA:**
+  `42ef28e36be89754a4d2042eae7637a06cefd89a`
+- **Runtime Campaign 2 build / database:** `35127417` /
+  `adamsmen-sol-wave-3-stage-0-layer2-35127417`
+- **Runtime Campaign 2 ruling:** PR #178 comment `5018637342`
 - **Frozen candidate:** the commit containing this record; its exact SHA is
   recorded in the final PR body and control-room report because a Git commit
   cannot embed its own SHA.
@@ -24,8 +29,10 @@
 ## 1. Identity and synchronization
 
 The historical pre-synchronization identity gate verified PR #178 open, draft,
-unmerged, at its then-current 23-path scope. The current cumulative scope is 27
-paths. PR #179 was closed and merged at the accepted Gate B integration SHA.
+unmerged, at its then-current 23-path scope. The pre-correction Campaign 2
+identity gate found 27 paths; this correction brings the current cumulative
+scope to 30 paths. PR #179 was closed and merged at the accepted Gate B
+integration SHA.
 Binding comments `5016117207`, `5016274358`, and `5016306005` existed and were
 read in full.
 
@@ -174,6 +181,66 @@ guard. Existing attempt/attempts write/unlink, direct environment lookup, and
 forged `_surface` detection remains, while unrelated store/job `self.write`
 continues to be ignored.
 
+## 2D. Runtime Campaign 2 and bounded test-harness correction
+
+Runtime Campaign 2 tested exact SHA
+`42ef28e36be89754a4d2042eae7637a06cefd89a` on fresh Odoo.sh build
+`35127417`, database
+`adamsmen-sol-wave-3-stage-0-layer2-35127417`. Clean install passed,
+same-SHA update passed, runtime was **not green**, the prior scheduled-drain
+failure passed, process-death produced the expected environment skip, and the
+zero-real-Shopify proof passed.
+
+Control-room ruling `5018637342` classified the deterministic findings as
+test-harness or stale-test defects: the dispatch AST selector counted nested
+commits; independent-cursor threads omitted Odoo 19 `release_test_lock()`;
+coordination could strand workers; outcomes and exceptions were inconsistently
+reported; uniqueness cleanup depended on nullable related `attempt.store_id`;
+retention SQL ran before ORM resolution flush; and two legacy tests duplicated
+obsolete raw sudo-count contracts.
+
+The corrected harness uses a direct-expression AST selector with an adversarial
+nested-commit fixture, one named-worker runner with dedicated channels and
+`release_test_lock()`, exact retry classification, bounded joins, and
+ownership-key cleanup with zero-residue diagnostics. Retention now flushes and
+proves eligibility before masking. Credential service owns one canonical
+filename/method/receiver/ordinal/purpose sudo inventory; job-log and readiness
+tests consume exact local subsets.
+
+The bounded correction commits are:
+
+1. `240484b8c29275db40e6316e7ccc5913a324bec0` — dispatch, concurrency,
+   cleanup, and retention harness corrections;
+2. `9243dc6c3a5d94620981516bdc0a97d8809bbbdd` — canonical sudo inventory
+   and legacy-test corrections;
+3. the commit containing this record — lessons, Campaign 2 evidence, and
+   candidate freeze; its exact SHA is recorded in the PR body and final
+   control-room report.
+
+`autopost_bills` remains an environment/module-ordering artifact: fresh
+install/build-phase tests did not show it, while early-module
+`-u --test-enable` did. Campaign 3 authoritative at-install evidence must come
+from the fresh build phase; a same-SHA update is registry/update evidence, not
+authoritative at-install regression evidence. No `account` dependency or
+production change was made.
+
+C1 ownership, stale-owner recovery, concurrent inconclusive counting, and
+invalid-state recovery remain **not yet proven production defects**. Campaign 3
+must determine them with the corrected isolated harness. The permanent controls
+are recorded in `runtime-lessons-learned.md`.
+
+### Campaign 3 execution order
+
+**Stage A — known blockers:** run only the dispatch sequence test, the complete
+`TestMutationConcurrency` class, resolved-uncertain masking, job-log sudo
+inventory, and readiness sudo inventory tests. If Stage A fails, stop and
+return complete Stage A evidence.
+
+**Stage B — focused Stage 0:** run all nine Stage 0 modules only after Stage A
+passes. If Stage B fails, stop before full regression.
+
+**Stage C — full connector regression:** run only after Stages A and B pass.
+
 ## 3. Binding A–N traceability
 
 | Binding | Production method(s) | Exact test evidence | Runtime proof | Rollback / fail-closed behavior |
@@ -276,26 +343,25 @@ The bounded campaign after `8915a2c` modifies exactly 13 authorized paths:
 three production models, all nine existing Stage 0 test modules, and this
 validation record. It creates no file.
 
-Runtime Campaign 1 correction after `033858b8` modifies exactly 14 authorized
+Runtime Campaign 1 correction after `033858b8` modified exactly 14 authorized
 paths: one production dispatcher, eight Stage 0 test modules, the four
-authorized legacy regression modules, and this validation record. The
-cumulative PR contains exactly the authorized maximum of 27 existing paths;
-it creates no file.
+authorized legacy regression modules, and this validation record. At that
+historical candidate the cumulative PR contained 27 existing paths.
 
 ## 6. Static validation actually executed
 
 | Check | Result |
 |---|---|
-| Python compile/AST parse of all 20 available addon Python files | PASS |
+| Python compile/AST parse of all 31 available addon Python files | PASS |
 | XML parse of the stale-owner cron | PASS |
 | Manifest literal parse and model/ACL/cron registration audit | PASS |
 | CSV parse of 26 ACL rows | PASS |
-| 88-character line scan | PASS |
+| 88-character line scan of the six corrected Python files | PASS |
 | Legacy marker/strategy/call literal scans | PASS |
 | GraphQL/raw-transport/source-guard audit | PASS (static source inspection; Odoo test execution pending) |
 | Credential, token, real-domain, and PII/logging audit | PASS — no real value or call |
 | Git patch trailing-whitespace / diff-check audit | PASS |
-| Integration comparison | PASS — zero behind and exactly 27 PR paths |
+| Integration comparison | PASS — zero behind; candidate scope exactly 30 PR paths |
 | Gate B byte-preservation audit | PASS |
 | Recovery-state/admission AST ownership audit | PASS |
 | Nine-module job-type/job-source fixture audit | PASS |
@@ -304,13 +370,21 @@ it creates no file.
 | Runtime Campaign 1 deterministic/stale finding traceability | PASS |
 | Exact dispatcher create-site inventory | PASS — one sanctioned site |
 | Exact method/receiver/purpose sudo inventory | PASS — 48 sites |
+| Canonical sudo inventory against all model ASTs | PASS — exact 48-site match |
+| Legacy job-log/readiness sudo subsets | PASS — exact owner-qualified subsets |
 | Thirteen-file fixture and tag audit | PASS |
 | Repository-wide duplicate test-method AST scan | PASS — no duplicates |
 | Synthetic duplicate-method detector fixture | PASS — duplicate reported |
-| Concurrent uniqueness source audit | PASS — IntegrityError and SQLSTATE 23505 required |
 | Attempt-write positive/negative fixtures | PASS |
 | External same-name attempt-write bypass fixtures | PASS — all rejected |
-| Current cumulative changed-file comparison | PASS — zero behind, exactly 27 paths |
+| Direct-statement commit detector adversarial proof | PASS — nested commits ignored |
+| Central worker-runner AST audit | PASS — only runner starts/joins threads |
+| Odoo test-lock harness audit | PASS — `release_test_lock()` encloses worker lifetime |
+| Concurrent uniqueness source audit | PASS — exact `23505`; arbitrary failures rejected |
+| Ownership-key cleanup source audit | PASS — job/attempt/child/log/store residue checked |
+| Resolved-retention source audit | PASS — ORM flush and eligibility precede masking |
+| Runtime lessons register/checklist audit | PASS — LL-001 through LL-012 present |
+| Current cumulative changed-file comparison | PASS — zero behind, exactly 30 paths |
 
 Odoo and PostgreSQL executables are unavailable in this workspace. Therefore
 install/upgrade, ORM constraints, ACL runtime, cron execution, all Odoo tests,
@@ -346,7 +420,7 @@ contains no inventory, fulfillment, refund, or payout mutation implementation.
 No Shopify token was read, no credential-backed request was made, and no real
 Shopify mutation was executed.
 
-The PR changes exactly these 27 existing authorized paths:
+The PR changes exactly these 30 authorized paths:
 
 1. `addons/shopify_connector_core/__manifest__.py`
 2. `addons/shopify_connector_core/data/shopify_connector_stale_owner_sweep_cron.xml`
@@ -375,8 +449,11 @@ The PR changes exactly these 27 existing authorized paths:
 25. `addons/shopify_connector_core/tests/test_mutation_security.py`
 26. `addons/shopify_connector_core/tests/test_mutation_source_guards.py`
 27. `docs/05-qa/task-stage0-layer2-validation-results.md`
+28. `addons/shopify_connector_core/tests/test_job_log_system_append.py`
+29. `addons/shopify_connector_core/tests/test_readiness_slot_closure.py`
+30. `docs/05-qa/runtime-lessons-learned.md`
 
-No production code changed in the final adversarial campaign. No Gate B
+No production code changed in the Runtime Campaign 2 correction. No Gate B
 document, decision record, inventory addon, other addon, CI/workflow, Wave 3
 handoff, or Task 013/013B implementation changed. PR #178 remains open, draft,
 and unmerged. Odoo/PostgreSQL runtime remains pending independent fresh-build
@@ -384,5 +461,5 @@ execution; runtime green is not claimed.
 
 ## 9. Recommendation
 
-**FINAL STATIC ADVERSARIAL GATE PASSED — READY FOR INDEPENDENT FRESH-BUILD
-ODOO.SH RERUN**
+**RUNTIME CAMPAIGN 2 CORRECTED STATICALLY — READY FOR TARGETED-FIRST
+CAMPAIGN 3**
