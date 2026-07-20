@@ -1,6 +1,13 @@
 # Wave 3 Stage 0 — DEC-031 Layer 2 Validation Results
 
-- **Status:** CAMPAIGN 3 DIAGNOSIS CORRECTED — FINAL RUNTIME CLOSURE REQUIRED
+- **Status:** STAGE 0 RUNTIME ACCEPTED WITH ONE INFRASTRUCTURE-DEFERRED PROOF
+  (product-owner ruling `5020947103`) — READY FOR FINAL STAGE 0 CONTROL-ROOM
+  REVIEW
+- **Final closure runtime-tested SHA:**
+  `d5159a1eef2c90f6687c583db551d9e787709699`
+- **Final closure build / database:** `35145929` /
+  `adamsmen-sol-wave-3-stage-0-layer2-35145929`
+- **Binding product-owner disposition:** PR #178 comment `5020947103`
 - **Original Stage 0 base:** `mvp/program-integration@3a2043cb8d45a4b9bc7bdb3ea39b58515e706da9`
 - **Pre-synchronization head:** `644853a68b3497c134ee648ce7399e50d30ff397`
 - **Accepted Gate B integration:** `8e2e707ff7025a7a2e9e0207a8886399a24b889c`
@@ -519,6 +526,154 @@ changed. PR #178 remains open, draft, and unmerged. Odoo/PostgreSQL runtime
 remains pending independent fresh-build execution; runtime green is not
 claimed.
 
-## 9. Recommendation
+## 9. Environment-limited Stage 0 runtime acceptance (build 35145929)
 
-**CAMPAIGN 3 DIAGNOSIS CORRECTED — READY FOR FINAL RUNTIME CLOSURE**
+Executed under binding product-owner ruling `5020947103` on the exact candidate
+`d5159a1eef2c90f6687c583db551d9e787709699`, fresh build `35145929`, database
+`adamsmen-sol-wave-3-stage-0-layer2-35145929`, Odoo `19.0`, dev stage. No new
+build was requested; no code, test, fixture, or assertion was modified.
+
+**Identity.** Deployed `HEAD` = branch tip `origin/sol/wave-3-stage-0-layer2` =
+`d5159a1…`; base `mvp/program-integration@8e2e707f…` with the branch zero
+commits behind and the base an ancestor; exactly 31 changed paths; protected
+`checkpoint/core-r2-readonly-uat-2026-07-15` = `acd8c469…` unchanged; no Task
+013 / 013B branch or PR present in the checkout.
+
+**Clean install (authoritative, fresh build/test phase).** PASS. Build
+`35145929` installed `adams_base, shopify_connector_core,
+shopify_connector_product, shopify_connector_sale` with `--test-enable` and
+returned `odoo.tests.result: 0 failed, 0 error(s) of 825 tests`. Registry
+loaded. Model `shopify.connector.mutation.attempt` and its fields, the
+non-negative-reconciliation check constraint, the `one_attempt_per_job` and
+`attempt_token` unique indexes, the four read-only attempt ACLs (admin,
+auditor, operator, reviewer), and the five connector crons (including the
+five-minute Layer 2 stale-owner sweep) are all present.
+
+**Same-SHA update.** PASS. `odoo-bin -u shopify_connector_core` reloaded the
+module (236 queries), loaded 92 modules, and reported `Registry loaded in
+7.328s` with a clean shutdown and zero real errors; model, constraints,
+indexes, ACLs, and crons remain. This is registry/update evidence only;
+baseline-to-candidate upgrade remains deferred to Wave 6.
+
+**Stage A (targeted regression, exact head).** All green.
+
+- A1 invalid recovery — `4 passed, 0 failed, 0 error`. Succeeded and
+  failed-clean attempts remain unchanged with their resolution timestamp and
+  evidence; the running original job blocks as
+  `blocked_manual_review / data_shape_schema_mismatch / duplicate_risk`; no
+  reconciliation job is created for the invalid state; pending and
+  unresolved-uncertain recovery still admit exactly one reconciliation job; a
+  temporary `UserError` ownership refusal neither rewrites nor blocks the
+  attempt.
+- A2 AST / source / harness contracts — `6 passed, 0 failed, 0 error`.
+  Dispatch exception handlers are not shadowed; the shadowing detector rejects
+  superclass-first and accepts specific-first; the direct-commit detector
+  ignores nested recovery commits; the external harness defines all three
+  scenarios, uses `spawn`, and is not imported by `tests/__init__.py`; no
+  standard worker thread constructs an ORM `Environment`.
+- A3 SQLSTATE `23505` — `1 passed, 0 failed, 0 error`. One insert commits and
+  the losing insert raises SQLSTATE `23505` on
+  `shopify_connector_mutation_attempt_one_attempt_per_job`; exactly one attempt
+  survives; cleanup leaves zero residue.
+
+**Stage B — nine Stage 0 modules (authoritative, fresh build/test phase).**
+Green. All nine ran in build `35145929`; the run's global result is
+`0 failed, 0 error(s)`; the only skip is the accepted opt-in process-death
+skip.
+
+| Module / class | Phase | Tests | Fail | Error | Skip |
+|---|---|---|---|---|---|
+| `test_mutation_api_guard` · `TestMutationApiGuard` | at_install | 8 | 0 | 0 | 0 |
+| `test_mutation_attempt` · `TestMutationAttempt` | at_install | 15 | 0 | 0 | 0 |
+| `test_mutation_concurrency` · `TestMutationConcurrency` | post_install | 18 | 0 | 0 | 0 |
+| `test_mutation_dispatch` · `TestMutationDispatch` | at_install | 10 | 0 | 0 | 0 |
+| `test_mutation_reconciliation` · `TestMutationReconciliation` | at_install | 10 | 0 | 0 | 0 |
+| `test_mutation_recovery` · `TestMutationRecovery` | at_install | 5 | 0 | 0 | 1 (opt-in process-death) |
+| `test_mutation_retention` · `TestMutationRetention` | at_install | 4 | 0 | 0 | 0 |
+| `test_mutation_security` · `TestMutationSecurity` | at_install | 4 | 0 | 0 | 0 |
+| `test_mutation_source_guards` · `TestMutationSourceGuards` | at_install | 15 | 0 | 0 | 0 |
+| **Total** | | **89** | **0** | **0** | **1 accepted** |
+
+A same-head targeted corroboration run
+(`odoo-bin -u shopify_connector_core --test-enable --test-tags <the nine
+classes>`) executed five classes clean —
+`0 failed, 0 error(s) of 56 tests` (ApiGuard 8, Concurrency 18, Dispatch 10,
+Recovery 5, SourceGuards 15) with the same single opt-in process-death skip —
+while `TestMutationAttempt`, `TestMutationReconciliation`,
+`TestMutationRetention`, and `TestMutationSecurity` errored at `setUpClass`
+**solely** on the known `autopost_bills` reused-database artifact
+(`NotNullViolation: null value in column "autopost_bills" of relation
+"res_partner"` while creating the fixture partner, before any connector code
+runs). That artifact is absent from the authoritative fresh build; per ruling
+`5020947103` and §5 it is classified separately and the fresh-build evidence
+governs those four classes.
+
+**Stage C — full connector regression (authoritative, fresh build/test
+phase).** Green. The fresh build's `--test-enable` run over
+`/adams_base, /shopify_connector_core, /shopify_connector_product,
+/shopify_connector_sale` returned `0 failed, 0 error(s) of 825 tests`. The
+current integration baseline contains exactly three connector addons; a
+targeted `-u --test-enable` rerun of product/sale is likewise governed by the
+fresh-build evidence because it is blocked solely by the same `autopost_bills`
+artifact.
+
+| Connector addon | Executed test methods (Starting markers) | Fail | Error | Skip |
+|---|---|---|---|---|
+| `shopify_connector_core` | 449 | 0 | 0 | 1 (opt-in process-death) |
+| `shopify_connector_product` | 182 | 0 | 0 | 0 |
+| `shopify_connector_sale` | 194 | 0 | 0 | 0 |
+| `adams_base` (base module in tag scope) | 0 connector tests | 0 | 0 | 0 |
+| **Total** | **825** | **0** | **0** | **1 accepted** |
+
+`shopify_connector_customer` is **not present** in this baseline; there is no
+customer coverage to establish. (Odoo's per-module `odoo.tests.stats` counter
+read `core 529 / product 202 / sale 232`; the authoritative executed-method
+total is the `odoo.tests.result` value `825`, independently corroborated by the
+825 per-test `Starting` markers, split `449 / 182 / 194`.)
+
+**SQLSTATE 23505 proof.** Green — one committed attempt, one SQLSTATE `23505`
+loser on `one_attempt_per_job` (Stage A3 at head; also exercised by the
+fresh-build `TestMutationConcurrency`).
+
+**Invalid-recovery proof.** Green — Stage A1 at head, four tests, as above; the
+`fe3eb18` specific-to-general handler order routes invalid committed-attempt
+recovery to a blocked original job with no reconciliation job.
+
+**Zero-fixture-residue proof.** PASS — every proof used `TransactionCase`
+rollback or explicit ownership-keyed cleanup; the database independently shows
+zero `layer2-runtime-*` stores, zero `Layer 2 % administrator` partners, zero
+`mutation_dispatch_selftest*` jobs, and zero selftest attempts after all runs.
+
+**Zero-real-Shopify proof.** PASS — zero stores with a credential present; only
+the synthetic `mutation_dispatch_selftest` / `…_reconcile` domains are
+registered; no `inventorySetQuantities`, `inventoryActivate`,
+`fulfillmentCreate`, `refundCreate`, `productSet`, or comparable real mutation
+verb exists in production source; no token was read and no Shopify host was
+contacted.
+
+**External harness — infrastructure disposition (ruling 5020947103).**
+External spawned-process concurrency harness not executable on Odoo.sh because
+multiprocessing semaphore creation requires writable `/dev/shm`; structural
+contract is green, SQLSTATE 23505 concurrency is green, and genuine multiprocess
+execution is deferred to a child-process-capable runner before release
+readiness. The observed `OSError [Errno 30] EROFS` occurs at
+`multiprocessing … SemLock` before any child, Registry, Environment, SQL
+operation, or transport is reached (independently reproduced with a minimal
+`multiprocessing.Queue()`); the container mounts `/` and `/dev/shm` read-only,
+with no `sudo`, `no_new_privs` set, and user namespaces disabled. It is not a
+connector defect and is not part of the Stage B/Stage C green calculation.
+Owner/deadline: the genuine spawned-process proof remains **mandatory** before
+final release readiness, no later than Wave 6.
+
+## 10. Recommendation
+
+**RUNTIME ACCEPTED WITH ONE INFRASTRUCTURE-DEFERRED PROOF — READY FOR FINAL
+STAGE 0 CONTROL-ROOM REVIEW.** Stage A, Stage B (nine modules), and Stage C
+(full connector regression) are green on the authoritative fresh build
+`35145929` for `d5159a1…`; install, same-SHA update, SQLSTATE 23505,
+invalid-recovery, zero-residue, and zero-real-Shopify are proven; the
+`autopost_bills` reused-database artifact and the opt-in process-death skip are
+classified separately; and the external multiprocess execution is
+infrastructure-deferred to a child-process-capable runner before release
+readiness. PR #178 remains draft and unmerged; no implementation or test file
+was changed; Task 013 / 013B are not begun.
