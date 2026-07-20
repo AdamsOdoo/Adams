@@ -49,6 +49,7 @@ later, separately authorized tasks.
         'data/shopify_connector_cron_drain.xml',
         'data/shopify_connector_cron_disconnect.xml',
         'data/shopify_connector_pii_retention_cron.xml',
+        'data/shopify_connector_stale_owner_sweep_cron.xml',
     ],
     'installable': True,
     'application': False,

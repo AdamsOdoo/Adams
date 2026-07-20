@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <record id="ir_cron_shopify_connector_stale_owner_sweep" model="ir.cron">
+            <field name="name">Shopify Connector: Layer 2 Stale Owner Sweep</field>
+            <field name="model_id" ref="model_shopify_connector_stale_owner_sweep"/>
+            <field name="state">code</field>
+            <field name="code">model.run_sweep()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

@@ -1,13 +1,25 @@
 from datetime import timedelta
 import logging
+import os
 import random
+import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import ValidationError
+from odoo.exceptions import UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from ..tools.redaction import redact
-from .shopify_connector_job import BUSINESS_JOB_SOURCES, MANUAL_REVIEW_SUBREASON_SELECTION
+from .shopify_connector_job import (
+    BUSINESS_JOB_SOURCES,
+    ERROR_CLASS_SELECTION,
+    MANUAL_REVIEW_SUBREASON_SELECTION,
+)
+from .shopify_connector_mutation_attempt import (
+    C2_SENTINEL_CONTEXT,
+    C2_SIDE_CURSOR_SENTINEL,
+    INCONCLUSIVE_RECONCILIATION_CAP,
+    canonical_sha256,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -100,6 +112,30 @@ REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE = 'remote_effect_not_replay_safe'
 REPLAY_SAFE_RETRY_POLICIES = (
     REPLAY_POLICY_LOCAL_ONLY,
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
+)
+
+MUTATION_STRATEGY_KEYS = frozenset((
+    'reconciliation_job_type',
+    'prepare_local',
+    'prepare_preconditions',
+    'transport',
+    'classify_direct_result',
+    'reconcile',
+    'apply_consequence',
+))
+DIRECT_ACTIONS = frozenset((
+    'succeed', 'fail_final', 'block_manual_review', 'reconcile',
+    'domain_callback',
+))
+RECONCILIATION_ACTIONS = frozenset((
+    'succeed', 'fail_final', 'cancel', 'block_manual_review',
+    'domain_callback',
+))
+REGISTERED_ERROR_CLASSES = frozenset(
+    value for value, _label in ERROR_CLASS_SELECTION
+)
+REGISTERED_MANUAL_SUBREASONS = frozenset(
+    value for value, _label in MANUAL_REVIEW_SUBREASON_SELECTION
 )
 
 
@@ -210,6 +246,15 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             return False
         job_id = claimed.id
 
+        if self._is_mutation_job_type(claimed.job_type):
+            if not self._concurrency_retry_supported():
+                raise ValidationError(
+                    'Layer 2 mutation dispatch requires an owned cursor with '
+                    'real commit boundaries.'
+                )
+            self._drain_mutation_one(claimed)
+            return True
+
         if not self._concurrency_retry_supported():
             # The shared in-test transaction cursor forbids commit/rollback, so
             # the per-job transaction boundary below cannot run here. The
@@ -303,6 +348,47 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         if not locked:
             self.env.cr.commit()
             return
+        # Layer 2: a durably-running owned mutation is not claimable, but a
+        # committed C2 attempt means transport may have occurred. Reconcile;
+        # never invoke the mutation handler again.
+        locked.invalidate_recordset()
+        if (
+            locked.state == 'running'
+            and locked.current_attempt_token
+            and self._is_mutation_job_type(locked.job_type)
+        ):
+            attempt = self.env[
+                'shopify.connector.mutation.attempt'
+            ].search([
+                ('job_id', '=', locked.id),
+                ('attempt_token', '=', locked.current_attempt_token),
+            ], limit=1)
+            if attempt and attempt.transport_attempted:
+                self._recover_committed_attempt_to_reconciliation(
+                    locked,
+                    attempt,
+                    'post_c2_owner_recovery',
+                    'dispatcher_recovery',
+                )
+                self.env.cr.commit()
+                return
+            # C1 committed but C2 did not: no transport was possible.
+            from_state = locked.state
+            locked.sudo().write({
+                'state': 'retry_waiting',
+                'next_retry_at': fields.Datetime.now(),
+                'current_attempt_token': False,
+                'owner_worker_ref': False,
+                'running_since': False,
+            })
+            locked._log_transition(
+                'state_change',
+                'Recovered a C1-only mutation owner; safe requeue before C2.',
+                from_state=from_state,
+                to_state='retry_waiting',
+            )
+            self.env.cr.commit()
+            return
         # (3) Revalidate CLAIMABLE state UNDER the lock (mirrors
         # ``_claim_for_dispatch``): only a still-queued or genuinely-due
         # retry_waiting job may be routed; a running/terminal/otherwise
@@ -350,6 +436,983 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
         self.env.cr.commit()
 
+    # ------------------------------------------------------------------
+    # DEC-031 Layer 2 mutation protocol
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _get_reconciliation_strategies(self):
+        """Mutation-domain registry; domain addons extend by add-only merge."""
+        return {
+            'mutation_dispatch_selftest': {
+                'reconciliation_job_type':
+                    'mutation_dispatch_selftest_reconcile',
+                'prepare_local': self._prepare_local_mutation_selftest,
+                'prepare_preconditions':
+                    self._prepare_preconditions_mutation_selftest,
+                'transport': self._transport_mutation_dispatch_selftest,
+                'classify_direct_result':
+                    self._classify_direct_mutation_selftest,
+                'reconcile': self._reconcile_mutation_dispatch_selftest,
+                'apply_consequence':
+                    self._apply_consequence_mutation_selftest,
+            },
+        }
+
+    @api.model
+    def _validated_mutation_strategy(self, mutation_domain):
+        strategy = self._get_reconciliation_strategies().get(mutation_domain)
+        if (
+            not isinstance(strategy, dict)
+            or set(strategy) != MUTATION_STRATEGY_KEYS
+            or not isinstance(strategy.get('reconciliation_job_type'), str)
+            or not strategy.get('reconciliation_job_type')
+            or any(
+                not callable(strategy.get(key))
+                for key in MUTATION_STRATEGY_KEYS
+                if key != 'reconciliation_job_type'
+            )
+        ):
+            raise ValidationError(
+                'The mutation strategy is missing or malformed.'
+            )
+        return strategy
+
+    @api.model
+    def _is_mutation_job_type(self, job_type):
+        return job_type in self._get_reconciliation_strategies()
+
+    @api.model
+    def _prepare_local_mutation_selftest(self, job):
+        return {
+            'mutation_domain': job.job_type,
+            'job_id': job.id,
+            'store_id': job.store_id.id,
+            'expected_connection_generation':
+                job.expected_connection_generation,
+            'expected_store_identity': job.store_id.shop_domain,
+            'synthetic_outcome': 'succeeded',
+        }
+
+    @api.model
+    def _prepare_preconditions_mutation_selftest(
+        self, local_snapshot, owner_context,
+    ):
+        if owner_context['job_id'] != local_snapshot['job_id']:
+            raise ValidationError('The synthetic owner snapshot is invalid.')
+        idempotency_key = uuid.uuid4().hex
+        operation = (
+            'mutation MutationDispatchSelftest($idempotencyKey: String!) { '
+            'shop { id } @idempotent(key: $idempotencyKey) }'
+        )
+        return {
+            'mutation_domain': local_snapshot['mutation_domain'],
+            'operation': operation,
+            'variables': {'idempotencyKey': idempotency_key},
+            'business_intent': {
+                'mutation_domain': local_snapshot['mutation_domain'],
+                'store_id': local_snapshot['store_id'],
+                'job_id': local_snapshot['job_id'],
+            },
+            'remote_mutation_intent': {
+                'operation_name': 'MutationDispatchSelftest',
+                'store_id': local_snapshot['store_id'],
+                'job_id': local_snapshot['job_id'],
+            },
+            'preconditions_snapshot': {
+                'expected_connection_generation':
+                    local_snapshot['expected_connection_generation'],
+                'expected_store_identity':
+                    local_snapshot['expected_store_identity'],
+            },
+            'expected_connection_generation':
+                local_snapshot['expected_connection_generation'],
+            'expected_store_identity':
+                local_snapshot['expected_store_identity'],
+            'shopify_idempotency_key': idempotency_key,
+            'synthetic_outcome': local_snapshot['synthetic_outcome'],
+        }
+
+    @api.model
+    def _transport_mutation_dispatch_selftest(self, request, attempt_context):
+        del attempt_context
+        return {
+            'outcome': request.get('synthetic_outcome', 'succeeded'),
+            'evidence': {'transport': 'synthetic_stub'},
+        }
+
+    @api.model
+    def _classify_direct_mutation_selftest(self, result):
+        code = (result or {}).get('error_code')
+        evidence = dict((result or {}).get('evidence') or {})
+        if code == 'IDEMPOTENCY_CONCURRENT_REQUEST':
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': 'concurrency_race_conflict',
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'Synthetic idempotency concurrency uncertainty.',
+                'evidence': evidence,
+            }
+        if code == 'THROTTLED':
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': 'shopify_throttling_rate_limit',
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'Synthetic throttling uncertainty.',
+                'evidence': evidence,
+            }
+        if code in (
+            'IDEMPOTENCY_KEY_PARAMETER_MISMATCH',
+            'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED',
+        ):
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': 'idempotency_contract_violation',
+                'manual_review_subreason':
+                    'idempotency_contract_violation',
+                'action': 'block_manual_review',
+                'message': 'Synthetic idempotency contract violation.',
+                'evidence': evidence,
+            }
+        outcome = (result or {}).get('outcome')
+        if outcome == 'succeeded':
+            action = 'succeed'
+            error_class = False
+        elif outcome == 'failed_clean':
+            action = 'fail_final'
+            error_class = 'shopify_user_errors_validation'
+        elif outcome == 'uncertain':
+            action = 'reconcile'
+            error_class = 'shopify_temporary_server_network'
+        else:
+            raise ValidationError('The direct result is malformed.')
+        return {
+            'observed_outcome': outcome,
+            'error_class': error_class,
+            'manual_review_subreason': False,
+            'action': action,
+            'message': 'Synthetic direct mutation outcome: %s.' % outcome,
+            'evidence': evidence,
+        }
+
+    @api.model
+    def _reconcile_mutation_dispatch_selftest(self, attempt):
+        return {
+            'verdict': 'applied',
+            'observed_store_identity': attempt.expected_store_identity,
+            'action': 'succeed',
+            'error_class': False,
+            'manual_review_subreason': False,
+            'message': 'Synthetic read-only reconciliation applied.',
+            'evidence': {'reconciliation': 'synthetic_stub'},
+        }
+
+    @api.model
+    def _apply_consequence_mutation_selftest(
+        self, job, attempt, phase, consequence, reconciliation_job=False,
+    ):
+        del job, attempt, phase, consequence, reconciliation_job
+        return True
+
+    @api.model
+    def _handle_mutation_dispatch_selftest(self, job):
+        raise ValidationError(
+            'Mutation jobs must be executed by the C1/C2/NET/C3 wrapper.'
+        )
+
+    @api.model
+    def _safe_message(self, value, fallback):
+        if not isinstance(value, str) or not value.strip():
+            return fallback
+        return redact(value.strip())
+
+    @api.model
+    def _validate_job_consequence(self, value, phase):
+        if not isinstance(value, dict):
+            raise ValidationError('A mutation consequence must be a dict.')
+        required = {
+            'observed_outcome', 'error_class', 'manual_review_subreason',
+            'action', 'message', 'evidence',
+        }
+        allowed = required | {'domain_payload'}
+        if set(value) - allowed or required - set(value):
+            raise ValidationError(
+                'The mutation consequence has an invalid field set.'
+            )
+        consequence = dict(value)
+        outcome = consequence['observed_outcome']
+        error_class = consequence['error_class'] or False
+        subreason = consequence['manual_review_subreason'] or False
+        action = consequence['action']
+        if outcome not in ('succeeded', 'failed_clean', 'uncertain'):
+            raise ValidationError('Unknown mutation observed outcome.')
+        if error_class and error_class not in REGISTERED_ERROR_CLASSES:
+            raise ValidationError('Unknown mutation error class.')
+        if subreason and subreason not in REGISTERED_MANUAL_SUBREASONS:
+            raise ValidationError('Unknown manual-review subreason.')
+        if not isinstance(consequence['evidence'], dict):
+            raise ValidationError('Mutation evidence must be a dict.')
+        if not isinstance(consequence.get('domain_payload', {}), dict):
+            raise ValidationError('Mutation domain_payload must be a dict.')
+        consequence['domain_payload'] = dict(
+            consequence.get('domain_payload') or {}
+        )
+        consequence['evidence'] = dict(consequence['evidence'])
+        consequence['error_class'] = error_class
+        consequence['manual_review_subreason'] = subreason
+        consequence['message'] = self._safe_message(
+            consequence['message'], 'Mutation consequence recorded.',
+        )
+        if phase == 'direct':
+            if action not in DIRECT_ACTIONS:
+                raise ValidationError('Unknown direct mutation action.')
+            if action == 'succeed' and outcome != 'succeeded':
+                raise ValidationError('succeed requires a succeeded outcome.')
+            if action == 'fail_final' and (
+                outcome != 'failed_clean' or not error_class
+            ):
+                raise ValidationError(
+                    'fail_final requires failed_clean and an error class.'
+                )
+            if action == 'reconcile' and outcome != 'uncertain':
+                raise ValidationError('reconcile requires uncertainty.')
+        else:
+            if action not in RECONCILIATION_ACTIONS:
+                raise ValidationError(
+                    'Unknown resolved mutation consequence action.'
+                )
+            if outcome != 'uncertain':
+                raise ValidationError(
+                    'Resolved consequences retain the uncertain machine outcome.'
+                )
+        if action == 'block_manual_review' and (
+            not error_class or not subreason
+        ):
+            raise ValidationError(
+                'Manual-review blocking requires registered vocabulary.'
+            )
+        return consequence
+
+    @api.model
+    def _validate_prepared_request(self, request, job_id, token, job_type):
+        if not isinstance(request, dict):
+            raise ValidationError('Prepared mutation request must be a dict.')
+        required = {
+            'mutation_domain', 'operation', 'variables', 'business_intent',
+            'remote_mutation_intent', 'preconditions_snapshot',
+            'expected_connection_generation', 'expected_store_identity',
+            'shopify_idempotency_key',
+        }
+        if required - set(request):
+            raise ValidationError('Prepared mutation request is incomplete.')
+        if (
+            request['mutation_domain'] != job_type
+            or not isinstance(request['operation'], str)
+            or not request['operation']
+            or not isinstance(request['variables'], dict)
+            or not isinstance(request['business_intent'], dict)
+            or not isinstance(request['remote_mutation_intent'], dict)
+            or not isinstance(request['preconditions_snapshot'], dict)
+            or not isinstance(request['expected_store_identity'], str)
+            or not request['expected_store_identity']
+            or not isinstance(request['shopify_idempotency_key'], str)
+            or not request['shopify_idempotency_key']
+        ):
+            raise ValidationError('Prepared mutation request is malformed.')
+        exact = dict(request)
+        exact['variables'] = dict(request['variables'])
+        exact['business_intent'] = dict(request['business_intent'])
+        exact['remote_mutation_intent'] = dict(
+            request['remote_mutation_intent']
+        )
+        exact['preconditions_snapshot'] = dict(
+            request['preconditions_snapshot']
+        )
+        canonical_sha256({
+            'job_id': job_id,
+            'attempt_token': token,
+            'request': exact,
+        })
+        return exact
+
+    @api.model
+    def _fallback_uncertain_consequence(self, exc):
+        return {
+            'observed_outcome': 'uncertain',
+            'error_class': 'data_shape_schema_mismatch',
+            'manual_review_subreason': False,
+            'action': 'reconcile',
+            'message': 'Mutation result was malformed; reconciliation required.',
+            'evidence': {'exception_class': type(exc).__name__},
+            'domain_payload': {},
+        }
+
+    @api.model
+    def _owner_cleanup_values(self):
+        return {
+            'current_attempt_token': False,
+            'owner_worker_ref': False,
+            'running_since': False,
+            'reconciliation_pending_until': False,
+        }
+
+    @api.model
+    def _block_original_job(self, job, error_class, subreason, message):
+        from_state = job.state
+        values = {
+            'state': 'blocked_manual_review',
+            'error_class': error_class,
+            'manual_review_subreason': subreason,
+            'finished_at': fields.Datetime.now(),
+        }
+        values.update(self._owner_cleanup_values())
+        job.sudo().write(values)
+        job._log_transition(
+            'state_change',
+            self._safe_message(message, 'Mutation blocked for manual review.'),
+            from_state=from_state,
+            to_state='blocked_manual_review',
+        )
+
+    @api.model
+    def _apply_validated_consequence(
+        self, job, attempt, phase, consequence, strategy,
+        reconciliation_job=False,
+    ):
+        consequence = self._validate_job_consequence(consequence, phase)
+        action = consequence['action']
+        message = consequence['message']
+        from_state = job.state
+        now = fields.Datetime.now()
+        values = self._owner_cleanup_values()
+        to_state = False
+        if action == 'succeed':
+            to_state = 'succeeded'
+            values.update({
+                'state': to_state,
+                'error_class': False,
+                'manual_review_subreason': False,
+                'finished_at': now,
+            })
+        elif action == 'fail_final':
+            to_state = 'failed_final'
+            values.update({
+                'state': to_state,
+                'error_class': consequence['error_class'],
+                'manual_review_subreason': False,
+                'finished_at': now,
+            })
+        elif action == 'block_manual_review':
+            to_state = 'blocked_manual_review'
+            values.update({
+                'state': to_state,
+                'error_class': consequence['error_class'],
+                'manual_review_subreason':
+                    consequence['manual_review_subreason'],
+                'finished_at': now,
+            })
+        elif action == 'cancel':
+            to_state = 'cancelled'
+            values.update({
+                'state': to_state,
+                'cancel_reason': message,
+                'manual_review_subreason': False,
+                'finished_at': now,
+            })
+        elif action == 'reconcile':
+            self._ensure_reconciliation_job(job, attempt, strategy)
+            values.update({
+                'error_class': consequence['error_class'],
+                'manual_review_subreason': False,
+                'finished_at': False,
+            })
+        job.sudo().write(values)
+        if to_state:
+            job._log_transition(
+                'state_change', message,
+                from_state=from_state, to_state=to_state,
+            )
+        if action != 'reconcile':
+            strategy['apply_consequence'](
+                job,
+                attempt,
+                phase,
+                consequence,
+                reconciliation_job=reconciliation_job,
+            )
+            job.invalidate_recordset()
+            if action == 'domain_callback' and job.state == 'running':
+                raise ValidationError(
+                    'The domain callback did not transition the mutation job.'
+                )
+        return True
+
+    @api.model
+    def _handle_mutation_dispatch_selftest_reconcile(self, job):
+        attempt = job.mutation_attempt_id
+        if not attempt:
+            job._transition_failed_final(
+                'unknown_system_error',
+                'The reconciliation job has no mutation-attempt link.',
+            )
+            return
+        original = attempt.job_id
+        if attempt.observed_outcome == 'pending':
+            self._block_original_job(
+                original,
+                'data_shape_schema_mismatch',
+                'duplicate_risk',
+                'Pending attempt reached reconciliation without recovery.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Pending reconciliation attempt was refused.'
+            )
+            return
+        if attempt.effective_disposition() != 'unresolved':
+            self._complete_reconciliation_job(
+                job, 'Mutation attempt was already resolved.'
+            )
+            return
+        try:
+            strategy = self._validated_mutation_strategy(
+                attempt.mutation_domain
+            )
+        except ValidationError:
+            self._block_original_job(
+                original,
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No valid reconciliation strategy is registered.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Missing strategy was routed to the original job.'
+            )
+            return
+        try:
+            result = strategy['reconcile'](attempt)
+            normalized = self._validate_reconciliation_result(result)
+        except Exception:
+            self._block_original_job(
+                original,
+                'data_shape_schema_mismatch',
+                'duplicate_risk',
+                'The reconciliation result was malformed; no resend occurred.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Malformed read result was routed to the original job.'
+            )
+            return
+        if (
+            normalized['observed_store_identity']
+            != attempt.expected_store_identity
+        ):
+            self._block_original_job(
+                original,
+                'store_identity_mismatch',
+                'store_identity_mismatch',
+                'Reconciliation observed a different Shopify store identity.',
+            )
+            self._complete_reconciliation_job(
+                job, 'Store-identity mismatch was routed without a verdict.'
+            )
+            return
+        if normalized['verdict'] == 'inconclusive':
+            count = attempt._record_inconclusive_reconciliation(
+                normalized['evidence']
+            )
+            if count >= INCONCLUSIVE_RECONCILIATION_CAP:
+                self._block_original_job(
+                    original,
+                    'duplicate_risk',
+                    'duplicate_risk',
+                    'Reconciliation remained inconclusive at the safety cap.',
+                )
+                self._complete_reconciliation_job(
+                    job, 'Inconclusive reconciliation reached its safety cap.'
+                )
+            else:
+                job._transition_retry_waiting(
+                    fields.Datetime.now() + timedelta(minutes=5),
+                    job.retry_count + 1,
+                    'shopify_temporary_server_network',
+                    normalized['message'],
+                )
+            return
+        disposition = (
+            'applied' if normalized['verdict'] == 'applied'
+            else 'not_applied'
+        )
+        try:
+            with self.env.cr.savepoint():
+                attempt._record_reconciliation_result(
+                    disposition, normalized['evidence'],
+                )
+                self._apply_validated_consequence(
+                    original,
+                    attempt,
+                    'reconciliation',
+                    normalized['consequence'],
+                    strategy,
+                    reconciliation_job=job,
+                )
+                self._complete_reconciliation_job(
+                    job, 'Read-only mutation reconciliation completed.'
+                )
+        except Exception as exc:
+            raise JobHandlerError(
+                'shopify_temporary_server_network',
+                'Atomic reconciliation consequence failed; read retry required.',
+                type(exc).__name__,
+            )
+
+    @api.model
+    def _complete_reconciliation_job(self, job, message):
+        """Give every handled read job one explicit terminal transition."""
+        if job.state != 'running':
+            raise ValidationError(
+                'Only a running reconciliation job may be completed.'
+            )
+        job.sudo().write({
+            'state': 'succeeded',
+            'error_class': False,
+            'manual_review_subreason': False,
+            'finished_at': fields.Datetime.now(),
+        })
+        job._log_transition(
+            'state_change', self._safe_message(
+                message, 'Reconciliation job completed.'
+            ),
+            from_state='running', to_state='succeeded',
+        )
+        return True
+
+    @api.model
+    def _validate_reconciliation_result(self, value):
+        if not isinstance(value, dict):
+            raise ValidationError('A reconciliation result must be a dict.')
+        required = {
+            'verdict', 'observed_store_identity', 'action', 'error_class',
+            'manual_review_subreason', 'message', 'evidence',
+        }
+        allowed = required | {'domain_payload'}
+        if set(value) - allowed or required - set(value):
+            raise ValidationError(
+                'The reconciliation result has an invalid field set.'
+            )
+        verdict = value['verdict']
+        identity = value['observed_store_identity']
+        if verdict not in ('applied', 'not_applied', 'inconclusive'):
+            raise ValidationError('Unknown reconciliation verdict.')
+        if not isinstance(identity, str) or not identity:
+            raise ValidationError(
+                'Reconciliation must report the observed store identity.'
+            )
+        if not isinstance(value['evidence'], dict):
+            raise ValidationError('Reconciliation evidence must be a dict.')
+        message = self._safe_message(
+            value['message'], 'Reconciliation result recorded.',
+        )
+        if verdict == 'inconclusive':
+            if value['action'] not in (False, None, 'reconcile'):
+                raise ValidationError(
+                    'An inconclusive verdict may only continue reconciliation.'
+                )
+            return {
+                'verdict': verdict,
+                'observed_store_identity': identity,
+                'message': message,
+                'evidence': dict(value['evidence']),
+            }
+        consequence = {
+            'observed_outcome': 'uncertain',
+            'error_class': value['error_class'],
+            'manual_review_subreason': value['manual_review_subreason'],
+            'action': value['action'],
+            'message': message,
+            'evidence': dict(value['evidence']),
+            'domain_payload': dict(value.get('domain_payload') or {}),
+        }
+        return {
+            'verdict': verdict,
+            'observed_store_identity': identity,
+            'message': message,
+            'evidence': dict(value['evidence']),
+            'consequence': self._validate_job_consequence(
+                consequence, 'reconciliation',
+            ),
+        }
+
+    @api.model
+    def _drain_mutation_one(self, job):
+        """Execute one mutation through prepare/C1/precondition/C2/NET/C3."""
+        try:
+            strategy = self._validated_mutation_strategy(job.job_type)
+        except ValidationError:
+            self._block_original_job(
+                job,
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No valid mutation strategy is registered; transport refused.',
+            )
+            self.env.cr.commit()
+            return
+        if self._preflight_existing_attempt_evidence(job):
+            self.env.cr.commit()
+            return
+        try:
+            local_snapshot = dict(strategy['prepare_local'](job))
+            canonical_sha256(local_snapshot)
+        except Exception as exc:
+            self._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'Local mutation preparation failed before C1.',
+                type(exc).__name__,
+                max_attempts=RETRY_MAX_ATTEMPTS,
+            )
+            self.env.cr.commit()
+            return
+        token = uuid.uuid4().hex
+        job_id = job.id
+        job_type = job.job_type
+        owner_context = {
+            'job_id': job_id,
+            'store_id': job.store_id.id,
+            'attempt_token': token,
+            'mutation_domain': job_type,
+        }
+        from_state = job.state
+        job.sudo().write({
+            'state': 'running',
+            'started_at': job.started_at or fields.Datetime.now(),
+            'current_attempt_token': token,
+            'owner_worker_ref': '%s:%s' % (self.env.cr.dbname, os.getpid()),
+            'running_since': fields.Datetime.now(),
+            'reconciliation_pending_until': False,
+        })
+        job._log_transition(
+            'attempt',
+            'Layer 2 mutation claim committed.',
+            from_state=from_state,
+            to_state='running',
+        )
+        self.env.flush_all()
+        self.env.cr.commit()
+
+        try:
+            request = self._validate_prepared_request(
+                strategy['prepare_preconditions'](
+                    dict(local_snapshot), dict(owner_context),
+                ),
+                job_id,
+                token,
+                job_type,
+            )
+            attempt_id = self._commit_attempt_intent_c2(
+                job_id, token, request,
+            )
+        except Exception as exc:
+            self._recover_pre_c2_failure(job_id, token, exc)
+            return
+
+        try:
+            raw_result = strategy['transport'](
+                dict(request),
+                {
+                    'job_id': job_id,
+                    'store_id': owner_context['store_id'],
+                    'attempt_id': attempt_id,
+                    'attempt_token': token,
+                    'mutation_domain': request['mutation_domain'],
+                },
+            )
+        except Exception as exc:
+            raw_result = {
+                'outcome': 'uncertain',
+                'evidence': {
+                    'exception_class': type(exc).__name__,
+                    'transport': 'exception_after_c2',
+                },
+            }
+        try:
+            consequence = self._validate_job_consequence(
+                strategy['classify_direct_result'](raw_result), 'direct',
+            )
+        except Exception as exc:
+            consequence = self._fallback_uncertain_consequence(exc)
+        try:
+            self._commit_mutation_outcome_c3(
+                job_id, attempt_id, token, consequence, strategy,
+            )
+        except Exception:
+            self._recover_layer2_owner(job_id, token)
+
+    @api.model
+    def _preflight_existing_attempt_evidence(self, job):
+        """Block redispatch before C1 when this job already owns evidence."""
+        if not self.env['shopify.connector.mutation.attempt'].search_count([
+            ('job_id', '=', job.id),
+        ]):
+            return False
+        self._block_original_job(
+            job,
+            'duplicate_risk',
+            'duplicate_risk',
+            'Existing attempt evidence blocks mutation-job redispatch.',
+        )
+        return True
+
+    @api.model
+    def _recover_pre_c2_failure(self, job_id, token, exc):
+        self.env.cr.rollback()
+        self.env.transaction.reset()
+        job = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not job:
+            self.env.cr.commit()
+            return
+        job.invalidate_recordset()
+        attempt = self.env['shopify.connector.mutation.attempt'].search([
+            ('job_id', '=', job_id),
+        ], limit=1)
+        if attempt:
+            if attempt.attempt_token == token:
+                self._recover_committed_attempt_to_reconciliation(
+                    job,
+                    attempt,
+                    'c2_discovered_during_pre_c2_recovery',
+                    'dispatcher_recovery',
+                )
+            else:
+                self._block_original_job(
+                    job,
+                    'duplicate_risk',
+                    'duplicate_risk',
+                    'Concurrent attempt evidence blocked C2.',
+                )
+        elif job.current_attempt_token == token and job.state == 'running':
+            job.sudo().write(self._owner_cleanup_values())
+            self._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'Pre-C2 mutation preparation failed safely.',
+                type(exc).__name__,
+                max_attempts=RETRY_MAX_ATTEMPTS,
+            )
+        self.env.cr.commit()
+
+    @api.model
+    def _recover_layer2_owner(self, job_id, token):
+        """Fresh-transaction recovery for every caught post-C2 failure."""
+        self.env.cr.rollback()
+        self.env.transaction.reset()
+        job = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not job:
+            self.env.cr.commit()
+            return
+        job.invalidate_recordset()
+        attempt = self.env['shopify.connector.mutation.attempt'].search([
+            ('job_id', '=', job_id),
+        ], limit=1)
+        if attempt and attempt.transport_attempted:
+            self._recover_committed_attempt_to_reconciliation(
+                job,
+                attempt,
+                'post_c2_owner_recovery',
+                'dispatcher_recovery',
+            )
+        elif job.current_attempt_token == token and job.state == 'running':
+            job.sudo().write(self._owner_cleanup_values())
+            self._schedule_retry_or_fail(
+                job,
+                'shopify_temporary_server_network',
+                'Recovered a pre-C2 failure; no transport was possible.',
+                False,
+                max_attempts=RETRY_MAX_ATTEMPTS,
+            )
+        self.env.cr.commit()
+
+    @api.model
+    def _recover_committed_attempt_to_reconciliation(
+        self, job, attempt, recovery_window, recovery_source,
+    ):
+        """Atomically own recovery evidence, one read job, and cleanup."""
+        try:
+            attempt = attempt._record_recovery_uncertain(
+                recovery_window, recovery_source,
+            )
+        except ValidationError:
+            if job.state == 'running':
+                self._block_original_job(
+                    job,
+                    'data_shape_schema_mismatch',
+                    'duplicate_risk',
+                    'Committed attempt had an invalid recovery state.',
+                )
+            return self.env['shopify.connector.job']
+        except UserError:
+            return self.env['shopify.connector.job']
+        reconciliation = self._ensure_reconciliation_job(job, attempt)
+        if job.state == 'running':
+            job.sudo().write(self._owner_cleanup_values())
+        return reconciliation
+
+    @api.model
+    def _commit_attempt_intent_c2(self, job_id, token, request):
+        side_cr = self.env.registry.cursor()
+        try:
+            side_context = dict(self.env.context)
+            side_context[C2_SENTINEL_CONTEXT] = C2_SIDE_CURSOR_SENTINEL
+            side_env = api.Environment(side_cr, self.env.uid, side_context)
+            exact_request = {
+                'operation': request['operation'],
+                'variables': request['variables'],
+            }
+            attempt = side_env[
+                'shopify.connector.mutation.attempt'
+            ]._create_attempt_intent({
+                'job_id': job_id,
+                'attempt_token': token,
+                'mutation_domain': request['mutation_domain'],
+                'expected_connection_generation':
+                    request['expected_connection_generation'],
+                'expected_store_identity':
+                    request['expected_store_identity'],
+                'remote_mutation_intent':
+                    request['remote_mutation_intent'],
+                'preconditions_snapshot':
+                    request['preconditions_snapshot'],
+                'business_intent_fingerprint': canonical_sha256(
+                    request['business_intent']
+                ),
+                'exact_request_fingerprint': canonical_sha256(exact_request),
+                'shopify_idempotency_key':
+                    request['shopify_idempotency_key'],
+            })
+            attempt_id = attempt.id
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return attempt_id
+
+    @api.model
+    def _commit_mutation_outcome_c3(
+        self, job_id, attempt_id, token, consequence, strategy,
+    ):
+        self.env.transaction.reset()
+        locked = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not locked:
+            raise ValidationError(
+                'C3 could not reacquire the mutation job owner row.'
+            )
+        locked.invalidate_recordset()
+        if (
+            locked.state != 'running'
+            or locked.current_attempt_token != token
+        ):
+            raise ValidationError(
+                'C3 mutation owner state/token mismatch; outcome refused.'
+            )
+        attempt = self.env[
+            'shopify.connector.mutation.attempt'
+        ].browse(attempt_id).try_lock_for_update()
+        if not attempt:
+            raise ValidationError(
+                'C3 could not reacquire the mutation attempt row.'
+            )
+        attempt.invalidate_recordset()
+        if (
+            attempt.attempt_token != token
+            or attempt.job_id != locked
+            or attempt.observed_outcome != 'pending'
+        ):
+            raise ValidationError('C3 mutation attempt identity mismatch.')
+        consequence = self._validate_job_consequence(consequence, 'direct')
+        attempt._record_direct_outcome(
+            consequence['observed_outcome'],
+            evidence=consequence['evidence'],
+        )
+        locked.store_id.invalidate_recordset()
+        identity_mismatch = (
+            locked.store_id.connection_generation
+            != attempt.expected_connection_generation
+            or locked.store_id.shop_domain
+            != attempt.expected_store_identity
+            or locked.job_type != attempt.mutation_domain
+        )
+        if identity_mismatch:
+            self._block_original_job(
+                locked,
+                'store_identity_mismatch',
+                'store_identity_mismatch',
+                'Local store generation or identity changed before C3.',
+            )
+        else:
+            self._apply_validated_consequence(
+                locked,
+                attempt,
+                'direct',
+                consequence,
+                strategy,
+            )
+        self.env.cr.flush()
+        self.env.cr.commit()
+
+    @api.model
+    def _ensure_reconciliation_job(self, original_job, attempt, strategy=None):
+        try:
+            strategy = strategy or self._validated_mutation_strategy(
+                attempt.mutation_domain
+            )
+        except ValidationError:
+            self._block_original_job(
+                original_job,
+                'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No valid reconciliation strategy exists for this attempt.',
+            )
+            return self.env['shopify.connector.job']
+        locked_attempt = attempt.try_lock_for_update()
+        if not locked_attempt:
+            return self.env['shopify.connector.job']
+        Job = self.env['shopify.connector.job']
+        existing = Job.search([
+            ('mutation_attempt_id', '=', attempt.id),
+        ], limit=1)
+        if existing:
+            if (
+                existing.state in ('succeeded', 'failed_final', 'cancelled')
+                and attempt.effective_disposition() == 'unresolved'
+                and original_job.state != 'blocked_manual_review'
+            ):
+                self._block_original_job(
+                    original_job,
+                    'duplicate_risk',
+                    'duplicate_risk',
+                    'The reconciliation job is terminal while unresolved.',
+                )
+            return existing
+        return Job.sudo().create({
+            'store_id': original_job.store_id.id,
+            'job_source': 'reconciliation',
+            'job_type': strategy['reconciliation_job_type'],
+            'state': 'queued',
+            'payload_hash': 'reconcile:%s' % attempt.attempt_token,
+            'mutation_attempt_id': attempt.id,
+            'expected_connection_generation':
+                attempt.expected_connection_generation,
+        })
+
     @api.model
     def _concurrency_retry_supported(self):
         """Whether the per-job transaction boundary (:meth:`_drain_one`) can
@@ -390,6 +1453,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         """
         return {
             'core_dispatch_selftest': self._handle_core_dispatch_selftest,
+            'mutation_dispatch_selftest': (
+                self._handle_mutation_dispatch_selftest
+            ),
+            'mutation_dispatch_selftest_reconcile': (
+                self._handle_mutation_dispatch_selftest_reconcile
+            ),
         }
 
     @api.model
@@ -415,6 +1484,12 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         """
         return {
             'core_dispatch_selftest': REPLAY_POLICY_LOCAL_ONLY,
+            'mutation_dispatch_selftest': (
+                REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE
+            ),
+            'mutation_dispatch_selftest_reconcile': (
+                REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE
+            ),
         }
 
     @api.model
@@ -566,6 +1641,8 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
 
+        if job.state != 'running':
+            return
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         job.sudo().write({

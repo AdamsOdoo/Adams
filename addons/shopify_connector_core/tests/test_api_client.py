@@ -1,6 +1,6 @@
+import ast
 import inspect
 import json
-import re
 from unittest.mock import patch
 
 import requests
@@ -18,6 +18,37 @@ from ..models.shopify_connector_api_client import (
 )
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+
+def _public_api_guard_violations(source):
+    tree = ast.parse(source)
+    class_node = next(
+        node for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and node.name == 'ShopifyConnectorApiClient'
+    )
+    methods = {
+        node.name: node for node in class_node.body
+        if isinstance(node, ast.FunctionDef) and not node.name.startswith('_')
+    }
+    violations = []
+    if set(methods) != {'execute', 'execute_business'}:
+        violations.append(('public_surface', tuple(sorted(methods))))
+    for name, required_calls in {
+        'execute': {'_validate_graphql_operation'},
+        'execute_business': {
+            '_validate_graphql_operation', '_admit_mutation',
+        },
+    }.items():
+        method = methods.get(name)
+        calls = {
+            node.func.attr for node in ast.walk(method)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+        } if method else set()
+        if not required_calls <= calls:
+            violations.append((name, tuple(sorted(required_calls - calls))))
+    return violations
 
 
 class FakeResponse:
@@ -269,13 +300,9 @@ class TestApiClient(TransactionCase):
         self.assertNotIn(leaking_token, exc.reason)
         self.assertNotIn(leaking_token, exc.technical_detail or '')
 
-    # 18. Read-only guarantee: no mutation operation string; minimal public surface.
+    # 18. Public surface and exact accepted Layer 2 mutation boundary.
     def test_read_only_guarantee(self):
         source = inspect.getsource(client_module)
-        self.assertIsNone(
-            re.search(r'\bmutation\s*[\{\(]', source),
-            'no GraphQL mutation operation string may appear in the client module',
-        )
         public_methods = {
             name for name, value in vars(
                 client_module.ShopifyConnectorApiClient
@@ -285,6 +312,64 @@ class TestApiClient(TransactionCase):
         # CORE-R2 (AR-047) adds exactly one public entry point:
         # `execute_business`, the committed-admission-lease context manager.
         self.assertEqual(public_methods, {'execute', 'execute_business'})
+        self.assertFalse(_public_api_guard_violations(source))
+
+    def test_read_only_entry_points_refuse_mutation_before_transport(self):
+        mutation = 'mutation Unsafe($id: ID!) { shop { id } }'
+        ClientClass = type(self.Client)
+        CredentialClass = type(
+            self.env['shopify.connector.store.credential']
+        )
+        Lease = self.env['shopify.connector.call.lease']
+        before = Lease.search_count([])
+        with patch.object(
+            CredentialClass, '_get_access_token',
+            side_effect=AssertionError('credential read forbidden'),
+        ) as credential, patch.object(
+            ClientClass, '_send',
+            side_effect=AssertionError('transport forbidden'),
+        ) as transport:
+            with self.assertRaises(UserError):
+                self.Client.execute(self.store, mutation, {'id': 'x'})
+            with self.assertRaises(UserError):
+                self.Client._send_lifecycle(
+                    self.store, mutation, DUMMY_TOKEN, {'id': 'x'},
+                )
+        credential.assert_not_called()
+        transport.assert_not_called()
+        self.assertEqual(Lease.search_count([]), before)
+
+    def test_business_mutation_without_layer2_context_fails_before_admission(self):
+        mutation = 'mutation Unsafe($id: ID!) { shop { id } }'
+        ClientClass = type(self.Client)
+        with patch.object(
+            ClientClass, '_admit_mutation',
+            side_effect=AssertionError('admission forbidden'),
+        ) as admit, patch.object(
+            ClientClass, '_send',
+            side_effect=AssertionError('transport forbidden'),
+        ) as transport:
+            with self.assertRaises(UserError):
+                with self.Client.execute_business(
+                    False, self.store, mutation, {'id': 'x'},
+                ):
+                    pass
+        admit.assert_not_called()
+        transport.assert_not_called()
+
+    def test_public_api_guard_detector_rejects_extra_mutation_method(self):
+        source = inspect.getsource(client_module)
+        unsafe = source.replace(
+            '    @api.model\n    def execute(self, store, query, variables=None):',
+            "    @api.model\n"
+            "    def unsafe_mutation(self, store):\n"
+            "        return self._send(store, {'query': 'mutation Unsafe { x }'})\n"
+            "\n"
+            "    @api.model\n"
+            "    def execute(self, store, query, variables=None):",
+            1,
+        )
+        self.assertTrue(_public_api_guard_violations(unsafe))
 
     # 20 (CORE-R2 regression). execute() preserves the two-arg `_send` seam.
     # The token-snapshot change makes `_send(store, body, token=None)`; the

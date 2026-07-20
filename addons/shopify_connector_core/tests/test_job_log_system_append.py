@@ -1,8 +1,7 @@
-import ast
-import os
-
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
+
+from .test_credential_service import core_sudo_inventory_for_file
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 
@@ -86,64 +85,15 @@ class TestJobLogSystemAppend(TransactionCase):
         )
         self.assertEqual(row.store_id, job.store_id)
 
-    # 31. SEC-1 source-level guard: the complete, itemized core-model
-    # sudo inventory. Exact-list equality makes every future elevation fail
-    # this test until it is explicitly reviewed and recorded.
+    # 31. Local job-log elevation contract, sourced from the canonical
+    # method/receiver/ordinal/purpose-qualified inventory.
     def test_source_level_sec1_sudo_inventory(self):
-        models_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'models',
-        )
-        sudo_call_sites = []
-        for filename in sorted(os.listdir(models_dir)):
-            if not filename.endswith('.py'):
-                continue
-            path = os.path.join(models_dir, filename)
-            with open(path, 'r', encoding='utf-8') as source_file:
-                tree = ast.parse(source_file.read(), filename=filename)
-            for node in ast.walk(tree):
-                if (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == 'sudo'
-                ):
-                    sudo_call_sites.append(filename)
         self.assertEqual(
-            sorted(sudo_call_sites),
-            [
-                'shopify_connector_binding_mixin.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job.py',
-                'shopify_connector_job_actions.py',
-                'shopify_connector_job_actions.py',
-                'shopify_connector_job_dispatch.py',
-                'shopify_connector_job_dispatch.py',
-                'shopify_connector_job_enqueue.py',
-                'shopify_connector_job_log.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_pii_retention.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_readiness_check.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store.py',
-                'shopify_connector_store_credential.py',
-            ],
+            core_sudo_inventory_for_file('shopify_connector_job_log.py'),
+            ((
+                'shopify_connector_job_log.py', '_system_append', 'self', 1,
+                'System audit-log append.',
+            ),),
         )
 
     # 32. Redaction: a dummy token passed to _system_append is never persisted.

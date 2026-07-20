@@ -21,3 +21,12 @@ from . import test_readiness_slot_closure
 from . import test_redaction
 from . import test_security_hardening
 from . import test_test_connection
+from . import test_mutation_attempt
+from . import test_mutation_dispatch
+from . import test_mutation_reconciliation
+from . import test_mutation_recovery
+from . import test_mutation_api_guard
+from . import test_mutation_security
+from . import test_mutation_retention
+from . import test_mutation_concurrency
+from . import test_mutation_source_guards

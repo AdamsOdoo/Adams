@@ -9,6 +9,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase
 
 from .test_api_client import FakeResponse, _success_body
+from .test_credential_service import core_sudo_inventory_for_file
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 DRAIN_CRON_XMLID = (
@@ -450,26 +451,32 @@ class TestReadinessSlotClosure(TransactionCase):
     def test_source_level_sec1_sudo_inventory_in_readiness(self):
         """SEC-1 adds protected job create/final-write elevation to
         run_for_store; CORE-R1 retains the one cron-read elevation."""
-        tree = self._readiness_source_tree()
-        sudo_methods = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.FunctionDef):
-                continue
-            for inner in ast.walk(node):
-                if (
-                    isinstance(inner, ast.Call)
-                    and isinstance(inner.func, ast.Attribute)
-                    and inner.func.attr == 'sudo'
-                ):
-                    sudo_methods.append(node.name)
         self.assertEqual(
-            sudo_methods,
-            ['run_for_store', 'run_for_store', '_drain_cron_active_state'],
+            core_sudo_inventory_for_file(
+                'shopify_connector_readiness_check.py'
+            ),
+            (
+                (
+                    'shopify_connector_readiness_check.py',
+                    '_drain_cron_active_state', 'cron', 1,
+                    'Read cron configuration.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
+                    'run_for_store', 'Job', 1,
+                    'Readiness audit job lifecycle.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
+                    'run_for_store', 'job', 1,
+                    'Readiness audit job lifecycle.',
+                ),
+            ),
         )
 
     def test_source_level_store_health_and_sec1_sudo_inventory(self):
         """CORE-R1's health write remains singular while SEC-1 adds only
-        the eight named store-side protected job writer elevations."""
+        the nine named store-side protected job writer elevations."""
         path = os.path.join(
             self._models_dir(), 'shopify_connector_store.py'
         )
@@ -477,13 +484,29 @@ class TestReadinessSlotClosure(TransactionCase):
             content = source_file.read()
         self.assertEqual(content.count("'api_health_state': 'normal'"), 1)
         self.assertIn("'api_health_state': 'degraded'", content)
-        tree = ast.parse(content, filename=path)
-        sudo_calls = [
-            node for node in ast.walk(tree)
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == 'sudo'
-            )
-        ]
-        self.assertEqual(len(sudo_calls), 8)
+        self.assertEqual(
+            core_sudo_inventory_for_file('shopify_connector_store.py'),
+            (
+                ('shopify_connector_store.py', '_apply_probe_failure',
+                 'job', 1, 'Probe failure transition.'),
+                ('shopify_connector_store.py', '_audit_probe_superseded',
+                 'job', 1, 'Probe supersession audit.'),
+                ('shopify_connector_store.py',
+                 '_create_lifecycle_audit_job', 'Job', 1,
+                 'Lifecycle audit carrier.'),
+                ('shopify_connector_store.py',
+                 '_create_lifecycle_audit_job', 'job', 1,
+                 'Lifecycle audit carrier.'),
+                ('shopify_connector_store.py', '_run_connection_probe',
+                 'Job', 1, 'Probe audit job lifecycle.'),
+                ('shopify_connector_store.py', '_run_connection_probe',
+                 'job', 1, 'Probe audit job lifecycle.'),
+                ('shopify_connector_store.py', '_run_connection_probe',
+                 'job', 2, 'Probe audit job lifecycle.'),
+                ('shopify_connector_store.py',
+                 '_sweep_quiescing_business_jobs', 'job', 1,
+                 'Disconnect job sweep.'),
+                ('shopify_connector_store.py', 'action_force_disconnect',
+                 'job', 1, 'Forced-disconnect audit.'),
+            ),
+        )

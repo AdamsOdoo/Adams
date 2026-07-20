@@ -1,6 +1,8 @@
 from odoo import fields, models
 from odoo.exceptions import AccessError, UserError
 
+from ..tools.redaction import redact
+
 
 MANUAL_RETRY_STATES = (
     'failed_retryable',
@@ -16,6 +18,11 @@ class ShopifyConnectorJobActions(models.Model):
 
     def action_manual_retry(self):
         self.ensure_one()
+        if self._has_mutation_attempt_evidence():
+            raise UserError(
+                'Mutation-evidence-linked jobs may only be resolved through '
+                'action_resolve_mutation_attempt.'
+            )
         from_state = self.state
         if from_state not in MANUAL_RETRY_STATES:
             raise UserError(
@@ -64,6 +71,10 @@ class ShopifyConnectorJobActions(models.Model):
 
     def action_cancel(self, reason=False):
         self.ensure_one()
+        if self._has_mutation_attempt_evidence():
+            raise UserError(
+                'Mutation-evidence-linked jobs cannot use generic cancel.'
+            )
         if not isinstance(reason, str) or not reason.strip():
             raise UserError("A non-empty cancellation reason is required.")
         from_state = self.state
@@ -84,7 +95,7 @@ class ShopifyConnectorJobActions(models.Model):
                 "Your Shopify Connector role cannot cancel this job."
             )
 
-        reason = reason.strip()
+        reason = redact(reason.strip())
         self.sudo().write({
             'state': 'cancelled',
             'cancel_reason': reason,
