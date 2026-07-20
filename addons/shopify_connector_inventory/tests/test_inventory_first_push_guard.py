@@ -150,3 +150,16 @@ class TestInventoryFirstPushGuard(TransactionCase):
         self.assertEqual(
             job.manual_review_subreason, 'destructive_write_guard_blocked',
         )
+
+    def test_enqueue_first_push_preview_admission_service(self):
+        """Sanctioned admission path (PR #182 comment 5025803697 item
+        22.C) -- previously a dead handler reachable only through direct
+        protected-field job creation."""
+        Service = self.env['shopify.connector.inventory.service']
+        job = Service.enqueue_first_push_preview(self.binding)
+        self.assertEqual(job.job_type, 'inventory_first_push_preview')
+        self.assertEqual(job.job_source, 'export_preview_dry_run')
+        self.assertEqual(job.state, 'queued')
+        job.sudo().write({'state': 'running'})
+        Service._handle_inventory_first_push_preview(job)
+        self.assertEqual(self.binding.first_push_state, 'previewed')

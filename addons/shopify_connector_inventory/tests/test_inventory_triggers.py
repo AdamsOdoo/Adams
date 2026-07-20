@@ -129,18 +129,57 @@ class TestInventoryTriggers(TransactionCase):
         jobs_after = self._open_push_jobs_for_binding(self.binding)
         self.assertEqual(len(jobs_after), before_count)
 
-    def test_scan_enqueues_deltas_only(self):
+    def test_cron_enqueues_one_typed_scan_job_per_eligible_store(self):
+        """Corrected D-013-6b/item 13: the cron entry point only enqueues
+        a typed `inventory_push_scan` job per eligible connected store --
+        it never scans inline itself."""
+        Service = self.env['shopify.connector.inventory.service']
+        jobs = Service.run_inventory_push_scan()
+        self.assertTrue(jobs)
+        self.assertTrue(all(j.job_type == 'inventory_push_scan' for j in jobs))
+        self.assertTrue(all(j.state == 'queued' for j in jobs))
+        # The cron call itself never touches inventory_last_push_scan_at
+        # or enqueues any push_sync job -- that is the scan handler's job.
+        self.settings.invalidate_recordset()
+        self.assertFalse(self.settings.inventory_last_push_scan_at)
+        self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+
+    def test_scan_handler_enqueues_deltas_only(self):
         Service = self.env['shopify.connector.inventory.service']
         self.binding.sudo().write({'last_pushed_available': 0.0})
-        with patch.object(
-            type(Service), '_read_shopify_inventory_pair',
-        ):
-            Service.run_inventory_push_scan()
+        scan_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'inventory_push_scan',
+            'state': 'running',
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        Service._handle_inventory_push_scan(scan_job)
         # free_qty is 0 (no stock moved in this test) and
         # last_pushed_available is already 0 -- no delta, no job.
         self.assertFalse(self._open_push_jobs_for_binding(self.binding))
         self.settings.invalidate_recordset()
         self.assertTrue(self.settings.inventory_last_push_scan_at)
+        scan_job.invalidate_recordset()
+        self.assertEqual(scan_job.state, 'succeeded')
+
+    def test_scan_handler_enqueues_push_sync_for_changed_pair(self):
+        Service = self.env['shopify.connector.inventory.service']
+        self.binding.sudo().write({'last_pushed_available': 999.0})
+        scan_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'inventory_push_scan',
+            'state': 'running',
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        with patch.object(
+            type(Service), '_refresh_pending_target', return_value=(0.0, 0.0),
+        ):
+            Service._handle_inventory_push_scan(scan_job)
+        self.assertTrue(self._open_push_jobs_for_binding(self.binding))
+        scan_job.invalidate_recordset()
+        self.assertEqual(scan_job.state, 'succeeded')
 
     def test_manual_push_requires_operator_or_admin(self):
         with self.assertRaises(Exception):
@@ -171,7 +210,7 @@ class TestInventoryTriggers(TransactionCase):
         with patch.object(
             type(Service), '_read_shopify_inventory_pair',
             return_value={
-                'tracked': True,
+                'tracked': True, 'item_exists': True, 'level_exists': True,
                 'available': 999.0,
                 'updated_at': '2020-06-01 00:00:00',
                 'store_identity': self.store.shop_domain,
@@ -184,3 +223,85 @@ class TestInventoryTriggers(TransactionCase):
             ('job_id', '=', job.id),
         ])
         self.assertTrue(any('drift' in (log.message or '').lower() for log in logs))
+
+    def test_shopify_equals_target_is_never_drift_even_if_differs_from_last_pushed(self):
+        """Corrected three-way drift matrix (item 14): Shopify already
+        reflecting the CURRENT Odoo target must succeed, never block --
+        even when it also differs from last_pushed_available."""
+        self.binding.sudo().write({
+            'last_pushed_available': 10.0,
+            'last_pushed_at': '2020-01-01 00:00:00',
+            'pending_target_available': 999.0,
+        })
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'inventory_push_sync',
+            'state': 'running',
+            'res_model': 'shopify.connector.inventory.level.binding',
+            'res_id': self.binding.id,
+            'shopify_target_gid': 'inventory_pair:%s:%s:%s' % (
+                self.store.id,
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            ),
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': True,
+                'available': 999.0, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ), patch.object(
+            type(Service), '_refresh_pending_target',
+            return_value=(999.0, 999.0),
+        ):
+            Service._handle_inventory_push_sync(job)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+
+    def test_no_prior_push_known_local_change_enqueues_set_quantities(self):
+        """Case 1 of the three-way matrix: no unexplained-drift history
+        yet and the Odoo target changed -- enqueue toward it."""
+        self.binding.sudo().write({
+            'last_pushed_available': 0.0,
+            'last_pushed_at': False,
+            'pending_target_available': 3.0,
+        })
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'inventory_push_sync',
+            'state': 'running',
+            'res_model': 'shopify.connector.inventory.level.binding',
+            'res_id': self.binding.id,
+            'shopify_target_gid': 'inventory_pair:%s:%s:%s' % (
+                self.store.id,
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            ),
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': True,
+                'available': 0.0, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ), patch.object(
+            type(Service), '_refresh_pending_target',
+            return_value=(3.0, 3.0),
+        ):
+            Service._handle_inventory_push_sync(job)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        new_jobs = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_set_quantities'),
+            ('res_id', '=', self.binding.id),
+        ])
+        self.assertTrue(new_jobs)

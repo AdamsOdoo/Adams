@@ -105,6 +105,24 @@ class TestInventoryLocationCacheSync(TransactionCase):
         )
         self.assertEqual(location.name, 'Warehouse A Renamed')
 
+    def test_enqueue_location_sync_admission_service(self):
+        """Sanctioned admission path (PR #182 comment 5025803697 item
+        22.C) -- previously a dead handler reachable only through direct
+        protected-field job creation."""
+        self.env['shopify.connector.store.settings'].create({
+            'store_id': self.store.id, 'inventory_domain_enabled': True,
+        })
+        self.store.write({'state': 'connected'})
+        Service = self.env['shopify.connector.inventory.service']
+        job = Service.enqueue_location_sync(self.store)
+        self.assertEqual(job.job_type, 'inventory_location_sync')
+        self.assertEqual(job.state, 'queued')
+
+    def test_enqueue_location_sync_denied_when_domain_disabled(self):
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(Exception):
+            Service.enqueue_location_sync(self.store)
+
     def test_pagination_across_two_pages(self):
         job = self._make_sync_job()
         Service = self.env['shopify.connector.inventory.service']

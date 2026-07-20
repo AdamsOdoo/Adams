@@ -1,3 +1,4 @@
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 from odoo.tools import mute_logger
 
@@ -207,3 +208,122 @@ class TestInventoryLevelBinding(TransactionCase):
             binding.with_user(self.user_reviewer).write({
                 'last_pushed_available': 999.0,
             })
+
+    # ------------------------------------------------------------------
+    # SEC-1 composite-binding company consistency (PR #182 comment
+    # 5025803697 item 21)
+    # ------------------------------------------------------------------
+
+    def test_company_neutral_records_remain_valid(self):
+        # cls.template/cls.location carry no explicit company -- valid.
+        binding = self._make_binding('gid://shopify/InventoryItem/108')
+        self.assertTrue(binding)
+
+    def test_cross_company_location_rejected(self):
+        other_company = self.env['res.company'].create({
+            'name': 'Inventory Binding Other Co',
+        })
+        other_location = self.env['stock.location'].create({
+            'name': 'Other Co Location',
+            'usage': 'internal',
+            'location_id': self.warehouse.view_location_id.id,
+            'company_id': other_company.id,
+        })
+        other_mapping = self.Mapping.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Location/101',
+            'odoo_location_id': other_location.id,
+            'match_key': 'manual',
+        })
+        with self.assertRaises(UserError):
+            with self.env.cr.savepoint():
+                self.Binding.sudo().create({
+                    'store_id': self.store.id,
+                    'product_variant_binding_id': self.variant_binding.id,
+                    'location_mapping_id': other_mapping.id,
+                    'shopify_inventory_item_gid':
+                        'gid://shopify/InventoryItem/109',
+                })
+
+    def test_cross_company_product_rejected(self):
+        other_company = self.env['res.company'].create({
+            'name': 'Inventory Binding Other Co 2',
+        })
+        other_template = self.env['product.template'].create({
+            'name': 'Other Co Product', 'company_id': other_company.id,
+        })
+        other_template_binding = self.env[
+            'shopify.connector.product.template.binding'
+        ].create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/109',
+            'product_template_id': other_template.id,
+        })
+        other_variant_binding = self.env[
+            'shopify.connector.product.variant.binding'
+        ].create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/109',
+            'product_variant_id': other_template.product_variant_id.id,
+            'product_template_binding_id': other_template_binding.id,
+        })
+        with self.assertRaises(UserError):
+            with self.env.cr.savepoint():
+                self.Binding.sudo().create({
+                    'store_id': self.store.id,
+                    'product_variant_binding_id': other_variant_binding.id,
+                    'location_mapping_id': self.mapping.id,
+                    'shopify_inventory_item_gid':
+                        'gid://shopify/InventoryItem/110',
+                })
+
+    # ------------------------------------------------------------------
+    # Sanctioned binding-ensure service (PR #182 comment 5025803697 item
+    # 22.B)
+    # ------------------------------------------------------------------
+
+    def test_sanctioned_service_creates_binding_for_operator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        binding = Service.with_user(
+            self.user_operator
+        ).ensure_inventory_level_binding(
+            self.variant_binding, self.mapping,
+            'gid://shopify/InventoryItem/111',
+        )
+        self.assertEqual(
+            binding.shopify_inventory_item_gid,
+            'gid://shopify/InventoryItem/111',
+        )
+
+    def test_sanctioned_service_ensure_is_idempotent(self):
+        Service = self.env['shopify.connector.inventory.service']
+        first = Service.with_user(
+            self.user_operator
+        ).ensure_inventory_level_binding(
+            self.variant_binding, self.mapping,
+            'gid://shopify/InventoryItem/112',
+        )
+        second = Service.with_user(
+            self.user_operator
+        ).ensure_inventory_level_binding(
+            self.variant_binding, self.mapping,
+            'gid://shopify/InventoryItem/112',
+        )
+        self.assertEqual(first.id, second.id)
+
+    def test_sanctioned_service_denied_for_auditor(self):
+        auditor = self.env['res.users'].create({
+            'name': 'Level Binding Auditor',
+            'login': 'level_binding_auditor_only',
+            'group_ids': [(6, 0, [
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_auditor'
+                ).id,
+            ])],
+        })
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(Exception):
+            Service.with_user(auditor).ensure_inventory_level_binding(
+                self.variant_binding, self.mapping,
+                'gid://shopify/InventoryItem/113',
+            )

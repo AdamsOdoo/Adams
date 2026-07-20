@@ -130,3 +130,80 @@ class TestLocationMapping(TransactionCase):
 
     def test_protected_fields_complete(self):
         self.Mapping._assert_binding_field_classification()
+
+    # ------------------------------------------------------------------
+    # Sanctioned backend creation service (PR #182 comment 5025803697
+    # item 22.A) -- ordinary create() of these fields is denied by the
+    # binding mixin; only this narrow service method may create/update.
+    # ------------------------------------------------------------------
+
+    def test_sanctioned_service_creates_mapping_for_operator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        mapping = Service.with_user(
+            self.user_operator
+        ).create_or_update_location_mapping(
+            self.store, self.internal_location, 'gid://shopify/Location/900',
+        )
+        self.assertEqual(mapping.store_id, self.store)
+        self.assertEqual(mapping.odoo_location_id, self.internal_location)
+        self.assertEqual(mapping.match_key, 'manual')
+        self.assertTrue(mapping.push_enabled)
+
+    def test_sanctioned_service_updates_existing_mapping_idempotently(self):
+        Service = self.env['shopify.connector.inventory.service']
+        first = Service.with_user(
+            self.user_operator
+        ).create_or_update_location_mapping(
+            self.store, self.internal_location, 'gid://shopify/Location/901',
+            push_enabled=True,
+        )
+        second = Service.with_user(
+            self.user_operator
+        ).create_or_update_location_mapping(
+            self.store, self.internal_location, 'gid://shopify/Location/901',
+            push_enabled=False,
+        )
+        self.assertEqual(first.id, second.id)
+        self.assertFalse(second.push_enabled)
+
+    def test_sanctioned_service_denied_for_auditor(self):
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(Exception):
+            Service.with_user(
+                self.user_auditor
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location,
+                'gid://shopify/Location/902',
+            )
+
+    def test_sanctioned_service_rejects_customer_location(self):
+        if not self.customer_location:
+            self.skipTest('No customer-usage location available in demo data.')
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(UserError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.customer_location,
+                'gid://shopify/Location/903',
+            )
+
+    def test_sanctioned_service_requires_explicit_gid(self):
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(UserError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location, '',
+            )
+
+    def test_ordinary_create_still_denied_for_operator(self):
+        """The sanctioned service exists alongside, not instead of, the
+        mixin's own generic-create denial."""
+        with self.assertRaises(Exception):
+            self.Mapping.with_user(self.user_operator).create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Location/904',
+                'odoo_location_id': self.internal_location.id,
+                'match_key': 'manual',
+            })
