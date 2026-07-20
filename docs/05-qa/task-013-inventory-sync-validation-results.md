@@ -83,7 +83,29 @@ on `shopify.connector.job.dispatch`; `_check_mapped_location` on
 `shopify.connector.readiness.check`; `_action_done` on `stock.move`
 (a standard Odoo model, not a connector core file).
 
-## 2. One implementation-level judgment call
+## 2. Pre-freeze audit correction applied
+
+The pre-freeze completeness audit (locked prompt §31/task instructions
+§31) found one genuine correctness gap, corrected in this same batch
+before freezing: `_transport_set_quantities`/`_transport_activate`
+originally read a caught `ShopifyClientError`'s `.error_class`
+attribute directly and passed it straight through into the returned
+transport result. `ShopifyClientError` carries the full core-wide
+16-value `error_class` registry (e.g. `shopify_permission_scope_auth`),
+which core's own generic consequence validator (`REGISTERED_ERROR_CLASSES`)
+would have accepted, but which is **not** one of this domain's fixed
+nine-value vocabulary (DEC-037 §7/§9) — an unlikely-but-possible auth
+failure mid-mutation would otherwise have leaked an out-of-vocabulary
+value past this module's own governing contract undetected by the
+static AST guard (which only scans for literal string constants, not
+values read dynamically off an exception attribute). Fixed by adding
+`_normalize_transport_error_class(exc)`, the single point both
+transport methods now go through: it maps any exception's `error_class`
+onto this module's fixed set, defaulting any value outside it to
+`shopify_temporary_server_network` (uncertain, reconcile-first) —
+never silently passed through, never defaulted to an automatic retry.
+
+## 3. One implementation-level judgment call
 
 DEC-037 §7 states "No new job type is added for reconciliation reads."
 However, `shopify.connector.job`'s existing
@@ -103,7 +125,7 @@ decision, and stays entirely within this module's own allowed files. It
 is called out here per the pre-freeze audit requirement, not treated as
 a silent deviation.
 
-## 3. Known limitation carried from the existing Stage 0 architecture
+## 4. Known limitation carried from the existing Stage 0 architecture
 
 `shopify.connector.job`'s `PROTECTED_JOB_FIELDS` frozenset (core file,
 not modified by this task) does not include `cas_retry_ordinal`, the one
@@ -121,7 +143,7 @@ inherited architecture characteristic, not a defect introduced by this
 implementation, and not exploitable to cause an unauthorized Shopify
 mutation.
 
-## 4. D-013-1 .. D-013-9 traceability
+## 5. D-013-1 .. D-013-9 traceability
 
 | Decision | Implemented in | Tests |
 | --- | --- | --- |
@@ -136,7 +158,7 @@ mutation.
 | D-013-8 baseline import split out | Not implemented (explicitly Task 013B scope; zero Task 013B code in this diff) | N/A |
 | D-013-9 Layer 2 integration (Gate B corrected) | `_get_reconciliation_strategies`/`_get_handlers`/`_get_replay_policies` extensions, three-job model (service) | `test_inventory_push_mechanics.py` |
 
-## 5. DEC-037 §4/§9 matrix traceability
+## 6. DEC-037 §4/§9 matrix traceability
 
 Every row of DEC-037 §4 (both mutation domains) and §9 (the
 job/mutation-consequence contract) is implemented in
@@ -148,7 +170,7 @@ No cell is left "TBD." The nine-value fixed `error_class` vocabulary
 never appear (verified by a static/AST test in
 `test_inventory_push_mechanics.py`).
 
-## 6. Static and AST validation — EXECUTED (pure Python, no Odoo required)
+## 7. Static and AST validation — EXECUTED (pure Python, no Odoo required)
 
 | Check | Result |
 | --- | --- |
@@ -168,7 +190,7 @@ workspace (a plain Python 3.11 interpreter; no Odoo installation is
 available here) and their exact commands/output are reproducible from
 this document's own git history.
 
-## 7. Odoo/PostgreSQL-dependent tests — IMPLEMENTED, EXECUTION PENDING EXTERNAL ENVIRONMENT
+## 8. Odoo/PostgreSQL-dependent tests — IMPLEMENTED, EXECUTION PENDING EXTERNAL ENVIRONMENT
 
 No Odoo or PostgreSQL runtime is available in this implementation
 workspace (confirmed at pre-edit audit; this is the environment
@@ -202,13 +224,13 @@ as passed until a genuine Odoo.sh or local-Odoo session runs them:
   independent-registry version (LL-006/LL-007) requires the
   child-process-capable runner this workspace does not have.
 
-## 8. Odoo.sh evidence — PENDING (not available in this workspace)
+## 9. Odoo.sh evidence — PENDING (not available in this workspace)
 
 Fresh clean installation, same-SHA update, the focused Task 013 suite,
 full connector regression, and residue inspection all require a
 dedicated Odoo.sh session and are not claimed here.
 
-## 9. Dev-store evidence — PENDING (not available in this workspace)
+## 10. Dev-store evidence — PENDING (not available in this workspace)
 
 This implementation session has no dev-store credentials or Shopify
 runtime authorization. Dev-store validation plan scenarios 1–12, 17–19
@@ -216,7 +238,7 @@ runtime authorization. Dev-store validation plan scenarios 1–12, 17–19
 executed. No real Shopify mutation, and no new Shopify read, occurred
 during this implementation session.
 
-## 10. External child-process concurrency proof — PENDING (not available in this workspace)
+## 11. External child-process concurrency proof — PENDING (not available in this workspace)
 
 Per `docs/05-qa/runtime-lessons-learned.md` LL-006/LL-007/LL-014, the
 genuine separate-OS-process, independent-Odoo-registry concurrency proof
@@ -225,7 +247,7 @@ multiprocessing semaphore/spawn support). This workspace does not
 provide one. This remains mandatory before Task 013 final merge
 authorization — no infrastructure waiver is claimed or implied.
 
-## 11. Residue audit
+## 12. Residue audit
 
 No Odoo/PostgreSQL runtime executed in this session, so there is no
 live-process residue to inspect (no idle-in-transaction connections, no
@@ -241,7 +263,7 @@ this domain module, not in `shopify_connector_core`, so it is additive
 to — not a violation of — the core-file sudo-site count core's own
 tests enforce).
 
-## 12. Remaining external evidence required before final merge authorization
+## 13. Remaining external evidence required before final merge authorization
 
 1. Odoo.sh: fresh install, same-SHA update, focused Task 013 suite, full
    connector regression, residue inspection.
@@ -251,7 +273,7 @@ tests enforce).
    validation plan, or an explicit, recorded control-room disposition
    for any scenario found genuinely not-executable.
 
-## 13. Explicit confirmations
+## 14. Explicit confirmations
 
 - This PR remains **draft**, **unmerged**, and was **not marked ready
   for review** by this session.

@@ -14,6 +14,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attempt import (
     INCONCLUSIVE_RECONCILIATION_CAP,
 )
+from odoo.addons.shopify_connector_core.tools.redaction import redact
 
 _logger = logging.getLogger(__name__)
 
@@ -79,6 +80,39 @@ def pair_scope_key(store_id, inventory_item_gid, location_gid):
     return 'inventory_pair:%s:%s:%s' % (
         store_id, inventory_item_gid or '', location_gid or '',
     )
+
+
+FIXED_ERROR_CLASS_VOCABULARY = frozenset((
+    'shopify_user_errors_validation',
+    'inventory_location_missing',
+    'concurrency_race_conflict',
+    'shopify_throttling_rate_limit',
+    'shopify_temporary_server_network',
+    'data_shape_schema_mismatch',
+    'idempotency_contract_violation',
+    'no_reconciliation_strategy',
+    'store_identity_mismatch',
+))
+
+
+def _normalize_transport_error_class(exc):
+    """Map any transport-level exception's `error_class` onto this
+    module's own fixed nine-value vocabulary (DEC-037 §7/§9).
+
+    `shopify.connector.api.client.ShopifyClientError` carries the full
+    core-wide 16-value `error_class` registry (e.g.
+    `shopify_permission_scope_auth`, which core's own generic
+    consequence validator would accept but this domain's own governing
+    contract never authorizes). Any value not already in this domain's
+    fixed set is conservatively mapped to
+    `shopify_temporary_server_network` (uncertain, reconcile-first) --
+    never silently passed through, and never defaulted to an automatic
+    retry.
+    """
+    error_class = getattr(exc, 'error_class', None)
+    if error_class in FIXED_ERROR_CLASS_VOCABULARY:
+        return error_class
+    return ERROR_CLASS_TEMPORARY
 
 
 # ======================================================================
@@ -982,10 +1016,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'evidence': {'transport': 'inventorySetQuantities'},
                 }
         except Exception as exc:
-            error_class = getattr(exc, 'error_class', None)
             return {
                 'outcome': 'uncertain',
-                'error_class': error_class or ERROR_CLASS_TEMPORARY,
+                'error_class': _normalize_transport_error_class(exc),
                 'evidence': {'exception_class': type(exc).__name__},
             }
 
@@ -1265,10 +1298,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'evidence': {'transport': 'inventoryActivate'},
                 }
         except Exception as exc:
-            error_class = getattr(exc, 'error_class', None)
             return {
                 'outcome': 'uncertain',
-                'error_class': error_class or ERROR_CLASS_TEMPORARY,
+                'error_class': _normalize_transport_error_class(exc),
                 'evidence': {'exception_class': type(exc).__name__},
             }
 
@@ -1584,7 +1616,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 "instead."
             )
 
-        safe_reason = reason.strip()[:500]
+        safe_reason = redact(reason.strip())[:500]
         new_job = self._handoff_supersede(
             blocked_job, locked_binding, 'manual_review_release',
             JOB_TYPE_PUSH_SYNC,
