@@ -76,6 +76,18 @@ class ShopifyConnectorLocationMapping(models.Model):
                         )
                     )
 
+    @api.constrains('odoo_location_id')
+    def _check_odoo_location_is_internal(self):
+        for mapping in self:
+            if (
+                mapping.odoo_location_id
+                and mapping.odoo_location_id.usage != 'internal'
+            ):
+                raise UserError(
+                    "Only an internal Odoo stock location can be mapped to "
+                    "a Shopify location."
+                )
+
     @api.constrains('store_id', 'odoo_location_id')
     def _check_location_company_consistency(self):
         for mapping in self:

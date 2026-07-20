@@ -1,3 +1,70 @@
+### Task 013 inventory synchronization — implementation candidate frozen — compact handoff (2026-07-20)
+
+- **Branch / PR:** `claude/wave-3-task-013-2g0ul0` (harness-provisioned
+  session branch; see PR #182 body for the note against the locked
+  prompt's `sol/wave-3-task-013-inventory-sync` name — used at the exact
+  required base SHA with zero drift), PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) →
+  `mvp/program-integration`.
+- **Exact base SHA:** `mvp/program-integration@8f5f421e2110c2e805460ea75fb519e48013e0f7`
+  (PR #181's merge commit).
+- **Authority:** PR #179 comment
+  [`5024473959`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5024473959)
+  (authoritative issuance) and comment
+  [`5024617526`](https://github.com/AdamsOdoo/Adams/pull/179#issuecomment-5024617526)
+  (continuation ruling: an environment-only hard stop does not block
+  implementation start). **Both comments name GPT-5.6 Sol as the
+  implementation worker.** This session's task prompt directed Claude
+  Code to implement Task 013 instead, which conflicts with `CLAUDE.md`
+  §13/DEC-032 ("Claude does not write connector feature code in this
+  role... No feature coding by Claude under this addendum"). The
+  conflict was raised explicitly and the requesting user confirmed
+  proceeding before any code was written — recorded here for the
+  control room's visibility, not a self-authorized role change.
+- **Implemented:** `addons/shopify_connector_inventory` — location
+  mapping, per-pair inventory-level binding with first-push
+  preview/confirmation, the three-job orchestration/mutation model
+  (`inventory_push_sync` read-only; `inventory_activate`/
+  `inventory_set_quantities` each a standalone Layer 2 mutation job
+  owning at most one attempt for its lifetime), the bounded
+  3-replacement CAS-stale chain and reconciliation-`not_applied`
+  replacement (both atomic via the framework's `domain_callback`
+  consequence action), the public `action_recheck_inventory_pair(reason)`
+  review-release action, location-cache sync via one named `sudo()`,
+  the `_check_mapped_location` readiness override, and the
+  `odoo_event`/`scheduled_sync`/`manual_sync` trigger surfaces — all
+  registered on the existing Stage 0 seams with **zero**
+  `shopify_connector_core`/`shopify_connector_product`/
+  `shopify_connector_sale` file edits. Full six-file test suite and
+  static/AST guards implemented; `py_compile`/`pyflakes`/XML/CSV checks
+  executed and green (`docs/05-qa/task-013-inventory-sync-validation-results.md`).
+- **One flagged judgment call:** DEC-037 §7 says no new `job_type` is
+  needed for reconciliation reads, but Stage 0's own
+  `_check_reconciliation_attempt_link` constraint structurally requires
+  one and the two existing core reconciliation-shaped values are
+  explicitly reserved selftest-only — this candidate adds exactly one
+  new shared `job_type` (`inventory_mutation_reconcile`) for both
+  mutation domains, dispatching purely on the attempt's own
+  `mutation_domain`. Flagged for control-room ratification, not silently
+  assumed.
+- **Status: IMPLEMENTATION CANDIDATE FROZEN — NOT RUNTIME-PROVEN.** No
+  Odoo/PostgreSQL runtime, no dev-store credentials, and no
+  child-process-capable concurrency runner exist in this workspace, so
+  every ORM-level test, module install/regression, the genuine
+  independent-registry concurrency proof, Odoo.sh evidence, and
+  dev-store mutation evidence all remain **pending** — none is claimed
+  as passed. PR #182 remains **draft, unmerged, not marked ready**; this
+  session did not self-accept and did not self-merge. Zero Task 013B
+  code. No protected reference changed.
+- **Next-session prompt guidance:** control room review of this
+  candidate (scope/code/architecture/security/test compliance, and the
+  one flagged job_type judgment call), followed by dedicated Odoo.sh,
+  dev-store, and external-concurrency-runner sessions before any final
+  merge authorization. Do not begin Task 013B before Task 013 itself is
+  merged and runtime-proven.
+
+---
+
 ### Wave 3 Gate B ACCEPTED — merge-closure normalization and merge — compact handoff (2026-07-19)
 
 - **Branch / PR:** same as Revision 3 below — `claude/wave-3-gate-b-inventory-2m5jcl`,
