@@ -140,25 +140,46 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 |---|---|
 | 0 — Identity gate & environment | ✅ complete (this file §1); committed `c675c83` |
 | 1 — Resource inventory & authority map | ✅ complete → `docs/01-research/wave-4-fulfillment-resource-inventory.md` |
-| 2 — Official Shopify & Odoo 19 research | ⏳ in progress (gather evidence collected; authoring notes) |
-| 3 — Merged-code integration audit | ⏳ pending (gather evidence collected) |
-| 4 — Decision & contradiction reconciliation | ⏳ pending |
+| 2 — Official Shopify & Odoo 19 research | ✅ complete → `wave-4-shopify-official-fulfillment-notes.md`, `wave-4-odoo19-fulfillment-architecture-notes.md` |
+| 3 — Merged-code integration audit | ✅ complete → `docs/03-architecture/wave-4-fulfillment-current-code-audit.md` |
+| 4 — Decision & contradiction reconciliation | ⏳ next (DEC-038) |
 | 5 — Candidate DoR, architecture & Task 014 packet | ⏳ pending |
 | 6 — File boundary, tests, validation, rollback, locked prompt | ⏳ pending |
 | 7 — Adversarial review, trackers, handoff, final report | ⏳ pending |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
-map fixed (§1 of the inventory); accepted contract (DEC-011, DEC-036/031 Layer 2,
-DEC-033 scope, DEC-008/015, RA-009/014/017/022/023) separated from proposed
-candidates (Task 014 packet, modes/16-condition engine, status model, COD,
-reconnect, DoR) and superseded records; 8 material contradictions logged for
-DEC-038 — incl. the **stale "17 @idempotent" count** (a 2026-04 mandatory-
-idempotency change supersedes it) and the **authority-model drift**.
+map fixed; accepted contract separated from proposed candidates and superseded
+records; contradictions logged for DEC-038.
 
-**Next phase:** author Phase 2 Shopify + Odoo notes and Phase 3 code audit from
-the gathered cited evidence (workflow `wf_f386bb21-5aa`, 19/19 agents, 0 errors);
-commit; continue. Draft PR opened + PR#/head posted to issue #186 at the Phase 1
-boundary.
+**Phase 2 key results (all cited, Admin API 2026-07 / Odoo 19.0 FINAL):**
+- All **7 Layer-A Shopify enum families EXACT-MATCH** the captured status model
+  (independently re-verified 2026-07-21).
+- **The "17 @idempotent" count is CURRENT, not stale** (agent direct-fetch of the
+  live idempotency page dated 2026-02-02) — fulfillment mutations confirmed
+  **absent** from it → **verify-before-retry validated** (corrects Phase-1
+  contradiction #1; to fix in DEC-038 batch).
+- New refinements → DEC-038: ">1 FO per location" (not one-per-location);
+  `supportedActions.CREATE_FULFILLMENT` as the authoritative eligibility gate;
+  `assignedLocation.location` nullable; staff permission `fulfill_and_ship_orders`
+  distinct from API scope; input-array 250 vs FO-line 512 caps; pin API `2026-07`.
+- **Odoo (verified-in-source):** done-qty = `stock.move.line.quantity` (no
+  `qty_done` field); hook = `_action_done` (not re-entrant `button_validate`);
+  backorder via `backorder_id`; `sale_id`/`sale_line_id` in `sale_stock`, carrier
+  fields in `stock_delivery` (dep set correct); **new risk:** `send_to_shipper`
+  auto-books on validation when carrier `rate_and_ship`.
+
+**Phase 3 key results (symbol-level, base `ab4f12f5`):** the Layer 2 spine is fully
+reusable (10 fulfillment seams identified with exact refs); inventory is the exact
+7-callback template; **`shopify_line_item_gid` is populated but read by no matcher**
+(fulfillment is its first consumer); `REQUIRED_MVP_SCOPES` still has the old
+`read_fulfillments` (D-014-2 swap is a Wave 4 task); **fulfillment mutations have no
+`@idempotent`** (prepare_preconditions must omit it; `userErrors` carry no code →
+`code_required=False`+positive-evidence branch); 8 code-grounded risks logged incl.
+`action_confirm()` auto-picking coexistence and the core Location-cache shared
+ownership.
+
+**Next phase:** author DEC-038 (41-item decision matrix + 16-condition Mode 2
+reconciliation); commit 3; continue.
 
 **Partial-resume anchor:** if a genuine environment/context/time limit forces a
 stop, stop at a phase boundary after committing+pushing this checkpoint and
