@@ -1,4 +1,4 @@
-name: Task 013 Track B verified export
+name: Task 013 Track B exact import
 
 on:
   pull_request:
@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  export-exact-tested-content:
+  import-exact-tested-commits:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -44,7 +44,7 @@ jobs:
           git bundle verify /tmp/track-b.bundle
           git fetch /tmp/track-b.bundle 'refs/heads/claude/wave-3-task-013-2g0ul0:refs/remotes/track-b/candidate'
 
-      - name: Verify identity and exact scope
+      - name: Verify exact identity, ancestry, and scope
         shell: bash
         run: |
           set -euo pipefail
@@ -52,11 +52,14 @@ jobs:
           C1='a700e94f8091793c5595ef87e6126860a8dca4c9'
           C2='973e4e8de6ac26b6c62ef786b4d9a1c2d478da86'
           C3='18ea5d729b6283c5a2af6d04a5285353aacd9ff9'
+          TARGET='refs/heads/claude/wave-3-task-013-2g0ul0'
+
           test "$(git rev-parse refs/remotes/track-b/candidate)" = "$C3"
           test "$(git rev-parse "$C3~3")" = "$BASE"
           printf '%s\n%s\n%s\n' "$C1" "$C2" "$C3" > /tmp/expected-commits
           git rev-list --reverse "$BASE..$C3" > /tmp/actual-commits
           diff -u /tmp/expected-commits /tmp/actual-commits
+
           cat > /tmp/expected-files <<'EOF'
           addons/shopify_connector_core/tests/test_mutation_source_guards.py
           addons/shopify_connector_inventory/tests/__init__.py
@@ -70,42 +73,14 @@ jobs:
           sort /tmp/expected-files > /tmp/expected-files.sorted
           diff -u /tmp/expected-files.sorted /tmp/actual-files
 
-      - name: Export exact per-commit file snapshots and metadata
+          REMOTE_HEAD="$(git ls-remote --heads origin "$TARGET" | awk '{print $1}')"
+          test "$REMOTE_HEAD" = "$BASE"
+
+      - name: Fast-forward PR 182 branch to exact runtime-tested head
         shell: bash
         run: |
           set -euo pipefail
-          OUT="$RUNNER_TEMP/track-b-export"
-          mkdir -p "$OUT/commit1/addons/shopify_connector_core/tests"
-          mkdir -p "$OUT/commit2/addons/shopify_connector_inventory/tests"
-          mkdir -p "$OUT/commit3/docs/01-research" "$OUT/commit3/docs/05-qa" "$OUT/commit3/docs/07-implementation-plan"
-
-          git show a700e94f8091793c5595ef87e6126860a8dca4c9:addons/shopify_connector_core/tests/test_mutation_source_guards.py > "$OUT/commit1/addons/shopify_connector_core/tests/test_mutation_source_guards.py"
-          git show 973e4e8de6ac26b6c62ef786b4d9a1c2d478da86:addons/shopify_connector_inventory/tests/__init__.py > "$OUT/commit2/addons/shopify_connector_inventory/tests/__init__.py"
-          git show 973e4e8de6ac26b6c62ef786b4d9a1c2d478da86:addons/shopify_connector_inventory/tests/test_inventory_concurrency.py > "$OUT/commit2/addons/shopify_connector_inventory/tests/test_inventory_concurrency.py"
-          git show 18ea5d729b6283c5a2af6d04a5285353aacd9ff9:docs/01-research/research-handoff.md > "$OUT/commit3/docs/01-research/research-handoff.md"
-          git show 18ea5d729b6283c5a2af6d04a5285353aacd9ff9:docs/05-qa/architecture-review-log.md > "$OUT/commit3/docs/05-qa/architecture-review-log.md"
-          git show 18ea5d729b6283c5a2af6d04a5285353aacd9ff9:docs/05-qa/task-013-inventory-sync-validation-results.md > "$OUT/commit3/docs/05-qa/task-013-inventory-sync-validation-results.md"
-          git show 18ea5d729b6283c5a2af6d04a5285353aacd9ff9:docs/07-implementation-plan/mvp-program-state.md > "$OUT/commit3/docs/07-implementation-plan/mvp-program-state.md"
-
-          {
-            echo 'BASE=6c221798409555597a432ccfa9959ee621f324ef'
-            echo 'BASE_TREE='"$(git rev-parse 6c221798409555597a432ccfa9959ee621f324ef^{tree})"
-            for c in a700e94f8091793c5595ef87e6126860a8dca4c9 973e4e8de6ac26b6c62ef786b4d9a1c2d478da86 18ea5d729b6283c5a2af6d04a5285353aacd9ff9; do
-              echo "===COMMIT $c==="
-              git cat-file commit "$c"
-              echo "TREE=$(git rev-parse "$c^{tree}")"
-            done
-          } > "$OUT/metadata.txt"
-          (cd "$OUT" && find commit1 commit2 commit3 -type f -print0 | sort -z | xargs -0 sha256sum) > "$OUT/file-sha256.txt"
-          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/task-013-track-b-exact-content.tar.gz" track-b-export
-          sha256sum "$RUNNER_TEMP/task-013-track-b-exact-content.tar.gz" > "$RUNNER_TEMP/task-013-track-b-exact-content.tar.gz.sha256"
-
-      - name: Upload exact recovered content
-        uses: actions/upload-artifact@v4
-        with:
-          name: task-013-track-b-exact-content
-          path: |
-            ${{ runner.temp }}/task-013-track-b-exact-content.tar.gz
-            ${{ runner.temp }}/task-013-track-b-exact-content.tar.gz.sha256
-          if-no-files-found: error
-          retention-days: 1
+          C3='18ea5d729b6283c5a2af6d04a5285353aacd9ff9'
+          TARGET='refs/heads/claude/wave-3-task-013-2g0ul0'
+          git push origin "$C3:$TARGET"
+          test "$(git ls-remote --heads origin "$TARGET" | awk '{print $1}')" = "$C3"
