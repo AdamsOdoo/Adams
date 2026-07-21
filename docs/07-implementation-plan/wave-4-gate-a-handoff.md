@@ -145,7 +145,7 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 | 4 — Decision & contradiction reconciliation | ✅ complete → `docs/04-decisions/DEC-038-…-reconciliation.md` (Proposed) |
 | 5 — Candidate DoR, architecture & Task 014 packet | ✅ complete → DoR updated; Task 014 packet §10 Gate A addendum (arch + Layer 2 + Mode 1/2 contracts) |
 | 6 — File boundary, tests, validation, rollback, locked prompt | ✅ complete → `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (LOCKED CANDIDATE — NOT ISSUED) + UAT-matrix Gate A addendum |
-| 7 — Adversarial review, trackers, handoff, final report | ⏳ next |
+| 7 — Adversarial review, trackers, handoff, final report | ✅ complete (adversarial review in DEC-038 §6; SRR-10; trackers updated; learning loop in research-handoff.md; #186 final comment) |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
 map fixed; accepted contract separated from proposed candidates and superseded
@@ -190,6 +190,21 @@ the note that the packet's §8 old locked prompt is **superseded** by the NEW lo
 prompt. DoR authority model reconciled to comment `5038326525`; program-state note
 refreshed (Waves 1–3 merged, Layer 2 accepted). Phase-1 inventory contradiction #1
 (the "stale 17" mis-flag) corrected.
+
+**Phase 7 key results:** one complete adversarial pass (~28 dimensions) — the
+package held on all substantive dimensions; genuine findings AR-F1 (no-tracking
+reconcile weakness → SRR-10 + required test), AR-F2 (citation artifact fixed),
+AR-F3 (reconnect wording dispositioned, applied on acceptance) corrected in a
+coherent batch (DEC-038 §6). No P0; no Mode 2 condition dropped/weakened; no
+self-acceptance/ready/merge language; CV-013 not downgraded. Mandatory
+quality-feedback-loop learning review recorded in `research-handoff.md`. Trackers
+updated: mvp-program-state (top status), mvp-acceptance-matrix (row 12),
+architecture-review-log (AR-070), sync-engine-risk-register (SRR-10).
+
+**FINAL RECOMMENDATION: `READY FOR CONTROL-ROOM GATE A REVIEW`.** Draft PR #188
+remains docs-only, unmerged, not marked ready; the locked prompt is not issued; no
+`addons/**` change; no Shopify operation; #185 (CV-013) open and critical; Q1–Q7
+await control-room rulings.
 
 **Phase 6 key results:** the NEW locked prompt (`sol-wave-4-fulfillment-locked-prompt.md`,
 `LOCKED CANDIDATE — NOT ISSUED`) freezes the enumerated file allowlist (no

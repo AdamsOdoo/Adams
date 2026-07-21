@@ -1,3 +1,76 @@
+### Wave 4 Gate A — fulfillment Definition-of-Ready / decision-reconciliation candidate (draft PR #188) (2026-07-21)
+
+- **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR
+  [#188](https://github.com/AdamsOdoo/Adams/pull/188) → `mvp/program-integration`
+  (base `ab4f12f5` = PR #182 merge commit; docs-only; unmerged; not marked ready).
+- **Prompt / authority:** the locked Gate A prompt
+  `control-room/wave-4-gate-a-prompt-review@187f04d5…` (blob
+  `57772d04960a910bd8715050649ddc4c08cc5430`); issued via issue #186 comment
+  `5038409153`; authority model per issue #186 comment `5038326525` (ChatGPT =
+  control room/acceptance/merge; **Claude = the explicitly-assigned authorized
+  governance/research worker**; the branch is `claude/…` rather than the prompt's
+  generic `sol/…` — a transparent, documented reconciliation, `docs/07-implementation-plan/wave-4-gate-a-handoff.md` §0).
+- **Scope:** governance/research only — **no `addons/**` change, no Shopify
+  operation, no self-acceptance/ready-marking/merge, no Gate B / Wave 5.**
+- **Identity gate:** PASSED (all 8 §3 items; base = PR #182 merge commit; protected
+  refs intact; #185/#186 open; no competing Wave 4 branch/PR; no fulfillment addon
+  at base; Waves 2/3 code present).
+- **Canonical outputs (6 + trackers):** `docs/01-research/wave-4-fulfillment-resource-inventory.md`;
+  `…/wave-4-shopify-official-fulfillment-notes.md` (Admin API 2026-07, accessed
+  2026-07-21); `…/wave-4-odoo19-fulfillment-architecture-notes.md` (Odoo 19.0
+  FINAL); `docs/03-architecture/wave-4-fulfillment-current-code-audit.md`;
+  `docs/04-decisions/DEC-038-…-reconciliation.md` (Proposed); updated
+  `wave-4-definition-of-ready.md` + `task-014-…-implementation-packet.md` §10;
+  `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (`LOCKED CANDIDATE —
+  NOT ISSUED`); `docs/05-qa/fulfillment-mode-uat-matrix.md` Gate A addendum;
+  trackers (program-state, acceptance-matrix row 12, AR-070, SRR-10, this handoff).
+- **Decision-critical results:** DEC-038 reconciled the **16-condition Mode 2
+  engine** (12 preserve / 4 evidence-backed refine / 0 dropped) and dispositioned
+  the 41-item matrix; fulfillment mutations are **not `@idempotent`** (verified) →
+  verify-before-retry under DEC-036/DEC-031 Layer 2 is primary dedup; done-qty =
+  `stock.move.line.quantity` (no `qty_done` in Odoo 19); 10 add-only Layer 2 seams;
+  7 escalated control-room questions (Q1–Q7). **CV-013 (#185) carried as critical,
+  not downgraded.**
+- **Recommendation:** `READY FOR CONTROL-ROOM GATE A REVIEW`.
+
+#### Learning feedback loop (mandatory — `../05-qa/quality-feedback-loop.md`)
+- **Lessons:**
+  1. **Verify "stale" claims before asserting them.** A gather agent flagged the
+     Shopify "17-mutation `@idempotent`" count as stale; a direct fetch of the live
+     idempotency page (dated 2026-02-02) proved it **current** and confirmed
+     fulfillment mutations are absent — the real, decision-critical fact. The
+     Phase-1 inventory's contradiction #1 was corrected. *Control:* every
+     version-sensitive claim carries a dated URL and is re-checked against the live
+     page, not a secondary summary.
+  2. **Prompt-hypothesized names must be validated against merged code.** The
+     prompt hypothesized `readiness_check.py`; the real file is
+     `shopify_connector_readiness_check.py`. The locked prompt/packet use the real
+     name. *Control:* the code audit resolves every symbol/file to `file:symbol:line`.
+  3. **The reusable template's divergences matter most.** Fulfillment mirrors the
+     inventory 7-callback Layer 2 template but must **omit** `@idempotent` and use
+     the `code_required=False` + positive-success-evidence classifier — copying the
+     inventory branch verbatim would be a defect. *Control:* SRR-10 + required tests.
+  4. **Fail-closed is not free of cost.** The no-tracking reconcile weakness
+     (SRR-10) is safe (→ review) but adds operator load; surfaced rather than hidden.
+- **Reusable controls produced:** the 41-item decision matrix method; the
+  condition-by-condition engine reconciliation (preserve/refine/escalate); the
+  add-only-seam audit pattern; the static source-guards (no-V2 / RA-023 /
+  no-`@idempotent` / no-`qty_done` / file-boundary).
+- **Rejected approaches:** none re-entered. RA-009/014/017/022/023 were re-checked
+  and **preserved** (DEC-038 §2, DoR G4-9); the no-`@idempotent`+verify-before-retry
+  design honors RA-014/RA-017; RA-022/RA-023 are enforced by static guards.
+- **Canonical-governance follow-ups (for the control room):** the reconnect policy
+  "(Mode-dependent)" wording (DEC-038 §6 AR-F3) aligns to "review in both modes" on
+  acceptance; the DEC-032→comment-`5038326525` authority wording is reconciled in
+  the Wave 4 DoR (the underlying DEC-032 record is not rewritten; `CLAUDE.md` §13
+  already points to the Wave 4 model); DEC-011's open items are dispositioned in
+  DEC-038. No `CLAUDE.md` change is required by this session.
+- **Quality gate:** satisfied — every claim cited/classified; canonical files
+  reused (no forks); handoff + program state + acceptance matrix + AR log + risk
+  register updated; the mandatory learning review is this section.
+
+---
+
 ### Task 013 Track B — candidate technical closure (guard + simultaneous concurrency) — same draft PR (2026-07-21)
 
 - **Branch / PR:** `claude/wave-3-task-013-2g0ul0`, PR

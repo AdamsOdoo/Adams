@@ -77,11 +77,11 @@ fulfillment addon is warranted (Phase 6). → DEC-038.
   auto backorder; `never` → remaining cancelled.)
 - **Deterministic, non-interactive validation** (no wizard) is achieved via the
   wizard's own mechanism: context `skip_backorder=True` plus
-  `picking_ids_not_to_backorder=[ids]` (from
-  `stock/wizard/stock_picking_return`… actually `stock_backorder_confirmation.py :
-  process / process_cancel_backorder : L49-75`). The single boolean
-  **`cancel_backorder`** decides at `_action_done` time: **False → backorder
-  created**, **True → remaining cancelled**.
+  `picking_ids_not_to_backorder=[ids]`
+  (`stock/wizard/stock_backorder_confirmation.py : process /
+  process_cancel_backorder : L49-75`). The single boolean **`cancel_backorder`**
+  decides at `_action_done` time: **False → backorder created**, **True →
+  remaining cancelled**.
   - **Implication:** Mode 2 auto-application (modes §4.1 "force `create_backorder`
     explicitly, never the `ask` wizard") and COD remainder cancellation (COD doc)
     map directly onto `cancel_backorder`. The connector must drive these context

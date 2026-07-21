@@ -192,6 +192,46 @@ must be **accepted or overruled** before the locked prompt is issued for Gate B.
 
 ---
 
+## 6. Adversarial review outcome (Phase 7)
+
+One complete adversarial pass challenged the package on the ~28 dimensions of the
+locked prompt §15 (stale API, legacy surfaces, scope names, missing/altered Mode 2
+conditions, partial-delivery ambiguity, Odoo quantity, location mismatch, multiple
+pickings/FOs, duplicate remote effects, false success, unsafe retries, inadequate
+reconciliation, mode-switch/disconnect races, COD contradictions, company mismatch,
+permission bypass, PII leakage, uninstall residue, giant-module vs micro-module,
+unnecessary cross-module changes, tests-not-exercising-production, sequential-tests-
+mislabeled-as-concurrency, dev-store cleanup, unauthorized scope, CV-013 downgrade,
+locked-prompt drift). **The package held on all substantive dimensions.** Genuine
+findings and their corrections (applied in this batch):
+
+- **AR-F1 [P1] — reconcile determinism is weaker for no-tracking fulfillments.**
+  D-014-6 permits creating a fulfillment without `trackingInfo`. On an ambiguous
+  transport outcome, the verify-before-retry reconcile read (item 29) then cannot
+  match by tracking number and must rely **solely** on the FO's `remainingQuantity`
+  having decreased by **exactly** our quantities. If another fulfillment or partial
+  activity also moved `remainingQuantity`, the read is ambiguous →
+  `inconclusive` → (after `INCONCLUSIVE_RECONCILIATION_CAP=3`) `duplicate_risk`
+  admin block. **This is SAFE (fails closed to review, never a silent duplicate)**
+  but raises operator load for no-tracking creates. **Correction:** recorded as a
+  demonstrated risk (`sync-engine-risk-register.md`, new SRR entry) and a
+  **required test** (no-tracking uncertain-outcome → `duplicate_risk`, not a second
+  create); the business-intent fingerprint + the per-line reconciled-quantity
+  ledger are the additional corroboration signals a no-tracking reconcile must use.
+- **AR-F2 [P2] — an editing artifact** in the Odoo notes §3 backorder citation —
+  corrected (`stock_backorder_confirmation.py:49-75`).
+- **AR-F3 [P2] — the reconnect "(Mode-dependent)" vs "review in both modes"
+  wording (item 20)** is **dispositioned here** (adopt the stricter modes §7 rule)
+  but **not yet applied** to `reconnect-catchup-backfill-policy.md` — correct for a
+  **Proposed** reconciliation; the product-doc wording is aligned when the control
+  room accepts this record (or by Sol at Gate B), avoiding a premature edit to an
+  accepted-pending product doc.
+
+No P0 finding. No condition of the 16-condition engine was dropped or weakened; the
+four §3 refinements sharpen the engine to verified evidence without changing intent.
+No self-acceptance, ready-marking, or merge language exists in any Gate A output;
+CV-013 (#185) is carried forward as critical and is not downgraded.
+
 ## Review / change control
 - **This record decides no code and authorizes no implementation.** It is a
   **candidate** reconciliation pending ChatGPT control-room acceptance.

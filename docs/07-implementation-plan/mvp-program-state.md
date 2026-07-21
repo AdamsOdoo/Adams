@@ -4,6 +4,36 @@
 
 ## Current status
 
+**WAVE 4 GATE A — DEFINITION-OF-READY / DECISION-RECONCILIATION CANDIDATE
+PRODUCED (2026-07-21).** Executed the locked Gate A prompt
+(`control-room/wave-4-gate-a-prompt-review@187f04d5…`, blob
+`57772d04960a910bd8715050649ddc4c08cc5430`) from the required base
+`mvp/program-integration@ab4f12f5a6857b2f3318ffc3b3f5f371307938bc` (PR #182 merge
+commit). **Worker:** Claude, as the explicitly-assigned authorized governance/
+research worker (issue #186 comment `5038326525`); this is a **candidate pending
+ChatGPT control-room acceptance** — no implementation, no `addons/**` change, no
+Shopify operation, no self-acceptance/ready-marking/merge. **Draft PR #188**
+(into `mvp/program-integration`, docs-only, unmerged), branch
+`claude/wave-4-gate-a-review-0nbhdw`. Identity gate PASSED (all 8 §3 items).
+Canonical outputs: resource inventory + authority map; official Shopify
+(Admin API 2026-07) + Odoo 19.0-source fulfillment notes; merged-code integration
+audit; **DEC-038** (Proposed) — the 41-item decision matrix + the 16-condition
+Mode 2 engine reconciled (12 preserve / 4 refine / 0 dropped) + 7 escalated
+control-room questions (Q1–Q7); updated Wave 4 DoR + Task 014 packet §10 (arch +
+Layer 2 + Mode 1/2 contracts); the **NEW locked Gate B prompt**
+(`sol-wave-4-fulfillment-locked-prompt.md`, `LOCKED CANDIDATE — NOT ISSUED`); the
+UAT-matrix Gate A validation addendum; new risk SRR-10. Key decision-critical
+confirmations: fulfillment mutations are **not `@idempotent`** (verified 2026-07-21)
+→ verify-before-retry under the accepted DEC-036/DEC-031 Layer 2 is the primary
+duplicate-prevention control; done-qty = `stock.move.line.quantity` (no `qty_done`
+in Odoo 19); the merged Layer 2 spine is fully reusable via 10 add-only seams.
+**CV-013 (#185) carried forward as critical — NOT downgraded.** **Recommendation:
+READY FOR CONTROL-ROOM GATE A REVIEW.** No Gate B / Wave 5 work started; the locked
+prompt is not issued. Wave 4 program row (below) stays "Not started" for
+implementation until the control room accepts Gate A and issues the prompt.
+
+---
+
 **TASK 013 (PR #182) — TRACK B CANDIDATE TECHNICAL CLOSURE COMPLETED (2026-07-21).**
 On Odoo.sh build `35199258` (a REBUILD of `35193596`; Odoo 19.0 / PostgreSQL
 16.14), Track B (authority: comment `5031833846`) delivered the candidate-side
