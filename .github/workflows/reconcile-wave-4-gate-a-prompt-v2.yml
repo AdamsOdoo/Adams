@@ -1,0 +1,195 @@
+name: Reconcile Wave 4 Gate A prompt v2
+
+on:
+  pull_request:
+    branches:
+      - mvp/program-integration
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'control-room/wave-4-gate-a-prompt-review'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout review branch
+        uses: actions/checkout@v4
+        with:
+          ref: control-room/wave-4-gate-a-prompt-review
+          fetch-depth: 0
+
+      - name: Apply control-room reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/06-prompts/wave-4-gate-a-codex-review-candidate.md')
+          text = path.read_text()
+          final_marker = '**Status:** CONTROL-ROOM RECONCILED — FINAL LOCKED GATE A PROMPT; ISSUED ONLY BY CHATGPT'
+          if final_marker in text:
+              print('Prompt already reconciled; no changes required.')
+              raise SystemExit(0)
+
+          replacements = {
+              '**Status:** CONTROL-ROOM REVIEW CANDIDATE — NOT ISSUED TO CODEX': final_marker,
+              'ChatGPT is the strategic control room, scope governor, reviewer, acceptance authority, and merge-authorizing authority.\n\nClaude may later perform an independent review of your Gate A package.':
+                  'Binding Wave 4 governance is recorded in issue #186 comment `5038326525`, which supersedes DEC-032 / issue #167 / `CLAUDE.md` only where those older records assign Claude sole control-room or sole merge authority. **ChatGPT is the strategic control room, scope governor, prompt-issuing authority, reviewer, acceptance authority, and merge-authorizing authority.** Claude is the independent reviewer and authorized runtime/governance worker when explicitly assigned; Claude may execute a merge only after explicit ChatGPT authorization. The product owner remains the ultimate business authority.',
+              '6. no already-authorized Wave 4 Gate A or implementation branch/PR exists;':
+                  '6. no already-authorized Wave 4 Gate A execution or implementation branch/PR exists; the prompt-review branch `control-room/wave-4-gate-a-prompt-review` and draft PR #187 are expected governance artifacts and are not competing execution work;',
+              '- the exact accepted 16-condition Mode 2 engine;':
+                  '- the existing proposed 16-condition Mode 2 engine, which Gate A must validate, reconcile, and either preserve exactly or supersede through an explicitly accepted decision;',
+              '18. every accepted Mode 2 condition;':
+                  '18. every condition in the existing proposed 16-condition Mode 2 engine, including whether it is preserved, corrected, or escalated for acceptance;',
+              'Locate and preserve the exact accepted 16-condition Mode 2 engine. Do not compress, expand, or paraphrase it into a different rule set.':
+                  'Locate and reconcile the existing proposed 16-condition Mode 2 engine. Do not compress, expand, or paraphrase it while evaluating it. Preserve it exactly when supported; when official evidence, merged code, or accepted decisions conflict, propose explicit line-level corrections and escalate them for control-room acceptance before Gate B.',
+              '- `docs/07-implementation-plan/wave-4-fulfillment-definition-of-ready.md`;\n- `docs/07-implementation-plan/task-014-fulfillment-implementation-packet.md`.':
+                  '- `docs/07-implementation-plan/wave-4-definition-of-ready.md`;\n- `docs/07-implementation-plan/task-014-fulfillment-tracking-implementation-packet.md`.\n\nAlso inspect `task-014-fulfillment-tracking-implementation-packet-proposed.md` as historical/proposed input. Do not create a near-name replacement or a second canonical DoR/packet.',
+              '- new files under `addons/shopify_connector_fulfillment/**`;\n- the exact readiness-check file in `shopify_connector_core` only for the accepted scope-name correction;':
+                  '- individually enumerated new files for `shopify_connector_fulfillment` (manifest, package initializers, models, services, security, data/cron, and tests only where the reconciled architecture proves each file necessary); do not authorize the addon through a wildcard;\n- exactly `addons/shopify_connector_core/models/readiness_check.py`, symbol `REQUIRED_MVP_SCOPES`, only for the accepted scope-name correction;',
+              '`docs/05-qa/wave-4-fulfillment-validation-plan.md`':
+                  '`docs/05-qa/fulfillment-mode-uat-matrix.md`\n\nUse that existing canonical matrix as the validation-plan carrier. Create a different validation document only when Phase 1 proves the matrix cannot carry a required contract, records the exact gap, and designates one explicit canonical successor rather than a parallel source of truth.',
+              '- fresh pre-C2 read requirements;':
+                  '- fresh pre-C2 read requirements as the primary duplicate-prevention control for fulfillment mutations that lack native idempotency, including verify-before-retry and adopt-if-found behavior;',
+              '- exact allowed files;':
+                  '- exact allowed files and a hard stop on any silent file-boundary expansion;',
+              '- rollback notes;':
+                  '- rollback notes, including rollback of the narrow cross-module readiness-scope correction;',
+          }
+
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'missing expected text for replacement: {old[:120]!r}')
+              text = text.replace(old, new)
+
+          def insert_once(anchor: str, replacement: str, label: str) -> None:
+              global text
+              if anchor not in text:
+                  raise SystemExit(f'{label} anchor missing')
+              text = text.replace(anchor, replacement, 1)
+
+          insert_once(
+              'No phase authorizes fulfillment implementation.\n',
+              '''No phase authorizes fulfillment implementation.\n\n### Depth priority — prevent shallow completion\n\nWhen context or time pressure appears, preserve depth in this order:\n\n1. decision-critical contracts: Odoo quantity semantics, line and location identity, Mode 1/Mode 2 rules, Layer 2 mutation/reconciliation, duplicate prevention, and security;\n2. verified official/code evidence and contradiction resolution;\n3. exact architecture, file boundary, and tests;\n4. packaging, summaries, and presentation.\n\nNever thin or guess a decision-critical contract merely to complete every document. Use the phase-boundary partial-completion path instead.\n''',
+              'depth priority',
+          )
+
+          insert_once(
+              '- Task 014 packets and drafts;\n',
+              '''- Task 014 packets and drafts, including `task-014-fulfillment-tracking-implementation-packet.md` and `task-014-fulfillment-tracking-implementation-packet-proposed.md`;\n- the existing canonical `wave-4-definition-of-ready.md`;\n- `fulfillment-operating-modes.md`;\n- `shopify-fulfillment-status-model.md`;\n- `fulfillment-mode-uat-matrix.md`;\n''',
+              'canonical resources',
+          )
+
+          insert_once(
+              '- when the write scope is conditionally required;\n',
+              '''- when the write scope is conditionally required;\n- the separate Shopify staff permission `fulfill_and_ship_orders` required for fulfillment creation, distinguished from API access scopes;\n''',
+              'Shopify permission',
+          )
+
+          insert_once(
+              '- deprecated or legacy fulfillment surfaces that remain forbidden.\n',
+              '''- deprecated or legacy fulfillment surfaces that remain forbidden, explicitly including `fulfillmentCreateV2` and `fulfillmentTrackingInfoUpdateV2` as names removed from current Admin API versions.\n''',
+              'deprecated surfaces',
+          )
+
+          insert_once(
+              '- `stock.move` and `stock.move.line` quantity semantics;\n',
+              '''- `stock.move` and `stock.move.line` quantity semantics, explicitly verifying Odoo 19 done quantity through `stock.move.line.quantity`, rejecting obsolete `qty_done` / `quantity_done` assumptions, and distinguishing demand such as `product_uom_qty`;\n''',
+              'Odoo quantity',
+          )
+
+          insert_once(
+              '- return pickings and reverse transfers;\n',
+              '- return pickings and reverse transfers as an Odoo forward-sync boundary only; Shopify-side return or reverse-fulfillment synchronization is outside Wave 4;\n',
+              'returns research boundary',
+          )
+
+          insert_once(
+              '- refunds;\n',
+              '''- Shopify-side returns or reverse-fulfillment synchronization; Odoo return pickings are researched only to define the safe forward-fulfillment boundary;\n- refunds;\n''',
+              'forbidden returns boundary',
+          )
+
+          insert_once(
+              '40. dev-store resource cleanup.\n',
+              '''40. dev-store resource cleanup;\n41. FulfillmentOrder status and request-status eligibility for both modes, including exact treatment of OPEN, IN_PROGRESS, ON_HOLD, SCHEDULED, CLOSED, INCOMPLETE, cancelled, and other current official states.\n''',
+              'decision item 41',
+          )
+
+          insert_once(
+              '- no legacy fulfillment API surface;\n',
+              '''- no legacy fulfillment API surface, including name-specific guards for `fulfillmentCreateV2` and `fulfillmentTrackingInfoUpdateV2`;\n- RA-023 line-identity enforcement through `lineItemsByFulfillmentOrder` or the exact current equivalent, with no order-ID-only fulfillment path;\n''',
+              'static guards',
+          )
+
+          insert_once(
+              '- redaction.\n\n### Genuine concurrency plan\n',
+              '''- redaction;\n- regression coverage for relevant prior defects and risk-register entries;\n- explicit RA-022 and RA-023 source-guard and behavior tests;\n- staff-permission/readiness tests distinct from API-scope tests.\n\n### Genuine concurrency plan\n''',
+              'unit regressions',
+          )
+
+          insert_once(
+              'Continue automatically from one phase to the next. Do not stop merely to ask permission between phases.\n',
+              '''At every phase boundary, commit and push the checkpoint and all coherent phase outputs before continuing.\n\nContinue automatically from one phase to the next. Do not stop merely to ask permission between phases.\n''',
+              'checkpoint push',
+          )
+
+          insert_once(
+              'Correct every issue found in one coherent documentation batch. Do not begin implementation.\n',
+              '''Correct every issue found in one coherent documentation batch. Do not begin implementation.\n\nRun the mandatory end-of-session learning review defined by `quality-feedback-loop.md`. Record the result in the **Learning feedback loop** section of `docs/01-research/research-handoff.md`, including lessons, reusable controls, rejected approaches, and whether any canonical governance file requires a follow-up correction. The session is not complete until this learning review is recorded.\n''',
+              'learning review',
+          )
+
+          insert_once(
+              '15. research, architecture-review, risk, and handoff updates.\n',
+              '''15. research, architecture-review, risk, and handoff updates;\n16. completed quality-feedback-loop review recorded in the Learning feedback loop section of `research-handoff.md`.\n''',
+              'canonical learning output',
+          )
+
+          insert_once(
+              '- the adversarial review is complete;\n',
+              '''- the adversarial review is complete;\n- the mandatory `quality-feedback-loop.md` review is complete and recorded in the Learning feedback loop section of `research-handoff.md`;\n''',
+              'definition-of-done learning review',
+          )
+
+          insert_once(
+              '- an exact future implementation boundary cannot be frozen without an unresolved critical decision.\n',
+              '''- an exact future implementation boundary cannot be frozen without an unresolved critical decision;\n- the work would require a file outside the frozen allowlist and no explicit control-room amendment exists.\n''',
+              'file-boundary hard stop',
+          )
+
+          start = text.index('## 20. Final report\n')
+          text = text[:start] + '''## 20. Final report\n\nReturn one concise but evidence-complete report containing:\n\n1. identity, branch/PR, starting SHA, final SHA, changed files, and commits;\n2. canonical outputs created or updated and their source-of-truth mapping;\n3. official Shopify and Odoo 19 findings with citations;\n4. merged-code audit findings and exact integration seams;\n5. accepted decisions preserved, contradictions corrected, proposed decisions, and remaining minimal control-room questions;\n6. complete Mode 1, Mode 2, proposed 16-condition reconciliation, and Layer 2 contract summaries;\n7. exact future allowed and forbidden file lists;\n8. test, source-guard, concurrency, runtime, security, lifecycle, dev-store, rollback, and CV-013 plans;\n9. risks, mitigations, and mandatory learning-feedback-loop outcome;\n10. confirmations that no `addons/**` file changed, no Shopify mutation occurred, the PR remains draft/unmerged, and the locked implementation prompt was not issued;\n11. recommendation: `READY FOR CONTROL-ROOM GATE A REVIEW` or `NOT READY — CONSOLIDATED DECISION BLOCKERS`.\n\nThen stop. Do not start implementation.\n'''
+
+          path.write_text(text)
+          PY
+
+      - name: Verify documentation-only reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -z "$(git diff --name-only -- addons)"
+          grep -q '5038326525' docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+          grep -q 'quality-feedback-loop.md' docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+          grep -q 'wave-4-definition-of-ready.md' docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+          grep -q 'task-014-fulfillment-tracking-implementation-packet.md' docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+          ! grep -q 'exact accepted 16-condition' docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+
+      - name: Commit and push final reconciled prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No reconciliation delta remains.'
+            exit 0
+          fi
+          git config user.name 'ChatGPT Control Room'
+          git config user.email 'control-room@users.noreply.github.com'
+          git add docs/06-prompts/wave-4-gate-a-codex-review-candidate.md
+          git commit -m 'Docs: reconcile and lock Wave 4 Gate A Codex prompt'
+          git push origin HEAD:control-room/wave-4-gate-a-prompt-review
