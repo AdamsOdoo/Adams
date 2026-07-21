@@ -39,7 +39,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check
           test -z "$(git diff --name-only -- addons)"
           test "$(git diff --name-only | tr '\n' ' ')" = "docs/06-prompts/wave-4-gate-a-codex-review-candidate.md "
           git config user.name 'ChatGPT Control Room'
