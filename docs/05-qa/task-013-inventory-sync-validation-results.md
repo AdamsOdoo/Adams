@@ -3,343 +3,388 @@
 - **Status: CORRECTED IMPLEMENTATION CANDIDATE FROZEN FOR INDEPENDENT
   REVIEW — NOT RUNTIME-PROVEN. Draft PR unmerged, not marked ready.**
 - **Repository:** `AdamsOdoo/Adams`
-- **Branch:** `claude/wave-3-task-013-2g0ul0` (harness-provisioned; see PR
-  #182 body for the session-naming note against the locked prompt's
-  `sol/wave-3-task-013-inventory-sync` name)
+- **Branch:** `claude/wave-3-task-013-2g0ul0`
 - **Draft PR:** [#182](https://github.com/AdamsOdoo/Adams/pull/182) →
   `mvp/program-integration`
 - **Exact base SHA:** `mvp/program-integration` @
   `8f5f421e2110c2e805460ea75fb519e48013e0f7` (PR #181's merge commit)
-- **This is a correction cycle on the same draft PR**, per the binding
-  control-room review at PR #182 comments
+- **This is the second correction cycle on the same draft PR.** The first
+  cycle (head `eb85ea43e73df2a0e1c1667b687f838f31058f81`) responded to PR
+  #182 comments
   [`5025765389`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5025765389)
   (REVISE) and its addendum
-  [`5025803697`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5025803697),
-  both issued against the previously-frozen head
-  `2c6c551391cc00602ca74ebebb7b20c39ab58a74`.
+  [`5025803697`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5025803697).
+  **This cycle** responds to the control-room re-review at
+  [`5028910116`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5028910116)
+  ("REVISE — NOT ACCEPTED FOR ODOO.SH, DEV-STORE, EXTERNAL-CONCURRENCY,
+  READY-FOR-REVIEW, OR MERGE"), which found 13 remaining implementation
+  defects in the corrected code and required one further pre-runtime
+  correction batch plus a full same-pattern audit before the next
+  freeze. Both prior amendments (`inventory_mutation_reconcile`, the
+  fail-closed integral-quantity rule) are **accepted in principle** by
+  this review and were **not** reopened.
 - **Implementation worker for this correction cycle:** Claude Code —
-  explicitly re-affirmed for **Task 013 / PR #182 only** by comment
-  `5025765389`'s binding governance disposition 1, as the accepted
-  exception permitted by `CLAUDE.md` §13. This does not change Claude's
-  default role for later tasks and does not authorize self-acceptance
-  or self-merge.
+  the explicit Task 013/PR #182-only exception is re-affirmed by comment
+  `5028910116`'s own framing ("Do not stop again on this point" from the
+  first cycle's ruling still applies). This does not change Claude's
+  default role for later tasks and does not authorize self-acceptance or
+  self-merge.
 - **Acceptance authority:** ChatGPT (product-owner control room). This
-  session did not accept its own work, did not mark the PR ready, and
-  did not merge.
+  session did not accept its own work, did not mark the PR ready, and did
+  not merge.
+- **Commits this cycle:** `3706d19c021cfdf60e037a5d11882453c0d0c12c`
+  (model corrections) and `76aaf4d8ce61715c535e77b7093ac9bde0be4a30`
+  (test corrections), on top of the seven commits already on the branch
+  from the identity-gate-verified starting head
+  `eb85ea43e73df2a0e1c1667b687f838f31058f81`.
 
-## 1. Implemented scope (as corrected)
+## 1. Implemented scope (as corrected this cycle)
 
 `addons/shopify_connector_inventory` (Full edition, LGPL-3; depends
-`shopify_connector_core`, `shopify_connector_product`, `stock`):
+`shopify_connector_core`, `shopify_connector_product`, `stock`). Only
+`models/shopify_connector_inventory_service.py` and the six test files
+changed this cycle — every other module file (`__init__.py`,
+`__manifest__.py`, `shopify_connector_inventory_level_binding.py`,
+`shopify_connector_location_mapping.py`, `shopify_connector_store_settings.py`,
+`ir.model.access.csv`, `shopify_connector_inventory_cron.xml`) is
+byte-identical to the prior cycle's frozen candidate; no governing
+document was touched (none was authorized or required this cycle).
 
-- `shopify.connector.location.mapping` (D-013-1(a)): explicit
-  Shopify-Location ↔ Odoo-internal-`stock.location` mapping, dual
-  uniqueness, ancestor/descendant-overlap guard, internal-only domain
-  (enforced server-side), company-consistency check, `push_enabled`
-  control, plus (new this cycle) a sanctioned service-level creation/
-  update path (`ShopifyConnectorInventoryService.
-  create_or_update_location_mapping`).
-- `shopify.connector.inventory.level.binding` (D-013-1(b)): per
-  (product-variant-binding, location-mapping) pair identity, dual
-  uniqueness, the first-push preview/confirmation record,
-  informational-only last-pushed/last-known/pending-target fields, the
-  public `action_recheck_inventory_pair(reason)` review-release action,
-  a new server-side SEC-1 composite-binding company-consistency
-  constraint, and a sanctioned service-level ensure/create path
-  (`ensure_inventory_level_binding`).
-- `shopify.connector.inventory.service` (D-013-9, DEC-037 §4/§5/§9): the
-  three central pair-execution jobs (`inventory_push_sync`,
-  `inventory_activate`, `inventory_set_quantities`) plus the shared,
-  read-only `inventory_mutation_reconcile` reconciliation job type
-  (ratified this cycle, §3 below) — seven registered `job_type` values
-  in total. Corrected this cycle:
-  - the pair read (`_read_shopify_inventory_pair`) now uses the official
-    2026-07 nested `inventoryItem(id:) { inventoryLevel(locationId:) }`
-    shape, distinguishing item-missing/untracked/level-absent/malformed
-    cases explicitly and failing closed on any ambiguous shape;
-  - both mutation documents now declare `$idempotencyKey: String!` and
-    apply `@idempotent(key: $idempotencyKey)`;
-  - `inventorySetQuantities` now sends `changeFromQuantity` (never
-    `compareQuantity`), an actual integer quantity gated by a fail-closed
-    integrality check, and a `referenceDocumentUri` built from the
-    database UUID (`ir.config_parameter` `database.uuid`), never the raw
-    database name;
-  - direct-success evidence for both mutations now requires more than an
-    empty `userErrors` list — matching `quantityAfterChange`/item/
-    location/zero-`available` evidence is mandatory before `succeeded`;
-  - reconciliation freshness/ABA evidence is now parsed as real
-    timezone-aware datetimes, never compared as raw differently-formatted
-    strings;
-  - every genuinely unsafe precondition the fresh pre-C2 read discovers
-    (store-identity mismatch, missing/inactive level, untracked item, a
-    non-integral target, a missing required GID) now fails closed via a
-    new `_fail_closed_pre_c2` seam **before** C2/transport, with no
-    `mutation.attempt` row created;
-  - ordinary job admission is now routed through the core's sanctioned
-    `shopify.connector.job.enqueue` service, never a direct
-    `shopify.connector.job.sudo().create()`;
-  - push-sync admission coalescing now swallows only the exact
-    operation-scope-key collision, re-verified by an independent query,
-    never any other `ValidationError`;
-  - `operation_scope_key` now equals the exact frozen literal
-    `inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`
-    for the three pair-execution job types (an inheritance override of
-    core's computed field), never core's longer composite string, and
-    never applied to the shared reconciliation type;
-  - `cas_retry_ordinal` is now protected against non-`sudo()` create/write
-    and range/domain-validated (0–3, non-zero only for
-    `inventory_set_quantities`);
-  - the scheduled push-scan cron now enqueues one typed
-    `inventory_push_scan` job per eligible store through the core enqueue
-    service, and that job's own handler (not the cron thread) performs
-    the per-store scan;
-  - drift classification now uses the corrected three-way matrix: Shopify
-    already equal to the current Odoo target is never drift, even when it
-    also differs from `last_pushed_available`;
-  - a genuine pre-existing sequencing defect in `_handle_inventory_push_sync`
-    (found and fixed during this cycle, not named by either review
-    comment — §2 item 15 below) that would have made every
-    orchestration→mutation handoff collide on the pair's own
-    `operation_scope_key`.
-- `shopify.connector.store.settings` extension (unchanged this cycle):
-  `inventory_scheduled_sync_enabled`, `inventory_last_push_scan_at`.
-- `security/ir.model.access.csv`, `data/shopify_connector_inventory_cron.xml`
-  (unchanged this cycle).
-- Six test files, all extended this cycle with new coverage for every
-  correction above (§6/§7 below).
+Corrected this cycle, all in `shopify_connector_inventory_service.py`
+(full detail in §2):
 
-**Zero core (`shopify_connector_core`), `shopify_connector_product`, or
-`shopify_connector_sale` files were created or modified**, this cycle or
-the previous one. Every extension still uses only the existing,
-unmodified seams.
+- Missing-InventoryItem identity now fails closed through the existing
+  `binding_conflict` review route in the orchestration handler, the
+  set-quantities pre-C2 precondition read, and both mutation domains'
+  reconciliation reads — never treated as an absent InventoryLevel and
+  never routed to activation.
+- `shopify.connector.inventory.level.binding.shopify_gid` now always
+  holds the real Shopify InventoryLevel GID, captured from the pair
+  read, activation direct-success evidence, activation reconciliation,
+  the set-quantities pre-C2 read, and set-quantities reconciliation — a
+  synthetic `<item_gid>:<location_gid>` composite is never constructed
+  anywhere in the module again (source-level guard confirms this). A
+  conflicting already-recorded GID fails closed pre-C2, or flags the
+  binding `status='review'` when observed only after an already-terminal
+  success.
+- The pre-C2 fail-closed helper (`_fail_closed_pre_c2`) no longer writes
+  to the job or commits — it only raises a new domain-owned
+  `InventoryPreC2FailClosedError`. The domain's own blocked disposition
+  is now written and committed exclusively by an inherited
+  `_recover_pre_c2_failure` override on the job-dispatch abstract model,
+  which runs only after core's own rollback/reset (LL-005 compliant, §4
+  below).
+- Shopify-returned quantity evidence (`available`, `changeFromQuantity`,
+  `quantityAfterChange`, activation `available`) is now validated by a
+  new `_strict_shopify_int` helper that accepts only a genuine, non-bool
+  Python `int` — `int(...)` is never used as a permissive coercion on
+  transport-returned data anywhere in the module. Set-quantities success
+  additionally requires exactly one `available` change (never a
+  duplicate or an extra quantity-name change) and an exact match on the
+  requested `reason`/`referenceDocumentUri`; a response carrying both
+  `userErrors` and a non-null adjustment group is classified `uncertain`/
+  `data_shape_schema_mismatch`, never a clean rejection.
+- The scheduled push-scan handler now distinguishes "never successfully
+  pushed" (`last_pushed_at` unset) from "successfully pushed a confirmed
+  zero" — a never-pushed pair is always admitted to orchestration, even
+  at a zero target.
+- The shared `inventory_mutation_reconcile` job's durable identity now
+  includes the store and mutation domain
+  (`reconcile:{store}:{mutation_domain}:{attempt_token}`), via an
+  inherited `_ensure_reconciliation_job` override scoped to the two
+  inventory mutation domains only; every non-inventory domain is
+  unchanged.
+- `_handoff_supersede` no longer accepts a caller-supplied
+  `cas_retry_ordinal` — the parameter does not exist on its signature.
+  For a CAS replacement (`is_cas_replacement=True`), the ordinal is
+  always derived from a freshly row-locked read of the exact predecessor
+  job; every other handoff (reconciliation-not-applied, manual-review
+  release) always creates its replacement at ordinal 0, regardless of
+  the predecessor's own ordinal. The prior cycle's disclosed procedural
+  limitation is resolved (§5).
+- CAS-exhaustion review-release eligibility now additionally requires
+  the final attempt's persisted, sanitized `user_error_codes` evidence
+  to actually contain `CHANGE_FROM_QUANTITY_STALE` — ordinal 3 alone is
+  no longer sufficient.
+- `_handle_inventory_mutation_reconcile` now separates execution of the
+  reconciliation read from validation of its returned structure into two
+  distinct `try`/`except` blocks (LL-013): a `JobHandlerError`, a
+  genuine PostgreSQL concurrency failure, or any other transient
+  read-execution exception now retries through the ordinary read-safe
+  job path; only a result the strategy actually returns, but that fails
+  schema validation, blocks the original job. The same PG-concurrency
+  re-raise correction was applied to the orchestration read wrapper and
+  the reconciliation handler's final atomic-apply block (same-pattern
+  audit finding, §2 item 14).
+- `_handle_inventory_location_sync` now validates the complete GraphQL
+  response/connection/pagination shape through a new
+  `_validate_locations_response` helper — a malformed or partial page
+  now raises `JobHandlerError(data_shape_schema_mismatch)` and follows
+  the ordinary read-safe retry path, never silently succeeding as an
+  empty store.
+- The review-release reason is now passed through the binding mixin's
+  PII-safe `_audit_safe_reason` helper (already used by
+  `action_override_binding`), not the secret-only `redact()`.
+- Both `_handle_inventory_push_sync` orchestration→mutation handoff
+  branches (DEC-037 §5.4 handoff A) now acquire the binding's row lock
+  before terminalizing the orchestration job and creating the child; all
+  handoff logs (A–D and manual-review release) now record both
+  `predecessor_job_id` and `successor_job_id`.
+- `enqueue_first_push_preview`/`enqueue_location_sync` are now private
+  (`_enqueue_first_push_preview`/`_enqueue_location_sync`) and require
+  explicit Operator/Administrator authority.
+  `create_or_update_location_mapping` no longer silently replaces an
+  existing mapping's Shopify GID or silently moves an already-mapped GID
+  to a different Odoo location — either case now fails closed with a
+  clear `UserError`.
 
-## 2. Correction batch applied (this cycle) — full audit trail
+## 2. Correction batch applied this cycle — full audit trail
 
-Every item below traces to PR #182 comment `5025765389` (numbered as in
-that comment) or its addendum `5025803697` (numbered 20–22), except item
-15, which is a defect this session found and fixed while implementing
-item 11 and was not named by either review comment.
+Every item traces to PR #182 comment
+[`5028910116`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5028910116),
+numbered as in that comment, except item 14, a same-pattern-audit finding
+beyond the 13 named items.
 
-1. **Read-query schema fix.** `_read_shopify_inventory_pair` no longer
-   calls the root `inventoryLevel(inventoryItemId:, locationId:)` field
-   (invalid on the 2026-07 schema); it now reads through
-   `inventoryItem(id:) { inventoryLevel(locationId:) }`, returning a
-   structured `item_exists`/`tracked`/`level_exists`/`available`/
-   `updated_at` shape and raising `JobHandlerError(data_shape_schema_mismatch)`
-   on any malformed/ambiguous response — never defaulting a missing item
-   to `tracked=True` or a malformed response to "no level."
-2. **Idempotency directive.** Both `inventorySetQuantities` and
-   `inventoryActivate` now declare `$idempotencyKey: String!` and apply
-   `@idempotent(key: $idempotencyKey)`, with the same UUID threaded into
-   `variables` and persisted on the attempt at C2 (`shopify_idempotency_key`,
-   unchanged core mechanism).
-3. **CAS field name.** `inventorySetQuantities` now sends
-   `changeFromQuantity` (an actual integer); `compareQuantity` no longer
-   appears anywhere in the module (source-level guard confirms this).
-4. **Freshness/ABA parsing.** `_reconcile_set_quantities` now parses
-   `InventoryQuantity.updatedAt` and `attempt.transport_at` into
-   timezone-aware `datetime` objects and compares them properly — never
-   a raw-string comparison of differently-formatted timestamps. A
-   same-value read with a later `updatedAt` (a possible ABA) remains
-   `inconclusive`; a same-value read with no later evidence, and only
-   when freshness evidence is genuinely usable, supports `not_applied`;
-   missing or unparsable freshness evidence never defaults to
-   `not_applied`.
-5. **Reference document URI.** Built as
-   `odoo://<database-uuid>/shopify.connector.job/<id>`, where
-   `<database-uuid>` is resolved from `ir.config_parameter`'s
-   `database.uuid` (never `env.cr.dbname`); if unresolvable, the job
-   fails closed pre-C2 rather than building a URI with a missing UUID.
-6. **Set-quantities direct-success evidence.** An empty `userErrors`
-   list is no longer sufficient. `_is_valid_set_quantities_success` now
-   requires a non-null `inventoryAdjustmentGroup` with a matching
-   `available` change whose `quantityAfterChange` equals the requested
-   target; any null/missing/mismatched shape becomes `uncertain` /
-   `data_shape_schema_mismatch`, action `reconcile` — never a false
-   `succeeded`.
-7. **Activate direct-success evidence.** `_is_valid_activate_success`
-   now requires a non-null `InventoryLevel` whose returned item/location
-   IDs match what was requested and whose `available` quantity is
-   exactly zero; the existing payload-shape-only clean-rejection/
-   ambiguous-shape classifications are otherwise unchanged (still no
-   message-text routing).
-8. **Source/AST + unit test coverage** for items 1–7 added to
-   `test_inventory_push_mechanics.py` (§6 below).
-9. **Core enqueue-service adoption.** `_create_inventory_job` now routes
-   every ordinary job creation through `shopify.connector.job.enqueue`
-   (the core's sole sanctioned domain enqueue service) instead of a
-   direct `shopify.connector.job.sudo().create()`. The domain-owned
-   `cas_retry_ordinal` field (outside that service's signature) is
-   applied through one narrow, same-transaction `sudo()` write
-   immediately after enqueueing, only when non-zero — no second
-   transaction, no parallel enqueue mechanism.
-10. **Coalescing correction.** `_try_enqueue_push_sync` now catches a
-    `ValidationError` only when its message matches the exact declared
-    `_store_operation_scope_key_uniq` constraint text, and only after
-    independently re-querying for an actual non-terminal job on the
-    precise pair; every other `ValidationError` (store-state,
-    domain-disabled, company, invalid fields, illegal transitions,
-    security, unrelated constraints, malformed identity) now propagates.
-11. **Exact `operation_scope_key` literal.** A new
-    `_compute_operation_scope_key` override (calling `super()` first)
-    sets the stored value to the exact frozen literal
-    (`job.shopify_target_gid`, verbatim) for the three pair-execution
-    job types only, while non-terminal and not superseded; every other
-    job type (including the shared reconciliation type) keeps core's
-    original composite behavior unchanged.
-12. **`cas_retry_ordinal` protection.** `create()`/`write()` overrides on
-    the job model now deny any non-`sudo()` attempt to supply or modify
-    `cas_retry_ordinal` (mirroring core's own `PROTECTED_JOB_FIELDS`
-    pattern exactly), and a new `@api.constrains` enforces it is 0 for
-    every job_type other than `inventory_set_quantities`, and within
-    [0, 3] always.
-13. **Typed scan-job cron.** `run_inventory_push_scan` (the cron entry
-    point) now only enqueues one `inventory_push_scan` job per eligible
-    connected store, through the core enqueue service; the actual
-    per-store scan logic moved into that job's own handler
-    (`_handle_inventory_push_scan`), never inline on the cron thread.
-14. **Corrected three-way drift matrix.** Shopify already equal to the
-    current Odoo target is never drift, even when it also differs from
-    `last_pushed_available`; unexplained drift is now recognized only
-    when Shopify differs from **both** the last-pushed value and the
-    current target.
-15. **[Self-discovered, not named by either review comment] Orchestration
-    → mutation handoff sequencing defect.** `_handle_inventory_push_sync`
-    previously created its child mutation job (`inventory_activate` or
-    `inventory_set_quantities`) for the same pair **before**
-    terminalizing itself. Since `operation_scope_key` never varies by
-    `job_type` (it is keyed on the pair alone), the still-`running`
-    orchestration job's own scope key was identical to the child's
-    about-to-be-inserted one, so the child's insert would collide on the
-    `_store_operation_scope_key_uniq` constraint — the entire
-    push_sync→mutation handoff would never actually succeed at runtime.
-    Fixed by reordering both branches to terminalize the orchestration
-    job (`state='succeeded'`) and flush **before** creating the child,
-    mirroring the exact ordering `_handoff_supersede` already used
-    elsewhere in this same file. Found while building the
-    `operation_scope_key` exact-literal tests (item 11); not part of
-    either review comment's explicit list.
-16. **Fail-closed integral-quantity gate.** A new
-    `_integral_quantity_or_none` helper accepts a target only when it is
-    integral within an accepted floating-point-noise tolerance
-    (`1e-4`), returning an actual Python `int`; a genuine fraction fails
-    closed pre-C2 as `data_shape_schema_mismatch`/`binding_conflict`,
-    with no mutation-attempt row created. Negative-to-zero clamping
-    (existing D-013-2 behavior) is unchanged and still logs the true
-    negative value.
-17. **Backend creation/admission services (comment `5025803697` item
-    22).** Four new sanctioned service methods, all authorization-checked,
-    all resolving/validating referenced records in the caller's own
-    environment before a narrow `sudo()` for the protected-field
-    create/write itself, none adding a public action or UI:
-    `create_or_update_location_mapping`, `ensure_inventory_level_binding`,
-    `enqueue_first_push_preview`, `enqueue_location_sync`. The latter two
-    make the previously dead `inventory_first_push_preview`/
-    `inventory_location_sync` handlers reachable through something other
-    than direct protected-field job creation.
-18. **SEC-1 composite-binding company consistency (comment `5025803697`
-    item 21).** A new `@api.constrains` on the inventory-level binding
-    enforces that any non-empty product-variant company and mapped-
-    location company both equal `env.company`, and equal each other when
-    both are non-empty; company-neutral records remain valid.
-19. **Fresh pre-C2 fail-closed conditions (comment `5025803697` item
-    20).** `_prepare_preconditions_set_quantities` no longer converts a
-    missing/inactive level's `available: None` to `0.0` and proceeds. A
-    new `_fail_closed_pre_c2` seam (§4 below) lets this domain-owned
-    callback reach the accepted `blocked_manual_review`/
-    `inventory_location_missing` disposition — not core's generic
-    `shopify_temporary_server_network` retry — with no mutation-attempt
-    row ever created. Applied to: store-identity mismatch, missing/
-    inactive level, item gone untracked, a non-integral target, and a
-    missing required GID.
+1. **Missing InventoryItem never routed to activation.**
+   `_handle_inventory_push_sync` previously checked only `tracked is
+   False`, so `item_exists=False` (`tracked=None`) fell through to the
+   `not read['level_exists']` branch and enqueued `inventory_activate`.
+   Fixed by adding an explicit `not read['item_exists']` check —
+   routed to `blocked_manual_review`/`binding_conflict` — before the
+   `tracked`/`level_exists` checks, in the orchestration handler, the
+   set-quantities pre-C2 precondition read, and both mutation domains'
+   reconciliation reads.
+2. **Real InventoryLevel GID identity.** The read query already
+   requested InventoryLevel `id`, but `_read_shopify_inventory_pair`
+   never extracted or returned it. Added `inventory_level_gid` to the
+   returned structure (validated non-empty when a level exists);
+   persisted from the pair read (pre-C2, opportunistic capture),
+   activation direct-success evidence, activation reconciliation, and
+   set-quantities reconciliation. The synthetic
+   `'%s:%s' % (item_gid, location_gid)` fallback is removed from both
+   `_apply_consequence_set_quantities` and `_apply_consequence_activate`
+   (confirmed absent by a static guard). A conflicting already-recorded
+   GID fails closed pre-C2 (no commit has occurred yet) or is flagged
+   `status='review'` post-success (the mutation itself already
+   succeeded and the job is already terminal, so the disposition itself
+   cannot block).
+3. **Pre-C2 fail-closed helper no longer commits.** `_fail_closed_pre_c2`
+   previously called `self.env.cr.commit()` directly inside a domain
+   `prepare_preconditions` path — a `TransactionCase` test calling
+   `_prepare_preconditions_set_quantities` directly would execute that
+   commit-bearing path (LL-005). Replaced with a domain-owned
+   `InventoryPreC2FailClosedError` (carrying `error_class`/`subreason`/
+   `message`) that is raised, never written or committed. A new
+   `ShopifyConnectorJobDispatchInventoryExtension._recover_pre_c2_failure`
+   override (an inherited dispatcher recovery seam, no core-file edit)
+   applies the domain's blocked disposition only for this exception
+   type, after replicating core's own rollback/reset/re-lock sequence;
+   every other exception delegates unchanged to `super()`. Full detail
+   §4.
+4. **Strict integer evidence.** Replaced every permissive `int(...)`
+   coercion of transport-returned quantity data with a new
+   `_strict_shopify_int(value)` helper (rejects `bool`, float, numeric
+   string, `None`) in `_read_shopify_inventory_pair` (`available`),
+   `_is_valid_set_quantities_success` (`quantityAfterChange`), and
+   `_is_valid_activate_success` (activation `available`).
+   `_is_valid_set_quantities_success` also now requires exactly one
+   `changes` entry named `available` (rejecting duplicates/extra
+   quantity-name changes) and an exact match on the requested
+   `reason`/`referenceDocumentUri`. `_classify_direct_set_quantities`
+   now classifies a response carrying both `userErrors` and a non-null
+   adjustment group as `uncertain`/`data_shape_schema_mismatch`, never a
+   clean rejection. Sanitized `user_error_codes` (never raw message
+   text) are now persisted in evidence whenever `userErrors` is
+   non-empty.
+5. **Never-pushed-zero scan admission.** `_handle_inventory_push_scan`
+   previously skipped whenever `target == last_pushed_available`, and
+   the Float field defaults to `0.0` — so a confirmed, never-pushed pair
+   with a zero target was skipped forever. Fixed by additionally
+   checking `last_pushed_at`: a never-pushed pair (`last_pushed_at`
+   unset) is always admitted regardless of target value; only a pair
+   with a recorded prior push and an unchanged target is skipped.
+6. **Shared reconciliation identity includes the mutation domain.** A
+   new `_ensure_reconciliation_job` override on
+   `ShopifyConnectorJobDispatchInventoryExtension`, scoped to
+   `inventory_activate`/`inventory_set_quantities` only, builds
+   `payload_hash='reconcile:{store_id}:{mutation_domain}:{attempt_token}'`
+   instead of core's bare `'reconcile:{attempt_token}'` — every
+   non-inventory domain still delegates to `super()` unchanged.
+7. **CAS ordinal lineage — no arbitrary jump, no non-CAS inheritance.**
+   `_handoff_supersede`'s signature no longer has a `cas_retry_ordinal`
+   parameter at all (replaced by a boolean `is_cas_replacement`). When
+   `True`, the method row-locks the exact predecessor job itself and
+   derives `cas_retry_ordinal = locked_job.cas_retry_ordinal + 1`
+   in-place, rejecting the call with `ValidationError` if the
+   predecessor is not an `inventory_set_quantities` job already below
+   the bounded ceiling. Every other handoff always passes
+   `is_cas_replacement=False` (the default), so the replacement is
+   always created at ordinal 0 — never inheriting a nonzero predecessor
+   ordinal. This resolves the prior cycle's disclosed procedural
+   limitation (§5).
+8. **CAS-exhaustion release requires the stale-code evidence.**
+   `_recheck_inventory_pair`'s CAS-exhaustion eligibility branch now
+   also reads the blocked job's mutation attempt's persisted
+   `remote_evidence_refs['direct']['user_error_codes']` and requires
+   `'CHANGE_FROM_QUANTITY_STALE'` to be present, in addition to
+   `cas_retry_ordinal == 3` — an ordinal-3 job whose final attempt never
+   actually recorded the stale code is no longer eligible.
+9. **Reconciliation exception ordering (LL-013).**
+   `_handle_inventory_mutation_reconcile` previously wrapped both
+   `strategy['reconcile'](attempt)` and
+   `Dispatch._validate_reconciliation_result(result)` in one broad
+   `except Exception`, misclassifying a transient read failure as
+   malformed evidence and blocking the original job. Split into two
+   `try`/`except` blocks: the read-execution block re-raises
+   `JobHandlerError` and `PG_CONCURRENCY_EXCEPTIONS_TO_RETRY` unchanged,
+   and wraps any other exception as `JobHandlerError(
+   shopify_temporary_server_network, ...)` for the ordinary retry path;
+   only the separate result-validation block's failure blocks the
+   original job as `data_shape_schema_mismatch`.
+10. **Location-sync response/pagination-shape validation.** A new
+    `_validate_locations_response(result)` helper requires `data`,
+    `locations`, `edges` (list), `pageInfo` (dict), `hasNextPage`
+    (bool), each edge/node shape, and a non-empty string GID, raising
+    `JobHandlerError(data_shape_schema_mismatch)` on any defect —
+    including a missing/malformed page cursor when `hasNextPage` is
+    true. `_handle_inventory_location_sync` now routes every page
+    through this validator instead of defaulting absent
+    `data`/`locations`/`edges` to empty structures. The inaccurate "sole
+    sudo() site" docstring wording is also corrected — the module has
+    several other narrow, named `sudo()` elevations.
+11. **PII-safe review-reason redaction.** `_recheck_inventory_pair` now
+    calls `locked_binding._audit_safe_reason(reason)` (the binding
+    mixin's existing secrets-plus-PII helper, already used by
+    `action_override_binding`) instead of the secret-only `redact()` —
+    email addresses and phone numbers are now redacted from the
+    `_logger.info` release-audit line, not just credentials/tokens.
+12. **Orchestration handoff row lock + complete lineage logging.** Both
+    `_handle_inventory_push_sync` handoff-A branches (activation-required
+    and set-quantities) now call `binding.try_lock_for_update()` before
+    writing `state='succeeded'` on the orchestration job and creating
+    the child — never terminalizing before the lock is confirmed held.
+    Every handoff log entry (A, both branches; B via
+    `_handoff_succeed_to_fresh_orchestration`; C/D via
+    `_handoff_supersede`; manual-review release, which reuses
+    `_handoff_supersede`) now includes both `predecessor_job_id=` and
+    `successor_job_id=` in its message text.
+13. **Backend admission hardening.** `enqueue_first_push_preview`/
+    `enqueue_location_sync` are renamed to
+    `_enqueue_first_push_preview`/`_enqueue_location_sync` and now
+    require explicit Operator/Administrator group membership (mirroring
+    the two sibling sanctioned services). `create_or_update_location_mapping`
+    now rejects (rather than silently applying) a differing Shopify GID
+    for an already-mapped Odoo location, and a differing Odoo location
+    for an already-mapped Shopify GID — both fail closed with a
+    `UserError` directing the caller to the reviewed binding-override
+    path; only non-identity controls (`push_enabled`) may still be
+    updated on an exact-identity match.
+14. **[Same-pattern audit finding, not one of the 13 named items]
+    PG-concurrency exception masking in two additional broad-catch
+    sites.** Beyond the reconciliation-handler fix required by item 9,
+    the same masking risk existed in `_handle_inventory_push_sync`'s
+    own read wrapper and in `_handle_inventory_mutation_reconcile`'s
+    final atomic-apply `except Exception` block: wrapping a genuine
+    PostgreSQL concurrency failure into `JobHandlerError` would route it
+    through `_invoke_handler`'s `except JobHandlerError` branch (which
+    performs an ORM write) instead of its dedicated
+    `except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY: raise` branch — exactly
+    the "write inside an already-aborted transaction" hazard core's own
+    comment at that call site warns against. Both sites now re-raise
+    `PG_CONCURRENCY_EXCEPTIONS_TO_RETRY` unchanged before the generic
+    `except Exception` fallback.
 
-## 3. Governing-document amendments applied (control-room ratified)
+## 3. Same-pattern audit — findings and disposition
 
-Exactly the two amendments the control room authorized (comment
-`5025765389` disposition 2 and item 16) were applied, and only those
-two, to the three newly-authorized governing files — no other Gate B
-decision was reopened:
+A full re-scan of `addons/shopify_connector_inventory/**` for every
+pattern listed in comment `5028910116`'s own checklist, beyond the 13
+named items:
 
-- **`docs/04-decisions/DEC-037-wave-3-inventory-gate-b.md` §7:** the
-  registered Task 013 job-type count is corrected from six to seven,
-  listing `inventory_mutation_reconcile` alongside the other six; the
-  pair-serialization identity bullet and domain-enable-flag bullet are
-  updated to match; a new bullet documents the shared reconciliation
-  type's read-only/attempt-linked/lifecycle behavior; a new bullet
-  documents the fail-closed integral-quantity rule. The superseded "No
-  new job type is added for reconciliation reads" sentence is struck
-  through and retained only for history.
-- **`docs/07-implementation-plan/task-013-inventory-sync-implementation-packet.md`:**
-  D-013-2 gains the fail-closed integral-quantity rule; the job-type →
-  domain-flag map (§4) is corrected from six to seven types; the §5 test
-  list gains two narrowly-scoped annotations (the integral-quantity gate
-  and the reconciliation job type's read-only/attempt-linked behavior)
-  for `test_inventory_push_mechanics.py`, and the drift-matrix/typed-
-  scan-cron correction is reflected in the existing
-  `test_inventory_triggers.py` entry without expanding its scope beyond
-  what it already covered.
-- **`docs/06-prompts/sol-wave-3-task-013-locked-prompt.md`:** the
-  service-model annotation gains the reconciliation job-type
-  registration description; HARD CONSTRAINTS gains the fail-closed
-  integral-quantity rule; the `test_inventory_push_mechanics.py`
-  annotation gains the same two narrowly-scoped items as the packet.
-  The locked prompt's issuance history is not altered or marked
-  executed.
+| Pattern | Finding |
+| --- | --- |
+| Missing remote identity treated as absent child resource | Item 1 above; no other occurrence found. |
+| Synthetic GIDs | Item 2 above; no other synthetic-identity construction found. |
+| Response coercion | Item 4 above (quantities); the transport-layer catch-all in `_transport_set_quantities`/`_transport_activate` is an intentional, unchanged, already-accepted DEC-037 pattern (any transport-shape exception becomes `uncertain`/reconcile, never trusted) — not a coercion defect. |
+| Response data plus errors | Item 4 above (set-quantities ambiguous case); `_classify_direct_activate`'s existing ambiguous-shape fallback (userErrors alongside a non-null level) was already correct and unchanged. |
+| Direct commits in domain callbacks | Item 3 above; confirmed by AST guard that no `self.env.cr.commit` appears in `_fail_closed_pre_c2`, `_prepare_preconditions_set_quantities`, or `_prepare_preconditions_activate`. |
+| TransactionCase commit masking | Item 3 above; new tests prove `job.state` is unchanged after a direct `prepare_preconditions` call (no commit occurs), separate from the durable genuine-connection recovery-seam proof. |
+| Missing pair locks | Item 12 above; `_apply_consequence_set_quantities`/`_apply_consequence_activate` already locked via `_lock_binding_for_pair` (unchanged, correct); the missing lock was specifically the two orchestration handoff-A branches. |
+| Omitted successor IDs in logs | Item 12 above; all handoffs now log both IDs. |
+| Broad exception swallowing | Items 9 and 14 above; no other broad `except Exception` site found that could route a PG-concurrency exception through an ORM-writing branch. |
+| Default-empty false success | Item 10 above; no other default-empty pattern found. |
+| First-run values confused with successful-zero values | Item 5 above; no other occurrence. |
+| Shared-job identity missing mutation domain | Item 6 above; the only shared-identity job type in this module. |
+| Arbitrary protected lineage values | Item 7 above; `cas_retry_ordinal` is the only domain-owned lineage field. |
+| Release eligibility inferred without structured evidence | Item 8 above; the other two eligibility branches (`inventory_location_missing`, ordinary `shopify_user_errors_validation`) do not depend on a specific structured code and were already correct. |
+| Secret-only redaction where PII redaction is required | Item 11 above; the only free-text user input logged anywhere in the module is the release reason. |
+| Public-named service methods lacking authorization | Item 13 above; `create_or_update_location_mapping`/`ensure_inventory_level_binding` already required Operator/Administrator authority from the prior cycle and were unaffected. |
 
-No other product or architecture decision was reopened in any of the
-three files.
+No known implementation limitation remains from this audit, except the
+already-declared external evidence classes in §9–§12 that genuinely
+require a later environment.
 
-## 4. The pre-C2 fail-closed seam — proof, not a gap
+## 4. The pre-C2 fail-closed seam — corrected, non-committing design
 
-Per comment `5025803697` item 20's instruction to report an exact seam
-gap if Stage 0 cannot express this without a forbidden core change: a
-working seam **was** found and used, entirely within this domain
-module's own `prepare_preconditions` callback — no core file was
-touched. `_fail_closed_pre_c2(job_id, error_class, subreason, message)`
-calls the existing, already-used-elsewhere cross-model method
-`shopify.connector.job.dispatch._block_original_job(...)` (the same
-method this module's own `_handle_inventory_mutation_reconcile` already
-calls) to write `blocked_manual_review` plus the domain's own
-error_class/subreason, commits immediately (mirroring the commit-
-after-state-transition pattern core's own `_drain_mutation_one` already
-uses between C1 and `prepare_preconditions`), and then raises. Because
-`job.state != 'running'` by the time core's `_recover_pre_c2_failure`
-re-acquires the job, its generic bounded-retry branch is a no-op and
-the domain-specific blocked disposition is what survives — no
-mutation-attempt row is ever created, and no Shopify transport occurs.
-This is proof-of-implementation, not a hard-stop.
+Comment `5028910116` item 3 found that the prior cycle's
+`_fail_closed_pre_c2` violated LL-005 by committing directly from a
+domain `prepare_preconditions` path. The corrected design:
 
-## 5. Known, honestly-disclosed limitation (procedural, not structural)
+1. `_fail_closed_pre_c2(job_id, error_class, subreason, message)` now
+   only raises `InventoryPreC2FailClosedError(error_class, subreason,
+   message)` — no write, no commit.
+2. `ShopifyConnectorJobDispatchInventoryExtension._recover_pre_c2_failure`
+   (an override of the existing dispatcher seam, `_inherit`-based, no
+   core-file edit) intercepts only this exception type. For it: performs
+   the same `self.env.cr.rollback()` / `self.env.transaction.reset()` /
+   fresh row-lock re-acquisition core's own version performs, confirms
+   no mutation attempt exists and the job is still the exact owner
+   (`current_attempt_token == token and state == 'running'`), then calls
+   `_block_original_job` with the domain's own `error_class`/`subreason`
+   and commits — mirroring exactly the cursor-boundary discipline core's
+   own `_recover_pre_c2_failure`/`_recover_layer2_owner` already use
+   (proven precedent: `test_mutation_concurrency.py`'s own genuine
+   independent-connection tests exercise this same core method the same
+   way). Every other exception delegates unchanged to `super()`.
+3. A genuine independent-PostgreSQL-connection test
+   (`TestInventoryPreC2RecoverySeam` in `test_inventory_push_mechanics.py`,
+   tagged `post_install`/`-at_install`, mirroring core's own
+   `TestMutationConcurrency._durable_fixture` pattern exactly — a
+   `TransactionCase`'s own uncommitted transaction is never visible to a
+   separate `db_connect` connection, so the fixture is created and
+   committed through its own independent connection) proves the seam
+   durably applies the domain's blocked disposition, and that an
+   unrelated exception still receives core's own generic bounded-retry
+   recovery.
 
-`cas_retry_ordinal`'s "a replacement always equals the predecessor's
-ordinal + 1, no direct jump" guarantee is enforced **procedurally** — by
-the single call site (`_apply_consequence_set_quantities`'s CAS-stale
-branch always passes `job.cas_retry_ordinal + 1`) — not by a database-
-level constraint verifying the predecessor/successor relationship,
-because the predecessor's `superseded_by_job_id` link is only written
-*after* the successor is created (`_handoff_supersede`'s existing,
-unchanged ordering), so a `@api.constrains` on the new job's own
-creation cannot yet see that link. The range/domain constraint (0–3,
-non-zero only for `inventory_set_quantities`, §2 item 12 above) **is**
-DB-enforced. This is disclosed here rather than silently assumed; it
-does not allow an unauthorized Shopify mutation or a fifth replacement
-job (the ordinal-3 exhaustion check in `_apply_consequence_set_quantities`
-remains the actual admission guard).
+No core file was touched. This is proof-of-implementation of the
+corrected, non-committing design, not a hard-stop.
 
-## 6. D-013-1 .. D-013-9 traceability (updated)
+## 5. Prior-cycle limitation — resolved
+
+The prior cycle's disclosed procedural limitation (`cas_retry_ordinal`'s
+"replacement = predecessor + 1, no direct jump" guarantee was enforced
+only by the single call site, not a DB constraint) is **resolved** this
+cycle by item 7 above: `_handoff_supersede` no longer accepts an ordinal
+argument at all, so no caller — sanctioned service or otherwise — can
+request an arbitrary jump through the module's own API surface. The
+ordinal is always derived, in-process, from a freshly row-locked read of
+the exact predecessor. **No known implementation limitation remains.**
+
+## 6. D-013-1 .. D-013-9 traceability (unchanged structurally this
+cycle; corrected implementations only)
 
 | Decision | Implemented in | Tests |
 | --- | --- | --- |
-| D-013-1(a) location mapping + sanctioned creation service | `shopify_connector_location_mapping.py`, `create_or_update_location_mapping` (service) | `test_location_mapping.py` |
-| D-013-1(b) inventory-level binding + sanctioned ensure service + SEC-1 company check | `shopify_connector_inventory_level_binding.py`, `ensure_inventory_level_binding` (service) | `test_inventory_level_binding.py` |
-| D-013-2 quantity source + clamp + fail-closed integral gate | `_refresh_pending_target`, `_integral_quantity_or_none`, `_prepare_preconditions_set_quantities` (service) | `test_inventory_triggers.py`, `test_inventory_push_mechanics.py` |
-| D-013-3 push mutation mechanics (corrected: schema, idempotent directive, changeFromQuantity, reference URI, direct-success evidence, pre-C2 fail-closed) | `_prepare_preconditions_set_quantities`, `_transport_set_quantities`, `_classify_direct_set_quantities`, `_apply_consequence_set_quantities` (service) | `test_inventory_push_mechanics.py` |
-| D-013-4 first-push guard | `first_push_state`/`action_confirm_first_push` (binding), `_handle_inventory_push_sync` gate, `enqueue_first_push_preview` (service) | `test_inventory_first_push_guard.py` |
-| D-013-5 location cache + readiness + sanctioned location-sync admission | `_handle_inventory_location_sync`, `_check_mapped_location` override, `enqueue_location_sync` (service) | `test_inventory_location_cache_sync.py` |
-| D-013-6 job granularity + triggers + typed scan cron + corrected drift matrix | `_enqueue_from_stock_moves`, `run_inventory_push_scan`, `_handle_inventory_push_scan`, `action_push_inventory_now` (service) | `test_inventory_triggers.py` |
-| D-013-7 concurrency + exact operation_scope_key literal + protected cas_retry_ordinal | `_compute_operation_scope_key` override, `create()`/`write()` overrides (job extension) | `test_inventory_push_mechanics.py` (unit-level); genuine concurrency proof pending, §9 below |
+| D-013-1(a) location mapping + sanctioned creation service (identity-conflict fail-closed this cycle) | `shopify_connector_location_mapping.py`, `create_or_update_location_mapping` (service) | `test_location_mapping.py` |
+| D-013-1(b) inventory-level binding + sanctioned ensure service + SEC-1 company check + real-GID persistence this cycle | `shopify_connector_inventory_level_binding.py`, `ensure_inventory_level_binding` (service) | `test_inventory_level_binding.py`, `test_inventory_push_mechanics.py` |
+| D-013-2 quantity source + clamp + fail-closed integral gate + strict-integer evidence this cycle | `_refresh_pending_target`, `_integral_quantity_or_none`, `_strict_shopify_int`, `_prepare_preconditions_set_quantities` (service) | `test_inventory_triggers.py`, `test_inventory_push_mechanics.py` |
+| D-013-3 push mutation mechanics (this cycle: strict-integer/exact-request/no-duplicate success evidence, ambiguous-shape classification, non-committing pre-C2 seam, real-GID capture) | `_prepare_preconditions_set_quantities`, `_transport_set_quantities`, `_classify_direct_set_quantities`, `_apply_consequence_set_quantities` (service) | `test_inventory_push_mechanics.py` |
+| D-013-4 first-push guard | `first_push_state`/`action_confirm_first_push` (binding), `_handle_inventory_push_sync` gate, `_enqueue_first_push_preview` (service, hardened this cycle) | `test_inventory_first_push_guard.py` |
+| D-013-5 location cache + readiness + sanctioned location-sync admission (response-shape validation + hardened admission this cycle) | `_handle_inventory_location_sync`, `_validate_locations_response`, `_check_mapped_location` override, `_enqueue_location_sync` (service, hardened this cycle) | `test_inventory_location_cache_sync.py` |
+| D-013-6 job granularity + triggers + typed scan cron + corrected drift matrix + never-pushed-zero scan fix this cycle | `_enqueue_from_stock_moves`, `run_inventory_push_scan`, `_handle_inventory_push_scan`, `action_push_inventory_now` (service) | `test_inventory_triggers.py` |
+| D-013-7 concurrency + exact operation_scope_key literal + protected cas_retry_ordinal + resolved ordinal-lineage limitation this cycle | `_compute_operation_scope_key` override, `create()`/`write()` overrides (job extension), `_handoff_supersede` | `test_inventory_push_mechanics.py` (unit-level); genuine concurrency proof pending, §9 below |
 | D-013-8 baseline import split out | Not implemented (Task 013B scope; zero Task 013B code in this diff) | N/A |
-| D-013-9 Layer 2 integration + core enqueue-service adoption + corrected coalescing | `_get_reconciliation_strategies`/`_get_handlers`/`_get_replay_policies` extensions, `_create_inventory_job`, `_try_enqueue_push_sync` (service) | `test_inventory_push_mechanics.py` |
+| D-013-9 Layer 2 integration + core enqueue-service adoption + corrected coalescing + exact reconciliation identity + row-locked handoffs this cycle | `_get_reconciliation_strategies`/`_get_handlers`/`_get_replay_policies` extensions, `_create_inventory_job`, `_try_enqueue_push_sync`, `_ensure_reconciliation_job` override, `_recover_pre_c2_failure` override | `test_inventory_push_mechanics.py` |
 
 ## 7. DEC-037 §4/§9 matrix traceability
 
@@ -348,10 +393,11 @@ job/mutation-consequence contract) is implemented in
 `_classify_direct_set_quantities`, `_classify_direct_activate`,
 `_reconcile_set_quantities`, `_reconcile_activate`,
 `_apply_consequence_set_quantities`, and `_apply_consequence_activate`,
-all corrected this cycle for direct-success evidence and freshness/ABA
-parsing (§2 items 4/6/7 above). No cell is left "TBD." The nine-value
-fixed `error_class` vocabulary (DEC-037 §7) is used exclusively; the
-four withdrawn Revision-2 values never appear (static/AST-verified).
+all corrected further this cycle for strict-integer evidence, exact
+request-matching, ambiguous-shape classification, missing-item routing,
+and real-GID capture. No cell is left "TBD." The nine-value fixed
+`error_class` vocabulary (DEC-037 §7) is used exclusively; the four
+withdrawn Revision-2 values never appear (static/AST-verified).
 
 ## 8. Static and AST validation — EXECUTED (pure Python, no Odoo required)
 
@@ -361,61 +407,70 @@ four withdrawn Revision-2 values never appear (static/AST-verified).
 | `python3 -m pyflakes` on the whole module (no unused imports/names beyond expected package `__init__.py` re-exports) | EXECUTED — PASS |
 | XML well-formedness on the cron data file | EXECUTED — PASS |
 | CSV row-shape check on `ir.model.access.csv` | EXECUTED — PASS |
+| Manifest parses as a valid Python dict literal | EXECUTED — PASS |
 | `git diff --check` (no whitespace errors) | EXECUTED — PASS |
-| Allowed-file audit: only the 22 files this correction batch is authorized to touch were changed | EXECUTED — PASS |
-| Pair read uses `inventoryItem(id: $itemId) { inventoryLevel(locationId: $locationId) }`; no `inventoryLevel(inventoryItemId:` root call anywhere | EXECUTED — PASS |
-| `@idempotent(key: $idempotencyKey)` appears exactly twice (once per mutation); `$idempotencyKey: String!` declared | EXECUTED — PASS |
-| `changeFromQuantity` present; `compareQuantity` absent, module-wide | EXECUTED — PASS |
-| No `inventoryAdjustQuantities` string anywhere in the module | EXECUTED — PASS |
-| No `'committed'` string anywhere in the module | EXECUTED — PASS |
-| No `onHand` string anywhere in the module | EXECUTED — PASS |
+| Allowed-file audit: only the 22 files this correction batch is authorized to touch were changed (exactly 6 touched this cycle: the service model and the six-file — five modified — test suite) | EXECUTED — PASS |
+| No `self.env.cr.commit` inside `_fail_closed_pre_c2`, `_prepare_preconditions_set_quantities`, or `_prepare_preconditions_activate` | EXECUTED — PASS |
+| No synthetic `'%s:%s'` InventoryLevel-GID pattern anywhere in the module | EXECUTED — PASS |
+| Exact reconciliation identity format `'reconcile:%s:%s:%s' % (` present | EXECUTED — PASS |
+| `_handoff_supersede`'s signature has no `cas_retry_ordinal` parameter and has `is_cas_replacement` | EXECUTED — PASS |
+| `_handle_inventory_location_sync` routes every page through `_validate_locations_response`; no default-empty `.get(...) or {}`/`or []` shape coercion remains in that handler | EXECUTED — PASS |
+| `_recheck_inventory_pair` uses `_audit_safe_reason`, never bare `redact(` | EXECUTED — PASS |
+| `_handle_inventory_push_sync` calls `binding.try_lock_for_update()` exactly twice (both handoff-A branches) | EXECUTED — PASS |
+| `_handle_inventory_mutation_reconcile`'s `except JobHandlerError`/`except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY` re-raise branches appear textually before its generic transient-wrap branch | EXECUTED — PASS |
+| Pair read uses `inventoryItem(id: $itemId) { inventoryLevel(locationId: $locationId) }`; no `inventoryLevel(inventoryItemId:` root call anywhere (prior cycle, re-verified unchanged) | EXECUTED — PASS |
+| `@idempotent(key: $idempotencyKey)` appears exactly twice; `changeFromQuantity` present, `compareQuantity` absent (prior cycle, re-verified unchanged) | EXECUTED — PASS |
+| No `inventoryAdjustQuantities`/`'committed'`/`onHand` string anywhere in the module | EXECUTED — PASS |
 | No withdrawn `error_class` literal anywhere in the module | EXECUTED — PASS |
 | No `inventoryActivate` call site in any `*_set_quantities` strategy method, and vice versa | EXECUTED — PASS |
 | No message-text (`.get('message')`/`['message']`) read in `_classify_direct_activate` | EXECUTED — PASS |
 
 These checks were run directly against the corrected committed source in
 this workspace (plain Python 3.11; no Odoo installation is available
-here) — reproduced independently of the six test files' own equivalent
-guard tests, and their exact commands/output are reproducible from this
-document's own git history.
+here), both as standalone verification scripts and as the equivalent
+assertions now encoded in the six test files' own static/AST guard tests.
 
 ## 9. Odoo/PostgreSQL-dependent tests — IMPLEMENTED, EXECUTION PENDING EXTERNAL ENVIRONMENT
 
 No Odoo or PostgreSQL runtime is available in this implementation
 workspace. The following were **implemented but not executed** here (all
-six test files were extended this cycle with new coverage for every
-correction in §2), and must not be represented as passed until a
-genuine Odoo.sh or local-Odoo session runs them:
+six test files extended this cycle with new coverage for every
+correction in §2, plus one new tagged test class), and must not be
+represented as passed until a genuine Odoo.sh or local-Odoo session runs
+them:
 
 - Every `TransactionCase`-based test in the six test files, including
-  the new coverage for: the corrected GraphQL read/mutation shapes, the
-  idempotency-directive/key threading, the CAS-field rename, the
-  integral-quantity gate boundaries, the reference-document-URI shape,
-  direct-success-evidence rejection of malformed payloads, freshness/ABA
-  parsing (including missing/malformed-timestamp fixtures), the exact
-  `operation_scope_key` literal and its lifecycle, `cas_retry_ordinal`'s
-  non-`sudo()` denial and range/domain constraint, the typed scan-job
-  cron and its handler, the corrected three-way drift matrix, the
-  sanctioned backend creation/admission services, the SEC-1
-  company-consistency constraint, the unrelated-`ValidationError`
-  propagation through coalescing, and the fresh pre-C2 fail-closed
-  conditions.
+  the new coverage for: missing-InventoryItem routing at all three call
+  sites, real-InventoryLevel-GID capture and conflict handling, the
+  non-committing pre-C2 fail-closed path, strict-integer/duplicate/
+  ambiguous-evidence rejection for both mutations, the never-pushed-zero
+  scan distinction (5 scenarios), the exact shared-reconciliation
+  identity, CAS ordinal-lineage denial/derivation (0→1→2→3, no-jump,
+  non-CAS-reset), CAS-exhaustion stale-code evidence requirement,
+  reconciliation exception-ordering (transient-retries vs.
+  malformed-blocks), location-sync malformed-response fixtures (6
+  scenarios), PII-safe review-reason redaction (email/phone/token/
+  ordinary-text fixtures), orchestration handoff row-lock/duplicate-
+  handoff/rollback/lineage-log proof, and the hardened backend admission
+  services (private rename, authorization, no silent identity
+  replacement/move).
+- `TestInventoryPreC2RecoverySeam` (tagged `post_install`, `-at_install`):
+  the genuine independent-PostgreSQL-connection proof that the recovery
+  seam durably commits the domain's blocked disposition, and that an
+  unrelated exception still receives core's generic recovery.
 - Module installation and same-SHA update.
 - Full connector regression (all existing Stage 0/product/sale suites)
-  to confirm zero regression from this addon's registration on the
-  shared seams, and specifically that the `job.create()`/`write()`
-  override added this cycle does not regress any existing core job
-  creation path.
-- Lifecycle/uninstall behavior (`_reassign_to_historic_job_type` via the
-  seven `job_type` `ondelete` callables, including the new
-  `inventory_mutation_reconcile` value).
+  to confirm zero regression from this cycle's changes, specifically
+  that the `_ensure_reconciliation_job`/`_recover_pre_c2_failure`
+  dispatcher overrides do not regress any non-inventory job type's
+  reconciliation or pre-C2 recovery path.
+- Lifecycle/uninstall behavior (`_reassign_to_historic_job_type`,
+  unchanged this cycle).
 - The genuine independent-PostgreSQL-connection concurrency proof for
   pair-serialization admission and atomic-handoff replacement-job
-  creation (DEC-037 §5.3/§5.4) — the unit-level equivalent (asserting
-  the DB-level admission/handoff behavior through the ORM directly, now
-  including the exact-literal `operation_scope_key` assertions) exists
-  in `test_inventory_push_mechanics.py`, but the genuine separate-
-  OS-process, independent-registry version (LL-006/LL-007) requires the
+  creation (DEC-037 §5.3/§5.4) — the unit-level equivalent exists in
+  `test_inventory_push_mechanics.py`, but the genuine separate-OS-process,
+  independent-registry version (LL-006/LL-007) requires the
   child-process-capable runner this workspace does not have.
 
 ## 10. Odoo.sh evidence — PENDING (not available in this workspace)
@@ -443,15 +498,16 @@ This remains mandatory before Task 013 final merge authorization.
 
 No Odoo/PostgreSQL runtime executed in this session, so there is no
 live-process residue to inspect. A source-level residue check was
-performed instead: no test fixture inserts raw SQL outside the ORM; no
-credential, access token, or PII literal appears anywhere in the module;
-the module still introduces exactly one new `sudo()` site
-(`_handle_inventory_location_sync`) for elevated writes plus the narrow,
-explicitly-scoped `sudo()` calls the new sanctioned service methods use
-only for the mixin's protected-field create/write (never for validation
-or authorization, which always run in the caller's own environment
-first) — consistent with D-013-5's "one named elevation-for-mutation
-sudo" intent and not a new unscoped elevation pattern.
+performed instead: no test fixture inserts raw SQL outside the ORM
+except the genuine independent-connection fixtures'
+setup/teardown DELETE statements in `TestInventoryPreC2RecoverySeam`
+(scoped to only the rows that same test created, mirroring core's own
+`TestMutationConcurrency._cleanup_fixture` pattern); no credential,
+access token, or PII literal appears anywhere in the module; the
+`_handle_inventory_location_sync` `sudo()` elevation is now correctly
+described as one of several narrow, named elevations this module uses
+(the prior cycle's "sole sudo() site" docstring wording was inaccurate
+and is corrected).
 
 ## 14. Remaining external evidence required before final merge authorization
 
@@ -463,11 +519,13 @@ sudo" intent and not a new unscoped elevation pattern.
    validation plan, or an explicit, recorded control-room disposition
    for any scenario found genuinely not-executable.
 
-No genuine implementation-level blocker remains: every P0/P1 item in
-both review comments was corrected in this same batch (§2), the one
-procedural-not-structural limitation is disclosed transparently (§5),
-and the one seam the review flagged as a possible hard-stop was
-resolved, not left open (§4).
+**No known implementation-level limitation remains** (§5): every item in
+comment `5028910116` was corrected in this same batch (§2), the full
+same-pattern audit found and corrected one additional defect beyond the
+13 named items (§3), and the prior cycle's disclosed procedural
+limitation is resolved (§5) — the next candidate has zero known
+implementation limitation except the external evidence classes above,
+which genuinely require a later environment.
 
 ## 15. Explicit confirmations
 
