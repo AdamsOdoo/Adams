@@ -1,3 +1,72 @@
+### Task 013 fourth correction cycle — tiny P0 patch per delta control-room review, same draft PR — compact handoff (2026-07-21)
+
+- **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) →
+  `mvp/program-integration`, base unchanged at
+  `8f5f421e2110c2e805460ea75fb519e48013e0f7`. Fourth correction cycle on
+  the same draft PR, not a new branch/PR.
+- **Authority:** PR #182 comment
+  [`5030514895`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5030514895)
+  ("ONE TINY P0 PATCH, THEN RUNTIME" — a delta review of cycle 3's three
+  new commits only, reviewed head
+  `47f1d9b2a2d4c8c894805c6d268adec6f352778a`), accepting cycle 3's seven
+  groups in direction and naming exactly three P0 defects.
+- **Corrected (exactly three items, scoped exclusively to
+  `shopify_connector_inventory_service.py` and
+  `test_inventory_push_mechanics.py`):**
+  1. `_apply_consequence_activate` called
+     `_handoff_succeed_to_fresh_orchestration` once conditionally and
+     once more unconditionally — removed the unconditional duplicate; a
+     new AST guard proves exactly one call site remains.
+  2. Both transport adapters (`_transport_set_quantities`/
+     `_transport_activate`) preserve the raw `userErrors` value instead
+     of `payload.get('userErrors') or []`; both classifiers
+     (`_classify_direct_set_quantities`/`_classify_direct_activate`)
+     validate `isinstance(user_errors, list)` before ever checking
+     emptiness, so a malformed falsey container (`{}`, `''`, `0`,
+     `False`, `None`, a tuple) can never reach the success validator or
+     be coerced into an apparent clean pass, even alongside an otherwise
+     fully valid success payload.
+  3. `_create_cas_successor_job` now independently re-verifies the
+     predecessor's own immutable attempt (`failed_clean`/`not_applied`,
+     exact structured `code == 'CHANGE_FROM_QUANTITY_STALE'` entry)
+     before deriving a successor ordinal, rather than trusting the
+     caller.
+- **Self-discovered, corrected before any test ran:** the first draft of
+  fix 3 read `locked_predecessor.mutation_attempt_id`; tracing core's
+  `_check_reconciliation_attempt_link` constraint showed that field can
+  never be set on an ordinary (non-reconciliation) job, so the gate would
+  always have raised. Corrected to search the attempt by its own
+  `job_id` reference, mirroring core's `_has_mutation_attempt_evidence()`
+  fallback.
+- **Discovered but explicitly out of scope, not fixed — flagged for the
+  next cycle:** `action_recheck_inventory_pair` has the identical
+  pre-existing pattern (`blocked_job.mutation_attempt_id`), meaning it
+  can never find a real attempt for any ordinary blocked job and will
+  always report "not eligible." Not one of the three authorized items;
+  documented in validation-results.md §2a/§13 and AR-068.
+- **Tests:** 13 new/corrected test methods (168 `test_` methods total in
+  the file); all Odoo-dependent tests remain execution-pending (no
+  runtime here) but were independently hand-traced and, for the four
+  classifier functions (which use no `self.env`), re-verified against
+  the actual extracted production source in a standalone Python harness.
+- **Validation:** `py_compile`/`pyflakes`/`git diff --check` green; new
+  source guards (exactly-one-handoff-call AST count; no `or []` fallback
+  for `userErrors`/`user_errors` anywhere in the file); allowed/forbidden
+  file audit clean (exactly the two authorized files changed); no Task
+  013B; all four protected references unchanged.
+- **Status:** PR #182 remains draft, unmerged, not marked ready; not
+  self-accepted, not self-merged. No Odoo.sh run, no dev-store/live
+  Shopify mutation, no new Shopify read this cycle.
+- **Next-session prompt:** Await control-room re-review of this tiny
+  patch (per comment `5030514895`'s own stated bar: verify only these
+  three fixes, then authorize the Odoo.sh runtime campaign unless a new
+  directly-visible P0 defect is found) and, separately, a control-room
+  decision on the disclosed `action_recheck_inventory_pair` defect
+  before any future correction cycle addresses it.
+
+---
+
 ### Task 013 third correction cycle — surgical control-room re-review REVISE applied to the same draft PR — compact handoff (2026-07-21)
 
 - **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR
