@@ -4,6 +4,57 @@
 
 ## Current status
 
+**TASK 013 (PR #182) — TRACK B CANDIDATE TECHNICAL CLOSURE COMPLETED (2026-07-21).**
+On Odoo.sh build `35199258` (a REBUILD of `35193596`; Odoo 19.0 / PostgreSQL
+16.14), Track B (authority: comment `5031833846`) delivered the candidate-side
+final technical evidence with **no production file changed anywhere**: (1) the
+core mutation-source **test guard** was corrected to accept the exact inventory
+prepare/transport split (`ACCEPTED_PREPARE_TRANSPORT_SPLIT`, the two real pairs)
+with 11 adversarial self-tests — the reviewed architecture and mutation literals
+were preserved, not relocated; (2) a genuine **simultaneous** concurrency suite
+(`test_inventory_concurrency.py`, 9 tests) was added, using two overlapping
+independent transactions (a holder holds a real `FOR UPDATE` / uncommitted
+`operation_scope_key` unique-index entry while a worker races it) — distinct from
+the pre-existing **sequential** `TestInventoryPreC2RecoverySeam` (terminology
+corrected: it is NOT a savepoint test and NOT simultaneous concurrency). The
+campaign **passed against the current candidate → no inventory production change**.
+Runtime (EXECUTED): inventory **0/247**, concurrency **0/9**, core guard **0/28**,
+core **0 failed + 12 err/305** (was 1F+12E — removed failure = the guard
+false-positive), product **0F+85E/163** (unchanged), sale **0/194**, combined
+4-module **0 failed + 97 err/909**, upgrade clean, uninstall→**0 residue**→reinstall
+→installed + **0/247**, security green. The two prior blockers were explicitly
+lifted for Track B: the exact-base comparison is **delegated to Track A** and the
+**97** core+product residuals are recorded **BASE-CONTROL PENDING** (not classified
+here); GitHub API access is not required (PR state control-room-verified).
+**Recommendation: TRACK B GREEN — READY FOR CONTROL-ROOM COMPARISON WITH TRACK A**
+(Task 013 cannot close until Track A returns). PR #182 stays **draft, unmerged,
+not marked ready**; no self-acceptance; no protected reference changed; no live
+Shopify mutation; Task 013B not started. Full evidence:
+[`../05-qa/task-013-inventory-sync-validation-results.md`](../05-qa/task-013-inventory-sync-validation-results.md)
+§16.
+
+**TASK 013 (PR #182) — FIRST GENUINE ODOO.SH RUNTIME VALIDATION COMPLETED (2026-07-21).**
+On Odoo.sh build `35193596` (Odoo 19.0 / PostgreSQL 16.14), the exact submitted
+head `26acf2b` was run for the first time at genuine runtime (all prior cycles
+were static-only — see the validation record §14/§15). Campaign A exposed
+**42/237 inventory tests failing**, including the known review-release P1 and
+four further runtime-only production defects (operation_scope_key never cleared
+before same-scope successor insert → P0; blocked-job supersede left
+`manual_review_subreason` set; coalescing caught the wrong exception; operator
+`free_qty` read not sudo'd), plus ~28 never-executed-at-runtime fixture defects.
+A single consolidated correction (`2bc6bdb`, `addons/shopify_connector_inventory/**`
+only) brings the focused inventory suite to **0 failed / 0 errors of 238**, with
+full-install, upgrade, uninstall→reinstall (zero residue), security-matrix and
+(single-transaction) suites all green. **Recommendation: RUNTIME GREEN — READY
+FOR CONTROL-ROOM REVIEW.** Residuals (control-room): a core mutation-source-guard
+false-positive on inventory's reviewed prepare/transport split (needs a core
+allowlist or a literal-relocation decision); no genuine independent-connection
+concurrency test exists; unchanged core/product/sale base-suite environmental
+NOT-NULL failures (out of scope). PR #182 stays **draft, unmerged, not marked
+ready**; no self-acceptance; no live Shopify mutation. Full evidence:
+[`../05-qa/task-013-inventory-sync-validation-results.md`](../05-qa/task-013-inventory-sync-validation-results.md)
+§15.
+
 **WAVE 3 GATE B ACCEPTED — MERGE-CLOSURE NORMALIZATION APPLIED AND MERGE AUTHORIZED (2026-07-19, PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)).**
 The control room reviewed Revision 3 (immediately below) at head
 `565d3daefdf0c87c46ffaf7a6d52f63841b1e770` and, by PR #179 comment

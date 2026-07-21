@@ -112,6 +112,19 @@ the safe anti-oversell floor). Write target: Shopify **`available`**
 only (accepted; `InventorySetQuantitiesInput.name` accepts only
 available/on_hand — captures §3).
 
+**Fail-closed integral-quantity rule [new, this correction batch, PR
+#182 comment `5025765389` item 16].** Shopify's quantity/
+`changeFromQuantity` fields are integers; `free_qty` is a float. After
+the clamp-to-0 step above, the target is sent to Shopify as an actual
+Python `int` only when it is integral within an accepted floating-
+point-noise tolerance. A genuinely fractional target (e.g. a
+non-integer UoM-precision result) is **never** rounded or truncated —
+it fails closed before any Shopify mutation attempt (no C2, no
+`mutation.attempt` row), routed as `error_class=
+'data_shape_schema_mismatch'` / `manual_review_subreason=
+'binding_conflict'`. No new `error_class`/`manual_review_subreason`
+value is introduced.
+
 **D-013-3 — Push mutation mechanics [Gate B-corrected, Revision 2
 2026-07-19, DEC-037 §1 item C8/§4 row 1/§5 — superseding this entry's
 original 2026-07-10 text below].** `inventorySetQuantities` with `name:
@@ -441,19 +454,25 @@ scoped ✅(D-013-2/3); 15 ambiguous/unmapped handling ✅ (unmapped →
 ARCH PD-5).
 
 Job-type → domain-flag map (red-team-added, exhaustive; **Revision 2,
-DEC-037 §7 adds the two mutation job types**): all six job types this
-module registers (`inventory_push_sync`, `inventory_push_scan`,
+DEC-037 §7 adds the two mutation job types; this correction batch adds
+the shared reconciliation job type, PR #182 comment `5025765389`
+disposition 2**): all seven job types this module registers
+(`inventory_push_sync`, `inventory_push_scan`,
 `inventory_first_push_preview`, `inventory_location_sync`,
-`inventory_activate`, `inventory_set_quantities`) map to
-`inventory_domain_enabled` via `_domain_flag_for_job_type()`. Of these,
-only `inventory_activate` and `inventory_set_quantities` are mutation job
-types (`job_type == mutation_domain`, registered in the reconciliation-
-strategy registry); the other four are Layer 1 read/orchestration/scan
-job types and carry no `mutation_domain`. Logging: all free text this module
-composes routes through `_system_append` (core redaction); payloads
-carry GIDs/quantities/location names only — no customer PII exists in
-this domain (note recorded to satisfy the cross-packet redaction
-check).
+`inventory_activate`, `inventory_set_quantities`,
+`inventory_mutation_reconcile`) map to `inventory_domain_enabled` via
+`_domain_flag_for_job_type()`. Of these, only `inventory_activate` and
+`inventory_set_quantities` are mutation job types (`job_type ==
+mutation_domain`, registered in the reconciliation-strategy registry);
+`inventory_mutation_reconcile` is the one shared, read-only
+reconciliation job type both mutation domains' `reconciliation_job_type`
+resolves to (never a mutation domain itself, never holding the pair
+scope, attempt-linked only); the remaining four are Layer 1
+read/orchestration/scan job types and carry no `mutation_domain`.
+Logging: all free text this module composes routes through
+`_system_append` (core redaction); payloads carry GIDs/quantities/
+location names only — no customer PII exists in this domain (note
+recorded to satisfy the cross-packet redaction check).
 
 ## 5. Tests (exact files)
 
@@ -524,11 +543,20 @@ the string `committed` never appears as a quantity name, and only
 `inventorySetQuantities`/`inventoryActivate` mutations exist in the
 module** — no `inventoryAdjustQuantities`, keeping set-semantics
 only; no call site constructs a `quantities[]` array with length > 1
-[Gate B, DEC-036 D4]); `test_inventory_triggers.py` (move-done hook enqueues correct
-pairs only for mapped locations + enabled domain; scan enqueues
-deltas only; drift note logged; manual action permission);
-`test_inventory_location_cache_sync.py` (upsert via the named sudo,
-read-only ACL intact, pagination). Runtime: Odoo.sh green mandatory
+[Gate B, DEC-036 D4]); **[new, this correction batch, scoped strictly to
+the two control-room-authorized governing amendments — every other
+code-level correction in this batch is reflected only in the module/
+tests themselves, not in this governing-text annotation] the integral-
+quantity gate (10.0/0/negative-clamped/floating-noise accepted,
+10.5-class rejected before any Shopify mutation attempt, no
+`mutation.attempt` row created); and the shared
+`inventory_mutation_reconcile` job type is read-only/attempt-linked and
+never redispatches an already-resolved attempt**); `test_inventory_triggers.py`
+(move-done hook enqueues correct pairs only for mapped locations +
+enabled domain; scan enqueues deltas only; drift note logged; manual
+action permission); `test_inventory_location_cache_sync.py` (upsert via
+the named sudo, read-only ACL intact, pagination). Runtime: Odoo.sh
+green mandatory
 (SRR-06). **Dev-store validation (new for this task — first mutation
 task):** before merge review, a human-operated run against the
 existing dev store must execute one confirmed first push + one CAS

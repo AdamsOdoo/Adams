@@ -703,16 +703,38 @@ remains exclusively `mutation.attempt`, C5, unchanged).
 
 ## 7. Task 013 job contract — frozen (closes contradiction C10, updated Revision 3)
 
-- **`job_type` values (six — Revision 2 adds two):**
+- **`job_type` values (seven — Revision 2 adds two, PR #182 comment
+  `5025765389` disposition 2 / this correction batch adds one more):**
   `inventory_push_sync` (orchestration/read-only, `remote_read_replay_safe`),
   `inventory_push_scan`, `inventory_first_push_preview`,
   `inventory_location_sync` (unchanged, existing four), plus
-  **`inventory_activate`** and **`inventory_set_quantities`** (new,
-  Revision 2 — each a standalone mutation job type, `job_type ==
+  **`inventory_activate`** and **`inventory_set_quantities`** (Revision
+  2 — each a standalone mutation job type, `job_type ==
   mutation_domain`, and each making at most one `mutation.attempt` for
-  its entire lifetime, Revision 3). No new job type is added for
-  reconciliation reads — those continue to use the existing generic
-  `remote_read_replay_safe` job type (DEC-036 D14).
+  its entire lifetime, Revision 3), plus **`inventory_mutation_reconcile`**
+  (accepted in principle by the control room, PR #182 comment
+  `5025765389`, and folded in here, the Task 013 packet, and the locked
+  prompt by the correction batch that follows it). Stage 0's own
+  `_check_reconciliation_attempt_link` constraint structurally requires
+  every mutation domain's `reconciliation_job_type` to resolve to a
+  real, dispatchable `job_type` value, and the two existing core values
+  (`mutation_dispatch_selftest_reconcile`/`mutation_dispatch_selftest`)
+  are explicitly reserved, "never a template for a future domain
+  job_type" — so this domain could not, in fact, reuse an existing
+  generic reconciliation job type as the superseded wording below once
+  assumed. `inventory_mutation_reconcile` is **one shared, read-only**
+  job type for both mutation domains (never a mutation domain itself,
+  never holding the inventory-pair operation scope, creating no
+  mutation attempt of its own — it only links to and dispatches on one
+  existing attempt's `mutation_domain`); no second, per-domain
+  reconciliation job type is authorized. The three central pair-
+  execution jobs remain exactly `inventory_push_sync`,
+  `inventory_activate`, `inventory_set_quantities`, and
+  `job_type == mutation_domain` continues to hold for the two mutation
+  jobs only. **Superseded text (retained for history only):** ~~No new
+  job type is added for reconciliation reads — those continue to use
+  the existing generic `remote_read_replay_safe` job type (DEC-036
+  D14).~~
 - **`job_source` values (unchanged, Task 013 D-013-6):** `odoo_event`
   (`trigger_origin='inventory_stock_change'`), `scheduled_sync`,
   `manual_sync`, `export_preview_dry_run`.
@@ -783,15 +805,40 @@ remains exclusively `mutation.attempt`, C5, unchanged).
   `CHANGE_FROM_QUANTITY_STALE` clean rejection.
 - **Pair-serialization identity convention:** §5.3, frozen literal
   `inventory_pair:{store_id}:{inventory_item_gid}:{shopify_location_gid}`
-  for all three inventory job types on a pair; reconciliation jobs use
-  the existing generic convention
-  `reconcile:{store}:{mutation_domain}:{attempt_token}` (DEC-036 D14).
-- **Domain-enable flag:** `inventory_domain_enabled` gates all six job
+  for the three pair-execution job types only (`inventory_push_sync`,
+  `inventory_activate`, `inventory_set_quantities`) — the shared
+  `inventory_mutation_reconcile` job type never holds this pair scope
+  and instead uses the existing generic reconciliation identity
+  convention `reconcile:{store}:{mutation_domain}:{attempt_token}`
+  (DEC-036 D14, format unchanged — only the dispatchable `job_type`
+  value used to reach it is new, per the bullet above).
+- **Domain-enable flag:** `inventory_domain_enabled` gates all seven job
   types above, plus both matrix rows' admission via the C2 registry gate.
 - **Connection-generation behavior:** unchanged from the existing generic
   admission behavior; every job type snapshots
   `expected_connection_generation`/`expected_store_identity` at its own
   C1/C2, independently per job.
+- **`inventory_mutation_reconcile` lifecycle:** maps to the same
+  `inventory_domain_enabled` gate as the other six types; on domain
+  uninstall it is converted to `historic_domain_job` through the
+  existing core `_reassign_to_historic_job_type` mechanism, identically
+  to every other inventory job type — no new lifecycle mechanism is
+  introduced, and it is never used as a template for another domain's
+  reconciliation job type (only one shared value is authorized here).
+- **Fail-closed integral-quantity rule (new, this correction batch, PR
+  #182 comment `5025765389` item 16 — extends D-013-2/D-013-3):**
+  Shopify's `InventorySetQuantitiesInput.quantities[].quantity`/
+  `changeFromQuantity` are integers; Odoo's `free_qty` is a float. After
+  the existing clamp-negative-to-0 step (D-013-2), the resulting target
+  is sent to Shopify as an actual Python integer only when it is
+  integral within an accepted floating-point-noise tolerance; a target
+  that is a genuine, meaningful fraction is never rounded or truncated
+  — it fails closed *before* any Shopify mutation attempt (no C2, no
+  `mutation.attempt` row), routed as
+  `error_class='data_shape_schema_mismatch'` /
+  `manual_review_subreason='binding_conflict'`. This introduces no new
+  `error_class`/`manual_review_subreason` value — both are already in
+  the frozen vocabularies above.
 
 ---
 

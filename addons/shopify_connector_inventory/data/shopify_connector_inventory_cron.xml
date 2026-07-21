@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Task 013 D-013-6b: the scheduled inventory push-scan cron.
+             15-minute default interval (DEC-037/locked prompt). Compares
+             the freshly-derived Odoo target against last_pushed_available
+             for every push-enabled binding of every store with both
+             inventory_domain_enabled and inventory_scheduled_sync_enabled
+             set, and enqueues deltas only. It never bypasses a blocked
+             pair or the first-push/reconnect gates, both enforced by
+             inventory_push_sync itself at dispatch time. Data only, no
+             view, menu, or action accompanies this record. -->
+        <record id="ir_cron_shopify_connector_inventory_push_scan" model="ir.cron">
+            <field name="name">Shopify Connector: Inventory Push Scan</field>
+            <field name="model_id" ref="model_shopify_connector_inventory_service"/>
+            <field name="state">code</field>
+            <field name="code">model.run_inventory_push_scan()</field>
+            <field name="interval_number">15</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>
