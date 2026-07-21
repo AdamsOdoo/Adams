@@ -206,6 +206,46 @@ def _strict_shopify_int(value):
     return value
 
 
+def _validate_structured_user_errors(user_errors, code_required):
+    """Strictly validate and sanitize a Shopify `userErrors` list into
+    the frozen structured evidence shape `[{code, field}]` (PR #182
+    comment 5029906989 item 7) -- replaces the free-form
+    `user_error_codes` list entirely. Returns `(sanitized_list, True)`
+    when every entry is well-formed, else `(None, False)` -- never
+    raises, and never persists message text (`message` is read from the
+    transport response but is never copied into the returned sanitized
+    entries or any evidence dict).
+
+    `code_required=True` (`inventorySetQuantities`) additionally
+    requires a non-empty string `code` on every entry.
+    `code_required=False` (`inventoryActivate`) only validates the
+    `field` shape -- the 2026-07 schema exposes no structured code for
+    that mutation's userErrors, so classification for it stays
+    payload-shape-only, never message-text-routed."""
+    if not isinstance(user_errors, list):
+        return None, False
+    sanitized = []
+    for entry in user_errors:
+        if not isinstance(entry, dict):
+            return None, False
+        field = entry.get('field')
+        if field is None:
+            field = []
+        elif not (
+            isinstance(field, list)
+            and all(isinstance(part, str) for part in field)
+        ):
+            return None, False
+        if code_required:
+            code = entry.get('code')
+            if not isinstance(code, str) or not code:
+                return None, False
+            sanitized.append({'code': code, 'field': field})
+        else:
+            sanitized.append({'field': field})
+    return sanitized, True
+
+
 class InventoryPreC2FailClosedError(Exception):
     """Domain-owned pre-C2 fail-closed signal (PR #182 comment
     5028910116 item 3).
@@ -226,6 +266,29 @@ class InventoryPreC2FailClosedError(Exception):
         self.error_class = error_class
         self.subreason = subreason
         self.message = message
+
+
+class InventoryActivationSupersededError(Exception):
+    """Domain-owned pre-C2 signal (PR #182 comment 5029906989 item 3):
+    raised by `_prepare_preconditions_activate` when its fresh pre-C2
+    read finds a valid Shopify InventoryLevel already exists for this
+    pair -- an activation mutation is no longer necessary or safe to
+    send (it would either fail or silently reset a level another actor
+    already established).
+
+    Never writes to the job and never commits (LL-005), exactly like
+    `InventoryPreC2FailClosedError`: the skip-and-handoff disposition is
+    applied exclusively by
+    `ShopifyConnectorJobDispatchInventoryExtension._recover_pre_c2_failure`
+    below, after core's own rollback/reset has already occurred.
+    """
+
+    def __init__(self, observed_level_gid):
+        super().__init__(
+            'A valid Shopify InventoryLevel already exists for this pair; '
+            'no activation mutation may be sent.'
+        )
+        self.observed_level_gid = observed_level_gid
 
 
 # ======================================================================
@@ -510,15 +573,19 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
     @api.model
     def _recover_pre_c2_failure(self, job_id, token, exc):
         """Domain-specific pre-C2 recovery seam (PR #182 comment
-        5028910116 item 3): for `InventoryPreC2FailClosedError` only,
-        allows core's own rollback/reset to occur first, then applies
-        this domain's own blocked disposition inside the fresh recovery
+        5028910116 item 3; extended by comment 5029906989 item 3): for
+        `InventoryPreC2FailClosedError` and `InventoryActivationSupersededError`
+        only, allows core's own rollback/reset to occur first, then
+        applies this domain's own disposition inside the fresh recovery
         transaction that follows -- never a domain-side commit inside
         `prepare_preconditions` itself (LL-005). Every other exception
         (a genuine transport/precondition failure, a core-recognized
         concurrency race, etc.) delegates unchanged to `super()`, which
         keeps its existing generic bounded-retry behaviour.
         """
+        if isinstance(exc, InventoryActivationSupersededError):
+            self._recover_activation_superseded(job_id, token, exc)
+            return
         if not isinstance(exc, InventoryPreC2FailClosedError):
             return super()._recover_pre_c2_failure(job_id, token, exc)
         self.env.cr.rollback()
@@ -543,6 +610,72 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
             self._block_original_job(
                 job, exc.error_class, exc.subreason, exc.message,
             )
+        self.env.cr.commit()
+
+    @api.model
+    def _recover_activation_superseded(self, job_id, token, exc):
+        """Skip an unnecessary `inventory_activate` job and atomically
+        hand off to a fresh `inventory_push_sync` (PR #182 comment
+        5029906989 item 3), entirely inside the fresh recovery
+        transaction that follows core's own rollback/reset -- never a
+        domain-side commit inside `prepare_preconditions` itself
+        (LL-005). No mutation attempt row exists (C2 was never reached)
+        and no Shopify transport occurs. Reacquires both the job and the
+        binding under locks; pair serialization is preserved by
+        terminalizing this job (state='skipped') and flushing before the
+        successor's insert, exactly mirroring every other handoff in
+        this module.
+        """
+        self.env.cr.rollback()
+        self.env.transaction.reset()
+        job = self.env['shopify.connector.job'].browse(
+            job_id
+        ).try_lock_for_update()
+        if not job:
+            self.env.cr.commit()
+            return
+        job.invalidate_recordset()
+        attempt_exists = bool(
+            self.env['shopify.connector.mutation.attempt'].search_count([
+                ('job_id', '=', job_id),
+            ])
+        )
+        if not (
+            not attempt_exists
+            and job.current_attempt_token == token
+            and job.state == 'running'
+        ):
+            self.env.cr.commit()
+            return
+        Binding = self.env['shopify.connector.inventory.level.binding']
+        binding = Binding.browse(job.res_id).exists()
+        locked_binding = binding.try_lock_for_update() if binding else binding
+        if not locked_binding:
+            # No stable binding to hand off to this pass -- leave the
+            # job at its post-rollback 'running' state (unchanged) and
+            # let the ordinary scheduler re-dispatch it, exactly like
+            # the sibling `InventoryPreC2FailClosedError` seam's own
+            # "job not lockable" branch above.
+            self.env.cr.commit()
+            return
+        locked_binding.invalidate_recordset()
+        if exc.observed_level_gid and not locked_binding.shopify_gid:
+            locked_binding.sudo().write({'shopify_gid': exc.observed_level_gid})
+        job.sudo().write({'state': 'skipped', 'finished_at': fields.Datetime.now()})
+        job.flush_recordset(['state'])
+        Service = self.env['shopify.connector.inventory.service']
+        new_job = Service._create_inventory_job(
+            job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, locked_binding,
+            trigger_origin=job.trigger_origin or False,
+        )
+        job._log_transition(
+            'state_change',
+            'A valid Shopify InventoryLevel already exists; skipped this '
+            'unnecessary activation and enqueued a fresh '
+            'inventory_push_sync; predecessor_job_id=%d '
+            'successor_job_id=%d.' % (job.id, new_job.id),
+            from_state='running', to_state='skipped',
+        )
         self.env.cr.commit()
 
     @api.model
@@ -583,19 +716,30 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
         locked_attempt = attempt.try_lock_for_update()
         if not locked_attempt:
             return self.env['shopify.connector.job']
+        # Every subsequent identity/domain/token/generation/disposition
+        # read uses `locked_attempt`, never the pre-lock `attempt`
+        # reference (PR #182 comment 5029906989 item 1): the lock exists
+        # precisely to prevent acting on a value a concurrent writer may
+        # have already changed.
         Job = self.env['shopify.connector.job']
         existing = Job.search([
-            ('mutation_attempt_id', '=', attempt.id),
+            ('mutation_attempt_id', '=', locked_attempt.id),
         ], limit=1)
         if existing:
             if (
-                existing.state in ('succeeded', 'failed_final', 'cancelled')
-                and attempt.effective_disposition() == 'unresolved'
+                existing.state in TERMINAL_JOB_STATES
+                and locked_attempt.effective_disposition() == 'unresolved'
                 and original_job.state != 'blocked_manual_review'
             ):
+                # `duplicate_risk` is a valid core registry value but is
+                # outside Task 013's frozen nine-value `error_class`
+                # vocabulary (PR #182 comment 5029906989 item 1): the
+                # error_class position always uses
+                # `data_shape_schema_mismatch`; `duplicate_risk` is only
+                # ever valid in the subreason position.
                 self._block_original_job(
                     original_job,
-                    SUBREASON_DUPLICATE_RISK, SUBREASON_DUPLICATE_RISK,
+                    ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE_RISK,
                     'The reconciliation job is terminal while unresolved.',
                 )
             return existing
@@ -605,12 +749,12 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
             'job_type': strategy['reconciliation_job_type'],
             'state': 'queued',
             'payload_hash': 'reconcile:%s:%s:%s' % (
-                original_job.store_id.id, attempt.mutation_domain,
-                attempt.attempt_token,
+                original_job.store_id.id, locked_attempt.mutation_domain,
+                locked_attempt.attempt_token,
             ),
-            'mutation_attempt_id': attempt.id,
+            'mutation_attempt_id': locked_attempt.id,
             'expected_connection_generation':
-                attempt.expected_connection_generation,
+                locked_attempt.expected_connection_generation,
         })
 
 
@@ -642,8 +786,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
 
     @api.model
     def _create_inventory_job(
-        self, store, job_source, job_type, binding,
-        trigger_origin=False, cas_retry_ordinal=0,
+        self, store, job_source, job_type, binding, trigger_origin=False,
     ):
         """Create one inventory job under the pair-serialization identity,
         routed through the core's sole sanctioned domain enqueue service
@@ -657,19 +800,20 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         `idempotency_key`, unlike `operation_scope_key`, persists past a
         job's terminal state).
 
-        `cas_retry_ordinal` is this domain's own protected field (not
-        part of the core enqueue service's signature): when non-zero
-        (an atomic CAS-replacement handoff), it is applied through one
-        narrow, same-transaction `sudo()` write immediately after
-        enqueueing -- no second transaction, no parallel enqueue
-        mechanism (item 13).
+        This is the ONLY inventory job creation surface, and it accepts
+        no `cas_retry_ordinal` parameter at all (PR #182 comment
+        5029906989 item 6): every job created here is ordinal 0 (the
+        field's own model-level default) -- there is no argument or
+        context path through this method for a nonzero value. The sole
+        surface that can ever produce a nonzero ordinal is
+        `_create_cas_successor_job` below.
         """
         pair_key = pair_scope_key(
             store.id,
             binding.shopify_inventory_item_gid,
             binding.location_mapping_id.shopify_gid,
         )
-        job = self.env['shopify.connector.job.enqueue'].enqueue(
+        return self.env['shopify.connector.job.enqueue'].enqueue(
             store, job_source, job_type,
             payload_hash=uuid.uuid4().hex,
             res_model='shopify.connector.inventory.level.binding',
@@ -677,13 +821,63 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             shopify_target_gid=pair_key,
             trigger_origin=trigger_origin or False,
         )
-        if cas_retry_ordinal:
-            job.sudo().write({'cas_retry_ordinal': cas_retry_ordinal})
-        return job
+
+    @api.model
+    def _create_cas_successor_job(self, locked_predecessor, binding):
+        """The sole creation surface for a nonzero `cas_retry_ordinal`
+        (PR #182 comment 5029906989 item 6). Requires an already
+        row-locked `inventory_set_quantities` predecessor (the caller
+        must have locked it, exactly like `_handoff_supersede` below
+        does before calling this); derives the successor ordinal
+        exclusively from that locked predecessor's own recorded
+        ordinal, exactly predecessor + 1 -- never a caller-supplied
+        value, and never invocable for ordinary (non-CAS) admission.
+        Only ordinal 1, 2, or 3 can ever result; the bounded ceiling is
+        enforced here, not by the caller. The ordinal is applied through
+        one narrow, same-transaction `sudo()` write immediately after
+        enqueueing via the ordinal-less `_create_inventory_job` -- no
+        second transaction, no parallel enqueue mechanism (item 13).
+        """
+        if (
+            locked_predecessor.job_type != JOB_TYPE_SET_QUANTITIES
+            or locked_predecessor.cas_retry_ordinal >= MAX_CAS_RETRY_ORDINAL
+        ):
+            raise ValidationError(
+                'A CAS replacement may only be created for an '
+                'inventory_set_quantities job below the bounded ordinal '
+                'ceiling.'
+            )
+        cas_retry_ordinal = locked_predecessor.cas_retry_ordinal + 1
+        new_job = self._create_inventory_job(
+            locked_predecessor.store_id, locked_predecessor.job_source,
+            JOB_TYPE_SET_QUANTITIES, binding,
+            trigger_origin=locked_predecessor.trigger_origin or False,
+        )
+        new_job.sudo().write({'cas_retry_ordinal': cas_retry_ordinal})
+        return new_job
+
+    @api.model
+    def _binding_push_admission_blocked(self, binding):
+        """`review`/`stale` inventory-level bindings must never enter
+        automatic or manual push execution (PR #182 comment 5029906989
+        item 4/§10 -- the required freeze-gate proof #4). `active`
+        remains eligible; so does `manually_overridden` -- the mixin's
+        own existing semantics for that value are unchanged and never
+        reinterpreted here (only `review`/`stale` are ever gated)."""
+        return binding.status in ('review', 'stale')
 
     @api.model
     def _try_enqueue_push_sync(self, store, binding, job_source, trigger_origin=False):
         """Admit one `inventory_push_sync` job for `binding`, or coalesce.
+
+        The sole `inventory_push_sync` admission point for every trigger
+        surface (stock-move event, manual push, scheduled scan) --
+        gating here on `_binding_push_admission_blocked` (PR #182
+        comment 5029906989 item 4) covers all three at once; the direct
+        orchestration dispatch and the CAS/reconciliation replacement
+        paths each re-check the same gate independently since a binding
+        can be flagged `review`/`stale` after this job was already
+        admitted.
 
         If a non-terminal inventory job already holds this pair's
         `operation_scope_key`, the DB-level unique constraint refuses the
@@ -702,6 +896,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         security, unrelated constraints, malformed identity) propagates
         unchanged.
         """
+        if self._binding_push_admission_blocked(binding):
+            _logger.info(
+                'Inventory pair store_id=%s item=%s location=%s: '
+                'push_sync admission refused while the binding is '
+                'flagged %s.', store.id,
+                binding.shopify_inventory_item_gid,
+                binding.location_mapping_id.shopify_gid, binding.status,
+            )
+            return self.env['shopify.connector.job']
         pair_key = pair_scope_key(
             store.id,
             binding.shopify_inventory_item_gid,
@@ -892,6 +1095,21 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             return
         store = job.store_id
 
+        # `review`/`stale` bindings must never enter orchestration (PR
+        # #182 comment 5029906989 item 4/§10): a re-check at dispatch
+        # time, independent of `_try_enqueue_push_sync`'s own admission-
+        # time gate, since the binding may have been flagged after this
+        # job was already created.
+        if self._binding_push_admission_blocked(binding):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'This inventory pair is flagged %s; no automatic or '
+                'manual push may proceed until it is reviewed.' % (
+                    binding.status,
+                ),
+            )
+            return
+
         # First-push guard (D-013-4): never enqueue any mutation for an
         # unconfirmed pair.
         if binding.first_push_state != 'confirmed':
@@ -983,6 +1201,21 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'longer exists; retry later.',
                 )
             locked_binding.invalidate_recordset()
+            if self._binding_push_admission_blocked(locked_binding):
+                # Re-checked under the row lock (PR #182 comment
+                # 5029906989 item 4): a concurrent writer may have
+                # flagged this pair `review`/`stale` after the earlier
+                # unlocked check above but before this handoff acquired
+                # the lock -- never create a child against a stale
+                # admission decision.
+                job._transition_blocked_manual_review(
+                    ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'This inventory pair is flagged %s; no automatic or '
+                    'manual push may proceed until it is reviewed.' % (
+                        locked_binding.status,
+                    ),
+                )
+                return
             job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
             job.flush_recordset(['state'])
             new_job = self._create_inventory_job(
@@ -998,6 +1231,28 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
             return
 
+        # Real InventoryLevel GID persistence *before* any no-op/drift/
+        # child-admission decision (PR #182 comment 5029906989 item 4):
+        # a no-op equality path below must never leave `shopify_gid`
+        # empty forever, and a conflicting already-recorded GID must
+        # fail closed here -- before any successor could be enqueued --
+        # never a synthetic identity.
+        observed_level_gid = read.get('inventory_level_gid')
+        if (
+            observed_level_gid and binding.shopify_gid
+            and binding.shopify_gid != observed_level_gid
+        ):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
+                'Orchestration read observed an InventoryLevel GID that '
+                'conflicts with the already-recorded value; manual '
+                'review is required before any mutation may be '
+                'enqueued.',
+            )
+            return
+        if observed_level_gid and not binding.shopify_gid:
+            binding.sudo().write({'shopify_gid': observed_level_gid})
+
         # Drift classification -- corrected three-way matrix (PR #182
         # comment 5025765389 item 14): Shopify already reflecting the
         # current Odoo target is never drift, regardless of whether it
@@ -1007,12 +1262,26 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         has_prior_push = bool(binding.last_pushed_at)
 
         if shopify_available == target:
-            # Already at the target business state; nothing to push.
+            # Verified no-op baseline (PR #182 comment 5029906989 item
+            # 5): a fresh, identity-validated read proving Shopify
+            # already equals the current Odoo target is recorded as the
+            # accepted synchronized baseline for scheduling purposes --
+            # never left with `last_pushed_at` unset, which would
+            # otherwise cause the scheduled scan (item 5's
+            # never-pushed-zero admission fix) to re-admit this exact
+            # pair on every later scan indefinitely. No Shopify mutation
+            # is sent and none is implied by recording this baseline.
+            binding.sudo().write({
+                'last_pushed_available': target,
+                'last_pushed_at': fields.Datetime.now(),
+            })
             job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
             job._log_transition(
                 'state_change',
-                'Shopify already reflects the current target; no push '
-                'needed.',
+                'Shopify already matched the current Odoo target; no '
+                'Shopify mutation was sent, no mutation attempt was '
+                'created; the verified read was recorded as the '
+                'synchronized baseline.',
                 from_state='running', to_state='succeeded',
             )
             return
@@ -1044,6 +1313,18 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'longer exists; retry later.',
             )
         locked_binding.invalidate_recordset()
+        if self._binding_push_admission_blocked(locked_binding):
+            # Re-checked under the row lock (PR #182 comment 5029906989
+            # item 4) -- see the identical reasoning in the activation
+            # branch above.
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'This inventory pair is flagged %s; no automatic or '
+                'manual push may proceed until it is reviewed.' % (
+                    locked_binding.status,
+                ),
+            )
+            return
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
         job.flush_recordset(['state'])
         new_job = self._create_inventory_job(
@@ -1089,13 +1370,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             'query InventoryPairRead($itemId: ID!, $locationId: ID!) { '
             'inventoryItem(id: $itemId) { id tracked '
             'inventoryLevel(locationId: $locationId) { id '
+            'item { id } location { id } '
             'quantities(names: ["available"]) { name quantity updatedAt '
             '} } } '
             'shop { myshopifyDomain } }'
         )
+        requested_item_gid = binding.shopify_inventory_item_gid
+        requested_location_gid = binding.location_mapping_id.shopify_gid
         variables = {
-            'itemId': binding.shopify_inventory_item_gid,
-            'locationId': binding.location_mapping_id.shopify_gid,
+            'itemId': requested_item_gid,
+            'locationId': requested_location_gid,
         }
         result = client.execute(store, query, variables)
         data = (result or {}).get('data')
@@ -1126,6 +1410,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 ERROR_CLASS_DATA_SHAPE,
                 'Malformed Shopify inventoryItem shape in pair read.',
             )
+        # The returned InventoryItem identity must equal the requested
+        # one (PR #182 comment 5029906989 item 4) -- never trusted by
+        # position alone.
+        if item.get('id') != requested_item_gid:
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Shopify returned a different InventoryItem identity '
+                'than requested.',
+            )
         tracked = item['tracked']
         level = item.get('inventoryLevel')
         if level is None:
@@ -1150,6 +1443,29 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'Shopify inventoryLevel is present but its GID is missing '
                 'or malformed.',
             )
+        # The returned level's item/location identity must belong to
+        # the requested pair, where the schema exposes it (PR #182
+        # comment 5029906989 item 4) -- this query requests both.
+        level_item = level.get('item') or {}
+        level_location = level.get('location') or {}
+        if (
+            not isinstance(level_item, dict)
+            or level_item.get('id') != requested_item_gid
+        ):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Shopify inventoryLevel item identity does not match the '
+                'requested InventoryItem.',
+            )
+        if (
+            not isinstance(level_location, dict)
+            or level_location.get('id') != requested_location_gid
+        ):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Shopify inventoryLevel location identity does not match '
+                'the requested location.',
+            )
         available = None
         updated_at = False
         found_available_entry = False
@@ -1160,6 +1476,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'Malformed Shopify quantities entry in pair read.',
                 )
             if quantity.get('name') == 'available':
+                if found_available_entry:
+                    # A duplicate "available" entry is never silently
+                    # resolved by taking the last one (PR #182 comment
+                    # 5029906989 item 8) -- fails closed instead.
+                    raise JobHandlerError(
+                        ERROR_CLASS_DATA_SHAPE,
+                        'Shopify returned more than one "available" '
+                        'quantity entry in pair read.',
+                    )
                 found_available_entry = True
                 try:
                     available = _strict_shopify_int(quantity.get('quantity'))
@@ -1673,13 +1998,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         pair's row lock. Both writes occur in the transaction already
         open at C3/reconciliation-consequence-apply time.
 
-        `cas_retry_ordinal` for a CAS replacement (`is_cas_replacement=
-        True`) is always derived here, from a freshly row-locked read of
-        the exact predecessor job being superseded -- never accepted as
-        a caller-supplied ordinal (PR #182 comment 5028910116 item 7):
-        no caller may request an arbitrary jump. Every other handoff
-        (reconciliation-not-applied, manual-review release) always
-        creates its replacement at ordinal 0, regardless of the
+        A CAS replacement (`is_cas_replacement=True`) is always created
+        through `_create_cas_successor_job`, which itself derives the
+        ordinal from this exact locked predecessor -- never accepted as
+        a caller-supplied ordinal here (PR #182 comment 5029906989 item
+        6): no caller may request an arbitrary jump, and
+        `_create_inventory_job` itself accepts no such parameter at all.
+        Every other handoff (reconciliation-not-applied, manual-review
+        release) always creates its replacement at ordinal 0 via the
+        ordinary `_create_inventory_job`, regardless of the
         predecessor's own ordinal -- a non-CAS replacement never
         inherits a nonzero ordinal.
         """
@@ -1691,18 +2018,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'later.',
             )
         locked_job.invalidate_recordset()
-        cas_retry_ordinal = 0
-        if is_cas_replacement:
-            if (
-                locked_job.job_type != JOB_TYPE_SET_QUANTITIES
-                or locked_job.cas_retry_ordinal >= MAX_CAS_RETRY_ORDINAL
-            ):
-                raise ValidationError(
-                    'A CAS replacement may only be created for an '
-                    'inventory_set_quantities job below the bounded '
-                    'ordinal ceiling.'
-                )
-            cas_retry_ordinal = locked_job.cas_retry_ordinal + 1
         from_state = locked_job.state
         locked_job.sudo().write({
             'state': 'cancelled',
@@ -1713,11 +2028,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # otherwise the two would momentarily collide on the DB unique
         # constraint within this same transaction.
         locked_job.flush_recordset(['state'])
-        new_job = self._create_inventory_job(
-            locked_job.store_id, locked_job.job_source, new_job_type,
-            binding, trigger_origin=locked_job.trigger_origin or False,
-            cas_retry_ordinal=cas_retry_ordinal,
-        )
+        if is_cas_replacement:
+            new_job = self._create_cas_successor_job(locked_job, binding)
+        else:
+            new_job = self._create_inventory_job(
+                locked_job.store_id, locked_job.job_source, new_job_type,
+                binding, trigger_origin=locked_job.trigger_origin or False,
+            )
         locked_job.sudo().write({'superseded_by_job_id': new_job.id})
         locked_job._log_transition(
             'state_change',
@@ -1865,7 +2182,21 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         elif observed_level_gid and not binding.shopify_gid:
             binding.sudo().write({'shopify_gid': observed_level_gid})
 
-        change_from_quantity = read['available']
+        # Defensive strict-integer re-validation at this exact callback
+        # boundary (PR #182 comment 5029906989 item 8): `read['available']`
+        # is already `_strict_shopify_int`-validated by the real
+        # `_read_shopify_inventory_pair`, but a mocked/overridden read in
+        # a test or future extension must never let a non-integer value
+        # silently become `changeFromQuantity` in the mutation request.
+        try:
+            change_from_quantity = _strict_shopify_int(read['available'])
+        except ValueError:
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
+                'The pre-C2 read did not return a strict integer '
+                '"available" quantity; refusing to build a Shopify '
+                'mutation request.',
+            )
         target, _free_qty = self._refresh_pending_target(binding)
         target_int, is_integral = _integral_quantity_or_none(target)
         if not is_integral:
@@ -1992,19 +2323,37 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
     ):
         """Direct-success evidence gate (PR #182 comment 5025765389 item
         6; strict-integer/no-duplicate/exact-request corrections per
-        comment 5028910116 item 4): an empty `userErrors` list alone is
+        comment 5028910116 item 4; non-empty-value correction per
+        comment 5029906989 item 8): an empty `userErrors` list alone is
         never sufficient. Requires a non-null adjustment group, a
-        returned `reason`/`referenceDocumentUri` matching exactly what
-        was requested, exactly one change (never a duplicate or extra
-        quantity-name change), that change named `available`, and its
-        `quantityAfterChange` a strict integer exactly equal to the
-        requested target -- `int(...)` is never used as a permissive
-        coercion here."""
+        non-empty, exactly-matching `reason`/`referenceDocumentUri` --
+        two missing values comparing equal (`None == None`) is never
+        valid success evidence -- exactly one change (never a duplicate
+        or extra quantity-name change), that change named `available`,
+        and its `quantityAfterChange` a strict integer exactly equal to
+        the requested target -- `int(...)` is never used as a
+        permissive coercion here."""
         if not isinstance(group, dict):
             return False
-        if group.get('reason') != expected_reason:
+        if not isinstance(expected_reason, str) or not expected_reason:
             return False
-        if group.get('referenceDocumentUri') != expected_reference_uri:
+        returned_reason = group.get('reason')
+        if (
+            not isinstance(returned_reason, str) or not returned_reason
+            or returned_reason != expected_reason
+        ):
+            return False
+        if (
+            not isinstance(expected_reference_uri, str)
+            or not expected_reference_uri
+        ):
+            return False
+        returned_reference_uri = group.get('referenceDocumentUri')
+        if (
+            not isinstance(returned_reference_uri, str)
+            or not returned_reference_uri
+            or returned_reference_uri != expected_reference_uri
+        ):
             return False
         changes = group.get('changes')
         if not isinstance(changes, list) or len(changes) != 1:
@@ -2087,11 +2436,28 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                             'either.',
                 'evidence': evidence,
             }
-        codes = {(error.get('code') or '') for error in user_errors}
-        # Sanitized structured user-error codes only -- never a raw
-        # message (PR #182 comment 5028910116 item 8): required to prove
-        # the final CAS-stale code before exhaustion release below.
-        evidence['user_error_codes'] = sorted(codes)
+        # Strict structured evidence shape `[{code, field}]` (PR #182
+        # comment 5029906989 item 7) -- replaces the free-form
+        # `user_error_codes` list entirely; never persists message text.
+        # A malformed entry (missing/non-string code, malformed field)
+        # is never trusted for a clean rejection -- ambiguous, reconcile
+        # first.
+        sanitized_errors, errors_ok = _validate_structured_user_errors(
+            user_errors, code_required=True,
+        )
+        if not errors_ok:
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': ERROR_CLASS_DATA_SHAPE,
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'inventorySetQuantities returned a malformed '
+                            'userErrors shape; reconciling before '
+                            'trusting either disposition.',
+                'evidence': evidence,
+            }
+        evidence['user_errors'] = sanitized_errors
+        codes = {entry['code'] for entry in sanitized_errors}
         if 'CHANGE_FROM_QUANTITY_STALE' in codes:
             return {
                 'observed_outcome': 'failed_clean',
@@ -2181,11 +2547,30 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                             'identity).',
                 'evidence': {},
             }
+        if not read['level_exists']:
+            # A set-quantities effect cannot be applied to a nonexistent
+            # InventoryLevel (PR #182 comment 5029906989 item 9): routed
+            # fail closed through the accepted inventory-location-
+            # missing/not_applied consequence instead of falling through
+            # to a generic `current=None` comparison, which would
+            # otherwise consume the bounded inconclusive-retry budget by
+            # looping as `inconclusive` forever.
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': read['store_identity'] or '',
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_LOCATION_MISSING,
+                'manual_review_subreason': SUBREASON_LOCATION_MISSING,
+                'message': 'Reconciliation found no Shopify inventory '
+                            'level exists for this pair; activation is '
+                            'required before quantities can be set.',
+                'evidence': {},
+            }
         target = (attempt.preconditions_snapshot or {}).get('target_quantity')
         pre_attempt = (attempt.preconditions_snapshot or {}).get(
             'change_from_quantity'
         )
-        current = read['available'] if read['level_exists'] else None
+        current = read['available']
         parsed_updated_at = _parse_shopify_datetime(read['updated_at'])
         transport_at = _odoo_datetime_to_utc(attempt.transport_at)
         freshness_usable = bool(parsed_updated_at) and bool(transport_at)
@@ -2245,6 +2630,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding = self._lock_binding_for_pair(job)
         domain_payload = consequence.get('domain_payload') or {}
         if phase == 'direct' and domain_payload.get('reason') == 'cas_stale':
+            if self._binding_push_admission_blocked(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'This inventory pair is flagged %s; no CAS '
+                    'replacement may be created until it is '
+                    'reviewed.' % (binding.status,),
+                )
+                return
             if job.cas_retry_ordinal >= MAX_CAS_RETRY_ORDINAL:
                 self._block_pair(
                     job, ERROR_CLASS_CONCURRENCY, SUBREASON_BINDING_CONFLICT,
@@ -2264,6 +2657,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             # Never a CAS replacement -- always ordinal 0, regardless of
             # this job's own possibly-nonzero ordinal (PR #182 comment
             # 5028910116 item 7).
+            if self._binding_push_admission_blocked(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'This inventory pair is flagged %s; no '
+                    'reconciliation replacement may be created until it '
+                    'is reviewed.' % (binding.status,),
+                )
+                return
             self._handoff_supersede(
                 job, binding, 'reconciliation_not_applied_replacement',
                 JOB_TYPE_SET_QUANTITIES,
@@ -2322,15 +2723,86 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
 
     @api.model
     def _prepare_preconditions_activate(self, local_snapshot, owner_context):
+        """A fresh, narrow pre-C2 Shopify pair read immediately before
+        this attempt's own C2 (PR #182 comment 5029906989 item 3):
+        `inventory_activate` previously validated only local GIDs and
+        went straight to transport, so a topology/identity race between
+        orchestration and this dispatch could still reach Shopify with a
+        stale disposition.
+
+        Mirrors `_prepare_preconditions_set_quantities`'s gate exactly:
+        a different store identity, a missing/recreated item, an item
+        that has gone untracked, or a conflicting already-recorded
+        InventoryLevel GID all fail closed via `_fail_closed_pre_c2` --
+        no mutation-attempt row is ever created. When the fresh read
+        instead finds a valid level already exists, sending an
+        activation mutation is never safe (it would either fail or
+        silently reset a level another actor already established) --
+        `InventoryActivationSupersededError` signals the dedicated
+        non-committing recovery seam to skip this job and hand off to a
+        fresh orchestration read instead, with no attempt and no
+        transport.
+        """
+        job_id = local_snapshot['job_id']
         if (
             not local_snapshot['inventory_item_gid']
             or not local_snapshot['location_gid']
         ):
             self._fail_closed_pre_c2(
-                local_snapshot['job_id'], ERROR_CLASS_DATA_SHAPE,
-                SUBREASON_DUPLICATE_RISK,
+                job_id, ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE_RISK,
                 'Missing a required Shopify identifier before transport.',
             )
+
+        store = self.env['shopify.connector.store'].browse(
+            local_snapshot['store_id']
+        )
+        binding = self.env['shopify.connector.inventory.level.binding'].browse(
+            local_snapshot['binding_id']
+        )
+        read = self._read_shopify_inventory_pair(store, binding)
+
+        if read['store_identity'] != local_snapshot['expected_store_identity']:
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'Fresh pre-C2 read observed a different Shopify store '
+                'identity.',
+            )
+        if not read['item_exists']:
+            # A stale or recreated InventoryItem identity discovered by
+            # the fresh pre-C2 read (PR #182 comment 5028910116 item 1):
+            # fails closed through the existing binding_conflict review
+            # route.
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'Fresh pre-C2 read found the Shopify inventory item no '
+                'longer exists (a stale or recreated identity).',
+            )
+        if read['tracked'] is False:
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_LOCATION_MISSING,
+                SUBREASON_LOCATION_MISSING,
+                'Fresh pre-C2 read found the Shopify inventory item is no '
+                'longer tracked.',
+            )
+
+        observed_level_gid = read.get('inventory_level_gid')
+        if (
+            observed_level_gid and binding.shopify_gid
+            and binding.shopify_gid != observed_level_gid
+        ):
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
+                'Fresh pre-C2 read observed an InventoryLevel GID that '
+                'conflicts with the already-recorded value.',
+            )
+
+        if read['level_exists']:
+            # A valid InventoryLevel already exists for this pair --
+            # activation is no longer necessary or safe to send (PR
+            # #182 comment 5029906989 item 3). No mutation is sent, no
+            # attempt row is created.
+            raise InventoryActivationSupersededError(observed_level_gid)
+
         idempotency_key = str(uuid.uuid4())
         operation = (
             'mutation InventoryActivate($inventoryItemId: ID!, '
@@ -2501,7 +2973,27 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'message': 'inventoryActivate applied.',
                 'evidence': evidence,
             }
-        if user_errors and level is None:
+        # Strict `field`-shape validation (PR #182 comment 5029906989
+        # item 7) -- inventoryActivate's userErrors carry no structured
+        # `code` in the 2026-07 schema, so classification here stays
+        # payload-shape-only, but a malformed entry is still never
+        # trusted for a clean rejection; never persists message text.
+        sanitized_errors, errors_ok = _validate_structured_user_errors(
+            user_errors, code_required=False,
+        )
+        if not errors_ok:
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': ERROR_CLASS_DATA_SHAPE,
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'inventoryActivate returned a malformed '
+                            'userErrors shape; reconciling before '
+                            'trusting either disposition.',
+                'evidence': evidence,
+            }
+        evidence['user_errors'] = sanitized_errors
+        if level is None:
             return {
                 'observed_outcome': 'failed_clean',
                 'error_class': ERROR_CLASS_VALIDATION,
@@ -2596,6 +3088,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
     ):
         binding = self._lock_binding_for_pair(job)
         if phase == 'reconciliation' and consequence['action'] == 'domain_callback':
+            if self._binding_push_admission_blocked(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'This inventory pair is flagged %s; no '
+                    'reconciliation replacement may be created until it '
+                    'is reviewed.' % (binding.status,),
+                )
+                return
             self._handoff_supersede(
                 job, binding, 'reconciliation_not_applied_replacement',
                 JOB_TYPE_ACTIVATE,
@@ -2629,6 +3129,12 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'rather than silently overwritten.', binding.id,
                 )
             binding.sudo().write(write_vals)
+            # A post-mutation GID conflict must create no successor
+            # (PR #182 comment 5029906989 item 4): the fresh orchestration
+            # handoff below is skipped whenever this outcome flagged the
+            # binding for review rather than cleanly recording the GID.
+            if write_vals.get('status') != 'review':
+                self._handoff_succeed_to_fresh_orchestration(job, binding)
             self._handoff_succeed_to_fresh_orchestration(job, binding)
 
     # ------------------------------------------------------------------
@@ -2834,17 +3340,27 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             elif subreason == SUBREASON_BINDING_CONFLICT:
                 if blocked_job.error_class == ERROR_CLASS_CONCURRENCY:
                     # CAS-exhaustion release additionally requires the
-                    # final attempt to have actually recorded the
-                    # structured stale code -- ordinal alone is not
-                    # proof (PR #182 comment 5028910116 item 8).
+                    # final attempt to have actually recorded an exact
+                    # structured entry with code=CHANGE_FROM_QUANTITY_STALE
+                    # -- ordinal alone is not proof (PR #182 comment
+                    # 5028910116 item 8), and this checks the frozen
+                    # structured `user_errors: [{code, field}]` evidence
+                    # shape, never a substring or generic container
+                    # membership test on a free-form list (PR #182
+                    # comment 5029906989 item 7).
                     direct_evidence = (
                         (attempt.remote_evidence_refs or {}).get('direct')
                         or {}
                     )
-                    stale_codes = direct_evidence.get('user_error_codes') or []
+                    structured_errors = direct_evidence.get('user_errors') or []
+                    has_exact_stale_code = any(
+                        isinstance(entry, dict)
+                        and entry.get('code') == 'CHANGE_FROM_QUANTITY_STALE'
+                        for entry in structured_errors
+                    )
                     eligible = (
                         blocked_job.cas_retry_ordinal == MAX_CAS_RETRY_ORDINAL
-                        and 'CHANGE_FROM_QUANTITY_STALE' in stale_codes
+                        and has_exact_stale_code
                     )
                 elif blocked_job.error_class == ERROR_CLASS_VALIDATION:
                     eligible = True
