@@ -138,18 +138,27 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 
 | Phase | Status |
 |---|---|
-| 0 — Identity gate & environment | ✅ complete (this file §1) |
-| 1 — Resource inventory & authority map | ⏳ in progress (gather running) |
-| 2 — Official Shopify & Odoo 19 research | ⏳ pending |
-| 3 — Merged-code integration audit | ⏳ pending |
+| 0 — Identity gate & environment | ✅ complete (this file §1); committed `c675c83` |
+| 1 — Resource inventory & authority map | ✅ complete → `docs/01-research/wave-4-fulfillment-resource-inventory.md` |
+| 2 — Official Shopify & Odoo 19 research | ⏳ in progress (gather evidence collected; authoring notes) |
+| 3 — Merged-code integration audit | ⏳ pending (gather evidence collected) |
 | 4 — Decision & contradiction reconciliation | ⏳ pending |
 | 5 — Candidate DoR, architecture & Task 014 packet | ⏳ pending |
 | 6 — File boundary, tests, validation, rollback, locked prompt | ⏳ pending |
 | 7 — Adversarial review, trackers, handoff, final report | ⏳ pending |
 
-**Next phase:** complete Phase 1 inventory; commit 1 (identity + inventory +
-checkpoint); push; open draft PR into `mvp/program-integration`; post PR number
-+ branch head to issue #186; continue to Phase 2.
+**Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
+map fixed (§1 of the inventory); accepted contract (DEC-011, DEC-036/031 Layer 2,
+DEC-033 scope, DEC-008/015, RA-009/014/017/022/023) separated from proposed
+candidates (Task 014 packet, modes/16-condition engine, status model, COD,
+reconnect, DoR) and superseded records; 8 material contradictions logged for
+DEC-038 — incl. the **stale "17 @idempotent" count** (a 2026-04 mandatory-
+idempotency change supersedes it) and the **authority-model drift**.
+
+**Next phase:** author Phase 2 Shopify + Odoo notes and Phase 3 code audit from
+the gathered cited evidence (workflow `wf_f386bb21-5aa`, 19/19 agents, 0 errors);
+commit; continue. Draft PR opened + PR#/head posted to issue #186 at the Phase 1
+boundary.
 
 **Partial-resume anchor:** if a genuine environment/context/time limit forces a
 stop, stop at a phase boundary after committing+pushing this checkpoint and
