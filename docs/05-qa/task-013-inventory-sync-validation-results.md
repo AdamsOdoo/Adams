@@ -691,3 +691,198 @@ Every Campaign A owned failure has a direct green Campaign B result.
 
 PR #182 remains **draft, unmerged, not marked ready**; no self-acceptance;
 no protected reference changed; no live Shopify mutation; Task 013B not started.
+
+---
+
+## 16. Track B — candidate technical closure (2026-07-21)
+
+> Runtime authorization: PR #182 comment `5031833846` (Track B). This
+> section supersedes §15.6's concurrency line and §15.7/§15.8's
+> concurrency/base-suite wording for the items it covers. Two prior
+> blockers were explicitly lifted by the control room for Track B: the
+> exact-base comparison is **delegated to independent Track A** (not run
+> here; the core/product/sale residuals below are recorded as
+> **BASE-CONTROL PENDING**, not classified), and in-workspace GitHub API
+> access is **not required** (PR state is control-room-verified).
+
+### 16.1 Track B environment (identity gate — PASS)
+
+| Item | Value |
+| --- | --- |
+| Repo / branch | `AdamsOdoo/Adams` @ `claude/wave-3-task-013-2g0ul0` |
+| Starting head | `6c221798409555597a432ccfa9959ee621f324ef` (verified `HEAD`) |
+| Base (Track A owns the comparison) | `mvp/program-integration@8f5f421e2110c2e805460ea75fb519e48013e0f7` (verified ancestor; **not** run here) |
+| **Odoo.sh build** | **`35199258`** (a REBUILD of the prior `35193596`; that build no longer exists) |
+| Database | `adamsmen-claude-wave-3-task-013-2g0ul0-35199258` (single injected dev DB) |
+| Odoo / PostgreSQL | `19.0` / `16.14` |
+| Runtime commit `2bc6bdb…` ancestor of head | Yes (verified) |
+| Protected checkpoint `checkpoint/core-r2-readonly-uat-2026-07-15` | `acd8c4691e72cf5590f2a56228b08f183b76cd9a` (unchanged) |
+
+### 16.2 Track B delta (files changed this session)
+
+Test/evidence only — **no production file changed anywhere**:
+
+- `addons/shopify_connector_core/tests/test_mutation_source_guards.py` —
+  narrow accepted prepare/transport split allowlist + adversarial
+  self-tests (core **test** file; no core production change).
+- `addons/shopify_connector_inventory/tests/test_inventory_concurrency.py`
+  (new) + `addons/shopify_connector_inventory/tests/__init__.py`.
+- Evidence docs (this file and the three companions).
+
+### 16.3 Core mutation-source guard — corrected and EXECUTED green
+
+The submitted head's `test_mutation_literals_require_guarded_transport_or_selftest`
+flagged `_prepare_preconditions_set_quantities` /
+`_prepare_preconditions_activate` because the guarded
+`execute_business(mutation_context=…)` call lives in the paired
+`_transport_*` method (the accepted, reviewed prepare/transport split) —
+a **static-guard false-positive** (§15.7). Per comment `5031833846` the
+accepted split is **preserved**; the mutation literals were **not**
+relocated. Instead the *test guard* was corrected narrowly
+(`ACCEPTED_PREPARE_TRANSPORT_SPLIT`, exactly the two real pairs):
+
+- default same-method guard preserved as the fallback;
+- an accepted split requires: (file, class, prepare-method) on the exact
+  allowlist; **one** paired transport method **in the same class**; that
+  transport holds `execute_business` **with** `mutation_context`; and
+  **neither** prepare nor transport reaches transport by `.execute` /
+  `._send` / raw `requests.*`.
+
+Adversarial self-tests (all EXECUTED green) prove: both real pairs pass
+(on the real production file, asserted non-vacuously); missing sibling
+fails; wrong sibling fails; wrong class fails; unlisted file fails;
+transport without `execute_business` fails; transport missing
+`mutation_context` fails; transport using `.execute` fails; transport
+using `._send` fails; transport using raw HTTP fails; the allowlist is
+exactly the two inventory pairs; and the pre-existing unguarded-mutation
+self-tests still fail as before.
+
+Result: `--test-tags /shopify_connector_core:TestMutationSourceGuards`
+→ **0 failed, 0 errors of 28** (EXECUTED). Whole-core dropped from
+**1 failed + 12 errors** (submitted head) to **0 failed + 12 errors** —
+the guard false-positive is the removed failure; no core production
+file changed.
+
+### 16.4 Existing sequential independent-connection recovery tests — TERMINOLOGY CORRECTED
+
+`TestInventoryPreC2RecoverySeam` (test_inventory_push_mechanics.py) is
+**sequential independent-connection durability/recovery** evidence: it
+opens one committed `db_connect` connection strictly **after** another
+and never holds two open at once. It proves committed recovery/blocked
+dispositions are **observable across separate connections**. It is **not**
+a single-transaction `cr.savepoint()` test, and it is **not** simultaneous
+concurrency evidence — those two prior descriptions are withdrawn.
+
+The three methods in that class executed in the 247-test inventory run
+(all **EXECUTED green**):
+
+- `test_pre_c2_fail_closed_recovery_seam_applies_domain_disposition`
+- `test_pre_c2_recovery_delegates_unrelated_exceptions_to_super`
+- `test_activation_superseded_recovery_skips_and_hands_off`
+
+### 16.5 New simultaneous-concurrency campaign — EXECUTED green
+
+`addons/shopify_connector_inventory/tests/test_inventory_concurrency.py`
+(`TestInventoryConcurrency`, 9 tests) supplies the simultaneous evidence
+that was previously absent. Each test runs **two independent database
+transactions whose lifetimes genuinely overlap**: a *holder* transaction
+acquires and **keeps** a real PostgreSQL `FOR UPDATE` row lock (or an
+uncommitted `operation_scope_key` unique-index entry) while a *worker*
+transaction — its own connection/environment/transaction — runs the real
+production operation against that live contention. This is genuine
+overlap (both transactions open at once), distinct from the sequential
+recovery-seam tests above, and it exercises the connector's real
+serialization primitives (`try_lock_for_update` = `FOR UPDATE SKIP
+LOCKED`; the `_store_operation_scope_key_uniq` index).
+
+*Mechanism note (honest):* overlapping **in-process transactions** are
+used rather than OS threads. Raw Python threads deadlock inside Odoo on
+the shared registry/connection-pool locks (core's own genuine-concurrency
+harness, `runtime_layer2_concurrency_harness.py`, uses OS **processes**
+for exactly this reason). The connector's inventory pair paths are
+*non-blocking* by design (SKIP-LOCKED + unique-index coalescing), so a
+second overlapping transaction deterministically **skips or is refused** —
+which is precisely what these holder/worker pairs exercise, with the
+lock timing as the race coordination the ruling permits.
+
+| # | Test | Proven (all EXECUTED green) |
+| --- | --- | --- |
+| 8.1 | `test_simultaneous_admission_serializes_to_exactly_one_pair_job` | overlapping second admission is genuinely blocked by the scope-key unique index and refused (55P03 under a short `lock_timeout`); `_try_enqueue_push_sync` coalesces benignly (empty, no error) when a pair job is already visible; a different pair stays independently admissible |
+| 8.2a | `test_orchestration_no_level_yields_exactly_one_activation_child` | one activation child under scope-key contention; the second is refused |
+| 8.2b | `test_orchestration_level_change_yields_one_set_quantities_child` | one set-quantities child under scope-key contention; the second is refused |
+| 8.3 | `test_concurrent_activation_superseded_recovery_one_successor` | while a worker holds the activation job lock the recovery safely skips (job untouched, no attempt, no successor); uncontended it becomes `skipped` once with exactly one fresh push_sync; a repeated loser makes no second successor |
+| 8.4 | `test_concurrent_cas_successor_creates_exactly_one_at_next_ordinal` | a concurrent lock-holder makes the CAS handoff fail closed (JobHandlerError, no successor); uncontended → exactly one successor at ordinal predecessor+1 (≤ ceiling), predecessor cancelled and linked once |
+| 8.5 | `test_concurrent_reconciliation_replacement_one_ordinal_zero` | loser fails closed; the not_applied replacement is exactly one **ordinal-0** set_quantities job (never inheriting the ordinal-2 predecessor); no automatic activation |
+| 8.6 | `test_concurrent_manual_review_release_one_successor` | a concurrent binding-lock holder makes `action_recheck_inventory_pair` fail closed (UserError, no successor); uncontended → exactly one ordinal-0 push_sync successor, predecessor cancelled + subreason cleared, **no Shopify transport / no attempt** |
+| 8.7 | `test_handoff_child_creation_failure_rolls_back_atomically` | injecting a successor-creation failure after the predecessor transition rolls the whole handoff back: predecessor restored to `running`, no successor, no dangling `superseded_by_job_id` |
+| 8.8 | `test_pg_lock_contention_is_a_safe_skip_never_a_pg_error` | a genuine blocking `FOR UPDATE` under a short `lock_timeout` raises a real `LockNotAvailable` (55P03), proving DB-level contention is real; production's own `try_lock_for_update` over the same held row **skips** (empty) rather than erroring — never converted to Shopify network uncertainty, no duplicate job/attempt |
+
+*Scenario 8.8 limitation (documented, not fabricated):* a raw
+serialization-failure / deadlock cannot be reliably induced **through the
+production inventory pair paths themselves** because they never block on a
+contended row (SKIP-LOCKED by design). The test therefore proves (a) the
+DB genuinely serializes (real 55P03) and (b) production converts that
+contention into a safe skip. A single end-to-end block-then-IntegrityError
+coalesce inside one live worker pair (rather than the two complementary
+8.1 halves) is the one micro-path that would require two OS processes.
+Complementary existing evidence: core's own
+`TestMutationConcurrency.test_serialization_failure_recovers_to_reconciliation`
+(re-executed green in the combined run) genuinely induces a real
+`could not serialize access due to concurrent update` (SQLSTATE 40001) at
+the mutation layer and proves it recovers to reconciliation rather than
+being misclassified — the inventory-pair layer proven here sits above it.
+
+Result: `--test-tags /shopify_connector_inventory:TestInventoryConcurrency`
+→ **0 failed, 0 errors of 9** (EXECUTED). Because the campaign passes
+against the current candidate, **no inventory production change was made**
+(§4 policy).
+
+### 16.6 Candidate rerun matrix (EXECUTED)
+
+| Suite | Result | Class |
+| --- | --- | --- |
+| Full inventory (`/shopify_connector_inventory`) | **0 failed, 0 errors of 247** (238 prior + 9 new) | EXECUTED — PASS |
+| Simultaneous-concurrency (`:TestInventoryConcurrency`) | **0 failed, 0 errors of 9** | EXECUTED — PASS |
+| Core mutation-source guard (`:TestMutationSourceGuards`) | **0 failed, 0 errors of 28** | EXECUTED — PASS |
+| Core suite (`/shopify_connector_core`) | **0 failed, 12 errors of 305** (was 1 failed + 12; the removed failure is the guard false-positive) | EXECUTED — PASS (0 candidate failures); 12 errors **BASE-CONTROL PENDING** |
+| Product suite (`/shopify_connector_product`) | **0 failed, 85 errors of 163** (unchanged; product untouched) | EXECUTED — 85 errors **BASE-CONTROL PENDING** |
+| Sale suite (`/shopify_connector_sale`) | **0 failed, 0 errors of 194** | EXECUTED — PASS |
+| Combined 4-module regression (`-u core,product,inventory,sale`) | **0 failed, 97 errors of 909** (= core 12 + product 85; inventory 0, sale 0) | EXECUTED — PASS (0 candidate failures) |
+| Upgrade (`-u shopify_connector_inventory`) | fields/constraints/registry/cron/security load; focused suite green | EXECUTED — PASS |
+| Uninstall → residue | **0** ir_model_data / ir_model / inventory tables / ir_model_fields for the inventory module | EXECUTED — PASS |
+| Reinstall (`-i`) → residue | state `installed`; 2 tables + 1 cron restored; **0 failed, 0 errors of 247** | EXECUTED — PASS |
+| Security matrix | inventory security tests green within the 247; core security green within the 305 | EXECUTED — PASS |
+
+### 16.7 BASE-CONTROL PENDING (delegated to Track A — NOT classified here)
+
+The **97** non-inventory residuals — **core 12 errors** (`res_partner.autopost_bills`
+NOT NULL) + **product 85 errors** (`product_template.tracking` NOT NULL) —
+persist and are recorded as **BASE-CONTROL PENDING**. Per comment
+`5031833846` they are **not** classified as base debt here; independent
+Track A owns the exact-base comparison at `8f5f421…`. They are unchanged
+by the Track B delta (which touched no core/product/sale production and no
+product/sale test): the candidate-side count is the same 12+85 as the
+submitted head (minus the one core guard failure the Track B guard fix
+removed). Task 013 cannot **close** until Track A returns and the
+control room compares.
+
+### 16.8 Track B posture
+
+- Remaining **P0**: none proven candidate-side.
+- Remaining **P1**: none proven candidate-side (the simultaneous
+  concurrency campaign passes without exposing any inventory defect).
+- Remaining **P2 / backlog**: the core mutation-source-guard item is now
+  **resolved** (test guard corrected, no production/architecture change);
+  the "no genuine simultaneous concurrency test" gap is now **closed** by
+  §16.5.
+- **BASE-CONTROL PENDING**: core 12 + product 85 (§16.7), awaiting Track A.
+- **External evidence still pending**: live Shopify dev-store mutation
+  gate (`inventoryActivate` / `inventorySetQuantities`) — out of Track B
+  scope; PR-body/state update deferred to the control room (in-workspace
+  GitHub API not required per the ruling).
+
+### 16.9 Track B confirmations
+
+PR #182 remains **draft, unmerged, not marked ready**; no self-acceptance;
+no protected reference changed; no live Shopify mutation; Task 013B not
+started; dev-store validation not started.

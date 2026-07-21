@@ -1,3 +1,45 @@
+### Task 013 Track B — candidate technical closure (guard + simultaneous concurrency) — same draft PR (2026-07-21)
+
+- **Branch / PR:** `claude/wave-3-task-013-2g0ul0`, PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) → `mvp/program-integration`
+  (base `8f5f421`, unchanged; head started at `6c22179`). Same draft PR.
+- **Authority:** PR #182 comment `5031833846` (Track B). Two prior blockers
+  explicitly lifted: the exact-base comparison is **delegated to Track A**
+  (residuals recorded **BASE-CONTROL PENDING**, not classified here), and
+  in-workspace GitHub API access is **not required** (PR state control-room-verified).
+- **Environment:** Odoo.sh build `35199258` (a REBUILD of the prior `35193596`),
+  Odoo 19.0 / PostgreSQL 16.14, single injected dev DB.
+- **Delta (test/evidence only — NO production file changed):** (1) corrected the
+  core mutation-source **test guard** to accept the exact inventory
+  prepare/transport split (`ACCEPTED_PREPARE_TRANSPORT_SPLIT`, two pairs) with
+  11 adversarial self-tests — the accepted architecture and mutation literals
+  were preserved, not relocated; (2) added
+  `addons/shopify_connector_inventory/tests/test_inventory_concurrency.py`
+  (`TestInventoryConcurrency`, 9 tests) — genuine **simultaneous** concurrency via
+  two overlapping independent transactions (a holder holds a real `FOR UPDATE` /
+  uncommitted unique-index entry while a worker races it); (3) evidence docs.
+- **Concurrency campaign passed against the current candidate → no inventory
+  production correction made** (§4 policy).
+- **Runtime (EXECUTED):** inventory **0/247** (238+9); concurrency **0/9**; core
+  guard **0/28**; core **0 failed + 12 err/305** (was 1F+12E — the removed failure
+  is the guard false-positive); product **0F+85E/163** (unchanged); sale **0/194**;
+  combined 4-module **0 failed + 97 err/909** (=12+85, inv 0, sale 0); upgrade
+  clean; uninstall→**0 residue**→reinstall→installed + **0/247**; security green.
+- **Terminology correction:** `TestInventoryPreC2RecoverySeam` (3 tests, executed
+  green) is **sequential** independent-connection durability/recovery — NOT a
+  single-transaction savepoint test, NOT simultaneous concurrency. The new
+  campaign supplies the simultaneous evidence.
+- **BASE-CONTROL PENDING:** core 12 + product 85 non-inventory residuals await
+  Track A's exact-base classification; Task 013 cannot **close** until then.
+- **Recommendation: TRACK B GREEN — READY FOR CONTROL-ROOM COMPARISON WITH TRACK A.**
+  PR #182 stays **draft, unmerged, not marked ready**; no self-acceptance; no
+  protected reference changed; no live Shopify mutation; Task 013B not started.
+  Full evidence:
+  [`../05-qa/task-013-inventory-sync-validation-results.md`](../05-qa/task-013-inventory-sync-validation-results.md)
+  §16.
+
+---
+
 ### Task 013 exact-head Odoo.sh runtime validation + consolidated correction — same draft PR (2026-07-21)
 
 - **Branch / PR:** `claude/wave-3-task-013-2g0ul0`, PR
