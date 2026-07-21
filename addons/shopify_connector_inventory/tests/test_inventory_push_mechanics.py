@@ -243,15 +243,25 @@ class TestInventoryPushMechanics(TransactionCase):
             job, token = self._make_mutation_job(job_type)
             attempt = self._make_attempt(job, token)
             self.assertEqual(attempt.mutation_domain, job.job_type)
+            # Free the pair's operation_scope_key before the next job_type
+            # creates its own (only one non-terminal pair job at a time).
+            job.sudo().write({'state': 'cancelled', 'cancel_reason': 'test'})
 
     def test_activation_and_set_quantities_are_distinct_jobs(self):
         activate_job, activate_token = self._make_mutation_job(
             'inventory_activate'
         )
+        activate_attempt = self._make_attempt(activate_job, activate_token)
+        # A single pair may only hold one non-terminal pair-execution job at
+        # a time (activation then set-quantities are serialized, never
+        # simultaneous); terminalize the activation before the set job so
+        # the two do not collide on the pair's operation_scope_key.
+        activate_job.sudo().write({
+            'state': 'cancelled', 'cancel_reason': 'test',
+        })
         set_job, set_token = self._make_mutation_job(
             'inventory_set_quantities'
         )
-        activate_attempt = self._make_attempt(activate_job, activate_token)
         set_attempt = self._make_attempt(set_job, set_token)
         self.assertNotEqual(activate_job.id, set_job.id)
         self.assertNotEqual(activate_job.job_type, set_job.job_type)
@@ -316,7 +326,12 @@ class TestInventoryPushMechanics(TransactionCase):
             attempt_for_current = self.env[
                 'shopify.connector.mutation.attempt'
             ].search([('job_id', '=', current.id)])
-            attempt_for_current._record_direct_outcome('failed_clean')
+            attempt_for_current._record_direct_outcome(
+                'failed_clean',
+                evidence={'user_errors': [
+                    {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+                ]},
+            )
             self.Service._apply_consequence_set_quantities(
                 current, attempt_for_current, 'direct',
                 {
@@ -338,8 +353,14 @@ class TestInventoryPushMechanics(TransactionCase):
             new_job = current.superseded_by_job_id
             self.assertEqual(new_job.cas_retry_ordinal, expected_ordinal + 1)
             self.assertNotEqual(new_job.id, current.id)
+            # The CAS successor is created queued; C2 attempt creation
+            # requires a running job whose owner token matches, so promote
+            # it exactly as the dispatcher would before its own attempt.
             new_job.sudo().write({
+                'state': 'running',
                 'current_attempt_token': uuid.uuid4().hex,
+                'started_at': fields.Datetime.now(),
+                'running_since': fields.Datetime.now(),
             })
             self._make_attempt(new_job, new_job.current_attempt_token)
             chain.append(new_job)
@@ -350,7 +371,12 @@ class TestInventoryPushMechanics(TransactionCase):
         exhausted_attempt = self.env[
             'shopify.connector.mutation.attempt'
         ].search([('job_id', '=', exhausted.id)])
-        exhausted_attempt._record_direct_outcome('failed_clean')
+        exhausted_attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_errors': [
+                {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+            ]},
+        )
         self.Service._apply_consequence_set_quantities(
             exhausted, exhausted_attempt, 'direct',
             {
@@ -422,6 +448,17 @@ class TestInventoryPushMechanics(TransactionCase):
         job, token = self._make_mutation_job('inventory_set_quantities')
         attempt = self._make_attempt(job, token)
         attempt._record_direct_outcome('failed_clean')
+        # The core Layer-2 committer writes blocked_manual_review for a
+        # block_manual_review disposition *before* invoking this domain
+        # callback (job_dispatch `_commit`/`_apply` ordering); replicate
+        # that seam so the callback is exercised exactly as in production
+        # -- its own contract here is only that it adds no automatic child.
+        job.sudo().write({
+            'state': 'blocked_manual_review',
+            'error_class': 'inventory_location_missing',
+            'manual_review_subreason': 'inventory_location_missing',
+            'finished_at': fields.Datetime.now(),
+        })
         self.Service._apply_consequence_set_quantities(
             job, attempt, 'direct',
             {
@@ -562,8 +599,13 @@ class TestInventoryPushMechanics(TransactionCase):
             job, token, target_quantity=10.0, change_from_quantity=5.0,
         )
         attempt._record_direct_outcome('uncertain')
+        # updatedAt must be *strictly* later than the attempt's transport
+        # timestamp for the ABA freshness guard to engage. Odoo Datetime is
+        # second-resolution, so a bare now() captured in the same second as
+        # transport_at is not strictly greater; derive it from
+        # transport_at + 1 minute instead.
         later_than_transport = fields.Datetime.to_string(
-            fields.Datetime.now()
+            fields.Datetime.add(attempt.transport_at, minutes=1)
         )
         with patch.object(
             type(self.Service), '_read_shopify_inventory_pair',
@@ -682,6 +724,61 @@ class TestInventoryPushMechanics(TransactionCase):
         job.invalidate_recordset()
         self.assertEqual(job.state, 'cancelled')
         self.assertEqual(job.cancel_reason, 'manual_review_release')
+
+    def test_release_resolves_attempt_by_forward_job_id_not_reconciliation_link(self):
+        """Known-P1 reproduction (PR #182 comment 5030781330): an ordinary
+        blocked mutation job's own attempt is reachable only through the
+        attempt's forward `job_id`, never the reconciliation-job-owned
+        `mutation_attempt_id` field (which stays NULL for it). The release
+        action must resolve the attempt by `job_id` and release the
+        otherwise-eligible pair; the pre-correction code read
+        `blocked_job.mutation_attempt_id` (always empty here) and wrongly
+        refused the release. This asserts both the invariant and the fix,
+        end to end: exactly one ordinal-0 successor, predecessor cancelled
+        and atomically linked, and no mutation attempt on the successor
+        (no transport during release)."""
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('failed_clean')
+        self._block_job_with(
+            job, 'inventory_location_missing', 'inventory_location_missing',
+        )
+        job.invalidate_recordset()
+        # The reconciliation-owned link is unset on an ordinary mutation
+        # job; the attempt is discoverable only by its forward job_id.
+        self.assertFalse(job.mutation_attempt_id)
+        self.assertEqual(
+            self.env['shopify.connector.mutation.attempt'].search(
+                [('job_id', '=', job.id)]
+            ),
+            attempt,
+        )
+        self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+            'Location now stocked, please re-check.'
+        )
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'cancelled')
+        self.assertEqual(job.cancel_reason, 'manual_review_release')
+        successor = job.superseded_by_job_id
+        self.assertTrue(successor)
+        self.assertEqual(successor.job_type, 'inventory_push_sync')
+        self.assertEqual(successor.cas_retry_ordinal, 0)
+        # Exactly one successor for this pair, and no mutation attempt was
+        # created on it (the release is orchestration-only, never transport).
+        self.assertEqual(
+            self.env['shopify.connector.job'].search_count([
+                ('res_id', '=', self.binding.id),
+                ('res_model', '=', 'shopify.connector.inventory.level.binding'),
+                ('job_type', '=', 'inventory_push_sync'),
+                ('state', 'not in', ('cancelled', 'failed_final')),
+            ]),
+            1,
+        )
+        self.assertFalse(
+            self.env['shopify.connector.mutation.attempt'].search_count(
+                [('job_id', '=', successor.id)]
+            )
+        )
 
     def test_release_positive_ordinary_validation_conflict(self):
         job, token = self._make_mutation_job('inventory_set_quantities')
@@ -1777,17 +1874,32 @@ class TestInventoryPushMechanics(TransactionCase):
             job.sudo().write({'state': 'cancelled', 'cancel_reason': 'x'})
 
     def test_operation_scope_key_not_pair_literal_for_reconciliation(self):
-        self.store.write({'state': 'connected'})
-        job = self.env['shopify.connector.job.enqueue'].enqueue(
-            self.store, 'reconciliation', 'inventory_mutation_reconcile',
-            payload_hash=uuid.uuid4().hex,
+        # A reconciliation job is created through _ensure_reconciliation_job
+        # with the exact mutation attempt it reconciles (core's
+        # _check_reconciliation_attempt_link constraint requires it); it is
+        # never a bare enqueue. Its operation_scope_key keeps core's default
+        # composite, never the pair literal used by the three pair-execution
+        # job types.
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        reconciliation_job = Dispatch._ensure_reconciliation_job(job, attempt)
+        self.assertNotEqual(
+            reconciliation_job.operation_scope_key, self.pair_key,
         )
-        self.assertNotEqual(job.operation_scope_key, self.pair_key)
 
     def test_operation_scope_key_retained_while_blocked(self):
         job, token = self._make_mutation_job('inventory_set_quantities')
         attempt = self._make_attempt(job, token)
         attempt._record_direct_outcome('failed_clean')
+        # Core blocks the job before the domain callback runs (see
+        # job_dispatch `_commit`/`_apply` ordering); replicate that seam.
+        job.sudo().write({
+            'state': 'blocked_manual_review',
+            'error_class': 'inventory_location_missing',
+            'manual_review_subreason': 'inventory_location_missing',
+            'finished_at': fields.Datetime.now(),
+        })
         self.Service._apply_consequence_set_quantities(
             job, attempt, 'direct',
             {
@@ -2006,6 +2118,11 @@ class TestInventoryPushMechanics(TransactionCase):
             self.assertEqual(
                 reconciliation_job.mutation_attempt_id, attempt,
             )
+            # Only one non-terminal pair-execution job may hold the pair's
+            # operation_scope_key at a time; terminalize this iteration's
+            # mutation job before the next job_type creates its own, exactly
+            # as the real serialized lifecycle would.
+            job.sudo().write({'state': 'cancelled', 'cancel_reason': 'test'})
 
     def test_shared_reconciliation_identity_idempotent_on_reuse(self):
         Dispatch = self.env['shopify.connector.job.dispatch']
@@ -2033,7 +2150,17 @@ class TestInventoryPushMechanics(TransactionCase):
         job, token = self._make_mutation_job(
             'inventory_set_quantities', cas_retry_ordinal=1,
         )
-        self._make_attempt(job, token)
+        attempt = self._make_attempt(job, token)
+        # `_create_cas_successor_job` independently re-verifies the frozen
+        # stale-CAS evidence (failed_clean/not_applied + structured
+        # CHANGE_FROM_QUANTITY_STALE) before deriving the ordinal; the
+        # predecessor must carry it.
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_errors': [
+                {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+            ]},
+        )
         new_job = self.Service._handoff_supersede(
             job, self.binding, 'cas_stale_bounded_replacement',
             'inventory_set_quantities', is_cas_replacement=True,
@@ -2712,6 +2839,8 @@ class TestInventoryPushMechanics(TransactionCase):
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': self.store.id,
             'job_source': 'odoo_event',
+            # core requires a trigger_origin for every odoo_event job.
+            'trigger_origin': 'inventory_stock_change',
             'job_type': 'inventory_push_sync',
             'state': 'running',
             'res_model': 'shopify.connector.inventory.level.binding',
@@ -2815,6 +2944,8 @@ class TestInventoryPushMechanics(TransactionCase):
         return self.env['shopify.connector.job'].sudo().create({
             'store_id': self.store.id,
             'job_source': 'odoo_event',
+            # core requires a trigger_origin for every odoo_event job.
+            'trigger_origin': 'inventory_stock_change',
             'job_type': 'inventory_push_sync',
             'state': 'running',
             'res_model': 'shopify.connector.inventory.level.binding',
@@ -2904,6 +3035,13 @@ class TestInventoryPushMechanics(TransactionCase):
                 'available': 10, 'updated_at': False,
                 'store_identity': self.store.shop_domain,
             },
+        ), patch.object(
+            # The orchestration handler always recomputes the target from
+            # live Odoo free_qty (last-value-wins); pin it to the intended
+            # baseline of 10 so this exercises the verified-noop path (the
+            # unstocked fixture product would otherwise derive target=0).
+            type(self.Service), '_refresh_pending_target',
+            return_value=(10.0, 10.0),
         ):
             self.Service._handle_inventory_push_sync(first_sync_job)
         first_sync_job.invalidate_recordset()

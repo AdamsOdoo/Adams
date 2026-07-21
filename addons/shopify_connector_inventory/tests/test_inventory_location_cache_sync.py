@@ -18,6 +18,11 @@ class TestInventoryLocationCacheSync(TransactionCase):
             'shop_domain': 'location-cache-sync-test.myshopify.com',
             'api_version': '2026-07',
         })
+        # `inventory_location_sync` is a business-gated `manual_sync` job;
+        # core's job-create gate refuses any business job for a store that
+        # is not `connected`. The store default is `setup_incomplete`, so
+        # the fixture must connect it exactly as the other suites do.
+        cls.store.write({'state': 'connected'})
         cls.user_auditor = cls.env['res.users'].create({
             'name': 'Location Cache Sync Auditor',
             'login': 'location_cache_sync_auditor',

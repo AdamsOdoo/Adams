@@ -1,8 +1,17 @@
 from odoo.exceptions import UserError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
 
+# Runs post_install: the cross-company tests create a fresh res.company,
+# whose required Odoo-19 base field res.company.inventory_period is
+# contributed by a module that sorts after shopify_connector_inventory in
+# the install graph. At at_install time that field is not yet on the model
+# (create-without hits the NOT NULL column; create-with is rejected as an
+# unknown field); post_install guarantees the complete registry so the
+# field and its default are available. Every other test in this class is
+# timing-agnostic and passes identically under post_install.
+@tagged('post_install', '-at_install')
 class TestInventoryLevelBinding(TransactionCase):
 
     EXPECTED_PROTECTED_FIELDS = frozenset((
@@ -223,26 +232,27 @@ class TestInventoryLevelBinding(TransactionCase):
         other_company = self.env['res.company'].create({
             'name': 'Inventory Binding Other Co',
         })
+        # A top-level internal location owned by the other company. It must
+        # not be parented under this company's warehouse view location, or
+        # stock's own _check_company rejects the cross-company parentage
+        # before the mapping's own company-consistency guard is reached.
         other_location = self.env['stock.location'].create({
             'name': 'Other Co Location',
             'usage': 'internal',
-            'location_id': self.warehouse.view_location_id.id,
             'company_id': other_company.id,
         })
-        other_mapping = self.Mapping.sudo().create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Location/101',
-            'odoo_location_id': other_location.id,
-            'match_key': 'manual',
-        })
+        # The location-mapping's _check_location_company_consistency guard is
+        # the enforcement point for a cross-company Odoo location: a binding
+        # can only ever reference a company-consistent mapping, so mapping a
+        # location owned by a different company than the current company must
+        # be rejected outright.
         with self.assertRaises(UserError):
             with self.env.cr.savepoint():
-                self.Binding.sudo().create({
+                self.Mapping.sudo().create({
                     'store_id': self.store.id,
-                    'product_variant_binding_id': self.variant_binding.id,
-                    'location_mapping_id': other_mapping.id,
-                    'shopify_inventory_item_gid':
-                        'gid://shopify/InventoryItem/109',
+                    'shopify_gid': 'gid://shopify/Location/101',
+                    'odoo_location_id': other_location.id,
+                    'match_key': 'manual',
                 })
 
     def test_cross_company_product_rejected(self):

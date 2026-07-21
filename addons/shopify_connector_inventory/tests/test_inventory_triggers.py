@@ -99,7 +99,6 @@ class TestInventoryTriggers(TransactionCase):
     def test_odoo_event_enqueues_only_mapped_pairs(self):
         supplier_location = self.env.ref('stock.stock_location_suppliers')
         move = self.env['stock.move'].create({
-            'name': 'Trigger Test Receipt',
             'product_id': self.template.product_variant_id.id,
             'product_uom_qty': 5.0,
             'product_uom': self.template.uom_id.id,
@@ -118,7 +117,6 @@ class TestInventoryTriggers(TransactionCase):
         # this pair a second time via that path.
         before_count = len(jobs)
         move2 = self.env['stock.move'].create({
-            'name': 'Trigger Test Unmapped Receipt',
             'product_id': self.template.product_variant_id.id,
             'product_uom_qty': 3.0,
             'product_uom': self.template.uom_id.id,

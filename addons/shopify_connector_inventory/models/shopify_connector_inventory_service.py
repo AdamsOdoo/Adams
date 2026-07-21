@@ -3,6 +3,8 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from psycopg2 import IntegrityError
+
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
@@ -107,6 +109,15 @@ PAIR_EXECUTION_JOB_TYPES = (
 # ever treating a caught ValidationError as benign coalescing.
 OPERATION_SCOPE_CONSTRAINT_MESSAGE = (
     'A non-terminal job already holds this operation scope for this store.'
+)
+# The DB unique index enforcing the operation-scope serialization. A
+# violated `models.Constraint` surfaces on flush as a raw psycopg2
+# `IntegrityError` whose message carries this index name -- never the
+# friendly `models.Constraint` message above (Odoo only substitutes the
+# friendly text at the HTTP boundary, not inside an inline savepoint
+# flush). Both forms are matched below so coalescing works in-process.
+OPERATION_SCOPE_CONSTRAINT_NAME = (
+    'shopify_connector_job_store_operation_scope_key_uniq'
 )
 
 
@@ -662,7 +673,7 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
         if exc.observed_level_gid and not locked_binding.shopify_gid:
             locked_binding.sudo().write({'shopify_gid': exc.observed_level_gid})
         job.sudo().write({'state': 'skipped', 'finished_at': fields.Datetime.now()})
-        job.flush_recordset(['state'])
+        job.flush_recordset(['state', 'operation_scope_key'])
         Service = self.env['shopify.connector.inventory.service']
         new_job = Service._create_inventory_job(
             job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, locked_binding,
@@ -964,21 +975,45 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             binding.shopify_inventory_item_gid,
             binding.location_mapping_id.shopify_gid,
         )
+        def _existing_pair_job():
+            return self.env['shopify.connector.job'].sudo().search([
+                ('store_id', '=', store.id),
+                ('job_type', 'in', INVENTORY_JOB_TYPES),
+                ('operation_scope_key', '=', pair_key),
+            ], limit=1)
+
+        # Fast-path coalesce: a non-terminal inventory job already holding
+        # this pair's operation_scope_key means "already in progress" -- the
+        # caller's Odoo-side change is already reflected on the binding's
+        # pending_target_available, so nothing is lost by admitting no new
+        # job. The DB-level unique constraint below stays the atomic guard
+        # for the narrow TOCTOU window where a concurrent worker inserts
+        # between this read and the create.
+        if _existing_pair_job():
+            return self.env['shopify.connector.job']
         try:
             with self.env.cr.savepoint():
                 return self._create_inventory_job(
                     store, job_source, JOB_TYPE_PUSH_SYNC, binding,
                     trigger_origin=trigger_origin,
                 )
-        except ValidationError as exc:
-            if OPERATION_SCOPE_CONSTRAINT_MESSAGE not in str(exc):
+        except (ValidationError, IntegrityError) as exc:
+            # A violated operation-scope constraint surfaces either as the
+            # friendly ValidationError message (HTTP boundary) or, inside
+            # this inline savepoint flush, as a raw psycopg2 IntegrityError
+            # naming the unique index; match both. Every other error
+            # (store-state, domain-disabled, company, invalid field,
+            # illegal transition, security, unrelated constraint) still
+            # propagates unchanged. Only re-treat it as benign coalescing
+            # after independently confirming a real non-terminal job now
+            # holds this exact pair scope.
+            message = str(exc)
+            if (
+                OPERATION_SCOPE_CONSTRAINT_MESSAGE not in message
+                and OPERATION_SCOPE_CONSTRAINT_NAME not in message
+            ):
                 raise
-            existing = self.env['shopify.connector.job'].sudo().search([
-                ('store_id', '=', store.id),
-                ('job_type', 'in', INVENTORY_JOB_TYPES),
-                ('operation_scope_key', '=', pair_key),
-            ], limit=1)
-            if not existing:
+            if not _existing_pair_job():
                 raise
             return self.env['shopify.connector.job']
 
@@ -994,7 +1029,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         """
         product = binding.product_variant_binding_id.product_variant_id
         location = binding.location_mapping_id.odoo_location_id
-        free_qty = product.with_context(location=location.id).free_qty
+        # Deriving the Odoo-side available quantity is an internal system
+        # read: an authorized Connector Operator/Administrator triggers the
+        # push, but computing `free_qty` walks stock.location/stock.quant,
+        # which the Shopify-connector groups do not (and should not) grant
+        # raw ACL for. Elevate exactly this quantity read via sudo (the
+        # result is already written back through `binding.sudo()` below) so
+        # the sanctioned trigger never demands a full Odoo Inventory role.
+        free_qty = product.sudo().with_context(location=location.id).free_qty
         target = max(free_qty, 0.0)
         if free_qty < 0:
             _logger.warning(
@@ -1271,7 +1313,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 )
                 return
             job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
-            job.flush_recordset(['state'])
+            job.flush_recordset(['state', 'operation_scope_key'])
             new_job = self._create_inventory_job(
                 store, job.job_source, JOB_TYPE_ACTIVATE, locked_binding,
                 trigger_origin=job.trigger_origin or False,
@@ -1380,7 +1422,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
             return
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
-        job.flush_recordset(['state'])
+        job.flush_recordset(['state', 'operation_scope_key'])
         new_job = self._create_inventory_job(
             store, job.job_source, JOB_TYPE_SET_QUANTITIES, locked_binding,
             trigger_origin=job.trigger_origin or False,
@@ -2073,15 +2115,23 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
         locked_job.invalidate_recordset()
         from_state = locked_job.state
+        # A manual-review release supersedes a job in `blocked_manual_review`,
+        # which still carries a `manual_review_subreason`. Core's
+        # `_check_manual_review_subreason` constraint requires that field to
+        # be empty in every non-blocked state, so it must be cleared as part
+        # of the same transition to `cancelled` (the CAS/reconciliation
+        # supersede paths already carry an empty subreason, so this is a
+        # no-op for them).
         locked_job.sudo().write({
             'state': 'cancelled',
             'cancel_reason': cancel_reason,
+            'manual_review_subreason': False,
         })
         # Flush so this job's operation_scope_key clears (terminal state)
         # before the replacement job's own scope key is computed --
         # otherwise the two would momentarily collide on the DB unique
         # constraint within this same transaction.
-        locked_job.flush_recordset(['state'])
+        locked_job.flush_recordset(['state', 'operation_scope_key'])
         if is_cas_replacement:
             new_job = self._create_cas_successor_job(locked_job, binding)
         else:
@@ -2109,7 +2159,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         `superseded_by_job_id`/`cancel_reason` (this is a successful
         completion, not a replacement), and never waiting for an
         unrelated later scan/manual trigger."""
-        job.flush_recordset(['state'])
+        job.flush_recordset(['state', 'operation_scope_key'])
         new_job = self._create_inventory_job(
             job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, binding,
             trigger_origin=job.trigger_origin or False,
@@ -3426,9 +3476,21 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
         blocked_job.invalidate_recordset()
 
-        attempt = blocked_job.mutation_attempt_id
+        # An ordinary mutation job's own attempt is never linked through
+        # the reconciliation-job-owned `mutation_attempt_id` field (core's
+        # `_check_reconciliation_attempt_link` constraint forbids it, and
+        # it stays NULL for `inventory_set_quantities`/`inventory_activate`
+        # jobs); it must be resolved by the attempt's forward `job_id`,
+        # exactly as `_create_cas_successor_job` already does (PR #182
+        # comment 5030781330). At most one attempt can ever exist per job
+        # (the `(job_id)` unique index enforces it at C2 creation time),
+        # so this search is required to resolve to exactly one -- zero
+        # (no attempt) and the impossible duplicate both fail closed.
+        attempt = self.env['shopify.connector.mutation.attempt'].sudo().search(
+            [('job_id', '=', blocked_job.id)],
+        )
         eligible = False
-        if attempt and attempt.observed_outcome == 'failed_clean' and (
+        if len(attempt) == 1 and attempt.observed_outcome == 'failed_clean' and (
             attempt.effective_disposition() == 'not_applied'
         ):
             subreason = blocked_job.manual_review_subreason
