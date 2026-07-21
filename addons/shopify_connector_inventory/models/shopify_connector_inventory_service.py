@@ -847,6 +847,60 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'inventory_set_quantities job below the bounded ordinal '
                 'ceiling.'
             )
+        # This helper is the sole nonzero-ordinal creation surface, so it
+        # must independently re-verify the immutable stale-CAS evidence
+        # itself rather than trust the caller (PR #182 comment 5030514895
+        # item 3): exactly one immutable mutation attempt, a
+        # `failed_clean` outcome with `not_applied` effective
+        # disposition, and an exact structured `user_errors` entry with
+        # `code == 'CHANGE_FROM_QUANTITY_STALE'` -- never a substring or
+        # generic-container membership test.
+        # `mutation_attempt_id` is a reconciliation-job-owned field (it
+        # points a reconciliation job at the attempt it reconciles); an
+        # ordinary mutation job's own attempt is never linked through
+        # that field (core's own `_check_reconciliation_attempt_link`
+        # constraint forbids it) and must instead be found by the
+        # attempt's forward `job_id` reference, exactly mirroring
+        # core's own `_has_mutation_attempt_evidence` fallback. At most
+        # one attempt can ever exist per job (enforced at C2 creation
+        # time), so this search is inherently "exactly one."
+        attempt = self.env['shopify.connector.mutation.attempt'].sudo().search(
+            [('job_id', '=', locked_predecessor.id)], limit=1,
+        )
+        if not attempt or attempt.observed_outcome != 'failed_clean' or (
+            attempt.effective_disposition() != 'not_applied'
+        ):
+            raise ValidationError(
+                'A CAS replacement requires the locked predecessor to '
+                'carry exactly one immutable failed_clean/not_applied '
+                'mutation attempt.'
+            )
+        direct_evidence = (
+            (attempt.remote_evidence_refs or {}).get('direct') or {}
+        )
+        structured_errors = direct_evidence.get('user_errors')
+        if not isinstance(structured_errors, list) or not structured_errors:
+            raise ValidationError(
+                'A CAS replacement requires the locked predecessor\'s '
+                'attempt to carry a non-empty structured user_errors '
+                'list.'
+            )
+        if not all(isinstance(entry, dict) for entry in structured_errors):
+            raise ValidationError(
+                'A CAS replacement requires every structured user_errors '
+                'entry on the locked predecessor\'s attempt to be a '
+                'dict.'
+            )
+        has_exact_stale_code = any(
+            entry.get('code') == 'CHANGE_FROM_QUANTITY_STALE'
+            for entry in structured_errors
+        )
+        if not has_exact_stale_code:
+            raise ValidationError(
+                'A CAS replacement requires the locked predecessor\'s '
+                'attempt to carry an exact CHANGE_FROM_QUANTITY_STALE '
+                'structured user-error entry.'
+            )
         cas_retry_ordinal = locked_predecessor.cas_retry_ordinal + 1
         new_job = self._create_inventory_job(
             locked_predecessor.store_id, locked_predecessor.job_source,
@@ -2302,7 +2356,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 payload = data.get('inventorySetQuantities') or {}
                 return {
                     'outcome': None,
-                    'user_errors': payload.get('userErrors') or [],
+                    # Preserve the raw returned value -- never default a
+                    # missing/malformed container to `[]` here; the
+                    # classifier is the single place that validates shape
+                    # (PR #182 comment 5030514895 item 2).
+                    'user_errors': payload.get('userErrors'),
                     'adjustment_group': payload.get('inventoryAdjustmentGroup'),
                     'requested_target': requested_target,
                     'requested_reason': requested_reason,
@@ -2386,8 +2444,26 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                             'inventorySetQuantities.',
                 'evidence': result.get('evidence') or {},
             }
-        user_errors = result.get('user_errors') or []
+        user_errors = result.get('user_errors')
         evidence = dict(result.get('evidence') or {})
+        # A malformed falsey container (`{}`, `''`, `0`, `False`, `None`,
+        # a tuple, a bare string) must never be coerced into an empty
+        # list via `or []` -- that would let a malformed response reach
+        # the success validator as an apparent clean pass (PR #182
+        # comment 5030514895 item 2). The container's shape is validated
+        # before its emptiness is ever checked.
+        if not isinstance(user_errors, list):
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': ERROR_CLASS_DATA_SHAPE,
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'inventorySetQuantities returned a malformed '
+                            'userErrors container (not a list); '
+                            'reconciling before trusting either '
+                            'disposition.',
+                'evidence': evidence,
+            }
         if not user_errors:
             group = result.get('adjustment_group')
             expected_target = result.get('requested_target')
@@ -2875,7 +2951,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 payload = data.get('inventoryActivate') or {}
                 return {
                     'outcome': None,
-                    'user_errors': payload.get('userErrors') or [],
+                    # Preserve the raw returned value -- never default a
+                    # missing/malformed container to `[]` here; the
+                    # classifier is the single place that validates shape
+                    # (PR #182 comment 5030514895 item 2).
+                    'user_errors': payload.get('userErrors'),
                     'inventory_level': payload.get('inventoryLevel'),
                     'requested_item_gid': requested_item_gid,
                     'requested_location_gid': requested_location_gid,
@@ -2939,9 +3019,27 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                             'inventoryActivate.',
                 'evidence': result.get('evidence') or {},
             }
-        user_errors = result.get('user_errors') or []
+        user_errors = result.get('user_errors')
         level = result.get('inventory_level')
         evidence = dict(result.get('evidence') or {})
+        # A malformed falsey container (`{}`, `''`, `0`, `False`, `None`,
+        # a tuple, a bare string) must never be coerced into an empty
+        # list via `or []` -- that would let a malformed response reach
+        # the success validator as an apparent clean pass (PR #182
+        # comment 5030514895 item 2). The container's shape is validated
+        # before its emptiness is ever checked.
+        if not isinstance(user_errors, list):
+            return {
+                'observed_outcome': 'uncertain',
+                'error_class': ERROR_CLASS_DATA_SHAPE,
+                'manual_review_subreason': False,
+                'action': 'reconcile',
+                'message': 'inventoryActivate returned a malformed '
+                            'userErrors container (not a list); '
+                            'reconciling before trusting either '
+                            'disposition.',
+                'evidence': evidence,
+            }
         # Classification by payload shape only -- inventoryActivate's
         # userErrors carry no structured code (DEC-037 §4 row 2). Never
         # matched on UserError.message text.
@@ -3135,7 +3233,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             # binding for review rather than cleanly recording the GID.
             if write_vals.get('status') != 'review':
                 self._handoff_succeed_to_fresh_orchestration(job, binding)
-            self._handoff_succeed_to_fresh_orchestration(job, binding)
 
     # ------------------------------------------------------------------
     # Shared reconciliation-job handler (one job_type, dispatches on the

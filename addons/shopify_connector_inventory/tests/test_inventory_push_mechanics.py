@@ -1201,6 +1201,34 @@ class TestInventoryPushMechanics(TransactionCase):
         self.assertNotIn("get('locations') or {}", method_source)
         self.assertNotIn("get('edges') or []", method_source)
 
+    def test_apply_consequence_activate_handoff_called_exactly_once(self):
+        """Source guard (PR #182 comment 5030514895 item 1): the clean
+        activation-success branch of `_apply_consequence_activate` must
+        call `_handoff_succeed_to_fresh_orchestration` exactly once --
+        the previous defect called it once conditionally and then once
+        more unconditionally, creating a duplicate successor on every
+        clean success and a spurious one after a GID conflict."""
+        source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_apply_consequence_activate'
+        )
+        call_count = 0
+        for node in ast.walk(method):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == '_handoff_succeed_to_fresh_orchestration'
+            ):
+                call_count += 1
+        self.assertEqual(
+            call_count, 1,
+            '_apply_consequence_activate must call '
+            '_handoff_succeed_to_fresh_orchestration exactly once; found '
+            '%d call site(s).' % call_count,
+        )
+
     def test_review_release_uses_audit_safe_reason_not_bare_redact(self):
         """The review-release path must use the PII-safe audit helper,
         never bare secret-only `redact()` (item 11)."""
@@ -2309,10 +2337,20 @@ class TestInventoryPushMechanics(TransactionCase):
         )
         self.assertNotIn(':', self.binding.shopify_gid.replace('gid://shopify/InventoryLevel/', ''))
         # No conflict was flagged, so the ordinary fresh-orchestration
-        # handoff (Handoff B) still fires exactly as before.
-        self.assertTrue(self.env['shopify.connector.job'].search([
+        # handoff (Handoff B) fires exactly once -- never twice (PR #182
+        # comment 5030514895 item 1: the duplicate unconditional call
+        # that followed the conditional one used to create a second
+        # successor here).
+        successors = self.env['shopify.connector.job'].search([
             ('job_type', '=', 'inventory_push_sync'),
             ('res_id', '=', self.binding.id),
+        ])
+        self.assertEqual(len(successors), 1)
+        # The handoff itself only enqueues a job; it never creates a
+        # mutation attempt (attempts are created exclusively at a later
+        # job's own C2 time).
+        self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
+            ('job_id', 'in', successors.ids),
         ]))
 
     def test_activate_success_conflicting_gid_flags_review_not_overwrite(self):
@@ -2338,14 +2376,16 @@ class TestInventoryPushMechanics(TransactionCase):
             self.binding.shopify_gid, 'gid://shopify/InventoryLevel/RECORDED',
         )
         self.assertEqual(self.binding.status, 'review')
-        # A post-mutation GID conflict must create no successor (PR #182
-        # comment 5029906989 item 4) -- the fresh-orchestration handoff
-        # is never issued when this outcome flagged the binding for
-        # review.
-        self.assertFalse(self.env['shopify.connector.job'].search([
+        # A post-mutation GID conflict must create zero successors (PR
+        # #182 comment 5029906989 item 4 / comment 5030514895 item 1) --
+        # the fresh-orchestration handoff is never issued when this
+        # outcome flagged the binding for review, and the previously
+        # unconditional duplicate call must not have fired either.
+        successors = self.env['shopify.connector.job'].search([
             ('job_type', '=', 'inventory_push_sync'),
             ('res_id', '=', self.binding.id),
-        ]))
+        ])
+        self.assertEqual(len(successors), 0)
 
     def test_reconcile_set_quantities_applied_captures_real_gid(self):
         job, token = self._make_mutation_job('inventory_set_quantities')
@@ -2924,14 +2964,113 @@ class TestInventoryPushMechanics(TransactionCase):
             with self.env.cr.savepoint():
                 self.Service._create_cas_successor_job(locked, self.binding)
 
+    # ------------------------------------------------------------------
+    # `_create_cas_successor_job` must independently re-verify the
+    # immutable stale-CAS evidence itself, never trust the caller (PR
+    # #182 comment 5030514895 item 3).
+    # ------------------------------------------------------------------
+
+    def _make_stale_cas_predecessor(self, cas_retry_ordinal=1, evidence=None):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=cas_retry_ordinal,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={
+                'user_errors': [
+                    {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+                ],
+            } if evidence is None else evidence,
+        )
+        # `mutation_attempt_id` is a reconciliation-job-owned field and
+        # must never be written on the ordinary predecessor job itself
+        # (core's `_check_reconciliation_attempt_link` constraint
+        # forbids it) -- the attempt is found by its own `job_id`
+        # reference instead, exactly as `_create_cas_successor_job`
+        # does.
+        return job.try_lock_for_update()
+
     def test_create_cas_successor_job_derives_ordinal_from_locked_predecessor(self):
+        locked = self._make_stale_cas_predecessor(cas_retry_ordinal=1)
+        new_job = self.Service._create_cas_successor_job(locked, self.binding)
+        self.assertEqual(new_job.cas_retry_ordinal, 2)
+        self.assertEqual(new_job.job_type, 'inventory_set_quantities')
+
+    def test_create_cas_successor_job_denies_without_any_attempt(self):
         job, _token = self._make_mutation_job(
             'inventory_set_quantities', cas_retry_ordinal=1,
         )
         locked = job.try_lock_for_update()
-        new_job = self.Service._create_cas_successor_job(locked, self.binding)
-        self.assertEqual(new_job.cas_retry_ordinal, 2)
-        self.assertEqual(new_job.job_type, 'inventory_set_quantities')
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_non_failed_clean_outcome(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=1,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'uncertain',
+            evidence={'user_errors': [
+                {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+            ]},
+        )
+        locked = job.try_lock_for_update()
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_missing_user_errors_evidence(self):
+        locked = self._make_stale_cas_predecessor(
+            cas_retry_ordinal=1, evidence={},
+        )
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_non_list_user_errors_evidence(self):
+        locked = self._make_stale_cas_predecessor(
+            cas_retry_ordinal=1, evidence={'user_errors': 'not-a-list'},
+        )
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_non_dict_entry_in_evidence(self):
+        locked = self._make_stale_cas_predecessor(
+            cas_retry_ordinal=1,
+            evidence={'user_errors': ['CHANGE_FROM_QUANTITY_STALE']},
+        )
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_wrong_code(self):
+        locked = self._make_stale_cas_predecessor(
+            cas_retry_ordinal=1,
+            evidence={'user_errors': [
+                {'code': 'ITEM_NOT_STOCKED_AT_LOCATION', 'field': []},
+            ]},
+        )
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
+
+    def test_create_cas_successor_job_denies_substring_code_match(self):
+        """No substring or generic-container membership is used -- a
+        code merely containing the stale marker as a substring is not
+        an exact structured entry."""
+        locked = self._make_stale_cas_predecessor(
+            cas_retry_ordinal=1,
+            evidence={'user_errors': [
+                {'code': 'CHANGE_FROM_QUANTITY_STALE_VARIANT', 'field': []},
+            ]},
+        )
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._create_cas_successor_job(locked, self.binding)
 
     # ------------------------------------------------------------------
     # Structured user-error evidence shape (PR #182 comment 5029906989
@@ -2986,6 +3125,121 @@ class TestInventoryPushMechanics(TransactionCase):
         self.assertEqual(
             consequence['error_class'], 'data_shape_schema_mismatch',
         )
+
+    # ------------------------------------------------------------------
+    # Strict userErrors container validation (PR #182 comment
+    # 5030514895 item 2): `payload.get('userErrors') or []` /
+    # `result.get('user_errors') or []` silently turned a malformed
+    # falsey container (`{}`, `''`, `0`, `False`, `None`, a tuple) into
+    # an apparently valid empty list -- the container's shape must be
+    # validated before its emptiness is ever checked.
+    # ------------------------------------------------------------------
+
+    MALFORMED_FALSEY_USER_ERROR_CONTAINERS = (None, {}, '', 0, False, ())
+
+    def test_set_quantities_malformed_falsey_user_errors_container_is_ambiguous(self):
+        for malformed in self.MALFORMED_FALSEY_USER_ERROR_CONTAINERS:
+            with self.subTest(malformed=repr(malformed)):
+                result = {
+                    'user_errors': malformed,
+                    'adjustment_group': None,
+                    'requested_target': 10, 'evidence': {},
+                }
+                consequence = self.Service._classify_direct_set_quantities(
+                    result
+                )
+                self.assertEqual(
+                    consequence['observed_outcome'], 'uncertain',
+                )
+                self.assertEqual(
+                    consequence['error_class'],
+                    'data_shape_schema_mismatch',
+                )
+
+    def test_activate_malformed_falsey_user_errors_container_is_ambiguous(self):
+        for malformed in self.MALFORMED_FALSEY_USER_ERROR_CONTAINERS:
+            with self.subTest(malformed=repr(malformed)):
+                result = {
+                    'user_errors': malformed,
+                    'inventory_level': None,
+                    'evidence': {},
+                }
+                consequence = self.Service._classify_direct_activate(result)
+                self.assertEqual(
+                    consequence['observed_outcome'], 'uncertain',
+                )
+                self.assertEqual(
+                    consequence['error_class'],
+                    'data_shape_schema_mismatch',
+                )
+
+    def test_set_quantities_valid_payload_with_malformed_user_errors_stays_uncertain(self):
+        """The exact P0 defect (PR #182 comment 5030514895 item 2): a
+        malformed falsey `userErrors` container alongside an otherwise
+        fully valid success payload must never be coerced into `[]`
+        and trusted as a clean success -- it must never reach
+        `_is_valid_set_quantities_success` at all."""
+        for malformed in ({}, '', 0, False):
+            with self.subTest(malformed=repr(malformed)):
+                result = {
+                    'user_errors': malformed,
+                    'adjustment_group': {
+                        'reason': 'correction',
+                        'referenceDocumentUri': 'uri-1',
+                        'changes': [{
+                            'name': 'available', 'delta': 5,
+                            'quantityAfterChange': 10,
+                        }],
+                    },
+                    'requested_target': 10, 'requested_reason': 'correction',
+                    'requested_reference_uri': 'uri-1', 'evidence': {},
+                }
+                consequence = self.Service._classify_direct_set_quantities(
+                    result
+                )
+                self.assertEqual(
+                    consequence['observed_outcome'], 'uncertain',
+                )
+                self.assertNotEqual(consequence['action'], 'succeed')
+
+    def test_activate_valid_payload_with_malformed_user_errors_stays_uncertain(self):
+        """The exact P0 defect (PR #182 comment 5030514895 item 2),
+        activation domain: a malformed falsey `userErrors` container
+        alongside an otherwise fully valid `InventoryLevel` success
+        payload must never be coerced into `[]` and trusted as a clean
+        success."""
+        for malformed in ({}, '', 0, False):
+            with self.subTest(malformed=repr(malformed)):
+                result = {
+                    'user_errors': malformed,
+                    'inventory_level': {
+                        'id': 'gid://shopify/InventoryLevel/999',
+                        'item': {'id': self.binding.shopify_inventory_item_gid},
+                        'location': {'id': self.mapping.shopify_gid},
+                        'quantities': [{'name': 'available', 'quantity': 0}],
+                    },
+                    'requested_item_gid': self.binding.shopify_inventory_item_gid,
+                    'requested_location_gid': self.mapping.shopify_gid,
+                    'evidence': {},
+                }
+                consequence = self.Service._classify_direct_activate(result)
+                self.assertEqual(
+                    consequence['observed_outcome'], 'uncertain',
+                )
+                self.assertNotEqual(consequence['action'], 'succeed')
+
+    def test_transport_source_never_defaults_user_errors_container_to_empty_list(self):
+        """Source guard (task §8): neither transport adapter may use
+        `payload.get('userErrors') or []`, and neither classifier may
+        use `result.get('user_errors') or []` -- either pattern
+        silently manufactures an empty list out of a malformed falsey
+        container before its shape is ever validated."""
+        source, tree = self._service_source_tree()
+        del tree
+        self.assertNotIn("payload.get('userErrors') or []", source)
+        self.assertNotIn("result.get('user_errors') or []", source)
+        self.assertNotIn('payload.get("userErrors") or []', source)
+        self.assertNotIn('result.get("user_errors") or []', source)
 
     # ------------------------------------------------------------------
     # `_read_shopify_inventory_pair` response-shape hardening (PR #182
