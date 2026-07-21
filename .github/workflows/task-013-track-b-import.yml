@@ -1,0 +1,77 @@
+name: Task 013 Track B exact import
+
+on:
+  push:
+    branches:
+      - 'chatgpt/task-013-track-b-import'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-exact-tested-commits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout isolated import branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and verify exact runtime bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .control-room/task-013-track-b/part{00..08} > /tmp/track-b.bundle.b64
+          test "$(wc -c < /tmp/track-b.bundle.b64)" = "34824"
+          base64 --decode /tmp/track-b.bundle.b64 > /tmp/track-b.bundle
+          test "$(stat -c %s /tmp/track-b.bundle)" = "26116"
+          echo '92cc3272e7821a57029d0415d327e71161ecee74f52110315b106b1769c4e44e  /tmp/track-b.bundle' | sha256sum --check --strict
+          git bundle verify /tmp/track-b.bundle
+
+      - name: Verify identity, ancestry, commit sequence, and exact scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='6c221798409555597a432ccfa9959ee621f324ef'
+          CANDIDATE='18ea5d729b6283c5a2af6d04a5285353aacd9ff9'
+          TARGET='refs/heads/claude/wave-3-task-013-2g0ul0'
+
+          git fetch /tmp/track-b.bundle 'refs/heads/claude/wave-3-task-013-2g0ul0:refs/remotes/track-b/candidate'
+          test "$(git rev-parse refs/remotes/track-b/candidate)" = "$CANDIDATE"
+          test "$(git rev-parse "$CANDIDATE~3")" = "$BASE"
+          test "$(git rev-list --count "$BASE..$CANDIDATE")" = '3'
+
+          cat > /tmp/expected-commits <<'EOF'
+          a700e94f8091793c5595ef87e6126860a8dca4c9
+          973e4e8de6ac26b6c62ef786b4d9a1c2d478da86
+          18ea5d729b6283c5a2af6d04a5285353aacd9ff9
+          EOF
+          git rev-list --reverse "$BASE..$CANDIDATE" > /tmp/actual-commits
+          diff -u /tmp/expected-commits /tmp/actual-commits
+
+          cat > /tmp/expected-files <<'EOF'
+          addons/shopify_connector_core/tests/test_mutation_source_guards.py
+          addons/shopify_connector_inventory/tests/__init__.py
+          addons/shopify_connector_inventory/tests/test_inventory_concurrency.py
+          docs/01-research/research-handoff.md
+          docs/05-qa/architecture-review-log.md
+          docs/05-qa/task-013-inventory-sync-validation-results.md
+          docs/07-implementation-plan/mvp-program-state.md
+          EOF
+          git diff --name-only "$BASE..$CANDIDATE" | sort > /tmp/actual-files
+          sort /tmp/expected-files > /tmp/expected-files.sorted
+          diff -u /tmp/expected-files.sorted /tmp/actual-files
+
+          REMOTE_HEAD="$(git ls-remote --heads origin "$TARGET" | awk '{print $1}')"
+          test "$REMOTE_HEAD" = "$BASE"
+
+      - name: Fast-forward existing PR branch to exact tested head
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE='18ea5d729b6283c5a2af6d04a5285353aacd9ff9'
+          TARGET='refs/heads/claude/wave-3-task-013-2g0ul0'
+          git push origin "$CANDIDATE:$TARGET"
+          test "$(git ls-remote --heads origin "$TARGET" | awk '{print $1}')" = "$CANDIDATE"
