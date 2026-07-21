@@ -1,3 +1,40 @@
+### Task 013 exact-head Odoo.sh runtime validation + consolidated correction — same draft PR (2026-07-21)
+
+- **Branch / PR:** `claude/wave-3-task-013-2g0ul0`, PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) → `mvp/program-integration`
+  (base `8f5f421`, unchanged). Same draft PR; not a new branch/PR.
+- **Authority:** PR #182 comment `5030781330` (exact-head runtime validation
+  + consolidated correction; Odoo/PostgreSQL only, no live Shopify mutation).
+- **Environment:** Odoo.sh build `35193596`, Odoo 19.0 / PostgreSQL 16.14,
+  single injected dev DB. **First genuine runtime** of Task 013 (all prior
+  cycles were static-only). GitHub API unavailable in-session (`gh` absent).
+- **Campaign A (submitted head `26acf2b`, no edits):** focused inventory suite
+  **4 failed + 38 errors of 237**; core/product/sale regression 1F+97E
+  (environmental base-field NOT NULL, out of scope).
+- **Corrections (commit `2bc6bdb`, `addons/shopify_connector_inventory/**` only):**
+  the known review-release P1 (`_recheck_inventory_pair` forward-`job_id`
+  resolution) plus four runtime-exposed production defects — `operation_scope_key`
+  never cleared before same-scope successor insert (P0, 5 sites), blocked-job
+  supersede leaving `manual_review_subreason` set, coalescing catching only
+  `ValidationError` instead of the raw `IntegrityError`, and the operator
+  `free_qty` read not being sudo'd — and ~28 never-run fixture defects. Added the
+  explicit known-P1 reproduction test.
+- **Campaign B (corrected head `2bc6bdb`):** focused inventory **0 failed / 0
+  errors of 238**; full-install, upgrade, uninstall→reinstall (zero residue),
+  security matrix, and single-transaction suites all green.
+- **Recommendation:** **RUNTIME GREEN — READY FOR CONTROL-ROOM REVIEW.**
+  Residuals: core mutation-source-guard false-positive (control-room decision);
+  no genuine independent-connection concurrency test; core/product/sale base-suite
+  environmental failures (out of scope). PR stays draft/unmerged/not-ready; no
+  self-acceptance; no protected ref changed; no live Shopify mutation; Task 013B
+  not started. Full evidence:
+  [`../05-qa/task-013-inventory-sync-validation-results.md`](../05-qa/task-013-inventory-sync-validation-results.md)
+  §15.
+- **Next action:** control-room review of `2bc6bdb`; decide the mutation-source-guard
+  seam; then the separately-gated live Shopify dev-store mutation validation.
+
+---
+
 ### Task 013 fourth correction cycle — tiny P0 patch per delta control-room review, same draft PR — compact handoff (2026-07-21)
 
 - **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR

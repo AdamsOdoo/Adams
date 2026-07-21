@@ -4,6 +4,28 @@
 
 ## Current status
 
+**TASK 013 (PR #182) — FIRST GENUINE ODOO.SH RUNTIME VALIDATION COMPLETED (2026-07-21).**
+On Odoo.sh build `35193596` (Odoo 19.0 / PostgreSQL 16.14), the exact submitted
+head `26acf2b` was run for the first time at genuine runtime (all prior cycles
+were static-only — see the validation record §14/§15). Campaign A exposed
+**42/237 inventory tests failing**, including the known review-release P1 and
+four further runtime-only production defects (operation_scope_key never cleared
+before same-scope successor insert → P0; blocked-job supersede left
+`manual_review_subreason` set; coalescing caught the wrong exception; operator
+`free_qty` read not sudo'd), plus ~28 never-executed-at-runtime fixture defects.
+A single consolidated correction (`2bc6bdb`, `addons/shopify_connector_inventory/**`
+only) brings the focused inventory suite to **0 failed / 0 errors of 238**, with
+full-install, upgrade, uninstall→reinstall (zero residue), security-matrix and
+(single-transaction) suites all green. **Recommendation: RUNTIME GREEN — READY
+FOR CONTROL-ROOM REVIEW.** Residuals (control-room): a core mutation-source-guard
+false-positive on inventory's reviewed prepare/transport split (needs a core
+allowlist or a literal-relocation decision); no genuine independent-connection
+concurrency test exists; unchanged core/product/sale base-suite environmental
+NOT-NULL failures (out of scope). PR #182 stays **draft, unmerged, not marked
+ready**; no self-acceptance; no live Shopify mutation. Full evidence:
+[`../05-qa/task-013-inventory-sync-validation-results.md`](../05-qa/task-013-inventory-sync-validation-results.md)
+§15.
+
 **WAVE 3 GATE B ACCEPTED — MERGE-CLOSURE NORMALIZATION APPLIED AND MERGE AUTHORIZED (2026-07-19, PR [#179](https://github.com/AdamsOdoo/Adams/pull/179)).**
 The control room reviewed Revision 3 (immediately below) at head
 `565d3daefdf0c87c46ffaf7a6d52f63841b1e770` and, by PR #179 comment

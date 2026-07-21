@@ -555,3 +555,139 @@ before the next cycle:**
 - **No live Shopify mutation** occurred — no Odoo/Odoo.sh process ran in
   this workspace, so no live transport call of any kind (read or
   mutation) was possible.
+
+---
+
+## 15. Exact-head Odoo.sh runtime validation (2026-07-21) — FIRST GENUINE RUNTIME
+
+> This section supersedes all prior "STATICALLY VERIFIED" / "EXECUTION
+> PENDING" claims for the items it covers. Every prior cycle (see §14:
+> *"No Odoo.sh run occurred"*) was static-analysis only; this is the
+> **first genuine Odoo 19 / PostgreSQL execution** of the Task 013
+> surface. Runtime authorization: PR #182 comment `5030781330`.
+
+### 15.1 Runtime environment (identity gate — PASS)
+
+| Item | Value |
+| --- | --- |
+| Repo / branch | `AdamsOdoo/Adams` @ `claude/wave-3-task-013-2g0ul0` |
+| Submitted head (Campaign A) | `26acf2bbe1fe3d325638c206ae16a05f047f9620` (verified `HEAD`) |
+| Base | `mvp/program-integration@8f5f421e2110c2e805460ea75fb519e48013e0f7` (verified ancestor) |
+| Corrected head (Campaign B) | `2bc6bdb5fb43bcdf69e760d20ae07b7db8fd0ba3` |
+| Odoo.sh build | `35193596` |
+| Database | `adamsmen-claude-wave-3-task-013-2g0ul0-35193596` (single injected dev DB) |
+| Odoo | `19.0` |
+| PostgreSQL | `16.14` |
+| GitHub API | **unavailable** in-session (`gh` absent, unauthenticated) — live PR state, comment `5030781330` full text, and PR-body update could not be performed from this workspace; PR governance actions deferred to the control room. |
+| DB isolation | Cannot `CREATE DATABASE` (role locked; `odoo-bin` hard-injects `--database`). Single isolated dev DB used for all campaigns; fresh-install, upgrade and same-DB runs classified accordingly below. |
+
+### 15.2 Campaign A — exact-head baseline (no edits)
+
+Command: `odoo-bin -u shopify_connector_inventory --test-enable --test-tags
+/shopify_connector_inventory --stop-after-init --no-http` (build install had
+already fresh-installed all four connector modules from the exact head).
+
+- **Focused inventory suite: 4 failed, 38 errors of 237 tests** (EXECUTED).
+- Cross-domain regression (`-u core,product,sale --test-enable`): core
+  **1 failed + 12 errors / 243**, product **0 failed + 85 errors / 163**,
+  sale **0 / 232** (EXECUTED).
+
+### 15.3 Complete baseline failure-classification table
+
+The 42 inventory failures collapse to these root causes (all owned by Task 013,
+all in `addons/shopify_connector_inventory/**`):
+
+| # tests | Failure signature | Class | Root cause | Correction |
+| --- | --- | --- | --- | --- |
+| 11 | `not eligible for release` | **production (known P1)** | `_recheck_inventory_pair` read `blocked_job.mutation_attempt_id` (reconciliation-owned, NULL for ordinary jobs) | resolve via forward `job_id`, require exactly one |
+| 3 | `UniqueViolation` scope (reconciliation replacements) | **production (P0)** | `_handoff_supersede` `flush_recordset(['state'])` never clears computed `operation_scope_key` before same-scope successor insert | flush `['state','operation_scope_key']` (5 occurrences) |
+| 13 (exposed by P1 fix) | `manual_review_subreason must be empty…` | **production (P1)** | supersede of a *blocked* job to `cancelled` left the subreason set | clear `manual_review_subreason` on cancel |
+| 1 | `UniqueViolation` (coalesce) | **production (P1)** | `_try_enqueue_push_sync` caught only `ValidationError`; the scope constraint surfaces as a raw psycopg2 `IntegrityError` on an inline savepoint flush | pre-check + catch `IntegrityError`/constraint-name (mirrors core enqueue) |
+| 1 | `stock.location AccessError` | **production (P1)** | `_refresh_pending_target` read `free_qty` in the operator's ACL context | sudo the internal quantity read |
+| 9 | store-state `manual_sync` requires connected | **fixture** | cache-sync `setUpClass` left store `setup_incomplete` | connect the store |
+| 4 | `trigger_origin` required for `odoo_event` | **fixture** | helper omitted `trigger_origin` | add `inventory_stock_change` |
+| 2 | CAS `requires … structured user_errors` | **fixture** | attempt recorded without `CHANGE_FROM_QUANTITY_STALE` evidence | record the stale evidence |
+| 2 | `'running' != 'blocked_manual_review'` | **fixture** | domain callback invoked without core's prior block transition | block first (as core does) |
+| 1 | `'not_applied' != 'inconclusive'` (ABA) | **fixture** | `updated_at` not strictly later than second-resolution `transport_at` | `transport_at + 1min` |
+| 1 | `False is not true` (verified-noop) | **fixture** | push_sync phase didn't pin the recomputed target | mock `_refresh_pending_target` |
+| 3 | `UniqueViolation` scope (loop tests) | **fixture** | two non-terminal pair jobs held simultaneously | terminalize between iterations |
+| 1 | reconciliation `requires one exact attempt` | **fixture** | bare `enqueue` of a reconciliation job | use `_ensure_reconciliation_job` |
+| 1 | `Invalid field 'name' in 'stock.move'` | **fixture (Odoo 19)** | `stock.move.name` removed | drop the field |
+| 2 | `res_company.inventory_period` NOT NULL / invalid field | **fixture (env ordering)** | required base field contributed by a module that sorts after this one; absent at `at_install` | run cross-company tests `post_install` + assert the mapping-level company guard |
+
+### 15.4 Known-P1 reproduction (§7) — RED→GREEN, EXECUTED
+
+- Added `test_release_resolves_attempt_by_forward_job_id_not_reconciliation_link`:
+  asserts `blocked_job.mutation_attempt_id` is unset, the attempt resolves by
+  forward `job_id`, the release yields exactly one ordinal-0 `inventory_push_sync`
+  successor, the predecessor is cancelled and atomically linked, and no mutation
+  attempt (no transport) is created on the successor.
+- Pre-fix (Campaign A): every positive-release test failed with *"not eligible
+  for release"* (RED, EXECUTED). Post-fix (Campaign B): all pass (GREEN, EXECUTED).
+- All §7 negative cases already covered and green: location-missing / validation
+  release succeed; CAS-exhaustion requires the exact structured stale code;
+  malformed/substring stale refused; uncertain / store-identity-mismatch /
+  operator / empty-reason refused; PII/secret-safe reason (email/phone/token).
+
+### 15.5 Consolidated corrections (commit `2bc6bdb`)
+
+Production (`models/shopify_connector_inventory_service.py`): P1 attempt
+resolution; five `flush_recordset(['state','operation_scope_key'])`; clear
+`manual_review_subreason` on supersede-cancel; coalesce pre-check + correct
+`IntegrityError` handling; sudo the operator `free_qty` read. Fixtures: as per
+the table above. No core/product/sale change.
+
+### 15.6 Campaign B — corrected-head rerun (`2bc6bdb`)
+
+| Sub-campaign | Result | Class |
+| --- | --- | --- |
+| Focused inventory suite | **0 failed, 0 errors of 238 tests** | EXECUTED — PASS |
+| Full 4-module suite (fresh install via `-i`, all modules) | inventory **0/238**; core/product/sale **1 failed + 97 errors** (unchanged, environmental — see §15.7) | EXECUTED — PASS (inventory) |
+| Upgrade path (`-u shopify_connector_inventory`) | fields/constraints/registry/cron/security load; focused suite green | EXECUTED — PASS |
+| Lifecycle / residue | uninstall → **0 residual tables / crons / ir_model_data / models**; reinstall (`-i`) → state `installed`, 2 tables + 1 cron restored, **0/238**, no collisions | EXECUTED — PASS |
+| Security role matrix (§5.6) | 26 tests green: operator/reviewer/admin/auditor denials, protected-field & CAS-ordinal spoof denial, unauthorized-release denial, sanctioned-action-only release, company consistency, PII/secret redaction | EXECUTED — PASS |
+| Concurrency (§5.7) | 24 `cr.savepoint()` **single-transaction ORM** tests green; **0 genuine independent-connection / multi-cursor / worker tests exist** | EXECUTED (single-transaction) — **NOT an independent-transaction concurrency proof** |
+
+Every Campaign A owned failure has a direct green Campaign B result.
+
+### 15.7 Out-of-scope / environmental (documented, NOT corrected)
+
+- **core 13 + product 85 = 98 base-suite failures** persist identically before
+  and after the correction: `product_template.tracking` NOT NULL (×83) and
+  `res_partner.autopost_bills` NOT NULL (×14). These occur in the
+  **core/product/sale test suites** creating base records; Task 013 is purely
+  additive and never touches those models or suites (confirmed: identical count
+  pre/post). A plain shell `create` of these base records succeeds (defaults
+  apply) — the failures are a base-suite × Odoo-19-required-field × module-load
+  interaction, not a connector defect, and are **outside the authorized paths**.
+- **1 core static-guard finding referencing inventory** —
+  `core/tests/test_mutation_source_guards.py::test_mutation_literals_require_guarded_transport_or_selftest`
+  flags `_prepare_preconditions_set_quantities` / `_prepare_preconditions_activate`
+  because they hold the `mutation …(` operation literal while the guarded
+  `execute_business(mutation_context=…)` call lives in the sibling
+  `_transport_*` method (reviewed prepare/transport separation). The mutation
+  **is** genuinely guarded (verified: transport is `client.execute_business`,
+  never `.execute`/`._send`) — a **static-guard false-positive**, present on the
+  submitted head. Fixing it requires either a **core** guard allowlist update
+  (forbidden path) or relocating the reviewed operation-string literals into the
+  `_transport_*` methods (accepted-architecture change). Per §8 this is a
+  **core-seam decision deferred to the control room**; not corrected here.
+
+### 15.8 Runtime posture
+
+- Remaining **P0**: none (the scope-collision P0 is fixed and rerun-proven).
+- Remaining **P1**: none in inventory paths (known P1 + the four runtime-exposed
+  production defects all fixed and rerun-proven).
+- Remaining **P2 / backlog**: (a) the core mutation-source-guard false-positive
+  (control-room decision); (b) no genuine independent-connection concurrency
+  test exists for the pair-serialization / lock / 40001 paths — recommend adding
+  real multi-cursor fixtures; (c) core/product/sale base-suite environmental
+  failures (owned by those modules).
+- **External evidence still pending**: live Shopify dev-store mutation gate
+  (`inventoryActivate` / `inventorySetQuantities`) — explicitly out of scope for
+  this Odoo/PostgreSQL-only session; GitHub PR-body/state update (no API access).
+
+### 15.9 Confirmations
+
+PR #182 remains **draft, unmerged, not marked ready**; no self-acceptance;
+no protected reference changed; no live Shopify mutation; Task 013B not started.
