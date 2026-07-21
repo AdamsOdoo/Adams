@@ -4,13 +4,18 @@ import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
-from odoo import fields
+from odoo import SUPERUSER_ID, api, fields
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.sql_db import db_connect
+from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
+)
+from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_service import (
+    InventoryPreC2FailClosedError,
 )
 
 
@@ -683,7 +688,10 @@ class TestInventoryPushMechanics(TransactionCase):
             'inventory_set_quantities', cas_retry_ordinal=3,
         )
         attempt = self._make_attempt(job, token)
-        attempt._record_direct_outcome('failed_clean')
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_error_codes': ['CHANGE_FROM_QUANTITY_STALE']},
+        )
         self._block_job_with(
             job, 'concurrency_race_conflict', 'binding_conflict',
         )
@@ -695,6 +703,79 @@ class TestInventoryPushMechanics(TransactionCase):
         self.assertEqual(job.cancel_reason, 'manual_review_release')
         new_job = job.superseded_by_job_id
         self.assertEqual(new_job.job_type, 'inventory_push_sync')
+
+    # ------------------------------------------------------------------
+    # CAS-exhaustion release requires the structured stale code (PR #182
+    # comment 5028910116 item 8)
+    # ------------------------------------------------------------------
+
+    def test_release_denied_cas_exhaustion_without_stale_code(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('failed_clean')
+        self._block_job_with(
+            job, 'concurrency_race_conflict', 'binding_conflict',
+        )
+        with self.assertRaises(UserError):
+            self.binding.with_user(
+                self.user_reviewer
+            ).action_recheck_inventory_pair('reason')
+
+    def test_release_denied_cas_exhaustion_with_different_code(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_error_codes': ['ITEM_NOT_STOCKED_AT_LOCATION']},
+        )
+        self._block_job_with(
+            job, 'concurrency_race_conflict', 'binding_conflict',
+        )
+        with self.assertRaises(UserError):
+            self.binding.with_user(
+                self.user_reviewer
+            ).action_recheck_inventory_pair('reason')
+
+    def test_release_evidence_immutable_through_release(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_error_codes': ['CHANGE_FROM_QUANTITY_STALE']},
+        )
+        self._block_job_with(
+            job, 'concurrency_race_conflict', 'binding_conflict',
+        )
+        self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+            'CAS exhausted.'
+        )
+        attempt.invalidate_recordset()
+        self.assertEqual(
+            attempt.remote_evidence_refs['direct']['user_error_codes'],
+            ['CHANGE_FROM_QUANTITY_STALE'],
+        )
+
+    def test_release_reason_no_message_text_routing(self):
+        """Eligibility is decided from structured evidence only -- never
+        by matching the free-text release reason string."""
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('failed_clean')
+        self._block_job_with(
+            job, 'concurrency_race_conflict', 'binding_conflict',
+        )
+        with self.assertRaises(UserError):
+            self.binding.with_user(
+                self.user_reviewer
+            ).action_recheck_inventory_pair('CHANGE_FROM_QUANTITY_STALE')
 
     def test_release_never_rewrites_outcome_or_disposition(self):
         job, token = self._make_mutation_job('inventory_set_quantities')
@@ -777,6 +858,87 @@ class TestInventoryPushMechanics(TransactionCase):
             ).action_recheck_inventory_pair('reason')
 
     # ------------------------------------------------------------------
+    # PII-safe (not just secret-safe) review-reason redaction (PR #182
+    # comment 5028910116 item 11)
+    # ------------------------------------------------------------------
+
+    def _block_releasable_job(self):
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('failed_clean')
+        self._block_job_with(
+            job, 'inventory_location_missing', 'inventory_location_missing',
+        )
+        return job
+
+    def test_release_reason_uses_audit_safe_helper(self):
+        self._block_releasable_job()
+        with patch.object(
+            type(self.binding), '_audit_safe_reason',
+            wraps=self.binding._audit_safe_reason,
+        ) as wrapped:
+            self.binding.with_user(
+                self.user_reviewer
+            ).action_recheck_inventory_pair('Ordinary release reason.')
+        wrapped.assert_called_once()
+
+    def test_release_reason_redacts_email(self):
+        self._block_releasable_job()
+        logger_name = (
+            'odoo.addons.shopify_connector_inventory.models.'
+            'shopify_connector_inventory_service'
+        )
+        with self.assertLogs(logger_name, level='INFO') as captured:
+            self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+                'Escalated by ops@example.com after physical count.'
+            )
+        joined = '\n'.join(captured.output)
+        self.assertNotIn('ops@example.com', joined)
+        self.assertIn('redacted-email', joined)
+
+    def test_release_reason_redacts_phone(self):
+        self._block_releasable_job()
+        logger_name = (
+            'odoo.addons.shopify_connector_inventory.models.'
+            'shopify_connector_inventory_service'
+        )
+        with self.assertLogs(logger_name, level='INFO') as captured:
+            self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+                'Confirmed by phone, call +1 555 123 4567 for details.'
+            )
+        joined = '\n'.join(captured.output)
+        self.assertNotIn('555 123 4567', joined)
+        self.assertIn('redacted-phone', joined)
+
+    def test_release_reason_redacts_token(self):
+        self._block_releasable_job()
+        logger_name = (
+            'odoo.addons.shopify_connector_inventory.models.'
+            'shopify_connector_inventory_service'
+        )
+        with self.assertLogs(logger_name, level='INFO') as captured:
+            self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+                'Reproduced with token shpat_abcdef0123456789 in the log.'
+            )
+        joined = '\n'.join(captured.output)
+        self.assertNotIn('shpat_abcdef0123456789', joined)
+
+    def test_release_reason_retains_ordinary_text(self):
+        self._block_releasable_job()
+        logger_name = (
+            'odoo.addons.shopify_connector_inventory.models.'
+            'shopify_connector_inventory_service'
+        )
+        with self.assertLogs(logger_name, level='INFO') as captured:
+            self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+                'Location now confirmed stocked after physical count.'
+            )
+        joined = '\n'.join(captured.output)
+        self.assertIn(
+            'Location now confirmed stocked after physical count', joined,
+        )
+
+    # ------------------------------------------------------------------
     # Static/AST guards
     # ------------------------------------------------------------------
 
@@ -800,6 +962,105 @@ class TestInventoryPushMechanics(TransactionCase):
                     node.value, WITHDRAWN_ERROR_CLASS_VALUES,
                     'Withdrawn error_class literal found: %r' % node.value,
                 )
+
+    # ------------------------------------------------------------------
+    # Additional static/AST guards for this correction cycle (PR #182
+    # comment 5028910116 §19)
+    # ------------------------------------------------------------------
+
+    def test_no_synthetic_inventory_level_gid_pattern(self):
+        """The synthetic `<item_gid>:<location_gid>` composite identity
+        must never be constructed anywhere in the module again -- only
+        the real, observed InventoryLevel GID is ever persisted to
+        `shopify_gid` (item 2)."""
+        source, _tree = self._service_source_tree()
+        self.assertNotIn("'%s:%s'", source)
+
+    def test_exact_reconciliation_identity_format_present(self):
+        source, _tree = self._service_source_tree()
+        self.assertIn("'reconcile:%s:%s:%s' % (", source)
+
+    def test_handoff_supersede_signature_has_no_ordinal_parameter(self):
+        """No caller may request an arbitrary CAS ordinal jump -- the
+        parameter itself must not exist on `_handoff_supersede` (item
+        7)."""
+        _source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_handoff_supersede'
+        )
+        arg_names = {arg.arg for arg in method.args.args + method.args.kwonlyargs}
+        self.assertNotIn('cas_retry_ordinal', arg_names)
+        self.assertIn('is_cas_replacement', arg_names)
+
+    def test_location_sync_uses_validated_response_helper(self):
+        """The location-sync handler must route every page through the
+        fail-closed shape validator, never default-empty coercion
+        (item 10)."""
+        source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_handle_inventory_location_sync'
+        )
+        method_source = ast.get_source_segment(source, method) or ''
+        self.assertIn('_validate_locations_response', method_source)
+        self.assertNotIn("get('data') or {}", method_source)
+        self.assertNotIn("get('locations') or {}", method_source)
+        self.assertNotIn("get('edges') or []", method_source)
+
+    def test_review_release_uses_audit_safe_reason_not_bare_redact(self):
+        """The review-release path must use the PII-safe audit helper,
+        never bare secret-only `redact()` (item 11)."""
+        source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_recheck_inventory_pair'
+        )
+        method_source = ast.get_source_segment(source, method) or ''
+        self.assertIn('_audit_safe_reason', method_source)
+        self.assertNotIn('redact(', method_source)
+
+    def test_push_sync_handoffs_acquire_binding_row_lock(self):
+        """Both orchestration->mutation handoff branches must acquire
+        the binding's row lock before terminalizing (item 12)."""
+        source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_handle_inventory_push_sync'
+        )
+        method_source = ast.get_source_segment(source, method) or ''
+        self.assertEqual(
+            method_source.count('binding.try_lock_for_update()'), 2,
+            'Both handoff-A branches must acquire the binding row lock.',
+        )
+
+    def test_reconcile_handler_reraises_before_wrapping_generic_exception(self):
+        """Exception ordering, specific to general (LL-013, item 9),
+        WITHIN `_handle_inventory_mutation_reconcile` itself: the
+        `except JobHandlerError: raise` / `except
+        PG_CONCURRENCY_EXCEPTIONS_TO_RETRY: raise` branches must appear
+        textually before the generic `except Exception` branch that
+        wraps a transient read failure."""
+        source, tree = self._service_source_tree()
+        method = next(
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_handle_inventory_mutation_reconcile'
+        )
+        method_source = ast.get_source_segment(source, method) or ''
+        reraise_index = method_source.index('except JobHandlerError:')
+        pg_reraise_index = method_source.index(
+            'except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:'
+        )
+        generic_index = method_source.index(
+            "'The reconciliation read failed transiently"
+        )
+        self.assertLess(reraise_index, generic_index)
+        self.assertLess(pg_reraise_index, generic_index)
 
     def test_no_quantities_array_length_greater_than_one(self):
         with patch.object(
@@ -965,21 +1226,50 @@ class TestInventoryPushMechanics(TransactionCase):
             type(self.Service), '_read_shopify_inventory_pair',
             return_value={
                 'tracked': True, 'item_exists': True, 'level_exists': True,
-                'available': 0.0, 'updated_at': False,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/1',
+                'available': 0, 'updated_at': False,
                 'store_identity': self.store.shop_domain,
             },
         ), patch.object(
             type(self.Service), '_refresh_pending_target',
             return_value=(10.5, 10.5),
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
                 self.Service._prepare_preconditions_set_quantities(
                     self._prepare_set_quantities_snapshot(job), {},
                 )
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(ctx.exception.subreason, 'binding_conflict')
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'blocked_manual_review')
-        self.assertEqual(job.error_class, 'data_shape_schema_mismatch')
-        self.assertEqual(job.manual_review_subreason, 'binding_conflict')
+        # No domain-side commit (LL-005 / item 3): prepare_preconditions
+        # alone never writes to or terminalizes the job.
+        self.assertEqual(job.state, 'running')
+        self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
+            ('job_id', '=', job.id),
+        ]))
+
+    def test_fresh_pre_c2_missing_item_blocks_no_attempt(self):
+        """A stale/recreated InventoryItem identity fails closed through
+        binding_conflict, never treated as a missing level (PR #182
+        comment 5028910116 item 1)."""
+        job, _token = self._make_mutation_job('inventory_set_quantities')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': None, 'item_exists': False, 'level_exists': False,
+                'inventory_level_gid': None,
+                'available': None, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
+                self.Service._prepare_preconditions_set_quantities(
+                    self._prepare_set_quantities_snapshot(job), {},
+                )
+        self.assertEqual(ctx.exception.error_class, 'shopify_user_errors_validation')
+        self.assertEqual(ctx.exception.subreason, 'binding_conflict')
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'running')
         self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
             ('job_id', '=', job.id),
         ]))
@@ -990,20 +1280,21 @@ class TestInventoryPushMechanics(TransactionCase):
             type(self.Service), '_read_shopify_inventory_pair',
             return_value={
                 'tracked': True, 'item_exists': True, 'level_exists': False,
+                'inventory_level_gid': None,
                 'available': None, 'updated_at': False,
                 'store_identity': self.store.shop_domain,
             },
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
                 self.Service._prepare_preconditions_set_quantities(
                     self._prepare_set_quantities_snapshot(job), {},
                 )
-        job.invalidate_recordset()
-        self.assertEqual(job.state, 'blocked_manual_review')
-        self.assertEqual(job.error_class, 'inventory_location_missing')
+        self.assertEqual(ctx.exception.error_class, 'inventory_location_missing')
         self.assertEqual(
-            job.manual_review_subreason, 'inventory_location_missing',
+            ctx.exception.subreason, 'inventory_location_missing',
         )
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'running')
         self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
             ('job_id', '=', job.id),
         ]))
@@ -1014,17 +1305,18 @@ class TestInventoryPushMechanics(TransactionCase):
             type(self.Service), '_read_shopify_inventory_pair',
             return_value={
                 'tracked': False, 'item_exists': True, 'level_exists': True,
-                'available': 5.0, 'updated_at': False,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/1',
+                'available': 5, 'updated_at': False,
                 'store_identity': self.store.shop_domain,
             },
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
                 self.Service._prepare_preconditions_set_quantities(
                     self._prepare_set_quantities_snapshot(job), {},
                 )
+        self.assertEqual(ctx.exception.error_class, 'inventory_location_missing')
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'blocked_manual_review')
-        self.assertEqual(job.error_class, 'inventory_location_missing')
+        self.assertEqual(job.state, 'running')
         self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
             ('job_id', '=', job.id),
         ]))
@@ -1035,20 +1327,97 @@ class TestInventoryPushMechanics(TransactionCase):
             type(self.Service), '_read_shopify_inventory_pair',
             return_value={
                 'tracked': True, 'item_exists': True, 'level_exists': True,
-                'available': 5.0, 'updated_at': False,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/1',
+                'available': 5, 'updated_at': False,
                 'store_identity': 'a-different-shop.myshopify.com',
             },
         ):
-            with self.assertRaises(Exception):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
                 self.Service._prepare_preconditions_set_quantities(
                     self._prepare_set_quantities_snapshot(job), {},
                 )
+        self.assertEqual(ctx.exception.error_class, 'store_identity_mismatch')
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'blocked_manual_review')
-        self.assertEqual(job.error_class, 'store_identity_mismatch')
+        self.assertEqual(job.state, 'running')
         self.assertFalse(self.env['shopify.connector.mutation.attempt'].search([
             ('job_id', '=', job.id),
         ]))
+
+    def test_fresh_pre_c2_conflicting_gid_blocks_no_attempt(self):
+        """A fresh pre-C2 read observing an InventoryLevel GID that
+        conflicts with the already-recorded one fails closed rather than
+        silently overwriting it (PR #182 comment 5028910116 item 2)."""
+        self.binding.sudo().write({
+            'shopify_gid': 'gid://shopify/InventoryLevel/RECORDED',
+        })
+        job, _token = self._make_mutation_job('inventory_set_quantities')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': True,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/OBSERVED',
+                'available': 5, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            with self.assertRaises(InventoryPreC2FailClosedError) as ctx:
+                self.Service._prepare_preconditions_set_quantities(
+                    self._prepare_set_quantities_snapshot(job), {},
+                )
+        self.assertEqual(ctx.exception.error_class, 'data_shape_schema_mismatch')
+        self.assertEqual(ctx.exception.subreason, 'binding_conflict')
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            self.binding.shopify_gid, 'gid://shopify/InventoryLevel/RECORDED',
+        )
+
+    def test_fresh_pre_c2_captures_gid_when_binding_empty(self):
+        job, _token = self._make_mutation_job('inventory_set_quantities')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': True,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/CAPTURED',
+                'available': 5, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            self.Service._prepare_preconditions_set_quantities(
+                self._prepare_set_quantities_snapshot(job), {},
+            )
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            self.binding.shopify_gid, 'gid://shopify/InventoryLevel/CAPTURED',
+        )
+
+    # ------------------------------------------------------------------
+    # No domain-side commit / durable recovery seam (PR #182 comment
+    # 5028910116 item 3)
+    # ------------------------------------------------------------------
+
+    def test_no_direct_commit_in_prepare_path_source(self):
+        source, tree = self._service_source_tree()
+        methods = {
+            node.name: node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+        }
+        for name in (
+            '_fail_closed_pre_c2', '_prepare_preconditions_set_quantities',
+            '_prepare_preconditions_activate',
+        ):
+            method_source = ast.get_source_segment(source, methods[name]) or ''
+            self.assertNotIn(
+                'self.env.cr.commit', method_source,
+                '%s must never directly commit (LL-005).' % name,
+            )
+
+    # The genuine independent-connection proof that the recovery seam
+    # itself durably commits (mirroring core's own
+    # `test_pre_c2_recovery_that_discovers_c2_marks_uncertain`) lives in
+    # `TestInventoryPreC2RecoverySeam` below -- a `TransactionCase`'s own
+    # uncommitted transaction is never visible to a separate `db_connect`
+    # connection, so that proof needs its own durably-committed fixture,
+    # not a job created through `self.env` here.
 
     # ------------------------------------------------------------------
     # Direct-success evidence (never a bare empty userErrors list)
@@ -1368,3 +1737,612 @@ class TestInventoryPushMechanics(TransactionCase):
             ('res_id', '=', self.binding.id),
         ])
         self.assertTrue(scan_jobs)
+
+    # ------------------------------------------------------------------
+    # Shared reconciliation identity includes store + mutation domain
+    # (PR #182 comment 5028910116 item 6)
+    # ------------------------------------------------------------------
+
+    def test_shared_reconciliation_identity_includes_store_and_domain(self):
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        for job_type in ('inventory_set_quantities', 'inventory_activate'):
+            job, token = self._make_mutation_job(job_type)
+            attempt = self._make_attempt(job, token)
+            reconciliation_job = Dispatch._ensure_reconciliation_job(
+                job, attempt,
+            )
+            self.assertEqual(
+                reconciliation_job.job_type, 'inventory_mutation_reconcile',
+            )
+            self.assertEqual(
+                reconciliation_job.payload_hash,
+                'reconcile:%s:%s:%s' % (self.store.id, job_type, token),
+            )
+            self.assertEqual(
+                reconciliation_job.mutation_attempt_id, attempt,
+            )
+
+    def test_shared_reconciliation_identity_idempotent_on_reuse(self):
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        first = Dispatch._ensure_reconciliation_job(job, attempt)
+        second = Dispatch._ensure_reconciliation_job(job, attempt)
+        self.assertEqual(first.id, second.id)
+
+    # ------------------------------------------------------------------
+    # CAS ordinal lineage: no arbitrary jump, no non-CAS inheritance (PR
+    # #182 comment 5028910116 item 7)
+    # ------------------------------------------------------------------
+
+    def test_handoff_supersede_rejects_arbitrary_ordinal_kwarg(self):
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        self._make_attempt(job, token)
+        with self.assertRaises(TypeError):
+            self.Service._handoff_supersede(
+                job, self.binding, 'cas_stale_bounded_replacement',
+                'inventory_set_quantities', cas_retry_ordinal=2,
+            )
+
+    def test_cas_replacement_ordinal_always_derived_predecessor_plus_one(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=1,
+        )
+        self._make_attempt(job, token)
+        new_job = self.Service._handoff_supersede(
+            job, self.binding, 'cas_stale_bounded_replacement',
+            'inventory_set_quantities', is_cas_replacement=True,
+        )
+        self.assertEqual(new_job.cas_retry_ordinal, 2)
+
+    def test_cas_replacement_denied_at_or_above_ceiling(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        self._make_attempt(job, token)
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._handoff_supersede(
+                    job, self.binding, 'cas_stale_bounded_replacement',
+                    'inventory_set_quantities', is_cas_replacement=True,
+                )
+
+    def test_cas_replacement_denied_for_non_set_quantities_job_type(self):
+        job, token = self._make_mutation_job('inventory_activate')
+        self._make_attempt(job, token)
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                self.Service._handoff_supersede(
+                    job, self.binding, 'cas_stale_bounded_replacement',
+                    'inventory_activate', is_cas_replacement=True,
+                )
+
+    def test_ordinary_admission_never_sets_nonzero_cas_ordinal(self):
+        job = self.Service._create_inventory_job(
+            self.store, 'scheduled_sync', 'inventory_set_quantities',
+            self.binding,
+        )
+        self.assertEqual(job.cas_retry_ordinal, 0)
+
+    def test_reconciliation_replacement_never_inherits_cas_ordinal(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=2,
+        )
+        attempt = self._make_attempt(job, token)
+        self.Service._apply_consequence_set_quantities(
+            job, attempt, 'reconciliation',
+            {
+                'observed_outcome': 'uncertain', 'error_class': False,
+                'manual_review_subreason': False,
+                'action': 'domain_callback', 'message': 'Not applied.',
+                'evidence': {},
+            },
+        )
+        job.invalidate_recordset()
+        self.assertEqual(job.superseded_by_job_id.cas_retry_ordinal, 0)
+
+    def test_manual_review_release_replacement_ordinal_zero(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=3,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_error_codes': ['CHANGE_FROM_QUANTITY_STALE']},
+        )
+        self._block_job_with(
+            job, 'concurrency_race_conflict', 'binding_conflict',
+        )
+        self.binding.with_user(self.user_reviewer).action_recheck_inventory_pair(
+            'CAS exhausted, releasing.'
+        )
+        job.invalidate_recordset()
+        self.assertEqual(job.superseded_by_job_id.cas_retry_ordinal, 0)
+
+    # ------------------------------------------------------------------
+    # Strict integer evidence / ambiguous data+errors / exact-request
+    # matching (PR #182 comment 5028910116 item 4)
+    # ------------------------------------------------------------------
+
+    def test_set_quantities_success_rejects_bool_quantity_after_change(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': None, 'referenceDocumentUri': None,
+                'changes': [{'name': 'available', 'quantityAfterChange': True}],
+            },
+            'requested_target': 1, 'requested_reason': None,
+            'requested_reference_uri': None, 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_float_quantity_after_change(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': None, 'referenceDocumentUri': None,
+                'changes': [{'name': 'available', 'quantityAfterChange': 10.0}],
+            },
+            'requested_target': 10, 'requested_reason': None,
+            'requested_reference_uri': None, 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_string_quantity_after_change(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': None, 'referenceDocumentUri': None,
+                'changes': [{'name': 'available', 'quantityAfterChange': '10'}],
+            },
+            'requested_target': 10, 'requested_reason': None,
+            'requested_reference_uri': None, 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_duplicate_available_change(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': None, 'referenceDocumentUri': None,
+                'changes': [
+                    {'name': 'available', 'quantityAfterChange': 10},
+                    {'name': 'available', 'quantityAfterChange': 10},
+                ],
+            },
+            'requested_target': 10, 'requested_reason': None,
+            'requested_reference_uri': None, 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_extra_quantity_name_change(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': None, 'referenceDocumentUri': None,
+                'changes': [
+                    {'name': 'available', 'quantityAfterChange': 10},
+                    {'name': 'on_hand', 'quantityAfterChange': 10},
+                ],
+            },
+            'requested_target': 10, 'requested_reason': None,
+            'requested_reference_uri': None, 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_reason_mismatch(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': 'correction', 'referenceDocumentUri': 'uri-1',
+                'changes': [{'name': 'available', 'quantityAfterChange': 10}],
+            },
+            'requested_target': 10, 'requested_reason': 'a_different_reason',
+            'requested_reference_uri': 'uri-1', 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_rejects_reference_uri_mismatch(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': 'correction', 'referenceDocumentUri': 'uri-wrong',
+                'changes': [{'name': 'available', 'quantityAfterChange': 10}],
+            },
+            'requested_target': 10, 'requested_reason': 'correction',
+            'requested_reference_uri': 'uri-1', 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_set_quantities_success_accepts_exact_matching_evidence(self):
+        result = {
+            'user_errors': [],
+            'adjustment_group': {
+                'reason': 'correction', 'referenceDocumentUri': 'uri-1',
+                'changes': [{'name': 'available', 'quantityAfterChange': 10}],
+            },
+            'requested_target': 10, 'requested_reason': 'correction',
+            'requested_reference_uri': 'uri-1', 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'succeeded')
+        self.assertEqual(consequence['evidence']['quantity_after_change'], 10)
+        self.assertEqual(consequence['evidence']['reason'], 'correction')
+
+    def test_set_quantities_data_plus_errors_is_ambiguous_not_clean_rejection(self):
+        result = {
+            'user_errors': [{'code': 'SOME_ERROR', 'field': [], 'message': 'x'}],
+            'adjustment_group': {
+                'reason': 'correction', 'referenceDocumentUri': 'uri-1',
+                'changes': [{'name': 'available', 'quantityAfterChange': 10}],
+            },
+            'requested_target': 10, 'requested_reason': 'correction',
+            'requested_reference_uri': 'uri-1', 'evidence': {},
+        }
+        consequence = self.Service._classify_direct_set_quantities(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+        self.assertEqual(
+            consequence['error_class'], 'data_shape_schema_mismatch',
+        )
+        self.assertEqual(consequence['action'], 'reconcile')
+
+    def test_activate_success_rejects_bool_available(self):
+        result = {
+            'user_errors': [],
+            'inventory_level': {
+                'id': 'gid://shopify/InventoryLevel/1',
+                'item': {'id': self.binding.shopify_inventory_item_gid},
+                'location': {'id': self.mapping.shopify_gid},
+                'quantities': [{'name': 'available', 'quantity': False}],
+            },
+            'requested_item_gid': self.binding.shopify_inventory_item_gid,
+            'requested_location_gid': self.mapping.shopify_gid,
+            'evidence': {},
+        }
+        consequence = self.Service._classify_direct_activate(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_activate_success_rejects_missing_level_gid(self):
+        result = {
+            'user_errors': [],
+            'inventory_level': {
+                'id': '',
+                'item': {'id': self.binding.shopify_inventory_item_gid},
+                'location': {'id': self.mapping.shopify_gid},
+                'quantities': [{'name': 'available', 'quantity': 0}],
+            },
+            'requested_item_gid': self.binding.shopify_inventory_item_gid,
+            'requested_location_gid': self.mapping.shopify_gid,
+            'evidence': {},
+        }
+        consequence = self.Service._classify_direct_activate(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_activate_success_rejects_duplicate_quantity_entries(self):
+        result = {
+            'user_errors': [],
+            'inventory_level': {
+                'id': 'gid://shopify/InventoryLevel/1',
+                'item': {'id': self.binding.shopify_inventory_item_gid},
+                'location': {'id': self.mapping.shopify_gid},
+                'quantities': [
+                    {'name': 'available', 'quantity': 0},
+                    {'name': 'available', 'quantity': 0},
+                ],
+            },
+            'requested_item_gid': self.binding.shopify_inventory_item_gid,
+            'requested_location_gid': self.mapping.shopify_gid,
+            'evidence': {},
+        }
+        consequence = self.Service._classify_direct_activate(result)
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_activate_success_captures_inventory_level_gid_evidence(self):
+        result = {
+            'user_errors': [],
+            'inventory_level': {
+                'id': 'gid://shopify/InventoryLevel/999',
+                'item': {'id': self.binding.shopify_inventory_item_gid},
+                'location': {'id': self.mapping.shopify_gid},
+                'quantities': [{'name': 'available', 'quantity': 0}],
+            },
+            'requested_item_gid': self.binding.shopify_inventory_item_gid,
+            'requested_location_gid': self.mapping.shopify_gid,
+            'evidence': {},
+        }
+        consequence = self.Service._classify_direct_activate(result)
+        self.assertEqual(consequence['observed_outcome'], 'succeeded')
+        self.assertEqual(
+            consequence['evidence']['inventory_level_gid'],
+            'gid://shopify/InventoryLevel/999',
+        )
+
+    # ------------------------------------------------------------------
+    # Real InventoryLevel GID persistence, never a synthetic identity
+    # (PR #182 comment 5028910116 item 2)
+    # ------------------------------------------------------------------
+
+    def test_activate_success_persists_real_gid_never_synthetic(self):
+        job, token = self._make_mutation_job('inventory_activate')
+        attempt = self._make_attempt(job, token)
+        job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
+        self.Service._apply_consequence_activate(
+            job, attempt, 'direct',
+            {
+                'observed_outcome': 'succeeded', 'error_class': False,
+                'manual_review_subreason': False, 'action': 'succeed',
+                'message': 'Activated.',
+                'evidence': {
+                    'inventory_level_gid': 'gid://shopify/InventoryLevel/777',
+                },
+            },
+        )
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            self.binding.shopify_gid, 'gid://shopify/InventoryLevel/777',
+        )
+        self.assertNotIn(':', self.binding.shopify_gid.replace('gid://shopify/InventoryLevel/', ''))
+
+    def test_activate_success_conflicting_gid_flags_review_not_overwrite(self):
+        self.binding.sudo().write({
+            'shopify_gid': 'gid://shopify/InventoryLevel/RECORDED',
+        })
+        job, token = self._make_mutation_job('inventory_activate')
+        attempt = self._make_attempt(job, token)
+        job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
+        self.Service._apply_consequence_activate(
+            job, attempt, 'direct',
+            {
+                'observed_outcome': 'succeeded', 'error_class': False,
+                'manual_review_subreason': False, 'action': 'succeed',
+                'message': 'Activated.',
+                'evidence': {
+                    'inventory_level_gid': 'gid://shopify/InventoryLevel/DIFFERENT',
+                },
+            },
+        )
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            self.binding.shopify_gid, 'gid://shopify/InventoryLevel/RECORDED',
+        )
+        self.assertEqual(self.binding.status, 'review')
+
+    def test_reconcile_set_quantities_applied_captures_real_gid(self):
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(
+            job, token, target_quantity=10.0, change_from_quantity=5.0,
+        )
+        attempt._record_direct_outcome('uncertain')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': True,
+                'inventory_level_gid': 'gid://shopify/InventoryLevel/888',
+                'available': 10, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            result = self.Service._reconcile_set_quantities(attempt)
+        self.assertEqual(result['verdict'], 'applied')
+        self.assertEqual(
+            result['evidence']['inventory_level_gid'],
+            'gid://shopify/InventoryLevel/888',
+        )
+
+    # ------------------------------------------------------------------
+    # Missing InventoryItem is never treated as an absent InventoryLevel
+    # (PR #182 comment 5028910116 item 1) -- reconciliation paths
+    # ------------------------------------------------------------------
+
+    def test_reconcile_set_quantities_missing_item_blocks_manual_review(self):
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('uncertain')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': None, 'item_exists': False, 'level_exists': False,
+                'inventory_level_gid': None,
+                'available': None, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            result = self.Service._reconcile_set_quantities(attempt)
+        self.assertEqual(result['verdict'], 'not_applied')
+        self.assertEqual(result['action'], 'block_manual_review')
+        self.assertEqual(result['manual_review_subreason'], 'binding_conflict')
+
+    def test_reconcile_activate_missing_item_blocks_manual_review(self):
+        job, token = self._make_mutation_job('inventory_activate')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('uncertain')
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': None, 'item_exists': False, 'level_exists': False,
+                'inventory_level_gid': None,
+                'available': None, 'updated_at': False,
+                'store_identity': self.store.shop_domain,
+            },
+        ):
+            result = self.Service._reconcile_activate(attempt)
+        self.assertEqual(result['verdict'], 'not_applied')
+        self.assertEqual(result['action'], 'block_manual_review')
+        self.assertEqual(result['manual_review_subreason'], 'binding_conflict')
+
+    # ------------------------------------------------------------------
+    # Reconciliation exception ordering, specific to general (LL-013; PR
+    # #182 comment 5028910116 item 9)
+    # ------------------------------------------------------------------
+
+    def test_reconcile_handler_reraises_job_handler_error_from_read(self):
+        from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+            JobHandlerError as CoreJobHandlerError,
+        )
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('uncertain')
+        reconciliation_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'reconciliation',
+            'job_type': 'inventory_mutation_reconcile',
+            'state': 'running',
+            'mutation_attempt_id': attempt.id,
+            'payload_hash': 'reconcile:%s:%s:%s' % (
+                self.store.id, job.job_type, token,
+            ),
+            'expected_connection_generation': attempt.expected_connection_generation,
+        })
+        with patch.object(
+            type(self.Service), '_read_shopify_inventory_pair',
+            side_effect=CoreJobHandlerError(
+                'shopify_temporary_server_network', 'transient read error',
+            ),
+        ):
+            with self.assertRaises(CoreJobHandlerError):
+                self.Service._handle_inventory_mutation_reconcile(
+                    reconciliation_job
+                )
+        original = self.env['shopify.connector.job'].browse(job.id)
+        original.invalidate_recordset()
+        # A transient read error must never falsely block the original
+        # job -- it stays exactly as it was, awaiting retry.
+        self.assertNotEqual(original.state, 'blocked_manual_review')
+
+    def test_reconcile_handler_blocks_on_malformed_result_shape(self):
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome('uncertain')
+        reconciliation_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'reconciliation',
+            'job_type': 'inventory_mutation_reconcile',
+            'state': 'running',
+            'mutation_attempt_id': attempt.id,
+            'payload_hash': 'reconcile:%s:%s:%s' % (
+                self.store.id, job.job_type, token,
+            ),
+            'expected_connection_generation': attempt.expected_connection_generation,
+        })
+        with patch.object(
+            type(self.Service), '_reconcile_set_quantities',
+            return_value={'not': 'a valid reconciliation result shape'},
+        ):
+            self.Service._handle_inventory_mutation_reconcile(reconciliation_job)
+        original = self.env['shopify.connector.job'].browse(job.id)
+        original.invalidate_recordset()
+        self.assertEqual(original.state, 'blocked_manual_review')
+        self.assertEqual(original.error_class, 'data_shape_schema_mismatch')
+
+
+@tagged('post_install', '-at_install')
+class TestInventoryPreC2RecoverySeam(TransactionCase):
+    """Genuine PostgreSQL independent-connection proof (mirrors core's
+    own `TestMutationConcurrency` pattern) that the inherited pre-C2
+    recovery seam -- never a domain-side commit inside
+    `prepare_preconditions` itself -- durably applies this domain's
+    blocked disposition only after core's own rollback/reset (PR #182
+    comment 5028910116 item 3). A plain `TransactionCase`'s own
+    uncommitted transaction is never visible to a separate `db_connect`
+    connection, so this fixture is created and committed through its own
+    independent connection, exactly like core's own
+    `TestMutationConcurrency._durable_fixture`.
+    """
+
+    def _durable_fixture(self):
+        domain = 'inventory-precc2-%s.myshopify.com' % uuid.uuid4().hex
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Inventory pre-C2 recovery seam',
+                'shop_domain': domain,
+                'api_version': '2026-07',
+                'state': 'connected',
+            })
+            token = uuid.uuid4().hex
+            job = env['shopify.connector.job'].sudo().create({
+                'store_id': store.id,
+                'job_source': 'scheduled_sync',
+                'job_type': 'inventory_set_quantities',
+                'state': 'running',
+                'current_attempt_token': token,
+                'owner_worker_ref': 'inventory-precc2:1',
+                'running_since': fields.Datetime.now(),
+                'started_at': fields.Datetime.now(),
+                'payload_hash': uuid.uuid4().hex,
+                'expected_connection_generation': store.connection_generation,
+            })
+            ids = store.id, job.id, token
+            cr.commit()
+        self.addCleanup(self._cleanup_fixture, store.id, job.id)
+        return ids
+
+    def _cleanup_fixture(self, store_id, job_id):
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            cr.execute(
+                'DELETE FROM shopify_connector_job_log WHERE job_id = %s',
+                (job_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_mutation_attempt '
+                'WHERE job_id = %s',
+                (job_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_job WHERE id = %s', (job_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_store WHERE id = %s',
+                (store_id,),
+            )
+            cr.commit()
+
+    def test_pre_c2_fail_closed_recovery_seam_applies_domain_disposition(self):
+        _store_id, job_id, token = self._durable_fixture()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env['shopify.connector.job.dispatch']._recover_pre_c2_failure(
+                job_id, token,
+                InventoryPreC2FailClosedError(
+                    'inventory_location_missing',
+                    'inventory_location_missing',
+                    'Fresh pre-C2 read found no Shopify inventory level.',
+                ),
+            )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(job.state, 'blocked_manual_review')
+            self.assertEqual(job.error_class, 'inventory_location_missing')
+            self.assertEqual(
+                job.manual_review_subreason, 'inventory_location_missing',
+            )
+            self.assertFalse(job.current_attempt_token)
+            self.assertEqual(
+                env['shopify.connector.mutation.attempt'].search_count([
+                    ('job_id', '=', job_id),
+                ]),
+                0,
+            )
+
+    def test_pre_c2_recovery_delegates_unrelated_exceptions_to_super(self):
+        """A non-domain exception (e.g. a genuine pre-C2 transport
+        failure) must still receive core's own generic bounded-retry
+        recovery, never this domain's blocked disposition."""
+        _store_id, job_id, token = self._durable_fixture()
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env['shopify.connector.job.dispatch']._recover_pre_c2_failure(
+                job_id, token, RuntimeError('synthetic pre-C2 failure'),
+            )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(job.state, 'retry_waiting')

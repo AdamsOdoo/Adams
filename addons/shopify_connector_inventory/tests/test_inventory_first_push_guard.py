@@ -154,12 +154,32 @@ class TestInventoryFirstPushGuard(TransactionCase):
     def test_enqueue_first_push_preview_admission_service(self):
         """Sanctioned admission path (PR #182 comment 5025803697 item
         22.C) -- previously a dead handler reachable only through direct
-        protected-field job creation."""
+        protected-field job creation. Hardened per comment 5028910116
+        item 13: private method, explicit Operator/Administrator
+        authority required."""
         Service = self.env['shopify.connector.inventory.service']
-        job = Service.enqueue_first_push_preview(self.binding)
+        job = Service.with_user(
+            self.user_operator
+        )._enqueue_first_push_preview(self.binding)
         self.assertEqual(job.job_type, 'inventory_first_push_preview')
         self.assertEqual(job.job_source, 'export_preview_dry_run')
         self.assertEqual(job.state, 'queued')
         job.sudo().write({'state': 'running'})
         Service._handle_inventory_first_push_preview(job)
         self.assertEqual(self.binding.first_push_state, 'previewed')
+
+    def test_enqueue_first_push_preview_denied_for_auditor(self):
+        auditor = self.env['res.users'].create({
+            'name': 'First Push Guard Auditor',
+            'login': 'first_push_guard_auditor',
+            'group_ids': [(6, 0, [
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_auditor'
+                ).id,
+            ])],
+        })
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(Exception):
+            Service.with_user(auditor)._enqueue_first_push_preview(
+                self.binding
+            )

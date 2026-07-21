@@ -197,6 +197,46 @@ class TestLocationMapping(TransactionCase):
                 self.store, self.internal_location, '',
             )
 
+    def test_sanctioned_service_denies_silent_gid_replacement(self):
+        """A differing GID for an already-mapped Odoo location fails
+        closed -- never silently replaces the recorded Shopify identity
+        (PR #182 comment 5028910116 item 13)."""
+        Service = self.env['shopify.connector.inventory.service']
+        Service.with_user(
+            self.user_operator
+        ).create_or_update_location_mapping(
+            self.store, self.internal_location, 'gid://shopify/Location/910',
+        )
+        with self.assertRaises(UserError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location,
+                'gid://shopify/Location/DIFFERENT',
+            )
+        mapping = self.Mapping.search([
+            ('store_id', '=', self.store.id),
+            ('odoo_location_id', '=', self.internal_location.id),
+        ])
+        self.assertEqual(mapping.shopify_gid, 'gid://shopify/Location/910')
+
+    def test_sanctioned_service_denies_silent_gid_move(self):
+        """An already-mapped GID cannot be silently moved to a different
+        Odoo location either (PR #182 comment 5028910116 item 13)."""
+        Service = self.env['shopify.connector.inventory.service']
+        Service.with_user(
+            self.user_operator
+        ).create_or_update_location_mapping(
+            self.store, self.internal_location, 'gid://shopify/Location/911',
+        )
+        with self.assertRaises(UserError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location_b,
+                'gid://shopify/Location/911',
+            )
+
     def test_ordinary_create_still_denied_for_operator(self):
         """The sanctioned service exists alongside, not instead of, the
         mixin's own generic-create denial."""

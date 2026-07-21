@@ -3,6 +3,10 @@ from unittest.mock import patch
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
+
 
 class TestInventoryLocationCacheSync(TransactionCase):
 
@@ -29,6 +33,15 @@ class TestInventoryLocationCacheSync(TransactionCase):
             'group_ids': [(6, 0, [
                 cls.env.ref(
                     'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
+        cls.user_operator = cls.env['res.users'].create({
+            'name': 'Location Cache Sync Operator',
+            'login': 'location_cache_sync_operator',
+            'group_ids': [(6, 0, [
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
                 ).id,
             ])],
         })
@@ -108,20 +121,41 @@ class TestInventoryLocationCacheSync(TransactionCase):
     def test_enqueue_location_sync_admission_service(self):
         """Sanctioned admission path (PR #182 comment 5025803697 item
         22.C) -- previously a dead handler reachable only through direct
-        protected-field job creation."""
+        protected-field job creation. Hardened per comment 5028910116
+        item 13: private method, explicit Operator/Administrator
+        authority required."""
         self.env['shopify.connector.store.settings'].create({
             'store_id': self.store.id, 'inventory_domain_enabled': True,
         })
         self.store.write({'state': 'connected'})
         Service = self.env['shopify.connector.inventory.service']
-        job = Service.enqueue_location_sync(self.store)
+        job = Service.with_user(
+            self.user_operator
+        )._enqueue_location_sync(self.store)
         self.assertEqual(job.job_type, 'inventory_location_sync')
         self.assertEqual(job.state, 'queued')
 
     def test_enqueue_location_sync_denied_when_domain_disabled(self):
+        self.env['shopify.connector.store.settings'].create({
+            'store_id': self.store.id, 'inventory_domain_enabled': False,
+        })
+        self.store.write({'state': 'connected'})
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(Exception):
-            Service.enqueue_location_sync(self.store)
+            Service.with_user(self.user_operator)._enqueue_location_sync(
+                self.store
+            )
+
+    def test_enqueue_location_sync_denied_for_auditor(self):
+        self.env['shopify.connector.store.settings'].create({
+            'store_id': self.store.id, 'inventory_domain_enabled': True,
+        })
+        self.store.write({'state': 'connected'})
+        Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(Exception):
+            Service.with_user(self.user_auditor)._enqueue_location_sync(
+                self.store
+            )
 
     def test_pagination_across_two_pages(self):
         job = self._make_sync_job()
@@ -155,3 +189,115 @@ class TestInventoryLocationCacheSync(TransactionCase):
             ]),
         ])
         self.assertEqual(len(cached), 2)
+
+    # ------------------------------------------------------------------
+    # Fail-closed response/pagination-shape validation (PR #182 comment
+    # 5028910116 item 10): a malformed or partial page must never be
+    # silently treated as "zero locations, no next page."
+    # ------------------------------------------------------------------
+
+    def test_malformed_response_no_data_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={'errors': 'no data key'},
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_malformed_response_locations_not_a_dict_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={'data': {'locations': None}},
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_malformed_response_edges_not_a_list_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={
+                'data': {'locations': {
+                    'edges': 'not-a-list', 'pageInfo': {'hasNextPage': False},
+                }},
+            },
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_malformed_node_missing_gid_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={
+                'data': {'locations': {
+                    'edges': [{'cursor': 'c1', 'node': {'name': 'No GID'}}],
+                    'pageInfo': {'hasNextPage': False},
+                }},
+            },
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_missing_page_info_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={'data': {'locations': {'edges': []}}},
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_invalid_has_next_page_type_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={
+                'data': {'locations': {
+                    'edges': [], 'pageInfo': {'hasNextPage': 'yes'},
+                }},
+            },
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
+
+    def test_missing_next_cursor_when_has_next_page_true_raises(self):
+        job = self._make_sync_job()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            return_value={
+                'data': {'locations': {
+                    'edges': [{
+                        'node': {
+                            'id': 'gid://shopify/Location/1', 'name': 'A',
+                        },
+                    }],
+                    'pageInfo': {'hasNextPage': True},
+                }},
+            },
+        ):
+            with self.assertRaises(JobHandlerError):
+                Service._handle_inventory_location_sync(job)
+        job.invalidate_recordset()
+        self.assertNotEqual(job.state, 'succeeded')
