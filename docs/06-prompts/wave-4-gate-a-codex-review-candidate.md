@@ -1,6 +1,6 @@
 # Wave 4 Gate A — Codex prompt review candidate
 
-**Status:** CONTROL-ROOM REVIEW CANDIDATE — NOT ISSUED TO CODEX  
+**Status:** CONTROL-ROOM RECONCILED — FINAL LOCKED GATE A PROMPT; ISSUED ONLY BY CHATGPT  
 **Required base:** `mvp/program-integration@ab4f12f5a6857b2f3318ffc3b3f5f371307938bc`  
 **Wave 4 control issue:** #186  
 **Deferred critical validation:** #185 (`CV-013`)  
@@ -17,9 +17,7 @@ This is one complete, end-to-end Gate A prompt. It is deliberately phase-gated i
 
 You are GPT-5.6 Sol, the primary research, repository-audit, decision-reconciliation, and planning worker for Wave 4 Gate A.
 
-ChatGPT is the strategic control room, scope governor, reviewer, acceptance authority, and merge-authorizing authority.
-
-Claude may later perform an independent review of your Gate A package.
+Binding Wave 4 governance is recorded in issue #186 comment `5038326525`, which supersedes DEC-032 / issue #167 / `CLAUDE.md` only where those older records assign Claude sole control-room or sole merge authority. **ChatGPT is the strategic control room, scope governor, prompt-issuing authority, reviewer, acceptance authority, and merge-authorizing authority.** Claude is the independent reviewer and authorized runtime/governance worker when explicitly assigned; Claude may execute a merge only after explicit ChatGPT authorization. The product owner remains the ultimate business authority.
 
 GitHub is the source of truth.
 
@@ -86,7 +84,7 @@ Before editing anything, verify and record:
    - issue #165;
    - PR #150;
    - PR #151;
-6. no already-authorized Wave 4 Gate A or implementation branch/PR exists;
+6. no already-authorized Wave 4 Gate A execution or implementation branch/PR exists; the prompt-review branch `control-room/wave-4-gate-a-prompt-review` and draft PR #187 are expected governance artifacts and are not competing execution work;
 7. no `shopify_connector_fulfillment` addon exists at the required base;
 8. the merged Layer 2, order, and inventory code expected from Waves 2 and 3 is present.
 
@@ -129,6 +127,8 @@ At every phase boundary, update it with:
 - next phase;
 - any environment limitation.
 
+At every phase boundary, commit and push the checkpoint and all coherent phase outputs before continuing.
+
 Continue automatically from one phase to the next. Do not stop merely to ask permission between phases.
 
 When an unavoidable context, time, or environment limit prevents completion, stop only at a phase boundary after committing and pushing the checkpoint. Report `PARTIAL GATE A — RESUME FROM PHASE <N>` and do not claim Gate A completeness.
@@ -167,6 +167,17 @@ Challenge the entire package, correct it coherently, update canonical trackers, 
 
 No phase authorizes fulfillment implementation.
 
+### Depth priority — prevent shallow completion
+
+When context or time pressure appears, preserve depth in this order:
+
+1. decision-critical contracts: Odoo quantity semantics, line and location identity, Mode 1/Mode 2 rules, Layer 2 mutation/reconciliation, duplicate prevention, and security;
+2. verified official/code evidence and contradiction resolution;
+3. exact architecture, file boundary, and tests;
+4. packaging, summaries, and presentation.
+
+Never thin or guess a decision-critical contract merely to complete every document. Use the phase-boundary partial-completion path instead.
+
 ## 6. Binding Wave 4 product scope
 
 Wave 4 delivers the complete fulfillment and tracking **backend**.
@@ -177,7 +188,7 @@ The accepted direction is:
 - Odoo delivery and tracking state mapped to Shopify through accepted FulfillmentOrder operations;
 - both fulfillment Mode 1 and Mode 2 backend are mandatory;
 - per-store `fulfillment_operating_mode`;
-- the exact accepted 16-condition Mode 2 engine;
+- the existing proposed 16-condition Mode 2 engine, which Gate A must validate, reconcile, and either preserve exactly or supersede through an explicitly accepted decision;
 - mode-switch state machine;
 - disconnected-period reconciliation;
 - COD interplay;
@@ -203,6 +214,7 @@ Do not authorize or implement:
 - inventory-domain changes except a narrow, demonstrated fulfillment-location integration need separately identified for control-room approval;
 - Task 013B;
 - product or media export;
+- Shopify-side returns or reverse-fulfillment synchronization; Odoo return pickings are researched only to define the safe forward-fulfillment boundary;
 - refunds;
 - payouts;
 - advanced accounting automation;
@@ -284,11 +296,15 @@ When a source is inaccessible, say so clearly. Do not invent the missing fact. R
 
 Search the repository and GitHub history for every relevant current or historical record, including:
 
-- Task 014 packets and drafts;
+- Task 014 packets and drafts, including `task-014-fulfillment-tracking-implementation-packet.md` and `task-014-fulfillment-tracking-implementation-packet-proposed.md`;
+- the existing canonical `wave-4-definition-of-ready.md`;
+- `fulfillment-operating-modes.md`;
+- `shopify-fulfillment-status-model.md`;
+- `fulfillment-mode-uat-matrix.md`;
 - DEC-011;
 - D-014-2;
 - Mode 1 and Mode 2 records;
-- the exact accepted 16-condition Mode 2 engine;
+- the existing proposed 16-condition Mode 2 engine, which Gate A must validate, reconcile, and either preserve exactly or supersede through an explicitly accepted decision;
 - mode-switch records;
 - disconnected/reconnect reconciliation decisions;
 - COD decisions and matrices;
@@ -348,6 +364,7 @@ Verify the exact current Admin GraphQL behavior relevant to Wave 4, including:
 - fulfillment-order line-item identifiers and quantities;
 - merchant-managed read and write scopes;
 - when the write scope is conditionally required;
+- the separate Shopify staff permission `fulfill_and_ship_orders` required for fulfillment creation, distinguished from API access scopes;
 - the exact current mutation surfaces for creating fulfillment and updating tracking information;
 - partial fulfillment behavior;
 - multiple FulfillmentOrders and location behavior;
@@ -359,7 +376,7 @@ Verify the exact current Admin GraphQL behavior relevant to Wave 4, including:
 - request IDs and rate-limit evidence;
 - idempotency support or absence of native idempotency;
 - API version compatibility;
-- deprecated or legacy fulfillment surfaces that remain forbidden.
+- deprecated or legacy fulfillment surfaces that remain forbidden, explicitly including `fulfillmentCreateV2` and `fulfillmentTrackingInfoUpdateV2` as names removed from current Admin API versions.
 
 Do not assume exact mutation or scope names from this prompt. Verify them from current official documentation.
 
@@ -373,13 +390,13 @@ Verify through official Odoo 19 documentation and actual source:
 
 - `sale.order` to picking relationships;
 - `stock.picking` lifecycle;
-- `stock.move` and `stock.move.line` quantity semantics;
+- `stock.move` and `stock.move.line` quantity semantics, explicitly verifying Odoo 19 done quantity through `stock.move.line.quantity`, rejecting obsolete `qty_done` / `quantity_done` assumptions, and distinguishing demand such as `product_uom_qty`;
 - validation workflow;
 - partial delivery;
 - backorders;
 - multiple pickings;
 - cancellations;
-- return pickings and reverse transfers;
+- return pickings and reverse transfers as an Odoo forward-sync boundary only; Shopify-side return or reverse-fulfillment synchronization is outside Wave 4;
 - carrier and tracking fields;
 - tracking updates after validation;
 - packages where materially relevant;
@@ -524,7 +541,7 @@ At minimum resolve or explicitly escalate:
 15. missing tracking data;
 16. Mode 1 admission and behavior;
 17. Mode 2 admission and behavior;
-18. every accepted Mode 2 condition;
+18. every condition in the existing proposed 16-condition Mode 2 engine, including whether it is preserved, corrected, or escalated for acceptance;
 19. mode switching with queued, running, uncertain, or review jobs;
 20. disconnected-period reconciliation;
 21. COD interaction;
@@ -546,9 +563,10 @@ At minimum resolve or explicitly escalate:
 37. readiness and scope checks;
 38. upgrade and uninstall behavior;
 39. historical deliveries and reconnect behavior;
-40. dev-store resource cleanup.
+40. dev-store resource cleanup;
+41. FulfillmentOrder status and request-status eligibility for both modes, including exact treatment of OPEN, IN_PROGRESS, ON_HOLD, SCHEDULED, CLOSED, INCOMPLETE, cancelled, and other current official states.
 
-Locate and preserve the exact accepted 16-condition Mode 2 engine. Do not compress, expand, or paraphrase it into a different rule set.
+Locate and reconcile the existing proposed 16-condition Mode 2 engine. Do not compress, expand, or paraphrase it while evaluating it. Preserve it exactly when supported; when official evidence, merged code, or accepted decisions conflict, propose explicit line-level corrections and escalate them for control-room acceptance before Gate B.
 
 When existing accepted records conflict, preserve the history and propose one canonical current disposition. Do not silently choose.
 
@@ -564,8 +582,10 @@ Prepare a complete candidate Wave 4 Definition of Ready and Task 014 implementat
 
 Reuse existing canonical files when present. Default paths when no equivalent exists:
 
-- `docs/07-implementation-plan/wave-4-fulfillment-definition-of-ready.md`;
-- `docs/07-implementation-plan/task-014-fulfillment-implementation-packet.md`.
+- `docs/07-implementation-plan/wave-4-definition-of-ready.md`;
+- `docs/07-implementation-plan/task-014-fulfillment-tracking-implementation-packet.md`.
+
+Also inspect `task-014-fulfillment-tracking-implementation-packet-proposed.md` as historical/proposed input. Do not create a near-name replacement or a second canonical DoR/packet.
 
 ### Modular architecture contract
 
@@ -606,7 +626,7 @@ Reuse the merged Stage 0 Layer 2 substrate. Freeze the candidate fulfillment int
 - job types;
 - one job to at most one attempt for the job lifetime;
 - C1 intent persistence;
-- fresh pre-C2 read requirements;
+- fresh pre-C2 read requirements as the primary duplicate-prevention control for fulfillment mutations that lack native idempotency, including verify-before-retry and adopt-if-found behavior;
 - C2 side-cursor boundary;
 - NET handling;
 - C3 outcome persistence;
@@ -681,8 +701,8 @@ Freeze a candidate exact file allowlist for future Gate B.
 
 Initial hypothesis to validate, not blindly accept:
 
-- new files under `addons/shopify_connector_fulfillment/**`;
-- the exact readiness-check file in `shopify_connector_core` only for the accepted scope-name correction;
+- individually enumerated new files for `shopify_connector_fulfillment` (manifest, package initializers, models, services, security, data/cron, and tests only where the reconciled architecture proves each file necessary); do not authorize the addon through a wildcard;
+- exactly `addons/shopify_connector_core/models/readiness_check.py`, symbol `REQUIRED_MVP_SCOPES`, only for the accepted scope-name correction;
 - exact documentation and QA files.
 
 List every permitted future implementation file explicitly. Do not use a broad authorization such as `addons/shopify_connector_core/**`, `addons/shopify_connector_sale/**`, or `addons/shopify_connector_inventory/**`.
@@ -695,7 +715,8 @@ List forbidden files and directories explicitly.
 
 Include checks for:
 
-- no legacy fulfillment API surface;
+- no legacy fulfillment API surface, including name-specific guards for `fulfillmentCreateV2` and `fulfillmentTrackingInfoUpdateV2`;
+- RA-023 line-identity enforcement through `lineItemsByFulfillmentOrder` or the exact current equivalent, with no order-ID-only fulfillment path;
 - no raw transport;
 - exact GraphQL document shapes;
 - exact scopes;
@@ -733,7 +754,10 @@ Include at minimum:
 - duplicate prevention;
 - company consistency;
 - permissions;
-- redaction.
+- redaction;
+- regression coverage for relevant prior defects and risk-register entries;
+- explicit RA-022 and RA-023 source-guard and behavior tests;
+- staff-permission/readiness tests distinct from API-scope tests.
 
 ### Genuine concurrency plan
 
@@ -789,7 +813,9 @@ Wave 4 final acceptance requires both fulfillment dev-store validation and CV-01
 
 Create or update the canonical validation plan. Default path when no equivalent exists:
 
-`docs/05-qa/wave-4-fulfillment-validation-plan.md`
+`docs/05-qa/fulfillment-mode-uat-matrix.md`
+
+Use that existing canonical matrix as the validation-plan carrier. Create a different validation document only when Phase 1 proves the matrix cannot carry a required contract, records the exact gap, and designates one explicit canonical successor rather than a parallel source of truth.
 
 ### Rollback plan
 
@@ -813,7 +839,7 @@ The prompt must include:
 
 - exact accepted base placeholder;
 - role and authority;
-- exact allowed files;
+- exact allowed files and a hard stop on any silent file-boundary expansion;
 - exact forbidden files;
 - complete functionality;
 - Mode 1 and Mode 2 contracts;
@@ -821,7 +847,7 @@ The prompt must include:
 - security and logging;
 - tests;
 - runtime evidence;
-- rollback notes;
+- rollback notes, including rollback of the narrow cross-module readiness-scope correction;
 - definition of done;
 - hard stops;
 - final report;
@@ -871,6 +897,8 @@ Challenge at minimum:
 
 Correct every issue found in one coherent documentation batch. Do not begin implementation.
 
+Run the mandatory end-of-session learning review defined by `quality-feedback-loop.md`. Record the result in the **Learning feedback loop** section of `docs/01-research/research-handoff.md`, including lessons, reusable controls, rejected approaches, and whether any canonical governance file requires a follow-up correction. The session is not complete until this learning review is recorded.
+
 Update the canonical current-state records:
 
 - `docs/07-implementation-plan/mvp-program-state.md`;
@@ -912,7 +940,8 @@ The final Gate A package must provide the following functions, whether through e
 12. rollback plan;
 13. locked, unissued implementation prompt;
 14. live program-state and acceptance-matrix updates;
-15. research, architecture-review, risk, and handoff updates.
+15. research, architecture-review, risk, and handoff updates;
+16. completed quality-feedback-loop review recorded in the Learning feedback loop section of `research-handoff.md`.
 
 When an existing canonical file fulfills one of these functions, update it and record that mapping in the resource inventory. Do not create a second source of truth.
 
@@ -953,7 +982,8 @@ Stop and return one consolidated blocker report when:
 - the proposed architecture requires a destructive or irreversible migration;
 - scope would materially change;
 - security or credential exposure is found;
-- an exact future implementation boundary cannot be frozen without an unresolved critical decision.
+- an exact future implementation boundary cannot be frozen without an unresolved critical decision;
+- the work would require a file outside the frozen allowlist and no explicit control-room amendment exists.
 
 Do not hard-stop for missing Shopify credentials or a development store during Gate A.
 
@@ -977,6 +1007,7 @@ This session is complete only when:
 - CV-013 is carried forward as critical;
 - the locked implementation prompt exists but is not issued;
 - the adversarial review is complete;
+- the mandatory `quality-feedback-loop.md` review is complete and recorded in the Learning feedback loop section of `research-handoff.md`;
 - canonical trackers and handoff are updated;
 - all changes are committed and pushed;
 - no `addons/**` file changed;
@@ -986,37 +1017,18 @@ This session is complete only when:
 
 ## 20. Final report
 
-Return:
+Return one concise but evidence-complete report containing:
 
-1. identity-gate result;
-2. branch and draft PR;
-3. exact starting and final SHA;
-4. complete changed-file list;
-5. resource inventory summary;
-6. official Shopify research summary with citations;
-7. official Odoo 19 research summary with citations;
-8. actual-code audit summary;
-9. accepted decisions preserved;
-10. contradictions corrected;
-11. proposed new decisions;
-12. remaining control-room questions;
-13. Mode 1 candidate contract summary;
-14. Mode 2 candidate contract summary;
-15. Layer 2 integration summary;
-16. exact future allowed-file list;
-17. exact future forbidden-file list;
-18. test and evidence plan;
-19. dev-store validation plan;
-20. rollback plan;
-21. CV-013 carry-forward status;
-22. risks and mitigations;
-23. commit list;
-24. confirmation that no `addons/**` file changed;
-25. confirmation that no Shopify mutation occurred;
-26. confirmation that the PR remains draft and unmerged;
-27. confirmation that the locked implementation prompt was not issued;
-28. recommendation:
-    - `READY FOR CONTROL-ROOM GATE A REVIEW`; or
-    - `NOT READY — CONSOLIDATED DECISION BLOCKERS`.
+1. identity, branch/PR, starting SHA, final SHA, changed files, and commits;
+2. canonical outputs created or updated and their source-of-truth mapping;
+3. official Shopify and Odoo 19 findings with citations;
+4. merged-code audit findings and exact integration seams;
+5. accepted decisions preserved, contradictions corrected, proposed decisions, and remaining minimal control-room questions;
+6. complete Mode 1, Mode 2, proposed 16-condition reconciliation, and Layer 2 contract summaries;
+7. exact future allowed and forbidden file lists;
+8. test, source-guard, concurrency, runtime, security, lifecycle, dev-store, rollback, and CV-013 plans;
+9. risks, mitigations, and mandatory learning-feedback-loop outcome;
+10. confirmations that no `addons/**` file changed, no Shopify mutation occurred, the PR remains draft/unmerged, and the locked implementation prompt was not issued;
+11. recommendation: `READY FOR CONTROL-ROOM GATE A REVIEW` or `NOT READY — CONSOLIDATED DECISION BLOCKERS`.
 
 Then stop. Do not start implementation.
