@@ -1,3 +1,81 @@
+### Task 013 third correction cycle — surgical control-room re-review REVISE applied to the same draft PR — compact handoff (2026-07-21)
+
+- **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR
+  [#182](https://github.com/AdamsOdoo/Adams/pull/182) →
+  `mvp/program-integration`, base unchanged at
+  `8f5f421e2110c2e805460ea75fb519e48013e0f7`. Third correction cycle on
+  the same draft PR, not a new branch/PR.
+- **Authority:** PR #182 comment
+  [`5029906989`](https://github.com/AdamsOdoo/Adams/pull/182#issuecomment-5029906989)
+  ("REVISE BEFORE RUNTIME," reviewed head
+  `7979134f76e275c3d60dfc30b2561b754f0b94c4"). Accepted in direction:
+  missing-item handling, strict-integer helper, typed scan jobs,
+  PII-safe reason, location-page validation, handoff row-locking, shared
+  reconciliation identity, independent-connection pre-C2 test seam.
+- **Corrected (seven groups, scoped exclusively to
+  `shopify_connector_inventory_service.py` and
+  `test_inventory_push_mechanics.py`):**
+  A. `_ensure_reconciliation_job`'s terminal-but-unresolved branch now
+     emits `data_shape_schema_mismatch`/`duplicate_risk` (never
+     `duplicate_risk` as `error_class`), reads `locked_attempt` post-lock,
+     and uses the complete `TERMINAL_JOB_STATES` set; the previously
+     false-green vocabulary test is replaced with a receiver/argument-
+     aware AST guard proven non-vacuous against a synthetic reproduction
+     of the exact original defect.
+  B. `inventory_activate` now performs a fresh pre-C2 Shopify read
+     (mirroring set-quantities); missing/untracked/store-mismatch/
+     conflicting-GID fail closed, and a level that already appeared
+     skips the job and hands off atomically to a fresh
+     `inventory_push_sync` via a new `InventoryActivationSupersededError`
+     + `_recover_activation_superseded` seam (LL-005 compliant, proven
+     via a genuine independent-PostgreSQL-connection fixture).
+  C. The real InventoryLevel GID is now persisted (or fails closed on
+     conflict) before `inventory_push_sync`'s no-op/child decisions; a
+     new `_binding_push_admission_blocked` helper centrally refuses
+     `review`/`stale` bindings across every admission surface, including
+     a lock-time re-check closing a self-discovered TOCTOU race; a
+     post-mutation GID conflict no longer triggers activation's
+     fresh-orchestration handoff.
+  D. A verified no-op read now records a synchronized
+     `last_pushed_available`/`last_pushed_at` baseline so a never-pushed
+     pair that already matches Shopify does not re-enqueue forever.
+  E. `cas_retry_ordinal` is removed entirely from `_create_inventory_job`;
+     a new `_create_cas_successor_job` is the sole surface that can
+     produce a nonzero ordinal, always derived from the locked
+     predecessor.
+  F. Structured `user_errors:[{code,field}]` evidence replaces the
+     free-form `user_error_codes` list; CAS-exhaustion release now
+     requires an exact structured `CHANGE_FROM_QUANTITY_STALE` entry,
+     never substring/membership matching.
+  G. The pair read now rejects duplicate `available` entries and
+     validates item/location identity; direct-success evidence requires
+     non-empty matching `reason`/`referenceDocumentUri` (two missing
+     values comparing equal is no longer valid success); absent-level
+     set-quantities reconciliation now routes to
+     `inventory_location_missing` instead of looping `inconclusive`.
+- **No new governing-document amendment** this cycle — none was
+  authorized or required; `DEC-037`/the packet/the locked prompt are
+  untouched.
+- **Status: THIRD-CYCLE SURGICALLY CORRECTED IMPLEMENTATION CANDIDATE
+  FROZEN — NOT RUNTIME-PROVEN.** Same external-evidence gaps as before.
+  PR #182 remains **draft, unmerged, not marked ready**; no
+  self-acceptance, no self-merge, no protected reference changed, zero
+  Task 013B code, no Odoo.sh run, no live Shopify mutation. One
+  documented, fails-safe narrow race remains (a concurrent GID write
+  landing inside the activation recovery seam's own re-lock window is
+  simply not captured that pass, never corrupted) — not classified as a
+  defect.
+- **Next-session prompt guidance:** control-room re-review of this
+  corrected candidate, followed by dedicated Odoo.sh, dev-store, and
+  external-concurrency-runner sessions before any final merge
+  authorization. Do not begin Task 013B before Task 013 itself is merged
+  and runtime-proven.
+
+Full detail: `docs/05-qa/task-013-inventory-sync-validation-results.md`,
+`docs/05-qa/architecture-review-log.md` AR-067.
+
+---
+
 ### Task 013 second correction cycle — control-room re-review REVISE applied to the same draft PR — compact handoff (2026-07-21)
 
 - **Branch / PR:** same as below — `claude/wave-3-task-013-2g0ul0`, PR
