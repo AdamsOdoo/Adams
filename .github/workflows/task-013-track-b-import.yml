@@ -23,7 +23,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .control-room/task-013-track-b/part{00..08} > /tmp/track-b.bundle.b64
+          cat \
+            .control-room/task-013-track-b/part00 \
+            .control-room/task-013-track-b/part01 \
+            .control-room/task-013-track-b/part02 \
+            .control-room/task-013-track-b/part03 \
+            .control-room/task-013-track-b/part04a \
+            .control-room/task-013-track-b/part04b \
+            .control-room/task-013-track-b/part04c \
+            .control-room/task-013-track-b/part04d \
+            .control-room/task-013-track-b/part05 \
+            .control-room/task-013-track-b/part06 \
+            .control-room/task-013-track-b/part07 \
+            .control-room/task-013-track-b/part08 \
+            > /tmp/track-b.bundle.b64
           test "$(wc -c < /tmp/track-b.bundle.b64)" = "34824"
           base64 --decode /tmp/track-b.bundle.b64 > /tmp/track-b.bundle
           test "$(stat -c %s /tmp/track-b.bundle)" = "26116"
