@@ -124,3 +124,53 @@ switches, the confirmation dialog and audit record.
   hold reasons) may not be reproducible on a dev store without a fulfillment
   service; those rows fall back to fixture-level tests (File B §10 fixtures)
   with the live case recorded as not-reproducible in the UAT evidence.
+
+---
+
+## Addendum (2026-07-21) — [Proposed] Wave 4 Gate A validation plan
+
+> **Status: Proposed — Wave 4 Gate A, 2026-07-21. Planning only; no test executed;
+> no gate opened.** Extends this matrix with the concurrency, Odoo.sh runtime,
+> dev-store campaign, and the Gate A test additions. Basis:
+> [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md);
+> Shopify notes / Odoo notes / code audit (Gate A companions). Nothing above this
+> line is rewritten.
+
+### A. Gate A test additions (beyond §1–§4)
+- `supportedActions` + FO-status eligibility (OPEN/IN_PROGRESS eligible;
+  ON_HOLD/SCHEDULED defer; INCOMPLETE/CLOSED/CANCELLED ineligible).
+- `assignedLocation.location`-null → snapshot fallback; never reads `location.mapping`.
+- **>1 FO per location** decomposition; FO-line-item-GID **2-hop** matching; skip
+  null-GID lines.
+- **No-`@idempotent` source-guard**; **`qty_done`/`quantity_done` source-guard**
+  (field absent in Odoo 19); RA-022 (no V2/legacy) + RA-023 (no order-ID-only path).
+- `code_required=False` + **positive-success-evidence** classifier (empty
+  `userErrors` alone ≠ success).
+- `action_confirm()` auto-picking coexistence; `send_to_shipper` `rate_and_ship`
+  collision; **staff-permission (`fulfill_and_ship_orders`) tests distinct from
+  API-scope tests**.
+
+### B. Genuine concurrency (independent PG transactions/processes — NOT savepoints)
+duplicate admission · operation-scope serialization · C1/C2/NET/C3 mutation handoff ·
+mode switch · tracking update · reconciliation replacement · review release ·
+rollback injection · real PostgreSQL contention where feasible (Odoo stock
+serializes at the quant layer).
+
+### C. Odoo.sh runtime (Gate C)
+exact-head identity · fresh install · upgrade · focused fulfillment suite · full
+connector regression · security matrix · lifecycle uninstall/reinstall across the
+full bridge stack · zero residue · concurrency · failure/rollback injection ·
+redaction + leak scan. Evidence wording distinguishes executed / static / pending.
+
+### D. Shopify dev-store campaign (Gate D — dedicated/disposable resources)
+baseline reads · Mode 1 fulfillment · Mode 2 fulfillment · partial where safe ·
+tracking creation · tracking update · repeat/no-op · replay prevention · clean
+rejection / review routing where safely reproducible · read-after-write ·
+cleanup/restoration · proof no unrelated resource changed.
+
+### E. Binding gate
+**Wave 4 final acceptance requires BOTH fulfillment dev-store validation AND CV-013
+(#185) to execute green.** Missing Shopify credentials/fixtures do not stop Gate B
+static / Odoo.sh work, but Wave 4 cannot receive final control-room acceptance,
+enter a release candidate, or begin UAT while #185 is open. This matrix is the
+canonical validation-plan carrier (no parallel validation doc is created).

@@ -144,8 +144,8 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 | 3 — Merged-code integration audit | ✅ complete → `docs/03-architecture/wave-4-fulfillment-current-code-audit.md` |
 | 4 — Decision & contradiction reconciliation | ✅ complete → `docs/04-decisions/DEC-038-…-reconciliation.md` (Proposed) |
 | 5 — Candidate DoR, architecture & Task 014 packet | ✅ complete → DoR updated; Task 014 packet §10 Gate A addendum (arch + Layer 2 + Mode 1/2 contracts) |
-| 6 — File boundary, tests, validation, rollback, locked prompt | ⏳ next |
-| 7 — Adversarial review, trackers, handoff, final report | ⏳ pending |
+| 6 — File boundary, tests, validation, rollback, locked prompt | ✅ complete → `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (LOCKED CANDIDATE — NOT ISSUED) + UAT-matrix Gate A addendum |
+| 7 — Adversarial review, trackers, handoff, final report | ⏳ next |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
 map fixed; accepted contract separated from proposed candidates and superseded
@@ -191,10 +191,20 @@ prompt. DoR authority model reconciled to comment `5038326525`; program-state no
 refreshed (Waves 1–3 merged, Layer 2 accepted). Phase-1 inventory contradiction #1
 (the "stale 17" mis-flag) corrected.
 
-**Next phase:** Phase 6 — exact file allowlist/forbidden lists, static/source-guard
-plan, unit/concurrency/runtime/dev-store plans, rollback plan, and the NEW locked
-implementation prompt (`docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md`,
-marked `LOCKED CANDIDATE — NOT ISSUED`). Commit 4; continue.
+**Phase 6 key results:** the NEW locked prompt (`sol-wave-4-fulfillment-locked-prompt.md`,
+`LOCKED CANDIDATE — NOT ISSUED`) freezes the enumerated file allowlist (no
+wildcards), the forbidden list, the static/source-guard plan (no V2/RA-022, RA-023
+line-identity, no-`@idempotent`, no-`qty_done`, no-raw-transport, exact scopes +
+staff permission, file-boundary guard), the unit/concurrency/runtime/dev-store test
+plans, the rollback plan, DoD, hard stops, final report, and the no-self-accept/
+no-merge/no-Wave-5 prohibitions. The UAT matrix carries the Gate A validation
+addendum (concurrency, Odoo.sh runtime, dev-store campaign, CV-013 binding gate).
+
+**Next phase:** Phase 7 — adversarial review + coherent corrections; run the
+mandatory quality-feedback-loop learning review (record in research-handoff.md);
+update the canonical trackers (mvp-program-state, mvp-acceptance-matrix,
+architecture-review-log, sync-engine-risk-register); post the final #186 handoff
+comment; final report. Commit 5.
 
 **Partial-resume anchor:** if a genuine environment/context/time limit forces a
 stop, stop at a phase boundary after committing+pushing this checkpoint and
