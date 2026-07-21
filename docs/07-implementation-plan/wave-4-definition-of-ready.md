@@ -1,18 +1,31 @@
 # Wave 4 — Definition of Ready (Fulfillment & Tracking)
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted.**
-> Acceptance authority: product owner + Claude control room (per
-> [`mvp-completion-program.md`](mvp-completion-program.md) §4 Wave 4 and the
-> DEC-032 operating model). This checklist gates the *opening* of Wave 4; it
-> authorizes no implementation by itself. Structure follows
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16; Wave 4 Gate A
+> reconciliation appended 2026-07-21. NOT accepted.**
+> **Acceptance authority (Wave 4): ChatGPT control room** (scope governor,
+> acceptance, merge-authorizing authority), with the product owner as ultimate
+> business authority — per issue #186 comment `5038326525`, which supersedes the
+> earlier DEC-032 "product owner + Claude control room" wording **only** where it
+> assigned Claude sole control-room/merge authority (all worker-separation,
+> independent-review, source-of-truth, and no-self-acceptance safeguards remain
+> binding). This checklist gates the *opening* of Wave 4; it authorizes no
+> implementation by itself. Structure follows
 > [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
 > (acceptance preconditions → allowed/forbidden → acceptance criteria → tests →
 > rollback → definition of done), adapted to the macro-wave model.
 >
-> **Current program state (2026-07-16):** Wave 1 is **merged** and **SRR-03 is
-> CLOSED**. Wave 4 depends on Waves 2 and 3 being merged (order bindings +
-> Layer 2). As a Shopify-mutation wave, Wave 4 closure requires **genuine (not
-> simulated) dev-store fulfillment mutation evidence**.
+> **Current program state (2026-07-21):** Waves 1–3 are **merged** into
+> `mvp/program-integration` (base `ab4f12f5…` = PR #182 / Task 013 merge commit);
+> **SRR-03 CLOSED**; the **DEC-036/DEC-031 Layer 2 substrate is Accepted
+> (2026-07-19) and runtime-proven** in Wave 3 (G4-1 satisfiable). Wave 4 Gate A
+> decision reconciliation is
+> [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md)
+> (Proposed) — its 41-item matrix + the 16-condition Mode 2 reconciliation (12
+> preserve / 4 refine) + the Q1–Q7 escalations are the binding input to this DoR
+> and the Task 014 packet re-acceptance (G4-5). As a Shopify-mutation wave, Wave 4
+> closure requires **genuine (not simulated) dev-store fulfillment mutation
+> evidence**, and **CV-013 (#185) — carried forward as critical — must execute
+> green before final acceptance / RC / UAT** (not downgraded).
 
 ## 1. Wave objective (one scoped outcome)
 

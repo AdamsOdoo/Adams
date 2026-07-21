@@ -142,9 +142,9 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 | 1 — Resource inventory & authority map | ✅ complete → `docs/01-research/wave-4-fulfillment-resource-inventory.md` |
 | 2 — Official Shopify & Odoo 19 research | ✅ complete → `wave-4-shopify-official-fulfillment-notes.md`, `wave-4-odoo19-fulfillment-architecture-notes.md` |
 | 3 — Merged-code integration audit | ✅ complete → `docs/03-architecture/wave-4-fulfillment-current-code-audit.md` |
-| 4 — Decision & contradiction reconciliation | ⏳ next (DEC-038) |
-| 5 — Candidate DoR, architecture & Task 014 packet | ⏳ pending |
-| 6 — File boundary, tests, validation, rollback, locked prompt | ⏳ pending |
+| 4 — Decision & contradiction reconciliation | ✅ complete → `docs/04-decisions/DEC-038-…-reconciliation.md` (Proposed) |
+| 5 — Candidate DoR, architecture & Task 014 packet | ✅ complete → DoR updated; Task 014 packet §10 Gate A addendum (arch + Layer 2 + Mode 1/2 contracts) |
+| 6 — File boundary, tests, validation, rollback, locked prompt | ⏳ next |
 | 7 — Adversarial review, trackers, handoff, final report | ⏳ pending |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
@@ -178,8 +178,23 @@ reusable (10 fulfillment seams identified with exact refs); inventory is the exa
 `action_confirm()` auto-picking coexistence and the core Location-cache shared
 ownership.
 
-**Next phase:** author DEC-038 (41-item decision matrix + 16-condition Mode 2
-reconciliation); commit 3; continue.
+**Phase 4–5 key results:** DEC-038 (Proposed) = the 41-item decision matrix
+(dispositions PRESERVE/REFINE/ESCALATE) + the **16-condition Mode 2 engine
+reconciled condition-by-condition (12 preserve, 4 evidence-backed refine, 0
+superseded)** + the authority-model reconciliation + **7 escalated control-room
+questions (Q1–Q7)**. Task 014 packet §10 addendum: corrected base (`ab4f12f5`, not
+`Shopify-connector`), modular architecture contract, Layer 2 integration contract
+(no-`@idempotent`; verify-before-retry primary; own operation-scope literal;
+`code_required=False`+positive-evidence classifier), Mode 1 & Mode 2 contracts, and
+the note that the packet's §8 old locked prompt is **superseded** by the NEW locked
+prompt. DoR authority model reconciled to comment `5038326525`; program-state note
+refreshed (Waves 1–3 merged, Layer 2 accepted). Phase-1 inventory contradiction #1
+(the "stale 17" mis-flag) corrected.
+
+**Next phase:** Phase 6 — exact file allowlist/forbidden lists, static/source-guard
+plan, unit/concurrency/runtime/dev-store plans, rollback plan, and the NEW locked
+implementation prompt (`docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md`,
+marked `LOCKED CANDIDATE — NOT ISSUED`). Commit 4; continue.
 
 **Partial-resume anchor:** if a genuine environment/context/time limit forces a
 stop, stop at a phase boundary after committing+pushing this checkpoint and

@@ -445,3 +445,161 @@ cache, [`../03-architecture/modular-architecture-recommendation.md`](../03-archi
 §2.3); the D-014-2 scope set + TD-002 fix; RA-009/014/022/023 constraints;
 the §8 prompt's hard constraints (which must be re-issued, extended with
 §9.1–§9.6, not weakened).
+
+---
+
+## 10. Addendum (2026-07-21) — [Proposed] Wave 4 Gate A reconciliation contract
+
+> **Status: Proposed — Wave 4 Gate A, 2026-07-21. NOT accepted.** Appended per the
+> Gate A session; nothing above this line is rewritten. **Every D-014 closure and
+> the §9 addendum remain intact and binding.** This addendum records the exact
+> base, the modular architecture contract, the Layer 2 integration contract, and
+> the Mode 1 / Mode 2 contracts, reconciled against current official Shopify
+> (Admin API 2026-07, accessed 2026-07-21), Odoo 19.0 FINAL source, and the merged
+> code at the required base. Full basis + dispositions:
+> [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md).
+> The §8 "locked final implementation prompt" above **targets the wrong base
+> (`Shopify-connector`) and is SUPERSEDED**; the re-issued candidate is
+> [`../06-prompts/sol-wave-4-fulfillment-locked-prompt.md`](../06-prompts/sol-wave-4-fulfillment-locked-prompt.md)
+> (`LOCKED CANDIDATE — NOT ISSUED`). **Re-acceptance required** as one unit (DoR
+> G4-5) before Wave 4 opens.
+
+### 10.1 Exact base (corrects §8)
+Required base: **`mvp/program-integration@ab4f12f5a6857b2f3318ffc3b3f5f371307938bc`**
+(the PR #182 / Task 013 merge commit), **not** `Shopify-connector`. The merged
+Stage 0 Layer 2 substrate (DEC-036/DEC-031, Accepted 2026-07-19) is present and the
+fulfillment mutations run under it (program hard-stop 4).
+
+### 10.2 Modular architecture contract — `shopify_connector_fulfillment`
+A **modular addon family member**, not a giant module; split by responsibility.
+Depends on `['shopify_connector_core', 'shopify_connector_sale', 'stock_delivery',
+'sale_stock']` (verified module names — Odoo notes §4; `stock_delivery` supplies the
+picking carrier fields, `sale_stock` supplies `sale_id`/`sale_line_id`). **No
+dependency on `shopify_connector_inventory`; never reads `location.mapping`** (audit
+§4). Proposed structure (exact file list frozen in the locked prompt / Phase 6):
+
+- **Models / bindings:**
+  - `shopify.connector.fulfillment.binding` (inherits core `binding.mixin`;
+    `shopify_gid` = **Fulfillment GID**; `picking_id` M2O(`stock.picking`, restrict,
+    index); `order_binding_id` M2O(store-consistency); the D-014-1 fields;
+    `UNIQUE(store_id, shopify_gid)` + `UNIQUE(store_id, picking_id)`). **Transport
+    idempotency/request-hash never on the binding** — they live on
+    `mutation.attempt` (audit §4).
+  - **Inbound evidence records** (per-fulfillment: unique `store+Fulfillment GID`;
+    per-line: reconciled-quantity ledger) — modes §5 / §9.2.
+  - Store-settings extension: `fulfillment_operating_mode` (Selection `mode1`/`mode2`,
+    default `mode1`, Admin-only via Python `groups=`), `fulfillment_notification_confirmed`,
+    `fulfillment_last_reconciliation_at`, and the mode-switch state fields.
+- **Fields / state taxonomy:** store all 7 Layer-A Shopify enum families **raw +
+  normalized** with the unknown-future-value contract (status model §7) and the
+  Delivered-inconsistency case (§8); Layer-C connector-derived states.
+- **Services / handlers / job types:** register via **add-only** `_inherit` seams
+  (zero core edits except the one named readiness edit): `job_type` `selection_add`
+  `fulfillment_create` + `fulfillment_create_reconcile` + `fulfillment_tracking_update`
+  (+ its reconcile); mutation-domain strategies (§10.3); handlers/replay policies;
+  `_domain_flag_for_job_type` → `fulfillment_domain_enabled`; readiness `_get_checks`
+  write-scope check (§10.4).
+- **Cron / manual backend:** `fulfillment_reconciliation_check` cron (60 min,
+  `job_source='reconciliation'`, per-run uuid nonce); manual retry surface — under
+  Layer 2 (Odoo cron pattern, Odoo notes §8).
+- **Permissions / ACL / record rules / protected fields:** mirror the inventory
+  group matrix (Auditor r / Operator r+c / Reviewer r+w / Admin r+w+c; no unlink);
+  sanctioned-service creation; binding attempt evidence read-only to users.
+- **Error vocabulary / log events / manual-review actions:** DEC-009's 16 fixed
+  classes (no 17th); emit `fulfillment_notification_confirmation_missing`;
+  review-release = public action on the binding → private service helper.
+- **Lifecycle / uninstall:** `original_job_type` retyping; full bridge-stack
+  install/upgrade/uninstall/reinstall; zero residue.
+- **Extension seams for later Wave 5 UI:** fields owned here; screens are Wave 5.
+
+### 10.3 Layer 2 integration contract (the fulfillment mutation domain)
+Reuse the merged Stage 0 Layer 2 substrate **verbatim**; supply the 7-callback
+strategy (inventory `service.py` is the exact template — audit §4). Freeze:
+- **Domain-registry values / job types** — `fulfillment_create`,
+  `fulfillment_create_reconcile`, `fulfillment_tracking_update`
+  (+ reconcile), registered add-only.
+- **One job → at most one attempt for the job lifetime** (one-attempt-per-job
+  `UniqueIndex`); a retry after clean-fail/not-applied = a **freshly enqueued
+  replacement job** (new `payload_hash`) — no attempt reuse (audit §1, DEC-038 #25).
+- **C1 intent persistence; C2 durable attempt on the dedicated side cursor; NET
+  transport; C3 outcome persistence** — inherited unchanged.
+- **Fresh pre-C2 read** = the **primary duplicate-prevention control** for these
+  non-idempotent mutations: verify-before-retry, adopt-if-found (D-014-7). The
+  reconcile read (order's `fulfillmentOrders`/`fulfillments`) returns
+  `applied/not_applied/inconclusive`; `INCONCLUSIVE_RECONCILIATION_CAP=3` →
+  `duplicate_risk` block.
+- **NO `@idempotent` directive** in the fulfillment operation string (fulfillment
+  mutations are not on Shopify's still-17 `@idempotent` list — Shopify notes §4.1);
+  `shopify_idempotency_key` stays null for fulfillment. Dedup = `business_intent_
+  fingerprint` + `operation_scope_key` serialization + the reconcile read.
+- **`exact_request_fingerprint`** must be byte-identical between C2 and the wire —
+  deterministic payload building (audit §6).
+- **Operation-scope serialization** — fulfillment's **own** scope literal
+  (recommended `(store, picking, FulfillmentOrder GID)`; escalated Q1), overriding
+  `_compute_operation_scope_key` for its own types only.
+- **`classify_direct_result`** uses the **`code_required=False` + positive-success-
+  evidence** branch (fulfillment `userErrors` carry no `code`; require a real
+  Fulfillment id before treating empty `userErrors` as applied — audit §4).
+- **Store identity + connection generation** — reused verbatim; **reconciliation-
+  before-retry; replacement-job behavior; manual-review routing/release; bounded
+  retry; no raw transport; no false success; no unsupported exactly-once claim**
+  (at-most-once + reconciliation convergence only).
+- **Do not invent a parallel fulfillment mutation framework.**
+
+### 10.4 Readiness / scope contract
+The **one named core edit**: `shopify_connector_core/models/shopify_connector_readiness_check.py`
+`REQUIRED_MVP_SCOPES` swap `read_fulfillments` → `read_merchant_managed_fulfillment_orders`
+(+ its test). A conditional **`write_merchant_managed_fulfillment_orders`** check is
+appended via the `_get_checks` seam (active when `fulfillment_domain_enabled`). **Add
+the staff-permission axis** `fulfill_and_ship_orders` (distinct from the API scope —
+Shopify notes §2) to the readiness/UAT contract.
+
+### 10.5 Mode 1 contract (Odoo-controlled; default)
+- **Purpose:** Odoo delivery validation drives Shopify fulfillment; external
+  fulfillments observed → review, never auto stock mutation.
+- **Admission event:** `stock.picking._action_done` (once-per-validation; not
+  re-entrant `button_validate` — Odoo notes §2), eligible per D-014-3
+  (`picking_type_code=='outgoing'` AND `location_dest usage=='customer'` AND
+  `state=='done'` AND bound order + `fulfillment_domain_enabled`). Adopt the
+  `sale_stock`-auto-created pickings (Q2), do not duplicate.
+- **Eligibility:** FO `status ∈ {OPEN, IN_PROGRESS}` **AND
+  `supportedActions` contains `CREATE_FULFILLMENT`** (DEC-038 #41).
+- **Fulfillable quantity:** per-line done `stock.move.line.quantity`, ≤ FO line
+  `remainingQuantity` (fresh pre-C2 read).
+- **Location resolution:** FO `assignedLocation` (`.location` nullable → snapshot
+  fallback) + core location cache; never `location_mapping`.
+- **Matching:** move → `sale_line_id` → `shopify_line_item_gid` → FO line
+  (`lineItem.id`) → FO-line-item `id`; explicit `lineItemsByFulfillmentOrder` always;
+  skip null-GID lines; unmatched → `mapping_missing` review (RA-023).
+- **Mutation sequence:** `fulfillmentCreate` (notifyCustomer persisted at enqueue,
+  default off); later tracking → `fulfillmentTrackingInfoUpdate` in place.
+- **Success / clean-rejection / uncertain / reconcile / retry / duplicate-prevention:**
+  the §10.3 Layer 2 contract.
+- **Inbound:** observe every fulfillment; origin-classify (own-GID ledger primary);
+  external → review case (import tracking / acknowledge / explicit validate).
+- **COD / scheduled / manual / disconnect / reconnect / logs:** per §9 + DEC-038.
+
+### 10.6 Mode 2 contract (bidirectional exact reconciliation; opt-in, Wave 4 backend)
+- Everything Mode 1 does **plus** auto-validate the Odoo delivery from an external
+  Shopify fulfillment **only when all 16 conditions pass** (the reconciled engine —
+  DEC-038 §3: 12 preserve, 4 refine); **first failure → named review reason**; any
+  ambiguity → review, **no partial automation, no auto stock mutation on
+  ambiguity**.
+- **Deterministic picking selection** (modes §4.1): drive `cancel_backorder`
+  explicitly (never the `ask` wizard — Odoo notes §3); any allocation choice →
+  `picking_ambiguous`.
+- **Mode switch** (Admin-only, audited, never-replays, scan-gated, idempotent,
+  rollback-safe — modes §6): in-flight Layer 2 jobs complete under Layer 2 and are
+  not cancelled by the switch (DEC-038 #19).
+- **Disconnected-period external fulfillments → review in BOTH modes** (the stricter
+  modes §7 rule; DEC-038 #20).
+
+### 10.7 New / corrected test families (delta to §5 / §9.6)
+Add: `supportedActions`/status eligibility; `assignedLocation.location`-null
+fallback; `>1 FO per location`; the FO-line-item-GID 2-hop matching; the
+no-`@idempotent` **source-guard** (the fulfillment operation string must not contain
+`@idempotent`); the `code_required=False` positive-success-evidence classifier;
+`action_confirm()` auto-picking coexistence; the `send_to_shipper` `rate_and_ship`
+collision; staff-permission (`fulfill_and_ship_orders`) tests distinct from API-scope
+tests; and a `qty_done`/`quantity_done` static source-guard (the field does not exist
+in Odoo 19). Exact file names frozen in the locked prompt (Phase 6).

@@ -145,14 +145,18 @@ used here for the Gate A decision-reconciliation record
 Material contradictions/gaps surfaced during inventory (each dispositioned in
 DEC-038):
 
-1. **Stale `@idempotent` "17 mutations" count** — asserted in RA-014, RA-017,
-   AR-008 evidence cell, and DEC-011 idempotency posture. Current official docs
-   (2026-07-21) confirm the 24-hour key window but **not** the "17" count; a
-   2026-04 mandatory-idempotency change (AR-057/DEC-036) supersedes it. The
-   fulfillment-mutation idempotency status must be re-verified against current
-   docs — **decision-critical** (governs whether `fulfillmentCreate` /
-   `fulfillmentTrackingInfoUpdate` have native idempotency, hence whether
-   verify-before-retry remains the primary control). See Shopify notes §mutations.
+1. **`@idempotent` "17 mutations" count — CORRECTED (not stale).** This item was
+   initially flagged as stale; **Phase 2 direct verification of the live official
+   idempotency page (dated 2026-02-02, accessed 2026-07-21) confirms the list is
+   still exactly 17 mutations, with `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`
+   absent** — corroborated by the 2026-01 changelog. The only 2026-04 change is that
+   supplying an `@idempotent` key became *mandatory* for those 17 (inventory/refund)
+   mutations; fulfillment is unaffected. So the "17-mutation" wording in RA-014,
+   RA-017, AR-008, and DEC-011 is **accurate** (a clarifying refresh, not a
+   correction, is warranted). The **decision-critical consequence is confirmed and
+   unchanged:** fulfillment mutations have **no native idempotency** → verify-before-
+   retry + operation-scope serialization under Layer 2 remains the **primary**
+   duplicate-prevention control (see Shopify notes §4.1, DEC-038 item 27).
 2. **Authority model drift** — DoR, modes doc, status model, COD doc, program
    files still cite the DEC-032 "product owner + Claude control room" acceptance
    model. Superseded for Wave 4 by issue #186 comment `5038326525` (ChatGPT =
