@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U0 operator UI: the two transient input wizards. Each collects input
+        and calls an existing sanctioned method; neither owns a business rule.
+    -->
+
+    <!-- Cancellation wizard -->
+    <record id="view_shopify_connector_job_cancel_wizard_form" model="ir.ui.view">
+        <field name="name">shopify.connector.job.cancel.wizard.form</field>
+        <field name="model">shopify.connector.job.cancel.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Cancel job">
+                <group>
+                    <field name="job_id" readonly="1"/>
+                    <field name="job_state" readonly="1"/>
+                    <field name="reason" placeholder="Why is this being cancelled? This is recorded."/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Cancel this job"
+                            class="btn-primary"/>
+                    <button string="Keep job" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_job_cancel_wizard" model="ir.actions.act_window">
+        <field name="name">Cancel job</field>
+        <field name="res_model">shopify.connector.job.cancel.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shopify_connector_job_cancel_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Mutation-attempt resolution wizard -->
+    <record id="view_shopify_connector_mutation_resolution_wizard_form" model="ir.ui.view">
+        <field name="name">shopify.connector.mutation.resolution.wizard.form</field>
+        <field name="model">shopify.connector.mutation.resolution.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Resolve mutation attempt">
+                <div class="alert alert-warning" role="alert">
+                    This records an administrator judgement about a change to Shopify.
+                    It is audited and cannot be undone. Base it on the evidence.
+                </div>
+                <group>
+                    <field name="mutation_attempt_id" readonly="1"/>
+                    <field name="mutation_domain" readonly="1"/>
+                    <field name="observed_outcome" readonly="1"/>
+                    <field name="disposition" widget="radio"/>
+                    <field name="reason" placeholder="What evidence supports this decision?"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Record decision"
+                            class="btn-primary"
+                            confirm="This decision is audited and cannot be undone. Continue?"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_mutation_resolution_wizard" model="ir.actions.act_window">
+        <field name="name">Resolve mutation attempt</field>
+        <field name="res_model">shopify.connector.mutation.resolution.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_shopify_connector_mutation_resolution_wizard_form"/>
+        <field name="target">new</field>
+    </record>
+</odoo>

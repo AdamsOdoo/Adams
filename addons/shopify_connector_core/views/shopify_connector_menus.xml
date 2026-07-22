@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U0 operator UI: connector navigation.
+
+        One root app menu "Shopify Connector", gated to the connector Auditor
+        group so the whole tree is hidden from users outside the connector
+        groups. Every first-level destination is a real, usable U0 screen; no
+        empty placeholders for later U1/U2/U3 work are shown. Mutation Evidence
+        is nested under the Error & Review Center as review content.
+
+        Read-only surfaces are visible to all four roles (all imply Auditor);
+        write/action controls inside each screen follow the existing server
+        group + state matrix.
+    -->
+    <menuitem id="menu_shopify_connector_root"
+              name="Shopify Connector"
+              sequence="50"
+              groups="shopify_connector_core.group_shopify_connector_auditor"/>
+
+    <menuitem id="menu_shopify_connector_dashboard"
+              name="Dashboard"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_dashboard"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_connector_stores"
+              name="Stores"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_store"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_connector_sync_center"
+              name="Sync Center"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_sync_center"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_connector_error_center"
+              name="Error &amp; Review Center"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_error_center"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_connector_mutation_evidence"
+              name="Mutation Evidence"
+              parent="menu_shopify_connector_error_center"
+              action="action_shopify_connector_mutation_attempt"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_connector_logs"
+              name="Logs"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_job_log"
+              sequence="50"/>
+</odoo>

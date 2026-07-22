@@ -14,3 +14,8 @@ from . import shopify_connector_job_dispatch
 from . import shopify_connector_stale_owner_sweep
 from . import shopify_connector_job_log
 from . import shopify_connector_readiness_check
+# U0 operator UI foundation: read-only dashboard aggregate service + two
+# transient input wizards (no new business logic, no new persistent table).
+from . import shopify_connector_ui_dashboard
+from . import shopify_connector_job_cancel_wizard
+from . import shopify_connector_mutation_resolution_wizard

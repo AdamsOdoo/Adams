@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U0 operator UI: Store & readiness experience.
+
+        Read-only for Auditor / Operator / Reviewer (store ACL is read for all
+        four roles); lifecycle/test controls are Administrator-only (store
+        write is Admin-only, and every button targets an existing sanctioned
+        method). The stored credential value is NEVER displayed and this UI
+        never claims the token is encrypted.
+    -->
+
+    <!-- Search -->
+    <record id="view_shopify_connector_store_search" model="ir.ui.view">
+        <field name="name">shopify.connector.store.search</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <search string="Stores">
+                <field name="name"/>
+                <field name="shop_domain"/>
+                <filter name="filter_connected" string="Connected"
+                        domain="[('state', '=', 'connected')]"/>
+                <filter name="filter_reconnect" string="Needs reconnect"
+                        domain="[('state', '=', 'reconnect_needed')]"/>
+                <filter name="filter_setup" string="Setup incomplete"
+                        domain="[('state', '=', 'setup_incomplete')]"/>
+                <filter name="filter_disconnected" string="Disconnected"
+                        domain="[('state', 'in', ('disconnecting', 'disconnected'))]"/>
+                <separator/>
+                <filter name="filter_api_degraded" string="API degraded or throttled"
+                        domain="[('api_health_state', 'in', ('throttled', 'degraded'))]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_state" string="Connection state" context="{'group_by': 'state'}"/>
+                    <filter name="group_health" string="API health" context="{'group_by': 'api_health_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- List -->
+    <record id="view_shopify_connector_store_list" model="ir.ui.view">
+        <field name="name">shopify.connector.store.list</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <list string="Stores"
+                  decoration-success="state == 'connected'"
+                  decoration-warning="state == 'reconnect_needed'"
+                  decoration-muted="state in ('disconnecting', 'disconnected')"
+                  create="false" delete="false" edit="false">
+                <field name="name"/>
+                <field name="shop_domain"/>
+                <field name="state" string="Connection"/>
+                <field name="api_health_state" string="API health" optional="show"/>
+                <field name="credential_present" string="Credential on file" optional="show"/>
+                <field name="last_test_connection_result" string="Last test" optional="show"/>
+                <field name="last_readiness_result" string="Last readiness" optional="show"/>
+                <field name="last_test_connection_at" string="Tested" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Form -->
+    <record id="view_shopify_connector_store_form" model="ir.ui.view">
+        <field name="name">shopify.connector.store.form</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="arch" type="xml">
+            <form string="Store" create="false" delete="false">
+                <header>
+                    <!-- Existing sanctioned lifecycle / test methods only.
+                         Administrator-only (store write is Admin-only). Button
+                         visibility approximates the server preconditions; the
+                         server method is the final authority. -->
+                    <button name="action_test_connection" type="object"
+                            string="Test connection" class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state in ('disconnecting', 'disconnected') or not credential_present"
+                            help="Ask Shopify to confirm the stored credential and permissions."/>
+                    <button name="action_activate" type="object"
+                            string="Activate" class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state in ('connected', 'disconnecting', 'disconnected') or not credential_present"
+                            help="Move the store to Connected once test connection and readiness have passed."/>
+                    <button name="action_reconnect" type="object"
+                            string="Reconnect"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state not in ('reconnect_needed', 'disconnected')"
+                            help="Re-verify the credential and readiness to resume syncing."/>
+                    <button name="action_disconnect" type="object"
+                            string="Disconnect"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state in ('disconnecting', 'disconnected')"
+                            confirm="Disconnecting stops all syncing and removes the stored credentials. History, matches, and logs are kept. You can reconnect anytime."/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="setup_incomplete,connected,reconnect_needed,disconnected"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h3><field name="shop_domain" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Connection">
+                            <field name="state" readonly="1"/>
+                            <field name="api_version" readonly="1"/>
+                            <field name="api_health_state" readonly="1"/>
+                            <field name="api_health_reason" readonly="1"
+                                   invisible="not api_health_reason"/>
+                            <field name="webhook_ready" readonly="1"/>
+                        </group>
+                        <group string="Credential">
+                            <field name="credential_present" string="Credential on file" readonly="1"/>
+                            <field name="credential_last_verified_at" readonly="1"/>
+                            <field name="credential_last_replaced_at" readonly="1"
+                                   invisible="not credential_last_replaced_at"/>
+                            <field name="credential_last_failure_reason" readonly="1"
+                                   invisible="not credential_last_failure_reason"/>
+                            <div class="text-muted" colspan="2">
+                                The access token is stored with restricted access and is never shown here.
+                            </div>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Last test connection">
+                            <field name="last_test_connection_result" readonly="1"/>
+                            <field name="last_test_connection_at" readonly="1"/>
+                            <field name="last_test_connection_reason" readonly="1"
+                                   invisible="not last_test_connection_reason"/>
+                        </group>
+                        <group string="Last readiness check">
+                            <field name="last_readiness_result" readonly="1"/>
+                            <field name="last_readiness_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Disconnect / quiescence"
+                           invisible="disconnect_status == 'none'">
+                        <field name="disconnect_status" readonly="1"/>
+                        <field name="disconnect_status_reason" readonly="1"
+                               invisible="not disconnect_status_reason"/>
+                        <field name="disconnect_open_lease_count" readonly="1"/>
+                        <field name="disconnect_requested_at" readonly="1"
+                               invisible="not disconnect_requested_at"/>
+                        <field name="disconnect_completed_at" readonly="1"
+                               invisible="not disconnect_completed_at"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_shopify_connector_store" model="ir.actions.act_window">
+        <field name="name">Stores</field>
+        <field name="res_model">shopify.connector.store</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shopify_connector_store_search"/>
+        <field name="context">{}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No store connected yet</p>
+            <p>Connect your Shopify store to begin. Stores appear here once created.</p>
+        </field>
+    </record>
+</odoo>
