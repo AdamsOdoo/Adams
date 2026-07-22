@@ -156,10 +156,17 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     def _c7_quantity_match(self, ctx):
         # The candidate picking's pending demand must equal (or deterministically
         # split to) the fulfillment quantities; compared against Odoo 19
-        # stock.move.line.quantity, never qty_done.
+        # stock.move.line.quantity, never qty_done. A quantity/coverage failure
+        # across every open candidate is reported HERE as quantity_mismatch;
+        # condition 9 is reserved for genuine deterministic-selection ambiguity
+        # among candidates that already passed this coverage check.
         ctx['required_qty'] = {
             sale_line.id: qty for gid, (sale_line, qty) in ctx['line_mapping'].items()
         }
+        compatible = self._quantity_compatible_pickings(ctx)
+        ctx['quantity_compatible_pickings'] = compatible
+        if not compatible:
+            return False, 'no quantity-compatible picking candidate'
         return True, None
 
     @api.model
@@ -180,6 +187,8 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
 
     @api.model
     def _c9_picking(self, ctx):
+        # Reserved for genuine deterministic-selection ambiguity ONLY: condition
+        # 7 has already proved at least one quantity-compatible candidate exists.
         picking = self._select_deterministic_picking(ctx)
         if not picking:
             return False, 'no single deterministic picking'
@@ -222,11 +231,56 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
 
     @api.model
     def _c14_remote_state(self, ctx):
-        # Fresh live re-read (already fetched in _c3 for this evaluation pass);
-        # confirm still SUCCESS and not cancelled.
-        node = ctx.get('fulfillment_node') or {}
+        # Separately fresh, authoritative Shopify read — deliberately NOT the
+        # node captured by condition 3. Performed immediately before the local
+        # stock validation that follows a 16/16 pass, through the same
+        # sanctioned read-only reader methods, no lock/transaction held across
+        # it. Any change, absence, or incompleteness fails closed and never
+        # reaches local validation.
+        store = ctx['store']
+        order_gid = ctx['order_binding'].shopify_gid
+        fulfillments = self._read_order_fulfillments(store, order_gid)
+        node = next(
+            (f for f in fulfillments
+             if isinstance(f, dict)
+             and f.get('id') == ctx['evidence'].shopify_fulfillment_gid),
+            None,
+        )
+        if not node:
+            return False, 'target fulfillment missing on second read'
         if node.get('status') != 'SUCCESS':
             return False, 'remote state changed'
+        lines = ((node.get('fulfillmentLineItems') or {}).get('nodes')) or []
+        if not lines:
+            return False, 'no fulfillment line items on second read'
+        second_qty_by_line = {}
+        for line in lines:
+            if not isinstance(line, dict):
+                return False, 'malformed fulfillment line on second read'
+            gid = (line.get('lineItem') or {}).get('id')
+            if not gid:
+                return False, 'unresolved fulfillment line on second read'
+            second_qty_by_line[gid] = (
+                second_qty_by_line.get(gid, 0) + (line.get('quantity') or 0)
+            )
+        first_qty_by_line = {}
+        for gid, (sale_line, qty) in ctx['line_mapping'].items():
+            first_qty_by_line[gid] = first_qty_by_line.get(gid, 0) + qty
+        if second_qty_by_line != first_qty_by_line:
+            return False, 'fulfillment quantities changed on second read'
+        # Location evidence must remain resolvable and unchanged (a fresh read
+        # of the same sanctioned FO/location path condition 8 already used).
+        node_fos = self._read_fulfillment_orders(store, order_gid)
+        try:
+            second_location_gid = self._resolve_single_location(
+                store,
+                [fo for fo in node_fos if fo.get('status') in ('OPEN', 'IN_PROGRESS')]
+                or node_fos,
+            )
+        except FulfillmentReadError:
+            return False, 'location evidence changed on second read'
+        if second_location_gid != ctx.get('location_gid'):
+            return False, 'location evidence changed on second read'
         return True, None
 
     @api.model
@@ -246,7 +300,12 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _select_deterministic_picking(self, ctx):
+    def _quantity_compatible_pickings(self, ctx):
+        """Every open outgoing candidate picking whose pending per-line demand
+        covers the required fulfillment quantities (Modes §4.1). Read-only,
+        no selection/ambiguity judgement — condition 7 uses this to decide
+        `quantity_mismatch`; condition 9's `_select_deterministic_picking`
+        uses the same list to decide `picking_ambiguous`."""
         order = ctx['order_binding'].sale_order_id
         required = ctx['required_qty']
         candidates = order.picking_ids.filtered(
@@ -254,7 +313,7 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             and p.location_dest_id.usage == 'customer'
             and p.state in ('assigned', 'confirmed', 'waiting')
         )
-        exact = []
+        compatible = []
         for picking in candidates:
             demand = {}
             for move in picking.move_ids:
@@ -269,10 +328,22 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
                 for line_id, qty in required.items()
             )
             if covers:
-                exact.append(picking)
-        # Exactly one covering candidate -> deterministic; zero or many -> fail.
-        if len(exact) == 1:
-            return exact[0]
+                compatible.append(picking)
+        return compatible
+
+    @api.model
+    def _select_deterministic_picking(self, ctx):
+        # Genuine deterministic-selection ambiguity ONLY: condition 7 already
+        # proved at least one quantity-compatible candidate exists, so a
+        # coverage failure can never reach here as 'no candidates'. Exactly
+        # one compatible candidate -> deterministic; more than one -> ambiguous
+        # (never re-classified as quantity_mismatch — coverage is not the
+        # problem, selection is).
+        compatible = ctx.get('quantity_compatible_pickings')
+        if compatible is None:
+            compatible = self._quantity_compatible_pickings(ctx)
+        if len(compatible) == 1:
+            return compatible[0]
         return False
 
     # ------------------------------------------------------------------

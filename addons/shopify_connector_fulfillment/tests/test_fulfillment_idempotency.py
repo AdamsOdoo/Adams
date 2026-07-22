@@ -8,6 +8,9 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attemp
     C2_SIDE_CURSOR_SENTINEL,
     INCONCLUSIVE_RECONCILIATION_CAP,
 )
+from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (
+    FulfillmentReadError,
+)
 
 
 class TestFulfillmentIdempotency(TransactionCase):
@@ -210,6 +213,87 @@ class TestFulfillmentIdempotency(TransactionCase):
         # Recorded as an inconclusive reconciliation, not resolved not_applied.
         self.assertEqual(attempt.inconclusive_reconciliation_count, 1)
         self.assertFalse(attempt.resolution_disposition)
+
+    # ------------------------------------------------------------------
+    # P2 correction: Mode 2 condition 14's separately fresh read is a pure
+    # local-evaluation read. It must never create mutation-attempt evidence
+    # or authorize a resend -- that machinery belongs exclusively to the
+    # C1/C2/NET/C3 mutation path exercised above, never to Mode 2's
+    # read-only auto-application evaluator.
+    # ------------------------------------------------------------------
+
+    def _mode2_ctx(self, location_gid='gid://shopify/Location/1'):
+        sale_line = Mock()
+        sale_line.id = 1
+        order_binding = Mock()
+        order_binding.shopify_gid = 'gid://shopify/Order/1'
+        evidence = Mock()
+        evidence.shopify_fulfillment_gid = 'gid://shopify/Fulfillment/1'
+        return {
+            'store': self.store,
+            'order_binding': order_binding,
+            'evidence': evidence,
+            'line_mapping': {
+                'gid://shopify/LineItem/1': (sale_line, 2),
+            },
+            'location_gid': location_gid,
+            'plan': {},
+        }
+
+    def _mode2_second_read_fixture(self):
+        node = {
+            'id': 'gid://shopify/Fulfillment/1', 'status': 'SUCCESS',
+            'fulfillmentLineItems': {'nodes': [{
+                'id': 'gid://shopify/FulfillmentLineItem/1', 'quantity': 2,
+                'lineItem': {'id': 'gid://shopify/LineItem/1'},
+            }]},
+        }
+        fo = {
+            'id': 'gid://shopify/FulfillmentOrder/1', 'status': 'OPEN',
+            'assignedLocation': {
+                'location': {'id': 'gid://shopify/Location/1'}},
+        }
+        self.env['shopify.connector.location'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_location_gid': 'gid://shopify/Location/1',
+            'name': 'L', 'shopify_location_active': True,
+        })
+        return node, fo
+
+    def test_condition14_second_read_never_creates_mutation_attempt(self):
+        ctx = self._mode2_ctx()
+        node, fo = self._mode2_second_read_fixture()
+        before = self.Attempt.search_count([])
+        with patch.object(type(self.Service), '_read_order_fulfillments',
+                          return_value=[node]), \
+                patch.object(type(self.Service), '_read_fulfillment_orders',
+                             return_value=[fo]):
+            ok, _detail = self.Service._c14_remote_state(ctx)
+        self.assertTrue(ok)
+        self.assertEqual(self.Attempt.search_count([]), before)
+
+    def test_condition14_failed_second_read_does_not_authorize_resend(self):
+        ctx = self._mode2_ctx()
+        with patch.object(type(self.Service), '_read_order_fulfillments',
+                          return_value=[]):
+            ok, _detail = self.Service._c14_remote_state(ctx)
+        self.assertFalse(ok)
+        # No mutation-attempt evidence was created or made eligible for a
+        # resend by this pure read-only local-evaluation condition.
+        self.assertEqual(self.Attempt.search_count([]), 0)
+
+    def test_condition14_unknown_read_outcome_remains_fail_closed(self):
+        # An incomplete/malformed second read is an unknown outcome; it must
+        # propagate (fail closed) rather than be silently treated as a pass.
+        ctx = self._mode2_ctx()
+        with patch.object(
+            type(self.Service), '_read_order_fulfillments',
+            side_effect=FulfillmentReadError(
+                'data_shape_schema_mismatch', 'incomplete'),
+        ):
+            with self.assertRaises(FulfillmentReadError):
+                self.Service._c14_remote_state(ctx)
+        self.assertEqual(self.Attempt.search_count([]), 0)
 
     def test_preflight_blocks_redispatch_with_existing_attempt(self):
         job, token = self._mutation_job()

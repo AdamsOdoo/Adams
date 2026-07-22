@@ -220,6 +220,47 @@ class TestFulfillmentSourceGuards(TransactionCase):
                     violations.append((path.name, node.lineno))
         self.assertFalse(violations, violations)
 
+    # -- P2 correction: condition 14's separately fresh read uses only the
+    #    sanctioned read-only reader path; no raw transport; no mutation
+    #    document reachable from it.
+
+    def _condition14_function_node(self):
+        source = (self._addon_root() / 'models'
+                  / 'shopify_connector_fulfillment_mode2.py').read_text('utf-8')
+        tree = ast.parse(source)
+        return next(
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == '_c14_remote_state'
+        )
+
+    def test_condition14_uses_only_sanctioned_read_methods(self):
+        c14 = self._condition14_function_node()
+        calls = {
+            node.func.attr for node in ast.walk(c14)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        # It must actually perform its own read through the sanctioned
+        # read-only reader/location-resolution methods...
+        self.assertTrue(
+            calls & {'_read_order_fulfillments', '_read_fulfillment_orders',
+                      '_resolve_single_location'},
+        )
+        # ...and never through raw transport or the mutation-execution path.
+        self.assertNotIn('_send', calls)
+        self.assertNotIn('execute_business', calls)
+        self.assertNotIn('execute', calls)
+
+    def test_condition14_contains_no_mutation_document(self):
+        c14 = self._condition14_function_node()
+        literals = [
+            node.value for node in ast.walk(c14)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        ]
+        for literal in literals:
+            self.assertNotRegex(literal.lower(), r'\bmutation\b')
+            self.assertNotIn('fulfillmentcreate(', literal.lower())
+            self.assertNotIn('fulfillmenttrackinginfoupdate(', literal.lower())
+
     # -- File-boundary guard: nothing outside the §2/§5 enumerated allowlist.
 
     def test_file_boundary_allowlist(self):

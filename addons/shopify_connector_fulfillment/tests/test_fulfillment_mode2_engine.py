@@ -1,7 +1,21 @@
 import uuid
+from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
 from odoo.tests.common import TransactionCase
+
+from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (
+    FulfillmentReadError,
+)
+
+
+class _FakeRecordset(list):
+    """Minimal `.filtered()`-capable stand-in for an Odoo recordset, used to
+    unit-test `_quantity_compatible_pickings` against plain Mock pickings
+    without requiring real stock.move fixtures."""
+
+    def filtered(self, predicate):
+        return _FakeRecordset(x for x in self if predicate(x))
 
 # Stable GIDs shared across the fixture and the stubbed reader nodes.
 LINE_ITEM_GID = 'gid://shopify/LineItem/111'
@@ -174,23 +188,60 @@ class TestFulfillmentMode2Engine(TransactionCase):
     _UNSET = object()
 
     def _evaluate(self, evidence, fulfillments=_UNSET, fos=_UNSET,
-                  picking=_UNSET):
+                  picking=_UNSET, quantity_compatible=_UNSET,
+                  fulfillments_side_effect=None, fos_side_effect=None):
         """Run _evaluate_mode2 with the two reads + the deterministic selector
         stubbed. Defaults produce a fully-valid 16/16 pass; a test overrides one
-        input to break exactly one condition."""
-        if fulfillments is self._UNSET:
-            fulfillments = [self._fulfillment_node()]
-        if fos is self._UNSET:
-            fos = [self._fo_node()]
-        if picking is self._UNSET:
-            picking = self._mock_picking()
+        input to break exactly one condition.
+
+        ``quantity_compatible``, when given, patches
+        ``_quantity_compatible_pickings`` directly (condition 7's real coverage
+        check) and leaves ``_select_deterministic_picking`` UNPATCHED so its
+        real ambiguity logic runs against that list — this is how the
+        quantity_mismatch-vs-picking_ambiguous distinction is exercised without
+        real stock.move fixtures. ``fulfillments_side_effect``/
+        ``fos_side_effect``, when given, let a test return a genuinely
+        different value on condition 14's second call than condition 3/8's
+        first call (proving the second read is separate, not reused).
+        """
         Service = self.Service
-        with patch.object(type(Service), '_read_order_fulfillments',
-                          return_value=fulfillments), \
-                patch.object(type(Service), '_read_fulfillment_orders',
-                             return_value=fos), \
-                patch.object(type(Service), '_select_deterministic_picking',
-                             return_value=picking):
+        with ExitStack() as stack:
+            if fulfillments_side_effect is not None:
+                stack.enter_context(patch.object(
+                    type(Service), '_read_order_fulfillments',
+                    side_effect=fulfillments_side_effect,
+                ))
+            else:
+                if fulfillments is self._UNSET:
+                    fulfillments = [self._fulfillment_node()]
+                stack.enter_context(patch.object(
+                    type(Service), '_read_order_fulfillments',
+                    return_value=fulfillments,
+                ))
+            if fos_side_effect is not None:
+                stack.enter_context(patch.object(
+                    type(Service), '_read_fulfillment_orders',
+                    side_effect=fos_side_effect,
+                ))
+            else:
+                if fos is self._UNSET:
+                    fos = [self._fo_node()]
+                stack.enter_context(patch.object(
+                    type(Service), '_read_fulfillment_orders',
+                    return_value=fos,
+                ))
+            if quantity_compatible is not self._UNSET:
+                stack.enter_context(patch.object(
+                    type(Service), '_quantity_compatible_pickings',
+                    return_value=quantity_compatible,
+                ))
+            else:
+                if picking is self._UNSET:
+                    picking = self._mock_picking()
+                stack.enter_context(patch.object(
+                    type(Service), '_select_deterministic_picking',
+                    return_value=picking,
+                ))
             return Service._evaluate_mode2(evidence)
 
     def _assert_stopped(self, result, evidence, reason, unchanged_state='observed'):
@@ -275,15 +326,105 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self._assert_stopped(result, evidence, 'quantity_overrun')
         self.assertNotEqual(result['reason'], 'over_fulfillment')
 
-    def test_c7_quantity_match_currently_always_passes_and_records_required(self):
-        # _c7_quantity_match is a no-op gate in the current engine: it always
-        # passes and records the required-quantity map for the selector. There
-        # is therefore no input that makes it emit 'quantity_mismatch'; this
-        # documents the helper's actual contract rather than inventing one.
-        ctx = {'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)}, 'plan': {}}
+    # -- P2 correction: condition 7 (quantity_mismatch) --------------------
+    # Corrected contract: condition 7 now actually determines quantity/
+    # coverage compatibility (it was previously a permanent no-op that always
+    # passed). A quantity incompatibility across every open candidate is
+    # reported HERE as 'quantity_mismatch' and must never fall through to be
+    # reported only as condition 9's 'picking_ambiguous'.
+
+    def _covering_picking(self, qty=2.0, sale_line=None):
+        picking = Mock()
+        picking.picking_type_code = 'outgoing'
+        picking.location_dest_id.usage = 'customer'
+        picking.state = 'assigned'
+        move = Mock()
+        move.sale_line_id.id = (sale_line or self.sale_line).id
+        move.product_uom_qty = qty
+        picking.move_ids = [move]
+        return picking
+
+    def test_c7_exact_quantity_coverage_records_required_and_passes(self):
+        covering = self._covering_picking(qty=2.0)
+        order_binding = Mock()
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([covering])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
         ok, _detail = self.Service._c7_quantity_match(ctx)
         self.assertTrue(ok)
         self.assertEqual(ctx['required_qty'], {self.sale_line.id: 2})
+        self.assertEqual(ctx['quantity_compatible_pickings'], [covering])
+
+    def test_c7_excess_demand_still_covers(self):
+        # Over-provisioning (demand > required) is safe and still covers;
+        # only under-coverage is a quantity mismatch.
+        generous = self._covering_picking(qty=5.0)
+        order_binding = Mock()
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([generous])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        ok, _detail = self.Service._c7_quantity_match(ctx)
+        self.assertTrue(ok)
+        self.assertEqual(ctx['quantity_compatible_pickings'], [generous])
+
+    def test_c7_insufficient_quantity_no_compatible_candidate(self):
+        short = self._covering_picking(qty=1.0)  # required is 2
+        order_binding = Mock()
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([short])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        ok, detail = self.Service._c7_quantity_match(ctx)
+        self.assertFalse(ok)
+        self.assertEqual(ctx['quantity_compatible_pickings'], [])
+
+    def test_c7_multiple_candidates_only_one_quantity_compatible(self):
+        short = self._covering_picking(qty=1.0)
+        covering = self._covering_picking(qty=2.0)
+        order_binding = Mock()
+        order_binding.sale_order_id.picking_ids = _FakeRecordset(
+            [short, covering])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        ok, _detail = self.Service._c7_quantity_match(ctx)
+        self.assertTrue(ok)
+        self.assertEqual(ctx['quantity_compatible_pickings'], [covering])
+
+    def test_c7_quantity_mismatch_no_compatible_picking_end_to_end(self):
+        # No open candidate covers the required quantities: the first-fail
+        # reason is quantity_mismatch, never picking_ambiguous.
+        evidence = self._evidence()
+        result = self._evaluate(evidence, quantity_compatible=[])
+        self._assert_stopped(result, evidence, 'quantity_mismatch')
+
+    def test_c9_single_quantity_compatible_candidate_is_selected(self):
+        # Exactly one quantity-compatible candidate: condition 7 passes and
+        # condition 9 deterministically selects it (real, unpatched
+        # _select_deterministic_picking) -- no ambiguity.
+        evidence = self._evidence()
+        picking = self._mock_picking()
+        result = self._evaluate(evidence, quantity_compatible=[picking])
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['plan']['picking'], picking)
+
+    def test_c9_picking_ambiguous_multiple_quantity_compatible_candidates(self):
+        # Two+ candidates both quantity-compatible: genuine deterministic-
+        # selection ambiguity -> picking_ambiguous (coverage was never the
+        # problem here, so quantity_mismatch must NOT fire).
+        evidence = self._evidence()
+        result = self._evaluate(
+            evidence,
+            quantity_compatible=[self._mock_picking(), self._mock_picking()],
+        )
+        self._assert_stopped(result, evidence, 'picking_ambiguous')
+        self.assertNotEqual(result['reason'], 'quantity_mismatch')
 
     def test_c8_location_unmapped(self):
         # The FO's assigned Shopify location is absent from the core cache.
@@ -293,7 +434,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self._assert_stopped(result, evidence, 'location_unmapped')
 
     def test_c9_picking_ambiguous(self):
-        # The deterministic selector cannot resolve exactly one covering picking.
+        # Low-level unit check of condition 9 in isolation: the (mocked)
+        # deterministic selector itself reports no resolvable picking. See
+        # test_c9_picking_ambiguous_multiple_quantity_compatible_candidates
+        # above for the real end-to-end genuine-ambiguity path, and
+        # test_c7_quantity_mismatch_no_compatible_picking_end_to_end for the
+        # corrected quantity_mismatch routing this must never fall back to.
         evidence = self._evidence()
         result = self._evaluate(evidence, picking=False)
         self._assert_stopped(result, evidence, 'picking_ambiguous')
@@ -345,6 +491,157 @@ class TestFulfillmentMode2Engine(TransactionCase):
         node = self._fulfillment_node(status='CANCELLED')
         result = self._evaluate(evidence, fulfillments=[node])
         self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    # -- P2 correction: condition 14 performs a SEPARATELY fresh live read --
+    # (never reuses condition 3's read). Each test below uses
+    # ``fulfillments_side_effect``/``fos_side_effect`` -- a distinct value per
+    # call -- so that condition 3/8's first call and condition 14's second
+    # call are provably independent reads, not one cached observation.
+
+    def test_c14_second_read_is_executed_separately(self):
+        # _read_order_fulfillments must be called twice during one evaluation
+        # pass: once for condition 3, once (genuinely re-invoked) for
+        # condition 14.
+        evidence = self._evidence()
+        node = self._fulfillment_node()
+        Service = self.Service
+        with patch.object(type(Service), '_read_order_fulfillments',
+                          return_value=[node]) as mocked, \
+                patch.object(type(Service), '_read_fulfillment_orders',
+                             return_value=[self._fo_node()]), \
+                patch.object(type(Service), '_select_deterministic_picking',
+                             return_value=self._mock_picking()):
+            result = Service._evaluate_mode2(evidence)
+        self.assertTrue(result['passed'])
+        self.assertEqual(mocked.call_count, 2)
+
+    def test_c14_first_read_cannot_be_reused(self):
+        # If condition 14 wrongly reused condition 3's cached node, a SUCCESS
+        # first read followed by a CANCELLED second read would incorrectly
+        # pass all 16 conditions. It must not: the second, genuinely separate
+        # read is what condition 14 evaluates.
+        evidence = self._evidence()
+        first = self._fulfillment_node(status='SUCCESS')
+        second = self._fulfillment_node(status='CANCELLED')
+        result = self._evaluate(
+            evidence, fulfillments_side_effect=[[first], [second]],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_unchanged_second_read_permits_continuation(self):
+        # Two independently-constructed but equal reads (not the same cached
+        # object) -> condition 14 passes and evaluation continues to 16/16.
+        evidence = self._evidence()
+        result = self._evaluate(
+            evidence,
+            fulfillments_side_effect=[
+                [self._fulfillment_node()], [self._fulfillment_node()],
+            ],
+        )
+        self.assertTrue(result['passed'])
+
+    def test_c14_quantity_changed_between_reads(self):
+        # The first read shows the expected quantity (2); the second,
+        # genuinely separate read shows a different quantity -> fail closed,
+        # never silently proceeding to local validation on stale quantities.
+        evidence = self._evidence()
+        first = self._fulfillment_node()
+        second = self._fulfillment_node(lines=[{
+            'id': FL_GID, 'quantity': 1, 'lineItem': {'id': LINE_ITEM_GID},
+        }])
+        result = self._evaluate(
+            evidence, fulfillments_side_effect=[[first], [second]],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_state_changed_between_reads(self):
+        evidence = self._evidence()
+        first = self._fulfillment_node(status='SUCCESS')
+        second = self._fulfillment_node(status='CANCELLED')
+        result = self._evaluate(
+            evidence, fulfillments_side_effect=[[first], [second]],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_location_changed_between_reads(self):
+        # A second Shopify location, also present in the core cache, so the
+        # second read resolves cleanly but to a DIFFERENT location than
+        # condition 8 already established -> fail closed.
+        other_location_gid = 'gid://shopify/Location/2'
+        self.env['shopify.connector.location'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_location_gid': other_location_gid,
+            'name': 'L2', 'shopify_location_active': True,
+        })
+        evidence = self._evidence()
+        first_fo = self._fo_node(location_gid=LOCATION_GID)
+        second_fo = self._fo_node(location_gid=other_location_gid)
+        result = self._evaluate(
+            evidence, fos_side_effect=[[first_fo], [second_fo]],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_target_fulfillment_disappeared_on_second_read(self):
+        evidence = self._evidence()
+        first = self._fulfillment_node()
+        result = self._evaluate(
+            evidence, fulfillments_side_effect=[[first], []],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_second_read_incomplete_fails_closed(self):
+        # The second read raises (pagination cap / malformed page): an
+        # incomplete read is never proof of anything and must fail closed,
+        # exactly like any other decision-critical read (§11.4).
+        evidence = self._evidence()
+        first = self._fulfillment_node()
+        result = self._evaluate(
+            evidence,
+            fulfillments_side_effect=[
+                [first],
+                FulfillmentReadError(
+                    'data_shape_schema_mismatch', 'incomplete second read'),
+            ],
+        )
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['reason'], 'remote_state_changed')
+
+    def test_c14_repeated_cursor_on_second_read_fails_closed(self):
+        evidence = self._evidence()
+        first = self._fulfillment_node()
+        result = self._evaluate(
+            evidence,
+            fulfillments_side_effect=[
+                [first],
+                FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'A paginated read repeated or dropped its cursor.'),
+            ],
+        )
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['reason'], 'remote_state_changed')
+
+    def test_c14_transport_failure_never_reaches_local_validation(self):
+        # A raw transport failure on the second read propagates (it is not
+        # silently swallowed as a pass) and local validation is proven
+        # un-called.
+        evidence = self._evidence()
+        first = self._fulfillment_node()
+        job = self._mode2_job(evidence)
+        Service = self.Service
+        with patch.object(type(Service), '_read_order_fulfillments',
+                          side_effect=[[first], ConnectionError('down')]), \
+                patch.object(type(Service), '_read_fulfillment_orders',
+                             return_value=[self._fo_node()]), \
+                patch.object(type(Service), '_select_deterministic_picking',
+                             return_value=self._mock_picking()), \
+                patch.object(type(Service), '_validate_picking_local',
+                             side_effect=AssertionError(
+                                 'a failed second read must never validate')):
+            with self.assertRaises(ConnectionError):
+                Service._handle_fulfillment_mode2_evaluation(job)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'observed')
 
     def test_c15_origin_unconfirmed(self):
         # An external origin that is not positively confirmed is never automated.
