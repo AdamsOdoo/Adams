@@ -5,19 +5,21 @@
 > Stable scope/sequencing: [`mvp-completion-program.md`](./mvp-completion-program.md). Review policy: [`../06-prompts/claude-mvp-wave-review-template.md`](../06-prompts/claude-mvp-wave-review-template.md). Acceptance evidence: [`../05-qa/mvp-acceptance-matrix.md`](../05-qa/mvp-acceptance-matrix.md).
 >
 > **Follow-on role/cadence update — later 2026-07-22.** [`DEC-039`](../04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md) and [`DEC-040`](../04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md) amend the roles this file otherwise assumes: **Claude is now the default implementation worker *and* default gate reviewer** (Sol remains an available secondary builder), **ChatGPT is the strategic control room** (no longer required to review every gate), and **iterations should target a full wave or a large, independently-revertable slice of one** rather than many small correction cycles — with review scrutiny scaling *up*, not down, as batch size grows, and UI (Wave 5 / U0) as a priority parallel track. The one hard rule this depends on: an implementing Claude session never reviews or accepts its own PR — see DEC-039/DEC-040 for the independent-review mechanism.
+>
+> **PR #191 correction-cycle status — 2026-07-22.** The integration SHA recorded below (`347e2b26...`) is the **PR #190** governance-calibration merge state. **PR #191** (the PR that introduces DEC-039/DEC-040 above) remains **draft and unmerged** while a consolidated governance correction (binding review comment `5043912321`, this PR) is applied — do not treat DEC-039/DEC-040 as active on `mvp/program-integration` until PR #191 actually merges. **Wave 4 PR #189** (`claude/wave-4-fulfillment-gate-b`) originally branched from `01f072dd4d83b7b39737452a686244a3a8c00332`; its starting-base amendment to the current integration SHA is recorded in issue #186 comment `5043405110`. PR #189 remains **open/draft**, not ready, not self-accepted, at head `702d083262b08bc1180be642579ba41144af6c18`. **U0 and PR #189 continuation remain blocked until PR #191 merges** — see issue #186 comment `5044031518` and PR #191 comment `5044154777`. The separate closure session that merges PR #191 must update this tracker to the real post-merge SHA; it is not invented here.
 
 ## 1. Current program status
 
 | Item | Current state |
 | --- | --- |
 | Program integration branch | `mvp/program-integration` |
-| Current integration SHA | `01f072dd4d83b7b39737452a686244a3a8c00332` |
+| Current integration SHA | `347e2b261c46026f5c3dcfaee9629696a9226103` (PR #190 governance-calibration merge; PR #191 still draft/unmerged — see note above) |
 | Wave 1 | Merged and runtime-green |
 | Wave 2 | Merged and runtime-green |
 | Wave 3 / Task 013 | Inventory + Layer 2 implementation merged; runtime and genuine concurrency evidence accepted |
 | Wave 3 residual | `CV-013` issue #185 open and critical; live Shopify inventory mutation validation still required before RC/UAT acceptance; Task 013B separately gated |
 | Wave 4 Gate A | Accepted and merged through PR #188; merge SHA `01f072dd4d83b7b39737452a686244a3a8c00332` |
-| Wave 4 Gate B | Formally issued on issue #186 comment `5043052341`; implementation branch/PR not yet reported in this tracker |
+| Wave 4 Gate B | Implementation candidate on draft PR #189 (`claude/wave-4-fulfillment-gate-b`), head `702d083262b08bc1180be642579ba41144af6c18`; originally branched from `01f072dd4d83b7b39737452a686244a3a8c00332`, base amendment in issue #186 comment `5043405110`; continuation blocked until PR #191 merges — see note above |
 | Wave 5 | Full wave not started; early UI slice is now authorized to run in parallel within the calibrated boundary |
 | PERF-1 | Full acceptance remains Wave 5/6; PERF-0 baseline is pulled forward into Wave 4 |
 | Wave 6 | Not started |

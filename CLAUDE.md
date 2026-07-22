@@ -240,14 +240,36 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
   `Shopify-connector`/`main`.
 - **The two roles must never be collapsed into one session.** A Claude
   session that implements a task/wave must not self-review, self-accept,
-  ready-mark, or merge that work. Independent review is satisfied by either:
-  a **separate top-level Claude session** reviewing from scratch, or a
-  **fresh subagent invocation** (via the `Agent` tool) given only the PR
-  diff, the acceptance criteria, and
-  [`claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md),
-  with no memory of the implementing thread's reasoning, instructed to
-  adversarially re-verify — never to summarize or rubber-stamp. See
-  DEC-039/DEC-040 for the full rule.
+  ready-mark, or merge that work. **Independent Claude review is the
+  default routine gate for every wave/batch** (DEC-040) — satisfied by
+  either a **separate top-level Claude session** reviewing from scratch, or
+  a **fresh subagent invocation** (via the `Agent` tool), instructed to
+  adversarially re-verify — never to summarize or rubber-stamp.
+  **ChatGPT review is a strategic control-room option (a spot-check or
+  escalation path), not a prerequisite for a routine gate.**
+  - **Memoryless means no memory of the implementer's reasoning, not
+    repository-blind.** The reviewer's briefing excludes the implementing
+    session's reasoning, its defenses of its own choices, and any
+    selective summary meant to sway the verdict — but it independently
+    reads the exact base/head checkout, the complete PR diff, the
+    governing DECs and implementation packets, the acceptance criteria,
+    the actual Odoo 19 source, automated-test output, genuine Odoo.sh
+    runtime evidence for code batches, screenshots/browser evidence where
+    relevant, and current official sources when a version-dependent fact
+    needs verification. A diff-only review does not satisfy this for
+    Tier 1 work.
+  - **The review is durable and non-suppressible.** The complete
+    independent-review report is posted verbatim to the PR, stating the
+    exact reviewed SHA. The implementing session may not rewrite,
+    selectively summarize, suppress, override, accept, ready-mark, or
+    merge it. A `REVISE` verdict is resolved through one consolidated
+    correction. After an `ACCEPT`, a **separate top-level closure
+    session** (or another explicitly authorized independent actor) —
+    never the implementing session — verifies the exact accepted SHA and
+    that the required evidence still corresponds to it before
+    ready-marking or merging. Reviewer silence, a partial report, or a
+    summary-only report is never acceptance.
+  See DEC-039/DEC-040 for the full rule.
 - **Batch size (DEC-040): target a full wave, or a large, coherent,
   independently-revertable slice of one, per iteration** — not many small
   correction cycles. Tier 3 (wording/polish) issues found mid-batch are
@@ -256,6 +278,14 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
   runtime results) is never skipped to move faster; speed comes from
   batching scope, not skipping evidence. **UI (Wave 5 / U0) is a priority
   parallel track** under this same large-batch cadence — see DEC-040.
+  **Runtime rule scope:** mandatory automated tests plus genuine Odoo.sh
+  runtime evidence (exact tested SHA, proportional to the batch's risk and
+  size) apply to **every implementation/code batch**, regardless of size —
+  never skipped. A **documentation/governance-only batch** does not
+  require an irrelevant Odoo.sh runtime campaign; it is verified by
+  repository/diff/path/link/consistency checks appropriate to the change,
+  must never fabricate runtime evidence, and must never weaken the
+  runtime requirement for a later code batch.
 - **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
   (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
   is never modified, reset, or force-pushed by this program. `mvp/program-integration`
@@ -284,9 +314,14 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
 - **Feature coding by Claude is now authorized under this addendum**, per
   DEC-039 (2026-07-22), strictly subject to the no-self-acceptance rule
   above: an implementing Claude session's role for its own work stays
-  execution only — it never doubles as that work's governance, audit, wave
-  review, or release-gating, which must come from ChatGPT or a separate,
-  independently-verifying Claude control-room session.
+  execution only — it never doubles as that work's independent review,
+  acceptance, ready-marking, or merge. Independent Claude review (a
+  separate top-level session or a fresh subagent, per the mechanism above)
+  is the **default** gate for this; ChatGPT strategic spot-checks and a
+  separate closure session for ready-marking/merge remain available and
+  required exactly where this section says so — governance, audit, wave
+  review, and release-gating for a Claude-implemented PR is never
+  performed by the session that implemented it.
 - The live status of this program is tracked in
   [`docs/07-implementation-plan/mvp-program-state.md`](docs/07-implementation-plan/mvp-program-state.md)
   — read it for current wave/blocker/decision status; do not rely on this
@@ -301,4 +336,9 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
    gate still applies.
 3. Do only the scoped task; cite and classify every claim; write to GitHub.
 4. Run the end-of-session learning review and update the handoff.
-5. End with the exact next-session prompt. Then stop and await ChatGPT review.
+5. End with the exact next-session prompt. Then stop and await independent
+   review before any acceptance, ready-marking, or merge. For work under
+   §13 (`mvp/program-integration`), that review is **independent Claude
+   review by default** (DEC-040), with ChatGPT as strategic control
+   room/spot-check rather than a routine line reviewer. Outside §13,
+   await ChatGPT review as before.
