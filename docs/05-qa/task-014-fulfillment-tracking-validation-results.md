@@ -158,13 +158,41 @@ fulfillment dev-store validation AND CV-013 (#185) to execute green.**
 Wave 4 cannot receive final control-room acceptance, enter a release candidate,
 or begin UAT while it is open.
 
-## 10. Pre-runtime adversarial audit
+## 10. Pre-runtime adversarial audit — findings + consolidated corrections
 
-One complete pre-freeze adversarial audit was performed before this candidate
-was frozen; findings and whole-pattern corrections are recorded in
-`docs/05-qa/architecture-review-log.md` (Gate B row) and in the final report
-(§27). Remaining P1/P2 items carried as implementation acceptance criteria are
-listed there; no known P0 remains.
+One complete pre-freeze adversarial audit was performed (an independent
+reviewer pass over every production file + cross-check against the merged core
+contracts) before this candidate was frozen. All confirmed defects were fixed
+in one consolidated batch; each fix corrected the whole pattern, not just the
+first site.
+
+| # | Sev | Finding | Correction |
+| --- | --- | --- | --- |
+| A1 | **P0** | Both mutation strategies returned `shopify_idempotency_key=''`; the merged core `_validate_prepared_request` hard-requires a **non-empty** string, so **every** `fulfillment_create` / `fulfillment_tracking_update` was rejected pre-C2 (dead outbound path). The Gate A packet's "null/unused" wording is incompatible with the merged Layer 2 request contract. | Both `prepare_preconditions` now supply a non-empty synthetic `uuid.uuid4().hex`. The operation documents carry **no** `@idempotent` directive and never reference the key, so it is persisted on the attempt but **never sent on the wire** (zero Shopify-side effect). "Unused" = no wire idempotency directive. |
+| A2 | **P1** | `review-release` `_handoff_replacement` unconditionally wrote `state='cancelled'`; `failed_final → cancelled` is not a legal transition (`LEGAL_JOB_TRANSITIONS`), so releasing a terminal clean-rejection mutation raised. | A terminal `failed_final` predecessor is now **superseded in place** (its operation scope is already released); a cancellable predecessor (`failed_retryable`/`blocked_manual_review`) still cancels + flushes before the replacement is created. |
+| A3 | **P2** | The shared reconcile handler validated the reconcile result before the `not_applied → inconclusive` coercion, so a rogue `not_applied` (action `None`) shape was blocked as `duplicate_risk` rather than coerced — the defensive coercion was unreachable. | The handler now coerces any `not_applied` verdict to `inconclusive` **before** validation — real defence-in-depth for the no-resend P0 (the fulfillment callbacks never emit `not_applied`; this guards a future/rogue callback). |
+| A4 | **P2** | `_read_order_fulfillments`' nested `fulfillmentLineItems` connection was fetched in one page and not checked for completeness — a fulfillment with >1 page of line items could feed Mode 2 partial data (violating §11.4). | `_read_order_fulfillments` now **fails closed** (`FulfillmentReadError`) when any fulfillment's line-item connection reports `hasNextPage` — Mode 2 → review, reconcile → INCONCLUSIVE, inbound → retry (all fail-closed-safe). |
+
+**Invariants independently confirmed to HOLD** (no change needed): the
+source/origin matrix at the single `_enqueue_once` choke point; byte-identical
+C2↔wire (operation constant + unmutated variables); the Q1 operation-scope
+override (mutation types only; reconcile scope `False`); consequence/reconcile
+result shapes; Odoo-19 API usage (`stock.move.line.quantity`, `shopify_line_item_gid`,
+carrier fields, sudo binding writes); fixed vocabulary (no `over_fulfillment`);
+binding field classification; the Mode 2 double-fulfillment-loop guard (bind
+before validate); handler return/arg-order.
+
+**No known P0 or P1 remains.** Residual material P2 carried as an
+implementation acceptance criterion for the control-room review / Gate C:
+
+- Mode 2 condition 7 (`quantity_mismatch`) is a pass-through that records the
+  required quantities; the actual quantity/coverage decision is enforced by
+  condition 9 (`_select_deterministic_picking`), so an under-covering picking
+  fails closed as `picking_ambiguous` rather than `quantity_mismatch` — a
+  reason-label imprecision only; the fail-closed safety holds.
+- Condition 14's "fresh live re-read" reuses the evaluation pass's read
+  (fetched at condition 3) rather than issuing a second read; the whole
+  evaluation is fresh, but a stricter separate re-read is a Gate-C refinement.
 
 ## 11. Rollback notes
 
