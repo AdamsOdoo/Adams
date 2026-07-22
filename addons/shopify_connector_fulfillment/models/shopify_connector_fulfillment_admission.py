@@ -105,9 +105,16 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
     ):
         """Enqueue idempotently: an existing job with the same identity
         (a stable payload_hash keyed to the operation) is never duplicated. A
-        business job is only enqueued for a connected store."""
+        business job is only enqueued for a connected store.
+
+        Enforces the merged source/origin invariant at the single enqueue choke
+        point: a non-`odoo_event` source can never carry a trigger origin (the
+        core `_check_trigger_origin_required` constraint), so any caller-supplied
+        trigger origin is cleared for such sources."""
         if store.state != 'connected':
             return self.env['shopify.connector.job']
+        if job_source != 'odoo_event':
+            trigger_origin = False
         Job = self.env['shopify.connector.job']
         existing = Job.search([
             ('store_id', '=', store.id),

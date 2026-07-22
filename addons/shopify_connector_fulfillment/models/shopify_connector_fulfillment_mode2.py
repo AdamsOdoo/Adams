@@ -291,6 +291,13 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             # Q6: fail closed BEFORE any validation (no book/charge).
             self._open_review(evidence, 'carrier_would_book')
             return
+        # Bind the picking to the EXTERNAL Fulfillment GID BEFORE validating it,
+        # so the outbound `stock.picking._action_done` trigger sees an existing
+        # fulfillment binding and does NOT enqueue a duplicate fulfillmentCreate
+        # (a picking is one fulfillment event, UNIQUE(store, picking)). This is
+        # the inbound-application record: the external fulfillment IS this
+        # picking's fulfillment.
+        self._bind_external_fulfillment(evidence, picking)
         try:
             self._validate_picking_local(picking)
         except Exception:
@@ -304,6 +311,27 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             'reconciled_state': 'applied',
             'resolution_at': fields.Datetime.now(),
         })
+
+    @api.model
+    def _bind_external_fulfillment(self, evidence, picking):
+        Binding = self.env['shopify.connector.fulfillment.binding'].sudo()
+        existing = Binding.search([
+            ('store_id', '=', evidence.store_id.id),
+            ('picking_id', '=', picking.id),
+        ], limit=1)
+        if existing:
+            binding = existing
+        else:
+            binding = Binding.create({
+                'store_id': evidence.store_id.id,
+                'shopify_gid': evidence.shopify_fulfillment_gid,
+                'picking_id': picking.id,
+                'order_binding_id': evidence.order_binding_id.id,
+                'shopify_status_snapshot': evidence.fulfillment_status_raw,
+                'shopify_last_synced_at': fields.Datetime.now(),
+            })
+        evidence.sudo().write({'fulfillment_binding_id': binding.id})
+        return binding
 
     @api.model
     def _carrier_would_book(self, picking):
