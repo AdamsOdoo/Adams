@@ -1,4 +1,75 @@
+### Wave 4 Gate A — bounded control-room correction applied (draft PR #188) (2026-07-22)
+
+- **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR
+  [#188](https://github.com/AdamsOdoo/Adams/pull/188) (unchanged; docs-only; unmerged;
+  not marked ready). **No `addons/**` change; no Shopify operation.**
+- **Trigger:** control-room **REVISE** — PR #188 comment `5041620950` + issue #186
+  status comment `5041623758` (one P0, nine P1, Q1–Q8 rulings).
+- **Corrections applied (one bounded batch):** **(P0)** uncertain remote outcome is
+  **reconcile-only** — once C2 commits `transport_attempted=true` the mutation is never
+  re-sent; **read absence = INCONCLUSIVE**; a replacement needs **positive
+  non-application evidence** (or proven `transport_attempted=false`); notifications fail
+  closed; every "absent → resend" path removed. **(P1)** complete 12-family job/replay
+  taxonomy frozen; fixed error/review vocabulary mapped to the merged registries with
+  **`over_fulfillment` removed** (no new selection value); the giant service file
+  replaced by an **enumerated modular file map** with **every exact test filename
+  frozen**; **cursor pagination** mandatory + fail-closed; **source-guard precision**
+  (V2 forbidden in production paths, nameable in tests); **lifecycle `ondelete`** for
+  every new `job_type` + `fulfillment_tracking_change`; **staff-permission NOT_PROVEN**
+  (not inferred from scopes); **`store.api_version`** policy (no fulfillment-only pin,
+  never `latest`); **Q1–Q8 ruled and applied**; stale status removed.
+- **Files touched (docs-only, within the authorized set):** DEC-038 (§4 rulings + §7
+  contracts), Task 014 packet (D-014-4/D-014-7/§10.3/§5 + new §11), locked prompt
+  (§2/§4/§5 + header/§1/§10/§11), DoR (§7 + criteria), UAT matrix (UAT-FM-1.9/1.9b/1.9c
+  + §2.2 note + §A), risk register (SRR-10), Shopify notes (§1 version policy), code
+  audit (at-most-once phrasing), handoff (§5 correction + stale-status removal),
+  trackers (program-state, acceptance-matrix row 12, AR-071, this handoff).
+- **Confirmations:** no `addons/**` change; no Shopify operation; PR draft/unmerged/
+  not-ready; locked prompt still **NOT ISSUED**; **#185 (CV-013) open and critical**;
+  Q1–Q8 ruled/applied (no open escalation remains from that set).
+- **Recommendation:** `READY FOR CONTROL-ROOM DELTA REVIEW`.
+
+#### Learning feedback loop (mandatory — `../05-qa/quality-feedback-loop.md`)
+- **Lessons:**
+  1. **"Absent" is never proof of non-application for a non-idempotent remote effect.**
+     The most consequential Gate A defect was allowing a resend when a reconcile read
+     did not yet show the fulfillment; without native `@idempotent`, eventual
+     visibility / pagination gaps / concurrent activity make an applied mutation look
+     absent. *Control:* the binding contract is **reconcile-only after
+     `transport_attempted=true`**; read absence → **INCONCLUSIVE**; only positive
+     non-application evidence authorizes a replacement; source-guard tests prove no
+     handler can reach a second mutation from a read miss.
+  2. **A frozen file allowlist must be modular *and* exhaustive, not a giant service
+     file plus a wildcard-free-but-monolithic split.** *Control:* one responsibility
+     per file (matching / each mutation callback / Mode 2 / inbound / scans / review
+     each separate) and **every exact test filename** enumerated; a file-boundary guard
+     fails on anything outside the set.
+  3. **Ground every selection value in the merged registry, not in prose.**
+     `over_fulfillment` read plausibly but is not in `ERROR_CLASS_SELECTION`. *Control:*
+     the vocabulary map is built from the verbatim
+     `shopify_connector_job.py:70-97` values; no new value without a control-room
+     amendment.
+  4. **Reads that gate a mutation must be complete, not first-page.** Fixed
+     `first: N` windows can silently prove "absence" or select a wrong target.
+     *Control:* cursor pagination to completion with a fail-closed cap; a partial page
+     can never prove absence, select a target, or authorize a send.
+- **Reusable controls produced:** the reconcile-only uncertain-outcome contract
+  (A–E); the accepted-registry vocabulary-mapping method; the modular
+  one-responsibility-per-file + exhaustive-test-filename allowlist pattern; the
+  cursor-pagination fail-closed contract for decision-critical reads.
+- **Rejected-approaches check:** RA-009/014/017/022/023 re-confirmed intact; the P0
+  correction strengthens RA-014 (no retry-everything) and RA-017 (key + reconcile
+  together) rather than reopening anything; no rejected approach re-entered; no new
+  technical debt beyond the already-logged SRR-10 (unchanged in substance).
+
+---
+
 ### Wave 4 Gate A — fulfillment Definition-of-Ready / decision-reconciliation candidate (draft PR #188) (2026-07-21)
+
+> **Superseded by the 2026-07-22 bounded correction above.** The "verify-before-retry
+> → resend" framing and the "7 escalated Q1–Q7" status below are corrected there
+> (reconcile-only; Q1–Q8 ruled); the recommendation is now `READY FOR CONTROL-ROOM
+> DELTA REVIEW`. Retained as the original session record.
 
 - **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR
   [#188](https://github.com/AdamsOdoo/Adams/pull/188) → `mvp/program-integration`

@@ -4,6 +4,21 @@
 
 ## Current status
 
+**WAVE 4 GATE A — BOUNDED CONTROL-ROOM CORRECTION APPLIED (2026-07-22).** Following
+the control-room REVISE review (**PR #188 comment `5041620950`** / issue #186 comment
+`5041623758`), one bounded documentation-only correction was applied on the same branch
+`claude/wave-4-gate-a-review-0nbhdw` / draft PR #188 (no `addons/**` change; no Shopify
+operation; PR stays draft/unmerged/not-ready): **(P0)** uncertain remote outcomes are
+now **reconcile-only** — read absence is INCONCLUSIVE, a replacement send requires
+positive non-application evidence, notifications fail closed (every "absent → resend"
+path removed); **Q1–Q8 ruled and applied** (no longer open); the fixed error/review
+vocabulary is mapped and `over_fulfillment` removed; the **complete job/replay
+taxonomy**, **modular file + exact test allowlist** (giant service file removed),
+**cursor pagination**, **source-guard precision**, **lifecycle `ondelete`**,
+**staff-permission NOT_PROVEN**, and **`store.api_version`** policy are frozen; stale
+status removed. **CV-013 (#185) remains open and critical.** **Recommendation: `READY
+FOR CONTROL-ROOM DELTA REVIEW`.** The original Gate A candidate record follows.
+
 **WAVE 4 GATE A — DEFINITION-OF-READY / DECISION-RECONCILIATION CANDIDATE
 PRODUCED (2026-07-21).** Executed the locked Gate A prompt
 (`control-room/wave-4-gate-a-prompt-review@187f04d5…`, blob
@@ -27,8 +42,10 @@ confirmations: fulfillment mutations are **not `@idempotent`** (verified 2026-07
 → verify-before-retry under the accepted DEC-036/DEC-031 Layer 2 is the primary
 duplicate-prevention control; done-qty = `stock.move.line.quantity` (no `qty_done`
 in Odoo 19); the merged Layer 2 spine is fully reusable via 10 add-only seams.
-**CV-013 (#185) carried forward as critical — NOT downgraded.** **Recommendation:
-READY FOR CONTROL-ROOM GATE A REVIEW.** No Gate B / Wave 5 work started; the locked
+**CV-013 (#185) carried forward as critical — NOT downgraded.** **Recommendation
+(2026-07-21, now superseded by the 2026-07-22 correction above → `READY FOR
+CONTROL-ROOM DELTA REVIEW`):** READY FOR CONTROL-ROOM GATE A REVIEW. Q1–Q7 (now Q1–Q8)
+are **ruled and applied** (DEC-038 §4). No Gate B / Wave 5 work started; the locked
 prompt is not issued. Wave 4 program row (below) stays "Not started" for
 implementation until the control room accepts Gate A and issues the prompt.
 

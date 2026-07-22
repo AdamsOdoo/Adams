@@ -10,8 +10,9 @@
 > acceptance.** It authorizes no implementation. It is not accepted, approved,
 > final, or ready by virtue of this worker producing it.
 
-**Updated:** 2026-07-21 · **Worker:** Claude (Opus 4.8), acting as the
-explicitly-assigned authorized governance/research worker (see §0).
+**Updated:** 2026-07-22 (bounded control-room correction — §5; originally 2026-07-21)
+· **Worker:** Claude, acting as the explicitly-assigned authorized
+governance/research worker (see §0).
 **Branch:** `claude/wave-4-gate-a-review-0nbhdw` · **Base SHA:**
 `ab4f12f5a6857b2f3318ffc3b3f5f371307938bc` (`mvp/program-integration`, PR #182
 merge commit).
@@ -146,6 +147,7 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 | 5 — Candidate DoR, architecture & Task 014 packet | ✅ complete → DoR updated; Task 014 packet §10 Gate A addendum (arch + Layer 2 + Mode 1/2 contracts) |
 | 6 — File boundary, tests, validation, rollback, locked prompt | ✅ complete → `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (LOCKED CANDIDATE — NOT ISSUED) + UAT-matrix Gate A addendum |
 | 7 — Adversarial review, trackers, handoff, final report | ✅ complete (adversarial review in DEC-038 §6; SRR-10; trackers updated; learning loop in research-handoff.md; #186 final comment) |
+| 8 — Bounded control-room correction (2026-07-22) | ✅ complete (§5 below): P0 reconcile-only; Q1–Q8 applied; vocabulary/taxonomy/allowlist/pagination/lifecycle/staff-perm/API-version frozen; stale status removed |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
 map fixed; accepted contract separated from proposed candidates and superseded
@@ -161,7 +163,8 @@ records; contradictions logged for DEC-038.
 - New refinements → DEC-038: ">1 FO per location" (not one-per-location);
   `supportedActions.CREATE_FULFILLMENT` as the authoritative eligibility gate;
   `assignedLocation.location` nullable; staff permission `fulfill_and_ship_orders`
-  distinct from API scope; input-array 250 vs FO-line 512 caps; pin API `2026-07`.
+  distinct from API scope; input-array 250 vs FO-line 512 caps; **use `store.api_version`
+  with `2026-07` as the verified contract** (no fulfillment-only pin — corrected 2026-07-22).
 - **Odoo (verified-in-source):** done-qty = `stock.move.line.quantity` (no
   `qty_done` field); hook = `_action_done` (not re-entrant `button_validate`);
   backorder via `backorder_id`; `sale_id`/`sale_line_id` in `sale_stock`, carrier
@@ -201,10 +204,12 @@ quality-feedback-loop learning review recorded in `research-handoff.md`. Tracker
 updated: mvp-program-state (top status), mvp-acceptance-matrix (row 12),
 architecture-review-log (AR-070), sync-engine-risk-register (SRR-10).
 
-**FINAL RECOMMENDATION: `READY FOR CONTROL-ROOM GATE A REVIEW`.** Draft PR #188
+**INITIAL RECOMMENDATION (2026-07-21): `READY FOR CONTROL-ROOM GATE A REVIEW`.**
+Superseded by the 2026-07-22 bounded correction (§5) after control-room REVISE
+(comment `5041620950`) — **now `READY FOR CONTROL-ROOM DELTA REVIEW`**. Draft PR #188
 remains docs-only, unmerged, not marked ready; the locked prompt is not issued; no
-`addons/**` change; no Shopify operation; #185 (CV-013) open and critical; Q1–Q7
-await control-room rulings.
+`addons/**` change; no Shopify operation; #185 (CV-013) open and critical; **Q1–Q8
+ruled and applied** (§5 / DEC-038 §4).
 
 **Phase 6 key results:** the NEW locked prompt (`sol-wave-4-fulfillment-locked-prompt.md`,
 `LOCKED CANDIDATE — NOT ISSUED`) freezes the enumerated file allowlist (no
@@ -215,13 +220,37 @@ plans, the rollback plan, DoD, hard stops, final report, and the no-self-accept/
 no-merge/no-Wave-5 prohibitions. The UAT matrix carries the Gate A validation
 addendum (concurrency, Odoo.sh runtime, dev-store campaign, CV-013 binding gate).
 
-**Next phase:** Phase 7 — adversarial review + coherent corrections; run the
-mandatory quality-feedback-loop learning review (record in research-handoff.md);
-update the canonical trackers (mvp-program-state, mvp-acceptance-matrix,
-architecture-review-log, sync-engine-risk-register); post the final #186 handoff
-comment; final report. Commit 5.
+**All seven internal phases are complete** (no phase remains open). The bounded
+control-room correction (§5 below) was subsequently applied on the same branch/PR.
 
 **Partial-resume anchor:** if a genuine environment/context/time limit forces a
 stop, stop at a phase boundary after committing+pushing this checkpoint and
 report `PARTIAL GATE A — RESUME FROM PHASE <N>`. Do not represent partial work
 as complete Gate A output.
+
+---
+
+## 5. Bounded control-room correction (2026-07-22) — applied
+
+Per **PR #188 comment `5041620950`** (REVISE before Gate A acceptance) + **issue #186
+comment `5041623758`**, one bounded, documentation-only correction was applied on this
+same branch/PR (no `addons/**` change; no Shopify operation; PR stays draft/unmerged):
+
+| Correction | Where |
+|---|---|
+| **P0** — uncertain remote outcome is **reconcile-only**; read absence → **INCONCLUSIVE**; positive non-application evidence required before any replacement; notifications fail closed; every "absent → resend" path removed | DEC-038 §7.1; packet D-014-7/§10.3/§11.1; DoR #7/#10; UAT-FM-1.9/1.9b/1.9c; SRR-10; locked prompt §4/§5 |
+| **Q1–Q8 rulings applied** (no longer open) | DEC-038 §4 |
+| **Fixed error/review vocabulary** mapped; `over_fulfillment` removed (no new selection value) | DEC-038 §7.2; UAT §2.2 note + UAT-FM-2.6; locked prompt §4 |
+| **Complete job/replay taxonomy** frozen (12 job families) | packet §11.2 |
+| **Modular file allowlist + every exact test filename** frozen (giant service file removed) | locked prompt §2/§5; packet §11.3 |
+| **Cursor pagination** (fail-closed cap, dup/repeat-cursor/malformed) | packet §11.4; locked prompt §4; DEC-038 §7.4 |
+| **Source-guard precision** (V2 forbidden in production paths, nameable in tests) | locked prompt §4 |
+| **Lifecycle `ondelete`** for every new `job_type` + `fulfillment_tracking_change` | DEC-038 §7.5; packet §11.5; locked prompt §5 |
+| **Staff-permission NOT_PROVEN** (not inferred from scopes) | DEC-038 §7.6; packet §11.6; Shopify notes §2 |
+| **API-version `store.api_version`** (no fulfillment-only pin; never `latest`) | DEC-038 §7.7; packet §11.7; Shopify notes §1; audit §6.8 |
+| **Stale status** removed (this "Next phase: Phase 7"); PR #188 body + #186 handoff refreshed | this file; PR #188; issue #186 |
+
+**CORRECTED RECOMMENDATION: `READY FOR CONTROL-ROOM DELTA REVIEW`.** PR #188 remains
+docs-only, draft, unmerged, not marked ready; the locked prompt is not issued; no
+`addons/**` change; no Shopify operation; **#185 (CV-013) open and critical**; Q1–Q8
+ruled and applied (no open escalation remains from that set).
