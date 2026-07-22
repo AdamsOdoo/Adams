@@ -25,11 +25,17 @@ in-repo captures.
   Oct 1, 17:00 UTC); each stable version is supported ≥12 months with ≥9 months
   overlap; unsupported-resource calls after an upgrade deadline risk App-Store
   delisting. `https://shopify.dev/docs/api/usage/versioning`.
-- **Implication (Wave 4):** pin the connector to an explicit version string
-  (`2026-07`), **not `latest`**; schedule annual re-validation before the pinned
+- **Implication (Wave 4) — corrected 2026-07-22 (DEC-038 Q7 / §7.7):** all calls go
+  through the core API client and **`store.api_version`**; there is **no
+  fulfillment-only version override** and **never `latest`**. `2026-07` is the current
+  researched/verified fulfillment contract; readiness records whether the store's
+  configured version is in the **accepted fulfillment compatibility set** and
+  **fails/blocks** unsupported/unverified versions; the GraphQL-shape/source-guard
+  suite runs against **every version in that set**; expansion needs current official
+  research + control-room acceptance. Schedule re-validation before an accepted
   version's window closes; monitor deprecation warnings. Enum sets
-  (`FulfillmentOrderStatus`, `FulfillmentOrderAction`) can gain values across
-  versions — the unknown-future-value contract (status model §7) is required.
+  (`FulfillmentOrderStatus`, `FulfillmentOrderAction`) can gain values across versions
+  — the unknown-future-value contract (status model §7) is required.
 
 ---
 

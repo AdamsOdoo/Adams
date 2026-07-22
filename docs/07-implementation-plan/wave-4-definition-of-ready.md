@@ -21,7 +21,9 @@
 > decision reconciliation is
 > [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md)
 > (Proposed) — its 41-item matrix + the 16-condition Mode 2 reconciliation (12
-> preserve / 4 refine) + the Q1–Q7 escalations are the binding input to this DoR
+> preserve / 4 refine) + the **applied Q1–Q8 rulings** (PR #188 comment `5041620950`,
+> 2026-07-22; no longer open) + the **P0 reconcile-only uncertain-outcome contract**
+> (DEC-038 §7.1) are the binding input to this DoR
 > and the Task 014 packet re-acceptance (G4-5). As a Shopify-mutation wave, Wave 4
 > closure requires **genuine (not simulated) dev-store fulfillment mutation
 > evidence**, and **CV-013 (#185) — carried forward as critical — must execute
@@ -129,10 +131,12 @@ fulfillment operating mode per store, and the per-store
 
 ## 3. Allowed / forbidden paths (wave-level; the re-issued Task 014 prompt is exhaustive)
 
-- **Allowed:** `addons/shopify_connector_fulfillment/**` (new); the one named
-  core readiness-check edit + its test (D-014-2); Layer-2 registration
-  entries the accepted Layer 2 design requires for the fulfillment mutations;
-  Wave 4 validation/evidence docs, AR-log rows, handoff, program state.
+- **Allowed:** the new `addons/shopify_connector_fulfillment/` addon — **enumerated
+  file-by-file (no `**` wildcard authorization)** in the re-issued locked prompt §2
+  (that list is the exhaustive authority; nothing outside it without a control-room
+  amendment); the one named core readiness-check edit + its test (D-014-2); the
+  add-only Layer-2 registration entries the accepted Layer 2 design requires; Wave 4
+  validation/evidence docs, AR-log rows, handoff, program state.
 - **Forbidden:** any read of `shopify.connector.location.mapping`;
   `fulfillmentOrderMove`/hold mutations and `FULFILLMENT_ORDERS_*`
   subscriptions; legacy fulfillment endpoints (RA-022); refunds/returns
@@ -180,8 +184,9 @@ fulfillment operating mode per store, and the per-store
 7. **Reconnect catch-up:** on reconnect, the fulfillment watermark scan
    re-reads FOs/fulfillments since the gap; every external fulfillment from
    the disconnected period lands as a review case (fulfillment-operating-modes
-   §7); interrupted outbound work resumes under
-   verification-read-before-retry.
+   §7); interrupted outbound work resumes **reconcile-only** (no resend from a read
+   miss; DEC-038 §7.1), and all catch-up reads are **cursor-paginated to completion**
+   (§7.4).
 8. **Per-store mode field + Mode 2 auto-application engine:** the
    `fulfillment_operating_mode` field is live with **both** values, selectable
    by the Administrator; Mode 2 auto-applies an Odoo fulfillment **only** when
@@ -196,8 +201,11 @@ fulfillment operating mode per store, and the per-store
    lost review case.
 10. **Layer 2 compliance proven:** every fulfillment mutation runs under the
     accepted Layer 2 protocol (durable attempt record before the call;
-    reconciliation read on ambiguous outcome; no blind retry path exists —
-    source-level test).
+    **once `transport_attempted=true` the job is reconcile-only** — the mutation is
+    never re-sent; **read absence → INCONCLUSIVE**, only positive non-application
+    evidence authorizes a replacement job; no resend-from-absence path exists —
+    source-level test; DEC-038 §7.1). Notification side effects obey the same rule
+    (a possible prior `notifyCustomer=true` is never repeated from absence).
 11. Task 014 packet §5/§6 test files and criteria (as extended by the
     addendum) all green on Odoo.sh; **genuine dev-store fulfillment mutation
     evidence** for both Mode 1 and Mode 2 paths (any exception is a specific
@@ -226,3 +234,19 @@ Mode 1 and Mode 2 backend behavior is delivered and runtime-proven inside
 Wave 4 — the only Mode 2 item carried forward is the Wave 5 **UI** (mode
 selector, review workspace, dashboards), whose backend contract Wave 4
 hands off intact.
+
+## 7. Bounded control-room correction (2026-07-22)
+
+Applied per PR #188 comment `5041620950` / issue #186 comment `5041623758`, the DoR
+now carries these binding contracts (detail in DEC-038 §4/§7 + Task 014 packet §11 +
+the locked prompt): **(P0)** uncertain remote outcomes are **reconcile-only** — read
+absence is INCONCLUSIVE, only positive non-application evidence authorizes a
+replacement, notifications fail closed (criteria #7/#10); **(Q1–Q8)** ruled and applied
+(operation-scope literals, adopt `sale_stock` pickings, core location cache only,
+`fulfillment_tracking_change` with `ondelete`, fulfillment-owned COD read, Q6 carrier
+fail-closed, `store.api_version`, staff-permission NOT_PROVEN); the **complete
+job/replay taxonomy**, **modular file + exact test allowlist**, **cursor pagination**,
+**fixed error/review vocabulary** (no `over_fulfillment`/no new selection value),
+**lifecycle `ondelete`**, and **staff-permission/API-version** policies are frozen.
+These are binding inputs to G4-5 re-acceptance; the gate checkboxes above remain
+**unchecked** (control-room acceptance is not self-granted here).

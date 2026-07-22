@@ -33,9 +33,9 @@ supplying 7 strategy callables — it does **not** re-implement it.
 | `idempotency_key` = `store|job_type|res_model|res_id|shopify_target_gid|payload_hash`, `UNIQUE(store_id, idempotency_key)`; `operation_scope_key` = `store|res_model|res_id|shopify_target_gid` (while non-terminal), `UNIQUE` | `shopify_connector_job.py : _compute_idempotency_key/_compute_operation_scope_key : L207-257,701-748` | **Pre-send dedup + single-in-flight-per-target serialization for free** — no new dedup mechanism. |
 | `_claim_for_dispatch` (`FOR UPDATE SKIP LOCKED`) | `shopify_connector_job.py : L518-572` | Fulfillment jobs claimed by the same drain. *(Docstring: multi-worker not proven by `TransactionCase`.)* |
 | Dispatcher drain + per-job txn + concurrency recovery | `shopify_connector_job_dispatch.py : run_drain/_drain_one/_recover_after_concurrency_conflict : L166-437` | On PG 40001/40P01/55P03: rollback + route **once by replay policy without replaying the handler** — what makes a non-idempotent fulfillment write safe under concurrency. |
-| **C1/C2/NET/C3 mutation protocol** | `shopify_connector_job_dispatch.py : _drain_mutation_one/_commit_attempt_intent_c2/_commit_mutation_outcome_c3 : L1047-1370` | C1 claim+`current_attempt_token`+commit; **C2 durable attempt on an INDEPENDENT side cursor** (`transport_attempted=True`)+commit; NET transport (exceptions→uncertain); C3 re-lock+revalidate token/state+immutable outcome+identity check+consequence+commit. **The exactly-once-oriented spine.** |
+| **C1/C2/NET/C3 mutation protocol** | `shopify_connector_job_dispatch.py : _drain_mutation_one/_commit_attempt_intent_c2/_commit_mutation_outcome_c3 : L1047-1370` | C1 claim+`current_attempt_token`+commit; **C2 durable attempt on an INDEPENDENT side cursor** (`transport_attempted=True`)+commit; NET transport (exceptions→uncertain); C3 re-lock+revalidate token/state+immutable outcome+identity check+consequence+commit. **The at-most-once + reconciliation-convergence spine** (never a claimed exactly-once remote effect; §7.1 P0). |
 | Mutation-domain strategy registry (7 keys) | `shopify_connector_job_dispatch.py : _get_reconciliation_strategies/MUTATION_STRATEGY_KEYS : L117-125,443-483` | **PRIMARY EXTENSION SEAM** — `_inherit` dispatch, add-merge a `{7 callables}` dict; `_validated_mutation_strategy` fails closed on any missing key. Only `mutation_dispatch_selftest` registered today. |
-| Reconciliation handler + `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` block; `observed_store_identity==expected` | `shopify_connector_job_dispatch.py : _handle_…_reconcile/_validate_reconciliation_result : L852-1045` | **The true dedup/exactly-once backstop for fulfillment** (since `@idempotent` is unavailable). |
+| Reconciliation handler + `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` block; `observed_store_identity==expected` | `shopify_connector_job_dispatch.py : _handle_…_reconcile/_validate_reconciliation_result : L852-1045` | **The true dedup/at-most-once backstop for fulfillment** (since `@idempotent` is unavailable). **Reconcile-only after `transport_attempted=true`; read absence = INCONCLUSIVE, never resend** (§7.1 P0). |
 | Replay-policy registry (`local_only`/`remote_read_replay_safe`/`remote_effect_not_replay_safe`; fail-closed default) | `shopify_connector_job_dispatch.py : _get_replay_policies : L102-115,1471-1506` | Fulfillment write = `remote_effect_not_replay_safe`; reconcile = `remote_read_replay_safe`. |
 | DEC-009 retry/failure routing (16 fixed error classes; bounded backoff 30s×2, cap 30min, ±20% jitter, max 12, 24h) | `shopify_connector_job_dispatch.py : _route_failure/_schedule_retry_or_fail : L26-160,1660-1748` | Handlers raise `JobHandlerError(error_class,…)`; routing/backoff/manual-review free. **No 17th class may be added.** |
 | **Mutation-attempt evidence model** (immutable; `attempt_token`, `business_intent_fingerprint`, `exact_request_fingerprint`, `shopify_idempotency_key`, `idempotency_valid_until≈now+23h`, `observed_outcome`); **one-attempt-per-job `UniqueIndex`** | `shopify_connector_mutation_attempt.py : L35-306` | A fulfillment retry after a clean failure needs a **NEW (replacement) job** — attempt reuse is forbidden. `shopify_idempotency_key` will be **null/unused** for fulfillment. |
@@ -179,12 +179,14 @@ The inventory 7-callback pattern + scope-serialization + handoff + review-releas
 ## 6. Architecture risks (traced to code) → feed DEC-038 + risk register
 
 1. **No native fulfillment `@idempotent`** (`dispatch.py` selftest embeds it;
-   fulfillment cannot) → exactly-once rests **entirely** on C1/C2/NET/C3 +
-   `business_intent_fingerprint` + the **reconcile verdict**; eventual consistency
-   between write and `fulfillmentOrders` read can cycle to
-   `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` admin block (operator load,
+   fulfillment cannot) → **at-most-once** (never a claimed exactly-once remote effect)
+   rests **entirely** on C1/C2/NET/C3 + `business_intent_fingerprint` + the **reconcile
+   verdict**; eventual consistency between write and `fulfillmentOrders` read can cycle
+   to `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` admin block (operator load,
    not silent dup). **Reconcile-read determinism is the single most important
-   fulfillment design risk.**
+   fulfillment design risk.** Once `transport_attempted=true` the job is
+   **reconcile-only**; **read absence is INCONCLUSIVE, never a resend** (§7.1 P0 —
+   DEC-038 §7.1).
 2. **Selftest classifier branch `'IDEMPOTENCY_PREVIOUS_ATTEMPT_FAILED'`
    (`dispatch.py:566-568`) is NOT a documented Shopify code** — a real fulfillment
    classifier must not copy it; documented codes are `IDEMPOTENCY_CONCURRENT_REQUEST`,

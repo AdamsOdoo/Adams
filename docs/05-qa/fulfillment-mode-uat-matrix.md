@@ -44,7 +44,9 @@
 | UAT-FM-1.6 | External fulfillment detection → review | Manually fulfill an order in Shopify admin (external origin) | Inbound record created; origin classified `external_merchant` via the §3 evidence stack (own-GID ledger miss + `service.handle`/event attribution); a User review case opens stating order, items/quantities, location, actor, tracking, and the exact proposed Odoo action; **zero stock change** |
 | UAT-FM-1.7 | Mode 1 User actions on the review case | From UAT-FM-1.6: (a) import tracking; (b) acknowledge; (c) explicitly validate the exact proposal | (a) writes only `carrier_tracking_ref`/URL (non-stock); (b) closes the case "handled outside Odoo", audited; (c) shows precise picking/lines/quantities/lots/locations and validates only on deliberate confirmation — the proposal equals the §4 evaluation output |
 | UAT-FM-1.8 | Connector-created fulfillment observed inbound | Let the webhook/scan re-observe the UAT-FM-1.1 fulfillment | Classified `connector` via own-GID ledger; snapshots refreshed; **never validates Odoo again**; no review case |
-| UAT-FM-1.9 | Uncertain outbound outcome | Simulate timeout on `fulfillmentCreate` (network fault injection) | Verification read (FO remaining quantities + own-GID ledger) precedes any retry; applied → adopt; not-applied → retry; inconclusive → `blocked_manual_review`; never a blind retry ([Fact] no idempotency key — capture §6.5) |
+| UAT-FM-1.9 | Uncertain outbound outcome (**reconcile-only**) | Simulate timeout on `fulfillmentCreate` after C2 commits `transport_attempted=true` (network fault injection) | The job is **reconcile-only — the mutation is never re-sent**. Reconcile read (FO/fulfillments cursor-paginated to completion + own-GID ledger) → **APPLIED** (positive evidence) adopt; **NOT_APPLIED** only on positive proof of non-application → bounded replacement job; **INCONCLUSIVE** (incl. **read absence**, incomplete scan, changed remote qty) → after `INCONCLUSIVE_RECONCILIATION_CAP=3` `duplicate_risk` review; **never a second send from a read miss** ([Fact] no `@idempotent` — capture §6.5) |
+| UAT-FM-1.9b | No-tracking uncertain outcome fails closed | UAT-FM-1.9 on a fulfillment created **without** tracking, with concurrent activity moving the FO `remainingQuantity` | Reconcile cannot match by tracking; ambiguity → **INCONCLUSIVE** → `duplicate_risk` review; **never a second create** (SRR-10) |
+| UAT-FM-1.9c | Possible-notification uncertainty fails closed | Uncertain `fulfillmentTrackingInfoUpdate` outcome where `notifyCustomer` may have fired | The possible notification is **never repeated** from read absence; reconcile-only; no duplicate customer notification |
 | UAT-FM-1.10 | Held / scheduled / declined FO states | Create `ON_HOLD` (each hold reason where reproducible), `SCHEDULED`, `REQUEST_DECLINED` conditions | Connector sends blocked per File B §2–3 rows; picking validation attempts route to review with the hold `displayReason` surfaced; connector never places/releases holds (D-014-5) |
 | UAT-FM-1.11 | Cancelled/failed inbound fulfillment | Cancel a connector-created fulfillment in Shopify (`ful_cancelled`); produce an `ERROR`/`FAILURE` result (`ful_error`/`ful_failure`) | Cancellation never auto-reverses Odoo stock; Odoo-already-validated → high-visibility review case; `ERROR`/`FAILURE` never reconciled as shipped |
 | UAT-FM-1.12 | Unknown status value (each Layer-A enum family) | Fixture-level (`unknown_ful_status` etc.) or replayed synthetic payload, one per Layer-A enum family (all seven, incl. `FulfillmentDisplayStatus`) | All five File B §7 unknown-value contract points hold for every Layer-A family: raw preserved, unknown badge, never success, unsafe automation stopped, schema warning raised |
@@ -65,6 +67,14 @@ first failing condition; a User review case opens carrying the **named
 reason** below; **zero Odoo stock change**; the case is workable via the
 Mode 1 actions (UAT-FM-1.7).
 
+> **Vocabulary note (2026-07-22 correction).** The "Expected review reason" column
+> holds a **descriptive case label**, not a core selection value. Each case persists an
+> accepted `error_class` (+ `manual_review_subreason`) from the merged
+> `ERROR_CLASS_SELECTION`/`MANUAL_REVIEW_SUBREASON_SELECTION` registries per the
+> **DEC-038 §7.2 mapping** — **no new selection value is introduced** (`over_fulfillment`
+> is not a registered value; the quantity-overrun case persists `ambiguous_match`, with
+> the "over-fulfillment" detail in sanitized evidence).
+
 | ID | Condition violated (File A §4 #) | How to violate | Expected review reason |
 | --- | --- | --- | --- |
 | UAT-FM-2.1 | 1 — exact order binding | External fulfillment on an order never imported/bound | `order_binding_missing` |
@@ -72,7 +82,7 @@ Mode 1 actions (UAT-FM-1.7).
 | UAT-FM-2.3 | 3 — FO identity | Fulfillment line whose FO/FO-line GID cannot be resolved | `fulfillment_order_unresolved` |
 | UAT-FM-2.4 | 4 — product/variant binding | Unbind (or archive the binding of) one line's variant | `product_binding_missing` |
 | UAT-FM-2.5 | 5 — line/quantity mapping | Sale line missing `shopify_line_item_gid` / UoM mismatch | `line_mapping_ambiguous` |
-| UAT-FM-2.6 | 6 — no over-fulfillment | External fulfillment quantity exceeds ordered−already-fulfilled | `over_fulfillment` |
+| UAT-FM-2.6 | 6 — no over-fulfillment | External fulfillment quantity exceeds ordered−already-fulfilled | over-fulfillment (descriptive) → persists `ambiguous_match` (§7.2 map) |
 | UAT-FM-2.7 | 7 — exact remaining Odoo quantity | Picking pending demand differs and does not deterministically split | `quantity_mismatch` |
 | UAT-FM-2.8 | 8 — location mapping | Fulfill from a Shopify location with no Odoo mapping | `location_unmapped` |
 | UAT-FM-2.9 | 9 — deterministic picking | Two candidate open pickings both covering the lines | `picking_ambiguous` |
@@ -147,8 +157,22 @@ switches, the confirmation dialog and audit record.
 - `code_required=False` + **positive-success-evidence** classifier (empty
   `userErrors` alone ≠ success).
 - `action_confirm()` auto-picking coexistence; `send_to_shipper` `rate_and_ship`
-  collision; **staff-permission (`fulfill_and_ship_orders`) tests distinct from
-  API-scope tests**.
+  collision; **staff-permission (`fulfill_and_ship_orders`) NOT_PROVEN — not inferred
+  from scopes**; **API-version compat gate (`store.api_version`, no fulfillment-only
+  pin, never `latest`)**.
+- **P0 reconcile-only (DEC-038 §7.1):** C2-committed unknown outcome cannot reach a
+  second mutation; **read absence → INCONCLUSIVE**; only positive non-application
+  evidence authorizes a replacement; no-tracking uncertainty (UAT-FM-1.9b) and
+  possible-notification uncertainty (UAT-FM-1.9c) fail closed.
+- **Cursor pagination (DEC-038 §7.4):** FOs / per-FO line items / reconcile reads /
+  inbound & reconnect scans / Mode 2 evidence reads paginate to completion
+  (`hasNextPage`/`endCursor`, fail-closed cap, duplicate/repeated-cursor/malformed-page);
+  a partial page never proves absence, selects a target, or authorizes a mutation.
+- **Fixed vocabulary (DEC-038 §7.2):** persisted `error_class`/`subreason` ∈ merged
+  registries; `over_fulfillment` (or any new value) never appears.
+- **Lifecycle `ondelete`:** every new `job_type` + `fulfillment_tracking_change`
+  reassigns historic rows to the sink; uninstall/reinstall zero residue; no orphan
+  attempt/evidence.
 
 ### B. Genuine concurrency (independent PG transactions/processes — NOT savepoints)
 duplicate admission · operation-scope serialization · C1/C2/NET/C3 mutation handoff ·

@@ -16,9 +16,17 @@
 > Odoo 19.0 FINAL), and the code audit
 > (`docs/03-architecture/wave-4-fulfillment-current-code-audit.md`, base
 > `ab4f12f5`). **Next unused decision id verified = DEC-038.**
+>
+> **Bounded control-room correction (2026-07-22).** Revised per PR #188 comment
+> `5041620950` / issue #186 comment `5041623758`: the P0 uncertain-outcome
+> **reconcile-only** contract (§7.1) replaces every "absent → resend" path; Q1–Q7 are
+> **ruled** and Q8 added (§4, applied); the fixed error/review vocabulary is mapped and
+> `over_fulfillment` removed (§7.2); job taxonomy, modular file/test allowlist,
+> pagination, lifecycle `ondelete`, staff-permission, and API-version contracts frozen
+> (§7.3–§7.7 + packet §11). Still **Proposed**; still authorizes no implementation.
 
 ## Date
-2026-07-21.
+2026-07-21 (bounded correction 2026-07-22).
 
 ## Scope
 Reconcile the Wave 4 fulfillment decision surface against **current official
@@ -61,7 +69,7 @@ ruling; **v** = verification-only (evidence confirms an accepted posture).
 
 | # | Topic | Verified facts (evidence) | Accepted ruling to preserve | Contradiction / gap | Proposed disposition | Test implication | CR? |
 |---|---|---|---|---|---|---|---|
-| 1 | **Fulfillable-quantity source of truth** | Shopify `FulfillmentOrderLineItem.remainingQuantity: Int!` drives partial fulfillment (Shopify notes §3); Odoo done-qty = `stock.move.line.quantity`, demand = `product_uom_qty` (Odoo notes §1) | DEC-011 (FO-based), D-014-4 (qty = move done `quantity`, ≤ `remainingQuantity`) | Modes cond.7 says `stock.move.product_uom_qty` vs done `quantity`; must be explicit which drives the create | **REFINE:** the **fulfilled quantity sent** = the picking's per-line **done `stock.move.line.quantity`**, and it must be **≤ the FO line's `remainingQuantity`** (re-read fresh pre-C2); `product_uom_qty` is demand only, never the sent quantity | pass: qty=done; fail-to-review: qty>remaining → `over_fulfillment` | v |
+| 1 | **Fulfillable-quantity source of truth** | Shopify `FulfillmentOrderLineItem.remainingQuantity: Int!` drives partial fulfillment (Shopify notes §3); Odoo done-qty = `stock.move.line.quantity`, demand = `product_uom_qty` (Odoo notes §1) | DEC-011 (FO-based), D-014-4 (qty = move done `quantity`, ≤ `remainingQuantity`) | Modes cond.7 says `stock.move.product_uom_qty` vs done `quantity`; must be explicit which drives the create | **REFINE:** the **fulfilled quantity sent** = the picking's per-line **done `stock.move.line.quantity`**, and it must be **≤ the FO line's `remainingQuantity`** (re-read fresh pre-C2); `product_uom_qty` is demand only, never the sent quantity | pass: qty=done; fail-to-review: qty>remaining → `ambiguous_match` (accepted subreason; the "over-fulfillment" detail lives in sanitized evidence/logs, **not** a new selection value — §7 map) | v |
 | 2 | **Odoo pickings/moves ↔ Shopify FOs** | One Order → **many** FOs; **>1 FO per location possible** (Shopify notes §3, corrects "one FO/location") | D-014-4 (picking→sale_id→order binding→order GID→FOs) | Modes §4.1 "one FO per fulfilling location" is a simplification | **REFINE:** map **per validated picking** to the FO(s) for that order+location; **iterate all FOs**, never assume one-per-location; `assignedLocation` groups them | test: order with 2 FOs at one location | Y |
 | 3 | **Shopify FO line items ↔ Odoo lines** | `FulfillmentOrderLineItemInput.id` = the **FulfillmentOrderLineItem GID** (not order-LineItem, not variant); the FO connection field is **`lineItems`** (Shopify notes §3); `sale.order.line.shopify_line_item_gid` exists but is **read by no matcher** (audit §2) | D-014-4 matching via `shopify_line_item_gid` (RA-023) | Matching must resolve **order-LineItem GID → FO-line-item GID**, a 2-hop the docs require; matcher does not exist yet | **REFINE:** matching chain = Odoo move → `move.sale_line_id` → `sale.order.line.shopify_line_item_gid` (LineItem GID) → the FO line whose `lineItem.id` equals it → that FO-line-item's `id` (used in the mutation). Skip null-GID lines (shipping/discount/rounding) | pass: full map; fail: unresolved line → `mapping_missing` (RA-023) | Y |
 | 4 | **Partial picking / partial fulfillment** | Odoo done-qty per line; Shopify `remainingQuantity` decrements; events carry no qty (Shopify notes §5) | DEC-011 partial posture (fulfill delivered qty; backorder = new event); D-014-4 | DEC-011 leaves exact partial rules OPEN | **REFINE:** each validated picking (incl. backorder) fulfills exactly its done quantities against `remainingQuantity`; no partial automation within one create; unresolved partials → review | pass: partial create; qty math | Y |
@@ -89,7 +97,7 @@ ruling; **v** = verification-only (evidence confirms an accepted posture).
 | 26 | **Operation-scope identity** | `operation_scope_key` `store|res_model|res_id|shopify_target_gid` (while non-terminal), `UNIQUE`; inventory overrides with its own literal (audit §1,§4) | DEC-036 (operation-scope serialization) | — | **REFINE:** fulfillment defines its **own scope literal** (per FulfillmentOrder or per picking; **decide granularity in Phase 5**) overriding `_compute_operation_scope_key` for its own types only | test: single-in-flight-per-scope | Y |
 | 27 | **Idempotency identity** | fulfillment mutations **NOT `@idempotent`** (still-17 list, verified 2026-07-21); `business_intent_fingerprint`+`exact_request_fingerprint`; `shopify_idempotency_key` unused for fulfillment (audit §1,§6; Shopify notes §4.1) | DEC-011/D-014-7/RA-017 (connector-designed key + verify-before-retry); RA-014 | Phase-1 inventory mis-flagged the "17" as stale | **PRESERVE** (RA-014/RA-017 correct); **REFINE:** `prepare_preconditions` **omits the `@idempotent` directive**; dedup = `business_intent_fingerprint` + `operation_scope_key` + the **reconcile read**; correct the Phase-1 inventory "stale-17" note | test: no `@idempotent` in the fulfillment operation string (source-guard) | Y |
 | 28 | **Retry & replacement lineage** | 16 fixed error classes; bounded backoff (max 12/24h); JobHandlerError (audit §1) | DEC-009 taxonomy (no 17th class) | — | **PRESERVE**; replacement lineage via `superseded_by_job_id` handoff pattern (audit §4) | test: retry backoff; lineage | v |
-| 29 | **Uncertain-result reconciliation** | reconcile verdict `applied/not_applied/inconclusive`; `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` block; identity guard (audit §1) | DEC-036 reconciliation-before-retry | Reconcile-read determinism is the key risk (audit §6) | **PRESERVE**; **REFINE:** the fulfillment reconcile read = order's `fulfillmentOrders`/`fulfillments`; verdict from a matching fulfillment (own tracking/`business_intent`) or `remainingQuantity` having decreased by exactly our quantities (D-014-7) | test: verify-adopt / absent-resend / inconclusive-block | Y |
+| 29 | **Uncertain-result reconciliation** | reconcile verdict `applied/not_applied/inconclusive`; `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` block; identity guard (audit §1) | DEC-036 reconciliation-before-retry | Reconcile-read determinism is the key risk (audit §6) | **PRESERVE**; **REFINE (P0-corrected — §7):** once C2 commits `transport_attempted=true` the job is **reconcile-only** (never a second `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`). The reconcile read (order's `fulfillmentOrders`/`fulfillments`) returns **APPLIED** only on positive authoritative evidence (matching fulfillment by own tracking/`business_intent`, or `remainingQuantity` decreased by **exactly** our quantities), **NOT_APPLIED** only on positive proof of non-application, else **INCONCLUSIVE**. **Read absence = INCONCLUSIVE, never `not_applied`, never resend authority.** | tests: transport-attempted→reconcile-only (no 2nd mutation); read-absence→INCONCLUSIVE; positive-non-application→bounded replacement job; cap→`duplicate_risk` review | Y |
 | 30 | **Clean rejection** | `userErrors` (base `UserError`, **no code**) → must require positive success evidence (audit §4) | DEC-009 (semantic errors → review) | Fulfillment can't use code-routing branch | **REFINE:** classify on `userErrors` presence + **positive success evidence (a real fulfillment id)**; empty `userErrors` alone ≠ success (`code_required=False` branch) | test: userErrors → fail/review; empty-but-no-id → reconcile | Y |
 | 31 | **Store identity & connection generation** | `expected_store_identity=shop_domain`; admission refuses stale generation; C3 re-checks (audit §1) | DEC-036 store-identity/epoch | — | **PRESERVE** (reuse verbatim) | test: stale-generation refusal; identity mismatch | v |
 | 32 | **Company consistency** | `settings.order_company_id` + `with_company` + immutable-after-binding lock; company via `picking_type_id`; picking name unique per company (audit §2; Odoo notes §7) | Order-domain company invariants | — | **PRESERVE**; **REFINE:** fulfillment picking/warehouse resolution runs in `order_company_id`; idempotency/scope keys company-scoped | test: cross-company refusal | Y |
@@ -139,41 +147,54 @@ engine gates automated inbound stock mutation — the highest-risk surface).
 
 ---
 
-## 4. Minimal control-room / product-owner question set (escalations)
+## 4. Control-room rulings on Q1–Q8 (APPLIED — no longer open)
 
-Questions that **cannot be derived from accepted records** and need an explicit
-ruling before Gate B implementation begins:
+> **Updated 2026-07-22 (bounded control-room correction).** The seven Gate A
+> escalations Q1–Q7 (and the added Q8) were **ruled by the control room** in PR #188
+> comment `5041620950`. The rulings below are **applied** across DEC-038, the Task
+> 014 packet §11, the DoR, the locked prompt, the UAT matrix, and the risk register.
+> **These are no longer open questions**; any genuinely new question found by the
+> correction is escalated separately (§14), never a reopening of a ruled item.
 
-- **Q1 — `operation_scope_key` granularity (item 26):** should a fulfillment write
-  serialize per **FulfillmentOrder GID** or per **Odoo picking**? (Recommendation:
-  per **(store, picking, FulfillmentOrder GID)** — matches DEC-011's operation-level
-  key intent; but confirm.)
-- **Q2 — `action_confirm()` auto-picking coexistence (audit §2):** confirm that
-  Wave 4 fulfillment **adopts** the `sale_stock`-auto-created delivery pickings (its
-  `_action_done` trigger fires on their validation) rather than creating parallel
-  pickings. (Recommendation: adopt.)
-- **Q3 — Core Location-cache population owner (audit §6):** the
-  `shopify.connector.location` cache is populated by the **inventory** location-sync
-  job; if a store enables fulfillment but not inventory, may fulfillment trigger a
-  **core-owned** cache refresh (never `location_mapping`)? (Recommendation: add a
-  core/shared refresh seam; do not couple to inventory.)
-- **Q4 — DEC-019 trigger-origin extension (item 13):** accept the proposed third
-  `trigger_origin` value `fulfillment_tracking_change` via `selection_add`?
-- **Q5 — COD-binding field ownership (item 21):** the widened `cod_fulfillment_state`
-  + new fulfillment fields — do they live on the **sale** order binding (a schema
-  addition to `shopify_connector_sale`, a cross-module edit) or on a **fulfillment**
-  binding that references the order binding? (Recommendation: fulfillment-owned
-  binding + read the sale COD read-model; avoid editing sale internals.)
-- **Q6 — `send_to_shipper` `rate_and_ship` posture (Odoo notes §5):** confirm the
-  operational rule that fulfillment stores use a `rate`-only carrier (or the
-  connector writes `carrier_tracking_ref` directly) to avoid Odoo auto-booking a
-  shipment on validation.
-- **Q7 — API version pin (audit §6):** accept pinning the connector's fulfillment
-  GraphQL to Admin API **`2026-07`** (vs the per-store negotiated version), with the
-  unknown-future-value contract as the safety net?
+- **Q1 — operation scope (item 26):** **RULED.** `fulfillment_create` serializes per
+  **`(store, Odoo picking, FulfillmentOrder GID)`** business operation; the tracking
+  update serializes per **`(store, fulfillment binding/picking, Fulfillment GID)`** as
+  its own operation scope. The exact literal is deterministic and documented (packet
+  §11.1).
+- **Q2 — picking ownership (audit §2):** **RULED.** Wave 4 fulfillment **adopts** the
+  `sale_stock`-auto-created delivery pickings (its `_action_done` trigger fires on
+  their validation) and **never creates a parallel delivery picking** for an imported
+  order.
+- **Q3 — Location cache (audit §6):** **RULED.** Fulfillment remains independent of
+  `shopify_connector_inventory` and **never reads `location.mapping`**. It **may own a
+  read-only Shopify-location refresh service inside the fulfillment addon** that
+  upserts the **core** `shopify.connector.location` cache through sanctioned code.
+  Missing/ambiguous location identity **fails closed** (`ambiguous_match` review).
+- **Q4 — trigger origin (item 13):** **RULED.** Accept `fulfillment_tracking_change`
+  via `selection_add`, with **explicit LC-1-compatible `ondelete`** behavior and tests
+  (§11 lifecycle contract).
+- **Q5 — COD field ownership (item 21):** **RULED.** Fulfillment-owned binding/evidence
+  fields **read** the sale-domain COD read model; **no `shopify_connector_sale`
+  production edit is authorized** in Gate B without a new control-room amendment.
+- **Q6 — carrier integration (Odoo notes §5):** **RULED.** Mode 2 **fails closed
+  before automatic picking validation** when the configured Odoo carrier flow would
+  invoke `send_to_shipper` / create or charge an external shipment / purchase a label,
+  unless a verified supported non-booking path is proven. Mode 1 may **observe** the
+  final Odoo tracking state after the merchant's normal validation. No undocumented
+  global carrier rewrite is imposed.
+- **Q7 — API version (audit §6):** **RULED.** Use **`store.api_version`**; verify the
+  current supported GraphQL shapes and **block unsupported/unverified versions**; **no
+  fulfillment-only hard pin** and **no silent `latest`**. `2026-07` is the present
+  verified fulfillment contract; version expansion requires current official research
+  + control-room acceptance (§13 API-version policy).
+- **Q8 — staff permission (item 33):** **RULED (added).** API scopes and the
+  `fulfill_and_ship_orders` **staff permission** are **separate axes**. Until an
+  official introspection mechanism is proven, the staff-permission prerequisite is
+  **manually confirmed and runtime-verified**, **not inferred** from
+  `currentAppInstallation.accessScopes` (§12 staff-permission readiness).
 
-None of Q1–Q7 blocks the Gate A **package** (each has a recommended default); each
-must be **accepted or overruled** before the locked prompt is issued for Gate B.
+**All of Q1–Q8 are ruled and applied; none remains open.** The Gate A package
+therefore carries **no unresolved decision escalation** from this set.
 
 ---
 
@@ -184,8 +205,8 @@ must be **accepted or overruled** before the locked prompt is issued for Gate B.
 - **G4-3 (state model):** ✅ content verified EXACT-MATCH vs 2026-07 (acceptance only).
 - **G4-4 (scope correction):** ✅ accepted (DEC-033 §6); add the staff-permission axis.
 - **G4-6 (Waves 2/3 merged):** ✅ order bindings + Layer 2 present at base.
-- **G4-2/G4-5/G4-7/G4-8/G4-9:** require control-room acceptance of this record + the
-  Q1–Q7 rulings; the technical contradictions are reconciled above.
+- **G4-2/G4-5/G4-7/G4-8/G4-9:** require control-room acceptance of this record; the
+  Q1–Q8 rulings are **applied** (§4) and the technical contradictions reconciled above.
 - **CV-013 (#185):** carried forward as a **critical** Wave 4 obligation; Wave 4
   cannot receive final acceptance / enter RC / UAT while #185 is open. **Not
   downgraded.**
@@ -231,6 +252,138 @@ No P0 finding. No condition of the 16-condition engine was dropped or weakened; 
 four §3 refinements sharpen the engine to verified evidence without changing intent.
 No self-acceptance, ready-marking, or merge language exists in any Gate A output;
 CV-013 (#185) is carried forward as critical and is not downgraded.
+
+## 7. Bounded control-room correction (2026-07-22) — binding contracts
+
+> Applied per PR #188 comment `5041620950` / issue #186 comment `5041623758`. This
+> section is **decision-level**; the exact tables (job taxonomy, modular file/test
+> allowlist, pagination) are frozen in the Task 014 packet §11 and the locked prompt,
+> and referenced here. It **supersedes** any earlier Gate A wording that permitted a
+> resend from read absence.
+
+### 7.1 P0 — uncertain remote outcome (reconcile-only; no resend from absence)
+
+The single binding mutation-recovery contract for `fulfillmentCreate` and
+`fulfillmentTrackingInfoUpdate` (which have **no native Shopify `@idempotent`**):
+
+- **A. Before C2 / no transport.** When C2 has not committed, or durable evidence
+  proves `transport_attempted = false`, the original remote mutation was **not
+  attempted**; after the local failure is classified, a **normal bounded replacement
+  job** may be created (accepted lineage; new `payload_hash`).
+- **B. Clean Shopify rejection.** A structured clean rejection with **positive
+  evidence the operation was not applied** may be corrected via a new replacement job.
+- **C. Transport attempted, outcome unknown.** Once C2 commits
+  `transport_attempted = true`, any missing response / timeout / network failure /
+  process crash / malformed outcome creates an **uncertain remote result**. That job
+  **may not send the mutation again**; it **transitions into reconciliation**.
+- **D. Reconciliation verdict.** A reconciliation read returns **APPLIED** only on
+  positive authoritative evidence of the exact intended effect; **NOT_APPLIED** only
+  on positive authoritative proof the specific operation was not applied;
+  **INCONCLUSIVE** for every other result. **Read absence alone is INCONCLUSIVE.** A
+  first-page miss, an exhausted-but-incomplete scan, delayed visibility, a missing
+  tracking number, a changed remote quantity/state, or a concurrent external action is
+  **not** NOT_APPLIED evidence.
+- **E. Resend prohibition.** No automatic second `fulfillmentCreate` /
+  `fulfillmentTrackingInfoUpdate` may be reached **solely** because a read did not find
+  the expected effect. When positive non-application evidence cannot be obtained, route
+  to **`duplicate_risk` manual review** after `INCONCLUSIVE_RECONCILIATION_CAP=3`. The
+  **same rule applies to notification side effects**: a possible prior
+  `notifyCustomer=true` call may **never** be repeated from read absence.
+
+Required source-guard/behavior tests (frozen in the packet §11 / locked prompt):
+C2-committed unknown outcome **cannot reach a second mutation**; read absence maps to
+**INCONCLUSIVE**; only **positive non-application evidence** authorizes a replacement;
+**no-tracking uncertainty fails closed**; **possible-customer-notification uncertainty
+fails closed**.
+
+### 7.2 Fixed error/review vocabulary map (no new selection value)
+
+Every fulfillment failure maps to the **existing merged registries** —
+`ERROR_CLASS_SELECTION` and its `MANUAL_REVIEW_SUBREASON_SELECTION` subset
+(`shopify_connector_core/models/shopify_connector_job.py:70-97`; DEC-009). **No new
+selection value is introduced** (that would require a separate control-room
+amendment). `over_fulfillment` is **not** an accepted class/subreason and is removed
+from every Gate A doc; the detailed reason is preserved only in **sanitized structured
+evidence/logs**, never as a persisted selection value.
+
+| Fulfillment condition | Accepted `error_class` | Manual-review `subreason` (if review) |
+|---|---|---|
+| Quantity exceeds remaining (formerly `over_fulfillment`) | `ambiguous_match` | `ambiguous_match` |
+| Missing line identity (no `shopify_line_item_gid` / no matching FO line) | `mapping_missing` | (retryable, or `ambiguous_match` if it blocks) |
+| Ambiguous FulfillmentOrder or picking | `ambiguous_match` | `ambiguous_match` |
+| Location unresolved/ambiguous (fulfillment) | `ambiguous_match` | `ambiguous_match` *(fulfillment does **not** reuse the inventory-domain `inventory_location_missing`)* |
+| Duplicate-risk uncertainty (post-cap) | `duplicate_risk` | `duplicate_risk` |
+| Store identity mismatch | `store_identity_mismatch` | `store_identity_mismatch` |
+| Scope / permission / auth failure (incl. staff-permission runtime failure) | `shopify_permission_scope_auth` | — |
+| Structured Shopify `userErrors` | `shopify_user_errors_validation` | — |
+| Malformed / unknown-shape response | `data_shape_schema_mismatch` | — |
+| Concurrent operation conflict (PG 40001/40P01/55P03) | `concurrency_race_conflict` | — |
+| Missing notification confirmation | `fulfillment_notification_confirmation_missing` | `fulfillment_notification_confirmation_missing` |
+| No reconciliation strategy registered (fail-closed) | `no_reconciliation_strategy` | `no_reconciliation_strategy` |
+| Throttle / temporary / network | `shopify_throttling_rate_limit` / `shopify_temporary_server_network` | — |
+
+The UAT matrix's "Expected review reason" column values (`order_binding_missing`,
+`over_fulfillment`, `location_unmapped`, …) are **descriptive case labels**, not core
+selection values; each case persists an accepted `error_class` (+ `subreason`) per this
+map.
+
+### 7.3 Complete job/replay taxonomy — frozen (packet §11.2)
+
+The exact table covering **every** Wave 4 backend job (12 job families — outbound
+admission/orchestration; `fulfillment_create` mutation + reconcile; tracking-change
+admission; `fulfillment_tracking_update` mutation + reconcile; inbound observation/
+origin-classification; periodic reconciliation/watermark scan; reconnect catch-up;
+mode-switch prerequisite/history scan; Mode 2 proposal/evaluation/application local
+job; manual-review release/replacement admission) — with `job_type`, purpose,
+`job_source`, `trigger_origin`, domain flag, `res_model`/identity, operation-scope
+literal, replay policy, handler, local/read/mutation/reconcile class, mutation domain,
+predecessor/successor lineage, mutation-attempt ownership, and terminal/manual-review
+dispositions — is **frozen in the packet §11.2**. A single shared fulfillment
+mutation-reconcile job type is used **only** where consistent with the accepted Layer 2
+pattern and the handler dispatches strictly from the linked attempt's mutation domain.
+**No 17th core error class; no unregistered manual-review subreason.**
+
+### 7.4 Pagination — frozen (packet §11.4)
+
+All decision-critical Shopify reads use **cursor pagination** (`pageInfo.hasNextPage`/
+`endCursor`, deterministic ordering, an explicit **fail-closed** max-page/node cap,
+duplicate-node + repeated-cursor detection, malformed-page handling) — no fixed
+`first: N` window. A **partial page set may never** prove absence, select a unique
+target, prove mapping completeness, authorize a mutation, or authorize a resend; on
+hitting the safety cap before completeness, route to a data-shape/manual-review
+disposition. Applies to: all FulfillmentOrders for an order; all required line items
+per candidate FO; reconciliation/adoption reads; inbound periodic scans; reconnect
+catch-up; Mode 2 evidence reads.
+
+### 7.5 Lifecycle `ondelete` — frozen (packet §11.5)
+
+Every new fulfillment `job_type` and the new `trigger_origin` value
+`fulfillment_tracking_change` are added via `selection_add` with an explicit
+**LC-1-compatible `ondelete`** reassigning historic rows to the accepted historic sink
+(`_reassign_to_historic_job_type`; `historic_domain_job`), preserving
+`original_job_type`, with upgrade/uninstall/reinstall + historic-row + zero-residue +
+no-orphan-attempt/evidence tests.
+
+### 7.6 Staff-permission readiness (Q8)
+
+`fulfill_and_ship_orders` is a **Shopify staff permission**, a separate axis from API
+scopes (visible via the granted-scope snapshot). **No accepted official introspection
+mechanism has been demonstrated** by this package. Until one is proven: **do not infer
+staff permission from scopes**; represent the prerequisite as a **manually confirmed /
+NOT_PROVEN** readiness item; preserve any real Shopify authorization failure as
+sanitized runtime evidence (`shopify_permission_scope_auth`); block live-mutation
+qualification until the permission is operator-confirmed and validated in the dedicated
+dev store (CV-013 / #185).
+
+### 7.7 API-version policy (Q7)
+
+All calls go through the core API client and **`store.api_version`**; **no
+fulfillment-only endpoint version is hard-coded**; **never `latest`**. `2026-07` is the
+currently researched/verified fulfillment contract; readiness records whether a store's
+configured version is in the **accepted fulfillment compatibility set** and
+**fails/blocks** for unsupported/unverified versions; the GraphQL-shape/source-guard
+suite runs against **every version in the accepted set**; version expansion requires
+current official research + control-room acceptance.
 
 ## Review / change control
 - **This record decides no code and authorizes no implementation.** It is a

@@ -84,12 +84,14 @@ Hook: `stock.picking._action_done` override enqueues
 yet — a documented deviation from the bind-row targeting precedent).
 
 **D-014-4 — Matching chain (consumes D-012's line GIDs).** picking →
-`sale_id` → order binding → order GID → query
-`order.fulfillmentOrders(first: 10)` **without a server-side status
+`sale_id` → order binding → order GID → query the order's
+`fulfillmentOrders` **cursor-paginated to completion** (`pageInfo.hasNextPage`/
+`endCursor`, fail-closed safety cap — §11.4 pagination contract **supersedes** any
+fixed `first: N` window) **without a server-side status
 filter** (red-team-fixed: `query:"status:open"` would exclude
 IN_PROGRESS FOs, which are exactly the state of a partially-fulfilled
 backorder chain), selecting `status ∈ {OPEN, IN_PROGRESS}`
-client-side → for each
+client-side (each FO's line items likewise cursor-paginated to completion) → for each
 picking move line: `move.sale_line_id.shopify_line_item_gid` → the FO
 line item whose `lineItem.id` matches; quantity = the move's done
 `quantity` (19.0 field — captures §8), must be ≤ `remainingQuantity`
@@ -153,16 +155,23 @@ behavior under real concurrent workers is explicitly unproven (ARCH
 §5.12 caveat applies with full force here); `UNIQUE(store_id,
 picking_id)` catches any duplicate **after** the first success, and
 the verification read (below) is the recovery net between the two;
-(2) ambiguous outcome (timeout/unknown): **verification read before
-any retry** — re-query the order's `fulfillments(first: 50)` +
-FO `remainingQuantity`; a fulfillment whose `trackingInfo.number`
-matches ours, or whose creation is corroborated by the FO's
-`remainingQuantity` having decreased by exactly our quantities, is
-adopted (binding created from the read, job succeeds); definitively
-absent → one re-send per retry cycle; inconclusive (no tracking to
-match AND ambiguous quantities) → `blocked_manual_review` /
-`duplicate_risk`. Both the operation key and the verification read are
-required together (accepted rule). `notifyCustomer` is persisted at
+(2) ambiguous outcome (timeout/unknown): **reconcile-only, never a
+second send** *(P0-corrected 2026-07-22 — §11.1 supersedes the earlier
+"absent → resend" wording)*. Once C2 commits `transport_attempted=true`
+the job **transitions to reconciliation** and re-queries the order's
+`fulfillments`/`fulfillmentOrders` **cursor-paginated to completion**
+(§11.4) + FO `remainingQuantity`. Verdict: **APPLIED** — a fulfillment
+whose `trackingInfo.number` matches ours, or whose creation is
+corroborated by `remainingQuantity` having decreased by **exactly** our
+quantities — is adopted (binding created from the read, job succeeds);
+**NOT_APPLIED** only on **positive authoritative proof** the operation
+was not applied (→ a bounded **replacement job**, new `payload_hash`);
+**INCONCLUSIVE** for everything else. **Read absence is INCONCLUSIVE,
+never `not_applied`, and never authority to resend**; after
+`INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` manual review.
+A pre-C2 / `transport_attempted=false` failure (nothing sent) uses a
+normal bounded replacement job. Both the operation-scope key and the
+reconcile read are required together (accepted rule). `notifyCustomer` is persisted at
 enqueue (`notification_default_enabled`, default False) and **never
 re-read at retry** (RA-009); absent explicit enablement no
 notification is ever sent — `fulfillment notification confirmation
@@ -192,8 +201,10 @@ fixed ✅(D-014-7); 6 no inventory scope ✅ (structural); 7 no
 product/order-import scope ✅; 8 no UI/webhook/OAuth ✅; 9 tests
 ✅(§5); 10 rollback ✅ (single-PR revert; created Shopify fulfillments
 remain — no auto-unfulfill; inventory unaffected); 11 live-dependency
-controlled (mutations exist — dev-store evidence or recorded waiver,
-as Task 013); 12 gate-act reconfirmation; 13 notification
+controlled (mutations exist — dev-store evidence **required**; any exception is a
+specific product-owner ruling on the record, **not a routine waiver** — §11.8);
+12 gate-act reconfirmation (**control-room acceptance, not draft-open — §11.8**);
+13 notification
 default-off + persisted-decision boundary explicit ✅(D-014-7); 14
 scope set + TD-002 fix explicit ✅(D-014-2); 15 unmatched/mismatch
 handling explicit ✅(D-014-4/5).
@@ -221,18 +232,21 @@ hook enqueue with odoo_event/trigger_origin);
 unmatched → mapping_missing, multi-location/hold/scheduled →
 ambiguous_match, explicit-line-list guard [source-level: the literal
 omission-of-fulfillmentOrderLineItems path must not exist]);
-`test_fulfillment_idempotency.py` (verification-read-adopt /
-absent-resend / inconclusive-review paths; no blind retry
-[source-level: creation call unreachable without a preceding
-verification read on retry]; notifyCustomer persisted-at-enqueue
-including retry-preserves-decision; second validate on same picking
-blocked by constraints); `test_fulfillment_tracking_update.py`
+`test_fulfillment_idempotency.py` (reconcile-only after
+`transport_attempted=true`: APPLIED→adopt, positive-NOT_APPLIED→bounded
+replacement job, **read-absence→INCONCLUSIVE→`duplicate_risk`** — never a
+second mutation from absence [source-level: no second `fulfillmentCreate`/
+`fulfillmentTrackingInfoUpdate` is reachable from a mere read miss];
+no-tracking uncertain outcome fails closed; **possible-`notifyCustomer`
+uncertainty fails closed** (never repeated from absence); notifyCustomer
+persisted-at-enqueue including retry-preserves-decision; second validate on
+same picking blocked by constraints); `test_fulfillment_tracking_update.py`
 (in-place update path, multi-number split, company passthrough,
 missing-ref creation with note); `test_fulfillment_readiness_td002.py`
 (REQUIRED_MVP_SCOPES contains read_merchant_managed_fulfillment_orders
 and not read_fulfillments; seam check behavior). Runtime: Odoo.sh
-green (SRR-06) + dev-store evidence or recorded ChatGPT waiver
-(mutation task, as Task 013). TD-002 core-test update runs inside the
+green (SRR-06) + dev-store evidence **required** (any exception = a specific
+product-owner ruling on the record, **not a routine ChatGPT waiver** — §11.8). TD-002 core-test update runs inside the
 core suite.
 
 ## 6. Acceptance criteria / DoD / rollback
@@ -243,7 +257,8 @@ notification default-off proven incl. retry; RA-022 respected
 (source-level: only `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`
 mutations exist, no V2/REST); zero inventory/refund/payout logic;
 TD-002 resolved with tests; suites + Odoo.sh green; validation record +
-AR row + handoff; draft PR; gate closes on draft-open.
+AR row + handoff; draft PR; ~~gate closes on draft-open~~ **[superseded — §11.8:
+the gate needs control-room acceptance, not draft-open]**.
 
 ## 7. Register impacts on acceptance
 
@@ -524,10 +539,15 @@ strategy (inventory `service.py` is the exact template — audit §4). Freeze:
 - **C1 intent persistence; C2 durable attempt on the dedicated side cursor; NET
   transport; C3 outcome persistence** — inherited unchanged.
 - **Fresh pre-C2 read** = the **primary duplicate-prevention control** for these
-  non-idempotent mutations: verify-before-retry, adopt-if-found (D-014-7). The
-  reconcile read (order's `fulfillmentOrders`/`fulfillments`) returns
-  `applied/not_applied/inconclusive`; `INCONCLUSIVE_RECONCILIATION_CAP=3` →
-  `duplicate_risk` block.
+  non-idempotent mutations (verify-before-**send**, adopt-if-already-present). **Once
+  C2 commits `transport_attempted=true` the job is reconcile-only — no second
+  mutation** (§11.1). The reconcile read (order's `fulfillmentOrders`/`fulfillments`,
+  **cursor-paginated to completion** — §11.4) returns
+  **APPLIED**/**NOT_APPLIED**/**INCONCLUSIVE**; **APPLIED** only on positive
+  authoritative evidence, **NOT_APPLIED** only on positive proof of non-application,
+  **read absence = INCONCLUSIVE**; `INCONCLUSIVE_RECONCILIATION_CAP=3` →
+  `duplicate_risk` block. A replacement send requires **positive non-application
+  evidence** (or a proven `transport_attempted=false`).
 - **NO `@idempotent` directive** in the fulfillment operation string (fulfillment
   mutations are not on Shopify's still-17 `@idempotent` list — Shopify notes §4.1);
   `shopify_idempotency_key` stays null for fulfillment. Dedup = `business_intent_
@@ -603,3 +623,126 @@ no-`@idempotent` **source-guard** (the fulfillment operation string must not con
 collision; staff-permission (`fulfill_and_ship_orders`) tests distinct from API-scope
 tests; and a `qty_done`/`quantity_done` static source-guard (the field does not exist
 in Odoo 19). Exact file names frozen in the locked prompt (Phase 6).
+
+---
+
+## 11. Addendum (2026-07-22) — [Proposed] Bounded control-room correction
+
+> **Status: Proposed — bounded control-room correction, 2026-07-22. NOT accepted.**
+> Applied per PR #188 comment `5041620950` / issue #186 comment `5041623758`. Nothing
+> above is deleted; where earlier wording conflicts (the "absent → resend" path,
+> `first: N` fixed windows, `over_fulfillment`, a single giant service file, a
+> fulfillment-only `2026-07` pin, **the "gate closes on draft-open" wording, and the
+> "recorded waiver" shortcut for dev-store evidence** — §3 #11 / §5 / §6 / §8),
+> **this section supersedes it** (corrected in place or via §11.8). Decision basis:
+> [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md)
+> §4 (Q1–Q8 rulings) + §7.
+
+### 11.1 P0 — uncertain remote outcome is reconcile-only
+Binding contract (DEC-038 §7.1): (A) before C2 / proven `transport_attempted=false` →
+normal bounded replacement job; (B) clean Shopify rejection with **positive
+non-application evidence** → replacement job; (C) once C2 commits
+`transport_attempted=true`, an unknown outcome (timeout/network/crash/malformed) is
+**reconcile-only — the mutation is never sent again**; (D) reconcile verdict is
+**APPLIED** (positive authoritative evidence) / **NOT_APPLIED** (positive proof of
+non-application) / **INCONCLUSIVE** (everything else, incl. **read absence**, first-page
+miss, incomplete scan, delayed visibility, missing tracking number, changed remote
+qty/state, concurrent external action); (E) **no automatic second
+`fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`** from a read miss — after
+`INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` review; the **same rule binds
+notification side effects** (a possible prior `notifyCustomer=true` is never repeated
+from absence). Source-guard/behavior tests: C2-committed unknown cannot reach a second
+mutation; read absence→INCONCLUSIVE; only positive non-application authorizes a
+replacement; no-tracking uncertainty fails closed; possible-notification uncertainty
+fails closed.
+
+### 11.2 Complete Wave 4 job / replay taxonomy (frozen)
+
+Every backend job. Mutation jobs own **at most one** `mutation.attempt` for their
+lifetime (DEC-036); a retry is a **freshly enqueued replacement job** (new
+`payload_hash`), never attempt reuse. Reconcile/read/local jobs own **no** attempt.
+Replay policies are the merged core values (`local_only` / `remote_read_replay_safe` /
+`remote_effect_not_replay_safe`). The two `*_reconcile` types share the merged
+fulfillment mutation-reconcile shape and **dispatch strictly from the linked attempt's
+mutation domain**. **No 17th error class; no unregistered subreason.**
+
+| # | `job_type` | Class | `job_source` | `trigger_origin` | Domain flag | `res_model` / identity | Operation-scope literal | Replay policy | Owns attempt | Lineage (pred → succ) | Terminal / review disposition |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `fulfillment_picking_admission` | local orchestration | `odoo_event` | `fulfillment_picking_validation` | `fulfillment_domain_enabled` | `stock.picking` | `(store, picking)` | `local_only` | no | `_action_done` → N× `fulfillment_create` (per FO) | succeeded (children enqueued) / `mapping_missing` / `ambiguous_match` review |
+| 2 | `fulfillment_create` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_picking_validation` | `fulfillment_domain_enabled` | `stock.picking` + `shopify_target_gid`=FO GID | `(store, picking, FulfillmentOrder GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_create_reconcile` (uncertain) / replacement `fulfillment_create` (positive NOT_APPLIED) | succeeded (binding written) / `duplicate_risk` / mapped error class |
+| 3 | `fulfillment_create_reconcile` | reconciliation (read) | `reconciliation` | — | `fulfillment_domain_enabled` | `stock.picking` (same op scope) | inherits create op scope | `remote_read_replay_safe` | no | `fulfillment_create` → replacement `fulfillment_create` (only positive NOT_APPLIED) | APPLIED→adopt / INCONCLUSIVE cap→`duplicate_risk` |
+| 4 | `fulfillment_tracking_admission` | local orchestration | `odoo_event` | `fulfillment_tracking_change` **(Q4)** | `fulfillment_domain_enabled` | `stock.picking` / fulfillment binding | `(store, binding)` | `local_only` | no | tracking-change hook → `fulfillment_tracking_update` | succeeded / `binding_conflict` review |
+| 5 | `fulfillment_tracking_update` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_tracking_change` | `fulfillment_domain_enabled` | fulfillment binding + `shopify_target_gid`=Fulfillment GID | `(store, binding, Fulfillment GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_tracking_update_reconcile` | succeeded / `duplicate_risk` / mapped error class |
+| 6 | `fulfillment_tracking_update_reconcile` | reconciliation (read) | `reconciliation` | — | `fulfillment_domain_enabled` | fulfillment binding (same op scope) | inherits update op scope | `remote_read_replay_safe` | no | `fulfillment_tracking_update` → replacement (positive NOT_APPLIED only) | APPLIED→adopt / INCONCLUSIVE cap→`duplicate_risk` |
+| 7 | `fulfillment_inbound_observation` | read + local classify | `webhook` / `scheduled_sync` | — | `fulfillment_domain_enabled` | inbound-evidence / order binding + Fulfillment GID | `(store, Fulfillment GID)` (read) | `remote_read_replay_safe` | no | → `fulfillment_mode2_evaluation` (Mode 2) | evidence recorded; external → Mode 1 review case |
+| 8 | `fulfillment_reconciliation_check` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store (watermark) + per-run uuid nonce | per-run nonce | `remote_read_replay_safe` | no | cron | snapshot/drift notes / review |
+| 9 | `fulfillment_reconnect_catchup` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | reconnect | every disconnected-period external fulfillment → review (**both modes**) |
+| 10 | `fulfillment_mode_switch_scan` | read + local (admin) | `manual_sync` / `scheduled_sync` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | admin switch request → enables Mode 2 | scan-clean → switch; blockers → abort to Mode 1 |
+| 11 | `fulfillment_mode2_evaluation` | local (Odoo write) | `webhook` / `odoo_event` / `reconciliation` | — | `fulfillment_domain_enabled` | inbound-evidence / `stock.picking` | `(store, Fulfillment GID)` | `local_only` | no | observation → (16/16) validate picking | 16/16 pass → validate (local); any fail → **named review reason** (§7.2 map); **fails closed before validation if carrier flow would book/charge — Q6** |
+| 12 | `fulfillment_review_release` | local (admin) | `manual_sync` | — | `fulfillment_domain_enabled` | fulfillment binding / job | `(store, target)` | `local_only` | no | admin action → release exactly one blocked job / admit replacement | released / replacement admitted under lineage |
+
+Exact `job_type` string spellings and any consolidation of adjacent local jobs are
+validated at Gate B against the merged `_get_handlers`/`_get_replay_policies`
+completeness invariant; a shared mutation-reconcile handler is used only where the
+merged Layer 2 pattern already does so.
+
+### 11.3 Modular file / exact-test allowlist → frozen in the locked prompt
+The giant `shopify_connector_fulfillment_service.py` is **replaced by an enumerated
+modular production file map**, and **every exact test filename is frozen**, in
+[`../06-prompts/sol-wave-4-fulfillment-locked-prompt.md`](../06-prompts/sol-wave-4-fulfillment-locked-prompt.md)
+§2/§5 (the implementation-worker authority). The §5, §9.6 and §10.7 **test families**
+above are the behavior families those exact filenames must cover; the frozen filename
+list is exhaustive (no additional production or test file without a control-room
+allowlist amendment). The `[service + seams + hooks]` single-file wording in §8's old
+prompt is **superseded** by that modular map.
+
+### 11.4 Cursor-pagination contract (frozen)
+Every decision-critical read paginates with **`pageInfo.hasNextPage` + `endCursor`** to
+completion, with: deterministic page ordering where available; an explicit
+**fail-closed** maximum-page/node safety cap; duplicate-node detection; repeated-cursor
+detection; malformed-page handling. Applies to **all** FulfillmentOrders for an order;
+**all** required line items for **every** candidate FO; fulfillment
+reconciliation/adoption reads; inbound periodic scans; reconnect catch-up; Mode 2
+evidence reads. A partial page set may **never** prove absence, select a unique target,
+prove mapping completeness, authorize a mutation, or authorize a resend; when the safety
+cap is reached before completeness, route to a data-shape/manual-review disposition
+(`data_shape_schema_mismatch` / `ambiguous_match`) — never continue on a partial set.
+This replaces `fulfillmentOrders(first: 10)`, `fulfillments(first: 50)`, and any
+"first page of FO line items" assumption.
+
+### 11.5 Lifecycle `ondelete` (frozen)
+Every new fulfillment `job_type` (§11.2) and the new `trigger_origin`
+`fulfillment_tracking_change` are added via `selection_add` with an **explicit
+LC-1-compatible `ondelete`** using `_reassign_to_historic_job_type` (→
+`historic_domain_job`), preserving `original_job_type`. Uninstall reassigns historic
+queued/terminal/review rows through the accepted sink; reinstall leaves **zero
+active-domain residue** and **no orphan** `mutation.attempt`/evidence record. Tests:
+upgrade; uninstall with historic queued+terminal+review rows; reinstall; residue scan.
+(Extends §7's LC-1 note to the full job set.)
+
+### 11.6 Staff-permission readiness (Q8)
+`fulfill_and_ship_orders` (staff permission) is a **separate axis** from API scopes; no
+official introspection mechanism is demonstrated. Readiness carries it as **manually
+confirmed / NOT_PROVEN**, never inferred from `currentAppInstallation.accessScopes`; a
+real Shopify auth failure is preserved as sanitized runtime evidence
+(`shopify_permission_scope_auth`); live-mutation qualification is blocked until it is
+operator-confirmed and dev-store-validated (CV-013 / #185).
+
+### 11.7 API-version policy (Q7)
+Calls go through the core API client and **`store.api_version`**; **no fulfillment-only
+version override**, **never `latest`**. `2026-07` is the present verified contract;
+readiness records whether the store's configured version is in the **accepted
+compatibility set** and fails/blocks otherwise; the GraphQL-shape/source-guard suite
+runs against every version in that set; expansion requires current official research +
+control-room acceptance.
+
+### 11.8 Corrected gate / acceptance posture (supersedes §3 #11 / §6 / §8 wording)
+The **gate does not close merely on draft-open**. Gate A and Gate B each require explicit
+**control-room acceptance** (ChatGPT), never self-acceptance; the PR stays draft/unmerged
+until then. Dev-store fulfillment mutation evidence is **required** for both Mode 1 and
+Mode 2; any exception is a **specific product-owner ruling recorded on GitHub**, **not a
+routine control-room/"recorded waiver"**. **Wave 4 cannot receive final acceptance, enter
+a release candidate, or begin UAT while CV-013 (#185) is open** — both the fulfillment
+dev-store campaign **and** CV-013 must execute green (DoR criterion 11; UAT §E). This
+replaces the earlier "gate closes on draft-open" / "dev-store evidence or recorded
+(ChatGPT) waiver" phrasing in §3 #11, §5, §6, and the superseded §8 prompt.
