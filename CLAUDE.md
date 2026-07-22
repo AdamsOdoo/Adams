@@ -220,15 +220,26 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
 > deliberate, product-owner-instructed, scoped change to the operating model
 > for work based on `mvp/program-integration` only. Full basis:
 > [`DEC-032-mvp-autonomous-execution-model.md`](docs/04-decisions/DEC-032-mvp-autonomous-execution-model.md)
-> (Accepted, 2026-07-15).
+> (Accepted, 2026-07-15), amended by
+> [`DEC-039-mvp-claude-implementation-worker-expansion.md`](docs/04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md)
+> (Accepted, 2026-07-22) — see that decision before assuming Claude cannot
+> implement in this program; the rule below reflects the amendment.
 
-- **Claude is now the independent control room** for the MVP completion
-  program: scope governor and release gatekeeper for all work on or
-  descending from `mvp/program-integration`. Claude does not write connector
-  feature code in this role.
-- **GPT-5.6 Sol is the implementation worker** for this program: the primary
+- **Claude is the independent control room** for the MVP completion
+  program by default: scope governor and release gatekeeper for all work on
+  or descending from `mvp/program-integration`. **As of DEC-039 (2026-07-22),
+  Claude is also an authorized implementation worker for this program,
+  alongside GPT-5.6 Sol** — the product owner may relay a ChatGPT-authored
+  implementation prompt to either. The two roles must never be collapsed
+  into one session: a Claude session that implements a task/wave must not
+  self-review, self-accept, ready-mark, or merge that work — the
+  control-room gate review for it must come from ChatGPT, or from a
+  **separate** Claude session explicitly acting as control room and
+  independently re-verifying the work. See DEC-039 for the full rule.
+- **GPT-5.6 Sol remains an implementation worker** for this program: an
   autonomous research/implementation worker, operating under
   [`docs/06-prompts/gpt56-sol-master-mvp-mission.md`](docs/06-prompts/gpt56-sol-master-mvp-mission.md).
+  DEC-039 adds Claude alongside Sol; it does not remove Sol.
 - **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
   (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
   is never modified, reset, or force-pushed by this program. `mvp/program-integration`
@@ -252,9 +263,12 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
   [`mvp-completion-program.md`](docs/07-implementation-plan/mvp-completion-program.md)
   §2 for the evidence) and are not to be closed, merged, or edited without an
   explicit control-room/product-owner decision recorded in that file's §9.
-- **No feature coding by Claude** under this addendum, unless the product
-  owner explicitly changes Claude's role again. Claude's role here is
-  governance, audit, wave review, and release-gating only.
+- **Feature coding by Claude is now authorized under this addendum**, per
+  DEC-039 (2026-07-22), strictly subject to the no-self-acceptance rule
+  above: an implementing Claude session's role for its own work stays
+  execution only — it never doubles as that work's governance, audit, wave
+  review, or release-gating, which must come from ChatGPT or a separate,
+  independently-verifying Claude control-room session.
 - The live status of this program is tracked in
   [`docs/07-implementation-plan/mvp-program-state.md`](docs/07-implementation-plan/mvp-program-state.md)
   — read it for current wave/blocker/decision status; do not rely on this
