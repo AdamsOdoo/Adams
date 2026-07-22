@@ -1,5 +1,17 @@
 # U0 — First Usable Shopify Connector Operator UI — Validation Results
 
+> **FINAL CLOSURE — U0 MERGED (2026-07-22).** Independent delta review of exact
+> head `a13f67210269277826e78b23be1fab5e0caffec5` returned **ACCEPT** (PR #192
+> comment [`5050387258`](https://github.com/AdamsOdoo/Adams/pull/192#issuecomment-5050387258));
+> the control room accepted that verdict and the exact-SHA runtime evidence
+> (comment [`5050525557`](https://github.com/AdamsOdoo/Adams/pull/192#issuecomment-5050525557)).
+> PR #192 merged into `mvp/program-integration` via merge commit
+> `8818c7714f46eefe51c6b452b5e3f24d155f26fb`. No candidate-owned P0, P1, or
+> material P2. All product-owner deferments remain
+> `DEFERRED BY PRODUCT OWNER — NOT PROVEN` and are carried forward to
+> UAT/release readiness. See **§13** for the full closure record. The
+> paragraphs below are the preserved historical record of each review stage.
+>
 > **Status: implementation candidate — Stage R1 Odoo.sh runtime campaign EXECUTED
 > on the corrected working tree (`EXECUTED — PASS — ODOO.SH CONTAINER,
 > PRE-REBUILD`); a Stage R2 correction is now IMPLEMENTED — EXACT-SHA ODOO.SH
@@ -477,3 +489,38 @@ U0/Test Connection/sale/inventory suites, (3) one fresh independent delta
 review limited to this correction, and only then (4) a separate closure
 session may ready-mark/merge on `ACCEPT`. This implementing session does not
 self-review, self-accept, ready-mark, or merge.
+
+---
+
+## 13. Final closure — PR #192 merged (2026-07-22)
+
+- **Final reviewed/accepted head:** `a13f67210269277826e78b23be1fab5e0caffec5`.
+- **Exact-SHA runtime:** build `35308219`, database
+  `adamsmen-claude-u0-operator-ui-foundation-35308219`.
+- **Runtime results at exact head:** U0 + Test Connection `67/67` (0 failed / 0
+  errors); sale `194/194`; inventory `247/247`; five-action non-admin
+  zero-side-effect matrix green; internal auth-failure path green;
+  mutation-resolution refusal paths green; no real Shopify request or
+  mutation occurred.
+- **Independent delta review:** PR #192 comment
+  [`5050387258`](https://github.com/AdamsOdoo/Adams/pull/192#issuecomment-5050387258)
+  — **VERDICT: ACCEPT**. No P0, P1, or material P2.
+- **Control-room final gate acceptance:** PR #192 comment
+  [`5050525557`](https://github.com/AdamsOdoo/Adams/pull/192#issuecomment-5050525557).
+- **Merge:** PR #192 merged into `mvp/program-integration` via merge commit
+  `8818c7714f46eefe51c6b452b5e3f24d155f26fb` (parents: prior tip
+  `1e2e5c258922b93e11f6bf6f5d4828517d12c917` and accepted head
+  `a13f67210269277826e78b23be1fab5e0caffec5`).
+- **Product-owner deferments:** all remain
+  `DEFERRED BY PRODUCT OWNER — NOT PROVEN` (HOOT/browser tours, driven browser
+  walkthrough + screenshots, browser accessibility/render/DOM-growth/memory
+  evidence, additional disposable-database fresh install, isolated
+  base-to-candidate upgrade, isolated uninstall/reinstall/zero-residue) —
+  carried forward as a UI/UAT/release-readiness risk, never represented as
+  passed.
+- **Out-of-scope trackers unaffected:** issue #193 (baseline warm-update
+  fixture defect) remains open, not attributable to this PR. Issue #185
+  (`[CV-013]`) remains open and critical.
+- This closure session performed no implementation, test correction, or
+  runtime execution; it reverified the frozen accepted identity, marked the
+  PR ready, merged it, and recorded this evidence.

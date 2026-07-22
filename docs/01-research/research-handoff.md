@@ -20007,3 +20007,62 @@ security matrix, mutation-wizard refusal, sale/inventory regressions,
 redaction, clean tree); submit the exact corrected SHA and that evidence to
 one fresh independent delta review; only on `ACCEPT` hand to a separate
 closure session for ready-marking/merge.
+
+## Session handoff — U0 PR #192 governance closure (2026-07-22)
+
+**What ran:** the separate closure session authorized by the control-room
+final gate acceptance (PR #192 comment `5050525557`), per CLAUDE.md §13/DEC-040.
+No implementation, test correction, or runtime execution occurred in this
+session.
+
+**Identity gate:** PASSED all 14 checks — repo `AdamsOdoo/Adams`; PR #192
+open/draft/unmerged/mergeable (`clean`); base `mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`;
+head `claude/u0-operator-ui-foundation@a13f67210269277826e78b23be1fab5e0caffec5`;
+no commit after the accepted head; independent-ACCEPT comment `5050387258`
+and control-room acceptance comment `5050525557` both present and matching;
+runtime evidence (build `35308219`) intact; zero unresolved review threads;
+issues #193 and #185 open; clean local working tree.
+
+**Actions taken:** marked PR #192 ready for review (re-verified head/base
+unchanged); merged PR #192 with the repository's normal merge-commit method
+(no squash/rebase) at commit `8818c7714f46eefe51c6b452b5e3f24d155f26fb`
+(parents: prior `mvp/program-integration` tip `1e2e5c258922b93e11f6bf6f5d4828517d12c917`
+and accepted head `a13f67210269277826e78b23be1fab5e0caffec5`; the accepted
+head is a confirmed ancestor and the merge introduced zero diff beyond the
+two parents); posted one tracker-only closure commit (this handoff entry plus
+`ui-u0-validation-results.md` §13, `mvp-program-state.md`'s Wave 5 row, and
+`architecture-review-log.md`'s AR-077 status); recorded closure comments on
+PR #192 and issue #167; deleted the merged remote branch
+`claude/u0-operator-ui-foundation`.
+
+**Merge SHA:** `8818c7714f46eefe51c6b452b5e3f24d155f26fb`.
+
+**Evidence references:** [`ui-u0-validation-results.md`](../05-qa/ui-u0-validation-results.md)
+§13 (final closure record); `architecture-review-log.md` AR-077 (closed);
+`mvp-program-state.md` Wave 5 row (accepted/runtime-verified/merged).
+
+**State:** U0 gate is CLOSED. Issue #193 (baseline warm-update fixture
+defect) remains open, unrelated to this PR. Issue #185 (`[CV-013]`) remains
+open and critical — Wave 4 may not receive final acceptance or enter UAT
+while it remains open. All product-owner deferments (HOOT, browser tours,
+driven walkthrough/screenshots, browser accessibility/render/memory
+evidence, additional disposable-database install, isolated upgrade, isolated
+uninstall/reinstall) remain `DEFERRED BY PRODUCT OWNER — NOT PROVEN`, carried
+to UAT/release readiness. No Shopify request or mutation occurred. U1/U2/U3
+and Wave 4 were not started or modified in this session.
+
+**Learning-feedback loop:** governance closure sessions benefit from a
+single-purpose identity gate (repo/PR/base/head/comments/issues/tree) checked
+once before any state-changing action, then re-verified immediately after
+mark-ready and after merge — this caught no drift here but is the correct
+discipline for an irreversible action.
+
+**Next-session prompt:** do **not** reuse the old Wave 4 exact-head runtime
+prompt for PR #189 (`claude/wave-4-fulfillment-gate-b`) — it was based on the
+pre-U0 integration tip `01f072dd4d83b7b39737452a686244a3a8c00332`. The next
+Wave 4 session must first inspect the new `mvp/program-integration` tip
+(now `8818c7714f46eefe51c6b452b5e3f24d155f26fb`), reconcile/merge that base
+into the Wave 4 branch under a new authorized prompt, determine the new exact
+Wave 4 candidate SHA, and reassess which runtime evidence must be repeated
+because U0 modified the core addon — before any new Odoo.sh campaign is
+authorized for that PR.
