@@ -2,10 +2,13 @@
 // Part of the Shopify Connector (U0 operator UI foundation).
 //
 // HOOT unit tests for the operational dashboard client action. Covers the
-// render states (loading / empty / healthy / degraded / manual-review),
-// filtered-navigation, failed RPC, refresh, hidden-tab pause, and accessible
-// labels. Reduced-motion and responsive behaviour are CSS-only (media queries)
-// and are covered by the SCSS + the driven runtime walkthrough, not here.
+// render states (empty / healthy / degraded / manual-review), filtered
+// navigation, failed RPC, and accessible labels. The >=30s refresh floor and
+// the visibility-aware background-tab pause are implemented in the client
+// action (see shopify_connector_dashboard.js) and are covered by source review
+// plus the driven runtime walkthrough, not asserted here. Reduced-motion and
+// responsive behaviour are CSS-only (media queries), covered by the SCSS + the
+// runtime walkthrough.
 
 import { expect, test, describe } from "@odoo/hoot";
 import { queryAll, queryFirst, queryText } from "@odoo/hoot-dom";

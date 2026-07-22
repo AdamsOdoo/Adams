@@ -105,8 +105,9 @@ class TestUiDashboard(TransactionCase):
     def test_reconnect_needed_is_degraded(self):
         self._make_store(state='reconnect_needed')
         data = self.Dashboard.get_dashboard_data()
-        # reconnect coexisting with no danger => degraded band (danger),
-        # because a reconnect blocks work like a failure would.
+        # reconnect-needed with no active danger => warning band (a reconnect is
+        # a warning-tier attention item, not a failure). Kept lenient so the
+        # test stays robust if the severity tiering is later refined.
         self.assertIn(data['state'], ('degraded', 'warning'))
 
     # ------------------------------------------------------------------ #

@@ -235,3 +235,29 @@ atomic, cleanly revertable unit.
     confirm against the running Odoo 19 web client.
   - Mutation-attempt test fixtures import Layer-2 create-surface constants;
     guarded with `skipTest` if the build shape differs.
+
+---
+
+## 12. Independent review outcome (DEC-040)
+
+A fresh, memoryless independent reviewer (separate `Agent` invocation, no
+implementer rationale) adversarially reviewed the frozen candidate `526ad63`
+against all ten acceptance dimensions and returned **VERDICT: ACCEPT** — no
+P0 / P1 / material-P2 in production code. Full report posted verbatim to
+[PR #192](https://github.com/AdamsOdoo/Adams/pull/192) with the reviewed SHA.
+
+The reviewer flagged three **Tier-3 test/doc** items (optional, non-gating,
+production-behaviour-neutral). Per the batch's Tier-3-fixed-inline rule they
+were folded in as a test/doc-only follow-up commit (production tree unchanged
+from the accepted `526ad63`):
+
+1. `test_dashboard_query_count_constant_across_scale` — added a warm-up call so
+   first-call ORM/ACL one-time work cannot inflate the first measured pass.
+2. HOOT header no longer claims the refresh-floor / hidden-tab-pause are
+   asserted there (they are source- + runtime-covered; the header now says so).
+3. Corrected the reconnect-test comment to describe the actual `warning` band.
+
+The remaining gate to merge is the **Odoo.sh runtime campaign (§8), not a code
+correction** — the independent code review is clean. The closure session should
+verify the new head, confirm the production delta from `526ad63` is empty, then
+run the Gate C campaign before ready/merge.

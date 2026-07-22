@@ -71,6 +71,10 @@ class TestUiPerformance(TransactionCase):
         # No week-old jobs, so the sparkline stays unavailable in both passes
         # and the query path is deterministic.
         self._seed_jobs(20)
+        # Warm one call first so ORM field metadata / group-resolution one-time
+        # work does not inflate the first measured pass (keeps the strict
+        # equality assertion meaningful).
+        self.Dashboard.get_dashboard_data()
         small = self._count_queries(lambda: self.Dashboard.get_dashboard_data())
         self._seed_jobs(200)
         large = self._count_queries(lambda: self.Dashboard.get_dashboard_data())
