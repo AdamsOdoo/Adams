@@ -183,17 +183,63 @@ carrier fields, sudo binding writes); fixed vocabulary (no `over_fulfillment`);
 binding field classification; the Mode 2 double-fulfillment-loop guard (bind
 before validate); handler return/arg-order.
 
-**No known P0 or P1 remains.** Residual material P2 carried as an
-implementation acceptance criterion for the control-room review / Gate C:
+**No known P0 or P1 remains.**
 
-- Mode 2 condition 7 (`quantity_mismatch`) is a pass-through that records the
-  required quantities; the actual quantity/coverage decision is enforced by
-  condition 9 (`_select_deterministic_picking`), so an under-covering picking
-  fails closed as `picking_ambiguous` rather than `quantity_mismatch` — a
-  reason-label imprecision only; the fail-closed safety holds.
-- Condition 14's "fresh live re-read" reuses the evaluation pass's read
-  (fetched at condition 3) rather than issuing a second read; the whole
-  evaluation is fresh, but a stricter separate re-read is a Gate-C refinement.
+### 10.1 Continuation (2026-07-22) — the two residual P2 findings, closed
+
+Per issue #186 comment `5044031518` (Wave 4 continuation ruling, item 4), the
+two P2 items recorded above are now corrected on this branch (commit
+`d9acb84`, prior to the `mvp/program-integration@1e2e5c2` synchronization
+merge `298e805`):
+
+- **Condition 7 (`quantity_mismatch`).** `_c7_quantity_match` is no longer a
+  pass-through. It now computes the set of open outgoing candidate pickings
+  whose pending demand covers the required fulfillment quantities
+  (`_quantity_compatible_pickings`) and fails closed with the named reason
+  `quantity_mismatch` when none exist. `_c9_picking` /
+  `_select_deterministic_picking` now only adjudicate genuine deterministic-
+  selection ambiguity among candidates condition 7 already proved are
+  quantity-compatible — a picking shortfall can no longer surface only as
+  `picking_ambiguous`. No new persisted vocabulary was introduced; both
+  `quantity_mismatch` and `picking_ambiguous` were already accepted
+  `REVIEW_REASON_SELECTION` values.
+- **Condition 14 (separately fresh live read).** `_c14_remote_state` no longer
+  reuses condition 3's cached `fulfillment_node`. It now performs its own
+  `_read_order_fulfillments` + `_read_fulfillment_orders`/
+  `_resolve_single_location` calls immediately before local validation would
+  occur, and fails closed (named reason `remote_state_changed`) on: a
+  disappeared target, a changed status, changed line quantities, changed
+  location evidence, or an incomplete/malformed/unavailable second read (any
+  `FulfillmentReadError`, including pagination cap/repeated-cursor). No Odoo
+  row lock or open transaction spans the read; no mutation is introduced; no
+  new error class or manual-review subreason was added.
+
+Tests strengthened in the existing frozen files (no new test filename):
+`test_fulfillment_mode2_engine.py` (condition 7/9 quantity-mismatch-vs-
+ambiguity routing; condition 14 separate-read/changed-precondition/incomplete-
+read/transport-failure cases), `test_fulfillment_idempotency.py` (condition
+14's read creates no mutation-attempt evidence and authorizes no resend),
+`test_fulfillment_concurrency.py` (no lock spans the condition-14 read; local
+validation cannot race past a changed second-read precondition),
+`test_fulfillment_source_guards.py` (condition 14 uses only the sanctioned
+read-only reader path; no raw transport; no mutation document).
+
+**Gate C (Odoo.sh) status: not executed in this environment.** This
+continuation session has no Odoo.sh credentials and no local Odoo/PostgreSQL
+runtime (`import odoo` fails; no vendored Odoo core is present in this
+workspace) — the same "no Odoo runtime exists in this workspace" limitation
+already disclosed for the original Gate B candidate. Everything achievable
+without a live Odoo runtime was done instead: `py_compile` across the whole
+addon, and a standalone re-execution (via the `ast` module, without importing
+`odoo`) of every static source-guard check — legacy V2/hold-mutation
+literals, `@idempotent`, `qty_done`/`quantity_done` access, `location.mapping`
+subscripting, raw transport/`_send` calls, `webhook`-source literals, and the
+production/test file-boundary allowlist — all **0 violations**, and a manifest
+data-file existence check — all present. The whole `TransactionCase` suite,
+including every test added by this continuation, remains
+`IMPLEMENTED — RUNTIME PENDING` pending an actual Gate C Odoo.sh campaign by a
+session/environment with genuine Odoo.sh access. Gate D dev-store and CV-013
+(#185, open/critical) remain separately `NOT PROVEN`, unchanged.
 
 ## 11. Rollback notes
 
