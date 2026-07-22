@@ -4,3 +4,5 @@
 from . import shopify_connector_fulfillment_binding
 from . import shopify_connector_fulfillment_inbound_evidence
 from . import shopify_connector_store_settings
+from . import shopify_connector_job
+from . import shopify_connector_readiness_check
