@@ -30,3 +30,11 @@ from . import test_mutation_security
 from . import test_mutation_retention
 from . import test_mutation_concurrency
 from . import test_mutation_source_guards
+# U0 operator UI foundation tests.
+from . import test_ui_installation
+from . import test_ui_dashboard
+from . import test_ui_visibility_matrix
+from . import test_ui_actions
+from . import test_ui_performance
+from . import test_ui_tours
+from . import test_ui_source_guards
