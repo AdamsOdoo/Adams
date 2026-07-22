@@ -201,3 +201,28 @@ To keep the repo reviewable as it grows:
 - Don't restate policy text (branch rules, phase gates, citation rules, etc.)
   across many docs — link to the canonical source (`CLAUDE.md`, this file)
   instead of copying it.
+
+---
+
+## Learning entry — U0 operator UI large-batch (2026-07-22)
+
+First large UI batch built by Claude under DEC-039/040. Durable lessons:
+
+1. **Verify every field/method/state against the *merged* backend before
+   writing a view.** The pre-review adversarial audit caught a job view
+   referencing a non-existent `created_at` (the job model has no `created_at`
+   and keeps `_log_access`, so only `create_date` exists) — a P1 that would
+   break install. An automated field-existence sweep (view `<field>` names vs
+   `fields.` definitions in the model source) is now part of the UI static
+   gate. Rule reinforced: never invent a backend field to make a mockup work.
+2. **XML/Owl mechanical traps are cheap to catch statically, expensive at
+   runtime.** XML comments cannot contain `--`; Owl `t-if` compiles JS
+   (`&&`, not `and`); Owl templates in assets fail the whole bundle on one
+   malformed node. All caught by `xml.dom.minidom` + `node --check` before
+   freezing.
+3. **When the build workspace has no Odoo runtime, classify honestly.** Every
+   runtime artifact (Odoo.sh campaign, tours, HOOT execution, screenshots) is
+   `RUNTIME PENDING`, never presented as a pass — same discipline as PR #189.
+4. **Keep the ACL surface minimal.** The dashboard aggregate service is an
+   `AbstractModel` (no ACL row) so the only ACL additions are the two transient
+   wizards, exactly as the packet scoped.

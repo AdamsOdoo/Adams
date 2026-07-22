@@ -118,3 +118,25 @@
 - "Current status" values mirror `mvp-completion-program.md` §3 exactly — update both files together, never one without the other.
 - Rows 6–8 and 10–12's inventory/fulfillment/order test types are "new" because no code exists yet; the exact test file names will be assigned when each wave's packet is implemented (see each packet's own §"Tests" section for the planned names). Row 9's exact test file names are now fixed (see row 9) as of the Wave 2 gate acceptance (2026-07-17) — they were the one prior omission from this note, now closed.
 - This matrix is the authoritative release checklist for Wave 6 — a release is not proposed until every row reaches its stated release criterion or is explicitly, recorded-ly waived by the product owner.
+
+---
+
+## U0 operator UI — implementation candidate (2026-07-22)
+
+Branch `claude/u0-operator-ui-foundation` (base `1e2e5c25`, DEC-039/040) delivers
+the first usable operator UI as one revertable batch. Acceptance-matrix items it
+advances from "no UI" to **implementation candidate, runtime pending**:
+
+- **Operational dashboard** — bounded read-only Owl dashboard on real aggregates
+  (severity model, ≤3 exceptions, chips, activity, optional sparkline).
+- **Job/sync logs UI** — native read-only Logs list/form; redacted fields only.
+- **Retry & recovery controls** — retry / cancel (wizard) / review-resolve /
+  mutation-resolution (admin wizard), each targeting an existing sanctioned
+  method with server-authoritative permission + state checks.
+- **Basic roles & permissions (UI surface)** — Auditor/Operator/Reviewer/
+  Administrator visibility matrix with negative direct-call tests.
+
+Static validation green; Odoo.sh runtime, tours, HOOT, screenshots PENDING at
+Gate C (no Odoo runtime in the build workspace). Full evidence:
+[`ui-u0-validation-results.md`](ui-u0-validation-results.md). Not accepted;
+awaiting the DEC-040 independent review.

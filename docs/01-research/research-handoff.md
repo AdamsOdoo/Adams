@@ -19833,3 +19833,45 @@ for ChatGPT's next direction (Part D or Part E).
   `Shopify-connector`. Next: ChatGPT review of AR-024. (Note: the
   2026-07-04/05 sprints logged their checkpoints in their compact
   entries above rather than here.)
+
+---
+
+## Session handoff — U0 operator UI large-batch (2026-07-22)
+
+**What ran:** built the U0 first-usable operator UI as one revertable batch on
+`claude/u0-operator-ui-foundation` (base `mvp/program-integration@1e2e5c25`),
+under DEC-039/040 (Claude default builder, independent review is the gate).
+
+**Identity gate:** PASSED all 12 checks (PR #191 merged `ba4ccc2`; DEC-039/040
+present + substantive; tracker refreshed; checkpoint `acd8c469` intact; base
+tip == amended `1e2e5c25`).
+
+**Delivered:** connector navigation; bounded read-only Owl dashboard on real
+aggregates; stores/readiness; Sync Center; Error & Review Center; logs; mutation
+evidence; safe retry/cancel/review/mutation-resolution actions. 3 modified + 15
+new production files, 1 modified + 8 new tests, this handoff + validation doc +
+copy deck + tracker/matrix/AR-log updates. All 27 code/test changes within the
+§8–§9 allowlist.
+
+**Evidence:** STATIC VALIDATION GREEN (py_compile, XML well-formedness, ESM
+syntax, manifest, allowlist, XML-ID uniqueness, cross-reference resolution,
+field-existence sweep, ACL structure, source-guard logic). Pre-review
+adversarial audit fixed 2×P1 + 2×P2 + 1 Tier-3 before freeze. **RUNTIME
+PENDING:** Odoo.sh campaign, browser tours, HOOT execution, driven walkthrough +
+screenshots — no Odoo runtime exists in the build workspace. Full record:
+[`ui-u0-validation-results.md`](../05-qa/ui-u0-validation-results.md).
+
+**State:** draft PR into `mvp/program-integration`, NOT self-accepted, NOT
+ready-marked, NOT merged. Independent DEC-040 review requested (report posted
+verbatim to the PR). No Shopify request/mutation occurred. U1/U2/U3 and
+fulfillment-mode UI were not started.
+
+**Learning-feedback loop:** see `quality-feedback-loop.md` U0 entry
+(field-existence sweep now part of the UI static gate; XML/Owl mechanical
+traps; honest runtime classification; minimal ACL surface).
+
+**Next-session prompt:** run the Gate C Odoo.sh runtime campaign (§8 of the
+validation doc) on the frozen candidate SHA, capture the screenshot inventory
+and the driven walkthrough, address any consolidated correction the independent
+reviewer returns, then hand to a separate closure session for ready/merge after
+`ACCEPT`.
