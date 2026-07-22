@@ -202,10 +202,12 @@ fulfillment operating mode per store, and the per-store
 10. **Layer 2 compliance proven:** every fulfillment mutation runs under the
     accepted Layer 2 protocol (durable attempt record before the call;
     **once `transport_attempted=true` the job is reconcile-only** — the mutation is
-    never re-sent; **read absence → INCONCLUSIVE**, only positive non-application
-    evidence authorizes a replacement job; no resend-from-absence path exists —
-    source-level test; DEC-038 §7.1). Notification side effects obey the same rule
-    (a possible prior `notifyCustomer=true` is never repeated from absence).
+    never re-sent; **read absence → INCONCLUSIVE**; **post-C2 `NOT_APPLIED` never
+    authorizes a replacement** (post-C2 = APPLIED/INCONCLUSIVE only); a replacement is
+    reachable **only** from `transport_attempted=false` or a synchronous `userErrors`
+    clean rejection; no resend-from-absence path exists — source-level test; DEC-038
+    §7.1). Notification side effects obey the same rule (a possible prior
+    `notifyCustomer=true` is never repeated from absence).
 11. Task 014 packet §5/§6 test files and criteria (as extended by the
     addendum) all green on Odoo.sh; **genuine dev-store fulfillment mutation
     evidence** for both Mode 1 and Mode 2 paths (any exception is a specific
@@ -240,8 +242,10 @@ hands off intact.
 Applied per PR #188 comment `5041620950` / issue #186 comment `5041623758`, the DoR
 now carries these binding contracts (detail in DEC-038 §4/§7 + Task 014 packet §11 +
 the locked prompt): **(P0)** uncertain remote outcomes are **reconcile-only** — read
-absence is INCONCLUSIVE, only positive non-application evidence authorizes a
-replacement, notifications fail closed (criteria #7/#10); **(Q1–Q8)** ruled and applied
+absence is INCONCLUSIVE; **post-C2 `NOT_APPLIED` never authorizes a replacement**
+(post-C2 = APPLIED/INCONCLUSIVE only; a replacement needs `transport_attempted=false`
+or a synchronous `userErrors` clean rejection), notifications fail closed (criteria
+#7/#10); **(Q1–Q8)** ruled and applied
 (operation-scope literals, adopt `sale_stock` pickings, core location cache only,
 `fulfillment_tracking_change` with `ondelete`, fulfillment-owned COD read, Q6 carrier
 fail-closed, `store.api_version`, staff-permission NOT_PROVEN); the **complete
@@ -250,3 +254,12 @@ job/replay taxonomy**, **modular file + exact test allowlist**, **cursor paginat
 **lifecycle `ondelete`**, and **staff-permission/API-version** policies are frozen.
 These are binding inputs to G4-5 re-acceptance; the gate checkboxes above remain
 **unchecked** (control-room acceptance is not self-granted here).
+
+**Final control-room micro-correction (2026-07-22)** — per PR #188 comment `5042183642`
+/ issue #186 comment `5042185019`: post-C2 `NOT_APPLIED` never authorizes a resend
+(post-C2 = APPLIED/INCONCLUSIVE only); the taxonomy is frozen at **exactly ten job
+types** with **one shared `fulfillment_mutation_reconcile`** that inherits **no**
+remote-effect operation scope; **`fulfillment_review_release` is not a job type**;
+**webhooks are forbidden as a Wave 4 source**; and the `fulfillment_tracking_change`
+trigger-origin uses the **dedicated** `_normalize_tracking_change_trigger_origin_on_uninstall`
+callable. Gate checkboxes remain **unchecked**.

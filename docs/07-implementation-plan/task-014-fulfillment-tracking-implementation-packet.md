@@ -160,17 +160,20 @@ second send** *(P0-corrected 2026-07-22 — §11.1 supersedes the earlier
 "absent → resend" wording)*. Once C2 commits `transport_attempted=true`
 the job **transitions to reconciliation** and re-queries the order's
 `fulfillments`/`fulfillmentOrders` **cursor-paginated to completion**
-(§11.4) + FO `remainingQuantity`. Verdict: **APPLIED** — a fulfillment
-whose `trackingInfo.number` matches ours, or whose creation is
-corroborated by `remainingQuantity` having decreased by **exactly** our
-quantities — is adopted (binding created from the read, job succeeds);
-**NOT_APPLIED** only on **positive authoritative proof** the operation
-was not applied (→ a bounded **replacement job**, new `payload_hash`);
-**INCONCLUSIVE** for everything else. **Read absence is INCONCLUSIVE,
-never `not_applied`, and never authority to resend**; after
+(§11.4) + FO `remainingQuantity`. Post-C2 the verdict has only **two
+actionable outcomes**: **APPLIED** — a fulfillment whose
+`trackingInfo.number` matches ours, or whose creation is corroborated by
+`remainingQuantity` having decreased by **exactly** our quantities — is
+adopted (binding created from the read, job succeeds); **INCONCLUSIVE**
+for **everything else**. Under the currently researched Shopify contract
+**no request-specific signal proves an already-attempted mutation was not
+applied**, so **post-C2 `NOT_APPLIED` is not an actionable Wave 4 verdict
+and never authorizes a replacement mutation**. **Read absence is
+INCONCLUSIVE, never `not_applied`, and never authority to resend**; after
 `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` manual review.
-A pre-C2 / `transport_attempted=false` failure (nothing sent) uses a
-normal bounded replacement job. Both the operation-scope key and the
+Only a **pre-C2 / `transport_attempted=false`** failure (nothing sent) or
+a **synchronous `userErrors` clean rejection** uses a normal bounded
+replacement job (new `payload_hash`). Both the operation-scope key and the
 reconcile read are required together (accepted rule). `notifyCustomer` is persisted at
 enqueue (`notification_default_enabled`, default False) and **never
 re-read at retry** (RA-009); absent explicit enablement no
@@ -233,8 +236,11 @@ unmatched → mapping_missing, multi-location/hold/scheduled →
 ambiguous_match, explicit-line-list guard [source-level: the literal
 omission-of-fulfillmentOrderLineItems path must not exist]);
 `test_fulfillment_idempotency.py` (reconcile-only after
-`transport_attempted=true`: APPLIED→adopt, positive-NOT_APPLIED→bounded
-replacement job, **read-absence→INCONCLUSIVE→`duplicate_risk`** — never a
+`transport_attempted=true`: post-C2 has only **APPLIED→adopt / INCONCLUSIVE**
+(**no post-C2 `NOT_APPLIED` replacement**); a replacement is reachable **only**
+from pre-C2/`transport_attempted=false` or a synchronous `userErrors` clean
+rejection; the shared `fulfillment_mutation_reconcile` **cannot enqueue another
+mutation**; **read-absence→INCONCLUSIVE→`duplicate_risk`** — never a
 second mutation from absence [source-level: no second `fulfillmentCreate`/
 `fulfillmentTrackingInfoUpdate` is reachable from a mere read miss];
 no-tracking uncertain outcome fails closed; **possible-`notifyCustomer`
@@ -267,10 +273,14 @@ TD-002 → fix routed here, Resolved on merge; MBQ-40/42/43 residuals →
 Resolved at packet level (backorder linkage used for audit labeling;
 live-location-read rule; mismatch → review); MBQ-61 exclusion restated.
 
-**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** the
-`fulfillment_tracking_change` `selection_add` `ondelete` uses the LC-1
-callable `_reassign_to_historic_job_type` from the start (LC-1 precedes
-Task 012 — DEC-030 / lifecycle §7), so no later retrofit is needed.
+**Lifecycle (LC-1) adoption (re-review `4945129824` item 7):** every new
+fulfillment **`job_type`** `selection_add` `ondelete` uses the LC-1 job-type
+sink `_reassign_to_historic_job_type` from the start (LC-1 precedes Task 012 —
+DEC-030 / lifecycle §7). The **`fulfillment_tracking_change` `trigger_origin`**
+value instead uses a **dedicated** callable
+`_normalize_tracking_change_trigger_origin_on_uninstall` — the job-type sink
+cleans `job_type` only and cannot remove a trigger-origin value, so it is not a
+valid cleanup for the removed value (see §11.5).
 
 ## 8. Locked final implementation prompt (Task 014)
 
@@ -510,10 +520,11 @@ dependency on `shopify_connector_inventory`; never reads `location.mapping`** (a
   Delivered-inconsistency case (§8); Layer-C connector-derived states.
 - **Services / handlers / job types:** register via **add-only** `_inherit` seams
   (zero core edits except the one named readiness edit): `job_type` `selection_add`
-  `fulfillment_create` + `fulfillment_create_reconcile` + `fulfillment_tracking_update`
-  (+ its reconcile); mutation-domain strategies (§10.3); handlers/replay policies;
-  `_domain_flag_for_job_type` → `fulfillment_domain_enabled`; readiness `_get_checks`
-  write-scope check (§10.4).
+  the frozen **ten** types (§11.2) — the two mutations `fulfillment_create` +
+  `fulfillment_tracking_update`, **one shared** `fulfillment_mutation_reconcile`, and
+  the local admission/scan/observation/Mode-2 types; mutation-domain strategies
+  (§10.3); handlers/replay policies; `_domain_flag_for_job_type` →
+  `fulfillment_domain_enabled`; readiness `_get_checks` write-scope check (§10.4).
 - **Cron / manual backend:** `fulfillment_reconciliation_check` cron (60 min,
   `job_source='reconciliation'`, per-run uuid nonce); manual retry surface — under
   Layer 2 (Odoo cron pattern, Odoo notes §8).
@@ -530,33 +541,40 @@ dependency on `shopify_connector_inventory`; never reads `location.mapping`** (a
 ### 10.3 Layer 2 integration contract (the fulfillment mutation domain)
 Reuse the merged Stage 0 Layer 2 substrate **verbatim**; supply the 7-callback
 strategy (inventory `service.py` is the exact template — audit §4). Freeze:
-- **Domain-registry values / job types** — `fulfillment_create`,
-  `fulfillment_create_reconcile`, `fulfillment_tracking_update`
-  (+ reconcile), registered add-only.
+- **Domain-registry values / job types** — the two mutation types
+  `fulfillment_create` + `fulfillment_tracking_update` and **one shared**
+  `fulfillment_mutation_reconcile` (dispatched strictly by the linked attempt's
+  mutation domain; owns no attempt, no remote-effect scope), registered add-only (§11.2).
 - **One job → at most one attempt for the job lifetime** (one-attempt-per-job
-  `UniqueIndex`); a retry after clean-fail/not-applied = a **freshly enqueued
-  replacement job** (new `payload_hash`) — no attempt reuse (audit §1, DEC-038 #25).
+  `UniqueIndex`); a retry after a **pre-C2 failure or a synchronous `userErrors` clean
+  rejection** = a **freshly enqueued replacement job** (new `payload_hash`) — no attempt
+  reuse, **never from a post-C2 read result** (audit §1, DEC-038 #25).
 - **C1 intent persistence; C2 durable attempt on the dedicated side cursor; NET
   transport; C3 outcome persistence** — inherited unchanged.
 - **Fresh pre-C2 read** = the **primary duplicate-prevention control** for these
   non-idempotent mutations (verify-before-**send**, adopt-if-already-present). **Once
   C2 commits `transport_attempted=true` the job is reconcile-only — no second
   mutation** (§11.1). The reconcile read (order's `fulfillmentOrders`/`fulfillments`,
-  **cursor-paginated to completion** — §11.4) returns
-  **APPLIED**/**NOT_APPLIED**/**INCONCLUSIVE**; **APPLIED** only on positive
-  authoritative evidence, **NOT_APPLIED** only on positive proof of non-application,
-  **read absence = INCONCLUSIVE**; `INCONCLUSIVE_RECONCILIATION_CAP=3` →
-  `duplicate_risk` block. A replacement send requires **positive non-application
-  evidence** (or a proven `transport_attempted=false`).
+  **cursor-paginated to completion** — §11.4) returns only **APPLIED** or
+  **INCONCLUSIVE** post-C2; **APPLIED** only on positive authoritative evidence;
+  **read absence = INCONCLUSIVE**; **post-C2 `NOT_APPLIED` is not an actionable Wave 4
+  verdict and never authorizes a replacement** (no accepted request-specific
+  non-application proof exists); `INCONCLUSIVE_RECONCILIATION_CAP=3` →
+  `duplicate_risk` block. A replacement send is reachable **only** from a proven
+  `transport_attempted=false` (nothing sent) or a synchronous `userErrors` clean
+  rejection — never from a post-C2 read result.
 - **NO `@idempotent` directive** in the fulfillment operation string (fulfillment
   mutations are not on Shopify's still-17 `@idempotent` list — Shopify notes §4.1);
   `shopify_idempotency_key` stays null for fulfillment. Dedup = `business_intent_
   fingerprint` + `operation_scope_key` serialization + the reconcile read.
 - **`exact_request_fingerprint`** must be byte-identical between C2 and the wire —
   deterministic payload building (audit §6).
-- **Operation-scope serialization** — fulfillment's **own** scope literal
-  (recommended `(store, picking, FulfillmentOrder GID)`; escalated Q1), overriding
-  `_compute_operation_scope_key` for its own types only.
+- **Operation-scope serialization (Q1 RULED)** — `fulfillment_create` per
+  `(store, picking, FulfillmentOrder GID)`; `fulfillment_tracking_update` per
+  `(store, binding/picking, Fulfillment GID)`; the shared
+  `fulfillment_mutation_reconcile` owns **no** remote-effect scope (reconciles via its
+  `mutation.attempt` link). Overrides `_compute_operation_scope_key` for the two
+  mutation types only.
 - **`classify_direct_result`** uses the **`code_required=False` + positive-success-
   evidence** branch (fulfillment `userErrors` carry no `code`; require a real
   Fulfillment id before treating empty `userErrors` as applied — audit §4).
@@ -637,54 +655,93 @@ in Odoo 19). Exact file names frozen in the locked prompt (Phase 6).
 > **this section supersedes it** (corrected in place or via §11.8). Decision basis:
 > [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md)
 > §4 (Q1–Q8 rulings) + §7.
+>
+> **Final control-room micro-correction (2026-07-22)** — per PR #188 comment `5042183642`
+> / issue #186 comment `5042185019`, §11.1/§11.2/§11.5 are further tightened:
+> **post-C2 `NOT_APPLIED` never authorizes a resend** (post-C2 reconciliation is
+> **APPLIED / INCONCLUSIVE** only); the taxonomy is frozen at **exactly ten job types**
+> with **one shared `fulfillment_mutation_reconcile`** that inherits **no** remote-effect
+> operation scope (the two per-domain `*_reconcile` types are removed);
+> **`fulfillment_review_release` is not a job type** (sanctioned-helper release);
+> **`webhook` is removed as a Wave 4 source** (webhooks forbidden this wave); and the
+> `fulfillment_tracking_change` trigger-origin uses the **dedicated**
+> `_normalize_tracking_change_trigger_origin_on_uninstall` callable (not the job-type
+> sink). The frozen names carry no "validated/consolidated at Gate B" caveat.
 
-### 11.1 P0 — uncertain remote outcome is reconcile-only
+### 11.1 P0 — uncertain remote outcome is reconcile-only (no post-C2 resend)
 Binding contract (DEC-038 §7.1): (A) before C2 / proven `transport_attempted=false` →
-normal bounded replacement job; (B) clean Shopify rejection with **positive
-non-application evidence** → replacement job; (C) once C2 commits
+normal bounded replacement job; (B) a **synchronous** structured `userErrors` clean
+rejection (no success object) is a **direct clean failure** — **not** a post-C2 uncertain
+verdict — and may be corrected via a new replacement job; (C) once C2 commits
 `transport_attempted=true`, an unknown outcome (timeout/network/crash/malformed) is
-**reconcile-only — the mutation is never sent again**; (D) reconcile verdict is
-**APPLIED** (positive authoritative evidence) / **NOT_APPLIED** (positive proof of
-non-application) / **INCONCLUSIVE** (everything else, incl. **read absence**, first-page
-miss, incomplete scan, delayed visibility, missing tracking number, changed remote
-qty/state, concurrent external action); (E) **no automatic second
-`fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`** from a read miss — after
-`INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` review; the **same rule binds
-notification side effects** (a possible prior `notifyCustomer=true` is never repeated
-from absence). Source-guard/behavior tests: C2-committed unknown cannot reach a second
-mutation; read absence→INCONCLUSIVE; only positive non-application authorizes a
-replacement; no-tracking uncertainty fails closed; possible-notification uncertainty
-fails closed.
+**reconcile-only — the mutation is never sent again** (via the shared
+`fulfillment_mutation_reconcile` job); (D) post-C2 reconciliation has only **two
+actionable outcomes** — **APPLIED** (positive authoritative evidence of the exact
+effect) / **INCONCLUSIVE** (**everything else**: read absence, unchanged FO quantities,
+old/unchanged tracking, a fully paginated read with no match, missing tracking,
+concurrent external activity). Under the currently researched Shopify contract **no
+request-specific proof of non-application exists**, so **post-C2 `NOT_APPLIED` is not an
+actionable Wave 4 verdict and never authorizes a replacement mutation** (a future path
+needs new official evidence + a control-room amendment + tests); (E) **no automatic
+second `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate`** from any post-C2 read
+result — after `INCONCLUSIVE_RECONCILIATION_CAP=3` → `duplicate_risk` review; the **same
+rule binds notification side effects** (a possible prior `notifyCustomer=true` is never
+repeated from absence). Source-guard/behavior tests: C2-committed unknown cannot reach a
+second mutation; read absence→INCONCLUSIVE; **no post-C2 read result authorizes a
+replacement** (only `transport_attempted=false` or a synchronous `userErrors` clean
+rejection may); the shared reconcile job **cannot enqueue another mutation**; no-tracking
+uncertainty fails closed; possible-notification uncertainty fails closed.
 
 ### 11.2 Complete Wave 4 job / replay taxonomy (frozen)
 
-Every backend job. Mutation jobs own **at most one** `mutation.attempt` for their
-lifetime (DEC-036); a retry is a **freshly enqueued replacement job** (new
-`payload_hash`), never attempt reuse. Reconcile/read/local jobs own **no** attempt.
-Replay policies are the merged core values (`local_only` / `remote_read_replay_safe` /
-`remote_effect_not_replay_safe`). The two `*_reconcile` types share the merged
-fulfillment mutation-reconcile shape and **dispatch strictly from the linked attempt's
-mutation domain**. **No 17th error class; no unregistered subreason.**
+Every backend job — **exactly ten frozen job types**. Mutation jobs own **at most one**
+`mutation.attempt` for their lifetime (DEC-036); a retry is a **freshly enqueued
+replacement job** (new `payload_hash`) reachable **only** from a pre-C2/no-transport
+failure or a synchronous `userErrors` clean rejection — never attempt reuse, never from a
+post-C2 read result. Reconcile/read/local jobs own **no** attempt. Replay policies are the
+merged core values (`local_only` / `remote_read_replay_safe` /
+`remote_effect_not_replay_safe`). There is **one shared** reconcile type,
+`fulfillment_mutation_reconcile`, linked to exactly one `mutation_attempt_id` and
+**dispatched strictly from that attempt's `mutation_domain`**; it owns no attempt and
+**neither owns nor inherits** a remote-effect operation-scope literal. **Webhooks are
+forbidden in Wave 4** — no job admits from `webhook`. **`fulfillment_review_release` is
+not a job type.** **No 17th error class; no unregistered subreason.**
 
 | # | `job_type` | Class | `job_source` | `trigger_origin` | Domain flag | `res_model` / identity | Operation-scope literal | Replay policy | Owns attempt | Lineage (pred → succ) | Terminal / review disposition |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `fulfillment_picking_admission` | local orchestration | `odoo_event` | `fulfillment_picking_validation` | `fulfillment_domain_enabled` | `stock.picking` | `(store, picking)` | `local_only` | no | `_action_done` → N× `fulfillment_create` (per FO) | succeeded (children enqueued) / `mapping_missing` / `ambiguous_match` review |
-| 2 | `fulfillment_create` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_picking_validation` | `fulfillment_domain_enabled` | `stock.picking` + `shopify_target_gid`=FO GID | `(store, picking, FulfillmentOrder GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_create_reconcile` (uncertain) / replacement `fulfillment_create` (positive NOT_APPLIED) | succeeded (binding written) / `duplicate_risk` / mapped error class |
-| 3 | `fulfillment_create_reconcile` | reconciliation (read) | `reconciliation` | — | `fulfillment_domain_enabled` | `stock.picking` (same op scope) | inherits create op scope | `remote_read_replay_safe` | no | `fulfillment_create` → replacement `fulfillment_create` (only positive NOT_APPLIED) | APPLIED→adopt / INCONCLUSIVE cap→`duplicate_risk` |
-| 4 | `fulfillment_tracking_admission` | local orchestration | `odoo_event` | `fulfillment_tracking_change` **(Q4)** | `fulfillment_domain_enabled` | `stock.picking` / fulfillment binding | `(store, binding)` | `local_only` | no | tracking-change hook → `fulfillment_tracking_update` | succeeded / `binding_conflict` review |
-| 5 | `fulfillment_tracking_update` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_tracking_change` | `fulfillment_domain_enabled` | fulfillment binding + `shopify_target_gid`=Fulfillment GID | `(store, binding, Fulfillment GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_tracking_update_reconcile` | succeeded / `duplicate_risk` / mapped error class |
-| 6 | `fulfillment_tracking_update_reconcile` | reconciliation (read) | `reconciliation` | — | `fulfillment_domain_enabled` | fulfillment binding (same op scope) | inherits update op scope | `remote_read_replay_safe` | no | `fulfillment_tracking_update` → replacement (positive NOT_APPLIED only) | APPLIED→adopt / INCONCLUSIVE cap→`duplicate_risk` |
-| 7 | `fulfillment_inbound_observation` | read + local classify | `webhook` / `scheduled_sync` | — | `fulfillment_domain_enabled` | inbound-evidence / order binding + Fulfillment GID | `(store, Fulfillment GID)` (read) | `remote_read_replay_safe` | no | → `fulfillment_mode2_evaluation` (Mode 2) | evidence recorded; external → Mode 1 review case |
-| 8 | `fulfillment_reconciliation_check` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store (watermark) + per-run uuid nonce | per-run nonce | `remote_read_replay_safe` | no | cron | snapshot/drift notes / review |
-| 9 | `fulfillment_reconnect_catchup` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | reconnect | every disconnected-period external fulfillment → review (**both modes**) |
-| 10 | `fulfillment_mode_switch_scan` | read + local (admin) | `manual_sync` / `scheduled_sync` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | admin switch request → enables Mode 2 | scan-clean → switch; blockers → abort to Mode 1 |
-| 11 | `fulfillment_mode2_evaluation` | local (Odoo write) | `webhook` / `odoo_event` / `reconciliation` | — | `fulfillment_domain_enabled` | inbound-evidence / `stock.picking` | `(store, Fulfillment GID)` | `local_only` | no | observation → (16/16) validate picking | 16/16 pass → validate (local); any fail → **named review reason** (§7.2 map); **fails closed before validation if carrier flow would book/charge — Q6** |
-| 12 | `fulfillment_review_release` | local (admin) | `manual_sync` | — | `fulfillment_domain_enabled` | fulfillment binding / job | `(store, target)` | `local_only` | no | admin action → release exactly one blocked job / admit replacement | released / replacement admitted under lineage |
+| 2 | `fulfillment_create` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_picking_validation` | `fulfillment_domain_enabled` | `stock.picking` + `shopify_target_gid`=FO GID | `(store, picking, FulfillmentOrder GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_mutation_reconcile` (post-C2 uncertain) / replacement `fulfillment_create` (**pre-C2 / synchronous clean rejection only**) | succeeded (binding written) / `duplicate_risk` / mapped error class |
+| 3 | `fulfillment_tracking_admission` | local orchestration | `odoo_event` | `fulfillment_tracking_change` **(Q4)** | `fulfillment_domain_enabled` | `stock.picking` / fulfillment binding | `(store, binding)` | `local_only` | no | tracking-change hook → `fulfillment_tracking_update` | succeeded / `binding_conflict` review |
+| 4 | `fulfillment_tracking_update` | Shopify mutation | `odoo_event` (or `manual_sync` on replacement) | `fulfillment_tracking_change` | `fulfillment_domain_enabled` | fulfillment binding + `shopify_target_gid`=Fulfillment GID | `(store, binding, Fulfillment GID)` **(Q1)** | `remote_effect_not_replay_safe` | **yes** | admission → `fulfillment_mutation_reconcile` (post-C2 uncertain) / replacement `fulfillment_tracking_update` (**pre-C2 / synchronous clean rejection only**) | succeeded / `duplicate_risk` / mapped error class |
+| 5 | `fulfillment_mutation_reconcile` | reconciliation (read; **shared, both domains**) | `reconciliation` | — | `fulfillment_domain_enabled` | linked `mutation_attempt_id`; dispatch by `mutation_domain` ∈ {`fulfillment_create`, `fulfillment_tracking_update`}; attempt link = reconciliation identity | **none — owns/inherits no remote-effect operation scope** | `remote_read_replay_safe` | no | `fulfillment_create` / `fulfillment_tracking_update` (post-C2 uncertain) → APPLIED-adopt or INCONCLUSIVE; **no replacement mutation** | APPLIED→adopt / INCONCLUSIVE cap→`duplicate_risk`; **never a second mutation** |
+| 6 | `fulfillment_inbound_observation` | read + local classify | `scheduled_sync` / `reconciliation` | — | `fulfillment_domain_enabled` | inbound-evidence / order binding + Fulfillment GID | `(store, Fulfillment GID)` (read) | `remote_read_replay_safe` | no | → `fulfillment_mode2_evaluation` (Mode 2) | evidence recorded; external → Mode 1 review case |
+| 7 | `fulfillment_reconciliation_check` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store (watermark) + per-run uuid nonce | per-run nonce | `remote_read_replay_safe` | no | cron | snapshot/drift notes / review |
+| 8 | `fulfillment_reconnect_catchup` | read (scan) | `reconciliation` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | reconnect | every disconnected-period external fulfillment → review (**both modes**) |
+| 9 | `fulfillment_mode_switch_scan` | read + local (admin) | `manual_sync` / `scheduled_sync` | — | `fulfillment_domain_enabled` | store + per-run nonce | per-run nonce | `remote_read_replay_safe` | no | admin switch request → enables Mode 2 | scan-clean → switch; blockers → abort to Mode 1 |
+| 10 | `fulfillment_mode2_evaluation` | local (Odoo write) | `odoo_event` / `reconciliation` | — | `fulfillment_domain_enabled` | inbound-evidence / `stock.picking` | `(store, Fulfillment GID)` | `local_only` | no | observation → (16/16) validate picking | 16/16 pass → validate (local); any fail → **named review reason** (§7.2 map); **fails closed before validation if carrier flow would book/charge — Q6** |
 
-Exact `job_type` string spellings and any consolidation of adjacent local jobs are
-validated at Gate B against the merged `_get_handlers`/`_get_replay_policies`
-completeness invariant; a shared mutation-reconcile handler is used only where the
-merged Layer 2 pattern already does so.
+**These exact ten `job_type` spellings are frozen; no Gate B rename or consolidation
+without a control-room allowlist/decision amendment.** Gate B only runs the build-time
+`_get_handlers`/`_get_replay_policies` completeness invariant against these exact names;
+it never re-opens the freeze. **Review release is not a job type**: a public action on the fulfillment
+binding calls a **private sanctioned service helper** that releases the exact blocked job
+or admits a permitted **pre-C2 / synchronous-clean-rejection** replacement under lineage.
+
+**Reconciliation handoff ordering (no operation-scope collision).** Before the shared
+`fulfillment_mutation_reconcile` job is inserted: (1) **lock** the uncertain mutation
+job; (2) **transition/supersede** it through the sanctioned path; (3) **flush** it so its
+remote-effect operation scope is released; (4) **create** the reconciliation job linked to
+the committed `mutation.attempt`; (5) **commit** per the accepted Layer 2 handoff pattern.
+No reconciliation child is inserted while its predecessor still holds a conflicting
+operation scope. The shared reconcile job may run while a disconnect is quiescing under
+the accepted Layer 2 rules, and may conclude only: applied/adopted; inconclusive +
+rescheduled within the cap; `duplicate_risk` manual review after the cap; or a mapped
+final/auth/configuration failure where supported — **never a replacement mutation from a
+post-C2 read result**. Required tests (folded into the frozen files, §11.3):
+predecessor terminalize/supersede-then-flush before the reconciliation insert; no
+operation-scope collision; one shared reconcile type for both mutation domains;
+attempt-domain dispatch; duplicate-reconciliation admission prevention; concurrent
+handoff; rollback injection; post-C2 reconciliation cannot enqueue another mutation.
 
 ### 11.3 Modular file / exact-test allowlist → frozen in the locked prompt
 The giant `shopify_connector_fulfillment_service.py` is **replaced by an enumerated
@@ -711,14 +768,36 @@ This replaces `fulfillmentOrders(first: 10)`, `fulfillments(first: 50)`, and any
 "first page of FO line items" assumption.
 
 ### 11.5 Lifecycle `ondelete` (frozen)
-Every new fulfillment `job_type` (§11.2) and the new `trigger_origin`
-`fulfillment_tracking_change` are added via `selection_add` with an **explicit
-LC-1-compatible `ondelete`** using `_reassign_to_historic_job_type` (→
-`historic_domain_job`), preserving `original_job_type`. Uninstall reassigns historic
-queued/terminal/review rows through the accepted sink; reinstall leaves **zero
-active-domain residue** and **no orphan** `mutation.attempt`/evidence record. Tests:
-upgrade; uninstall with historic queued+terminal+review rows; reinstall; residue scan.
-(Extends §7's LC-1 note to the full job set.)
+**Job types.** Every new fulfillment `job_type` (§11.2) is added via `selection_add` with
+an **explicit LC-1-compatible `ondelete`** using the job-type sink
+`_reassign_to_historic_job_type` (→ `historic_domain_job`), preserving `original_job_type`
+(cancels/retypes the job; the historic row is never re-interpreted as active work).
+
+**Trigger origin.** The new `trigger_origin` value `fulfillment_tracking_change` (Q4) uses
+a **dedicated, fulfillment-owned** `ondelete` callable —
+`_normalize_tracking_change_trigger_origin_on_uninstall`, defined in
+`addons/shopify_connector_fulfillment/models/shopify_connector_job.py` — **not**
+`_reassign_to_historic_job_type` (which cleans `job_type` only and cannot remove a
+trigger-origin value, so it can neither clear the removed value nor prove zero residue).
+On uninstall, for every record carrying `trigger_origin='fulfillment_tracking_change'`
+the callable: (1) appends **one** sanitized audited manual-action log recording that the
+original trigger origin was `fulfillment_tracking_change` and is being normalized because
+the domain capability is uninstalling (provenance preserved in the immutable job log);
+(2) replaces the removed value with the permanent **core** value
+`fulfillment_picking_validation`; (3) **does not clear `trigger_origin` while
+`job_source='odoo_event'`** (that would violate the merged core `job_source`/
+`trigger_origin` constraint); (4) **does not change `job_source`**; (5) leaves **no**
+record carrying `fulfillment_tracking_change` after uninstall; (6) reinstall does not
+re-interpret the historic row as active fulfillment work. The two `ondelete` callbacks are
+order-independent (trigger-origin before job-type, or job-type before trigger-origin).
+
+**Tests:** queued tracking-admission job; running/retry/review tracking job (where the
+lifecycle permits the uninstall fixture); terminal tracking job; trigger-origin callback
+before job-type callback and vice-versa; core `job_source`/`trigger_origin` constraint
+still valid; **exactly one** provenance-normalization audit per affected job; no removed
+trigger-origin value remains; no active fulfillment job remains; reinstall produces **zero
+active-domain residue** and **no orphan** `mutation.attempt`/evidence record. (Extends §7's
+LC-1 note to the full job set; folds into `test_fulfillment_lifecycle.py`.)
 
 ### 11.6 Staff-permission readiness (Q8)
 `fulfill_and_ship_orders` (staff permission) is a **separate axis** from API scopes; no

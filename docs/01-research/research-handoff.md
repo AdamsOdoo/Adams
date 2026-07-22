@@ -1,4 +1,75 @@
+### Wave 4 Gate A — final control-room micro-correction applied (draft PR #188) (2026-07-22)
+
+- **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR
+  [#188](https://github.com/AdamsOdoo/Adams/pull/188) (unchanged; docs-only; unmerged;
+  not marked ready). **No `addons/**` change; no new file; no Shopify operation.**
+- **Trigger:** control-room **delta-review REVISE** — PR #188 comment `5042183642` +
+  issue #186 status comment `5042185019` (five narrow decision-critical defects).
+- **Corrections applied (one final micro-batch):** **(P0)** post-C2 `NOT_APPLIED`
+  **never authorizes a resend** — post-C2 reconciliation has only **APPLIED /
+  INCONCLUSIVE**; a replacement is reachable only from `transport_attempted=false` or a
+  **synchronous `userErrors` clean rejection**. **(P1)** one **shared**
+  `fulfillment_mutation_reconcile` (linked to one `mutation_attempt_id`, dispatched by
+  its `mutation_domain`, **no** remote-effect-scope inheritance, explicit
+  lock→supersede→flush→insert handoff); the taxonomy frozen at **exactly ten job types**
+  (freeze-defeating "revisit at Gate B" wording removed); **`fulfillment_review_release`
+  demoted to a sanctioned-service helper** (not a job type); **`webhook` removed as a
+  Wave 4 source** (forbidden this wave); the `fulfillment_tracking_change` trigger-origin
+  uses a **dedicated** `_normalize_tracking_change_trigger_origin_on_uninstall` callable
+  (not the job-type sink); the active DEC-038 41-item matrix reconciled
+  (#13/#21/#24/#26/#29/#35) and the nonexistent §14 cross-ref fixed; PR #188 body
+  commit-count wording corrected.
+- **Files touched (docs-only, within the authorized set):** DEC-038 (banner + matrix
+  #13/#21/#24/#26/#29/#35 + §4 §14/§7.6/§7.7 refs + §7.1/§7.3/§7.5), Task 014 packet
+  (D-014-7/§10.2/§10.3/§11.1/§11.2/§11.5 + §11 banner), locked prompt (§2/§4/§5 +
+  banner), DoR (#10/§7), UAT matrix (UAT-FM-1.8/1.9/2.12/2.14/§A/§B/open-items), risk
+  register (SRR-10), Shopify notes (§4.1 phrasing), handoff (§4 Phase 9 + §5 annotations
+  + new §6), trackers (program-state, acceptance-matrix row 12, AR-072, this handoff).
+- **Confirmations:** no `addons/**` change; no new file; no Shopify operation; PR
+  draft/unmerged/not-ready; locked prompt still **NOT ISSUED**; **#185 (CV-013) open and
+  critical**; Q1–Q8 ruled/applied.
+- **Recommendation:** `READY FOR CONTROL-ROOM FINAL DELTA ACCEPTANCE`.
+
+#### Learning feedback loop (mandatory — `../05-qa/quality-feedback-loop.md`)
+- **Lessons:**
+  1. **An abstract "positive NOT_APPLIED" predicate is itself a latent duplicate-risk.**
+     Leaving the resend-authorizing verdict undefined lets a future implementer invent an
+     unsafe non-application proof. *Control:* for these non-`@idempotent` mutations
+     post-C2 has **only APPLIED / INCONCLUSIVE**; a replacement is reachable only pre-C2
+     or from a synchronous `userErrors` clean rejection; the shared reconcile cannot
+     enqueue a mutation (source-guard test).
+  2. **A reconcile job must not inherit the mutation's remote-effect operation scope.**
+     Doing so diverges from the proven inventory Layer 2 pattern and can collide at
+     handoff. *Control:* one shared `fulfillment_mutation_reconcile` keyed on its
+     `mutation_attempt` link, owning no remote-effect scope, inserted only after the
+     predecessor is terminalized/superseded and **flushed**.
+  3. **"Frozen" must be unconditional.** A taxonomy declared frozen but "revisitable at
+     Gate B" is not frozen. *Control:* exactly ten job-type spellings; no Gate B
+     rename/consolidation without a control-room amendment.
+  4. **An `ondelete` callback must actually clean the field it guards.**
+     `_reassign_to_historic_job_type` cleans `job_type`, not `trigger_origin`. *Control:*
+     a dedicated `_normalize_tracking_change_trigger_origin_on_uninstall` normalizes the
+     removed trigger-origin value to core `fulfillment_picking_validation`, audits
+     provenance, and respects the `job_source`/`trigger_origin` constraint.
+- **Reusable controls produced:** the post-C2 APPLIED/INCONCLUSIVE-only recovery
+  contract; the shared-reconcile-with-no-scope-inheritance + lock→supersede→flush→insert
+  handoff pattern; the "frozen means unconditional" taxonomy rule; the field-specific
+  `ondelete` normalization pattern.
+- **Rejected-approaches check:** RA-009/014/017/022/023 re-confirmed intact; this
+  micro-correction further strengthens RA-014/RA-017 (no resend from a read result at all
+  post-C2) and reintroduces no rejected approach; no new technical debt beyond the
+  already-logged SRR-10 (unchanged in substance).
+
+---
+
 ### Wave 4 Gate A — bounded control-room correction applied (draft PR #188) (2026-07-22)
+
+> **Partly superseded by the 2026-07-22 final micro-correction above:** post-C2
+> `NOT_APPLIED` no longer authorizes any replacement (post-C2 = APPLIED/INCONCLUSIVE
+> only); the 12-family taxonomy was refrozen to **ten** job types with one shared
+> `fulfillment_mutation_reconcile`; `webhook` was removed as a Wave 4 source; the
+> trigger-origin uninstall now uses a dedicated callable. Retained as the first-delta
+> record; the recommendation is now `READY FOR CONTROL-ROOM FINAL DELTA ACCEPTANCE`.
 
 - **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR
   [#188](https://github.com/AdamsOdoo/Adams/pull/188) (unchanged; docs-only; unmerged;

@@ -4,7 +4,27 @@
 
 ## Current status
 
-**WAVE 4 GATE A — BOUNDED CONTROL-ROOM CORRECTION APPLIED (2026-07-22).** Following
+**WAVE 4 GATE A — FINAL CONTROL-ROOM MICRO-CORRECTION APPLIED (2026-07-22).** Following
+the control-room **delta-review REVISE** (**PR #188 comment `5042183642`** / issue #186
+comment `5042185019`, five narrow decision-critical defects), one final
+documentation-only micro-correction was applied on the same branch
+`claude/wave-4-gate-a-review-0nbhdw` / draft PR #188 (no `addons/**` change; no new file;
+no Shopify operation; PR stays draft/unmerged/not-ready): **(P0)** post-C2 `NOT_APPLIED`
+**never authorizes a resend** — post-C2 reconciliation has only **APPLIED /
+INCONCLUSIVE**; a replacement is reachable only from `transport_attempted=false` or a
+**synchronous `userErrors` clean rejection**; **(P1)** one **shared**
+`fulfillment_mutation_reconcile` (no remote-effect-scope inheritance; explicit
+lock→supersede→flush→insert handoff); the taxonomy frozen at **exactly ten job types**
+(freeze-defeating "revisit at Gate B" wording removed); **`fulfillment_review_release`
+is not a job type** (sanctioned-service helper); **`webhook` removed as a Wave 4
+source**; the `fulfillment_tracking_change` trigger-origin uses a **dedicated**
+`_normalize_tracking_change_trigger_origin_on_uninstall` callable; the active DEC-038
+41-item matrix reconciled (#13/#21/#24/#26/#29/#35), the nonexistent §14 cross-ref
+fixed, and the PR #188 body commit-count corrected. **CV-013 (#185) remains open and
+critical.** **Recommendation: `READY FOR CONTROL-ROOM FINAL DELTA ACCEPTANCE`.** The
+first-delta correction and original Gate A candidate records follow.
+
+**WAVE 4 GATE A — BOUNDED CONTROL-ROOM CORRECTION APPLIED (2026-07-22, first delta — the post-C2 `NOT_APPLIED`/12-family-taxonomy/webhook-source items below are superseded by the final micro-correction above).** Following
 the control-room REVISE review (**PR #188 comment `5041620950`** / issue #186 comment
 `5041623758`), one bounded documentation-only correction was applied on the same branch
 `claude/wave-4-gate-a-review-0nbhdw` / draft PR #188 (no `addons/**` change; no Shopify

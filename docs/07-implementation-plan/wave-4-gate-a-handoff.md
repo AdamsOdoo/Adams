@@ -10,7 +10,7 @@
 > acceptance.** It authorizes no implementation. It is not accepted, approved,
 > final, or ready by virtue of this worker producing it.
 
-**Updated:** 2026-07-22 (bounded control-room correction — §5; originally 2026-07-21)
+**Updated:** 2026-07-22 (bounded control-room correction — §5; final control-room micro-correction — §6; originally 2026-07-21)
 · **Worker:** Claude, acting as the explicitly-assigned authorized
 governance/research worker (see §0).
 **Branch:** `claude/wave-4-gate-a-review-0nbhdw` · **Base SHA:**
@@ -148,6 +148,7 @@ From PR #187 comment `5038405915` + issue #186 comment `5038326525`:
 | 6 — File boundary, tests, validation, rollback, locked prompt | ✅ complete → `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (LOCKED CANDIDATE — NOT ISSUED) + UAT-matrix Gate A addendum |
 | 7 — Adversarial review, trackers, handoff, final report | ✅ complete (adversarial review in DEC-038 §6; SRR-10; trackers updated; learning loop in research-handoff.md; #186 final comment) |
 | 8 — Bounded control-room correction (2026-07-22) | ✅ complete (§5 below): P0 reconcile-only; Q1–Q8 applied; vocabulary/taxonomy/allowlist/pagination/lifecycle/staff-perm/API-version frozen; stale status removed |
+| 9 — Final control-room micro-correction (2026-07-22) | ✅ complete (§6 below): post-C2 `NOT_APPLIED` never resends (APPLIED/INCONCLUSIVE only); **ten**-job taxonomy + one shared `fulfillment_mutation_reconcile` (no scope inheritance); no review-release job type; no Wave 4 webhook source; dedicated trigger-origin uninstall callable; DEC-038 matrix #13/#21/#24/#26/#29/#35 reconciled |
 
 **Phase 1 key results:** next unused decision id = **DEC-038**; canonical-output
 map fixed; accepted contract separated from proposed candidates and superseded
@@ -158,7 +159,7 @@ records; contradictions logged for DEC-038.
   (independently re-verified 2026-07-21).
 - **The "17 @idempotent" count is CURRENT, not stale** (agent direct-fetch of the
   live idempotency page dated 2026-02-02) — fulfillment mutations confirmed
-  **absent** from it → **verify-before-retry validated** (corrects Phase-1
+  **absent** from it → **reconcile-only recovery validated** (corrects Phase-1
   contradiction #1; to fix in DEC-038 batch).
 - New refinements → DEC-038: ">1 FO per location" (not one-per-location);
   `supportedActions.CREATE_FULFILLMENT` as the authoritative eligibility gate;
@@ -187,7 +188,7 @@ reconciled condition-by-condition (12 preserve, 4 evidence-backed refine, 0
 superseded)** + the authority-model reconciliation + **7 escalated control-room
 questions (Q1–Q7)**. Task 014 packet §10 addendum: corrected base (`ab4f12f5`, not
 `Shopify-connector`), modular architecture contract, Layer 2 integration contract
-(no-`@idempotent`; verify-before-retry primary; own operation-scope literal;
+(no-`@idempotent`; reconcile-only recovery primary; own operation-scope literal;
 `code_required=False`+positive-evidence classifier), Mode 1 & Mode 2 contracts, and
 the note that the packet's §8 old locked prompt is **superseded** by the NEW locked
 prompt. DoR authority model reconciled to comment `5038326525`; program-state note
@@ -230,7 +231,10 @@ as complete Gate A output.
 
 ---
 
-## 5. Bounded control-room correction (2026-07-22) — applied
+## 5. Bounded control-room correction (2026-07-22, first delta) — applied
+> **Partly superseded by §6** (the final micro-correction). Rows below marked
+> "further tightened in §6" / "refrozen … in §6" record the first delta's state, which
+> §6 then narrowed.
 
 Per **PR #188 comment `5041620950`** (REVISE before Gate A acceptance) + **issue #186
 comment `5041623758`**, one bounded, documentation-only correction was applied on this
@@ -238,10 +242,10 @@ same branch/PR (no `addons/**` change; no Shopify operation; PR stays draft/unme
 
 | Correction | Where |
 |---|---|
-| **P0** — uncertain remote outcome is **reconcile-only**; read absence → **INCONCLUSIVE**; positive non-application evidence required before any replacement; notifications fail closed; every "absent → resend" path removed | DEC-038 §7.1; packet D-014-7/§10.3/§11.1; DoR #7/#10; UAT-FM-1.9/1.9b/1.9c; SRR-10; locked prompt §4/§5 |
+| **P0** — uncertain remote outcome is **reconcile-only**; read absence → **INCONCLUSIVE**; notifications fail closed; every "absent → resend" path removed *(further tightened in §6 — post-C2 `NOT_APPLIED` never authorizes a replacement)* | DEC-038 §7.1; packet D-014-7/§10.3/§11.1; DoR #7/#10; UAT-FM-1.9/1.9b/1.9c; SRR-10; locked prompt §4/§5 |
 | **Q1–Q8 rulings applied** (no longer open) | DEC-038 §4 |
 | **Fixed error/review vocabulary** mapped; `over_fulfillment` removed (no new selection value) | DEC-038 §7.2; UAT §2.2 note + UAT-FM-2.6; locked prompt §4 |
-| **Complete job/replay taxonomy** frozen (12 job families) | packet §11.2 |
+| **Complete job/replay taxonomy** frozen (12 job families; **refrozen to ten job types in §6**) | packet §11.2 |
 | **Modular file allowlist + every exact test filename** frozen (giant service file removed) | locked prompt §2/§5; packet §11.3 |
 | **Cursor pagination** (fail-closed cap, dup/repeat-cursor/malformed) | packet §11.4; locked prompt §4; DEC-038 §7.4 |
 | **Source-guard precision** (V2 forbidden in production paths, nameable in tests) | locked prompt §4 |
@@ -250,7 +254,32 @@ same branch/PR (no `addons/**` change; no Shopify operation; PR stays draft/unme
 | **API-version `store.api_version`** (no fulfillment-only pin; never `latest`) | DEC-038 §7.7; packet §11.7; Shopify notes §1; audit §6.8 |
 | **Stale status** removed (this "Next phase: Phase 7"); PR #188 body + #186 handoff refreshed | this file; PR #188; issue #186 |
 
-**CORRECTED RECOMMENDATION: `READY FOR CONTROL-ROOM DELTA REVIEW`.** PR #188 remains
-docs-only, draft, unmerged, not marked ready; the locked prompt is not issued; no
+**CORRECTED RECOMMENDATION (first delta): `READY FOR CONTROL-ROOM DELTA REVIEW`** —
+_superseded by the §6 final micro-correction recommendation below._ PR #188 remained
+docs-only, draft, unmerged, not marked ready; the locked prompt not issued; no
 `addons/**` change; no Shopify operation; **#185 (CV-013) open and critical**; Q1–Q8
 ruled and applied (no open escalation remains from that set).
+
+---
+
+## 6. Final control-room micro-correction (2026-07-22) — applied
+
+Per **PR #188 comment `5042183642`** (DELTA REVIEW — final narrow revision) + **issue
+#186 comment `5042185019`**, one final documentation-only micro-correction was applied on
+the same branch/PR (**no `addons/**` change; no new file; no Shopify operation; PR stays
+draft/unmerged/not-ready**):
+
+| Correction | Where |
+|---|---|
+| **P0** — **post-C2 `NOT_APPLIED` never authorizes a resend**; post-C2 reconciliation has only **APPLIED / INCONCLUSIVE**; a replacement is reachable only from `transport_attempted=false` or a **synchronous `userErrors` clean rejection**; notifications fail closed | DEC-038 §7.1 B/D/E + #29; packet §11.1/§10.3/D-014-7; DoR #10/§7; UAT-FM-1.9; SRR-10; locked prompt §4/§5 |
+| **Shared reconciliation job** — one `fulfillment_mutation_reconcile` linked to one `mutation_attempt_id`, dispatched by its `mutation_domain`; owns/inherits **no** remote-effect operation scope; handoff ordering (lock→supersede→**flush**→insert) with no scope collision | DEC-038 §7.3 + #24/#26; packet §11.2; locked prompt §2/§4/§5 |
+| **Ten-job taxonomy frozen** (was 12); the two per-domain `*_reconcile` types removed; **`fulfillment_review_release` is not a job type** (sanctioned-helper release) | packet §11.2; DEC-038 §7.3 + #24; locked prompt §4/§5 |
+| **Webhooks removed as a Wave 4 source** (forbidden this wave) — inbound/Mode 2 use `odoo_event`/`scheduled_sync`/`reconciliation`/`manual_sync` | DEC-038 #35; packet §11.2; UAT-FM-1.8/2.12/2.14/open-items; locked prompt §4/§5 |
+| **Dedicated trigger-origin `ondelete`** callable `_normalize_tracking_change_trigger_origin_on_uninstall` (not the job-type sink); normalizes removed value → core `fulfillment_picking_validation`, audits provenance, respects the `job_source`/`trigger_origin` constraint | DEC-038 §7.5 + #13; packet §11.5; locked prompt §2/§5 |
+| **Active DEC-038 41-item matrix reconciled** to the applied rulings (#13 Q4, #21 Q5, #24 shared reconcile, #26 Q1 scopes, #29 no post-C2 replacement, #35 no webhook); nonexistent §14 cross-ref fixed | DEC-038 §2/§4 |
+| **PR #188 body** commit-count wording corrected (8 commits; not "seven phases = seven commits") | PR #188 |
+
+**FINAL RECOMMENDATION: `READY FOR CONTROL-ROOM FINAL DELTA ACCEPTANCE`.** PR #188 remains
+docs-only, draft, unmerged, not marked ready; the locked prompt is **NOT ISSUED**; no
+`addons/**` change; no new file; no Shopify operation; **#185 (CV-013) open and
+critical**; Q1–Q8 ruled and applied. No Gate B / Wave 5 work started; no self-acceptance.

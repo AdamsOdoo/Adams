@@ -16,6 +16,16 @@
 > exact test filenames are frozen (§2/§5); pagination, source-guard precision,
 > lifecycle `ondelete`, staff-permission (NOT_PROVEN), and `store.api_version` policy
 > are applied. Basis: PR #188 comment `5041620950`.
+>
+> **Final control-room micro-correction (2026-07-22):** post-C2 `NOT_APPLIED` **never
+> authorizes a resend** (post-C2 = **APPLIED / INCONCLUSIVE** only); the taxonomy is
+> frozen at **exactly ten job types** (§11.2) with **one shared
+> `fulfillment_mutation_reconcile`** (no per-domain reconcile; **no** remote-effect-scope
+> inheritance); **`fulfillment_review_release` is not a job type** (sanctioned-helper
+> release); **no Wave 4 `webhook` source**; the `fulfillment_tracking_change`
+> trigger-origin uses the **dedicated** `_normalize_tracking_change_trigger_origin_on_uninstall`
+> callable (not the job-type sink). Basis: PR #188 comment `5042183642` / issue #186
+> comment `5042185019`.
 
 ---
 
@@ -59,10 +69,16 @@ map (NO `**`; NO giant service file; one responsibility per file):**
     `fulfillment_notification_confirmed`, `fulfillment_last_reconciliation_at`,
     mode-switch state fields
 - **Job / dispatch extensions (add-only seams):**
-  - `models/shopify_connector_job.py` — `job_type` **and** `trigger_origin`
-    (`fulfillment_tracking_change`) `selection_add` **with explicit LC-1 `ondelete`**;
-    `_domain_flag_for_job_type` override; own `_compute_operation_scope_key` (own
-    types only — the Q1 literals)
+  - `models/shopify_connector_job.py` — the **ten** frozen `job_type` values (§11.2)
+    `selection_add` with the job-type-sink `ondelete` `_reassign_to_historic_job_type`,
+    **and** the `trigger_origin` value `fulfillment_tracking_change` `selection_add` with
+    its **dedicated** `ondelete` callable
+    `_normalize_tracking_change_trigger_origin_on_uninstall` (**not** the job-type sink —
+    it normalizes the removed value to the core value `fulfillment_picking_validation`,
+    audits provenance, and respects the `job_source`/`trigger_origin` constraint);
+    `_domain_flag_for_job_type` override; own `_compute_operation_scope_key` for the **two
+    mutation types only** (the Q1 literals) — the shared `fulfillment_mutation_reconcile`
+    inherits **no** remote-effect scope
   - `models/shopify_connector_job_dispatch.py` — `_get_reconciliation_strategies` /
     `_get_handlers` / `_get_replay_policies` add-only merges; local admission/scan
     handler dispatch
@@ -79,15 +95,19 @@ map (NO `**`; NO giant service file; one responsibility per file):**
     (never `location.mapping`; Q3 read-only refresh service lives here)
 - **Layer 2 mutation strategies (one file per mutation domain — never both in one):**
   - `models/shopify_connector_fulfillment_create_strategy.py` — the 7-callback
-    strategy for `fulfillment_create` (+ `*_reconcile`)
+    strategy for `fulfillment_create` + the create-domain reconcile read invoked by the
+    **shared** `fulfillment_mutation_reconcile` (post-C2: **APPLIED / INCONCLUSIVE only**,
+    no resend)
   - `models/shopify_connector_fulfillment_tracking_strategy.py` — the 7-callback
-    strategy for `fulfillment_tracking_update` (+ `*_reconcile`)
+    strategy for `fulfillment_tracking_update` + the tracking-domain reconcile read
+    invoked by the same shared `fulfillment_mutation_reconcile`
 - **Inbound observation / origin classification:**
   - `models/shopify_connector_fulfillment_inbound.py` — inbound observation +
     origin-classification evidence stack
 - **Mode 1 review / Mode 2 evaluation (separate from matching, mutation, scans):**
   - `models/shopify_connector_fulfillment_review.py` — Mode 1 review-case actions
-    (import tracking / acknowledge / explicit validate) + review-release helper
+    (import tracking / acknowledge / explicit validate) + the review-release **sanctioned
+    service helper** (public binding action → private helper; **not** a job type)
   - `models/shopify_connector_fulfillment_mode2.py` — the 16-condition Mode 2
     evaluator + local application (validate picking); **Q6 carrier fail-closed**
 - **Reconciliation / reconnect / mode-switch scans:**
@@ -162,10 +182,17 @@ forbidden):
 - **No `@idempotent`** in any fulfillment **operation string / production GraphQL
   constant** (fulfillment mutations are not on Shopify's 17-mutation list).
 - **P0 no-resend-from-absence** — no fulfillment handler can reach a **second**
-  `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` from a mere reconcile read miss;
-  a replacement send is reachable **only** from proven `transport_attempted=false` or a
-  positive-NOT_APPLIED verdict (§5 tests prove read-absence→INCONCLUSIVE and the
-  no-second-mutation source-path).
+  `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` from **any** post-C2 reconcile read
+  result; a replacement send is reachable **only** from a proven
+  `transport_attempted=false` (nothing sent) or a **synchronous `userErrors` clean
+  rejection** — **post-C2 `NOT_APPLIED` is not an actionable Wave 4 verdict and never
+  authorizes a resend**; the shared `fulfillment_mutation_reconcile` **cannot enqueue a
+  mutation** (§5 tests prove read-absence→INCONCLUSIVE, the no-second-mutation
+  source-path, and no-mutation-from-reconcile).
+- **Frozen ten-job taxonomy / no webhook source** — the fulfillment job registry holds
+  **exactly the ten §11.2 `job_type` values** (one shared `fulfillment_mutation_reconcile`;
+  **no** per-domain `*_reconcile`; **no** `fulfillment_review_release` job type); **no
+  Wave 4 job admits from `job_source='webhook'`** (webhooks forbidden this wave — §3).
 - **Cursor pagination** — decision-critical reads use `pageInfo.hasNextPage`/
   `endCursor` with a fail-closed cap; **no fixed `first: N`** window is used to prove
   absence, select a target, or authorize a mutation.
@@ -206,19 +233,19 @@ Every behavior gets a **pass + fail-to-review** case. The filename list is
 - `test_fulfillment_location_resolution.py` — `assignedLocation.location`-null fallback; **core cache only, never `location.mapping`**; Q3 read-only refresh; fail-closed on unresolved/ambiguous.
 - `test_fulfillment_create_strategy.py` — 7 callbacks; **no `@idempotent` source-guard**; `code_required=False` **positive-success-evidence** classifier; C1/C2/NET/C3; `supportedActions.CREATE_FULFILLMENT` gate; FO-status eligibility.
 - `test_fulfillment_tracking_strategy.py` — in-place update; multi-number split; missing-ref-with-note; `notifyCustomer` persisted/never re-read (RA-009).
-- `test_fulfillment_idempotency.py` — **P0**: reconcile-only after `transport_attempted=true`; **read-absence→INCONCLUSIVE**; positive-NOT_APPLIED→bounded replacement job; **no second mutation from a read miss**; **no-tracking uncertainty fails closed**; **possible-`notifyCustomer` uncertainty fails closed**; `INCONCLUSIVE_RECONCILIATION_CAP=3`→`duplicate_risk`; duplicate prevention.
+- `test_fulfillment_idempotency.py` — **P0**: reconcile-only after `transport_attempted=true`; post-C2 has only **APPLIED / INCONCLUSIVE** (**no post-C2 `NOT_APPLIED` replacement**); **read-absence→INCONCLUSIVE**; a replacement is reachable **only** from `transport_attempted=false` or a synchronous `userErrors` clean rejection; the shared `fulfillment_mutation_reconcile` **cannot enqueue a mutation**; **no second mutation from a read miss**; **no-tracking uncertainty fails closed**; **possible-`notifyCustomer` uncertainty fails closed**; `INCONCLUSIVE_RECONCILIATION_CAP=3`→`duplicate_risk`; duplicate prevention.
 - `test_fulfillment_inbound_classification.py` — origin evidence stack; own-GID precedence; unknown→external default.
 - `test_fulfillment_mode2_engine.py` — **all 16 conditions** (pass + fail-to-review each); **Q6 carrier fail-closed** before validation; deterministic split; no partial automation on ambiguity.
 - `test_fulfillment_mode_switch.py` — state machine; idempotent re-confirm; rollback; in-flight Layer 2 jobs **not** cancelled by the switch.
 - `test_fulfillment_scans.py` — reconciliation-scan idempotency (uuid nonce); **reconnect catch-up → review in both modes**; watermark.
-- `test_fulfillment_review_release.py` — Mode 1 actions (import tracking/acknowledge/explicit validate); admin review-release; exactly-one-blocked-job.
+- `test_fulfillment_review_release.py` — Mode 1 actions (import tracking/acknowledge/explicit validate); the review-release **sanctioned service helper** (public binding action → private helper; **not a job type**) releasing exactly one blocked job / admitting a permitted pre-C2/synchronous-clean-rejection replacement under lineage.
 - `test_fulfillment_cod_interplay.py` — COD scenarios 4–13 state derivation; `stock.return.picking` as the only restoration path.
 - `test_fulfillment_state_model.py` — 7 Layer-A families raw+normalized; unknown-future-value contract; Delivered-inconsistency case.
-- `test_fulfillment_lifecycle.py` — `selection_add` **`ondelete`**; upgrade/uninstall/reinstall across the full bridge stack; historic queued+terminal+review rows; **zero residue; no orphan attempt/evidence**.
+- `test_fulfillment_lifecycle.py` — job-type `selection_add` **`ondelete`** sink **and** the dedicated `trigger_origin` callable `_normalize_tracking_change_trigger_origin_on_uninstall` (removed value → core `fulfillment_picking_validation`; exactly one provenance audit; `job_source`/`trigger_origin` constraint intact; either callback order); upgrade/uninstall/reinstall across the full bridge stack; historic queued+running/review+terminal rows; **no removed trigger-origin value survives; zero residue; no orphan attempt/evidence**.
 - `test_fulfillment_readiness.py` — `REQUIRED_MVP_SCOPES` swap; write-scope seam; **staff-permission NOT_PROVEN (not inferred from scopes)**; **API-version compat gate** (`store.api_version`).
 - `test_fulfillment_vocabulary_guard.py` — persisted `error_class`/`subreason` ∈ merged registries; **`over_fulfillment`/any new value absent**; mapping to accepted vocabulary (DEC-038 §7.2).
-- `test_fulfillment_source_guards.py` — RA-022 (no V2/REST/legacy in production paths); RA-023; no-`@idempotent`; no-`qty_done`/`quantity_done`; no `location.mapping` import; no raw transport; **file-boundary guard** (nothing outside §2/§5).
-- `test_fulfillment_concurrency.py` — the genuine independent-transaction/process cases of §6 (or the dedicated harness it references).
+- `test_fulfillment_source_guards.py` — RA-022 (no V2/REST/legacy in production paths); RA-023; no-`@idempotent`; no-`qty_done`/`quantity_done`; no `location.mapping` import; no raw transport; **exactly the ten §11.2 job types registered** (no per-domain reconcile, no `fulfillment_review_release` job type); **no `job_source='webhook'`** in any Wave 4 job; **file-boundary guard** (nothing outside §2/§5).
+- `test_fulfillment_concurrency.py` — the genuine independent-transaction/process cases of §6 (or the dedicated harness it references); the shared-reconcile **handoff ordering** (predecessor terminalize/supersede → **flush** the mutation op-scope → insert the reconcile job), **no operation-scope collision**, attempt-domain dispatch, duplicate-reconciliation admission prevention, rollback injection.
 - Plus the one named core-edit test: `addons/shopify_connector_core/tests/test_readiness_check.py` (assertion update only).
 
 Regression coverage for relevant prior defects / risk-register entries (incl. **SRR-10**

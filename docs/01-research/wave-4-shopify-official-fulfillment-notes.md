@@ -218,9 +218,10 @@ test contract (it is distinct from the API scope — a Gate A addition).
   17). **This corrects Phase-1 inventory contradiction #1**, which mis-flagged the
   count as stale. The decision-critical consequence is **confirmed and unchanged**:
   `fulfillmentCreate`/`fulfillmentTrackingInfoUpdate` have **no native
-  idempotency**, so the connector's **verify-before-retry + operation-scope
-  serialization under Layer 2** (D-014-7 / DEC-011 / DEC-036) remains the **primary
-  duplicate-prevention control** — RA-014/RA-017 unaffected. → DEC-038.
+  idempotency**, so the connector's **fresh pre-C2 read + reconcile-only recovery
+  (no post-C2 resend — DEC-038 §7.1) + operation-scope serialization under Layer 2**
+  (D-014-7 / DEC-011 / DEC-036) remains the **primary duplicate-prevention control** —
+  RA-014/RA-017 unaffected. → DEC-038.
 
 ---
 
