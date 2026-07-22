@@ -68,7 +68,9 @@ class TestUiVisibilityMatrix(TransactionCase):
     def test_non_connector_user_has_no_root_menu(self):
         root = self.env.ref('shopify_connector_core.menu_shopify_connector_root')
         auditor = self.env.ref('shopify_connector_core.group_shopify_connector_auditor')
-        self.assertIn(auditor, root.groups_id)
+        # Odoo 19: ir.ui.menu exposes the access groups as `group_ids`
+        # (the pre-19 `groups_id` name was removed).
+        self.assertIn(auditor, root.group_ids)
         self.assertFalse(self.plain.has_group('shopify_connector_core.group_shopify_connector_auditor'))
 
     def test_non_admin_cannot_read_credential(self):
@@ -136,11 +138,14 @@ class TestUiVisibilityMatrix(TransactionCase):
     # ------------------------------------------------------------------ #
     def test_mutation_resolution_wizard_admin_only(self):
         Wizard = self.env['shopify.connector.mutation.resolution.wizard']
+        # The create ACL is the security control under test. Check it directly:
+        # the wizard's mutation_attempt_id/disposition/reason are all required,
+        # so a bare create({}) would raise a NOT NULL error unrelated to the
+        # ACL. Auditor/Operator/Reviewer lack the create ACL; Admin holds it.
         for role in ('auditor', 'operator', 'reviewer'):
             with self.assertRaises(AccessError):
-                Wizard.with_user(self.users[role]).create({})
-        # Admin can create the transient wizard (create ACL present).
-        Wizard.with_user(self.users['admin']).create({})
+                Wizard.with_user(self.users[role]).check_access('create')
+        Wizard.with_user(self.users['admin']).check_access('create')
 
     # ------------------------------------------------------------------ #
     #  protected-field write stays denied even for Admin (non-sudo)
@@ -149,3 +154,24 @@ class TestUiVisibilityMatrix(TransactionCase):
         job = self._make_job('failed_final')
         with self.assertRaises(AccessError):
             job.with_user(self.users['admin']).write({'state': 'queued'})
+
+    # ------------------------------------------------------------------ #
+    #  Stage R1: the four public store lifecycle/probe actions are
+    #  Administrator-only at the server boundary. A read-only role (Auditor/
+    #  Operator/Reviewer) and a plain user are denied with AccessError on a
+    #  direct ORM/RPC call -- before any side effect (job/log, credential
+    #  read, Shopify transport, store-row lock/write). The hidden button is
+    #  never the control; the server method is.
+    # ------------------------------------------------------------------ #
+    def test_store_lifecycle_actions_admin_only_direct_call(self):
+        actions = ('action_test_connection', 'action_activate',
+                   'action_disconnect', 'action_reconnect')
+        non_admin = (self.users['auditor'], self.users['operator'],
+                     self.users['reviewer'], self.plain)
+        for user in non_admin:
+            for action in actions:
+                with self.assertRaises(AccessError):
+                    getattr(self.store.with_user(user), action)()
+        # Administrator passes the boundary guard (admits; raises nothing).
+        self.store.with_user(
+            self.users['admin'])._ensure_connector_admin_boundary()

@@ -30,7 +30,7 @@
                         domain="[('observed_outcome', '=', 'succeeded')]"/>
                 <filter name="filter_failed_clean" string="Confirmed not applied"
                         domain="[('observed_outcome', '=', 'failed_clean')]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
                     <filter name="group_outcome" string="Outcome" context="{'group_by': 'observed_outcome'}"/>
                     <filter name="group_domain" string="Domain" context="{'group_by': 'mutation_domain'}"/>

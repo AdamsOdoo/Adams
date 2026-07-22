@@ -57,6 +57,11 @@ class TestUiSourceGuards(TransactionCase):
             for name in files:
                 if not name.endswith('.py'):
                     continue
+                # This guard file necessarily contains the very tokens it
+                # searches for ('http.Controller', '@http.route') as string
+                # literals, so it must never inspect itself (false positive).
+                if name == 'test_ui_source_guards.py':
+                    continue
                 text = open(os.path.join(root, name), encoding='utf-8').read()
                 # Guard only the NEW U0 files for controller/oauth surfaces.
                 if name.startswith(('shopify_connector_ui_dashboard',

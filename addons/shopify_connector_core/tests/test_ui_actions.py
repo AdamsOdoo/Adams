@@ -65,7 +65,12 @@ class TestUiActions(TransactionCase):
         return self.env['shopify.connector.mutation.attempt'].sudo().with_context(**ctx).create({
             'job_id': job.id,
             'attempt_token': 'u0-tok-%d' % self._seq,
-            'mutation_domain': 'inventory',
+            # Use the core self-test mutation domain: it is the only strategy
+            # guaranteed registered regardless of which domain addons run, so
+            # the resolution consequence path resolves a valid strategy. (The
+            # bare 'inventory' domain does not exist -- the inventory addon
+            # registers 'inventory_set_quantities' / 'inventory_activate'.)
+            'mutation_domain': 'mutation_dispatch_selftest',
             'observed_outcome': observed_outcome,
         })
 

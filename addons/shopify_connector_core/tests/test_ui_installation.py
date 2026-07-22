@@ -7,7 +7,7 @@
 # / upgrade / uninstall-reinstall / zero-residue is exercised by the Odoo.sh
 # runtime campaign (validation doc §Runtime).
 
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 
 @tagged('post_install', '-at_install', 'shopify_connector_u0')
@@ -29,7 +29,9 @@ class TestUiInstallation(TransactionCase):
     def test_menus_resolve_and_are_gated(self):
         root = self.env.ref('shopify_connector_core.menu_shopify_connector_root')
         auditor = self.env.ref('shopify_connector_core.group_shopify_connector_auditor')
-        self.assertIn(auditor, root.groups_id,
+        # Odoo 19: ir.ui.menu exposes access groups as `group_ids`
+        # (the pre-19 `groups_id` name was removed).
+        self.assertIn(auditor, root.group_ids,
                       "Root connector menu must be gated to the connector groups.")
         for xmlid in (
             'shopify_connector_core.menu_shopify_connector_dashboard',
@@ -62,9 +64,16 @@ class TestUiInstallation(TransactionCase):
         self.assertIn('shopify.connector.ui.dashboard', self.env)
         self.assertIn('shopify.connector.job.cancel.wizard', self.env)
         self.assertIn('shopify.connector.mutation.resolution.wizard', self.env)
-        # The dashboard service is abstract: no table, and it answers.
+        # The dashboard service is abstract: no table, and it answers a
+        # connector user (it is connector-users-only; the framework superuser
+        # is not a connector-group member, so exercise it as an Auditor).
         self.assertTrue(self.env['shopify.connector.ui.dashboard']._abstract)
-        data = self.env['shopify.connector.ui.dashboard'].get_dashboard_data()
+        viewer = new_test_user(
+            self.env, login='u0_install_viewer',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_auditor')
+        data = self.env['shopify.connector.ui.dashboard'].with_user(
+            viewer).get_dashboard_data()
         self.assertIn('state', data)
 
     def test_manifest_depends_web(self):

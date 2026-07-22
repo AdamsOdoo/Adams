@@ -29,7 +29,7 @@
                 <separator/>
                 <filter name="filter_api_degraded" string="API degraded or throttled"
                         domain="[('api_health_state', 'in', ('throttled', 'degraded'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_state" string="Connection state" context="{'group_by': 'state'}"/>
                     <filter name="group_health" string="API health" context="{'group_by': 'api_health_state'}"/>
                 </group>

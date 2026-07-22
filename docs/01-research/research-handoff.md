@@ -1,3 +1,71 @@
+### U0 PR #192 — Stage R1 Odoo.sh runtime campaign + one consolidated correction (2026-07-22)
+
+- **Branch / PR:** `claude/u0-operator-ui-foundation`, draft PR
+  [#192](https://github.com/AdamsOdoo/Adams/pull/192). Base
+  `mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`. Starting
+  SHA `f80437932cea31190d8cd45ca10f18f4c8245b75`. **Draft/unmerged; not
+  self-reviewed/accepted/ready-marked/merged.**
+- **Environment:** Odoo.sh dev container, Odoo **19.0**, PostgreSQL **16.14**,
+  build **35284077** / DB `adamsmen-claude-u0-operator-ui-foundation-35284077`
+  (prompt named build `35282748`; same branch at the same SHA, build rolled
+  forward — SHA is the freeze). No real Shopify request or mutation occurred;
+  U1/U2/U3 not begun.
+- **Owned defects found + fixed (one consolidated batch):**
+  1. **Install-blocking Odoo-19 view-validation P0** (`views/*`, 5 constructs):
+     `<group expand="0" string="Group By">` in the store/job/job_log/
+     mutation_attempt **search** views (Odoo-19 search `<group>` allows neither
+     `expand` nor `string`) + `active_id` in the job form stat-button `context`
+     (field-accessibility validator). Fix: plain `<group>` + `active_id`→`id`.
+     Registry then loads (79 modules, 66 s).
+  2. **Known Test Connection direct-RPC P1** (`store.py`): proven at runtime —
+     unfixed, a non-admin (Auditor/Operator/Reviewer/plain) caller of
+     `action_test_connection` was **not denied** and created a
+     `core_test_connection` job + 2 `job.log` rows (`exc=NONE`, Δjob=1, Δlog=2);
+     the probe funnels job/log/credential/transport work through `sudo()` before
+     the late non-sudo write. Fix: `_ensure_connector_admin_boundary()` enforcing
+     the **existing** `group_shopify_connector_admin` at the top of the four
+     public actions (`action_test_connection`/`activate`/`disconnect`/
+     `reconnect`), before any side effect; `env.su`-exempt (framework
+     superuser/cron/tests). Fixed: all four roles → `AccessError`, 0 transport,
+     0 jobs, 0 logs, no store/cred change; Administrator path unchanged. Mirrors
+     the existing `action_force_disconnect` guard. Analogous audit (§10):
+     `reconnect` (same probe), `disconnect` (audited-no-op `sudo()` job),
+     `activate` (store-row lock) — all closed by the one guard.
+  3. **Four owned U0 test defects** surfaced by genuine runtime (test-level, no
+     production access-control loosened): dashboard aggregate run as the
+     framework superuser → run as a connector Auditor (`test_ui_dashboard/
+     performance/installation`); `ir.ui.menu.groups_id`→`group_ids` (Odoo 19);
+     source-guard self-inspection false positive; fixture's non-existent
+     `mutation_domain='inventory'`→`mutation_dispatch_selftest`.
+- **Corrected-tree runtime (pre-rebuild):** U0 suite **63 / 0 failed / 0
+  errors**; core **368 / 0 failed / 11 errors** — all 11 are the **environmental**
+  `autopost_bills` at_install `setUpClass` NOT-NULL (account loads after core;
+  production unaffected — proven in a normal shell). Leak/redaction scan clean.
+  `test_test_connection` retagged `post_install` so its role-user security tests
+  run past the at_install blocker (8 pre-existing assertions unchanged).
+- **Pending Stage R2 (not hard stops, §11):** browser tours + HOOT — Chrome 141
+  launches/connects but `HttpCase.browser_js` fails with `can't start new thread`
+  (container limit); absolute RD-1/RD-2 timings; upgrade/uninstall-reinstall
+  zero-residue; **and the corrected-SHA Odoo.sh rebuild for exact-build proof.**
+- **Files changed (allowlist-clean):** `models/shopify_connector_store.py`; 4
+  `views/*.xml`; `tests/test_test_connection.py` + the 7 `tests/test_ui_*.py`;
+  evidence docs (validation-results §1a, program-state, this handoff,
+  architecture-review-log AR-076). No forbidden file; no new file.
+- **Publish:** committed as one consolidated correction; `odoosh-push` performed
+  (webhook held — a manual rebuild is required for Stage R2). Corrected SHA
+  recorded in the final report.
+- **Learning-loop:** Odoo-19 view validation is materially stricter (search
+  `<group>` attributes, `active_id` field-ref, `ir.ui.menu.group_ids`); genuine
+  Odoo.sh runtime caught an install-blocking P0 and a "no-denial" security P1
+  that static/no-runtime validation reported as green — reinforcing the DEC-040
+  mandatory-runtime rule. A hand-rolled `has_group` gate must exempt `env.su` or
+  it denies the framework superuser (also caused the dashboard test failures).
+- **Next session (Stage R2 prompt):** after the control room triggers the
+  corrected-SHA rebuild, re-run install + the U0/`TestTestConnection` suites +
+  the security acceptance matrix on the **fresh build**, attempt browser
+  tours/HOOT + screenshots + RD-1/RD-2 timings + upgrade/uninstall-reinstall
+  zero-residue, and issue the durable independent review. Do **not** self-accept.
+
 ### Wave 4 Gate A — final control-room micro-correction applied (draft PR #188) (2026-07-22)
 
 - **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR

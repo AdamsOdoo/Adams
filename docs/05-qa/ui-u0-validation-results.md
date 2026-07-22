@@ -1,6 +1,11 @@
 # U0 — First Usable Shopify Connector Operator UI — Validation Results
 
-> **Status: implementation candidate — STATIC VALIDATION GREEN, RUNTIME PENDING (Gate C / Odoo.sh).**
+> **Status: implementation candidate — Stage R1 Odoo.sh runtime campaign EXECUTED
+> on the corrected working tree (`EXECUTED — PASS — ODOO.SH CONTAINER,
+> PRE-REBUILD`); a corrected-SHA rebuild + Stage R2 remain.** The original
+> `RUNTIME PENDING` claims below are superseded for everything Stage R1 actually
+> ran — see **§1a**. Browser execution (tours + HOOT) and absolute-timing budgets
+> remain pending Stage R2 (container thread limit; §1a).
 > This document records the honest evidence for the U0 operator-UI batch on
 > branch `claude/u0-operator-ui-foundation`. It follows the program's
 > established evidence-classification discipline (see PR #189 for the same
@@ -34,6 +39,149 @@ mandatory Odoo.sh runtime campaign (§24 of the U0 prompt), the driven browser
 walkthrough + screenshots (§23), and actual execution of the Python / HOOT /
 tour suites are `RUNTIME PENDING`. No static-only result is presented as a
 runtime pass.
+
+---
+
+## 1a. Stage R1 Odoo.sh runtime campaign — `EXECUTED — PASS — ODOO.SH CONTAINER, PRE-REBUILD`
+
+> This section supersedes the `RUNTIME PENDING` rows below for everything it
+> ran. Evidence is genuine Odoo 19 runtime inside the Odoo.sh dev container, on
+> the **corrected working tree**. It is **pre-rebuild**: the corrected SHA
+> requires a fresh Odoo.sh build for exact-build (Stage R2) confirmation.
+
+**Environment / identity.** Odoo.sh dev container. Odoo **19.0**; PostgreSQL
+**16.14**. Branch `claude/u0-operator-ui-foundation`, tip = HEAD =
+`f80437932cea31190d8cd45ca10f18f4c8245b75` (exact candidate SHA; clean tree at
+campaign start). Build **35284077** / DB
+`adamsmen-claude-u0-operator-ui-foundation-35284077` — the prompt named build
+`35282748`, but the container had been rebuilt from the **same branch at the
+same SHA**; the SHA (not the build number) is the candidate freeze, so evidence
+is valid. Modules present: `shopify_connector_core` (19.0.1.10.0),
+`shopify_connector_product` (19.0.2.1.2), `shopify_connector_sale` (19.0.2.0.0),
+`shopify_connector_inventory` (19.0.1.0.0). No Wave-4 fulfillment addon present.
+No credential/secret printed.
+
+**Initial install at the exact candidate SHA — FAILED (owned P0, install-blocking).**
+`odoo-bin -i` of the four modules failed to load the registry at
+`f804379…` with `odoo.tools.convert.ParseError` — Odoo 19 tightened view
+validation and five U0 search/form-view constructs are now invalid:
+
+| # | File | Construct | Odoo 19 rule |
+| --- | --- | --- | --- |
+| 1–4 | store / job / job_log / mutation_attempt search views | `<group expand="0" string="Group By">` | search `<group>` (shared `common.rng`) allows neither `expand` nor `string`; the current idiom is a plain `<group>` wrapping the group-by `<filter>`s |
+| 5 | job form view stat button | `context="{'search_default_job_id': active_id}"` | the field-accessibility validator treats `active_id` as a non-existent field on `shopify.connector.job` (Access-Rights-Inconsistency); the current idiom uses `id` |
+
+Fix (owned; `views/*`): plain `<group>` in all four search views + `active_id`→`id`
+in the job stat button. After the fix the full stack installs cleanly (**79
+modules loaded, registry loaded in 66 s**) — registry, models, U0 XML views,
+menus/actions, ACLs, Owl/SCSS/tour/HOOT asset bundles all load; no missing
+model/field/external-ID, no duplicate XML ID, no invalid domain/modifier.
+
+**Known Test Connection P1 — reproduced then fixed (mocked transport; no real Shopify call).**
+`shopify.connector.store.action_test_connection()` invoked by
+Auditor / Operator / Reviewer / plain user (runtime, `registry_enter_test_mode`,
+`_send` mocked):
+
+| tree | exc | transport | Δjob | Δlog | store | cred |
+| --- | --- | --- | --- | --- | --- | --- |
+| **UNFIXED** (`store.py` reverted via `git stash`) | **NONE — not denied** | 0¹ | **+1** | **+2** | unchanged | unchanged |
+| **FIXED** (boundary guard) | **AccessError** | 0 | 0 | 0 | unchanged | unchanged |
+
+¹ In `registry_enter_test_mode` the shared `_admit_lifecycle` side-cursor
+self-supersedes before `_send`, so transport shows 0 in-test; the code path
+proves an admitted probe reaches `_send_lifecycle` (and the sanctioned
+`_get_access_token` `sudo()` materialises the token) **before** the late
+non-sudo store write — i.e. before any ACL bite. The runtime-proven harm on the
+unfixed tree is: **an unauthorized read-only role is not denied at all and
+creates a `core_test_connection` job + two `job.log` rows** (`exc=NONE`, Δjob=1,
+Δlog=2). The corrected-contract regression test
+(`test_test_connection_denies_non_admin_before_side_effects`) **FAILS on the
+unfixed tree** (the recorded proof) and **passes on the fixed tree**.
+
+**Correction — one consolidated Administrator boundary (owned; `store.py`).**
+New `_ensure_connector_admin_boundary()` enforces the **existing**
+`group_shopify_connector_admin` (no new role/group) at the top of the four
+public store actions — `action_test_connection`, `action_activate`,
+`action_disconnect`, `action_reconnect` — **before** any job/log creation,
+credential read, Shopify transport, or store-row lock/write. Mirrors the guard
+already present in `action_force_disconnect`. The Odoo framework superuser
+(`env.su`: crons, the disconnect controller, the test harness) is exempt as
+everywhere in Odoo; a real RPC caller can never be `su`, so this is a strict
+**tightening** — nothing is loosened.
+
+**Analogous public-action audit (§10).** `action_reconnect` shares
+`_run_connection_probe` → same job/log/credential/transport-before-denial
+defect. `action_disconnect`'s already-`disconnecting` **audited-no-op** branch
+creates a `sudo()` audit job with **no** denial at all. `action_activate`
+acquires the store-row lifecycle lock before denial. All three are closed by
+the uniform boundary guard. No lifecycle behaviour is redesigned; Administrator
+outcomes are unchanged.
+
+**Corrected-tree U0 test campaign — `EXECUTED — PASS`.** 63 post-tests
+(`TestTestConnection` [post_install; see below] + all seven
+`shopify_connector_u0` classes except the browser tour): **0 failed, 0 errors**.
+The four-role Administrator-only direct-call matrix
+(`test_store_lifecycle_actions_admin_only_direct_call`) passes.
+
+**U0 defects surfaced by genuine runtime and fixed (owned; test-level, no
+production access-control loosened).**
+
+| id | test | root cause | fix |
+| --- | --- | --- | --- |
+| RC1 | `test_ui_dashboard` (12), `test_ui_performance` (4), `test_ui_installation` (1) | ran the connector-users-only dashboard aggregate as the **framework superuser** (not a connector-group member) → `AccessError` | run the aggregate as a connector **Auditor** (the realistic caller) |
+| RC2 | `test_ui_installation.test_menus_resolve_and_are_gated` | `ir.ui.menu.groups_id` removed in Odoo 19 | → `group_ids` |
+| RC3 | `test_ui_source_guards.test_no_controller_or_webhook_or_oauth` | the guard inspected **itself** and matched the literal `'http.Controller'` it searches for | skip the guard's own file |
+| RC6 | `test_ui_actions.test_mutation_resolution_applies` | fixture used a non-existent `mutation_domain='inventory'` (registry has `inventory_set_quantities` / `inventory_activate` / `mutation_dispatch_selftest`) | use the always-registered `mutation_dispatch_selftest` |
+
+`test_test_connection.py` was retagged `post_install` (see the environmental
+note) to run the added security regression; its eight pre-existing assertions
+are unchanged and pass.
+
+**Core regression (`shopify_connector_core`) — `EXECUTED`.** 368 tests:
+**0 failed, 11 errors** — all 11 are the **environmental** `autopost_bills`
+`setUpClass` blocker (below), never a connector-logic failure. The genuine
+cross-connection lifecycle/concurrency classes that ran passed (no
+`can't start new thread`). **No regression from the correction** — consistent
+with the `env.su` exemption (every superuser-driven lifecycle test passes the
+guard unchanged). Product / Sale / Inventory install cleanly (fresh-install
+smoke ✓, full 4-module registry load); their own at_install user-creating
+suites share the same environmental blocker.
+
+**Leak / redaction scan — PASS.** Odoo logs + test output contain no real
+`shpat_` token (only the dummy `shpat_DUMMYDUMMYDUMMY…`), no
+`Authorization`/`X-Shopify-Access-Token` header, no secret/password, and no
+customer PII (only test-domain `@example.com` addresses). The P1 regression
+also asserts no token persists to store/job/log.
+
+**Environmental blockers (evidence-backed; not owned; pending Stage R2).**
+
+- **`autopost_bills` at_install setUpClass NOT-NULL.** `account`'s
+  `res.partner.autopost_bills` (required, default `'ask'`) is NOT-NULL in the
+  DB. `shopify_connector_core` loads **before** `account`, so an at_install test
+  that creates a `res.users` in `setUpClass` inserts a partner while the field
+  is not yet on the in-registry model → NOT-NULL violation. Proven environmental:
+  a normal `odoo-bin shell` creates users/partners fine (default applied); only
+  the at_install phase is affected. Not introduced by U0 or this correction;
+  production is unaffected. It blocks 11 core at_install user-creating classes
+  (connection_lifecycle, credential_access/service, job_actions,
+  job_log_system_append, mutation_attempt/reconciliation/retention/security,
+  readiness_slot_closure, security_hardening). Post_install U0 tests are
+  unaffected (account is fully loaded by then), which is why
+  `test_test_connection` was retagged `post_install`.
+- **Browser tour + HOOT — container thread limit.** With HTTP enabled, Chrome
+  141 launches and connects via the devtools websocket, but
+  `HttpCase.browser_js`/`start_tour` fails with
+  `RuntimeError: can't start new thread` — a container process/thread cap, not a
+  connector defect. Server-side Python tests are unaffected. Browser execution
+  (registered tours + the HOOT JS suite) and absolute browser render/timing
+  budgets (PB-1/2/3/7/8/12 absolutes) are **pending Stage R2** on the
+  corrected-SHA build. Asset *registration* is proven by the clean install.
+
+**Not exact-build proof.** Every result above is on the corrected working tree
+inside the existing build; it is genuine runtime but **pre-rebuild**. Final
+exact-build confirmation, browser tours/HOOT, upgrade/uninstall-reinstall
+zero-residue, and RD-1/RD-2 absolute timings belong to Stage R2 on the
+corrected-SHA Odoo.sh build.
 
 ---
 

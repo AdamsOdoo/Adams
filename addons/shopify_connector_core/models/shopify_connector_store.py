@@ -157,6 +157,35 @@ class ShopifyConnectorStore(models.Model):
         'A store already exists for this Shopify shop domain.',
     )
 
+    def _ensure_connector_admin_boundary(self):
+        """Refuse a non-Administrator caller at a public action boundary
+        BEFORE any side effect (Stage R1 SEC; sibling of the guard already in
+        ``action_force_disconnect``).
+
+        ``action_test_connection``, ``action_activate``, ``action_disconnect``
+        and ``action_reconnect`` funnel privileged work -- audit ``Job`` /
+        ``job.log`` creation, the one sanctioned credential-token ``sudo()``
+        read, the Shopify transport call, and the store-row lifecycle
+        lock/write -- through ``_run_connection_probe`` /
+        ``_create_lifecycle_audit_job``, several sites via ``sudo()``. The store
+        write ACL is Administrator-only, but it only bites at the LATE non-sudo
+        mirror write, so an unauthorized direct-RPC caller (Auditor / Operator /
+        Reviewer, who all hold store *read*) could otherwise reach the Shopify
+        transport, materialise the credential, and create audit rows before
+        being denied. Enforcing the existing
+        ``group_shopify_connector_admin`` here -- no new role or group -- closes
+        that gap so denial happens before every side effect. The framework
+        superuser (``env.su``: crons, the disconnect controller, and the test
+        harness) is exempt exactly as elsewhere in Odoo; a real RPC caller can
+        never be ``su``.
+        """
+        if not self.env.su and not self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may run connection '
+                'and lifecycle actions on a store.'
+            )
+
     def action_test_connection(self):
         """Run one read-only Shopify test-connection check (Task 003).
 
@@ -169,6 +198,10 @@ class ShopifyConnectorStore(models.Model):
         purpose used by `action_reconnect` for the finalized `disconnected` state.
         """
         self.ensure_one()
+        # SEC (Stage R1): enforce the Administrator boundary BEFORE
+        # `_run_connection_probe` creates any job/log, reads the credential, or
+        # reaches the Shopify transport (the known direct-RPC P1).
+        self._ensure_connector_admin_boundary()
         # `_run_connection_probe` returns `'superseded'` when a concurrent
         # lifecycle/credential change discarded the result; Test Connection has no
         # further step, so return None (the accepted RPC contract) either way.
@@ -552,6 +585,9 @@ class ShopifyConnectorStore(models.Model):
         (DEC-022 §4.4).
         """
         self.ensure_one()
+        # SEC (Stage R1): Administrator boundary before the store-row lifecycle
+        # lock and any audit-job side effect (analogous to Test Connection).
+        self._ensure_connector_admin_boundary()
         # CORE-R2 (AR-047; review 4690639375 #1): take the conflicting store-row
         # update lock FIRST, then validate every state-dependent precondition
         # against the fresh state read UNDER that lock (TOCTOU-safe). A disconnect
@@ -751,6 +787,11 @@ class ShopifyConnectorStore(models.Model):
         (matrix §8). Disconnect is one-way.
         """
         self.ensure_one()
+        # SEC (Stage R1): Administrator boundary before the store-row lock and
+        # any audit-job side effect. Without it the already-disconnecting
+        # "audited no-op" branch below would create a `Job`/`job.log` via
+        # `sudo()` for an unauthorized caller with NO denial at all.
+        self._ensure_connector_admin_boundary()
         locked_state, locked_generation = self._lock_store_for_lifecycle()
         if locked_state in ('disconnecting', 'disconnected'):
             self._create_lifecycle_audit_job(
@@ -1089,6 +1130,10 @@ class ShopifyConnectorStore(models.Model):
         `self.state` after calling, not rely on an exception.
         """
         self.ensure_one()
+        # SEC (Stage R1): Administrator boundary before `_run_connection_probe`
+        # (reconnect shares Test Connection's job/log/credential/transport path)
+        # or any reconnect_needed audit-job side effect.
+        self._ensure_connector_admin_boundary()
         # CORE-R2 (AR-047; analysis §8): reconnect is refused while the store is
         # `disconnecting` (disconnect is one-way; reconnect is only from the
         # finalized `disconnected` state). No credential/state/audit is written.

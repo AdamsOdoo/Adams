@@ -21,7 +21,17 @@ class TestUiDashboard(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.Dashboard = cls.env['shopify.connector.ui.dashboard']
+        # The dashboard aggregate is connector-users-only and runs as the
+        # *current* user (per-user ACLs apply). Exercise it as the realistic
+        # caller -- a connector Auditor with read on the connector models. The
+        # framework superuser is not a connector-group member, so running the
+        # aggregate as the raw superuser would (correctly) be refused.
+        cls.viewer = new_test_user(
+            cls.env, login='u0_dash_viewer',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_auditor')
+        cls.Dashboard = cls.env[
+            'shopify.connector.ui.dashboard'].with_user(cls.viewer)
         cls.Store = cls.env['shopify.connector.store'].sudo()
         cls.Job = cls.env['shopify.connector.job'].sudo()
         cls._seq = 0

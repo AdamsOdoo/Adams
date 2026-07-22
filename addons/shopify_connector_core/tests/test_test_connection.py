@@ -1,13 +1,25 @@
 import json
+import logging
 from unittest.mock import patch
 
-from odoo.exceptions import UserError
-from odoo.tests.common import TransactionCase
+from odoo.exceptions import AccessError, UserError
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 from odoo.tools import mute_logger
 
 from .test_api_client import FakeResponse, _success_body
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+
+_logger = logging.getLogger(__name__)
+
+
+# Stage R1: run post_install. This class creates res.users fixtures; on a build
+# where `account` (which adds the required `autopost_bills` field to res.partner)
+# loads AFTER shopify_connector_core, an at_install run fails in setUpClass with a
+# res_partner NOT-NULL violation before the module's own fields even matter. The
+# post_install phase runs after every module (account included) is fully loaded,
+# which is the correct phase for role-user security tests.
+@tagged('post_install', '-at_install')
 
 
 class TestTestConnection(TransactionCase):
@@ -264,3 +276,104 @@ class TestTestConnection(TransactionCase):
                     'job_type': 'core_readiness_check',
                     'state': 'running',
                 })
+
+    # 29. Stage R1 P1 -- permission must be enforced BEFORE any side effect.
+    # A non-admin caller (Auditor / Operator / Reviewer / plain user) must be
+    # denied with AccessError before action_test_connection creates a job or
+    # job.log, reads the credential, or reaches the Shopify transport. Pre-fix
+    # this test fails for Auditor/Operator/Reviewer (they reach `_send` and
+    # create a job because `_run_connection_probe` performs those side effects
+    # via sudo() before the late non-sudo store write denies them); the logged
+    # per-role table is the recorded runtime proof. Post-fix all roles are
+    # denied with zero side effects. The store-write ACL is Admin-only, so the
+    # boundary guard uses the existing group_shopify_connector_admin.
+    def _role_user(self, label, *role_suffixes):
+        groups = 'base.group_user'
+        for suffix in role_suffixes:
+            groups += ',shopify_connector_core.group_shopify_connector_%s' % suffix
+        return new_test_user(
+            self.env, login='tc_p1_%s' % label, groups=groups,
+        )
+
+    def test_test_connection_denies_non_admin_before_side_effects(self):
+        self._set_token()
+        Client = self.env['shopify.connector.api.client']
+        Job = self.env['shopify.connector.job'].sudo()
+        JobLog = self.env['shopify.connector.job.log'].sudo()
+        roles = [
+            ('auditor', ('auditor',)),
+            ('operator', ('operator',)),
+            ('reviewer', ('reviewer',)),
+            ('plain', ()),
+        ]
+        evidence = []
+        for label, suffixes in roles:
+            user = self._role_user(label, *suffixes)
+            send = []
+
+            def fake_send(inner_self, store, body, token=None, _s=send):
+                _s.append(1)
+                return FakeResponse(
+                    200,
+                    json_body=_success_body(domain=self.store.shop_domain),
+                )
+
+            jobs0 = Job.search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', 'core_test_connection'),
+            ])
+            logs0 = JobLog.search_count([('store_id', '=', self.store.id)])
+            tc_at0 = self.store.last_test_connection_at
+            cred0 = self._get_credential().credential_state
+            exc = 'NONE(success)'
+            with patch.object(type(Client), '_send', fake_send):
+                try:
+                    self.store.with_user(user).action_test_connection()
+                except Exception as e:  # noqa: BLE001 -- observing the raise
+                    exc = type(e).__name__
+            self.env.invalidate_all()
+            djob = Job.search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', 'core_test_connection'),
+            ]) - jobs0
+            dlog = JobLog.search_count(
+                [('store_id', '=', self.store.id)]) - logs0
+            self.store.invalidate_recordset()
+            evidence.append((
+                label, exc, len(send), djob, dlog,
+                self.store.last_test_connection_at != tc_at0,
+                self._get_credential().credential_state != cred0,
+            ))
+
+        for row in evidence:
+            _logger.info(
+                'P1 test_connection role=%-9s exc=%-18s send=%s dJob=%s '
+                'dLog=%s storeChanged=%s credChanged=%s', *row)
+
+        for label, exc, send_n, djob, dlog, store_changed, cred_changed in evidence:
+            self.assertEqual(
+                exc, 'AccessError',
+                '%s: expected AccessError, got %s' % (label, exc))
+            self.assertEqual(
+                send_n, 0,
+                '%s reached the Shopify transport before denial' % label)
+            self.assertEqual(
+                djob, 0, '%s created a job before denial' % label)
+            self.assertEqual(
+                dlog, 0, '%s created a job log before denial' % label)
+            self.assertFalse(
+                store_changed, '%s mutated a store mirror before denial' % label)
+            self.assertFalse(
+                cred_changed,
+                '%s mutated the credential before denial' % label)
+
+    # 30. Admin path is unchanged by the boundary guard (regression).
+    def test_test_connection_admin_still_succeeds_after_guard(self):
+        self._set_token()
+        response = FakeResponse(
+            200, json_body=_success_body(domain=self.store.shop_domain))
+        self._run_test_connection(lambda self, store, body, token=None: response)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.last_test_connection_result, 'pass')
+        job = self._latest_job()
+        self.assertEqual(job.state, 'succeeded')

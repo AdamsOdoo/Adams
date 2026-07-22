@@ -11,7 +11,7 @@ import os
 import time
 
 from odoo import fields
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 
 @tagged('post_install', '-at_install', 'shopify_connector_u0')
@@ -20,7 +20,15 @@ class TestUiPerformance(TransactionCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.Dashboard = cls.env['shopify.connector.ui.dashboard']
+        # Exercise the connector-users-only dashboard aggregate as a connector
+        # Auditor (the realistic caller); the framework superuser is not a
+        # connector-group member. Query-count/timing bounds are unaffected.
+        cls.viewer = new_test_user(
+            cls.env, login='u0_perf_viewer',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_auditor')
+        cls.Dashboard = cls.env[
+            'shopify.connector.ui.dashboard'].with_user(cls.viewer)
         cls.Store = cls.env['shopify.connector.store'].sudo()
         cls.Job = cls.env['shopify.connector.job'].sudo()
         cls._seq = 0
