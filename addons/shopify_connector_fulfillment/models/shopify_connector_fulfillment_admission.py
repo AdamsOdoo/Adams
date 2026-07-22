@@ -1,0 +1,238 @@
+import hashlib
+import logging
+
+from odoo import api, models
+
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
+
+from .shopify_connector_fulfillment_create_strategy import (
+    CREATE_FULFILLMENT_ACTION,
+    FO_BLOCKING_STATUSES,
+    FO_ELIGIBLE_STATUSES,
+)
+from .shopify_connector_fulfillment_reader import FulfillmentReadError
+from .shopify_connector_job import (
+    JOB_TYPE_CREATE,
+    JOB_TYPE_PICKING_ADMISSION,
+    JOB_TYPE_TRACKING_ADMISSION,
+    JOB_TYPE_TRACKING_UPDATE,
+    TRIGGER_ORIGIN_PICKING,
+    TRIGGER_ORIGIN_TRACKING,
+)
+
+_logger = logging.getLogger(__name__)
+
+
+class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
+    """Outbound admission / orchestration (no Shopify mutation).
+
+    `fulfillment_picking_admission` decomposes a validated outbound picking into
+    exactly one `fulfillment_create` child (a picking is one physical shipment
+    → one Shopify fulfillment, UNIQUE(store, picking); a backorder chain
+    produces separate pickings → separate fulfillments).
+    `fulfillment_tracking_admission` enqueues a `fulfillment_tracking_update` for
+    a post-fulfillment tracking change on a bound picking.
+    """
+
+    _inherit = 'shopify.connector.fulfillment.service'
+
+    # ------------------------------------------------------------------
+    # Enqueue seams (called from stock.picking._action_done and manual actions)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _fulfillment_settings(self, store):
+        return self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+
+    @api.model
+    def _enqueue_picking_admission(
+        self, picking, job_source='odoo_event',
+        trigger_origin=TRIGGER_ORIGIN_PICKING,
+    ):
+        store = self._picking_store(picking)
+        if not store:
+            return self.env['shopify.connector.job']
+        settings = self._fulfillment_settings(store)
+        if not settings or not settings.fulfillment_domain_enabled:
+            return self.env['shopify.connector.job']
+        return self._enqueue_once(
+            store, job_source, JOB_TYPE_PICKING_ADMISSION,
+            'admission:%d' % picking.id, 'stock.picking', picking.id,
+            trigger_origin=trigger_origin,
+        )
+
+    @api.model
+    def _enqueue_tracking_admission(
+        self, binding, job_source='odoo_event',
+        trigger_origin=TRIGGER_ORIGIN_TRACKING,
+    ):
+        store = binding.store_id
+        settings = self._fulfillment_settings(store)
+        if not settings or not settings.fulfillment_domain_enabled:
+            return self.env['shopify.connector.job']
+        digest = self._tracking_payload_hash(binding.picking_id)
+        return self._enqueue_once(
+            store, job_source, JOB_TYPE_TRACKING_ADMISSION,
+            'tracking_admission:%d:%s' % (binding.id, digest),
+            'shopify.connector.fulfillment.binding', binding.id,
+            trigger_origin=trigger_origin,
+        )
+
+    @api.model
+    def _picking_store(self, picking):
+        binding = self.env['shopify.connector.order.binding'].search([
+            ('sale_order_id', '=', picking.sale_id.id),
+        ], limit=1)
+        return binding.store_id if binding else False
+
+    @api.model
+    def _tracking_payload_hash(self, picking):
+        raw = '%s|%s|%s' % (
+            picking.carrier_tracking_ref or '',
+            getattr(picking, 'carrier_tracking_url', '') or '',
+            picking.carrier_id.name or '',
+        )
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
+
+    @api.model
+    def _enqueue_once(
+        self, store, job_source, job_type, payload_hash, res_model, res_id,
+        shopify_target_gid=False, trigger_origin=False,
+    ):
+        """Enqueue idempotently: an existing job with the same identity
+        (a stable payload_hash keyed to the operation) is never duplicated. A
+        business job is only enqueued for a connected store."""
+        if store.state != 'connected':
+            return self.env['shopify.connector.job']
+        Job = self.env['shopify.connector.job']
+        existing = Job.search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', job_type),
+            ('res_model', '=', res_model),
+            ('res_id', '=', res_id),
+            ('payload_hash', '=', payload_hash),
+        ], limit=1)
+        if existing:
+            return existing
+        return self.env['shopify.connector.job.enqueue'].enqueue(
+            store, job_source, job_type,
+            payload_hash=payload_hash,
+            res_model=res_model, res_id=res_id,
+            shopify_target_gid=shopify_target_gid,
+            trigger_origin=trigger_origin,
+        )
+
+    # ------------------------------------------------------------------
+    # Picking-admission handler
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _handle_fulfillment_picking_admission(self, job):
+        picking = self.env['stock.picking'].browse(job.res_id)
+        store = job.store_id
+        binding = self.env['shopify.connector.order.binding'].search([
+            ('store_id', '=', store.id),
+            ('sale_order_id', '=', picking.sale_id.id),
+        ], limit=1)
+        if not binding or not binding.shopify_gid:
+            raise JobHandlerError(
+                'mapping_missing',
+                'The picking has no resolvable Shopify order binding.',
+            )
+        # Idempotent: a picking is one fulfillment event.
+        if self.env['shopify.connector.fulfillment.binding'].search_count([
+            ('store_id', '=', store.id), ('picking_id', '=', picking.id),
+        ]):
+            return
+        try:
+            fos = self._read_fulfillment_orders(store, binding.shopify_gid)
+        except FulfillmentReadError as exc:
+            raise JobHandlerError(exc.error_class, exc.message)
+
+        eligible = []
+        for fo in fos:
+            status = fo.get('status')
+            if status in FO_BLOCKING_STATUSES:
+                raise JobHandlerError(
+                    'ambiguous_match',
+                    'A FulfillmentOrder is %s; the connector never places or '
+                    'releases holds.' % status,
+                )
+            if status in FO_ELIGIBLE_STATUSES:
+                actions = {
+                    (a or {}).get('action')
+                    for a in (fo.get('supportedActions') or [])
+                }
+                if CREATE_FULFILLMENT_ACTION in actions:
+                    eligible.append(fo)
+        if not eligible:
+            raise JobHandlerError(
+                'ambiguous_match',
+                'No eligible FulfillmentOrder supports CREATE_FULFILLMENT.',
+            )
+        try:
+            line_inputs, _diag = self._match_picking_to_fo_lines(picking, eligible)
+            shipped_fos = [fo for fo in eligible if fo.get('id') in line_inputs]
+            self._resolve_single_location(store, shipped_fos)
+        except FulfillmentReadError as exc:
+            raise JobHandlerError(exc.error_class, exc.message)
+
+        # Notification-confirmation gate (RA-009): if the store wants
+        # notifications but has not confirmed, surface it rather than silently
+        # not notifying.
+        settings = self._fulfillment_settings(store)
+        if (
+            settings and settings.notification_default_enabled
+            and not settings.fulfillment_notification_confirmed
+        ):
+            raise JobHandlerError(
+                'fulfillment_notification_confirmation_missing',
+                'Customer notification is enabled but not confirmed for this '
+                'store; fulfillment is held for confirmation.',
+            )
+
+        representative_fo_gid = min(line_inputs)
+        self._enqueue_once(
+            store, job.job_source, JOB_TYPE_CREATE,
+            'create:%d' % picking.id, 'stock.picking', picking.id,
+            shopify_target_gid=representative_fo_gid,
+            trigger_origin=job.trigger_origin or False,
+        )
+        job._log_transition(
+            'note',
+            'Fulfillment picking admission enqueued a fulfillment_create for '
+            '%d FulfillmentOrder(s).' % len(line_inputs),
+        )
+
+    # ------------------------------------------------------------------
+    # Tracking-admission handler
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _handle_fulfillment_tracking_admission(self, job):
+        binding = self.env['shopify.connector.fulfillment.binding'].browse(
+            job.res_id
+        )
+        if not binding.exists() or not binding.shopify_gid:
+            raise JobHandlerError(
+                'binding_conflict',
+                'The fulfillment binding to update no longer exists.',
+            )
+        self._enqueue_once(
+            job.store_id, job.job_source, JOB_TYPE_TRACKING_UPDATE,
+            'tracking_update:%d:%s' % (
+                binding.id, self._tracking_payload_hash(binding.picking_id),
+            ),
+            'shopify.connector.fulfillment.binding', binding.id,
+            shopify_target_gid=binding.shopify_gid,
+            trigger_origin=job.trigger_origin or False,
+        )
+        job._log_transition(
+            'note',
+            'Fulfillment tracking admission enqueued a '
+            'fulfillment_tracking_update.',
+        )

@@ -19,6 +19,7 @@
     'data': [
         'security/shopify_connector_fulfillment_security.xml',
         'security/ir.model.access.csv',
+        'data/shopify_connector_fulfillment_cron.xml',
     ],
     'installable': True,
     'application': False,
