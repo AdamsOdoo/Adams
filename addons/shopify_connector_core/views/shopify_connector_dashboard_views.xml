@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U0 operator UI: the operational dashboard client action. The single
+        bounded Owl surface in U0. Its component (tag "shopify_connector_dashboard")
+        is registered in static/src/js/shopify_connector_dashboard.js and reads
+        only the read-only aggregate service shopify.connector.ui.dashboard.
+    -->
+    <record id="action_shopify_connector_dashboard" model="ir.actions.client">
+        <field name="name">Dashboard</field>
+        <field name="tag">shopify_connector_dashboard</field>
+    </record>
+</odoo>
