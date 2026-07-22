@@ -13,6 +13,179 @@ from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_job impo
 )
 
 
+# ---------------------------------------------------------------------------
+# No-fake-success static guard (Stage R2A P1 correction).
+#
+# Stage R1 disclosed that two harness scenarios were hard-coded `ok: True`
+# stubs with no process creation, no fixture, and no durable-outcome check.
+# The AST-based audit below enforces harness *structure* only (this file
+# never imports/executes the harness -- runtime success is proven only at
+# Gate C); it must reject a future regression to the same shape without
+# tripping on comments/docstrings that merely *mention* the old pattern.
+# ---------------------------------------------------------------------------
+
+REQUIRED_CONCURRENCY_SCENARIOS = frozenset((
+    'c1_ownership_race',
+    'operation_scope_serialization',
+    'concurrent_inconclusive_increment',
+    'duplicate_picking_admission',
+    'duplicate_tracking_admission',
+    'reconciliation_replacement_race',
+    'review_release_race',
+    'mode_switch_interaction',
+    'rollback_injection_recovery',
+))
+
+# Any one of these call names, found anywhere in a scenario's reachable
+# closure (its own body plus every locally-defined helper it calls,
+# transitively), counts as genuine process/transaction orchestration.
+_PROCESS_EVIDENCE_CALLS = frozenset(('get_context', 'Process'))
+# Any one of these call names counts as inspecting a durable DB outcome.
+_DURABLE_QUERY_CALLS = frozenset(('search', 'browse', 'search_count', 'read', 'execute'))
+# A call to the shared cleanup entrypoint counts as a cleanup/residue check.
+_CLEANUP_CALLS = frozenset(('_finish_cleanup',))
+
+
+def _ast_literal_str_elements(node):
+    return [elt.value for elt in node.elts if isinstance(elt, ast.Constant)]
+
+
+def _ast_dict_str_to_name(node):
+    mapping = {}
+    for key, value in zip(node.keys, node.values):
+        if isinstance(key, ast.Constant) and isinstance(value, ast.Name):
+            mapping[key.value] = value.id
+    return mapping
+
+
+def _call_target_names(node):
+    """Every function/method name a Call node inside `node` invokes."""
+    names = set()
+    for child in ast.walk(node):
+        if isinstance(child, ast.Call):
+            func = child.func
+            if isinstance(func, ast.Name):
+                names.add(func.id)
+            elif isinstance(func, ast.Attribute):
+                names.add(func.attr)
+    return names
+
+
+def _is_trivial_stub_return(func_node):
+    """True if `func_node`'s own body (ignoring a leading docstring) is
+    nothing but `return {<dict literal>}` -- the exact shape of the
+    disclosed Stage R1 stubs, regardless of which keys the dict carries."""
+    body = func_node.body
+    if body and isinstance(body[0], ast.Expr) and isinstance(
+            getattr(body[0], 'value', None), ast.Constant):
+        body = body[1:]
+    if len(body) != 1 or not isinstance(body[0], ast.Return):
+        return False
+    return isinstance(body[0].value, ast.Dict)
+
+
+def _closure_nodes(name, functions, seen):
+    """AST nodes reachable from local function `name`: its own body plus
+    every locally-defined helper it calls, transitively (bounded to this
+    module's own top-level functions -- stdlib/ORM calls are leaves)."""
+    if name in seen or name not in functions:
+        return []
+    seen.add(name)
+    node = functions[name]
+    nodes = list(ast.walk(node))
+    for target in _call_target_names(node):
+        if target in functions and target not in seen:
+            nodes.extend(_closure_nodes(target, functions, seen))
+    return nodes
+
+
+def audit_concurrency_harness_scenarios(source):
+    """Structural (AST-only) audit of the external harness's SCENARIOS/
+    RUNNERS wiring. Returns a list of human-readable violation strings;
+    empty means the harness structurally satisfies the no-fake-success
+    contract. Never executes the harness or imports `odoo`."""
+    violations = []
+    tree = ast.parse(source)
+    functions = {
+        node.name: node for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+    }
+
+    scenario_names = None
+    runner_map = None
+    for node in tree.body:
+        if not (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)):
+            continue
+        target_name = node.targets[0].id
+        if target_name == 'SCENARIOS' and isinstance(node.value, (ast.Tuple, ast.List)):
+            scenario_names = _ast_literal_str_elements(node.value)
+        elif target_name == 'RUNNERS' and isinstance(node.value, ast.Dict):
+            runner_map = _ast_dict_str_to_name(node.value)
+
+    if scenario_names is None:
+        return ['no module-level SCENARIOS tuple found']
+    if runner_map is None:
+        return ['no module-level RUNNERS dict found']
+
+    missing_required = REQUIRED_CONCURRENCY_SCENARIOS - set(scenario_names)
+    if missing_required:
+        violations.append(
+            'frozen concurrency scenarios missing from SCENARIOS: %r'
+            % sorted(missing_required))
+    if set(scenario_names) != set(runner_map):
+        violations.append(
+            'SCENARIOS and RUNNERS keys differ: %r'
+            % sorted(set(scenario_names) ^ set(runner_map)))
+
+    for scenario in sorted(scenario_names):
+        runner_name = runner_map.get(scenario)
+        if not runner_name or runner_name not in functions:
+            violations.append(
+                '%s: mapped to a placeholder/missing implementation (%r)'
+                % (scenario, runner_name))
+            continue
+        runner_node = functions[runner_name]
+
+        if _is_trivial_stub_return(runner_node):
+            violations.append(
+                '%s: runner %s() is a bare literal-dict return with no '
+                'orchestration -- the exact Stage R1 stub shape'
+                % (scenario, runner_name))
+            continue
+
+        closure = _closure_nodes(runner_name, functions, set())
+        closure_calls = set()
+        for n in closure:
+            if isinstance(n, ast.Call):
+                func = n.func
+                if isinstance(func, ast.Name):
+                    closure_calls.add(func.id)
+                elif isinstance(func, ast.Attribute):
+                    closure_calls.add(func.attr)
+
+        if not (closure_calls & _PROCESS_EVIDENCE_CALLS):
+            violations.append(
+                '%s: no process creation or independent-transaction '
+                'orchestration found (own body + local helper closure)'
+                % scenario)
+        if not (closure_calls & _DURABLE_QUERY_CALLS):
+            violations.append(
+                '%s: never inspects a durable database outcome'
+                % scenario)
+        if not (closure_calls & _CLEANUP_CALLS):
+            violations.append(
+                '%s: no cleanup/residue verification reachable' % scenario)
+        if not any(
+                isinstance(n, ast.Attribute) and n.attr == 'exitcode'
+                for n in closure):
+            violations.append(
+                '%s: parent result never inspects a child exit code'
+                % scenario)
+
+    return violations
+
+
 @tagged('post_install', '-at_install')
 class TestFulfillmentConcurrency(TransactionCase):
     """Genuine independent-transaction concurrency for the fulfillment Layer 2
@@ -282,3 +455,77 @@ class TestFulfillmentConcurrency(TransactionCase):
                     imported_modules.add(alias.name)
         self.assertNotIn(
             'runtime_layer2_fulfillment_concurrency_harness', imported_modules)
+
+    # -- No-fake-success guard (Stage R2A P1 correction). --------------
+
+    def test_no_fake_success_scenarios(self):
+        """Every SCENARIOS entry must map to a runner that genuinely
+        orchestrates processes/independent transactions, inspects a durable
+        DB outcome, checks child exit codes, and performs cleanup/residue
+        verification -- not a hard-coded pass. Structural (AST) only; this
+        never imports/executes the harness (see the docstring on
+        audit_concurrency_harness_scenarios)."""
+        path = Path(__file__).with_name(
+            'runtime_layer2_fulfillment_concurrency_harness.py')
+        source = path.read_text('utf-8')
+        violations = audit_concurrency_harness_scenarios(source)
+        self.assertEqual(
+            violations, [],
+            'harness scenario audit violations: %r' % (violations,))
+
+    def test_no_fake_success_guard_rejects_the_disclosed_stub_shape(self):
+        """Proves the guard is not decorative: fed a synthetic module shaped
+        exactly like the disclosed Stage R1 stub (a SCENARIOS/RUNNERS pair
+        pointing at a bare `return {'ok': True, ...}` function with no
+        process creation, query, or cleanup), it must reject it."""
+        stub_source = (
+            "SCENARIOS = ('operation_scope_serialization',)\n\n\n"
+            "def run_operation_scope_serialization(settings, timeout):\n"
+            "    return {'scenario': 'operation_scope_serialization',\n"
+            "            'ok': True, 'zero_real_shopify': True}\n\n\n"
+            "RUNNERS = {\n"
+            "    'operation_scope_serialization': "
+            "run_operation_scope_serialization,\n"
+            "}\n"
+        )
+        violations = audit_concurrency_harness_scenarios(stub_source)
+        self.assertTrue(
+            violations, 'the guard failed to reject a literal ok:True stub')
+        joined = ' '.join(violations)
+        self.assertIn(
+            'runner run_operation_scope_serialization() is a bare '
+            'literal-dict return with no orchestration', joined,
+        )
+
+    def test_no_fake_success_guard_accepts_genuine_orchestration(self):
+        """Negative-of-the-negative: a runner that genuinely spawns via
+        get_context/Process, inspects a durable outcome, checks an exit
+        code, and calls a cleanup helper must NOT be flagged, so the guard
+        cannot be satisfied by trivially banning every dict return."""
+        genuine_source = (
+            "SCENARIOS = ('operation_scope_serialization',)\n\n\n"
+            "def _finish_cleanup(settings, fixture):\n"
+            "    return {}\n\n\n"
+            "def run_operation_scope_serialization(settings, timeout):\n"
+            "    context = multiprocessing.get_context('spawn')\n"
+            "    process = context.Process(target=lambda: None)\n"
+            "    process.start()\n"
+            "    process.join()\n"
+            "    code = process.exitcode\n"
+            "    job = environment['shopify.connector.job'].search([])\n"
+            "    _finish_cleanup(settings, {})\n"
+            "    return {'scenario': 'operation_scope_serialization',\n"
+            "            'passed': bool(job) and code == 0}\n\n\n"
+            "RUNNERS = {\n"
+            "    'operation_scope_serialization': "
+            "run_operation_scope_serialization,\n"
+            "}\n"
+        )
+        violations = audit_concurrency_harness_scenarios(genuine_source)
+        scenario_violations = [
+            v for v in violations if v.startswith('operation_scope_serialization:')
+        ]
+        self.assertEqual(
+            scenario_violations, [],
+            'the guard false-positived on genuine orchestration: %r'
+            % (scenario_violations,))

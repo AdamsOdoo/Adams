@@ -1,11 +1,28 @@
 # Task 014 — Fulfillment / Tracking Validation Results (Wave 4 Gate B)
 
-> **Status:** Gate B implementation candidate — **READY FOR ONE EXHAUSTIVE
-> CONTROL-ROOM REVIEW**. Draft PR #189, unmerged, not marked ready, not
-> self-accepted. No live Shopify mutation occurred. Gate C (Odoo.sh runtime)
-> and Gate D (Shopify dev-store) evidence is classified `IMPLEMENTED—RUNTIME
-> PENDING` / `NOT PROVEN` — never fabricated. CV-013 (#185) remains open and
-> critical.
+> **Status:** Gate B implementation candidate — **STAGE R2A CONCURRENCY-PROOF
+> P1 CORRECTED; FRESH EXACT-SHA ODOO.SH VERIFICATION REQUIRED**. Draft
+> PR #189, unmerged, not marked ready, not self-accepted. No live Shopify
+> mutation occurred. Gate C (Odoo.sh runtime) and Gate D (Shopify dev-store)
+> evidence is classified `IMPLEMENTED—RUNTIME PENDING` / `NOT PROVEN` — never
+> fabricated. CV-013 (#185) remains open and critical.
+>
+> **Stage R2A correction (2026-07-22).** The control room (PR #189 comment
+> `5045580551` / issue #186 comment `5045582535`) disclosed a P1
+> test-integrity defect: two of the out-of-band concurrency harness's three
+> scenarios (`run_concurrent_inconclusive_increment`,
+> `run_operation_scope_serialization`) were hard-coded `ok: True` stubs that
+> performed no concurrent work. This is corrected in full below (new §"STAGE
+> R2A") — every stubbed scenario now does genuine spawned-process work, six
+> further frozen-family scenarios were added, and the static no-fake-success
+> guard was strengthened. **No scenario in this harness has been executed
+> against a live database in this session** (no Odoo runtime is available
+> here, same limitation already disclosed for Stage R1/continuation) — the
+> correction is `IMPLEMENTED — EXACT-SHA ODOO.SH EXECUTION PENDING`, not
+> `EXECUTED—PASS`. Do not read the Stage R1 "in-suite genuine-concurrency
+> tests... are all inside the passing 200" language below as covering the
+> external harness — it does not; see the new section for the exact
+> distinction.
 
 ---
 
@@ -101,10 +118,13 @@ credential fragments, and non-synthetic PII (emails/phones): **zero hits**.
 - **Standalone spawn-multiprocessing harness**
   (`runtime_layer2_fulfillment_concurrency_harness.py`): not separately run —
   the plain `python3` invocation in this shell cannot bootstrap the Odoo package
-  the way the `odoo-bin` wrapper does (`ImportError: SUPERUSER_ID`). Genuine
-  independent-connection concurrency is evidenced by the passing in-suite
-  `test_fulfillment_concurrency.py`; only the harness's `c1_ownership_race`
-  scenario does real work (the other two are stubs).
+  the way the `odoo-bin` wrapper does (`ImportError: SUPERUSER_ID`). At this
+  point in the record only `c1_ownership_race` did real work; the other two
+  registered scenarios were **hard-coded `ok: True` stubs** — a P1
+  test-integrity defect disclosed by the control room and corrected in the
+  Stage R2A section below (all scenarios now genuinely orchestrate spawned
+  processes/independent transactions; none has run against a live database
+  yet).
 - **Fresh-install-on-clean-DB and full upgrade/uninstall/reinstall residue
   campaigns**: this container is linked to a single DB (AGENTS.md) and cannot
   create disposable databases; the build's own install created this stack
@@ -130,6 +150,125 @@ ready-mark, or merge performed.
 `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (blob
 `ad7418f846ae0479471306c3ae997ac4eb60df4b`), issued by issue #186 comment
 `5043052341` with the PR #188 comment `5042975042` source/origin amendment.
+
+## STAGE R2A — GENUINE CONCURRENCY-PROOF P1 CORRECTION (2026-07-22)
+
+> Ruling basis: PR #189 comment `5045580551` / issue #186 comment
+> `5045582535`, a legitimate P1 reopening under the one-correction rule.
+> Classification for everything in this section:
+> **`IMPLEMENTED — EXACT-SHA ODOO.SH EXECUTION PENDING`.** No scenario in
+> this harness has been executed against a live database in this session —
+> this workspace has no Odoo runtime (same disclosed limitation as Stage
+> R1/continuation). A fresh Odoo.sh build must check out the exact corrected
+> head and run the full matrix (Stage R2B) before any of these scenarios may
+> be labelled `EXECUTED—PASS`.
+
+### R2A.1 Disclosed P1
+
+At the pre-correction head (`ac122d0`), the external harness's
+`run_concurrent_inconclusive_increment` and `run_operation_scope_serialization`
+returned a hard-coded `{'ok': True, ...}` literal — no fixture, no worker, no
+transaction, no durable-outcome check. The static AST contract test in force
+at that head (`test_external_concurrency_harness_contract`) checked only that
+named functions/strings existed in the file; it could not and did not detect
+a placeholder function body. Only `run_c1_ownership_race` did genuine work.
+
+### R2A.2 Frozen concurrency-family audit (locked prompt §6 / this task's §6)
+
+| # | Family | Evidence after this correction |
+| --- | --- | --- |
+| 1 | Duplicate admission | **NEW** external scenarios `duplicate_picking_admission` / `duplicate_tracking_admission` — two spawned workers race the real `_enqueue_once` dedup choke point; the DB-level `UNIQUE(store_id, idempotency_key)` constraint admits exactly one durable job. |
+| 2 | Mutation C1 ownership | `c1_ownership_race` (retained; already genuine at Stage R1) — strengthened with an explicit post-race residue check (no attempt row created by either worker). |
+| 3 | Operation-scope serialization | **FIXED** (was a stub) — `operation_scope_serialization`: two spawned workers insert a `fulfillment_create` job holding the identical `(store, picking, FO GID)` scope; `UNIQUE(store_id, operation_scope_key)` admits exactly one; the winner is then terminalized and a permitted replacement with the same scope is proven admissible. Complements the genuine in-suite `test_overlapping_same_scope_insert_is_refused` (real `db_connect` independent cursors, executed at Stage R1). |
+| 4 | C1/C2/NET/C3 handoff ordering | Cited from existing genuine evidence, not re-implemented here: the accepted core harness (`shopify_connector_core/tests/runtime_layer2_concurrency_harness.py::run_c1_ownership_race` / `run_concurrent_inconclusive_increment` / `run_concurrent_stale_sweep`) already proves the C1/C2/NET/C3 commit-point protocol at the substrate level DEC-036 defines it, and the fulfillment strategies (`shopify_connector_fulfillment_create_strategy.py` / `_tracking_strategy.py`) supply only strategy-callback data into that identical core wrapper (`_drain_mutation_one`) — they do not reimplement or override any commit-point behavior. This satisfies the "already proven genuinely in an existing test" exception; the fulfillment-domain-specific extensions of it (the operation-scope override, the mutation-domain reconcile ownership) are separately proven by families 3 and 8 below. |
+| 5 | Concurrent inconclusive reconciliation increments | **FIXED** (was a stub) — `concurrent_inconclusive_increment`: two spawned workers invoke the actual production `_record_inconclusive_reconciliation` on one committed uncertain attempt, retried only through the accepted bounded lock-refusal/serialization-failure policy; durable count is exactly `[1, 2]` (no lost update); a third sequential call proves the cap (3) is reachable without a skipped value. |
+| 6 | Tracking-update admission | **NEW** `duplicate_tracking_admission` (see family 1 — the two admission families share one generic child function, parametrized by job type/res_model, each with its own `SCENARIOS` entry and postcondition check). |
+| 7 | Mode-switch interaction with in-flight Layer 2 jobs | **NEW** `mode_switch_interaction`: one worker holds an uncommitted row lock on a `running` `fulfillment_create` job while a second worker concurrently calls `action_rollback_to_mode1()`; the switch completes independently of the held lock (proven by real elapsed-time evidence: switcher time < holder's hold duration, not just code inspection), the in-flight mutation job is untouched, and a queued `fulfillment_mode2_evaluation` job is cancelled per the accepted contract. |
+| 8 | Reconciliation replacement admission | **NEW** `reconciliation_replacement_race`: two spawned workers race to create a `fulfillment_mutation_reconcile` job for the same committed uncertain attempt; the DB-level partial `UniqueIndex "(mutation_attempt_id) WHERE mutation_attempt_id IS NOT NULL"` admits exactly one reconcile-job owner — proving one shared reconcile and no second mutation reachable from post-C2 uncertainty. |
+| 9 | Review-release replacement admission | **NEW** `review_release_race`: two authorized `_release_blocked_mutation` calls overlap on the same fulfillment binding; the binding-level `try_lock_for_update` refuses the second; exactly one blocked job is released, exactly one permitted replacement is created, and `superseded_by_job_id` lineage is verified. |
+| 10 | Rollback injection and recovery | **NEW** `rollback_injection_recovery`: a worker claims a job (writes the C1 ownership fields, uncommitted) and is then killed with `os._exit()` before it can commit — a genuine crash, not a simulated `cursor.rollback()`. A second worker is proven refused while the crasher still holds the row; after the crash, a fresh worker claims the job cleanly once PostgreSQL rolls back the dropped connection's transaction. |
+| 11 | No leaked running/owned/scope state after worker failure | Proven as the durable postcondition of family 10 (final read shows `state='queued'`, no token/owner/running_since, live operation scope intact, zero orphan `mutation.attempt`) and as a standing postcondition on families 2/3/5/8/9. |
+| 12 | Real PostgreSQL contention where the invariant depends on it | Families 1, 3, 5, 6, 8, 9, 10 all provoke genuine PostgreSQL-level contention (unique-constraint collisions or row locks across independent connections/processes), not sequential simulation. |
+
+### R2A.3 Existing genuine scenarios retained
+
+`c1_ownership_race` — unchanged in substance (two spawned workers race
+`try_lock_for_update()` on one committed job); the shared harness scaffolding
+was refactored to match the accepted core harness's fuller pattern
+(`_run_children`/`_scenario_summary`/`_finish_cleanup`), and a durable
+post-race residue check was added (no attempt row leaked by either worker).
+
+### R2A.4 Stubbed scenarios replaced
+
+`run_concurrent_inconclusive_increment` and `run_operation_scope_serialization`
+— both rewritten in full per R2A.2 families 5 and 3 above. Neither returns a
+literal `ok`/`passed` value; both derive their result from spawned-process
+outcomes and a durable postcondition read.
+
+### R2A.5 Additional genuine scenarios implemented
+
+`duplicate_picking_admission`, `duplicate_tracking_admission`,
+`reconciliation_replacement_race`, `review_release_race`,
+`mode_switch_interaction`, `rollback_injection_recovery` — see R2A.2 families
+1/6, 8, 9, 7, 10 respectively for the exact mechanism each proves.
+
+### R2A.6 Process/transaction discipline (all nine scenarios)
+
+`multiprocessing.get_context('spawn')` only (never `fork`); each child opens
+its own `Registry` + cursor + `Environment` (no cached registry across forked
+state); readiness is synchronized through a `ready_queue`/`start_event`
+barrier before release; explicit `commit()`/`rollback()` boundaries; bounded
+timeouts on every `wait()`/`join()`/`get()`; process exit codes are captured
+(`process.exitcode`) and checked (via the shared `_run_children` helper for
+seven scenarios, inline for the two bespoke ones —
+`mode_switch_interaction`/`rollback_injection_recovery` — which have
+asymmetric child roles); every scenario cleans up its fixture and verifies
+zero residue via `_finish_cleanup`/`_cleanup_fixture` before returning. No
+raw Shopify transport; `zero_real_shopify: True` on every summary.
+
+**Side-effect note:** `review_release_race` and `mode_switch_interaction`
+grant the runtime superuser account the
+`shopify_connector_core.group_shopify_connector_admin` group once, durably
+(idempotent — re-running never duplicates the grant), so the production
+group-gated actions under test (`_release_blocked_mutation`,
+`action_rollback_to_mode1`) can be genuinely exercised. This is not treated
+as fixture residue.
+
+### R2A.7 Strengthened no-fake-success guard
+
+`test_fulfillment_concurrency.py` gained
+`audit_concurrency_harness_scenarios()` (AST-only, never imports/executes the
+harness) plus three test methods:
+`test_no_fake_success_scenarios` (runs the audit against the real harness and
+requires zero violations), `test_no_fake_success_guard_rejects_the_disclosed_stub_shape`
+(feeds the guard a synthetic module shaped exactly like the disclosed stub and
+asserts rejection — proving the guard is not decorative), and
+`test_no_fake_success_guard_accepts_genuine_orchestration` (a synthetic
+module with real `get_context`/`Process`/query/exit-code/cleanup calls must
+NOT be flagged — proving the guard cannot be satisfied by banning every
+dict-returning function). For each `SCENARIOS` entry the guard verifies,
+across the runner's own body **and** every locally-defined helper it calls
+transitively (so shared helpers like `_run_children` count for every
+scenario that uses them): genuine process/transaction orchestration
+(`get_context`/`Process`), a durable-outcome inspection
+(`search`/`browse`/`search_count`/`read`/`execute`), a child exit-code
+inspection (`.exitcode`), a cleanup/residue call (`_finish_cleanup`), that
+the frozen nine-scenario set is present, and that no runner is a bare
+`return {<dict literal>}` with no orchestration (the literal shape of the
+disclosed stubs, checked independent of which keys the dict carries so a
+future `'passed': True`-shaped regression is caught too).
+
+### R2A.8 Static validation performed this session
+
+`py_compile` and `ast.parse` succeed on both changed files; the guard was
+executed standalone (no Odoo import) against the real harness (zero
+violations) and against the pre-correction harness content at `ac122d0`
+(rejected, confirming the guard would have caught the disclosed P1); every
+`SCENARIOS` entry maps to a real implementation; `spawn`-only confirmed (zero
+`fork` usage); every child opens its own environment; every scenario has
+timeout and exit-code handling; cleanup/residue logic present in every
+scenario; zero raw transport; no production file changed; exactly the four
+allowed files touched.
 
 ## 1. Evidence classification legend
 
@@ -247,14 +386,25 @@ execution is `IMPLEMENTED—RUNTIME PENDING` (no Odoo runtime here).
 
 ## 6. Genuine concurrency evidence
 
-The out-of-band `runtime_layer2_fulfillment_concurrency_harness.py` uses OS
-processes via `multiprocessing.get_context('spawn')` (never `fork`), a
-per-process `Registry` + cursor + `Environment`, and real commit boundaries —
-mirroring the accepted core harness. Its structural contract is `EXECUTED—PASS`
-(AST-verified here). Genuine independent-connection cases
-(`test_fulfillment_concurrency.py`: operation-scope serialization via
-`db_connect`, shared-reconcile handoff) are `IMPLEMENTED—RUNTIME PENDING` — they
-require real pooled cursors on a live database (Gate C).
+**Superseded by the Stage R2A section below for the external harness's exact
+status — read that section, not this paragraph alone, for the
+scenario-by-scenario classification.** The out-of-band
+`runtime_layer2_fulfillment_concurrency_harness.py` uses OS processes via
+`multiprocessing.get_context('spawn')` (never `fork`), a per-process
+`Registry` + cursor + `Environment`, and real commit boundaries — mirroring
+the accepted core harness. Its structural contract (function/wiring
+presence, `spawn`-only, no fork) is `STATICALLY VERIFIED` (AST-verified
+here); as of the Stage R2A correction the strengthened
+`test_no_fake_success_scenarios` guard additionally verifies every
+registered scenario genuinely orchestrates processes, inspects a durable
+outcome, checks child exit codes, and performs cleanup — this is also
+`STATICALLY VERIFIED`, not `EXECUTED—PASS` (no scenario has run against a
+live database in this workspace). Genuine independent-connection evidence
+that **has** executed is `test_fulfillment_concurrency.py`'s
+`test_overlapping_same_scope_insert_is_refused` (real `db_connect`
+independent cursors; ran green at Stage R1 inside the passing 200) — this
+remains the one frozen-family case with actual Gate C execution evidence
+behind it; every external-harness scenario is `IMPLEMENTED—RUNTIME PENDING`.
 
 ## 7. Odoo.sh (Gate C) evidence — `IMPLEMENTED—RUNTIME PENDING`
 
