@@ -1,18 +1,33 @@
 # Wave 4 — Definition of Ready (Fulfillment & Tracking)
 
-> **Status: Proposed — Fable gap-closure mission, 2026-07-16. NOT accepted.**
-> Acceptance authority: product owner + Claude control room (per
-> [`mvp-completion-program.md`](mvp-completion-program.md) §4 Wave 4 and the
-> DEC-032 operating model). This checklist gates the *opening* of Wave 4; it
-> authorizes no implementation by itself. Structure follows
+> **Status: Proposed — Fable gap-closure mission, 2026-07-16; Wave 4 Gate A
+> reconciliation appended 2026-07-21. NOT accepted.**
+> **Acceptance authority (Wave 4): ChatGPT control room** (scope governor,
+> acceptance, merge-authorizing authority), with the product owner as ultimate
+> business authority — per issue #186 comment `5038326525`, which supersedes the
+> earlier DEC-032 "product owner + Claude control room" wording **only** where it
+> assigned Claude sole control-room/merge authority (all worker-separation,
+> independent-review, source-of-truth, and no-self-acceptance safeguards remain
+> binding). This checklist gates the *opening* of Wave 4; it authorizes no
+> implementation by itself. Structure follows
 > [`../06-prompts/implementation-task-template.md`](../06-prompts/implementation-task-template.md)
 > (acceptance preconditions → allowed/forbidden → acceptance criteria → tests →
 > rollback → definition of done), adapted to the macro-wave model.
 >
-> **Current program state (2026-07-16):** Wave 1 is **merged** and **SRR-03 is
-> CLOSED**. Wave 4 depends on Waves 2 and 3 being merged (order bindings +
-> Layer 2). As a Shopify-mutation wave, Wave 4 closure requires **genuine (not
-> simulated) dev-store fulfillment mutation evidence**.
+> **Current program state (2026-07-21):** Waves 1–3 are **merged** into
+> `mvp/program-integration` (base `ab4f12f5…` = PR #182 / Task 013 merge commit);
+> **SRR-03 CLOSED**; the **DEC-036/DEC-031 Layer 2 substrate is Accepted
+> (2026-07-19) and runtime-proven** in Wave 3 (G4-1 satisfiable). Wave 4 Gate A
+> decision reconciliation is
+> [`../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md`](../04-decisions/DEC-038-wave-4-fulfillment-gate-a-reconciliation.md)
+> (Proposed) — its 41-item matrix + the 16-condition Mode 2 reconciliation (12
+> preserve / 4 refine) + the **applied Q1–Q8 rulings** (PR #188 comment `5041620950`,
+> 2026-07-22; no longer open) + the **P0 reconcile-only uncertain-outcome contract**
+> (DEC-038 §7.1) are the binding input to this DoR
+> and the Task 014 packet re-acceptance (G4-5). As a Shopify-mutation wave, Wave 4
+> closure requires **genuine (not simulated) dev-store fulfillment mutation
+> evidence**, and **CV-013 (#185) — carried forward as critical — must execute
+> green before final acceptance / RC / UAT** (not downgraded).
 
 ## 1. Wave objective (one scoped outcome)
 
@@ -116,10 +131,12 @@ fulfillment operating mode per store, and the per-store
 
 ## 3. Allowed / forbidden paths (wave-level; the re-issued Task 014 prompt is exhaustive)
 
-- **Allowed:** `addons/shopify_connector_fulfillment/**` (new); the one named
-  core readiness-check edit + its test (D-014-2); Layer-2 registration
-  entries the accepted Layer 2 design requires for the fulfillment mutations;
-  Wave 4 validation/evidence docs, AR-log rows, handoff, program state.
+- **Allowed:** the new `addons/shopify_connector_fulfillment/` addon — **enumerated
+  file-by-file (no `**` wildcard authorization)** in the re-issued locked prompt §2
+  (that list is the exhaustive authority; nothing outside it without a control-room
+  amendment); the one named core readiness-check edit + its test (D-014-2); the
+  add-only Layer-2 registration entries the accepted Layer 2 design requires; Wave 4
+  validation/evidence docs, AR-log rows, handoff, program state.
 - **Forbidden:** any read of `shopify.connector.location.mapping`;
   `fulfillmentOrderMove`/hold mutations and `FULFILLMENT_ORDERS_*`
   subscriptions; legacy fulfillment endpoints (RA-022); refunds/returns
@@ -167,8 +184,9 @@ fulfillment operating mode per store, and the per-store
 7. **Reconnect catch-up:** on reconnect, the fulfillment watermark scan
    re-reads FOs/fulfillments since the gap; every external fulfillment from
    the disconnected period lands as a review case (fulfillment-operating-modes
-   §7); interrupted outbound work resumes under
-   verification-read-before-retry.
+   §7); interrupted outbound work resumes **reconcile-only** (no resend from a read
+   miss; DEC-038 §7.1), and all catch-up reads are **cursor-paginated to completion**
+   (§7.4).
 8. **Per-store mode field + Mode 2 auto-application engine:** the
    `fulfillment_operating_mode` field is live with **both** values, selectable
    by the Administrator; Mode 2 auto-applies an Odoo fulfillment **only** when
@@ -183,8 +201,13 @@ fulfillment operating mode per store, and the per-store
    lost review case.
 10. **Layer 2 compliance proven:** every fulfillment mutation runs under the
     accepted Layer 2 protocol (durable attempt record before the call;
-    reconciliation read on ambiguous outcome; no blind retry path exists —
-    source-level test).
+    **once `transport_attempted=true` the job is reconcile-only** — the mutation is
+    never re-sent; **read absence → INCONCLUSIVE**; **post-C2 `NOT_APPLIED` never
+    authorizes a replacement** (post-C2 = APPLIED/INCONCLUSIVE only); a replacement is
+    reachable **only** from `transport_attempted=false` or a synchronous `userErrors`
+    clean rejection; no resend-from-absence path exists — source-level test; DEC-038
+    §7.1). Notification side effects obey the same rule (a possible prior
+    `notifyCustomer=true` is never repeated from absence).
 11. Task 014 packet §5/§6 test files and criteria (as extended by the
     addendum) all green on Odoo.sh; **genuine dev-store fulfillment mutation
     evidence** for both Mode 1 and Mode 2 paths (any exception is a specific
@@ -213,3 +236,30 @@ Mode 1 and Mode 2 backend behavior is delivered and runtime-proven inside
 Wave 4 — the only Mode 2 item carried forward is the Wave 5 **UI** (mode
 selector, review workspace, dashboards), whose backend contract Wave 4
 hands off intact.
+
+## 7. Bounded control-room correction (2026-07-22)
+
+Applied per PR #188 comment `5041620950` / issue #186 comment `5041623758`, the DoR
+now carries these binding contracts (detail in DEC-038 §4/§7 + Task 014 packet §11 +
+the locked prompt): **(P0)** uncertain remote outcomes are **reconcile-only** — read
+absence is INCONCLUSIVE; **post-C2 `NOT_APPLIED` never authorizes a replacement**
+(post-C2 = APPLIED/INCONCLUSIVE only; a replacement needs `transport_attempted=false`
+or a synchronous `userErrors` clean rejection), notifications fail closed (criteria
+#7/#10); **(Q1–Q8)** ruled and applied
+(operation-scope literals, adopt `sale_stock` pickings, core location cache only,
+`fulfillment_tracking_change` with `ondelete`, fulfillment-owned COD read, Q6 carrier
+fail-closed, `store.api_version`, staff-permission NOT_PROVEN); the **complete
+job/replay taxonomy**, **modular file + exact test allowlist**, **cursor pagination**,
+**fixed error/review vocabulary** (no `over_fulfillment`/no new selection value),
+**lifecycle `ondelete`**, and **staff-permission/API-version** policies are frozen.
+These are binding inputs to G4-5 re-acceptance; the gate checkboxes above remain
+**unchecked** (control-room acceptance is not self-granted here).
+
+**Final control-room micro-correction (2026-07-22)** — per PR #188 comment `5042183642`
+/ issue #186 comment `5042185019`: post-C2 `NOT_APPLIED` never authorizes a resend
+(post-C2 = APPLIED/INCONCLUSIVE only); the taxonomy is frozen at **exactly ten job
+types** with **one shared `fulfillment_mutation_reconcile`** that inherits **no**
+remote-effect operation scope; **`fulfillment_review_release` is not a job type**;
+**webhooks are forbidden as a Wave 4 source**; and the `fulfillment_tracking_change`
+trigger-origin uses the **dedicated** `_normalize_tracking_change_trigger_origin_on_uninstall`
+callable. Gate checkboxes remain **unchecked**.

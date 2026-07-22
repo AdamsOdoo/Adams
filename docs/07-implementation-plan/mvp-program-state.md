@@ -4,6 +4,73 @@
 
 ## Current status
 
+**WAVE 4 GATE A — FINAL CONTROL-ROOM MICRO-CORRECTION APPLIED (2026-07-22).** Following
+the control-room **delta-review REVISE** (**PR #188 comment `5042183642`** / issue #186
+comment `5042185019`, five narrow decision-critical defects), one final
+documentation-only micro-correction was applied on the same branch
+`claude/wave-4-gate-a-review-0nbhdw` / draft PR #188 (no `addons/**` change; no new file;
+no Shopify operation; PR stays draft/unmerged/not-ready): **(P0)** post-C2 `NOT_APPLIED`
+**never authorizes a resend** — post-C2 reconciliation has only **APPLIED /
+INCONCLUSIVE**; a replacement is reachable only from `transport_attempted=false` or a
+**synchronous `userErrors` clean rejection**; **(P1)** one **shared**
+`fulfillment_mutation_reconcile` (no remote-effect-scope inheritance; explicit
+lock→supersede→flush→insert handoff); the taxonomy frozen at **exactly ten job types**
+(freeze-defeating "revisit at Gate B" wording removed); **`fulfillment_review_release`
+is not a job type** (sanctioned-service helper); **`webhook` removed as a Wave 4
+source**; the `fulfillment_tracking_change` trigger-origin uses a **dedicated**
+`_normalize_tracking_change_trigger_origin_on_uninstall` callable; the active DEC-038
+41-item matrix reconciled (#13/#21/#24/#26/#29/#35), the nonexistent §14 cross-ref
+fixed, and the PR #188 body commit-count corrected. **CV-013 (#185) remains open and
+critical.** **Recommendation: `READY FOR CONTROL-ROOM FINAL DELTA ACCEPTANCE`.** The
+first-delta correction and original Gate A candidate records follow.
+
+**WAVE 4 GATE A — BOUNDED CONTROL-ROOM CORRECTION APPLIED (2026-07-22, first delta — the post-C2 `NOT_APPLIED`/12-family-taxonomy/webhook-source items below are superseded by the final micro-correction above).** Following
+the control-room REVISE review (**PR #188 comment `5041620950`** / issue #186 comment
+`5041623758`), one bounded documentation-only correction was applied on the same branch
+`claude/wave-4-gate-a-review-0nbhdw` / draft PR #188 (no `addons/**` change; no Shopify
+operation; PR stays draft/unmerged/not-ready): **(P0)** uncertain remote outcomes are
+now **reconcile-only** — read absence is INCONCLUSIVE, a replacement send requires
+positive non-application evidence, notifications fail closed (every "absent → resend"
+path removed); **Q1–Q8 ruled and applied** (no longer open); the fixed error/review
+vocabulary is mapped and `over_fulfillment` removed; the **complete job/replay
+taxonomy**, **modular file + exact test allowlist** (giant service file removed),
+**cursor pagination**, **source-guard precision**, **lifecycle `ondelete`**,
+**staff-permission NOT_PROVEN**, and **`store.api_version`** policy are frozen; stale
+status removed. **CV-013 (#185) remains open and critical.** **Recommendation: `READY
+FOR CONTROL-ROOM DELTA REVIEW`.** The original Gate A candidate record follows.
+
+**WAVE 4 GATE A — DEFINITION-OF-READY / DECISION-RECONCILIATION CANDIDATE
+PRODUCED (2026-07-21).** Executed the locked Gate A prompt
+(`control-room/wave-4-gate-a-prompt-review@187f04d5…`, blob
+`57772d04960a910bd8715050649ddc4c08cc5430`) from the required base
+`mvp/program-integration@ab4f12f5a6857b2f3318ffc3b3f5f371307938bc` (PR #182 merge
+commit). **Worker:** Claude, as the explicitly-assigned authorized governance/
+research worker (issue #186 comment `5038326525`); this is a **candidate pending
+ChatGPT control-room acceptance** — no implementation, no `addons/**` change, no
+Shopify operation, no self-acceptance/ready-marking/merge. **Draft PR #188**
+(into `mvp/program-integration`, docs-only, unmerged), branch
+`claude/wave-4-gate-a-review-0nbhdw`. Identity gate PASSED (all 8 §3 items).
+Canonical outputs: resource inventory + authority map; official Shopify
+(Admin API 2026-07) + Odoo 19.0-source fulfillment notes; merged-code integration
+audit; **DEC-038** (Proposed) — the 41-item decision matrix + the 16-condition
+Mode 2 engine reconciled (12 preserve / 4 refine / 0 dropped) + 7 escalated
+control-room questions (Q1–Q7); updated Wave 4 DoR + Task 014 packet §10 (arch +
+Layer 2 + Mode 1/2 contracts); the **NEW locked Gate B prompt**
+(`sol-wave-4-fulfillment-locked-prompt.md`, `LOCKED CANDIDATE — NOT ISSUED`); the
+UAT-matrix Gate A validation addendum; new risk SRR-10. Key decision-critical
+confirmations: fulfillment mutations are **not `@idempotent`** (verified 2026-07-21)
+→ verify-before-retry under the accepted DEC-036/DEC-031 Layer 2 is the primary
+duplicate-prevention control; done-qty = `stock.move.line.quantity` (no `qty_done`
+in Odoo 19); the merged Layer 2 spine is fully reusable via 10 add-only seams.
+**CV-013 (#185) carried forward as critical — NOT downgraded.** **Recommendation
+(2026-07-21, now superseded by the 2026-07-22 correction above → `READY FOR
+CONTROL-ROOM DELTA REVIEW`):** READY FOR CONTROL-ROOM GATE A REVIEW. Q1–Q7 (now Q1–Q8)
+are **ruled and applied** (DEC-038 §4). No Gate B / Wave 5 work started; the locked
+prompt is not issued. Wave 4 program row (below) stays "Not started" for
+implementation until the control room accepts Gate A and issues the prompt.
+
+---
+
 **TASK 013 (PR #182) — TRACK B CANDIDATE TECHNICAL CLOSURE COMPLETED (2026-07-21).**
 On Odoo.sh build `35199258` (a REBUILD of `35193596`; Odoo 19.0 / PostgreSQL
 16.14), Track B (authority: comment `5031833846`) delivered the candidate-side
