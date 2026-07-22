@@ -4,6 +4,32 @@
 
 ## Current status
 
+**WAVE 4 GATE B — FULFILLMENT/TRACKING BACKEND IMPLEMENTED; READY FOR ONE
+EXHAUSTIVE CONTROL-ROOM REVIEW (2026-07-22).** Gate A was accepted and merged
+(PR #188 → integration `01f072dd`; issue #186 comment `5042982528`). Gate B was
+issued (issue #186 comment `5043052341` + PR #188 comment `5042975042` binding
+source/origin amendment). Claude Code, as the authorized Gate B implementation
+worker, implemented the new `shopify_connector_fulfillment` addon + the one
+named core edit on branch `claude/wave-4-fulfillment-gate-b` / **draft PR #189**
+(unmerged, not ready, not self-accepted; **no live Shopify mutation**). Delivered:
+D-014-1..8; the ten frozen job types + shared reconcile + dedicated
+trigger-origin uninstall callable; the Q1 operation-scope override; both
+7-callback Layer 2 strategies (anonymous-form GraphQL, **no `@idempotent`**,
+RA-022/RA-023) with **reconcile-only post-C2 (APPLIED/INCONCLUSIVE only, no
+resend, cap 3 → `duplicate_risk`)**; both Mode 1 and Mode 2 (16-condition engine
++ Q6 carrier fail-closed); the mode-switch state machine; inbound observation +
+7-family state normalization; scans + cron; the fulfillment readiness seam
+(write-scope, API-version Q7, staff-permission NOT_PROVEN Q8). **Evidence:** the
+frozen core + fulfillment source guards executed standalone → **0 violations**
+(the anonymous-operation approach keeps the frozen `ACCEPTED_PREPARE_TRANSPORT_SPLIT`
+allowlist untouched); `py_compile` clean. **No Odoo runtime in this workspace** →
+the `TransactionCase` suite is `IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh);
+Gate D dev-store + CV-013 are `NOT PROVEN`/pending. **CV-013 (#185) remains open
+and critical.** Full evidence:
+[`../05-qa/task-014-fulfillment-tracking-validation-results.md`](../05-qa/task-014-fulfillment-tracking-validation-results.md);
+review record AR-073. Recommendation: **READY FOR ONE EXHAUSTIVE CONTROL-ROOM
+REVIEW**. The Gate A records follow.
+
 **WAVE 4 GATE A — FINAL CONTROL-ROOM MICRO-CORRECTION APPLIED (2026-07-22).** Following
 the control-room **delta-review REVISE** (**PR #188 comment `5042183642`** / issue #186
 comment `5042185019`, five narrow decision-critical defects), one final

@@ -1,3 +1,71 @@
+### Wave 4 Gate B — fulfillment/tracking backend implemented (draft PR #189) (2026-07-22)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`, **draft PR
+  [#189](https://github.com/AdamsOdoo/Adams/pull/189)** into `mvp/program-integration`
+  (unmerged; not marked ready; not self-accepted). **No live Shopify mutation.**
+  Base `mvp/program-integration@01f072dd4d83b7b39737452a686244a3a8c00332`.
+- **Worker / authority:** Claude Code as the authorized Gate B implementation
+  worker (issue #186 comment `5043052341`). ChatGPT is the acceptance/merge
+  authority; the product owner is the business authority. No self-accept / ready
+  / merge; no Gate C/Gate D/Wave 5 work started.
+- **Delivered:** the new `shopify_connector_fulfillment` addon (one
+  `shopify.connector.fulfillment.service` split across the enumerated
+  responsibility files) + the one named core edit (`REQUIRED_MVP_SCOPES` swap +
+  its test). D-014-1..8; ten frozen job types + shared `fulfillment_mutation_reconcile`
+  + dedicated `_normalize_tracking_change_trigger_origin_on_uninstall`; Q1
+  operation-scope override; both 7-callback Layer 2 strategies (anonymous-form
+  GraphQL constants, **no `@idempotent`**, RA-022/RA-023) with **reconcile-only
+  post-C2 (APPLIED/INCONCLUSIVE only; read absence = INCONCLUSIVE; cap 3 →
+  `duplicate_risk`; no resend; no repeated notification)**; admission (one create
+  per picking; per-FO line decomposition); `stock.picking._action_done` trigger +
+  tracking hook; the 16-condition Mode 2 engine + Q6 carrier fail-closed; Mode 1
+  review actions + review-release helper; inbound observation + origin
+  classification + 7-family state normalization; scans + mode-switch state
+  machine + cron; the readiness seam (write-scope, API-version Q7, staff-permission
+  NOT_PROVEN Q8); ACL + multi-company rules. All 22 frozen test filenames + the
+  out-of-band spawn concurrency harness.
+- **Evidence classification (honest):** frozen **core** + fulfillment source
+  guards executed standalone → **0 violations**; `py_compile` clean. **No Odoo
+  runtime in this workspace** → the `TransactionCase` suite is
+  `IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh). Gate D dev-store + CV-013 are
+  `NOT PROVEN`/pending. **CV-013 (#185) open and critical.** Full detail:
+  [`../05-qa/task-014-fulfillment-tracking-validation-results.md`](../05-qa/task-014-fulfillment-tracking-validation-results.md);
+  review record AR-073.
+
+- **Learning feedback loop:**
+  - *What worked:* mapping the merged Layer 2 substrate (inventory
+    `_service.py`, job/dispatch/mutation_attempt, the frozen source guards)
+    exhaustively **before** writing a line of integration code prevented seam
+    drift; running the **frozen core guard logic standalone** against the new
+    production tree caught the single hardest architectural risk (the
+    un-editable `ACCEPTED_PREPARE_TRANSPORT_SPLIT` allowlist) early and proved
+    the anonymous-operation resolution empirically.
+  - *New lesson (LL — Gate B):* when a new domain mirrors an accepted
+    prepare/transport split but the **frozen** core guard's allowlist is exactly
+    scoped to the prior domains and cannot be widened, an **anonymous GraphQL
+    operation** (module constant, referenced by name) satisfies the guard's
+    named-mutation regex by construction while the domain's own guard provides
+    the real coverage — a reusable pattern for future domains that add mutation
+    strategies without touching frozen core tests.
+  - *Reinforced:* the reconcile-only P0 is safest enforced **in the reconcile
+    callback itself** (never returning `not_applied`) **and** re-enforced at the
+    shared handler (coercing any `not_applied` to inconclusive) — defence in
+    depth for the highest-consequence contract.
+  - *Carry-forward risk:* SRR-10 (no-tracking reconcile is weaker, fails closed
+    to `duplicate_risk` review) is retained by design; runtime proof (Gate C/D)
+    of the concurrency + reconcile paths is still pending.
+
+- **Exact next-session prompt (control room):** *"CHATGPT CONTROL ROOM — perform
+  the one exhaustive Wave 4 Gate B review of draft PR #189 (branch
+  `claude/wave-4-fulfillment-gate-b`, base `01f072dd`). Verify the identity gate,
+  the frozen §2/§5 allowlist, the source/origin matrix, the reconcile-only P0,
+  the ten-job taxonomy + shared reconcile, the 16-condition Mode 2 engine + Q6,
+  lifecycle/security, and the evidence classification in
+  `docs/05-qa/task-014-fulfillment-tracking-validation-results.md`. Report all
+  P0/P1/material-P2 findings in one consolidated ruling (issue #186 comment
+  `5043013284`). Do not run a second narrow correction loop. #185 (CV-013)
+  remains open; no live Shopify mutation is authorized."*
+
 ### Wave 4 Gate A — final control-room micro-correction applied (draft PR #188) (2026-07-22)
 
 - **Branch / PR:** `claude/wave-4-gate-a-review-0nbhdw`, draft PR

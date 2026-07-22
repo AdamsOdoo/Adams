@@ -206,3 +206,27 @@ cleanup/restoration · proof no unrelated resource changed.
 static / Odoo.sh work, but Wave 4 cannot receive final control-room acceptance,
 enter a release candidate, or begin UAT while #185 is open. This matrix is the
 canonical validation-plan carrier (no parallel validation doc is created).
+
+---
+
+## Gate B implementation evidence (2026-07-22, draft PR #189)
+
+Gate B implemented the backend behind every UAT-FM scenario in this matrix; the
+scenarios themselves are **runtime/dev-store validation plans** and remain
+`IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh) / `NOT PROVEN` (Gate D dev-store).
+The frozen unit suite that maps to these scenarios is present and compiles; the
+static source guards executed with **0 violations**. Key mutation-safety rows are
+covered by `tests/test_fulfillment_idempotency.py`:
+
+- **UAT-FM-1.9 / 1.9b / 1.9c** (uncertain outcome reconcile-only; no-tracking
+  fail-closed; possible-notification never repeated) → the reconcile callbacks
+  return only APPLIED / INCONCLUSIVE, the shared handler coerces any
+  `not_applied` to inconclusive, and `INCONCLUSIVE_RECONCILIATION_CAP=3` routes
+  to `duplicate_risk`. No second mutation is reachable from a post-C2 read.
+- **UAT-FM-2.0 … 2.18** (16-condition Mode 2, deterministic split, Q6 carrier
+  fail-closed) → `tests/test_fulfillment_mode2_engine.py`.
+- **UAT-FM-3.x** (mode switch, reconnect → review in both modes) →
+  `tests/test_fulfillment_mode_switch.py`, `tests/test_fulfillment_scans.py`.
+
+Full classification: `task-014-fulfillment-tracking-validation-results.md`.
+No live Shopify mutation occurred in Gate B. CV-013 (#185) remains open/critical.
