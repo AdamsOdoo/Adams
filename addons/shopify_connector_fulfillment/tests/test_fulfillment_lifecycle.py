@@ -37,7 +37,12 @@ class TestFulfillmentLifecycle(TransactionCase):
         })
 
     def test_job_type_sink_retypes_to_historic(self):
-        job = self._job('fulfillment_create')
+        # odoo_event jobs require a trigger_origin (core constraint); supply the
+        # valid core value explicitly.
+        job = self._job(
+            'fulfillment_create',
+            trigger_origin='fulfillment_picking_validation',
+        )
         job._reassign_to_historic_job_type()
         job.invalidate_recordset()
         self.assertEqual(job.job_type, 'historic_domain_job')

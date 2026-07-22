@@ -248,7 +248,11 @@ class TestFulfillmentConcurrency(TransactionCase):
                                  'changed second-read precondition')):
             Service._handle_fulfillment_mode2_evaluation(job)
         evidence.invalidate_recordset()
-        self.assertEqual(evidence.reconciled_state, 'observed')
+        # A changed second read fails closed: the handler opens a review case
+        # for the named reason and NEVER applies locally (the patched local
+        # validation above would have raised had it been reached).
+        self.assertEqual(evidence.reconciled_state, 'review')
+        self.assertEqual(evidence.review_reason, 'remote_state_changed')
         self.assertNotEqual(evidence.reconciled_state, 'applied')
 
     # -- Harness contract (AST): spawn, not fork, run_* functions, wiring.
@@ -266,7 +270,15 @@ class TestFulfillmentConcurrency(TransactionCase):
         self.assertNotIn("get_context('fork')", source)
         self.assertIn('Registry(', source)
         self.assertIn('Environment', source)
-        # The harness is NOT imported by the test package.
-        init_source = path.with_name('__init__.py').read_text('utf-8')
+        # The harness is NOT imported by the test package. Assert on the real
+        # import graph, not raw text: the __init__ comment deliberately names
+        # the file ("...is deliberately NOT imported here"), so a substring
+        # check would false-positive on that comment.
+        init_tree = ast.parse(path.with_name('__init__.py').read_text('utf-8'))
+        imported_modules = set()
+        for node in ast.walk(init_tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for alias in node.names:
+                    imported_modules.add(alias.name)
         self.assertNotIn(
-            'runtime_layer2_fulfillment_concurrency_harness', init_source)
+            'runtime_layer2_fulfillment_concurrency_harness', imported_modules)

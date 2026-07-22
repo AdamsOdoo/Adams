@@ -116,8 +116,24 @@ class TestFulfillmentLocationResolution(TransactionCase):
             and node.name == '_resolve_single_location'
         )
         segment = ast.get_source_segment(source, method)
-        self.assertNotIn('location.mapping', segment)
-        self.assertIn('shopify.connector.location', segment)
+        # Assert on the executable body, not raw text: the docstring
+        # deliberately names 'location.mapping' ("Never reads location.mapping"),
+        # so a substring check on the source would false-positive. Collect the
+        # string literals actually used in code (docstring excluded) and prove
+        # the mapping model is never referenced there.
+        body = list(method.body)
+        if (body and isinstance(body[0], ast.Expr)
+                and isinstance(body[0].value, ast.Constant)
+                and isinstance(body[0].value.value, str)):
+            body = body[1:]  # drop the docstring node
+        code_string_literals = {
+            node.value
+            for stmt in body
+            for node in ast.walk(stmt)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        self.assertNotIn('location.mapping', code_string_literals)
+        self.assertIn('shopify.connector.location', code_string_literals)
 
     # ------------------------------------------------------------------
     # _refresh_location_cache

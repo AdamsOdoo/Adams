@@ -70,7 +70,8 @@ class TestFulfillmentPickingAdmission(TransactionCase):
                 'product_uom_qty': qty, 'shopify_line_item_gid': gid,
             })
             move = self.env['stock.move'].create({
-                'name': 'm', 'product_id': self.product.id,
+                # Odoo 19 removed stock.move.name (computed `reference` instead).
+                'product_id': self.product.id,
                 'product_uom_qty': qty, 'product_uom': self.product.uom_id.id,
                 'picking_id': picking.id,
                 'location_id': self.stock_loc.id,

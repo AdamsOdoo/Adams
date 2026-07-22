@@ -7,6 +7,124 @@
 > PENDING` / `NOT PROVEN` — never fabricated. CV-013 (#185) remains open and
 > critical.
 
+---
+
+## RUNTIME CAMPAIGN (Gate C) — 2026-07-22, genuine Odoo.sh execution
+
+> **This section supersedes the "no Odoo runtime" environment note below for the
+> items it covers.** The frozen Wave 4 fulfillment suite was executed for the
+> first time on a genuine Odoo.sh build. Labels are `EXECUTED—PASS` /
+> `EXECUTED—FAIL` per actual runs. Gate D and CV-013 (#185) remain `NOT PROVEN`
+> / open. No live Shopify mutation occurred.
+
+### C.1 Build identity (genuine)
+
+| Field | Value |
+| --- | --- |
+| Odoo.sh build | `35279596` (branch `claude/wave-4-fulfillment-gate-b`) |
+| Database | `adamsmen-claude-wave-4-fulfillment-gate-b-35279596` |
+| Odoo version | 19.0 |
+| PostgreSQL | 16.14 |
+| Initial candidate SHA | `be528f269c45cde36daa43631de4e0d66980dc3d` |
+| PR base | `mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917` |
+| Installed stack | core 19.0.1.9.1, product 19.0.2.1.2, sale 19.0.2.0.0, inventory 19.0.1.0.0, fulfillment 19.0.1.0.0 (all `installed`) |
+
+### C.2 Initial run at `be528f2` — EXECUTED—FAIL
+
+`odoo-bin -u shopify_connector_fulfillment --test-enable --test-tags /shopify_connector_fulfillment`
+→ **26 failed, 17 error(s) of 187 tests**. The frozen suite had never been
+executed on Odoo 19 and used pre-19 API. Complete owned root-cause set (7
+test-side, 1 minor production Odoo-19 adaptation):
+
+| RC | Root cause | Owner | Fix |
+| --- | --- | --- | --- |
+| A | `stock.move` created with the removed `name` field | test | drop `name` (matching/admission/create_strategy/trigger/mode2_engine) |
+| B | `res.users.groups_id` → `group_ids` (Odoo 19 rename) | test | rename (binding, mode_switch) |
+| C | mode2 `_evaluate`/hand-rolled patches never satisfy P2-1's real c7 coverage check | test | patch `_quantity_compatible_pickings` |
+| D | naive `assertNotIn(substr, source_text)` trips on a deliberate comment mention | test | assert on the AST (real imports / code literals) |
+| E | source-guard asserts an input field in the mutation *document* (it lives in the variables) | test | assert the builder's variables + typed input |
+| F | lifecycle `_job` helper omits the required `trigger_origin` | test | supply the valid core origin |
+| G | idempotency test drives an illegal `running→queued` transition | test | legal `running→failed_retryable→queued` |
+| H | production writes computed, non-stored `carrier_tracking_url` | **prod** | write only stored `carrier_tracking_ref` |
+
+### C.3 Consolidated correction (one batch, allowlist-only)
+
+14 files, all under `addons/shopify_connector_fulfillment/**` — 13 test files +
+1 production file (`models/shopify_connector_fulfillment_review.py`). No new
+filenames, no frozen-test deletions, no core file touched. Accepted P2-1/P2-2
+contracts preserved: production c7/c9 classification and the c14 separately-fresh
+read are unchanged; RC-C is a test-fixture alignment to the P2-1 production
+contract, not a production change. Naive `assertNotIn` guards were strengthened
+(assert real imports / code literals / builder variables), never weakened.
+
+### C.4 Final run — EXECUTED—PASS
+
+| Suite | Result | Label |
+| --- | --- | --- |
+| shopify_connector_fulfillment | **0 failed, 0 error(s) of 200 tests** | `EXECUTED—PASS` |
+| shopify_connector_sale | 0 failed, 0 error(s) of 194 tests | `EXECUTED—PASS` |
+| shopify_connector_inventory | 0 failed, 0 error(s) of 247 tests | `EXECUTED—PASS` |
+
+P2-1 quantity classification, P2-2 condition-14 fresh-read, Layer 2 / post-C2
+strategies, lifecycle, review-release, source-guards, idempotency, mode-switch,
+and the in-suite genuine-concurrency tests (`test_fulfillment_concurrency.py` —
+real `odoo.sql_db.db_connect` independent cursors, with the operation-scope
+unique-index lock-timeout refusal observed at runtime) are all inside the
+passing 200.
+
+### C.5 Pre-existing, OUT-OF-SCOPE regression (NOT Wave-4-owned)
+
+| Suite | Result | Classification |
+| --- | --- | --- |
+| shopify_connector_core | 12 error(s) of 306 | pre-existing / out-of-allowlist |
+| shopify_connector_product | 85 error(s) of 163 | pre-existing / out-of-allowlist |
+
+All failures are `psycopg2 NotNullViolation` (`autopost_bills` on `res_partner`
+via `res.users.create`; `tracking` on `product_template`) in **test files this
+PR does not modify** — git-verified: only the 14 fulfillment files above were
+changed. They reproduce independently of the Wave 4 correction and lie outside
+this PR's allowlist (§6 permits only the two named readiness files in core).
+sale and inventory — which create the same models — pass, so this is not a
+DB-wide failure but specific create-paths in the core/product suites that were
+never run on Odoo 19. **This blocks the campaign's "combined regression passes"
+Definition of Done and requires a control-room decision. It is not a Wave 4
+fulfillment defect and must not be papered over by changing Wave 1–3 files to
+make Wave 4 pass (§7 forbidden scope).**
+
+### C.6 Leak / redaction scan — EXECUTED—PASS
+
+Every runtime log scanned for access tokens, bearer/authorization headers,
+credential fragments, and non-synthetic PII (emails/phones): **zero hits**.
+
+### C.7 Not executed this session (honest gaps — never fabricated)
+
+- **Standalone spawn-multiprocessing harness**
+  (`runtime_layer2_fulfillment_concurrency_harness.py`): not separately run —
+  the plain `python3` invocation in this shell cannot bootstrap the Odoo package
+  the way the `odoo-bin` wrapper does (`ImportError: SUPERUSER_ID`). Genuine
+  independent-connection concurrency is evidenced by the passing in-suite
+  `test_fulfillment_concurrency.py`; only the harness's `c1_ownership_race`
+  scenario does real work (the other two are stubs).
+- **Fresh-install-on-clean-DB and full upgrade/uninstall/reinstall residue
+  campaigns**: this container is linked to a single DB (AGENTS.md) and cannot
+  create disposable databases; the build's own install created this stack
+  cleanly (all modules `installed`). Not re-proven on a throwaway DB.
+- **GitHub identity-gate items and the PR/issue handoff**: **no authenticated
+  GitHub API in this container** (no `gh`, no token, unauthenticated https/SSH).
+  Identity items 3/4/5/6/8, the PR #189 body update, and the runtime handoff
+  comments could not be performed here and are handed to an actor with GitHub
+  access.
+
+### C.8 Recommendation
+
+`NOT READY — CONSOLIDATED RUNTIME BLOCKERS`, with the nuance that the **Wave 4
+fulfillment work itself is runtime-green** after one consolidated correction.
+The blockers are (1) the pre-existing, out-of-scope core/product regression
+(control-room adjudication required) and (2) the environment's lack of GitHub
+access preventing the mandated PR/issue handoff. Gate D and CV-013 (#185) remain
+`NOT PROVEN` / open. No live Shopify mutation occurred; no self-review,
+ready-mark, or merge performed.
+
 **Base:** `mvp/program-integration@01f072dd4d83b7b39737452a686244a3a8c00332`.
 **Branch:** `claude/wave-4-fulfillment-gate-b`. **Prompt:**
 `docs/06-prompts/sol-wave-4-fulfillment-locked-prompt.md` (blob

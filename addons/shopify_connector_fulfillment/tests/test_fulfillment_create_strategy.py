@@ -109,7 +109,8 @@ class TestFulfillmentCreateStrategy(TransactionCase):
             'sale_id': sale.id,
         })
         move = self.env['stock.move'].create({
-            'name': 'm', 'product_id': product.id, 'product_uom_qty': 2.0,
+            # Odoo 19 removed stock.move.name (computed `reference` instead).
+            'product_id': product.id, 'product_uom_qty': 2.0,
             'picking_id': picking.id, 'location_id': stock_loc.id,
             'location_dest_id': customer_loc.id, 'sale_line_id': sale_line.id,
         })

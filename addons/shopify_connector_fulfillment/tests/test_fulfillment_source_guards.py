@@ -101,8 +101,22 @@ class TestFulfillmentSourceGuards(TransactionCase):
         from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_create_strategy import (  # noqa: E501
             FULFILLMENT_CREATE_DOCUMENT,
         )
-        self.assertIn('lineItemsByFulfillmentOrder', FULFILLMENT_CREATE_DOCUMENT)
+        # RA-023: the create is FulfillmentOrder-line-explicit. The mutation is
+        # variable-based, so the FulfillmentInput carrying the explicit per-FO
+        # line lists is passed as $fulfillment -> 'lineItemsByFulfillmentOrder'
+        # lives in the request VARIABLES the strategy builds, not in the
+        # document text. Guard both: the document uses the typed input + calls
+        # fulfillmentCreate, and the builder actually emits the explicit key.
         self.assertIn('fulfillmentCreate', FULFILLMENT_CREATE_DOCUMENT)
+        self.assertIn('FulfillmentInput', FULFILLMENT_CREATE_DOCUMENT)
+        create_source = next(
+            src for path, src in self._model_sources().items()
+            if path.name == 'shopify_connector_fulfillment_create_strategy.py'
+        )
+        self.assertIn(
+            'lineItemsByFulfillmentOrder',
+            _string_constants(ast.parse(create_source)),
+        )
 
     # -- No @idempotent in any fulfillment operation string
 

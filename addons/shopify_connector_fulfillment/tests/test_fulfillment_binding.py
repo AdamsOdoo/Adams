@@ -62,7 +62,7 @@ class TestFulfillmentBinding(TransactionCase):
         cls.plain_user = cls.env['res.users'].create({
             'name': 'FUL Non-Su',
             'login': 'ful-nonsu-%s' % uuid.uuid4().hex,
-            'groups_id': [(6, 0, [cls.env.ref('base.group_user').id])],
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
         })
 
     @classmethod

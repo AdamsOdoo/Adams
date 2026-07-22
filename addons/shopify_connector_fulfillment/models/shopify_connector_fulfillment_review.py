@@ -159,13 +159,14 @@ class ShopifyConnectorFulfillmentReviewService(models.AbstractModel):
             raise UserError('No Odoo delivery picking resolves for this order.')
         tracking = json.loads(evidence.tracking_snapshot or '[]')
         numbers = [t.get('number') for t in tracking if isinstance(t, dict) and t.get('number')]
-        urls = [t.get('url') for t in tracking if isinstance(t, dict) and t.get('url')]
         companies = [t.get('company') for t in tracking if isinstance(t, dict) and t.get('company')]
         vals = {}
         if numbers:
             vals['carrier_tracking_ref'] = ','.join(numbers)
-        if urls:
-            vals['carrier_tracking_url'] = urls[0]
+        # Odoo 19's stock.picking.carrier_tracking_url is a read-only COMPUTED
+        # field (derived from carrier_id + carrier_tracking_ref, no inverse), so
+        # the imported Shopify tracking URL cannot be persisted to it directly.
+        # Only the stored carrier_tracking_ref is written; Odoo derives the URL.
         if vals:
             # A non-stock write only.
             picking.write(vals)

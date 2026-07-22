@@ -299,7 +299,11 @@ class TestFulfillmentIdempotency(TransactionCase):
         job, token = self._mutation_job()
         self._uncertain_attempt(job, token)
         # A mutation job that already owns attempt evidence is blocked from
-        # redispatch (duplicate_risk), never re-sent.
+        # redispatch (duplicate_risk), never re-sent. Reach the re-queued state
+        # via legal transitions (running -> failed_retryable -> queued): a
+        # direct running -> queued write is correctly rejected by the core
+        # transition guard.
+        job.sudo().write({'state': 'failed_retryable'})
         job.sudo().write({'state': 'queued', 'current_attempt_token': False})
         blocked = self.Dispatch._preflight_existing_attempt_evidence(job)
         job.invalidate_recordset()

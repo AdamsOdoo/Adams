@@ -72,12 +72,12 @@ class TestFulfillmentModeSwitch(TransactionCase):
         admin_group = cls.env.ref(
             'shopify_connector_core.group_shopify_connector_admin'
         )
-        cls.env.user.sudo().write({'groups_id': [(4, admin_group.id)]})
+        cls.env.user.sudo().write({'group_ids': [(4, admin_group.id)]})
         # A fresh non-admin user for the AccessError paths.
         cls.non_admin = cls.env['res.users'].create({
             'name': 'FUL Non-Admin',
             'login': 'ful-nonadmin-%s' % uuid.uuid4().hex,
-            'groups_id': [(6, 0, [cls.env.ref('base.group_user').id])],
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
         })
 
     # ------------------------------------------------------------------

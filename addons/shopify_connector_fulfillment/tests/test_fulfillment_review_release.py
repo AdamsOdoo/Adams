@@ -183,7 +183,11 @@ class TestFulfillmentReviewRelease(TransactionCase):
             evidence.with_user(self.reviewer_user).action_import_tracking()
         self.picking.invalidate_recordset()
         self.assertEqual(self.picking.carrier_tracking_ref, '1Z999')
-        self.assertEqual(self.picking.carrier_tracking_url, 'http://track/1')
+        # Odoo 19's carrier_tracking_url is a read-only computed field derived
+        # from carrier_id + carrier_tracking_ref; the raw imported Shopify URL
+        # is deliberately NOT persisted to it (the stored ref above is the
+        # imported evidence). With no carrier on this picking it computes falsy.
+        self.assertFalse(self.picking.carrier_tracking_url)
         # A non-stock write only: picking state is untouched.
         self.assertEqual(self.picking.state, before_state)
         evidence.invalidate_recordset()

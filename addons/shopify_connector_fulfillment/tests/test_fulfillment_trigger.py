@@ -65,14 +65,23 @@ class TestFulfillmentTrigger(TransactionCase):
             'picking_type_id': self._picking_type('outgoing').id,
             'location_id': self.stock_loc.id,
             'location_dest_id': self.customer_loc.id,
-            'sale_id': self.sale.id,
+        })
+        # In Odoo 19 stock.picking.sale_id is COMPUTED from
+        # move_ids.sale_line_id.order_id (a direct sale_id write is overwritten
+        # by the compute), so the delivery move must carry a real sale line for
+        # the order to resolve and be admission-eligible.
+        sale_line = self.env['sale.order.line'].create({
+            'order_id': self.sale.id, 'product_id': self.product.id,
+            'product_uom_qty': 2.0,
         })
         self.env['stock.move'].create({
-            'name': 'm', 'product_id': self.product.id,
+            # Odoo 19 removed stock.move.name (computed `reference` instead).
+            'product_id': self.product.id,
             'product_uom_qty': 2.0, 'product_uom': self.product.uom_id.id,
             'picking_id': picking.id,
             'location_id': self.stock_loc.id,
             'location_dest_id': self.customer_loc.id,
+            'sale_line_id': sale_line.id,
         })
         return picking
 
@@ -113,6 +122,9 @@ class TestFulfillmentTrigger(TransactionCase):
         picking.move_ids._action_assign()
         for line in picking.move_ids.move_line_ids:
             line.quantity = 2.0
+            # Odoo 17+ only completes a move on validation when its lines are
+            # marked picked; without it the picking stays 'assigned'.
+            line.picked = True
         with patch.object(
             type(self.Service), '_enqueue_picking_admission',
         ) as mock_enqueue:

@@ -238,6 +238,17 @@ class TestFulfillmentMode2Engine(TransactionCase):
             else:
                 if picking is self._UNSET:
                     picking = self._mock_picking()
+                # Condition 7 (the P2-1 real coverage check) runs before the
+                # deterministic selector; the fixture picking carries no real
+                # stock.move, so supply a non-empty quantity-compatible set here
+                # so evaluation can reach the condition actually under test. The
+                # explicit ``quantity_compatible=`` path above is left untouched
+                # so the quantity_mismatch-vs-picking_ambiguous split is still
+                # exercised against the real selector.
+                stack.enter_context(patch.object(
+                    type(Service), '_quantity_compatible_pickings',
+                    return_value=[picking],
+                ))
                 stack.enter_context(patch.object(
                     type(Service), '_select_deterministic_picking',
                     return_value=picking,
@@ -509,6 +520,8 @@ class TestFulfillmentMode2Engine(TransactionCase):
                           return_value=[node]) as mocked, \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(type(Service), '_quantity_compatible_pickings',
+                             return_value=[self._mock_picking()]), \
                 patch.object(type(Service), '_select_deterministic_picking',
                              return_value=self._mock_picking()):
             result = Service._evaluate_mode2(evidence)
@@ -633,6 +646,8 @@ class TestFulfillmentMode2Engine(TransactionCase):
                           side_effect=[[first], ConnectionError('down')]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(type(Service), '_quantity_compatible_pickings',
+                             return_value=[self._mock_picking()]), \
                 patch.object(type(Service), '_select_deterministic_picking',
                              return_value=self._mock_picking()), \
                 patch.object(type(Service), '_validate_picking_local',
@@ -704,6 +719,8 @@ class TestFulfillmentMode2Engine(TransactionCase):
                           return_value=[self._fulfillment_node()]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(type(Service), '_quantity_compatible_pickings',
+                             return_value=[self._mock_picking(carrier_id=False)]), \
                 patch.object(type(Service), '_select_deterministic_picking',
                              return_value=self._mock_picking(carrier_id=False)), \
                 patch.object(type(Service), '_validate_picking_local',
