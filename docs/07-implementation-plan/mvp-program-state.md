@@ -4,23 +4,23 @@
 >
 > Stable scope/sequencing: [`mvp-completion-program.md`](./mvp-completion-program.md). Review policy: [`../06-prompts/claude-mvp-wave-review-template.md`](../06-prompts/claude-mvp-wave-review-template.md). Acceptance evidence: [`../05-qa/mvp-acceptance-matrix.md`](../05-qa/mvp-acceptance-matrix.md).
 >
-> **Follow-on role/cadence update — later 2026-07-22.** [`DEC-039`](../04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md) and [`DEC-040`](../04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md) amend the roles this file otherwise assumes: **Claude is now the default implementation worker *and* default gate reviewer** (Sol remains an available secondary builder), **ChatGPT is the strategic control room** (no longer required to review every gate), and **iterations should target a full wave or a large, independently-revertable slice of one** rather than many small correction cycles — with review scrutiny scaling *up*, not down, as batch size grows, and UI (Wave 5 / U0) as a priority parallel track. The one hard rule this depends on: an implementing Claude session never reviews or accepts its own PR — see DEC-039/DEC-040 for the independent-review mechanism.
+> **Role/cadence governance active — 2026-07-22.** [`DEC-039`](../04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md) and [`DEC-040`](../04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md) were merged through PR #191 at governance baseline `ba4ccc2ce3c809e6168f95de63ebc5277c4c6fbb`. **Claude is the default implementation worker and default independent gate reviewer** (Sol remains an authorized secondary builder). **ChatGPT is the strategic control room** for scope, priority, timeline and hard-stop escalation, not the routine line reviewer. Iterations target a full wave or large independently-revertable slice; review scrutiny scales up with batch size. An implementing Claude session never reviews, accepts, ready-marks or merges its own PR.
 >
-> **PR #191 correction-cycle status — 2026-07-22.** The integration SHA recorded below (`347e2b26...`) is the **PR #190** governance-calibration merge state. **PR #191** (the PR that introduces DEC-039/DEC-040 above) remains **draft and unmerged** while a consolidated governance correction (binding review comment `5043912321`, this PR) is applied — do not treat DEC-039/DEC-040 as active on `mvp/program-integration` until PR #191 actually merges. **Wave 4 PR #189** (`claude/wave-4-fulfillment-gate-b`) originally branched from `01f072dd4d83b7b39737452a686244a3a8c00332`; its starting-base amendment to the current integration SHA is recorded in issue #186 comment `5043405110`. PR #189 remains **open/draft**, not ready, not self-accepted, at head `702d083262b08bc1180be642579ba41144af6c18`. **U0 and PR #189 continuation remain blocked until PR #191 merges** — see issue #186 comment `5044031518` and PR #191 comment `5044154777`. The separate closure session that merges PR #191 must update this tracker to the real post-merge SHA; it is not invented here.
+> **PR #191 closure status.** Independent verification-only review accepted exact head `53c4197970c0bb2cd441c409f92bf069785dc16f` in PR comment `5044408909`; separate closure marked the PR ready and merged it at `ba4ccc2ce3c809e6168f95de63ebc5277c4c6fbb`. **U0 and the existing Wave 4 PR #189 continuation are now unblocked.** Wave 4 PR #189 (`claude/wave-4-fulfillment-gate-b`) originally branched from `01f072dd4d83b7b39737452a686244a3a8c00332`, remains open/draft at head `702d083262b08bc1180be642579ba41144af6c18`, and must merge the latest `mvp/program-integration` tip before correcting its two known P2 findings and starting Odoo.sh runtime. This tracker-only closure commit may sit above the PR #191 merge; workers must fetch the live branch tip rather than assume the governance merge SHA is the current ref tip.
 
 ## 1. Current program status
 
 | Item | Current state |
 | --- | --- |
 | Program integration branch | `mvp/program-integration` |
-| Current integration SHA | `347e2b261c46026f5c3dcfaee9629696a9226103` (PR #190 governance-calibration merge; PR #191 still draft/unmerged — see note above) |
+| Latest accepted governance baseline | `ba4ccc2ce3c809e6168f95de63ebc5277c4c6fbb` (PR #191 merge; fetch the live branch tip for new work because tracker-only closure commits may sit above it) |
 | Wave 1 | Merged and runtime-green |
 | Wave 2 | Merged and runtime-green |
 | Wave 3 / Task 013 | Inventory + Layer 2 implementation merged; runtime and genuine concurrency evidence accepted |
 | Wave 3 residual | `CV-013` issue #185 open and critical; live Shopify inventory mutation validation still required before RC/UAT acceptance; Task 013B separately gated |
 | Wave 4 Gate A | Accepted and merged through PR #188; merge SHA `01f072dd4d83b7b39737452a686244a3a8c00332` |
-| Wave 4 Gate B | Implementation candidate on draft PR #189 (`claude/wave-4-fulfillment-gate-b`), head `702d083262b08bc1180be642579ba41144af6c18`; originally branched from `01f072dd4d83b7b39737452a686244a3a8c00332`, base amendment in issue #186 comment `5043405110`; continuation blocked until PR #191 merges — see note above |
-| Wave 5 | Full wave not started; early UI slice is now authorized to run in parallel within the calibrated boundary |
+| Wave 4 Gate B | Implementation candidate on draft PR #189 (`claude/wave-4-fulfillment-gate-b`), head `702d083262b08bc1180be642579ba41144af6c18`; continuation now authorized: synchronize with the live integration tip, close the two recorded P2 findings, run Odoo.sh, apply at most one consolidated runtime correction and submit for independent Claude review |
+| Wave 5 | Full wave not started; U0 first usable operator UI is authorized to start in parallel from the live integration tip |
 | PERF-1 | Full acceptance remains Wave 5/6; PERF-0 baseline is pulled forward into Wave 4 |
 | Wave 6 | Not started |
 | Shopify development store | Critical external dependency for CV-013 and Wave 4 final validation |
@@ -77,20 +77,20 @@ The corrective action is risk-tiering plus one consolidated correction, not weak
 
 | Active work | Tier | Reason | Correction budget |
 | --- | --- | --- | --- |
-| Wave 4 Gate B fulfillment implementation | **Tier 1** | Shopify mutations, Layer 2, concurrency, idempotency, security, data integrity | One exhaustive review; one consolidated correction maximum; runtime failures collected into one batch |
-| U0 UI foundation | **Tier 2** | New operator information architecture on existing hardened actions; no UI-owned mutation logic | One normal review; Tier 3 polish fixed in-pass |
+| Wave 4 Gate B fulfillment implementation | **Tier 1** | Shopify mutations, Layer 2, concurrency, idempotency, security, data integrity | One exhaustive independent review; one consolidated correction maximum; runtime failures collected into one batch |
+| U0 UI foundation | **Tier 2** with Tier 1 security/action checks | New operator information architecture on existing hardened actions; no UI-owned mutation logic | One normal independent review; Tier 3 polish fixed in-pass; Odoo.sh mandatory because this is code |
 | PERF-0 baseline | **Tier 2**, escalating to Tier 1 for unsafe findings | Benchmark design/measurement; lock/network or destabilizing regression becomes blocking | One normal review; performance defect batch consolidated |
-| Calibration governance PR | **Tier 2** | Program sequencing/review policy, no production code | One review, no full runtime ceremony |
+| Governance calibration | **Tier 2 — merged** | Program sequencing/review policy, no production code | One consolidated correction and one verification-only review completed through PR #191 |
 
 ## 5. Parallel execution now authorized
 
 ### Wave 4 backend
 
-Proceed with the issued Gate B prompt from the exact integration SHA. The late source/origin matrix is mandatory implementation/test acceptance criteria; it is not ignored and must be proven before Gate B acceptance.
+Continue existing PR #189. Merge the live integration tip normally into its branch, preserve its implementation history, correct the two recorded P2 findings, run the full Odoo.sh campaign, collect any runtime failures into one consolidated correction and submit the exact candidate SHA to an independent Claude reviewer.
 
 ### U0 — first UI slice
 
-May start on a separate branch from the same integration base, limited to:
+May start on a separate branch from the live integration tip, limited to:
 
 - navigation/menu/actions;
 - store/readiness summary;
@@ -118,13 +118,13 @@ Assumptions: Odoo.sh remains accessible; a disposable Shopify development store 
 | Milestone | Expected window | Confidence / dependency |
 | --- | --- | --- |
 | Wave 3 residual live closure | 2026-07-23 to 2026-07-31 | Medium; depends on dev-store fixtures. Inventory code itself is already merged. |
-| Wave 4 implementation candidate | 2026-07-23 to 2026-08-07 | Medium; both modes and Layer 2 make this larger than prior backend waves. |
-| Wave 4 runtime + consolidated correction + rerun | 2026-08-06 to 2026-08-14 | Medium; one complete Odoo.sh campaign and one correction batch. |
-| Wave 4 dev-store + CV-013 validation | 2026-08-12 to 2026-08-18 | Low/medium until store access is confirmed. |
-| U0 first usable UI slice | 2026-07-24 to 2026-08-06 | Medium/high; read-only/hardened surfaces can run in parallel. |
-| PERF-0 baseline + Wave 4 comparison | 2026-07-27 to 2026-08-10 | Medium/high if benchmark environment is available. |
-| Wave 5 full UI/export/SEC-2/PERF-1 | 2026-08-10 to 2026-09-08 | Medium; use separate UI/export workstreams with one integration gate. |
-| Wave 6 full UAT/release readiness | 2026-09-07 to 2026-09-23 | Medium/low; depends on all mutation/dev-store gates. |
+| Wave 4 implementation candidate | Already implemented on PR #189; synchronization/P2/runtime continuation begins now | High for code availability; runtime risk remains |
+| Wave 4 runtime + consolidated correction + rerun | 2026-07-23 to 2026-08-14 | Medium; one complete Odoo.sh campaign and one correction batch |
+| Wave 4 dev-store + CV-013 validation | 2026-08-12 to 2026-08-18 | Low/medium until store access is confirmed |
+| U0 first usable UI slice | 2026-07-23 to 2026-08-06 | Medium/high; read-only/hardened surfaces can run in parallel |
+| PERF-0 baseline + Wave 4 comparison | 2026-07-27 to 2026-08-10 | Medium/high if benchmark environment is available |
+| Wave 5 full UI/export/SEC-2/PERF-1 | 2026-08-10 to 2026-09-08 | Medium; use separate UI/export workstreams with one integration gate |
+| Wave 6 full UAT/release readiness | 2026-09-07 to 2026-09-23 | Medium/low; depends on all mutation/dev-store gates |
 
 **Realistic release-candidate range:** 2026-09-14 to 2026-09-25.
 
@@ -149,11 +149,10 @@ If schedule slips, use these levers in order:
 
 ## 8. Next actions
 
-1. Complete and review this calibration PR as Tier 2.
-2. Continue Wave 4 Gate B under issue #186 comment `5043052341` and the calibrated one-correction rule.
-3. Open a bounded U0 UI-foundation task/branch from the current integration base.
-4. Open PERF-0 benchmark definition/execution in parallel.
-5. Confirm the Shopify development-store fixture date; if not available by early August, escalate the release-date dependency immediately.
+1. Continue Wave 4 PR #189 from the live integration tip under issue #186 comment `5044031518` and the calibrated one-correction rule.
+2. Start U0 UI foundation from the live integration tip as one large usable slice.
+3. Open PERF-0 benchmark definition/execution in parallel.
+4. Confirm the Shopify development-store fixture date; if not available by early August, escalate the release-date dependency immediately.
 
 ## 9. Wave-boundary calibration template
 
