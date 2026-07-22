@@ -222,31 +222,49 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
 > [`DEC-032-mvp-autonomous-execution-model.md`](docs/04-decisions/DEC-032-mvp-autonomous-execution-model.md)
 > (Accepted, 2026-07-15), amended by
 > [`DEC-039-mvp-claude-implementation-worker-expansion.md`](docs/04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md)
-> (Accepted, 2026-07-22) — see that decision before assuming Claude cannot
-> implement in this program; the rule below reflects the amendment.
+> (Accepted, 2026-07-22) and
+> [`DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md`](docs/04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md)
+> (Accepted, 2026-07-22) — see those decisions before assuming Claude cannot
+> implement, or that ChatGPT must review every gate, in this program; the
+> rules below reflect both amendments.
 
-- **Claude is the independent control room** for the MVP completion
-  program by default: scope governor and release gatekeeper for all work on
-  or descending from `mvp/program-integration`. **As of DEC-039 (2026-07-22),
-  Claude is also an authorized implementation worker for this program,
-  alongside GPT-5.6 Sol** — the product owner may relay a ChatGPT-authored
-  implementation prompt to either. The two roles must never be collapsed
-  into one session: a Claude session that implements a task/wave must not
-  self-review, self-accept, ready-mark, or merge that work — the
-  control-room gate review for it must come from ChatGPT, or from a
-  **separate** Claude session explicitly acting as control room and
-  independently re-verifying the work. See DEC-039 for the full rule.
-- **GPT-5.6 Sol remains an implementation worker** for this program: an
-  autonomous research/implementation worker, operating under
-  [`docs/06-prompts/gpt56-sol-master-mvp-mission.md`](docs/06-prompts/gpt56-sol-master-mvp-mission.md).
-  DEC-039 adds Claude alongside Sol; it does not remove Sol.
+- **Default roles as of DEC-040 (2026-07-22): Claude builds and Claude
+  reviews; ChatGPT is the strategic control room; Sol is an available
+  secondary builder.** Claude is the default implementation worker *and*
+  the default gate reviewer for `mvp/program-integration` work. **GPT-5.6
+  Sol remains an authorized implementation worker** (DEC-039) but is no
+  longer assumed default. **ChatGPT** sets/approves scope, priority, and
+  timeline, resolves hard-stops needing a commercial judgment call, and is
+  the escalation point — but is not required to line-review every wave gate.
+  The product owner remains final authority on promotion to
+  `Shopify-connector`/`main`.
+- **The two roles must never be collapsed into one session.** A Claude
+  session that implements a task/wave must not self-review, self-accept,
+  ready-mark, or merge that work. Independent review is satisfied by either:
+  a **separate top-level Claude session** reviewing from scratch, or a
+  **fresh subagent invocation** (via the `Agent` tool) given only the PR
+  diff, the acceptance criteria, and
+  [`claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md),
+  with no memory of the implementing thread's reasoning, instructed to
+  adversarially re-verify — never to summarize or rubber-stamp. See
+  DEC-039/DEC-040 for the full rule.
+- **Batch size (DEC-040): target a full wave, or a large, coherent,
+  independently-revertable slice of one, per iteration** — not many small
+  correction cycles. Tier 3 (wording/polish) issues found mid-batch are
+  fixed inline, never spun into a separate cycle. Review scrutiny **scales
+  up, not down, with batch size** — evidence (tests + genuine Odoo.sh
+  runtime results) is never skipped to move faster; speed comes from
+  batching scope, not skipping evidence. **UI (Wave 5 / U0) is a priority
+  parallel track** under this same large-batch cadence — see DEC-040.
 - **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
   (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
   is never modified, reset, or force-pushed by this program. `mvp/program-integration`
   was created from that exact commit and is where every macro-wave PR lands.
 - **The macro-wave process supersedes the prior micro-session workflow
-  (§2, §6) only for work based on `mvp/program-integration`.** Sol may work
-  autonomously inside an authorized wave without per-commit approval; Claude
+  (§2, §6) only for work based on `mvp/program-integration`.** Whichever
+  worker implements (Claude, by default, or Sol) may work autonomously
+  inside an authorized wave/batch without per-commit approval; a Claude
+  session acting independently (never the implementing session itself)
   reviews and gates each wave's merge using
   [`docs/06-prompts/claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md).
   Every other CLAUDE.md rule (citation discipline §7, claim classification

@@ -3,6 +3,8 @@
 > **Current live tracker — calibrated 2026-07-22.** The complete pre-calibration tracker is archived at [`archive/mvp-program-state-through-2026-07-22.md`](./archive/mvp-program-state-through-2026-07-22.md). That archive preserves the full dated audit trail. This file is intentionally concise and must remain the first current-state document a worker reads.
 >
 > Stable scope/sequencing: [`mvp-completion-program.md`](./mvp-completion-program.md). Review policy: [`../06-prompts/claude-mvp-wave-review-template.md`](../06-prompts/claude-mvp-wave-review-template.md). Acceptance evidence: [`../05-qa/mvp-acceptance-matrix.md`](../05-qa/mvp-acceptance-matrix.md).
+>
+> **Follow-on role/cadence update — later 2026-07-22.** [`DEC-039`](../04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md) and [`DEC-040`](../04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md) amend the roles this file otherwise assumes: **Claude is now the default implementation worker *and* default gate reviewer** (Sol remains an available secondary builder), **ChatGPT is the strategic control room** (no longer required to review every gate), and **iterations should target a full wave or a large, independently-revertable slice of one** rather than many small correction cycles — with review scrutiny scaling *up*, not down, as batch size grows, and UI (Wave 5 / U0) as a priority parallel track. The one hard rule this depends on: an implementing Claude session never reviews or accepts its own PR — see DEC-039/DEC-040 for the independent-review mechanism.
 
 ## 1. Current program status
 
