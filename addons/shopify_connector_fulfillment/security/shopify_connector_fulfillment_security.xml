@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Multi-company isolation for the fulfillment domain records. The
+            connector store carries no company_id (company is threaded through
+            the bound Odoo picking / sale order), so the fulfillment binding and
+            inbound evidence are scoped to the company of their bound Odoo
+            record. System code runs sudo() and bypasses these rules; they
+            constrain interactive access only.
+        -->
+        <record id="fulfillment_binding_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Binding: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('picking_id.company_id', '=', False), ('picking_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="fulfillment_inbound_evidence_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Inbound Evidence: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_inbound_evidence"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('order_binding_id', '=', False), '|', ('order_binding_id.sale_order_id.company_id', '=', False), ('order_binding_id.sale_order_id.company_id', 'in', company_ids)]</field>
+        </record>
+    </data>
+</odoo>

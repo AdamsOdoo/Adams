@@ -16,8 +16,10 @@
         'stock_delivery',
         'sale_stock',
     ],
-    # Data/security files are added as each model lands (Gate B build order).
-    'data': [],
+    'data': [
+        'security/shopify_connector_fulfillment_security.xml',
+        'security/ir.model.access.csv',
+    ],
     'installable': True,
     'application': False,
     'auto_install': False,
