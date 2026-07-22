@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- Part of the Shopify Connector (U0 operator UI foundation). -->
+<templates xml:space="preserve">
+
+    <t t-name="shopify_connector_core.Dashboard">
+        <div class="o_sc_dashboard" dir="auto">
+            <div class="o_sc_dashboard__inner">
+
+                <!-- ============ LOADING ============ -->
+                <t t-if="state.status === 'loading'">
+                    <div class="sc-skeleton sc-skeleton--band" aria-hidden="true"/>
+                    <div class="sc-skeleton sc-skeleton--line" aria-hidden="true"/>
+                    <p role="status">Loading your dashboard…</p>
+                </t>
+
+                <!-- ============ ERROR ============ -->
+                <t t-elif="state.status === 'error'">
+                    <div class="sc-band sc-band--danger" role="alert">
+                        <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                        <div class="sc-band__body">
+                            <div class="sc-band__text">We couldn't load the dashboard</div>
+                            <div class="sc-band__hint" t-esc="state.errorMessage"/>
+                        </div>
+                    </div>
+                    <div>
+                        <button class="sc-btn" t-on-click="() => this.refresh()">
+                            <i class="fa fa-rotate-right" aria-hidden="true"/>
+                            <span>Try again</span>
+                        </button>
+                    </div>
+                </t>
+
+                <!-- ============ READY ============ -->
+                <t t-else="">
+                    <t t-set="data" t-value="state.data"/>
+
+                    <!-- first-run / empty -->
+                    <t t-if="data.state === 'empty'">
+                        <div t-att-class="bandClass(data.lead.severity)" aria-live="polite">
+                            <i class="fa sc-band__icon" t-att-class="data.lead.icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text" t-esc="data.lead.text"/>
+                                <div class="sc-band__hint" t-esc="data.lead.hint"/>
+                            </div>
+                        </div>
+                        <div class="sc-empty">
+                            <div class="sc-section__title">Get started</div>
+                            <p>Connect your Shopify store to begin syncing. Here's what happens next:</p>
+                            <ol class="sc-empty__steps">
+                                <li>Add your store and its Shopify credential.</li>
+                                <li>Run a test connection and a readiness check.</li>
+                                <li>Activate the store — syncing and this dashboard come to life.</li>
+                            </ol>
+                        </div>
+                    </t>
+
+                    <!-- operational states -->
+                    <t t-else="">
+                        <!-- Region 1: lead answer band -->
+                        <div t-att-class="bandClass(data.lead.severity)" aria-live="polite">
+                            <i class="fa sc-band__icon" t-att-class="data.lead.icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text" t-esc="data.lead.text"/>
+                                <div class="sc-band__hint" t-esc="data.lead.hint"/>
+                            </div>
+                        </div>
+
+                        <!-- Region 2: at most three exceptions, or one affirmative line -->
+                        <section aria-label="Items needing attention">
+                            <t t-if="data.exceptions.length">
+                                <h2 class="sc-section__title">Needs your attention</h2>
+                                <div class="sc-exceptions">
+                                    <t t-foreach="data.exceptions" t-as="exc" t-key="exc.id">
+                                        <div t-att-class="exceptionClass(exc.severity)">
+                                            <i class="fa sc-exception__icon" t-att-class="exc.icon" aria-hidden="true"/>
+                                            <div class="sc-exception__main">
+                                                <div class="sc-exception__title" t-esc="exc.title"/>
+                                                <div class="sc-exception__why" t-esc="exc.why"/>
+                                                <div class="sc-exception__meta">
+                                                    <span class="sc-exception__count" t-esc="exc.count"/>
+                                                    <span>·</span>
+                                                    <span class="sc-owner-chip">Owner: <t t-esc="exc.owner"/></span>
+                                                </div>
+                                            </div>
+                                            <div class="sc-exception__side">
+                                                <button class="sc-btn" t-on-click="() => this.openException(exc)">
+                                                    <span>Review</span>
+                                                    <i class="fa fa-arrow-right" aria-hidden="true"/>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <div class="sc-affirm">
+                                    <i class="fa fa-check" aria-hidden="true"/>
+                                    <span t-esc="data.affirmative"/>
+                                </div>
+                            </t>
+                        </section>
+
+                        <!-- Region 3: secondary metric chips -->
+                        <section aria-label="Key metrics">
+                            <div class="sc-chips">
+                                <t t-foreach="data.chips" t-as="chip" t-key="chip.id">
+                                    <div t-att-class="chipClass(chip)">
+                                        <span class="sc-chip__label" t-esc="chip.label"/>
+                                        <span class="sc-chip__value" t-esc="chip.value"/>
+                                    </div>
+                                </t>
+                            </div>
+                        </section>
+
+                        <!-- Region 4: recent activity -->
+                        <section aria-label="Recent activity">
+                            <h2 class="sc-section__title">Recent activity</h2>
+                            <t t-if="data.activity.length">
+                                <div class="sc-activity">
+                                    <t t-foreach="data.activity" t-as="act" t-key="act.id">
+                                        <div class="sc-activity__item">
+                                            <span t-att-class="badgeClass(act.tone)" t-esc="act.state_label"/>
+                                            <span class="sc-activity__text">
+                                                <t t-esc="act.job_label"/>
+                                                <t t-if="act.store"> · <t t-esc="act.store"/></t>
+                                                <t t-if="act.source_label"> · <t t-esc="act.source_label"/></t>
+                                            </span>
+                                            <span class="sc-activity__meta" t-esc="act.relative"/>
+                                        </div>
+                                    </t>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <p class="sc-cadence">No sync activity yet. When syncing starts, it appears here.</p>
+                            </t>
+                            <p class="sc-cadence" t-esc="data.cadence"/>
+                        </section>
+
+                        <!-- Region 5: optional 7-day sparkline (severable) -->
+                        <t t-if="data.sparkline &amp;&amp; data.sparkline.available">
+                            <section aria-label="Seven-day activity">
+                                <h2 class="sc-section__title">Last 7 days</h2>
+                                <div class="sc-spark">
+                                    <!-- Non-colour legend (decorative; the per-day list below is
+                                         the real accessible text equivalent) -->
+                                    <div class="sc-spark__legend" aria-hidden="true">
+                                        <span class="sc-spark__legend-item">
+                                            <i class="sc-spark__swatch sc-spark__swatch--ok"/>
+                                            <span>Succeeded</span>
+                                        </span>
+                                        <span class="sc-spark__legend-item">
+                                            <i class="sc-spark__swatch sc-spark__swatch--bad"/>
+                                            <span>Failed</span>
+                                        </span>
+                                    </div>
+                                    <!-- The bars are a decorative image; role="img" flattens
+                                         descendants from the accessibility tree, so the real
+                                         per-day text equivalent lives in the visually-hidden
+                                         list below it, not inside this element. -->
+                                    <div class="sc-spark__bars" role="img" t-att-aria-label="data.sparkline.summary">
+                                        <t t-foreach="data.sparkline.days" t-as="day" t-key="day.date">
+                                            <div class="sc-spark__day">
+                                                <div class="sc-spark__stack"
+                                                     t-att-title="day.label + ': ' + day.success + ' succeeded, ' + day.failure + ' failed'">
+                                                    <div class="sc-spark__bar sc-spark__bar--ok"
+                                                         t-att-style="barHeight(day.success, sparkMax)"/>
+                                                    <div class="sc-spark__bar sc-spark__bar--bad"
+                                                         t-att-style="barHeight(day.failure, sparkMax)"/>
+                                                </div>
+                                                <span class="sc-spark__label" t-esc="day.label"/>
+                                            </div>
+                                        </t>
+                                    </div>
+                                    <ul class="sc-spark__visually-hidden">
+                                        <t t-foreach="data.sparkline.days" t-as="day" t-key="day.date">
+                                            <li t-esc="day.label + ': ' + day.success + ' succeeded, ' + day.failure + ' failed'"/>
+                                        </t>
+                                    </ul>
+                                    <p class="sc-spark__summary" t-esc="data.sparkline.summary"/>
+                                </div>
+                            </section>
+                        </t>
+                    </t>
+                </t>
+
+            </div>
+        </div>
+    </t>
+
+</templates>

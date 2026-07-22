@@ -1,0 +1,62 @@
+// Part of the Shopify Connector (U0 operator UI foundation).
+//
+// The connector design-token layer. These values mirror the accepted visual
+// baseline verbatim (docs/09-ui-prototype/assets/prototype.css §tokens and
+// docs/03-architecture/premium-ui-ux-design-system.md §4-§8). Light-mode only,
+// platform assets only: no external font, no CDN, no icon library, no charting
+// library. Tokens are scoped to the dashboard root so they never leak into the
+// wider Odoo backend.
+
+.o_sc_dashboard {
+    // --- Surfaces (design-system §5) ---
+    --sc-surface-0: #F8FAFC; // page background
+    --sc-surface-1: #FFFFFF; // card
+    --sc-surface-2: #FFFFFF; // raised overlay
+
+    // --- Text (§6) ---
+    --sc-text-primary: #1F2937;
+    --sc-text-secondary: #475467;
+
+    // --- Hairlines & boundaries (§5-§6) ---
+    --sc-border: #E4E7EC;        // decorative grouping hairline only
+    --sc-border-strong: #79839B; // interactive control boundary (SC 1.4.11)
+
+    // --- Interactive accent + focus (§6) ---
+    --sc-accent: #175CD3;
+    --sc-focus: #175CD3;
+
+    // --- Semantic status colours (§6): text/icon on tint or white only ---
+    --sc-success-text: #067647; --sc-success-bg: #ECFDF3;
+    --sc-warning-text: #B54708; --sc-warning-bg: #FFFAEB;
+    --sc-danger-text: #B42318;  --sc-danger-bg: #FEF3F2;
+    --sc-info-text: #175CD3;    --sc-info-bg: #EFF8FF;
+    --sc-neutral-text: #475467; --sc-neutral-bg: #F2F4F7;
+
+    // --- Spacing scale (§4): 4 8 12 16 24 32 48 64 ---
+    --sc-space-1: 4px;  --sc-space-2: 8px;  --sc-space-3: 12px; --sc-space-4: 16px;
+    --sc-space-5: 24px; --sc-space-6: 32px; --sc-space-7: 48px; --sc-space-8: 64px;
+
+    // --- Type scale (§4) ---
+    --sc-fs-caption: 0.75rem;
+    --sc-fs-secondary: 0.875rem;
+    --sc-fs-body: 1rem;
+    --sc-fs-cardtitle: 1.125rem;
+    --sc-fs-lead: 1.375rem;
+    --sc-fs-dominant: 1.75rem;
+    --sc-fw-body: 400;
+    --sc-fw-label: 500;
+    --sc-fw-dominant: 600;
+
+    // --- Radius (§5) ---
+    --sc-radius: 8px;
+
+    // --- Motion (§8) ---
+    --sc-motion-1: 100ms;
+    --sc-motion-2: 150ms;
+    --sc-motion-3: 250ms;
+    --sc-ease: cubic-bezier(0.2, 0, 0, 1);
+
+    // --- Font stack (§4): platform only, no external font ---
+    --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
