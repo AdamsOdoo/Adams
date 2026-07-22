@@ -183,6 +183,16 @@ class ShopifyConnectorJobDispatchFulfillmentExtension(models.AbstractModel):
                 'The reconciliation read failed transiently; retry required.',
                 type(exc).__name__,
             ) from exc
+        # Wave 4 P0 defence in depth: post-C2 has only APPLIED / INCONCLUSIVE. A
+        # reconcile callback that (incorrectly) returns `not_applied` is coerced
+        # to inconclusive BEFORE validation — a post-C2 read result may never
+        # authorize a replacement mutation. (The fulfillment callbacks never
+        # emit not_applied; this guards a future/rogue callback.)
+        if isinstance(result, dict) and result.get('verdict') == 'not_applied':
+            result = dict(
+                result, verdict='inconclusive', action=None,
+                error_class=None, manual_review_subreason=None,
+            )
         try:
             normalized = self._validate_reconciliation_result(result)
         except Exception:

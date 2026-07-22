@@ -237,11 +237,24 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
     @api.model
     def _read_order_fulfillments(self, store, order_gid):
         """Return every Fulfillment for an order (cursor-paginated). Used by the
-        reconcile reads and inbound observation."""
-        return self._paginate(
+        reconcile reads, inbound observation, and Mode 2. The nested
+        fulfillmentLineItems connection is fetched in one page; if any
+        fulfillment has more line items than one page, decision-critical
+        completeness cannot be proven — fail closed (§11.4)."""
+        fulfillments = self._paginate(
             store, ORDER_FULFILLMENTS_QUERY, {'orderId': order_gid},
             'order.fulfillments',
         )
+        for node in fulfillments:
+            line_conn = (node or {}).get('fulfillmentLineItems') or {}
+            page_info = line_conn.get('pageInfo') or {}
+            if page_info.get('hasNextPage'):
+                raise FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'A fulfillment has more line items than a single page; '
+                    'decision-critical completeness cannot be proven.',
+                )
+        return fulfillments
 
     # ------------------------------------------------------------------
     # FO-line-item 2-hop matching (RA-023)

@@ -255,7 +255,7 @@ class TestFulfillmentCreateStrategy(TransactionCase):
                 snapshot, {},
             )
         # Fulfillment mutations have no @idempotent key; kept empty by design.
-        self.assertEqual(request['shopify_idempotency_key'], '')
+        self.assertTrue(request['shopify_idempotency_key'])  # non-empty (core gate); never in the operation
         self.assertIs(request['operation'], FULFILLMENT_CREATE_DOCUMENT)
         self.assertEqual(request['mutation_domain'], 'fulfillment_create')
         # The picking's shipped line reached the fulfillmentCreate input.

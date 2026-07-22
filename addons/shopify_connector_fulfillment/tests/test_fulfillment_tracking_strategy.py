@@ -156,7 +156,7 @@ class TestFulfillmentTrackingStrategy(TransactionCase):
             request['preconditions_snapshot']['notify_customer'],
             snapshot['notify_customer'],
         )
-        self.assertEqual(request['shopify_idempotency_key'], '')
+        self.assertTrue(request['shopify_idempotency_key'])  # non-empty (core gate); never in the operation
 
     def test_prepare_persists_notify_false_decision(self):
         node = {'id': 'gid://shopify/Fulfillment/1', 'status': 'SUCCESS',

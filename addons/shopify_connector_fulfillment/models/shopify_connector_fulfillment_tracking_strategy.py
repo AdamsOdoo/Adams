@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 
 from odoo import api, fields, models
 
@@ -151,7 +152,11 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
             'expected_connection_generation':
                 local_snapshot['expected_connection_generation'],
             'expected_store_identity': local_snapshot['expected_store_identity'],
-            'shopify_idempotency_key': '',
+            # Non-empty to satisfy the merged Layer 2 request contract; the
+            # operation document has NO @idempotent directive and never
+            # references it, so it is never sent on the wire (see the
+            # create-strategy note).
+            'shopify_idempotency_key': uuid.uuid4().hex,
         }
 
     # ------------------------------------------------------------------

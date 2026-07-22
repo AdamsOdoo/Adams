@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 
 from odoo import api, fields, models
 
@@ -206,8 +207,14 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
             'expected_connection_generation':
                 local_snapshot['expected_connection_generation'],
             'expected_store_identity': local_snapshot['expected_store_identity'],
-            # Fulfillment mutations have no @idempotent key; kept empty by design.
-            'shopify_idempotency_key': '',
+            # The merged Layer 2 request contract requires a non-empty
+            # shopify_idempotency_key on every prepared mutation request. The
+            # fulfillment operation document contains NO @idempotent directive
+            # and never references this key, so it is persisted on the attempt
+            # but never sent on the wire — it has zero Shopify-side effect
+            # (fulfillmentCreate is not on the 17-mutation @idempotent list).
+            # "Unused" means "no wire idempotency directive", not "absent".
+            'shopify_idempotency_key': uuid.uuid4().hex,
         }
 
     @api.model

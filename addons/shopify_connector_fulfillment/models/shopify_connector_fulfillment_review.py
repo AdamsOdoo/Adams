@@ -115,14 +115,18 @@ class ShopifyConnectorFulfillmentReviewService(models.AbstractModel):
             raise UserError('The predecessor job is held by another operation.')
         locked.invalidate_recordset()
         from_state = locked.state
-        locked.sudo().write({
-            'state': 'cancelled',
-            'cancel_reason': cancel_reason,
-            'manual_review_subreason': False,
-        })
-        # Flush so the predecessor's operation_scope_key clears before the
-        # replacement's own scope is computed (no unique-constraint collision).
-        locked.flush_recordset(['state', 'operation_scope_key'])
+        # `failed_final` is terminal and cannot transition to `cancelled`
+        # (LEGAL_JOB_TRANSITIONS); its operation scope is already released, so it
+        # is superseded in place. A cancellable predecessor (failed_retryable /
+        # blocked_manual_review) is cancelled first — which clears its scope —
+        # before the replacement is created (no unique-constraint collision).
+        if from_state != 'failed_final':
+            locked.sudo().write({
+                'state': 'cancelled',
+                'cancel_reason': cancel_reason,
+                'manual_review_subreason': False,
+            })
+            locked.flush_recordset(['state', 'operation_scope_key'])
         new_job = self.env['shopify.connector.job.enqueue'].enqueue(
             locked.store_id, 'manual_sync', locked.job_type,
             payload_hash='%s:release:%s' % (
@@ -133,13 +137,14 @@ class ShopifyConnectorFulfillmentReviewService(models.AbstractModel):
             trigger_origin=False,
         )
         locked.sudo().write({'superseded_by_job_id': new_job.id})
+        locked.invalidate_recordset()
         locked._log_transition(
             'manual_action',
             'Fulfillment mutation released and superseded by a manual_sync '
             'replacement; predecessor_job_id=%d successor_job_id=%d.' % (
                 locked.id, new_job.id,
             ),
-            from_state=from_state, to_state='cancelled',
+            from_state=from_state, to_state=locked.state,
         )
         return new_job
 
