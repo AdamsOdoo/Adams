@@ -226,3 +226,50 @@ First large UI batch built by Claude under DEC-039/040. Durable lessons:
 4. **Keep the ACL surface minimal.** The dashboard aggregate service is an
    `AbstractModel` (no ACL row) so the only ACL additions are the two transient
    wizards, exactly as the packet scoped.
+
+## Learning entry — U0 Stage R2 P1 correction (2026-07-22)
+
+Independent review of exact head `0fa512d` (comment `5049668193`) found one
+new P1 the Stage R1 correction's own stated sweep missed:
+`action_mark_reconnect_needed` had no Administrator boundary at all — a
+category #12 (security/permission weakness) issue. This is at least the
+second time this exact U0 batch has produced a "side effect before
+permission enforcement" finding on the store model (Stage R1's Test
+Connection P1, then this one) — a recurring-pattern signal worth a concrete
+prevention rule (below) rather than a fix-and-move-on response; a formal
+occurrence count against `defect-pattern-log.md`'s own tally is left to
+whichever session next reconciles that log, since this correction batch does
+not modify it.
+
+1. **"We audited every caller" claims must be provable, not asserted.** AR-076
+   claimed the analogous-action sweep for the "side effect before permission
+   enforcement" pattern was complete ("all three... are closed by the uniform
+   boundary guard"), but never actually enumerated *every* public method on
+   the model — it enumerated only the ones already suspected. The missed
+   sixth method (`action_mark_reconnect_needed`) was pre-existing, undocumented
+   as in-scope, and had zero test coverage of its permission behavior (every
+   existing call in `test_connection_lifecycle.py` used a hard-coded admin
+   user). **Prevention:** when a correction claims a sweep of "every public
+   action with pattern X" is complete, the claim must be backed by an actual
+   enumeration (e.g. `grep` every `def action_` / non-underscore public
+   method on the model and show each one's disposition), not a description of
+   the methods already known to be affected. Recorded here as the concrete
+   gate for any future "we swept every occurrence" claim on this project.
+2. **A test asserting only the exception type is not a security regression
+   test.** The Stage R1 version of `test_store_lifecycle_actions_admin_only_direct_call`
+   asserted `AccessError` for four actions but no side-effect deltas; a
+   reorder moving the guard after the lock/audit-job creation would still
+   pass it. **Prevention:** any permission-boundary test for an action with
+   its own side effects must assert the concrete zero-delta evidence (lock
+   call count, transport call count, Job/JobLog count, and every mutable
+   field) in addition to the exception type — now the pattern for all five
+   privileged store actions in `test_ui_visibility_matrix.py`.
+3. **A guard test scoped by filename prefix is not a guard.** The prior
+   controller/webhook/OAuth source guard only ran its assertions on `.py`
+   files whose name started with one of four hard-coded prefixes; every other
+   production file — including the file this exact correction touches — was
+   walked but never checked. **Prevention:** a source-tree security guard
+   must scan by structural exclusion (a real `tests/`/`__pycache__` directory
+   check) and detect the actual surface via the AST (a real controller base
+   class, a real route decorator), never by a filename allowlist that can
+   silently miss a new file or be gamed by renaming one.

@@ -1251,8 +1251,22 @@ class ShopifyConnectorStore(models.Model):
         -> audited no-op). Moving to `reconnect_needed` is an auth-failure
         degradation, not a generation-changing reconnect, so it does **not** bump
         the epoch.
+
+        SEC (Stage R2 correction; independent review 5049668193 P1): this public
+        method had no `_ensure_connector_admin_boundary()` call at all -- on a
+        store already `disconnecting`/`disconnected` the audited-no-op branch
+        below creates a `sudo()`-backed audit Job/JobLog with **no** denial
+        whatsoever (the one ACL-gated write in this method sits only in the
+        *other* branch). Enforcing the boundary here, first, mirrors the other
+        four privileged public store actions. The sole internal caller
+        (`_apply_probe_failure`, via `_run_connection_probe`) only ever reaches
+        this method after its own caller -- `action_test_connection` or
+        `action_reconnect` -- already passed this identical check earlier in the
+        same request, so this is a no-op re-check for every legitimate internal
+        path, never a behavior change for it.
         """
         self.ensure_one()
+        self._ensure_connector_admin_boundary()
         locked_state, _generation = self._lock_store_for_lifecycle()
         if locked_state in ('disconnecting', 'disconnected'):
             self._create_lifecycle_audit_job(

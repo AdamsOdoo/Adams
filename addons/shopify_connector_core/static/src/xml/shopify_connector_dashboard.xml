@@ -140,11 +140,28 @@
                         <t t-if="data.sparkline &amp;&amp; data.sparkline.available">
                             <section aria-label="Seven-day activity">
                                 <h2 class="sc-section__title">Last 7 days</h2>
-                                <div class="sc-spark" role="img" t-att-aria-label="data.sparkline.summary">
-                                    <div class="sc-spark__bars">
+                                <div class="sc-spark">
+                                    <!-- Non-colour legend (decorative; the per-day list below is
+                                         the real accessible text equivalent) -->
+                                    <div class="sc-spark__legend" aria-hidden="true">
+                                        <span class="sc-spark__legend-item">
+                                            <i class="sc-spark__swatch sc-spark__swatch--ok"/>
+                                            <span>Succeeded</span>
+                                        </span>
+                                        <span class="sc-spark__legend-item">
+                                            <i class="sc-spark__swatch sc-spark__swatch--bad"/>
+                                            <span>Failed</span>
+                                        </span>
+                                    </div>
+                                    <!-- The bars are a decorative image; role="img" flattens
+                                         descendants from the accessibility tree, so the real
+                                         per-day text equivalent lives in the visually-hidden
+                                         list below it, not inside this element. -->
+                                    <div class="sc-spark__bars" role="img" t-att-aria-label="data.sparkline.summary">
                                         <t t-foreach="data.sparkline.days" t-as="day" t-key="day.date">
                                             <div class="sc-spark__day">
-                                                <div class="sc-spark__stack">
+                                                <div class="sc-spark__stack"
+                                                     t-att-title="day.label + ': ' + day.success + ' succeeded, ' + day.failure + ' failed'">
                                                     <div class="sc-spark__bar sc-spark__bar--ok"
                                                          t-att-style="barHeight(day.success, sparkMax)"/>
                                                     <div class="sc-spark__bar sc-spark__bar--bad"
@@ -154,6 +171,11 @@
                                             </div>
                                         </t>
                                     </div>
+                                    <ul class="sc-spark__visually-hidden">
+                                        <t t-foreach="data.sparkline.days" t-as="day" t-key="day.date">
+                                            <li t-esc="day.label + ': ' + day.success + ' succeeded, ' + day.failure + ' failed'"/>
+                                        </t>
+                                    </ul>
                                     <p class="sc-spark__summary" t-esc="data.sparkline.summary"/>
                                 </div>
                             </section>

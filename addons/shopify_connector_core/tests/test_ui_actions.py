@@ -150,6 +150,51 @@ class TestUiActions(TransactionCase):
         with self.assertRaises(AccessError):
             attempt.with_user(self.operator).action_resolve_mutation_attempt('applied', 'x')
 
+    # Stage R2 correction (independent review 5049668193 material P2): the
+    # wizard must be REFUSED by the sanctioned server method -- not silently
+    # accepted -- when the attempt is not `uncertain`, and the refusal must
+    # leave the attempt and its owning job completely unchanged. Only the
+    # success path (`test_mutation_resolution_applies`) and input-validation
+    # path were previously exercised through the wizard; neither business-rule
+    # refusal branch was.
+    def test_mutation_resolution_wizard_refuses_non_uncertain_attempt(self):
+        job = self._make_job('blocked_manual_review')
+        attempt = self._make_attempt(job, observed_outcome='pending')
+        job_state_before = job.state
+        wiz = self.env['shopify.connector.mutation.resolution.wizard'].with_user(self.admin).create(
+            {'mutation_attempt_id': attempt.id, 'disposition': 'applied',
+             'reason': 'confirmed in Shopify admin'})
+        with self.assertRaises(UserError):
+            wiz.action_confirm()
+        attempt.invalidate_recordset()
+        job.invalidate_recordset()
+        self.assertFalse(attempt.resolution_disposition)
+        self.assertFalse(attempt.resolution_reason)
+        self.assertEqual(job.state, job_state_before)
+
+    def test_mutation_resolution_wizard_refuses_already_resolved_attempt(self):
+        job = self._make_job('blocked_manual_review')
+        attempt = self._make_attempt(job, observed_outcome='uncertain')
+        # The first resolution goes through the sanctioned method directly
+        # (not the wizard) so the "already resolved" precondition is genuine.
+        attempt.with_user(self.admin).action_resolve_mutation_attempt(
+            'applied', 'first resolution')
+        attempt.invalidate_recordset()
+        job.invalidate_recordset()
+        disposition_before = attempt.resolution_disposition
+        reason_before = attempt.resolution_reason
+        job_state_before = job.state
+        wiz = self.env['shopify.connector.mutation.resolution.wizard'].with_user(self.admin).create(
+            {'mutation_attempt_id': attempt.id, 'disposition': 'not_applied',
+             'reason': 'second attempt should be refused'})
+        with self.assertRaises(UserError):
+            wiz.action_confirm()
+        attempt.invalidate_recordset()
+        job.invalidate_recordset()
+        self.assertEqual(attempt.resolution_disposition, disposition_before)
+        self.assertEqual(attempt.resolution_reason, reason_before)
+        self.assertEqual(job.state, job_state_before)
+
     # ------------------------------------------------------------------ #
     #  store lifecycle preconditions (no Shopify call is triggered)
     # ------------------------------------------------------------------ #

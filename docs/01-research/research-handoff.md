@@ -19943,3 +19943,67 @@ validation doc) on the frozen candidate SHA, capture the screenshot inventory
 and the driven walkthrough, address any consolidated correction the independent
 reviewer returns, then hand to a separate closure session for ready/merge after
 `ACCEPT`.
+
+## Session handoff — U0 Stage R2 P1 correction (2026-07-22)
+
+**What ran:** an exceptional P1 reopening on PR #192. Independent review of
+the exact Stage R1 head `0fa512d2ecec028f6e6bc4198de441c9f50224c1` (PR #192
+comment `5049668193`) returned `REVISE`: `action_mark_reconnect_needed`
+(pre-existing code, byte-identical to base) had no
+`_ensure_connector_admin_boundary()` call, so a non-admin direct ORM/RPC
+caller could create an unauthorized `sudo()`-backed lifecycle audit Job/JobLog
+on a `disconnecting`/`disconnected` store with zero denial. The control room
+accepted the verdict verbatim (comment `5049734472`) and authorized exactly
+one consolidated correction batch.
+
+**Identity gate:** PASSED. Branch `claude/u0-operator-ui-foundation` at the
+expected head; PR #192 open/draft/unmerged, base
+`mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`; both
+binding comments (`5049668193`, `5049734472`) present; issues #193 and #185
+open as recorded; working tree clean; no commit after the expected head.
+
+**Delivered (one consolidated commit):** `_ensure_connector_admin_boundary()`
+added as the first statement in `action_mark_reconnect_needed`
+(`shopify_connector_store.py`); `test_ui_visibility_matrix.py`'s direct-call
+test extended to a five-action zero-side-effect matrix (lifecycle-lock call
+count, transport call count, Job/JobLog delta, every store/credential field)
+covering all five privileged public store actions, including
+`action_mark_reconnect_needed`'s two dangerous branches (store already
+`disconnecting`/`disconnected`); `test_ui_actions.py` gained two
+mutation-resolution-wizard refusal-path tests; `test_ui_source_guards.py`'s
+controller/OAuth guard rewritten to scan the whole production tree via the
+AST (structural exclusion of `tests/`/`__pycache__`, not a filename
+allowlist), with a synthetic-fixture rejection proof and a production-tree
+acceptance proof, plus a source-level sparkline regression assertion; the
+dashboard sparkline (`shopify_connector_dashboard.xml`/`.scss`) gained a
+textured (non-colour) failure-bar fill, a non-colour legend, and a per-day
+accessible text equivalent outside the decorative `role="img"` boundary.
+`ui-u0-validation-results.md` §11/§12, `architecture-review-log.md` (AR-077),
+and `mvp-program-state.md`'s Wave 5 row were corrected to state the `526ad63`
+`ACCEPT` never covered the Stage R1 security code, that the exact-head review
+at `0fa512d` returned `REVISE`, and that no final independent `ACCEPT` exists
+yet for this PR.
+
+**Evidence:** static validation only in this session — `py_compile` and AST
+parse of every changed Python file, the hardened source-guard logic run
+directly against the real tree (rejects the synthetic fixture, accepts the
+actual production tree), and an allowlist-conformance diff proving only the
+authorized files changed. **No Odoo.sh runtime executed and none claimed.**
+Classification: `IMPLEMENTED — EXACT-SHA ODOO.SH VERIFICATION PENDING`.
+
+**State:** PR #192 remains draft/unmerged; this session did not self-review,
+self-accept, ready-mark, or merge. No Shopify request or mutation occurred.
+
+**Learning-feedback loop:** see `quality-feedback-loop.md`'s U0 Stage R2 entry
+(sweep claims must be provably exhaustive, not asserted; a permission-boundary
+test must assert side-effect deltas, not just the exception type; a source
+guard must exclude by directory structure and detect via the AST, never a
+filename allowlist).
+
+**Next-session prompt:** trigger one exact-SHA Odoo.sh rebuild at the new
+head recorded in the PR body; run the narrow exact-build confirmation
+(registry/install, the accepted U0/Test Connection suite, the new five-action
+security matrix, mutation-wizard refusal, sale/inventory regressions,
+redaction, clean tree); submit the exact corrected SHA and that evidence to
+one fresh independent delta review; only on `ACCEPT` hand to a separate
+closure session for ready-marking/merge.

@@ -2,10 +2,22 @@
 
 > **Status: implementation candidate — Stage R1 Odoo.sh runtime campaign EXECUTED
 > on the corrected working tree (`EXECUTED — PASS — ODOO.SH CONTAINER,
-> PRE-REBUILD`); a corrected-SHA rebuild + Stage R2 remain.** The original
+> PRE-REBUILD`); a Stage R2 correction is now IMPLEMENTED — EXACT-SHA ODOO.SH
+> VERIFICATION PENDING; a corrected-SHA rebuild remains.** The original
 > `RUNTIME PENDING` claims below are superseded for everything Stage R1 actually
 > ran — see **§1a**. Browser execution (tours + HOOT) and absolute-timing budgets
 > remain pending Stage R2 (container thread limit; §1a).
+>
+> **Stage R2 correction (2026-07-22) — see §12.** The independent review of the
+> exact Stage R1 head `0fa512d2ecec028f6e6bc4198de441c9f50224c1` (PR #192
+> comment `5049668193`) returned **REVISE**: one confirmed P1
+> (`action_mark_reconnect_needed` lacked the Administrator boundary) plus five
+> accepted test/evidence corrections. The control room accepted that verdict
+> (comment `5049734472`). This session applied the one authorized consolidated
+> correction. **No final independent `ACCEPT` exists yet** for this PR; §12
+> below is the accurate, current review-status record — do not rely on
+> anything below it that predates this note.
+>
 > This document records the honest evidence for the U0 operator-UI batch on
 > branch `claude/u0-operator-ui-foundation`. It follows the program's
 > established evidence-classification discipline (see PR #189 for the same
@@ -373,7 +385,16 @@ atomic, cleanly revertable unit.
 ## 11. Remaining risk register
 
 - **P0:** none known.
-- **P1:** none known after the pre-review audit (§5).
+- **P1:** none known after the pre-review audit (§5) **at `526ad63`/`f804379`**.
+  The independent review of the later, exact Stage R1 head `0fa512d` (PR #192
+  comment `5049668193`) confirmed one new P1 — `action_mark_reconnect_needed`
+  (`store.py:1237`) had no `_ensure_connector_admin_boundary()` call at all, so
+  a non-admin direct ORM/RPC caller could reach a `sudo()`-backed lifecycle
+  audit Job/JobLog write with zero denial on a `disconnecting`/`disconnected`
+  store. **Corrected in this Stage R2 batch** (§12): the guard is now the
+  first statement in that method, mirroring the other four privileged public
+  store actions. `IMPLEMENTED — EXACT-SHA ODOO.SH VERIFICATION PENDING`; no
+  independent re-review has run against the corrected SHA yet.
 - **Material P2 / runtime-verification items:**
   - RPC dispatch to the `AbstractModel` dashboard service (§3.1) — expected to
     work; confirm at Gate C.
@@ -388,24 +409,71 @@ atomic, cleanly revertable unit.
 
 ## 12. Independent review outcome (DEC-040)
 
-A fresh, memoryless independent reviewer (separate `Agent` invocation, no
-implementer rationale) adversarially reviewed the frozen candidate `526ad63`
-against all ten acceptance dimensions and returned **VERDICT: ACCEPT** — no
-P0 / P1 / material-P2 in production code. Full report posted verbatim to
-[PR #192](https://github.com/AdamsOdoo/Adams/pull/192) with the reviewed SHA.
+**This section's scope is layered across three distinct reviewed heads. Do
+not read any one paragraph below as describing the current PR state — only
+the final paragraph does.**
 
-The reviewer flagged three **Tier-3 test/doc** items (optional, non-gating,
-production-behaviour-neutral). Per the batch's Tier-3-fixed-inline rule they
-were folded in as a test/doc-only follow-up commit (production tree unchanged
-from the accepted `526ad63`):
+**Stage R1a — `526ad63` (historical, pre-runtime evidence only).** A fresh,
+memoryless independent reviewer (separate `Agent` invocation, no implementer
+rationale) adversarially reviewed the frozen candidate `526ad63` against all
+ten acceptance dimensions and returned **VERDICT: ACCEPT** — no P0 / P1 /
+material-P2 in the production code that existed **at that SHA**. Full report
+posted verbatim to [PR #192](https://github.com/AdamsOdoo/Adams/pull/192)
+with the reviewed SHA. The reviewer flagged three Tier-3 test/doc items,
+folded in as a test/doc-only follow-up commit (production tree unchanged from
+`526ad63` at that point — commit `f804379`).
 
-1. `test_dashboard_query_count_constant_across_scale` — added a warm-up call so
-   first-call ORM/ACL one-time work cannot inflate the first measured pass.
-2. HOOT header no longer claims the refresh-floor / hidden-tab-pause are
-   asserted there (they are source- + runtime-covered; the header now says so).
-3. Corrected the reconnect-test comment to describe the actual `warning` band.
+**This `ACCEPT` covers only `526ad63`/`f804379`. It does NOT cover, and was
+never presented as covering, the Stage R1 security/view corrections described
+in §1a above** — `_ensure_connector_admin_boundary()`, the four view-validity
+fixes, and the associated test changes were all written **after** this review
+ran, landing at head `0fa512d2ecec028f6e6bc4198de441c9f50224c1`. That new
+production code required its own fresh independent review before any
+acceptance could extend to it; the paragraph below is that review.
 
-The remaining gate to merge is the **Odoo.sh runtime campaign (§8), not a code
-correction** — the independent code review is clean. The closure session should
-verify the new head, confirm the production delta from `526ad63` is empty, then
-run the Gate C campaign before ready/merge.
+**Stage R1b — `0fa512d` (exact Stage R1 head) — VERDICT: REVISE.** A second
+fresh, memoryless independent reviewer read the exact repository checkout at
+`0fa512d2ecec028f6e6bc4198de441c9f50224c1` (PR #192 comment
+[`5049668193`](https://github.com/AdamsOdoo/Adams/pull/192)) — the complete
+base→head diff, every changed file, the governing DECs, and the actual Odoo
+19 upstream source for version-specific claims — and returned **VERDICT:
+REVISE**. It confirmed the Stage R1 correction genuinely closed the four
+actions it targeted, but found **one new P1**:
+`shopify.connector.store.action_mark_reconnect_needed()` (`store.py:1237`)
+had no `_ensure_connector_admin_boundary()` call at all, so a non-admin
+direct ORM/RPC caller could reach a `sudo()`-backed lifecycle audit Job/JobLog
+write with zero denial on a `disconnecting`/`disconnected` store — the exact
+defect class Stage R1 claimed to have eliminated everywhere. It also
+confirmed five accepted material-P2 test/evidence items (the visibility
+matrix's missing side-effect-delta counters for three actions, the
+mutation-resolution wizard's untested refusal path, the source guard's
+hard-coded-prefix gate, the sparkline's colour-only per-day distinction, and
+this very §12 being stale/self-contradictory relative to `0fa512d`). The
+control room accepted this verdict verbatim in binding ruling
+[`5049734472`](https://github.com/AdamsOdoo/Adams/pull/192) and authorized
+exactly one consolidated correction batch.
+
+**Stage R2 — this correction (implemented; not yet independently reviewed).**
+This session applied the single authorized consolidated correction against
+`0fa512d`: `_ensure_connector_admin_boundary()` is now the first statement in
+`action_mark_reconnect_needed`; the visibility-matrix direct-call test now
+asserts zero lifecycle-lock/transport/Job/JobLog/store/credential deltas for
+all five privileged public store actions, including the two dangerous
+`action_mark_reconnect_needed` branches (store already
+`disconnecting`/`disconnected`); the mutation-resolution wizard's two refusal
+branches are now proven through the wizard; the controller/OAuth source guard
+now scans the whole production tree via the AST instead of a four-prefix
+filename gate, with a synthetic-fixture rejection proof; and the sparkline
+now carries a non-colour (textured) distinction plus a per-day accessible
+text equivalent. **Classification: `IMPLEMENTED — EXACT-SHA ODOO.SH
+VERIFICATION PENDING`.** Static validation (py_compile, AST parse, the
+hardened guard run directly, allowlist conformance) passed in this workspace;
+no Odoo runtime executed in this session and none is claimed. **No final
+independent `ACCEPT` exists yet for this PR.** The remaining sequence is
+unchanged in kind from the one recorded in the PR body: (1) one fresh
+exact-SHA Odoo.sh build at the corrected head, (2) a narrow exact-build
+confirmation covering the new five-action security matrix plus the existing
+U0/Test Connection/sale/inventory suites, (3) one fresh independent delta
+review limited to this correction, and only then (4) a separate closure
+session may ready-mark/merge on `ACCEPT`. This implementing session does not
+self-review, self-accept, ready-mark, or merge.

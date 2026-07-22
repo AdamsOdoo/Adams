@@ -175,15 +175,67 @@
     .sc-cadence { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); margin-block-start: var(--sc-space-2); }
 
     // --- Optional 7-day sparkline (region 5, severable) ---
+    //
+    // Stage R2 correction (independent review 5049668193 material P2): the
+    // success/failure bars used to differ ONLY by hue. The failure bar now
+    // also carries a diagonal-stripe texture (pure CSS, no external asset),
+    // there is a non-colour legend, and a visually-hidden per-day text list
+    // gives assistive tech the exact counts (the bars themselves are a
+    // decorative role="img" that flattens descendants from the a11y tree).
     .sc-spark { display: flex; flex-direction: column; gap: var(--sc-space-2); }
+    .sc-spark__legend { display: flex; gap: var(--sc-space-4); }
+    .sc-spark__legend-item {
+        display: inline-flex; align-items: center; gap: var(--sc-space-2);
+        font-size: var(--sc-fs-caption); color: var(--sc-text-secondary);
+    }
+    .sc-spark__swatch {
+        display: inline-block;
+        inline-size: 12px; block-size: 12px;
+        border-radius: 2px;
+        flex: 0 0 auto;
+    }
+    .sc-spark__swatch--ok { background: var(--sc-neutral-text); }
+    .sc-spark__swatch--bad {
+        background: repeating-linear-gradient(
+            45deg,
+            var(--sc-danger-text),
+            var(--sc-danger-text) 3px,
+            var(--sc-surface-0) 3px,
+            var(--sc-surface-0) 6px
+        );
+        border: 1px solid var(--sc-danger-text);
+    }
     .sc-spark__bars { display: flex; align-items: flex-end; gap: var(--sc-space-2); block-size: 64px; }
     .sc-spark__day { display: flex; flex-direction: column; align-items: center; gap: var(--sc-space-1); flex: 1 1 0; }
     .sc-spark__stack { display: flex; flex-direction: column-reverse; justify-content: flex-end; block-size: 48px; inline-size: 100%; }
     .sc-spark__bar { inline-size: 100%; border-radius: 2px 2px 0 0; }
     .sc-spark__bar--ok { background: var(--sc-neutral-text); }
-    .sc-spark__bar--bad { background: var(--sc-danger-text); }
+    // Textured, not just coloured, so success/failure remain distinguishable
+    // without relying on colour perception.
+    .sc-spark__bar--bad {
+        background: repeating-linear-gradient(
+            45deg,
+            var(--sc-danger-text),
+            var(--sc-danger-text) 3px,
+            var(--sc-surface-0) 3px,
+            var(--sc-surface-0) 6px
+        );
+    }
     .sc-spark__label { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
     .sc-spark__summary { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+    // Standard visually-hidden ("sr-only") utility: present in the
+    // accessibility tree, invisible on screen.
+    .sc-spark__visually-hidden {
+        position: absolute;
+        inline-size: 1px; block-size: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        list-style: none;
+    }
 
     // --- Loading skeleton ---
     .sc-skeleton {
