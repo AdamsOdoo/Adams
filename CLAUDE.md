@@ -220,22 +220,81 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
 > deliberate, product-owner-instructed, scoped change to the operating model
 > for work based on `mvp/program-integration` only. Full basis:
 > [`DEC-032-mvp-autonomous-execution-model.md`](docs/04-decisions/DEC-032-mvp-autonomous-execution-model.md)
-> (Accepted, 2026-07-15).
+> (Accepted, 2026-07-15), amended by
+> [`DEC-039-mvp-claude-implementation-worker-expansion.md`](docs/04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md)
+> (Accepted, 2026-07-22) and
+> [`DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md`](docs/04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md)
+> (Accepted, 2026-07-22) — see those decisions before assuming Claude cannot
+> implement, or that ChatGPT must review every gate, in this program; the
+> rules below reflect both amendments.
 
-- **Claude is now the independent control room** for the MVP completion
-  program: scope governor and release gatekeeper for all work on or
-  descending from `mvp/program-integration`. Claude does not write connector
-  feature code in this role.
-- **GPT-5.6 Sol is the implementation worker** for this program: the primary
-  autonomous research/implementation worker, operating under
-  [`docs/06-prompts/gpt56-sol-master-mvp-mission.md`](docs/06-prompts/gpt56-sol-master-mvp-mission.md).
+- **Default roles as of DEC-040 (2026-07-22): Claude builds and Claude
+  reviews; ChatGPT is the strategic control room; Sol is an available
+  secondary builder.** Claude is the default implementation worker *and*
+  the default gate reviewer for `mvp/program-integration` work. **GPT-5.6
+  Sol remains an authorized implementation worker** (DEC-039) but is no
+  longer assumed default. **ChatGPT** sets/approves scope, priority, and
+  timeline, resolves hard-stops needing a commercial judgment call, and is
+  the escalation point — but is not required to line-review every wave gate.
+  The product owner remains final authority on promotion to
+  `Shopify-connector`/`main`.
+- **The two roles must never be collapsed into one session.** A Claude
+  session that implements a task/wave must not self-review, self-accept,
+  ready-mark, or merge that work. **Independent Claude review is the
+  default routine gate for every wave/batch** (DEC-040) — satisfied by
+  either a **separate top-level Claude session** reviewing from scratch, or
+  a **fresh subagent invocation** (via the `Agent` tool), instructed to
+  adversarially re-verify — never to summarize or rubber-stamp.
+  **ChatGPT review is a strategic control-room option (a spot-check or
+  escalation path), not a prerequisite for a routine gate.**
+  - **Memoryless means no memory of the implementer's reasoning, not
+    repository-blind.** The reviewer's briefing excludes the implementing
+    session's reasoning, its defenses of its own choices, and any
+    selective summary meant to sway the verdict — but it independently
+    reads the exact base/head checkout, the complete PR diff, the
+    governing DECs and implementation packets, the acceptance criteria,
+    the actual Odoo 19 source, automated-test output, genuine Odoo.sh
+    runtime evidence for code batches, screenshots/browser evidence where
+    relevant, and current official sources when a version-dependent fact
+    needs verification. A diff-only review does not satisfy this for
+    Tier 1 work.
+  - **The review is durable and non-suppressible.** The complete
+    independent-review report is posted verbatim to the PR, stating the
+    exact reviewed SHA. The implementing session may not rewrite,
+    selectively summarize, suppress, override, accept, ready-mark, or
+    merge it. A `REVISE` verdict is resolved through one consolidated
+    correction. After an `ACCEPT`, a **separate top-level closure
+    session** (or another explicitly authorized independent actor) —
+    never the implementing session — verifies the exact accepted SHA and
+    that the required evidence still corresponds to it before
+    ready-marking or merging. Reviewer silence, a partial report, or a
+    summary-only report is never acceptance.
+  See DEC-039/DEC-040 for the full rule.
+- **Batch size (DEC-040): target a full wave, or a large, coherent,
+  independently-revertable slice of one, per iteration** — not many small
+  correction cycles. Tier 3 (wording/polish) issues found mid-batch are
+  fixed inline, never spun into a separate cycle. Review scrutiny **scales
+  up, not down, with batch size** — evidence (tests + genuine Odoo.sh
+  runtime results) is never skipped to move faster; speed comes from
+  batching scope, not skipping evidence. **UI (Wave 5 / U0) is a priority
+  parallel track** under this same large-batch cadence — see DEC-040.
+  **Runtime rule scope:** mandatory automated tests plus genuine Odoo.sh
+  runtime evidence (exact tested SHA, proportional to the batch's risk and
+  size) apply to **every implementation/code batch**, regardless of size —
+  never skipped. A **documentation/governance-only batch** does not
+  require an irrelevant Odoo.sh runtime campaign; it is verified by
+  repository/diff/path/link/consistency checks appropriate to the change,
+  must never fabricate runtime evidence, and must never weaken the
+  runtime requirement for a later code batch.
 - **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
   (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
   is never modified, reset, or force-pushed by this program. `mvp/program-integration`
   was created from that exact commit and is where every macro-wave PR lands.
 - **The macro-wave process supersedes the prior micro-session workflow
-  (§2, §6) only for work based on `mvp/program-integration`.** Sol may work
-  autonomously inside an authorized wave without per-commit approval; Claude
+  (§2, §6) only for work based on `mvp/program-integration`.** Whichever
+  worker implements (Claude, by default, or Sol) may work autonomously
+  inside an authorized wave/batch without per-commit approval; a Claude
+  session acting independently (never the implementing session itself)
   reviews and gates each wave's merge using
   [`docs/06-prompts/claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md).
   Every other CLAUDE.md rule (citation discipline §7, claim classification
@@ -252,9 +311,17 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
   [`mvp-completion-program.md`](docs/07-implementation-plan/mvp-completion-program.md)
   §2 for the evidence) and are not to be closed, merged, or edited without an
   explicit control-room/product-owner decision recorded in that file's §9.
-- **No feature coding by Claude** under this addendum, unless the product
-  owner explicitly changes Claude's role again. Claude's role here is
-  governance, audit, wave review, and release-gating only.
+- **Feature coding by Claude is now authorized under this addendum**, per
+  DEC-039 (2026-07-22), strictly subject to the no-self-acceptance rule
+  above: an implementing Claude session's role for its own work stays
+  execution only — it never doubles as that work's independent review,
+  acceptance, ready-marking, or merge. Independent Claude review (a
+  separate top-level session or a fresh subagent, per the mechanism above)
+  is the **default** gate for this; ChatGPT strategic spot-checks and a
+  separate closure session for ready-marking/merge remain available and
+  required exactly where this section says so — governance, audit, wave
+  review, and release-gating for a Claude-implemented PR is never
+  performed by the session that implemented it.
 - The live status of this program is tracked in
   [`docs/07-implementation-plan/mvp-program-state.md`](docs/07-implementation-plan/mvp-program-state.md)
   — read it for current wave/blocker/decision status; do not rely on this
@@ -269,4 +336,9 @@ See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
    gate still applies.
 3. Do only the scoped task; cite and classify every claim; write to GitHub.
 4. Run the end-of-session learning review and update the handoff.
-5. End with the exact next-session prompt. Then stop and await ChatGPT review.
+5. End with the exact next-session prompt. Then stop and await independent
+   review before any acceptance, ready-marking, or merge. For work under
+   §13 (`mvp/program-integration`), that review is **independent Claude
+   review by default** (DEC-040), with ChatGPT as strategic control
+   room/spot-check rather than a routine line reviewer. Outside §13,
+   await ChatGPT review as before.
