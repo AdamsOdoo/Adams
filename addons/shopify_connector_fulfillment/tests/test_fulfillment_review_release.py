@@ -235,7 +235,7 @@ class TestFulfillmentReviewRelease(TransactionCase):
         )
         with self.assertRaises(AccessError):
             self.Service.with_user(self.plain_user)._release_blocked_mutation(
-                binding, 'Not authorized.',
+                binding.with_user(self.plain_user), 'Not authorized.',
             )
         # The blocked mutation is untouched by the refused release.
         old_job.invalidate_recordset()

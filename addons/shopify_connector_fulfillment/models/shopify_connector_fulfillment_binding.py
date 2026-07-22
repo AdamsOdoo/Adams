@@ -93,8 +93,9 @@ class ShopifyConnectorFulfillmentBinding(models.Model):
 
     def action_release_fulfillment_review(self, reason=False):
         """Public review-release action (DEC-038 §7.3): delegates to the
-        private sanctioned service helper. Never a ``job_type``."""
+        private sanctioned service helper (defined on the fulfillment service,
+        which the review module extends). Never a ``job_type``."""
         self.ensure_one()
         return self.env[
-            'shopify.connector.fulfillment.review'
+            'shopify.connector.fulfillment.service'
         ]._release_blocked_mutation(self, reason)
