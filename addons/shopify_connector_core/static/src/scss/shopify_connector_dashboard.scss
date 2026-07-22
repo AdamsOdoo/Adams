@@ -1,0 +1,279 @@
+// Part of the Shopify Connector (U0 operator UI foundation).
+//
+// Operational dashboard component styles. Uses only the connector token layer
+// and CSS logical properties (margin-inline / padding-inline / inset-inline /
+// text-align:start) so dir="rtl" mirrors the whole surface with no directional
+// override. No external font/CDN/icon library. One card style only: 8px radius,
+// 1px hairline, no resting shadow.
+
+.o_sc_dashboard {
+    background: var(--sc-surface-0);
+    color: var(--sc-text-primary);
+    font-family: var(--sc-font);
+    min-height: 100%;
+    padding: var(--sc-space-6);
+    overflow-x: hidden; // never a connector-created horizontal page scroll
+
+    * { box-sizing: border-box; }
+
+    .o_sc_dashboard__inner {
+        max-width: 1120px;
+        margin-inline: auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-6);
+    }
+
+    // --- Focus visibility (WCAG 2.4.7): every operable element ---
+    a:focus-visible,
+    button:focus-visible,
+    [tabindex]:focus-visible {
+        outline: 2px solid var(--sc-focus);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+    // --- Lead answer band (region 1) ---
+    .sc-band {
+        display: flex;
+        align-items: center;
+        gap: var(--sc-space-4);
+        padding: var(--sc-space-5);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-neutral-bg);
+
+        .sc-band__icon { font-size: 20px; line-height: 1; flex: 0 0 auto; }
+        .sc-band__body { display: flex; flex-direction: column; gap: var(--sc-space-1); }
+        .sc-band__text {
+            font-size: var(--sc-fs-dominant);
+            font-weight: var(--sc-fw-dominant);
+            line-height: 1.2;
+        }
+        .sc-band__hint { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+
+        &.sc-band--success { background: var(--sc-success-bg); color: var(--sc-success-text);
+            .sc-band__hint { color: var(--sc-success-text); } }
+        &.sc-band--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text);
+            .sc-band__hint { color: var(--sc-warning-text); } }
+        &.sc-band--danger { background: var(--sc-danger-bg); color: var(--sc-danger-text);
+            .sc-band__hint { color: var(--sc-danger-text); } }
+        &.sc-band--info { background: var(--sc-info-bg); color: var(--sc-info-text);
+            .sc-band__hint { color: var(--sc-info-text); } }
+    }
+
+    // --- Section scaffolding ---
+    .sc-section__title {
+        font-size: var(--sc-fs-lead);
+        font-weight: var(--sc-fw-label);
+        margin-block-end: var(--sc-space-3);
+    }
+
+    // --- Exceptions (region 2), at most three ---
+    .sc-exceptions { display: flex; flex-direction: column; gap: var(--sc-space-3); }
+
+    .sc-exception {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sc-space-3);
+        padding: var(--sc-space-4);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+        border-inline-start-width: 4px;
+
+        &.sc-exception--danger { border-inline-start-color: var(--sc-danger-text); }
+        &.sc-exception--warning { border-inline-start-color: var(--sc-warning-text); }
+
+        .sc-exception__icon { flex: 0 0 auto; font-size: 16px; margin-block-start: 2px; }
+        .sc-exception__main { flex: 1 1 auto; display: flex; flex-direction: column; gap: var(--sc-space-1); }
+        .sc-exception__title { font-size: var(--sc-fs-cardtitle); font-weight: var(--sc-fw-label); }
+        .sc-exception__why { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+        .sc-exception__meta { display: flex; gap: var(--sc-space-2); flex-wrap: wrap; align-items: center;
+            font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+        .sc-exception__count { font-weight: var(--sc-fw-dominant); font-variant-numeric: tabular-nums; }
+        .sc-exception__side { display: flex; flex-direction: column; align-items: flex-end; gap: var(--sc-space-2); }
+    }
+
+    .sc-owner-chip {
+        display: inline-flex; align-items: center;
+        padding-inline: var(--sc-space-2); padding-block: 2px;
+        border-radius: 10px; background: var(--sc-neutral-bg); color: var(--sc-neutral-text);
+        font-size: var(--sc-fs-caption);
+    }
+
+    .sc-affirm {
+        padding: var(--sc-space-4);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-success-bg);
+        color: var(--sc-success-text);
+        font-size: var(--sc-fs-secondary);
+    }
+
+    // --- Action buttons (enqueue-only; sizes per WCAG 2.5.8) ---
+    .sc-btn {
+        min-block-size: 36px; min-inline-size: 24px;
+        display: inline-flex; align-items: center; gap: var(--sc-space-2);
+        padding-inline: var(--sc-space-3); padding-block: var(--sc-space-2);
+        border: 1px solid var(--sc-border-strong);
+        border-radius: 6px;
+        background: var(--sc-surface-1);
+        color: var(--sc-accent);
+        font-size: var(--sc-fs-secondary); font-weight: var(--sc-fw-label);
+        cursor: pointer;
+        transition: background var(--sc-motion-1) var(--sc-ease);
+        &:hover { background: var(--sc-info-bg); }
+    }
+
+    // --- Secondary metric chips (region 3), quiet by default ---
+    .sc-chips { display: flex; flex-wrap: wrap; gap: var(--sc-space-3); }
+
+    .sc-chip {
+        display: flex; flex-direction: column; gap: var(--sc-space-1);
+        min-inline-size: 120px;
+        padding: var(--sc-space-3);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+
+        .sc-chip__label { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+        .sc-chip__value { font-size: var(--sc-fs-cardtitle); font-weight: var(--sc-fw-label); font-variant-numeric: tabular-nums; }
+
+        &.sc-chip--loud.sc-chip--warning { background: var(--sc-warning-bg);
+            .sc-chip__value { color: var(--sc-warning-text); } }
+        &.sc-chip--loud.sc-chip--danger { background: var(--sc-danger-bg);
+            .sc-chip__value { color: var(--sc-danger-text); } }
+        &.sc-chip--loud.sc-chip--success { background: var(--sc-success-bg);
+            .sc-chip__value { color: var(--sc-success-text); } }
+    }
+
+    // --- Recent activity (region 4) ---
+    .sc-activity { display: flex; flex-direction: column; gap: var(--sc-space-2); }
+
+    .sc-activity__item {
+        display: flex; align-items: center; gap: var(--sc-space-3);
+        padding-block: var(--sc-space-2);
+        border-block-end: 1px solid var(--sc-border);
+        &:last-child { border-block-end: 0; }
+
+        .sc-activity__text { flex: 1 1 auto; font-size: var(--sc-fs-secondary); }
+        .sc-activity__meta { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); font-variant-numeric: tabular-nums; }
+    }
+
+    .sc-badge {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding-inline: var(--sc-space-2); padding-block: 2px;
+        border-radius: 10px; font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-label);
+        &.sc-badge--success { background: var(--sc-success-bg); color: var(--sc-success-text); }
+        &.sc-badge--danger { background: var(--sc-danger-bg); color: var(--sc-danger-text); }
+        &.sc-badge--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text); }
+        &.sc-badge--info { background: var(--sc-info-bg); color: var(--sc-info-text); }
+        &.sc-badge--neutral { background: var(--sc-neutral-bg); color: var(--sc-neutral-text); }
+    }
+
+    .sc-cadence { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); margin-block-start: var(--sc-space-2); }
+
+    // --- Optional 7-day sparkline (region 5, severable) ---
+    //
+    // Stage R2 correction (independent review 5049668193 material P2): the
+    // success/failure bars used to differ ONLY by hue. The failure bar now
+    // also carries a diagonal-stripe texture (pure CSS, no external asset),
+    // there is a non-colour legend, and a visually-hidden per-day text list
+    // gives assistive tech the exact counts (the bars themselves are a
+    // decorative role="img" that flattens descendants from the a11y tree).
+    .sc-spark { display: flex; flex-direction: column; gap: var(--sc-space-2); }
+    .sc-spark__legend { display: flex; gap: var(--sc-space-4); }
+    .sc-spark__legend-item {
+        display: inline-flex; align-items: center; gap: var(--sc-space-2);
+        font-size: var(--sc-fs-caption); color: var(--sc-text-secondary);
+    }
+    .sc-spark__swatch {
+        display: inline-block;
+        inline-size: 12px; block-size: 12px;
+        border-radius: 2px;
+        flex: 0 0 auto;
+    }
+    .sc-spark__swatch--ok { background: var(--sc-neutral-text); }
+    .sc-spark__swatch--bad {
+        background: repeating-linear-gradient(
+            45deg,
+            var(--sc-danger-text),
+            var(--sc-danger-text) 3px,
+            var(--sc-surface-0) 3px,
+            var(--sc-surface-0) 6px
+        );
+        border: 1px solid var(--sc-danger-text);
+    }
+    .sc-spark__bars { display: flex; align-items: flex-end; gap: var(--sc-space-2); block-size: 64px; }
+    .sc-spark__day { display: flex; flex-direction: column; align-items: center; gap: var(--sc-space-1); flex: 1 1 0; }
+    .sc-spark__stack { display: flex; flex-direction: column-reverse; justify-content: flex-end; block-size: 48px; inline-size: 100%; }
+    .sc-spark__bar { inline-size: 100%; border-radius: 2px 2px 0 0; }
+    .sc-spark__bar--ok { background: var(--sc-neutral-text); }
+    // Textured, not just coloured, so success/failure remain distinguishable
+    // without relying on colour perception.
+    .sc-spark__bar--bad {
+        background: repeating-linear-gradient(
+            45deg,
+            var(--sc-danger-text),
+            var(--sc-danger-text) 3px,
+            var(--sc-surface-0) 3px,
+            var(--sc-surface-0) 6px
+        );
+    }
+    .sc-spark__label { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+    .sc-spark__summary { font-size: var(--sc-fs-caption); color: var(--sc-text-secondary); }
+    // Standard visually-hidden ("sr-only") utility: present in the
+    // accessibility tree, invisible on screen.
+    .sc-spark__visually-hidden {
+        position: absolute;
+        inline-size: 1px; block-size: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        margin: -1px;
+        padding: 0;
+        border: 0;
+        list-style: none;
+    }
+
+    // --- Loading skeleton ---
+    .sc-skeleton {
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-neutral-bg);
+    }
+    .sc-skeleton--band { block-size: 84px; }
+    .sc-skeleton--line { block-size: 56px; }
+
+    // --- First-run / empty guided card ---
+    .sc-empty {
+        padding: var(--sc-space-6);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+        .sc-empty__steps { margin-block-start: var(--sc-space-3); padding-inline-start: var(--sc-space-5); }
+        .sc-empty__steps li { margin-block: var(--sc-space-1); }
+    }
+
+    // --- Responsive: compact shell <=900px; phone refinements <=640px ---
+    @media (max-width: 900px) {
+        padding: var(--sc-space-4);
+        .sc-band__text { font-size: var(--sc-fs-lead); }
+        .sc-exception { flex-wrap: wrap; }
+        .sc-chip { min-inline-size: 96px; flex: 1 1 40%; }
+    }
+    @media (max-width: 640px) {
+        padding: var(--sc-space-3);
+        .sc-chips { gap: var(--sc-space-2); }
+        .sc-exception__side { align-items: flex-start; }
+    }
+}
+
+// --- Reduced motion (WCAG 2.3.3 / §8): non-essential transitions collapse ---
+@media (prefers-reduced-motion: reduce) {
+    .o_sc_dashboard * {
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+    }
+}

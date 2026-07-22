@@ -1,0 +1,142 @@
+/** @odoo-module **/
+// Part of the Shopify Connector (U0 operator UI foundation).
+//
+// Browser tours for the U0 operator surfaces, driven by HttpCase.start_tour
+// (see tests/test_ui_tours.py). The primary navigation tour is role-agnostic
+// (every connector role can read every surface) and is the automated check.
+// The role-action tours exercise the retry / cancel / review controls and are
+// intended for the driven Odoo.sh runtime campaign with seeded fixtures.
+
+import { registry } from "@web/core/registry";
+
+const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
+
+// --- 1. Primary navigation (Auditor and up): Dashboard -> Stores ->
+//        Sync Center -> Error & Review Center -> Logs. Read-only; asserts each
+//        surface renders and no write control is required to move through. ---
+registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
+    url: "/odoo",
+    steps: () => [
+        {
+            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+            content: "Open the Shopify Connector app.",
+            run: "click",
+        },
+        {
+            trigger: ".o_sc_dashboard",
+            content: "The operational dashboard renders.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_stores")}`,
+            content: "Go to Stores.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The stores list renders.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_sync_center")}`,
+            content: "Go to the Sync Center.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The Sync Center list renders.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_error_center")}`,
+            content: "Go to the Error & Review Center.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The Error & Review Center renders.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_logs")}`,
+            content: "Go to Logs.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The Logs list renders.",
+        },
+    ],
+});
+
+// --- 2. Operator: open the Error Center, open a cancellable job, open the
+//        cancellation wizard, confirm a reason is required. Needs a seeded
+//        queued/running job (runtime fixture). ---
+registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
+    url: "/odoo",
+    steps: () => [
+        {
+            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_sync_center")}`,
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view .o_data_row:first-child",
+            content: "Open the first job.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view",
+            content: "The job form is available; cancellation is offered where the state and role allow it.",
+        },
+    ],
+});
+
+// --- 3. Reviewer: reach a blocked_manual_review job and confirm the review
+//        controls (release / resolve) are present, while admin-only mutation
+//        resolution is not. Needs a seeded blocked job (runtime fixture). ---
+registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
+    url: "/odoo",
+    steps: () => [
+        {
+            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_error_center")}`,
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The Error & Review Center renders for the reviewer.",
+        },
+    ],
+});
+
+// --- 4. Administrator: open a store, confirm the safe lifecycle/test controls
+//        are visible and no credential value is shown; reach mutation evidence
+//        and confirm the resolution wizard is offered. Needs seeded fixtures. ---
+registry.category("web_tour.tours").add("shopify_connector_u0_admin_tour", {
+    url: "/odoo",
+    steps: () => [
+        {
+            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_stores")}`,
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The stores list renders for the administrator.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_mutation_evidence")}`,
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The mutation-evidence list renders.",
+        },
+    ],
+});

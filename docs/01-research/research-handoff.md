@@ -1,3 +1,71 @@
+### U0 PR #192 — Stage R1 Odoo.sh runtime campaign + one consolidated correction (2026-07-22)
+
+- **Branch / PR:** `claude/u0-operator-ui-foundation`, draft PR
+  [#192](https://github.com/AdamsOdoo/Adams/pull/192). Base
+  `mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`. Starting
+  SHA `f80437932cea31190d8cd45ca10f18f4c8245b75`. **Draft/unmerged; not
+  self-reviewed/accepted/ready-marked/merged.**
+- **Environment:** Odoo.sh dev container, Odoo **19.0**, PostgreSQL **16.14**,
+  build **35284077** / DB `adamsmen-claude-u0-operator-ui-foundation-35284077`
+  (prompt named build `35282748`; same branch at the same SHA, build rolled
+  forward — SHA is the freeze). No real Shopify request or mutation occurred;
+  U1/U2/U3 not begun.
+- **Owned defects found + fixed (one consolidated batch):**
+  1. **Install-blocking Odoo-19 view-validation P0** (`views/*`, 5 constructs):
+     `<group expand="0" string="Group By">` in the store/job/job_log/
+     mutation_attempt **search** views (Odoo-19 search `<group>` allows neither
+     `expand` nor `string`) + `active_id` in the job form stat-button `context`
+     (field-accessibility validator). Fix: plain `<group>` + `active_id`→`id`.
+     Registry then loads (79 modules, 66 s).
+  2. **Known Test Connection direct-RPC P1** (`store.py`): proven at runtime —
+     unfixed, a non-admin (Auditor/Operator/Reviewer/plain) caller of
+     `action_test_connection` was **not denied** and created a
+     `core_test_connection` job + 2 `job.log` rows (`exc=NONE`, Δjob=1, Δlog=2);
+     the probe funnels job/log/credential/transport work through `sudo()` before
+     the late non-sudo write. Fix: `_ensure_connector_admin_boundary()` enforcing
+     the **existing** `group_shopify_connector_admin` at the top of the four
+     public actions (`action_test_connection`/`activate`/`disconnect`/
+     `reconnect`), before any side effect; `env.su`-exempt (framework
+     superuser/cron/tests). Fixed: all four roles → `AccessError`, 0 transport,
+     0 jobs, 0 logs, no store/cred change; Administrator path unchanged. Mirrors
+     the existing `action_force_disconnect` guard. Analogous audit (§10):
+     `reconnect` (same probe), `disconnect` (audited-no-op `sudo()` job),
+     `activate` (store-row lock) — all closed by the one guard.
+  3. **Four owned U0 test defects** surfaced by genuine runtime (test-level, no
+     production access-control loosened): dashboard aggregate run as the
+     framework superuser → run as a connector Auditor (`test_ui_dashboard/
+     performance/installation`); `ir.ui.menu.groups_id`→`group_ids` (Odoo 19);
+     source-guard self-inspection false positive; fixture's non-existent
+     `mutation_domain='inventory'`→`mutation_dispatch_selftest`.
+- **Corrected-tree runtime (pre-rebuild):** U0 suite **63 / 0 failed / 0
+  errors**; core **368 / 0 failed / 11 errors** — all 11 are the **environmental**
+  `autopost_bills` at_install `setUpClass` NOT-NULL (account loads after core;
+  production unaffected — proven in a normal shell). Leak/redaction scan clean.
+  `test_test_connection` retagged `post_install` so its role-user security tests
+  run past the at_install blocker (8 pre-existing assertions unchanged).
+- **Pending Stage R2 (not hard stops, §11):** browser tours + HOOT — Chrome 141
+  launches/connects but `HttpCase.browser_js` fails with `can't start new thread`
+  (container limit); absolute RD-1/RD-2 timings; upgrade/uninstall-reinstall
+  zero-residue; **and the corrected-SHA Odoo.sh rebuild for exact-build proof.**
+- **Files changed (allowlist-clean):** `models/shopify_connector_store.py`; 4
+  `views/*.xml`; `tests/test_test_connection.py` + the 7 `tests/test_ui_*.py`;
+  evidence docs (validation-results §1a, program-state, this handoff,
+  architecture-review-log AR-076). No forbidden file; no new file.
+- **Publish:** committed as one consolidated correction; `odoosh-push` performed
+  (webhook held — a manual rebuild is required for Stage R2). Corrected SHA
+  recorded in the final report.
+- **Learning-loop:** Odoo-19 view validation is materially stricter (search
+  `<group>` attributes, `active_id` field-ref, `ir.ui.menu.group_ids`); genuine
+  Odoo.sh runtime caught an install-blocking P0 and a "no-denial" security P1
+  that static/no-runtime validation reported as green — reinforcing the DEC-040
+  mandatory-runtime rule. A hand-rolled `has_group` gate must exempt `env.su` or
+  it denies the framework superuser (also caused the dashboard test failures).
+- **Next session (Stage R2 prompt):** after the control room triggers the
+  corrected-SHA rebuild, re-run install + the U0/`TestTestConnection` suites +
+  the security acceptance matrix on the **fresh build**, attempt browser
+  tours/HOOT + screenshots + RD-1/RD-2 timings + upgrade/uninstall-reinstall
+  zero-residue, and issue the durable independent review. Do **not** self-accept.
+
 ### Wave 4 Gate B — fulfillment/tracking backend implemented (draft PR #189) (2026-07-22)
 
 - **Branch / PR:** `claude/wave-4-fulfillment-gate-b`, **draft PR
@@ -30,7 +98,9 @@
   `IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh). Gate D dev-store + CV-013 are
   `NOT PROVEN`/pending. **CV-013 (#185) open and critical.** Full detail:
   [`../05-qa/task-014-fulfillment-tracking-validation-results.md`](../05-qa/task-014-fulfillment-tracking-validation-results.md);
-  review record AR-073.
+  review record AR-078 (renumbered during Wave 4/U0 base reconciliation;
+  U0's own AR-073..AR-077 sequence is unchanged — see
+  `architecture-review-log.md`).
 
 - **Learning feedback loop:**
   - *What worked:* mapping the merged Layer 2 substrate (inventory
@@ -19901,3 +19971,168 @@ for ChatGPT's next direction (Part D or Part E).
   `Shopify-connector`. Next: ChatGPT review of AR-024. (Note: the
   2026-07-04/05 sprints logged their checkpoints in their compact
   entries above rather than here.)
+
+---
+
+## Session handoff — U0 operator UI large-batch (2026-07-22)
+
+**What ran:** built the U0 first-usable operator UI as one revertable batch on
+`claude/u0-operator-ui-foundation` (base `mvp/program-integration@1e2e5c25`),
+under DEC-039/040 (Claude default builder, independent review is the gate).
+
+**Identity gate:** PASSED all 12 checks (PR #191 merged `ba4ccc2`; DEC-039/040
+present + substantive; tracker refreshed; checkpoint `acd8c469` intact; base
+tip == amended `1e2e5c25`).
+
+**Delivered:** connector navigation; bounded read-only Owl dashboard on real
+aggregates; stores/readiness; Sync Center; Error & Review Center; logs; mutation
+evidence; safe retry/cancel/review/mutation-resolution actions. 3 modified + 15
+new production files, 1 modified + 8 new tests, this handoff + validation doc +
+copy deck + tracker/matrix/AR-log updates. All 27 code/test changes within the
+§8–§9 allowlist.
+
+**Evidence:** STATIC VALIDATION GREEN (py_compile, XML well-formedness, ESM
+syntax, manifest, allowlist, XML-ID uniqueness, cross-reference resolution,
+field-existence sweep, ACL structure, source-guard logic). Pre-review
+adversarial audit fixed 2×P1 + 2×P2 + 1 Tier-3 before freeze. **RUNTIME
+PENDING:** Odoo.sh campaign, browser tours, HOOT execution, driven walkthrough +
+screenshots — no Odoo runtime exists in the build workspace. Full record:
+[`ui-u0-validation-results.md`](../05-qa/ui-u0-validation-results.md).
+
+**State:** draft PR into `mvp/program-integration`, NOT self-accepted, NOT
+ready-marked, NOT merged. Independent DEC-040 review requested (report posted
+verbatim to the PR). No Shopify request/mutation occurred. U1/U2/U3 and
+fulfillment-mode UI were not started.
+
+**Learning-feedback loop:** see `quality-feedback-loop.md` U0 entry
+(field-existence sweep now part of the UI static gate; XML/Owl mechanical
+traps; honest runtime classification; minimal ACL surface).
+
+**Next-session prompt:** run the Gate C Odoo.sh runtime campaign (§8 of the
+validation doc) on the frozen candidate SHA, capture the screenshot inventory
+and the driven walkthrough, address any consolidated correction the independent
+reviewer returns, then hand to a separate closure session for ready/merge after
+`ACCEPT`.
+
+## Session handoff — U0 Stage R2 P1 correction (2026-07-22)
+
+**What ran:** an exceptional P1 reopening on PR #192. Independent review of
+the exact Stage R1 head `0fa512d2ecec028f6e6bc4198de441c9f50224c1` (PR #192
+comment `5049668193`) returned `REVISE`: `action_mark_reconnect_needed`
+(pre-existing code, byte-identical to base) had no
+`_ensure_connector_admin_boundary()` call, so a non-admin direct ORM/RPC
+caller could create an unauthorized `sudo()`-backed lifecycle audit Job/JobLog
+on a `disconnecting`/`disconnected` store with zero denial. The control room
+accepted the verdict verbatim (comment `5049734472`) and authorized exactly
+one consolidated correction batch.
+
+**Identity gate:** PASSED. Branch `claude/u0-operator-ui-foundation` at the
+expected head; PR #192 open/draft/unmerged, base
+`mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`; both
+binding comments (`5049668193`, `5049734472`) present; issues #193 and #185
+open as recorded; working tree clean; no commit after the expected head.
+
+**Delivered (one consolidated commit):** `_ensure_connector_admin_boundary()`
+added as the first statement in `action_mark_reconnect_needed`
+(`shopify_connector_store.py`); `test_ui_visibility_matrix.py`'s direct-call
+test extended to a five-action zero-side-effect matrix (lifecycle-lock call
+count, transport call count, Job/JobLog delta, every store/credential field)
+covering all five privileged public store actions, including
+`action_mark_reconnect_needed`'s two dangerous branches (store already
+`disconnecting`/`disconnected`); `test_ui_actions.py` gained two
+mutation-resolution-wizard refusal-path tests; `test_ui_source_guards.py`'s
+controller/OAuth guard rewritten to scan the whole production tree via the
+AST (structural exclusion of `tests/`/`__pycache__`, not a filename
+allowlist), with a synthetic-fixture rejection proof and a production-tree
+acceptance proof, plus a source-level sparkline regression assertion; the
+dashboard sparkline (`shopify_connector_dashboard.xml`/`.scss`) gained a
+textured (non-colour) failure-bar fill, a non-colour legend, and a per-day
+accessible text equivalent outside the decorative `role="img"` boundary.
+`ui-u0-validation-results.md` §11/§12, `architecture-review-log.md` (AR-077),
+and `mvp-program-state.md`'s Wave 5 row were corrected to state the `526ad63`
+`ACCEPT` never covered the Stage R1 security code, that the exact-head review
+at `0fa512d` returned `REVISE`, and that no final independent `ACCEPT` exists
+yet for this PR.
+
+**Evidence:** static validation only in this session — `py_compile` and AST
+parse of every changed Python file, the hardened source-guard logic run
+directly against the real tree (rejects the synthetic fixture, accepts the
+actual production tree), and an allowlist-conformance diff proving only the
+authorized files changed. **No Odoo.sh runtime executed and none claimed.**
+Classification: `IMPLEMENTED — EXACT-SHA ODOO.SH VERIFICATION PENDING`.
+
+**State:** PR #192 remains draft/unmerged; this session did not self-review,
+self-accept, ready-mark, or merge. No Shopify request or mutation occurred.
+
+**Learning-feedback loop:** see `quality-feedback-loop.md`'s U0 Stage R2 entry
+(sweep claims must be provably exhaustive, not asserted; a permission-boundary
+test must assert side-effect deltas, not just the exception type; a source
+guard must exclude by directory structure and detect via the AST, never a
+filename allowlist).
+
+**Next-session prompt:** trigger one exact-SHA Odoo.sh rebuild at the new
+head recorded in the PR body; run the narrow exact-build confirmation
+(registry/install, the accepted U0/Test Connection suite, the new five-action
+security matrix, mutation-wizard refusal, sale/inventory regressions,
+redaction, clean tree); submit the exact corrected SHA and that evidence to
+one fresh independent delta review; only on `ACCEPT` hand to a separate
+closure session for ready-marking/merge.
+
+## Session handoff — U0 PR #192 governance closure (2026-07-22)
+
+**What ran:** the separate closure session authorized by the control-room
+final gate acceptance (PR #192 comment `5050525557`), per CLAUDE.md §13/DEC-040.
+No implementation, test correction, or runtime execution occurred in this
+session.
+
+**Identity gate:** PASSED all 14 checks — repo `AdamsOdoo/Adams`; PR #192
+open/draft/unmerged/mergeable (`clean`); base `mvp/program-integration@1e2e5c258922b93e11f6bf6f5d4828517d12c917`;
+head `claude/u0-operator-ui-foundation@a13f67210269277826e78b23be1fab5e0caffec5`;
+no commit after the accepted head; independent-ACCEPT comment `5050387258`
+and control-room acceptance comment `5050525557` both present and matching;
+runtime evidence (build `35308219`) intact; zero unresolved review threads;
+issues #193 and #185 open; clean local working tree.
+
+**Actions taken:** marked PR #192 ready for review (re-verified head/base
+unchanged); merged PR #192 with the repository's normal merge-commit method
+(no squash/rebase) at commit `8818c7714f46eefe51c6b452b5e3f24d155f26fb`
+(parents: prior `mvp/program-integration` tip `1e2e5c258922b93e11f6bf6f5d4828517d12c917`
+and accepted head `a13f67210269277826e78b23be1fab5e0caffec5`; the accepted
+head is a confirmed ancestor and the merge introduced zero diff beyond the
+two parents); posted one tracker-only closure commit (this handoff entry plus
+`ui-u0-validation-results.md` §13, `mvp-program-state.md`'s Wave 5 row, and
+`architecture-review-log.md`'s AR-077 status); recorded closure comments on
+PR #192 and issue #167; deleted the merged remote branch
+`claude/u0-operator-ui-foundation`.
+
+**Merge SHA:** `8818c7714f46eefe51c6b452b5e3f24d155f26fb`.
+
+**Evidence references:** [`ui-u0-validation-results.md`](../05-qa/ui-u0-validation-results.md)
+§13 (final closure record); `architecture-review-log.md` AR-077 (closed);
+`mvp-program-state.md` Wave 5 row (accepted/runtime-verified/merged).
+
+**State:** U0 gate is CLOSED. Issue #193 (baseline warm-update fixture
+defect) remains open, unrelated to this PR. Issue #185 (`[CV-013]`) remains
+open and critical — Wave 4 may not receive final acceptance or enter UAT
+while it remains open. All product-owner deferments (HOOT, browser tours,
+driven walkthrough/screenshots, browser accessibility/render/memory
+evidence, additional disposable-database install, isolated upgrade, isolated
+uninstall/reinstall) remain `DEFERRED BY PRODUCT OWNER — NOT PROVEN`, carried
+to UAT/release readiness. No Shopify request or mutation occurred. U1/U2/U3
+and Wave 4 were not started or modified in this session.
+
+**Learning-feedback loop:** governance closure sessions benefit from a
+single-purpose identity gate (repo/PR/base/head/comments/issues/tree) checked
+once before any state-changing action, then re-verified immediately after
+mark-ready and after merge — this caught no drift here but is the correct
+discipline for an irreversible action.
+
+**Next-session prompt:** do **not** reuse the old Wave 4 exact-head runtime
+prompt for PR #189 (`claude/wave-4-fulfillment-gate-b`) — it was based on the
+pre-U0 integration tip `01f072dd4d83b7b39737452a686244a3a8c00332`. The next
+Wave 4 session must first inspect the new `mvp/program-integration` tip
+(now `8818c7714f46eefe51c6b452b5e3f24d155f26fb`), reconcile/merge that base
+into the Wave 4 branch under a new authorized prompt, determine the new exact
+Wave 4 candidate SHA, and reassess which runtime evidence must be repeated
+because U0 modified the core addon — before any new Odoo.sh campaign is
+authorized for that PR.
