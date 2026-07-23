@@ -3,9 +3,11 @@
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Not self-accepted,
 > not ready-marked, not merged.** Produced 2026-07-23; **corrected 2026-07-23** per
 > control-room comment `5056513213` (`REVISE — one consolidated docs-only
-> correction`). **`DOCS CORRECTED — AWAITING FRESH INDEPENDENT GATE-A REVIEW`.**
-> Follows `docs/06-prompts/session-handoff-template.md` adapted to the macro-wave
-> model.
+> correction`); then **status-layer synthesis reset 2026-07-23** per control-room
+> ruling `5058042330` (resolving the confirmed material-P2 in independent review
+> `5057796514`). **`STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING FRESH
+> INDEPENDENT REVIEW`.** Follows `docs/06-prompts/session-handoff-template.md`
+> adapted to the macro-wave model.
 
 ## 1. Session objective (met)
 
@@ -67,8 +69,13 @@ worktree); every referenced model/field/selection/action was source-verified.
 - **P2:** D-P2-1 (vocabulary — code authoritative, product docs annotated),
   D-P2-2 (native tracking timeline), D-P2-3 (no mode-switch history model),
   D-P2-4 (dark mode outside U1), D-P2-5 (consequences = display-only; dynamic
-  preflight is a separate backend task) — all **resolved**. (Full detail:
-  `u1-risks-and-open-questions.md`; status table: `README.md` §4.)
+  preflight is a separate backend task) — all **resolved**; **D-P2-6 (status-layer
+  & badge taxonomy) — `RESET`** by control-room ruling `5058042330` (this session):
+  the canonical status-source & badge matrix (`u1-backend-ui-contract-inventory.md`
+  §12) fixes the confirmed material-P2 — A7 (`display_status_*`, display-only, not a
+  carrier milestone), A5 only from `delivered_inconsistency` + `tracking_snapshot`,
+  **A2 deferred (no seam, no badge)**, layers never merged, acceptance A22. (Full
+  detail: `u1-risks-and-open-questions.md`; status table: `README.md` §4.)
 
 ## 6. Learning feedback loop (per CLAUDE.md §12)
 
@@ -102,6 +109,21 @@ worktree); every referenced model/field/selection/action was source-verified.
   `models/__init__.py` must not) is easy to state loosely and get wrong — pin it
   with structural tests. Both are now enforced by acceptance rows A20/A21 and the
   consistency sweep.
+- **Synthesis-reset learning (2026-07-23, control-room ruling `5058042330`):** a
+  status *badge taxonomy* can pass a field-existence check yet still bind the wrong
+  **layer** — UX/IA §8 mapped the real fields `display_status_*` to the wrong Shopify
+  family (A5 instead of A7) and asserted an A2 badge with **no backing field at all**.
+  Two lessons: (a) verify not just that a field exists but *which layer it carries*,
+  by reading the exact population site (`inbound.py` → `display_status_* =
+  node['displayStatus']` = A7) and the field's own code comment; and (b) **never
+  infer a badge from a Shopify enum the connector does not persist** (A2/A3/A6 have no
+  seam → deferred, no badge). Fix: one **canonical status-source & badge matrix**
+  (contract §12) that every dependent doc/prototype links to instead of re-deriving,
+  plus an acceptance criterion (A22) that proves per-layer label/icon/severity
+  correctness and the A5≠A7, no-phantom-A2 invariants. Also surfaced a genuine
+  backend-completeness item: `delivered_inconsistency` /
+  `review_reason='delivered_not_validated'` are declared but never written at
+  `2d9cff0` — recorded honestly rather than papered over.
 
 ## 7. Exact next-session prompt
 
@@ -148,6 +170,19 @@ Verify from scratch:
      vocabulary is annotated non-destructively (docs unchanged).
  11. AR-079, TD-003, mvp-program-state.md, research-handoff.md, and the handoff all
      agree with the corrected package.
+ 12. STATUS-LAYER SYNTHESIS RESET is correct and complete: the canonical
+     status-source & badge matrix (u1-backend-ui-contract-inventory.md §12) matches
+     the exact Wave 4 source at 2d9cff0 — display_status_* = A7 (display-only, never
+     a carrier milestone); A5 only from delivered_inconsistency + parsed
+     tracking_snapshot (never from A7; no full A5 enum timeline); A2
+     FulfillmentOrderStatus DEFERRED (no backing field, no badge); A4 =
+     fulfillment_status_* (automation authority + display); A1 only via
+     order_binding_id.shopify_fulfillment_status_snapshot; A3/A6 outside U1. No
+     A5/A7 merge, no phantom A2, no layer-merging survives anywhere in the package,
+     the prototypes, the acceptance matrix (A22), or the locked prompt. The
+     error_class count reads 19; the ALLOWED FILES headers are unambiguous about the
+     repo-root docs/ paths; the delivered-inconsistency data-inert caveat is
+     recorded honestly.
 Post the verbatim review at the exact reviewed SHA. Do not accept/ready-mark/merge
 if you are also the author. Recommend ACCEPT or REVISE (one consolidated correction).
 ```

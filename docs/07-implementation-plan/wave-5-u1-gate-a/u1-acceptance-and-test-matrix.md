@@ -62,6 +62,7 @@ blocker per se, but fulfillment dev-store validation + CV-013 (#185) remain
 | A19 | **U0 regression** — U0/Test Connection suite (67), sale (194), inventory (247) stay green with U1 installed | RUN |
 | A20 | **Package import structure** — addon root `__init__.py` imports `wizards` exactly once (keeps `from . import models`); `wizards/__init__.py` imports the wizard model exactly once; `models/__init__.py` does NOT import the sibling `wizards` package; the wizard TransientModel is registered after install; no circular or duplicate import | PY + XMLG (source guard) + RUN |
 | A21 | **Wizard is non-authoritative (display-and-delegate boundary)** — the mode-switch wizard's reads/counts never decide eligibility, never classify blockers, never determine "review required", never choose the target mode, never alter server-action arguments, never suppress a server-legal action, never create a Job/mutation, never write a protected/snapshot field, never contact Shopify; every displayed count is bounded, ACL-safe, and labelled informational/non-authoritative | PY (negative tests) + XMLG (AST source guard) |
+| A22 | **Status-badge layer correctness (per the canonical §12 matrix)** — every rendered badge maps to its exact §12 backing field with the correct layer label/icon/severity: **A4** fields (`fulfillment_status_*`) render as A4; **A7** fields (`display_status_*`) render as A7 **display-only** and are **never** labelled/iconized as a carrier milestone; **A5** carrier evidence is drawn **only** from parsed `tracking_snapshot` + the `delivered_inconsistency` case and **never** consumes the A7 fields; a delivered-inconsistency is **visually distinct** (word+icon+severity) and never auto-validates Odoo stock; **no A2 `FulfillmentOrderStatus` badge** is present (deferred — no backing seam); **no layer-merging** and **no colour-only** status meaning; an unknown raw value (`schema_warning`) stays visible and fails closed; every badge has backing source evidence; screenshot coverage spans the key layer combinations across widths + RTL; no sensitive/raw JSON payload is rendered | PY + XMLG (source guard: no A7→A5 mapping, no A2 status field, no layer-merge) + SHOT |
 
 ## 3. Functional scenarios U1 must support (from the fulfillment-mode + COD UAT matrices)
 
@@ -74,13 +75,21 @@ U1 must render/drive (not re-implement) these existing backend scenarios:
   → the named `review_reason`, zero stock change, workable via Mode 1 actions.
   (Vocabulary: the over-fulfillment case renders as `quantity_overrun` on the
   evidence and persists `ambiguous_match` on the core job — see contract §10.)
-- **Mode switch** — UAT-FM-3.1…3.5: confirmation lists unresolved externals;
-  scan-gated; rollback any time; idempotent; non-admin refused server-side;
-  disconnected-period externals land as review in both modes.
-- **Delivered inconsistency** — UAT-FM-4.1: `delivered_inconsistency` critical
-  pinned case; never auto-resolves by stock change.
+- **Mode switch** — UAT-FM-3.1…3.5: confirmation shows a **bounded, ACL-safe,
+  non-authoritative informational count** of open external review cases (the server
+  reconciliation scan, not the wizard, is authoritative); scan-gated; rollback any
+  time; idempotent; non-admin refused server-side; disconnected-period externals
+  land as review in both modes.
+- **Delivered inconsistency (A5, §12)** — UAT-FM-4.1: the `delivered_inconsistency`
+  critical pinned case is visually distinct and never auto-resolves by stock change.
+  *(The flag is declared but data-inert at `2d9cff0`; the acceptance verifies the
+  rendering path when the flag is set, and that A5 is never synthesized from the A7
+  `display_status_*` fields — §12 / risks.)*
 - **Unknown status** — Layer-A unknown value → `schema_warning` badge, never
   silently success.
+- **Status-badge layer correctness** — each of A4 / A7 / A5 / reconciliation /
+  origin / review-reason renders as its own §12 layer with the correct label/icon/
+  severity; A7 is never shown as a carrier milestone; A2 has no badge (A22).
 - **COD interplay (read models)** — U1 surfaces fulfillment/tracking state that
   the COD workspace (Wave 6) consumes; U1 does not build the COD workspace.
 

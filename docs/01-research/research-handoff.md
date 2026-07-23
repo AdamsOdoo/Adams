@@ -35,6 +35,24 @@
   Product docs `fulfillment-operating-modes.md` / `shopify-fulfillment-status-model.md`
   received non-destructive superseded-vocabulary annotations (docs stay `Proposed`).
   No `addons/**` change; no Shopify operation.
+- **Status-layer synthesis reset (2026-07-23, PR #194, control-room ruling
+  `5058042330`; independent review `5057796514`):** a confirmed material-P2 —
+  UX/IA §8 mapped the code fields `display_status_*` to A5 `FulfillmentEventStatus`
+  (they are A7 `FulfillmentDisplayStatus`) and asserted a phantom A2
+  `FulfillmentOrderStatus` badge with no backing field — was re-derived from the
+  exact Wave 4 source and reset into **one canonical status-source & badge matrix**
+  (`u1-backend-ui-contract-inventory.md` §12). Bindings verified at `2d9cff0`: A7 =
+  `display_status_*` (display-only, never a carrier milestone); A5 only via
+  `delivered_inconsistency` + parsed `tracking_snapshot` (both declared-but-data-inert
+  at `2d9cff0` for `delivered_inconsistency`); **A2 DEFERRED — no read seam, no
+  badge**; A4 = `fulfillment_status_*`; layers never merged; acceptance **A22** proves
+  per-layer correctness. The independent review's six Tier-3 items (error_class count
+  16→19; README runtime-green qualifier; ALLOWED FILES header wording; residual
+  `under_review` locations logged in TD-003; new-glyph registration + "four-layer"
+  phrasing; prototype validate-role copy) were normalized in the same docs-only reset
+  commit. Prototypes (`fulfillment/`, `tracking-timeline/`, `external-fulfillment-review/`)
+  reconciled to §12. No `addons/**` change; no Shopify operation.
+  `STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING FRESH INDEPENDENT REVIEW`.
 - **Key finding (unchanged):** product docs carry vocabulary superseded by the
   shipped code (`external_service`/`carrier_event_only`, `over_fulfillment`,
   `under_review`/`auto_matched`/`rejected`); U1 binds to the code values — logged as

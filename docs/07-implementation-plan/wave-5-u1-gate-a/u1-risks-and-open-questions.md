@@ -114,6 +114,22 @@ The mode-switch consequences display is composed by U1 from bounded, ACL-safe,
 preflight** read-model is a **separate backend task**, recorded for later — never
 implemented in U1.
 
+**D-P2-6 — Status-layer & badge taxonomy. `RESET` (control-room synthesis-reset
+ruling, PR #194 comment `5058042330`; independent review `5057796514`).** A
+confirmed material P2 (UX/IA §8 mapped `display_status_*` to A5 and asserted a
+phantom A2 badge) was re-derived from the exact Wave 4 source and reset. The single
+**canonical Authoritative status-source & badge matrix** now lives in
+`u1-backend-ui-contract-inventory.md` §12; every dependent doc/prototype links to it.
+Bindings (source-verified at `2d9cff0`): **A7** = `display_status_*`
+(`Fulfillment.displayStatus`, display-only, never a carrier milestone); **A5** carrier
+milestones are represented **only** from `delivered_inconsistency` + parsed
+`tracking_snapshot`, never from A7, and never as a full A5 enum timeline (deferred —
+no backing enum); **A2 `FulfillmentOrderStatus`** = **DEFERRED — BACKEND READ SEAM NOT
+AVAILABLE** (no field; no badge); **A4** = `fulfillment_status_*` (automation authority
++ display); A1 available only indirectly via
+`order_binding_id.shopify_fulfillment_status_snapshot`; A3/A6 outside U1. Layers are
+never merged; acceptance A22 verifies label/icon/severity correctness per layer.
+
 ## Standing risks
 
 - **CV-013 (#185) open/critical** — live fulfillment mutation qualification unproven
@@ -125,6 +141,15 @@ implemented in U1.
   sources are `odoo_event`/`scheduled_sync`/`reconciliation`/`manual_sync`.
 - **No Task-014 validation-results file yet** — no runtime record of operator
   surfaces; U1 acceptance must generate its own runtime evidence once Wave 4 merges.
+- **A5 delivered-inconsistency seams are declared but data-inert at `2d9cff0`** —
+  the `delivered_inconsistency` Boolean field and the
+  `review_reason='delivered_not_validated'` selection value both **exist** on the
+  evidence model but are **never written by any Wave-4 code path** (grep-verified).
+  The badge/case is therefore contract-ready but currently unpopulated: U1 renders it
+  when the backend sets it and must **never** synthesize the A5 case from the A7
+  `display_status_*` fields. Populating these seams is a **backend-completeness item
+  (not U1's to implement)** — flagged for the control room / a future Wave-4 backend
+  follow-up, and captured in the canonical §12 matrix invariants.
 
 ## Open questions (non-blocking, track)
 

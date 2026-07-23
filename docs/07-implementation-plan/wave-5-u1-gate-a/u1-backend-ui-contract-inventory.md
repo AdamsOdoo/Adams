@@ -92,15 +92,15 @@ Source: `models/shopify_connector_fulfillment_inbound_evidence.py`. **All fields
 | `shopify_order_gid` | Char | — | Safe (remote ref) |
 | `origin_class` | Selection | §5.2 | Safe |
 | `origin_confirmed` | Boolean | — | Safe |
-| `fulfillment_status_raw` | Char | — | Safe (badge source) |
-| `fulfillment_status_normalized` | Char | — | Safe (badge source) |
-| `fulfillment_status_is_success` | Boolean | — | Safe |
-| `display_status_raw` | Char | — | Safe (display-only per code) |
-| `display_status_normalized` | Char | — | Safe |
-| `state_snapshot` | Text (JSON) | — | **Guarded** — raw Layer-A snapshot; render parsed/summarised, never raw dump |
-| `schema_warning` | Boolean | — | Safe (unknown-enum flag) |
-| `delivered_inconsistency` | Boolean | — | Safe |
-| `tracking_snapshot` | Text (JSON) | — | **Guarded** — parse to chips; not a raw dump |
+| `fulfillment_status_raw` | Char | — | Safe (**A4** badge source — §12) |
+| `fulfillment_status_normalized` | Char | — | Safe (**A4** badge source — §12) |
+| `fulfillment_status_is_success` | Boolean | — | Safe (A4 automation flag) |
+| `display_status_raw` | Char | — | Safe (**A7** `FulfillmentDisplayStatus`, display-only per code — §12; **not** A5) |
+| `display_status_normalized` | Char | — | Safe (**A7**, display-only; stored = raw — §12) |
+| `state_snapshot` | Text (JSON) | — | **Guarded** — raw snapshot (A4+A7 only); render parsed/summarised, never raw dump |
+| `schema_warning` | Boolean | — | Safe (unknown-enum flag — §12) |
+| `delivered_inconsistency` | Boolean | — | Safe (**A5** delivered-inconsistency seam; declared but data-inert at `2d9cff0` — §12 / risks) |
+| `tracking_snapshot` | Text (JSON) | — | **Guarded** — **A5** carrier evidence (parsed `trackingInfo`); parse to chips, not a raw dump — §12 |
 | `reconciled_state` | Selection | §5.3 | Safe |
 | `review_reason` | Selection | §5.4 | Safe (badge) |
 | `review_detail` | Text | — | Safe — code guarantees this is **sanitized** structured detail, never a raw payload |
@@ -179,10 +179,12 @@ Added: `fulfillment_tracking_change`. Merged core value reused: `fulfillment_pic
 `retry_waiting`, `failed_retryable`, `blocked_manual_review`.
 Terminal: `succeeded`, `failed_final`, `skipped`, `cancelled`.
 
-### 5.8 Core `error_class` (16) / `manual_review_subreason` (9)
-`error_class`: `shopify_throttling_rate_limit`, `shopify_temporary_server_network`,
+### 5.8 Core `error_class` (19) / `manual_review_subreason` (9)
+`error_class` (**19 members** = 6 base + the 9 `manual_review_subreason` values +
+4 tail; verified in `core/models/shopify_connector_job.py` `ERROR_CLASS_SELECTION`):
+`shopify_throttling_rate_limit`, `shopify_temporary_server_network`,
 `shopify_permission_scope_auth`, `shopify_user_errors_validation`, `odoo_validation_configuration`,
-`mapping_missing`, + the 9 subreasons, + `financial_total_mismatch`, `data_shape_schema_mismatch`,
+`mapping_missing`, **+ the 9 subreasons**, + `financial_total_mismatch`, `data_shape_schema_mismatch`,
 `concurrency_race_conflict`, `unknown_system_error`.
 `manual_review_subreason` (9): `ambiguous_match`, `binding_conflict`, `duplicate_risk`,
 `no_reconciliation_strategy`, `idempotency_contract_violation`, `store_identity_mismatch`,
@@ -304,7 +306,7 @@ strings (do **not** use in views/prompts):
 | Product doc value | Doc source | Code-authoritative value |
 |---|---|---|
 | origin `external_service` | `fulfillment-operating-modes.md` §3 | `external_app` |
-| origin `carrier_event_only` | same | (no such origin class; carrier milestones surface via `delivered_inconsistency` / status fields) |
+| origin `carrier_event_only` | same | (no such origin class; carrier milestones surface via `delivered_inconsistency` + parsed `tracking_snapshot` — **not** the A7 `display_status_*` fields; see §12) |
 | origin unknown (unnamed) | same | `external_unknown` |
 | review reason `over_fulfillment` | same §4 (cond. 6) | `quantity_overrun` |
 | reconciled state `under_review` | same §5 | `review` |
@@ -314,6 +316,17 @@ strings (do **not** use in views/prompts):
 These are logged as **TD (documentation)** in `u1-risks-and-open-questions.md` and
 must be reconciled in the U1 copy deck, which maps each **code** value to an
 operator label.
+
+**Residual un-annotated superseded-vocabulary locations (outside this reset's
+allowed files — logged, not edited here).** Two documents outside the Wave 5 U1
+Gate A allowed-files set still carry the superseded `under_review` string
+un-annotated: `docs/05-qa/fulfillment-mode-uat-matrix.md` (scenario **UAT-FM-3.3**)
+and `docs/02-product/premium-ux-master-specification.md` (**§3 S21**). They are
+recorded here and in **TD-003** as residual locations for a separately-authorized
+product-doc reconciliation pass; the code value is `review` (§5.3). This reset does
+**not** edit those two files (they are not in the allowed set — see
+`u1-gate-a-handoff.md`), and their presence does not weaken the code-authoritative
+rule.
 
 ---
 
@@ -335,3 +348,82 @@ consequences), it is built by **reading** existing ACL-safe records with bounded
 domains in the view/wizard layer — never by adding backend business logic, and
 never used to decide eligibility, classify blockers, or determine "review required"
 (those stay server-authoritative; the wizard is display-and-delegate only).
+
+---
+
+## 12. Authoritative status-source & badge matrix (CANONICAL — source-verified at `2d9cff0`)
+
+> **This §12 is the single canonical source-of-truth for every U1 status badge,
+> operational visualization, and status-derived surface.** UX/IA §8, the acceptance
+> & test matrix, the locked implementation prompt, and the fulfillment/tracking
+> prototypes all reference this matrix and **must not re-derive or contradict it**.
+> Governing rule (control-room ruling `5058042330`): **never infer a field merely
+> because Shopify exposes the enum** — a badge exists in U1 only when an exact
+> backing field or sanctioned read seam exists at Wave 4 head
+> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`. Status layers are **never merged or
+> silently renamed** (status model §1/§9).
+>
+> The Shopify platform exposes **seven Layer-A enum families (A1–A7)** within the
+> status model's four-layer (Layer A/B/C/D) taxonomy. Wave 4 code persists only a
+> **subset** of them; the rest are deferred or out of U1. This matrix records what
+> is actually backed, not what Shopify could expose.
+
+### 12.1 Backend source & availability
+
+| # | Layer / family | Authoritative source (model) | Exact backing field / read seam | At `2d9cff0` | Raw | Normalized | Source class | U1 disposition |
+|---|---|---|---|---|---|---|---|---|
+| L0 | **Odoo delivery** | `stock.picking` (Odoo) | `stock.picking.state` | **yes** | n/a (Odoo enum) | n/a | **automation authority** — real stock movement | **Implemented** — lineage node; the sole authority for stock completion |
+| A1 | `OrderDisplayFulfillmentStatus` (order roll-up) | `shopify.connector.order.binding` (`_sale`) | `order_binding_id.shopify_fulfillment_status_snapshot` (Char) — indirect, via the evidence→order-binding relation | **yes** (indirect seam) | yes | **no** normalized A1 field | display only | **Represented indirectly** — surfaced through the order-binding lineage; **not** the review-case primary badge |
+| A2 | `FulfillmentOrderStatus` (FO work-state) | Shopify FulfillmentOrder — **not persisted by the connector** | **NONE** (no field on `inbound.evidence` or `fulfillment.binding`; `shopify_fulfillment_order_gids` is the FO-GID list, **not** the FO status) | **NO** | — | — | (Shopify: automation input — **not captured**) | **DEFERRED — BACKEND READ SEAM NOT AVAILABLE.** No standalone A2 badge in U1; not inferred from any other layer |
+| A3 | `FulfillmentOrderRequestStatus` | Shopify FO `requestStatus` — not persisted | NONE | **NO** | — | — | (Shopify: display + gating — not captured) | **Outside U1** (no seam) |
+| A4 | `FulfillmentStatus` (fulfillment result) | `shopify.connector.fulfillment.inbound.evidence` | `fulfillment_status_raw`, `fulfillment_status_normalized`, `fulfillment_status_is_success` | **yes** | yes (`node['status']`) | yes (`A4_FULFILLMENT_STATUS_KNOWN`: SUCCESS/CANCELLED/ERROR/FAILURE + deprecated OPEN/PENDING) | **automation authority** (Mode 2 condition 2 gate) **+ display** | **Implemented** — primary fulfillment-result badge; `_is_success` is the automation flag |
+| A5 | `FulfillmentEventStatus` (carrier milestone) | `...inbound.evidence` (+ review reader) | `delivered_inconsistency` (Boolean) **+** `tracking_snapshot` (Text/JSON of `trackingInfo`). **No normalized A5-enum field exists.** | `tracking_snapshot` **yes** (populated from `trackingInfo`; **read** in `review.py:160`); `delivered_inconsistency` **declared but never written `True`** by any Wave-4 path (data-inert — see risks) | `tracking_snapshot` = raw `trackingInfo` (company/number/url) only; **no** raw A5-event field | **no** normalized A5 enum | **display only** + `delivered_inconsistency` is a **derived warning/review state** | **Represented indirectly / partial** — render parsed `tracking_snapshot` chips + the delivered-inconsistency case; **never consume the A7 `display_status_*` fields**; a full normalized A5 milestone timeline is **deferred** (no backing enum) |
+| A6 | `FulfillmentHoldReason` | Shopify hold — not persisted | NONE | **NO** | — | — | (Shopify: display only — not captured) | **Outside U1** (no seam) |
+| A7 | `FulfillmentDisplayStatus` (display roll-up) | `...inbound.evidence` | `display_status_raw`, `display_status_normalized` — **both** = `node['displayStatus']` (`Fulfillment.displayStatus`) | **yes** | yes | stored **= raw** (no normalization applied at `2d9cff0`) | **display only — never an automation input** (code comment, `inbound_evidence.py:106`) | **Implemented** — A7 display-status badge, **display-only**; **never labelled or iconized as a carrier milestone** (it is not A5) |
+| — | State snapshot (audit) | `...inbound.evidence` | `state_snapshot` (Text/JSON — **only** `A4_FulfillmentStatus` + `A7_displayStatus`) | **yes** | yes (raw A4+A7) | n/a | **audit only** | **Lineage/detail** — parsed chips, never a raw dump (§9 guarded) |
+| — | Unknown-value flag | `...inbound.evidence` | `schema_warning` (Boolean; set `not is_known` for an unknown A4 value) | **yes** | n/a | n/a | **derived warning** | **Implemented** — "Unknown status (raw value)" chip; fails closed, never success |
+| C1 | Connector reconciliation | `...inbound.evidence` | `reconciled_state` (5: observed/review/acknowledged/applied/superseded) | **yes** | n/a | n/a | connector reconciliation state | **Implemented** — reconciliation badge |
+| C2 | Review / error condition | `...inbound.evidence` + core `shopify.connector.job` | `review_reason` (20) on evidence; `error_class` (**19**) / `manual_review_subreason` (9) / job `state` (10) on the job | **yes** | n/a | n/a | **derived review/error state** (operator + audit) | **Implemented** — review-reason badge + job error/state |
+| C3 | Origin classification | `...inbound.evidence` | `origin_class` (4) + `origin_confirmed` (Boolean) | **yes** | n/a | n/a | automation input (origin gating) + display | **Implemented** — origin chip |
+| C4 | Mutation-attempt outcome | core `shopify.connector.mutation.attempt` | `observed_outcome` (4) + `resolution_*` (safe summary — §9) | **yes** | n/a | n/a | **audit / lineage** (safe summary only) | **Lineage/detail** — never the intent/fingerprint/idempotency-key fields (§9) |
+| C5 | Binding fulfillment status | `shopify.connector.fulfillment.binding` | `shopify_status_snapshot` (Char) + `shopify_status_normalized` (Char) | **yes** | yes | yes | display only (binding-level snapshot) | **Represented indirectly** — binding lineage badge |
+
+### 12.2 Visual / badge contract (per retained, rendered layer)
+
+Labels/icons are **semantic placeholders** reconciled to the platform FontAwesome
+set (P9) at implementation (status model §9). Severity tokens reuse the U0 layer
+(calm/info/warning/critical/unknown).
+
+| Layer | Operator label family | Icon family (semantic) | Severity rule | Unknown value | Empty / unavailable |
+|---|---|---|---|---|---|
+| L0 Odoo delivery | Draft / Waiting / Ready / **Done** / Cancelled | `truck` / `check-circle` | calm→done; info→in-progress | n/a (fixed Odoo enum) | no picking → "—" |
+| A1 order roll-up | Not shipped / Partially shipped / Fully shipped / … (status model §2) | `truck-outline` / `truck-half` / `truck-check` | per §2 | `badge-unknown` / `help-circle` (§7) | no snapshot → no badge |
+| A4 fulfillment result | Shipped (confirmed) / Cancelled / Error / Failed | `check-circle` / `cancel` / `alert-circle` / `close-octagon` | calm / warning / critical (§4) | "Unknown: RAW", `schema_warning`, never success | no status → "—", `_is_success=false` |
+| A5 carrier milestone (tracking + delivered-inconsistency **only**) | tracking chips (carrier/number); **Delivered per carrier — Odoo delivery not validated** (delivered-inconsistency) | `truck-fast` / `package-check`; inconsistency → `alert-decagram` | tracking chips info/calm; **delivered-inconsistency → critical, pinned** (§8) | unknown milestone → §7 ("unknown milestone") | no `trackingInfo` → no chips; `delivered_inconsistency=false` → no inconsistency badge |
+| A7 display status (roll-up, display-only) | e.g. Marked as fulfilled / Submitted / Label printed / In transit / Delivered — **shown as "Shopify display status"**, never as a carrier event | `tag` / `information-outline` (distinct from A5 `truck-*`) | calm/info; **never critical by itself** | `badge-unknown` (§7) | no value → "—" |
+| C1 reconciliation | Observed / Review Case Open / Acknowledged / Applied / Superseded | `eye` / `hand` / `check` | review → warning/critical; applied → calm | n/a (fixed selection) | default `observed` |
+| C2 review reason / error | the 20 review reasons / 19 error classes (operator labels via copy deck) | `tag` / `alert-*` | per reason severity | `unknown_status_value` review reason; `unknown_system_error` | no reason → not a review case |
+| C3 origin | Connector-Created / External — Merchant / External — App/Service / External — Unknown Origin | `link` / `store` / `apps` / `help` | neutral/info | `external_unknown` handles the unknown case | default `external_unknown` |
+| — unknown-value | Unknown status (raw value) | `help-circle` | warning | (this row **is** the unknown handler) | — |
+
+### 12.3 Binding invariants (enforced by acceptance A22)
+
+- **One badge per layer; layers never merged** (status model §1/§9).
+- **Word + icon on every consequential state; colour is never the only signal.**
+- **A5 and A7 use clearly different labels and icons** — A7 is the Shopify
+  *display-status roll-up* (`display_status_*`), A5 is a *carrier milestone*
+  (`tracking_snapshot` + `delivered_inconsistency`). A7 values
+  (`MARKED_AS_FULFILLED`, `SUBMITTED`, `LABEL_PRINTED`, `IN_TRANSIT`, `DELIVERED`, …)
+  are **never** rendered under a carrier-milestone badge.
+- **A4 success ≠ Odoo stock completion; A7 roll-up ≠ carrier delivery.** Only
+  `stock.picking.state = done` proves stock movement.
+- **`delivered_inconsistency` stays high-visibility when set** (§8), but is
+  **data-inert at `2d9cff0`** (declared, never written `True`; likewise
+  `review_reason='delivered_not_validated'`) — U1 renders the flag/reason when the
+  backend populates it and must not synthesize A5 state from A7 (see
+  `u1-risks-and-open-questions.md`).
+- **No badge without backing evidence** — A2/A3/A6 are deferred/outside U1; no
+  phantom badge.
+- **Guarded JSON** (`state_snapshot`, `tracking_snapshot`, `tracking_*_snapshot`,
+  `shopify_fulfillment_order_gids`) is parsed to chips/links, **never** dumped; the
+  §9 never-render set is never surfaced.

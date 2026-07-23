@@ -107,9 +107,11 @@ Realized by the prototypes as the **External fulfillment review center**
   system failure."
 - **Case detail (form)** — two columns, **evidence left / decision right**:
   - Evidence: Fulfillment GID, FO GIDs (`shopify_fulfillment_order_gids`),
-    order↔sale binding, `fulfillment_status_*`/`display_status_*` badges (Layer-A
-    families §8), `review_reason` badge, `review_detail` (sanitized), tracking
-    (parsed from `tracking_snapshot`), `line_ids` comparison table (Shopify vs
+    order↔sale binding, `fulfillment_status_*` (**A4**) and `display_status_*`
+    (**A7**, display-only) badges — kept distinct per §8/§12 (A7 is never a carrier
+    milestone), `review_reason` badge, `review_detail` (sanitized), carrier-milestone
+    evidence (parsed from `tracking_snapshot`, **A5**; plus the
+    `delivered_inconsistency` case when set), `line_ids` comparison table (Shopify vs
     Odoo remaining), location-mapping check.
   - Decision (role-gated buttons → §6 sanctioned actions):
     **Import tracking** (`action_import_tracking`, Operator+),
@@ -142,9 +144,12 @@ Realized by the prototypes as the **External fulfillment review center**
   contract). Reuse U0's Mutation Evidence list (read-only for all roles; the only
   change path is the admin `action_resolve_mutation_attempt` wizard).
 - **Tracking timeline** (optional, from the prototype) — a read-only carrier
-  milestone view; **a milestone never validates Odoo stock nor changes the
-  reconciliation state**. In U1 this can be a form section over
-  `state_snapshot`/`tracking_snapshot`, not a new Owl surface (PD-7).
+  milestone (**A5**) view; **a milestone never validates Odoo stock nor changes the
+  reconciliation state**. In U1 this is a form section over the parsed
+  `tracking_snapshot` (carrier/number/url — the only A5 evidence backed at `2d9cff0`)
+  plus the `delivered_inconsistency` case, not a new Owl surface (PD-7). A **full
+  normalized A5 milestone-enum timeline is deferred** (no backing enum field — §12);
+  `state_snapshot` is an **A4+A7** audit blob, not an A5 source.
 
 ## 6. Mode-switch confirmation flow (display-and-delegate consequences pattern)
 
@@ -188,28 +193,65 @@ the admin mode buttons, mirroring the prototype's **Mode 2 consequences drawer**
 - **Verification-before-retry** — uncertain outcomes read "Verifying remote
   result… checking Shopify before any retry, never a blind resend"; retry offered
   only on server-eligible rows.
-- **Delivered-inconsistency** — surface the `delivered_inconsistency` flag as a
-  high-visibility case: "Delivered per carrier — Odoo delivery not validated";
-  never auto-resolves by stock change.
+- **Delivered-inconsistency (A5, §12)** — surface the `delivered_inconsistency`
+  flag as a high-visibility case: "Delivered per carrier — Odoo delivery not
+  validated"; never auto-resolves by stock change. *(The `delivered_inconsistency`
+  field and the `review_reason='delivered_not_validated'` value exist at `2d9cff0`
+  but are **not yet written by any Wave-4 code path** — U1 renders them when the
+  backend populates them and must never synthesize the A5 case from the A7
+  `display_status_*` fields; see `u1-risks-and-open-questions.md`.)*
 - **Unknown-status** — `schema_warning` renders "Unknown status (raw value)",
   degraded health chip, never silently success.
 
 ## 8. Status badge taxonomy (one badge per layer; never merged)
 
-From `shopify-fulfillment-status-model.md` (four-layer taxonomy) + the code fields:
+**The single source of truth for every badge below is the canonical Authoritative
+status-source & badge matrix in `u1-backend-ui-contract-inventory.md` §12**
+(source-verified at Wave 4 head `2d9cff0`). This section renders that matrix as the
+UI/badge contract; it does **not** re-derive it, and no badge here may contradict
+§12. The Shopify platform exposes **seven Layer-A enum families (A1–A7)** inside the
+status model's four-layer (Layer A/B/C/D) taxonomy; **Wave 4 code backs only a
+subset**, so U1 renders only the backed layers and defers the rest — never inferring
+a field merely because Shopify exposes the enum.
 
-- **Odoo delivery** — `stock.picking.state` (authority for real stock).
-- **Order roll-up** — A1 `OrderDisplayFulfillmentStatus`.
-- **FulfillmentOrder work-state** — A2 `FulfillmentOrderStatus`.
-- **Fulfillment result** — A4 `FulfillmentStatus` (Mode-2 condition-2 gate) →
-  code `fulfillment_status_raw`/`_normalized`/`_is_success`.
-- **Carrier milestone (display only)** — A5 `FulfillmentEventStatus` →
-  code `display_status_raw`/`_normalized`.
-- **Connector reconciliation** — `reconciled_state`.
+**Backed U1 badges** (each maps to an exact §12 backing field/seam):
 
-Severity vocabulary reuses U0 tokens: calm/neutral, info, warning, danger,
-unknown. **Colour is never the only signal** (icon + label always). Severities
-never downgrade by roll-up (row shows the max severity across its layers).
+- **Odoo delivery** — `stock.picking.state` (the authority for real stock).
+- **A1 order roll-up (display)** — `OrderDisplayFulfillmentStatus`, available
+  **indirectly** via `order_binding_id.shopify_fulfillment_status_snapshot`
+  (lineage; not the review-case primary badge).
+- **A4 fulfillment result** — `FulfillmentStatus` (Mode-2 condition-2 automation
+  gate **+** display) → `fulfillment_status_raw`/`_normalized`/`_is_success`.
+- **A7 fulfillment display status (display only)** — `FulfillmentDisplayStatus`
+  (`Fulfillment.displayStatus`) → `display_status_raw`/`_normalized`. A7 is a
+  merchant-facing roll-up, **display-only, never an automation input**, and is
+  **never labelled or iconized as a carrier milestone** (it is not A5).
+- **A5 carrier milestone (display only)** — `FulfillmentEventStatus` is **not stored
+  as a normalized enum** at `2d9cff0`. U1 represents accepted milestone evidence
+  **only** from the `delivered_inconsistency` case (§7) and safely parsed
+  `tracking_snapshot` chips — **never** from the A7 `display_status_*` fields, and
+  never as a full A5 enum timeline (that surface is deferred — no backing enum).
+- **Connector reconciliation** — `reconciled_state`; **review/error condition** —
+  `review_reason` (+ core job `error_class`/`state`); **origin** — `origin_class`;
+  **unknown value** — `schema_warning` (fails closed, never success).
+
+**Deferred / outside U1** (no backing seam at `2d9cff0` — **no badge**):
+
+- **A2 `FulfillmentOrderStatus`** — **DEFERRED — BACKEND READ SEAM NOT AVAILABLE**:
+  no field on `inbound.evidence` or `fulfillment.binding` backs it
+  (`shopify_fulfillment_order_gids` is the FO-GID list, not the FO status). Not
+  inferred from any other layer; no standalone A2 badge in U1.
+- **A3 `FulfillmentOrderRequestStatus`**, **A6 `FulfillmentHoldReason`** — not
+  captured by Wave 4 code; outside U1.
+
+Rules (status model §1/§9; enforced by acceptance A22): **one badge per layer,
+layers never merged**; **word + icon always — colour is never the only signal**;
+**A5 and A7 use clearly different labels/icons**; **A4 success ≠ Odoo stock
+completion and A7 roll-up ≠ carrier delivery** (only `stock.picking.state = done`
+proves stock movement); **no badge appears without backing evidence**. Severity
+tokens reuse U0 (calm/info/warning/danger/unknown); severities never downgrade by
+roll-up (a row shows the max severity across its **distinct** layers, never a merged
+status).
 
 ## 9. States, empties, responsive, accessibility, performance
 
@@ -232,7 +274,13 @@ never downgrade by roll-up (row shows the max severity across its layers).
   horizontal page scroll; optional columns hidden ≤640px keeping the primary
   answer visible.
 - **Icons** — use the **platform FontAwesome set (P9)**; the prototype's inline
-  SVGs are placeholders.
+  SVGs are placeholders. Any **new semantic glyph** introduced by U1 beyond the §7
+  failure/manual-review catalogue and the design-system icon library — notably the
+  distinct **A7 display-status** icon (e.g. `tag`/`information-outline`, kept visually
+  distinct from the A5 `truck-*`/`package-check` carrier icons per §8/§12) and the
+  delivered-inconsistency `alert-decagram` — must be **registered as an explicit
+  `[Recommendation]`** and reconciled to the FontAwesome set at implementation, never
+  silently added.
 
 ## 10. Copy principles specific to U1 (code→label mapping owned by the copy deck)
 

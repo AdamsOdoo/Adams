@@ -43,7 +43,8 @@ the U0 design token layer, copy principles, and Odoo-19 view idioms VERBATIM.
 Wire EVERY button ONLY to the sanctioned Wave 4 actions listed in the backend
 UI-contract inventory §6. Introduce NO business logic.
 
-ALLOWED FILES (all NEW/edited under addons/shopify_connector_fulfillment/):
+ALLOWED FILES (addon files are under addons/shopify_connector_fulfillment/; the
+five docs/... deliverables at the end are repo-root paths, NOT under the addon):
   views/shopify_connector_fulfillment_menus.xml
   views/shopify_connector_store_settings_fulfillment_views.xml
   views/shopify_connector_fulfillment_review_views.xml
@@ -117,6 +118,16 @@ HARD CONSTRAINTS:
   - NEVER render remote_mutation_intent / preconditions_snapshot / *_fingerprint /
     shopify_idempotency_key / remote_evidence_refs / mode_switch_nonce / tokens.
     Parse JSON snapshots; never dump raw. No raw traceback/payload/credential.
+  - STATUS-BADGE TAXONOMY is FROZEN to the canonical matrix in the backend
+    UI-contract inventory §12 (and UX/IA §8): one badge per layer, layers never
+    merged. display_status_raw/_normalized are A7 FulfillmentDisplayStatus
+    (display-only) — NEVER render them as an A5 carrier milestone. A5 carrier
+    evidence comes ONLY from parsed tracking_snapshot + the delivered_inconsistency
+    case — NEVER from the A7 fields, and NEVER as a full A5 enum timeline. There is
+    NO A2 FulfillmentOrderStatus badge (deferred — no backing field). A4 success is
+    not Odoo stock completion; A7 roll-up is not carrier delivery; only
+    stock.picking.state=done proves stock movement. Every badge maps to an exact
+    §12 backing field; no badge without backing evidence (acceptance A22).
   - Mode display + change on the Store form; review workspace + lineage as standard
     Odoo list/form/search views; consequences via the TransientModel wizard.
   - Five states per surface; bounded/paginated lists; word+icon never colour alone;

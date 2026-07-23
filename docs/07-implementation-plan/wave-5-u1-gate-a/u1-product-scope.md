@@ -92,8 +92,9 @@ denial through these internal groups.
 - **Mode switching (admin-only, audited):** switching to Mode 2 runs a **read-only
   safe reconciliation scan**; Mode 2 activates only on a clean scan; blockers abort
   back to Mode 1. **Never replays history** — pre-existing unresolved externals
-  stay review cases and are **listed at confirmation time**. **Rollback to Mode 1
-  always allowed**; cancels in-flight Mode 2 evaluations back to review; evidence/
+  stay review cases and are surfaced as a **bounded, non-authoritative informational
+  count** at confirmation time (the server reconciliation scan is authoritative).
+  **Rollback to Mode 1 always allowed**; cancels in-flight Mode 2 evaluations back to review; evidence/
   bindings/audit untouched. In-flight Layer 2 mutation jobs are **not** cancelled.
 - **CV-013 caveat:** the `fulfillment_staff_permission` readiness check is
   `NOT_PROVEN`; live fulfillment mutation qualification stays blocked until

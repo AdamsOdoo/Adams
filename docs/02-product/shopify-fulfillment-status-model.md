@@ -29,12 +29,26 @@
 > | Section · anchor | Superseded value | Code-authoritative replacement |
 > |---|---|---|
 > | §1 "Layer C — connector-derived states", reconciliation-state enumeration | `under_review` / `auto_matched` / `rejected` | `review`; `auto_matched` and `rejected` are **absent** (not stored states); full set: `observed`/`review`/`acknowledged`/`applied`/`superseded` |
-> | §1 "Layer C — connector-derived states", origin-classes enumeration | `external_service` / `carrier_event_only` | `external_app` / (removed origin — carrier milestones via `delivered_inconsistency` / status fields); full set: `connector`/`external_merchant`/`external_app`/`external_unknown` |
+> | §1 "Layer C — connector-derived states", origin-classes enumeration | `external_service` / `carrier_event_only` | `external_app` / (removed origin — carrier milestones surface via `delivered_inconsistency` + parsed `tracking_snapshot`, **not** the A7 `display_status_*` fields); full set: `connector`/`external_merchant`/`external_app`/`external_unknown` |
 >
 > **Not superseded — leave untouched (false positives):** the word "rejected" in the
 > **Layer A** Shopify tables (`REQUEST_DECLINED` "a fulfillment service rejected some
 > items"; `REJECTED` / `fo_req_rejected`; `CANCELLATION_REJECTED`) is a **Shopify**
 > enum/prose value, **not** the Layer C reconciliation state.
+>
+> **U1-backing disposition (Wave 5 U1 Gate A status-layer reset, 2026-07-23 — ruling
+> `5058042330`).** This document describes the full Shopify platform taxonomy
+> (Layer-A families A1–A7). **Wave 4 code at `2d9cff0` backs only a subset**, so U1
+> renders only the backed layers; the authoritative U1 status/badge source-of-truth
+> is the canonical matrix in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §12. In particular: **A4** = `fulfillment_status_*`; **A7** (§4.1) =
+> `display_status_*` (display-only — never a carrier milestone); **A5** carrier
+> milestones (§5) are **not** stored as a normalized enum and surface only via
+> `delivered_inconsistency` + parsed `tracking_snapshot`; **A2** (§3.1), **A3**
+> (§3.2), **A6** (§3.3) have **no U1 backing field** at `2d9cff0` (deferred/outside
+> U1). This annotation is non-destructive; the section values below are unchanged and
+> the document stays **Proposed**.
 
 ---
 

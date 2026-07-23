@@ -25,7 +25,7 @@
 | Wave 6 | Not started |
 | Shopify development store | Critical external dependency for CV-013 and Wave 4 final validation |
 
-### Wave 5 U1 Gate A — status note (2026-07-23; corrected 2026-07-23)
+### Wave 5 U1 Gate A — status note (2026-07-23; corrected 2026-07-23; status-layer synthesis reset 2026-07-23)
 
 **Wave 5 U1 (fulfillment operator experience) Gate A / Definition-of-Ready was
 prepared, then corrected once per control-room comment `5056513213`
@@ -44,8 +44,24 @@ wizards package); premium-UI browser/render evidence is **required before U1
 merge**. This is Gate-A planning only: **no U1 implementation is authorized**, and
 U1 code remains gated on PR #189 merge, **SEC-2 merge (runtime-green)**, D-P0-3
 (load-bearing Proposed product/UX contracts still need independent acceptance), and
-the wave-5 gates (G5-1…G5-9 all unchecked). `DOCS CORRECTED — AWAITING FRESH
-INDEPENDENT GATE-A REVIEW`.
+the wave-5 gates (G5-1…G5-9 all unchecked).
+
+**Status-layer synthesis reset (2026-07-23, control-room ruling `5058042330`;
+independent review `5057796514`):** a fresh independent review of the corrected head
+`36321db` returned `REVISE` on one confirmed **material P2** — UX/IA §8 mapped the
+code fields `display_status_*` to A5 `FulfillmentEventStatus` (they are A7
+`FulfillmentDisplayStatus`) and asserted a phantom A2 `FulfillmentOrderStatus` badge
+with no backing field. The control room ruled a docs-only **synthesis reset**: the U1
+status/badge contract was re-derived from the exact Wave 4 source into **one canonical
+status-source & badge matrix** (`u1-backend-ui-contract-inventory.md` §12) — A7 =
+`display_status_*` (display-only, never a carrier milestone); A5 only via
+`delivered_inconsistency` + parsed `tracking_snapshot`; **A2 DEFERRED — no read seam,
+no badge**; A4 = `fulfillment_status_*`; layers never merged; acceptance **A22**
+proves per-layer correctness. The review's six Tier-3 items were normalized in the
+same commit; the fulfillment/tracking-timeline/external-review prototypes were
+reconciled to §12. No `addons/**` change; no Shopify operation; not
+self-accepted/ready-marked/merged. `STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING
+FRESH INDEPENDENT REVIEW`.
 
 ## 2. Product-owner calibration — effective 2026-07-22
 

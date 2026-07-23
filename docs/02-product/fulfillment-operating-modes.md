@@ -30,7 +30,7 @@
 > |---|---|---|
 > | §3 evidence-stacking table, row "None of the above resolves" | `external` (unnamed unknown origin) | `external_unknown` |
 > | §3 "resulting origin classes" list, item 3 | `external_service` | `external_app` |
-> | §3 "resulting origin classes" list, item 4 | `carrier_event_only` | (no such origin class — carrier milestones surface via `delivered_inconsistency` / status fields) |
+> | §3 "resulting origin classes" list, item 4 | `carrier_event_only` | (no such origin class — carrier milestones surface via `delivered_inconsistency` + parsed `tracking_snapshot`, **not** the A7 `display_status_*` fields) |
 > | §4 16-condition table, condition 6 ("No over-fulfillment"), review-reason cell | `over_fulfillment` | `quantity_overrun` (on evidence) **+** `ambiguous_match` (as `manual_review_subreason` on the core job) — semantic split, not a rename |
 > | §4 16-condition table, condition 15 ("Confirmed external") | `external_*` / "unknown-pending" scheme | code origin classes per §5.2 (`external_unknown` for unknown) |
 > | §5 inbound-record field table, "Origin classification" row | `external_service` / `carrier_event_only` | `external_app` / (removed origin) |
@@ -41,6 +41,15 @@
 > **Not superseded — leave untouched (false positives):** the word "rejected" in the
 > status banner above is the governance term *Rejected-approach* and the filename
 > `rejected-approaches-log.md`, **not** a reconciliation state.
+>
+> **U1 status-layer backing (Wave 5 U1 Gate A status-layer reset, 2026-07-23 — ruling
+> `5058042330`).** For which Shopify status layers U1 actually renders vs defers at
+> Wave 4 `2d9cff0`, the authoritative source-of-truth is the canonical status-source &
+> badge matrix in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §12 (A7 `display_status_*` display-only; A5 via `delivered_inconsistency` +
+> `tracking_snapshot` only; A2 deferred — no backing seam). This document stays
+> **Proposed**; section values are unchanged.
 
 ---
 

@@ -4,9 +4,15 @@
 > implementation.** Produced 2026-07-23 by the Wave 5 U1 Gate A
 > product/UX/architecture session; **corrected 2026-07-23** per control-room comment
 > [`5056513213`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5056513213)
-> (`REVISE — one consolidated docs-only correction`). **`DOCS CORRECTED — AWAITING
-> FRESH INDEPENDENT GATE-A REVIEW`.** Not self-accepted, not ready-marked, not
-> merged.
+> (`REVISE — one consolidated docs-only correction`); then **status-layer synthesis
+> reset 2026-07-23** per control-room ruling
+> [`5058042330`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5058042330)
+> (resolving the confirmed material-P2 in independent review
+> [`5057796514`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5057796514)
+> — see the canonical status-source & badge matrix in
+> `u1-backend-ui-contract-inventory.md` §12). **`STATUS-LAYER SYNTHESIS RESET
+> COMPLETE — AWAITING FRESH INDEPENDENT REVIEW`.** Not self-accepted, not
+> ready-marked, not merged.
 
 **U1 = the fulfillment operator experience** (the re-based UI phase after the
 merged U0 core surface — see `u1-product-scope.md` §0). Built entirely against the
@@ -59,7 +65,15 @@ strategy).
 - **Product/UX contracts (D-P0-3):** **NOT YET ACCEPTED** — still-Proposed;
   independent acceptance required before U1 implementation (see the Gate-A
   prerequisite & status table, §4).
-- **Overall:** `DOCS CORRECTED — AWAITING FRESH INDEPENDENT GATE-A REVIEW`.
+- **Status-layer & badge taxonomy (synthesis reset, ruling `5058042330`):** the
+  single **canonical status-source & badge matrix** is
+  `u1-backend-ui-contract-inventory.md` **§12** (dependent docs/prototypes link to
+  it, never re-derive it). `display_status_*` = **A7** (display-only, never a carrier
+  milestone); **A5** carrier milestones only from `delivered_inconsistency` + parsed
+  `tracking_snapshot`; **A2 `FulfillmentOrderStatus` DEFERRED — no backing seam, no
+  badge**; layers never merged; acceptance **A22** verifies per-layer correctness.
+- **Overall:** `STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING FRESH INDEPENDENT
+  REVIEW`.
 
 ## 3. U1 resource inventory (existing U1-related documentation found)
 
@@ -129,7 +143,7 @@ G5-1…G5-9 all remain **unchecked**.
 
 | Item | Source | Status |
 |---|---|---|
-| Wave 4 fulfillment backend (models/fields/actions/selections/groups) | `2d9cff0` (PR #189 head); `u1-backend-ui-contract-inventory.md` | **Accepted at Wave 4 Gate A / candidate runtime-green**, but **not on the integration tip until PR #189 merges** |
+| Wave 4 fulfillment backend (models/fields/actions/selections/groups) | `2d9cff0` (PR #189 head); `u1-backend-ui-contract-inventory.md` | **Accepted at Wave 4 Gate A / candidate runtime-green** (focused fresh-install + domain suites; the Wave 4 **nine-process concurrency campaign remains `DEFERRED — NOT PROVEN`**, §4.5), but **not on the integration tip until PR #189 merges** |
 | Module placement (inside `shopify_connector_fulfillment`) | PD-2, DEC-016(A), AR-079 | **Accepted** (D-P1-2) |
 | Design system (tokens/scales/a11y/screenshot criteria) | `premium-ui-ux-design-system.md` §4–§7/§12–§14 | **Accepted** |
 | UI/UX design-review checklist | `ui-ux-design-review-checklist.md` (AR-023) | **Accepted**, but still encodes the **four-role** model — the two-role SEC-2 acceptance must land first so U1 is built two-role |
