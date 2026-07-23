@@ -1,3 +1,109 @@
+### Wave 4 Tier-1 findings synthesis — PR #189 (docs-only) (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`, draft PR
+  [#189](https://github.com/AdamsOdoo/Adams/pull/189) (unchanged; docs-only
+  commit; unmerged; not marked ready; not self-accepted). **No `addons/**`
+  change; no code/test/CI file changed; no Odoo.sh runtime executed; no
+  Shopify request or mutation occurred.**
+- **Trigger:** a fresh independent Tier-1 review of exact head
+  `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a` returned `REVISE` (PR #189
+  comment [`5058257403`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5058257403))
+  — 2 confirmed P0s, 9 P1s, 13 material P2s — but its own headline counts
+  were internally inconsistent (stating both "25" and "26" blocking findings
+  against its own severity subtotals of 24). The control room accepted the
+  `REVISE` verdict as a valid hard stop and ordered one dedicated
+  synthesis/reset session before any correction implementation (comment
+  [`5058826143`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5058826143)).
+- **What this session did:** independently re-verified all 24 named findings
+  against the exact reviewed source (not the reviewer's summary), resolved
+  the 24/25/26 count discrepancy (24 is authoritative — the extra headline
+  counts trace to two findings each being mentioned in two dimension
+  write-ups without the review's own arithmetic being corrected to match its
+  own stated collapse), built 13 root-cause themes with full correction
+  boundaries/acceptance criteria/test-runtime matrices, assessed impact on
+  frozen PR #194 (Wave 5 U1 Gate A), and produced one locked (not-yet-
+  authorized) correction implementation prompt. Also corrected two
+  governance-doc findings the review itself raised: `technical-debt-register.md`'s
+  TD-002 row (reverted from a premature `Resolved` to `In progress`) and this
+  file's own stale Wave 4 Gate B "next-session prompt" (annotated, not
+  rewritten, to stop routing future review to ChatGPT — see that entry
+  below).
+- **Both P0s confirmed as binding baselines:** (P0-A) `stock_picking.py`
+  swallows a `UNIQUE(store_id, operation_scope_key)` collision with no
+  savepoint, silently discarding the caller's own transaction; (P0-B) Mode
+  2's picking-selection never checks for sibling, un-evidenced moves before
+  calling `picking._action_done()` on the whole picking, so a genuine partial
+  Shopify fulfillment can silently over-validate/stock-deduct an unrelated
+  order line.
+- **Recommended correction structure:** one correction campaign with ordered
+  internal stages on this same branch/PR (11 of 13 themes are immediately,
+  narrowly correctable within the existing allowed-files scope with no
+  destructive migration); 2 themes (multi-company `ir.rule` gap on
+  `shopify.connector.job`/`.mutation.attempt`; U0 dashboard job-type labels)
+  are fully outside this PR's implementable scope and require a separate
+  control-room-scoped DEC or scope amendment; 1 theme (picking-to-warehouse
+  cross-check) is partially so, pending an architecture decision closing
+  DEC-011's still-open item.
+- **Evidence classification (honest):** documentation-only synthesis —
+  verified by repository/diff/path/link/consistency checks, never a
+  fabricated runtime campaign. No correction test is claimed as executed.
+  The nine-process external-multiprocessing campaign remains `DEFERRED BY
+  PRODUCT OWNER — NOT PROVEN` (comment `5055372944`), unchanged by this
+  session. Issue #185 (CV-013) remains open/critical; issue #193 remains the
+  separate baseline owner.
+- **Files:** `docs/05-qa/wave-4-tier1-findings-ledger.md` (NEW),
+  `docs/07-implementation-plan/wave-4-tier1-correction-synthesis.md` (NEW),
+  `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` (NEW),
+  `docs/07-implementation-plan/wave-4-tier1-synthesis-handoff.md` (NEW);
+  updates to `docs/05-qa/technical-debt-register.md`,
+  `docs/05-qa/architecture-review-log.md` (AR-079),
+  `docs/07-implementation-plan/mvp-program-state.md`, and this file.
+
+- **Learning feedback loop:**
+  - *What worked:* dispatching one verification agent per root-cause theme
+    (rather than one pass over the whole review) let each theme's agent read
+    every relevant file in full and independently re-derive line-cited
+    evidence, which is how three refinements beyond the reviewer's own text
+    were caught: a broader exposure for the transaction-poisoning class (3
+    more unguarded `_enqueue_once` call sites), a second missing terminal
+    state (`failed_final`, not just `cancelled`) for the origin-confirmation
+    gap, and the concrete reason two findings (`P1-7`, `F-11`) cannot be
+    fixed inside this PR at all (they require editing `shopify_connector_core`,
+    forbidden by this PR's own locked allowed-files list without a
+    control-room amendment).
+  - *New lesson:* a review's own headline finding-count can be internally
+    inconsistent with its own itemized severity subtotals without any
+    individual finding being wrong — the fix is careful reconciliation
+    against the review's own text (which, in this case, already explained
+    the discrepancy in a parenthetical the headline arithmetic simply never
+    incorporated), not discarding or re-deriving the count from scratch.
+  - *Reinforced:* CLAUDE.md §13's no-self-acceptance rule applies exactly as
+    much to a synthesis/reset session as to an implementation session — this
+    session authored a correction *prompt* but did not, and may not, use it
+    itself.
+  - *Carry-forward risk:* the recommended correction batch, once
+    control-room-accepted, still requires full DEC-040 runtime rigor (fresh
+    exact-SHA Odoo.sh evidence, proportional to this Tier-1
+    mutation-safety/concurrency/data-integrity batch's risk and size) before
+    its own independent review — synthesizing the findings does not reduce
+    that requirement.
+
+- **Exact next-session prompt (control room or independent reviewer):**
+  *"Do not implement yet. First, the control room must accept or revise this
+  synthesis (`docs/07-implementation-plan/wave-4-tier1-correction-synthesis.md`)
+  and its recommended correction structure. Once accepted, a fresh
+  implementation session (never this synthesis session) may use
+  `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` to implement
+  the 11 authorized themes as one correction campaign with ordered internal
+  stages, run a full exact-SHA Odoo.sh campaign, and submit the result to
+  independent Claude review (a separate top-level session or a fresh
+  subagent — never ChatGPT-by-default, per DEC-039/DEC-040). Do not fold in
+  the two carved-out themes (multi-company job/mutation.attempt scoping;
+  U0 dashboard labels) without their own separate control-room decisions.
+  #185 (CV-013) remains open; no live Shopify mutation is authorized."*
+
+---
+
 ### U0 PR #192 — Stage R1 Odoo.sh runtime campaign + one consolidated correction (2026-07-22)
 
 - **Branch / PR:** `claude/u0-operator-ui-foundation`, draft PR
@@ -124,6 +230,8 @@
   - *Carry-forward risk:* SRR-10 (no-tracking reconcile is weaker, fails closed
     to `duplicate_risk` review) is retained by design; runtime proof (Gate C/D)
     of the concurrency + reconcile paths is still pending.
+
+> **Stale-routing correction (2026-07-23, Wave 4 Tier-1 findings synthesis, finding F-13):** the "Exact next-session prompt" below still names "CHATGPT CONTROL ROOM" as the routine Gate B reviewer. That was already superseded by DEC-039/DEC-040 (Accepted 2026-07-22, merged via PR #191 ahead of every runtime/reconciliation commit on this branch), which make **independent Claude review** (a separate top-level session or a fresh subagent) the default routine gate, repositioning ChatGPT as an optional strategic spot-check — this file was simply never updated when those DECs landed. In fact, an independent Claude Tier-1 review of exact head `2d9cff0` already ran under the correct model and returned `REVISE` (PR #189 comment `5058257403`); the control room accepted that verdict and ordered a synthesis reset (comment `5058826143`), now complete — see the top-of-file entry for this synthesis session. The prompt text below is retained verbatim for history; do not follow its "CHATGPT CONTROL ROOM" routing for any future Gate B work.
 
 - **Exact next-session prompt (control room):** *"CHATGPT CONTROL ROOM — perform
   the one exhaustive Wave 4 Gate B review of draft PR #189 (branch
