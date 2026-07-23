@@ -203,7 +203,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         move.state = 'confirmed'
         move.sale_line_id.id = line.id
         move.product_uom_qty = qty
-        move.product_uom = line.product_uom
+        move.product_uom = line.product_uom_id
         picking.move_ids = [move]
         return picking
 
@@ -396,7 +396,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         move.state = 'confirmed'
         move.sale_line_id.id = line.id
         move.product_uom_qty = qty
-        move.product_uom = line.product_uom
+        move.product_uom = line.product_uom_id
         picking.move_ids = [move]
         return picking
 
@@ -510,7 +510,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         dozen = self.env.ref('uom.product_uom_dozen')
         unit = self.env.ref('uom.product_uom_unit')
         sale_line = Mock()
-        sale_line.product_uom = dozen
+        sale_line.product_uom_id = dozen
         move = Mock()
         move.product_uom_qty = 24.0
         move.product_uom = unit
@@ -526,7 +526,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         unit = self.env.ref('uom.product_uom_unit')
         sale_line = self.env['sale.order.line'].create({
             'order_id': self.sale.id, 'product_id': self.product.id,
-            'product_uom_qty': 2.0, 'product_uom': dozen.id,
+            'product_uom_qty': 2.0, 'product_uom_id': dozen.id,
             'shopify_line_item_gid': 'gid://shopify/LineItem/UOM-DOZEN',
         })
         picking = self.env['stock.picking'].create({
@@ -1005,12 +1005,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         move_a.state = 'confirmed'
         move_a.sale_line_id.id = self.sale_line.id
         move_a.product_uom_qty = 2.0
-        move_a.product_uom = self.sale_line.product_uom
+        move_a.product_uom = self.sale_line.product_uom_id
         move_sibling = Mock()
         move_sibling.state = 'confirmed'
         move_sibling.sale_line_id.id = sibling_sale_line.id
         move_sibling.product_uom_qty = 1.0
-        move_sibling.product_uom = sibling_sale_line.product_uom
+        move_sibling.product_uom = sibling_sale_line.product_uom_id
         picking.move_ids = [move_a, move_sibling]
         order_binding = Mock()
         order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
@@ -1353,7 +1353,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
     def test_c8_picking_source_outside_mapped_subtree_fails_closed(self):
         other_loc = self.env['stock.location'].create({
             'name': 'F4 Unrelated', 'usage': 'internal',
-            'location_id': self.env.ref('stock.stock_location_locations').id,
+            'location_id': self.stock_loc.location_id.id,
         })
         evidence = self._evidence(
             shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-OUTSIDE',
@@ -1387,7 +1387,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
     def test_c14_mapping_changed_between_c8_and_c14_fails_closed(self):
         other_loc = self.env['stock.location'].create({
             'name': 'F4 Changed Mapping', 'usage': 'internal',
-            'location_id': self.env.ref('stock.stock_location_locations').id,
+            'location_id': self.stock_loc.location_id.id,
         })
         evidence = self._evidence(
             shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-CHANGED',

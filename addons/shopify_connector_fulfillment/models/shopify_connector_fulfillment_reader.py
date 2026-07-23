@@ -372,7 +372,7 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
         separately on the caller side)."""
         quantity = move_line.quantity or 0.0
         move_uom = move_line.product_uom_id
-        target_uom = sale_line.product_uom if sale_line else False
+        target_uom = sale_line.product_uom_id if sale_line else False
         if move_uom and target_uom and move_uom != target_uom:
             quantity = move_uom._compute_quantity(quantity, target_uom)
         return int(round(quantity))

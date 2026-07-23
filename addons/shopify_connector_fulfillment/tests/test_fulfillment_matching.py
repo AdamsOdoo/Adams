@@ -290,7 +290,7 @@ class TestFulfillmentMatching(TransactionCase):
         uom_dozen = self.env.ref('uom.product_uom_dozen')
         sale_line = self.env['sale.order.line'].create({
             'order_id': self.sale.id, 'product_id': self.product.id,
-            'product_uom_qty': 1.0, 'product_uom': uom_dozen.id,
+            'product_uom_qty': 1.0, 'product_uom_id': uom_dozen.id,
             'shopify_line_item_gid': 'gid://shopify/LineItem/UOM',
         })
         picking = self.env['stock.picking'].create({

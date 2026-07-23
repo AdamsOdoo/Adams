@@ -374,7 +374,26 @@ class TestFulfillmentConcurrency(TransactionCase):
             holder_cr.close()
 
     def _cleanup_store(self, store_id):
+        # FK-safe, residue-free order: every one of these tables carries an
+        # `ondelete='restrict'` `store_id` (or, for evidence, an
+        # `order_binding_id` restrict onto order_binding) -- deleting the
+        # store first would raise an IntegrityError while any of them still
+        # reference it. Evidence lines cascade automatically
+        # (`evidence_id` ondelete='cascade'), so they need no explicit delete.
         with db_connect(self.dbname).cursor() as cr:
+            cr.execute(
+                'DELETE FROM shopify_connector_fulfillment_inbound_evidence'
+                ' WHERE store_id = %s',
+                (store_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_location WHERE store_id = %s',
+                (store_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_order_binding WHERE store_id = %s',
+                (store_id,),
+            )
             cr.execute(
                 'DELETE FROM shopify_connector_job WHERE store_id = %s',
                 (store_id,),
@@ -811,12 +830,15 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'location': {'id': 'gid://shopify/Location/1'}},
             'line_items': [],
         }
+        stock_loc = self.env.ref('stock.stock_location_stock')
         picking = Mock()
         picking.id = 999999
         picking.state = 'assigned'
         picking.move_ids = []
+        picking.location_id = stock_loc
 
         Service = self.env['shopify.connector.fulfillment.service']
+        LocationModel = type(self.env['shopify.connector.location'])
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': store.id, 'job_source': 'reconciliation',
             'job_type': 'fulfillment_mode2_evaluation', 'state': 'queued',
@@ -824,10 +846,17 @@ class TestFulfillmentConcurrency(TransactionCase):
             'res_id': evidence.id,
             'payload_hash': 'mode2:%d' % evidence.id,
         })
+        # Condition 8's F-4 seam must resolve to a real mapped location (and
+        # `picking` must genuinely sit in its subtree) so the evaluation
+        # actually reaches condition 14 -- otherwise it fails closed earlier,
+        # at condition 8, with `location_unmapped`, and never proves the
+        # race this test targets.
         with patch.object(type(Service), '_read_order_fulfillments',
                           side_effect=[[_node('SUCCESS')], [_node('CANCELLED')]]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[fo]), \
+                patch.object(LocationModel, '_resolve_odoo_location',
+                             return_value=stock_loc), \
                 patch.object(type(Service), '_quantity_compatible_pickings',
                              return_value=[picking]), \
                 patch.object(type(Service), '_select_deterministic_picking',

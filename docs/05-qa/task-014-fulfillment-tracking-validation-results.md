@@ -1,5 +1,27 @@
 # Task 014 — Fulfillment / Tracking Validation Results (Wave 4 Gate B)
 
+> **Status (2026-07-23, narrow runtime correction session):** `WAVE 4
+> NARROW ODOO 19 CORRECTION IMPLEMENTED — FRESH EXACT-HEAD RUNTIME RERUN
+> NEXT`. The exact-head Odoo.sh runtime campaign for candidate `cc87088`
+> (build `35372226`, database
+> `adamsmen-claude-wave-4-fulfillment-gate-b-35372226`, Odoo 19.0 /
+> PostgreSQL 16.14) is accepted as authoritative `EXECUTED — FAIL` evidence
+> (PR #189 comment
+> [`5062917634`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5062917634);
+> issue #167 comment `5062920724`): the fulfillment suite returned
+> `10 failed + 35 errors / 281 tests`, rooted in a candidate-owned Odoo
+> 19-incompatible `sale.order.line.product_uom` access (Odoo 19 exposes
+> `product_uom_id`) plus four runtime-fixture defects the same run exposed.
+> This session performed exactly the one narrow correction the ruling
+> authorized — no synthesis, decision lock, architecture cycle, or broad
+> review. See §"WAVE 4 NARROW ODOO 19 RUNTIME CORRECTION" below for the
+> full finding-by-finding record. No Odoo runtime is available in this
+> session's own container; the correction is verified by `py_compile`,
+> `ast.parse`, and source/call-site tracing only — never claimed as
+> `EXECUTED — PASS`. No live Shopify request or mutation occurred. Draft
+> PR #189, unmerged, not marked ready, not self-accepted — this session
+> performed no self-review.
+
 > **Status (2026-07-23, consolidated correction session):** `WAVE 4
 > CONSOLIDATED CORRECTION IMPLEMENTED — RUNTIME VERIFICATION NEXT`. Per the
 > binding control-room review (PR #189 comment `5061975312`, exact reviewed
@@ -34,6 +56,68 @@
 > session performed no self-review. See §"WAVE 4 CLOSURE CORRECTION
 > CAMPAIGN" below for the full theme-by-theme record; the sections below it
 > are the prior sessions' historical record, preserved unchanged.
+
+---
+
+## WAVE 4 NARROW ODOO 19 RUNTIME CORRECTION — 2026-07-23 (this session)
+
+**Base (unchanged):** `mvp/program-integration@dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+**Prior head:** `cc87088e46d1707d35a3271a420034f9762c9562` (the consolidated
+correction below, exact-head runtime-tested and found `EXECUTED — FAIL`).
+**Authorization:** the binding control-room runtime-failure ruling, PR #189
+comment
+[`5062917634`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5062917634)
+(`WAVE 4 EXACT-HEAD RUNTIME FAILED — ONE NARROW ODOO 19 CORRECTION
+REQUIRED`), mirrored in issue #167 comment `5062920724` — the complete,
+narrow correction contract for this session.
+
+### Runtime evidence this correction responds to (accepted as binding, not re-litigated)
+
+- Odoo.sh build `35372226`, database
+  `adamsmen-claude-wave-4-fulfillment-gate-b-35372226`, Odoo 19.0 /
+  PostgreSQL 16.14, exact checked-out SHA `cc87088`, clean tree, no Shopify
+  request or mutation.
+- Fulfillment suite: `10 failed + 35 errors / 281 tests` — distinct from
+  issue #193's baseline signature and candidate-owned.
+- Runtime-green and preserved unchanged by this correction: fail-closed
+  scans/PD-B4 (`12/12 + 16/16`), ordinary warehouse-user behavior
+  (`15/15`), deterministic ascending lock order, module schema/registry
+  warm update, leak/redaction, zero Shopify operations.
+
+### Finding-by-finding result
+
+| Finding | Root cause | Correction | Files | Static result |
+| --- | --- | --- | --- | --- |
+| Primary candidate-owned P0 — Odoo 19-incompatible sale-line UoM access | `_move_qty_in_sale_uom`/`_qty_equal` read the nonexistent `sale.order.line.product_uom`; Odoo 19 renamed this field to `product_uom_id` | Both helpers now read `sale_line.product_uom_id` | `shopify_connector_fulfillment_mode2.py` | py_compile clean; `sale_line.product_uom` (non-`_id`) grep-clean across the addon |
+| Pre-existing Wave-4 defect exposed by the same runtime family | `_fo_line_uom_quantity` read the same nonexistent `sale_line.product_uom` | Corrected to `sale_line.product_uom_id` | `shopify_connector_fulfillment_reader.py` | py_compile clean |
+| Invalid `sale.order.line` fixture field/access uses of `product_uom` | Test fixtures set/created `product_uom` on `sale.order.line` Mocks and real records (a field that doesn't exist on the model); `stock.move`'s own genuine `product_uom` field was left untouched | Every sale-line-side reference corrected to `product_uom_id`; `stock.move`/`stock.move.line` `product_uom`/`product_uom_qty` creates verified unchanged (real fields on that model) | `test_fulfillment_mode2_engine.py`, `test_fulfillment_matching.py` | py_compile clean; targeted grep confirms no remaining sale-line `.product_uom` (non-`_id`) reference |
+| Nonexistent XML ID `stock.stock_location_locations` | Two location fixtures anchored a sibling internal location to an unstable/nonexistent Odoo 19 core XML ID | Replaced with the fixture-derived `self.stock_loc.location_id.id` (the real fixture warehouse's own parent), preserving the intended "outside the mapped subtree" sibling relationship | `test_fulfillment_mode2_engine.py` | py_compile clean; XML-ID grep-clean |
+| FK-unsafe, residue-leaving committed concurrency-fixture cleanup | `_cleanup_store` deleted `shopify_connector_job`/`.store_settings` then the store itself, while committed `shopify_connector_order_binding`/`.location`/`.fulfillment_inbound_evidence` rows (each `ondelete='restrict'` on `store_id`, evidence additionally `restrict` on `order_binding_id`) still referenced it | Cleanup order corrected to evidence → location → order_binding → job → store_settings → store (evidence lines cascade automatically via `ondelete='cascade'`) | `test_fulfillment_concurrency.py` | py_compile clean; FK dependency chain verified against each model's actual field definition |
+| Condition-14 race test stopped early at Condition 8 | `test_local_validation_cannot_race_past_changed_second_read` never mocked the F-4 `_resolve_odoo_location` seam or gave its mocked picking a real `location_id`, so Condition 8 failed closed to `location_unmapped` before Condition 14 (the test's actual target) ever ran | Added a real fixture-derived `stock.stock_location_stock` as both the mocked picking's `location_id` and the patched seam's return value, so Condition 8 passes and evaluation genuinely reaches Condition 14, which then fails closed to `remote_state_changed` on the second read's `CANCELLED` status exactly as asserted | `test_fulfillment_concurrency.py` | py_compile clean; condition-sequencing traced by source read (`_evaluate_mode2`'s ordered checks tuple) |
+
+### Self-verification summary
+
+`py_compile` and `ast.parse` clean on all 5 changed files (2 production,
+3 test); forbidden-path audit clean (no manifest/security/views/data/CI
+file touched — `git status --porcelain` shows exactly these 5 files);
+repo-wide grep confirms no remaining `sale_line.product_uom`/
+`line.product_uom` (non-`_id`) reference and no remaining
+`stock.stock_location_locations` reference anywhere in the addon; call
+sites of `_move_qty_in_sale_uom`/`_qty_equal` (`_picking_pending_demand`)
+confirmed unaffected by the field rename. Every correction implemented at
+`cc87088` (P0-1/P0-2/P1-1/P1-2/P1-3) and all eleven closure-campaign themes
+are preserved unchanged — this session touched only the six defects the
+runtime ruling named. No Odoo runtime available in this session's
+container; every claim above is `IMPLEMENTED — RUNTIME PENDING`, never
+`EXECUTED — PASS`. No Shopify request or mutation occurred. Issue #185
+(CV-013) remains open and critical; issue #193 remains the separate
+baseline owner; PR #194 remains untouched.
+
+**Next state:** a fresh exact-head Odoo.sh runtime rerun of the halted
+matrix (fulfillment/inventory/sale/core suites, warm upgrade, the
+concurrency scenarios). No synthesis, decision lock, architecture cycle,
+broad review, SEC-2, U1, merge, ready-mark, or live Shopify operation was
+performed or is authorized by this session.
 
 ---
 

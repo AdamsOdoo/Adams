@@ -420,7 +420,7 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
         fulfils."""
         qty = move.product_uom_qty or 0.0
         move_uom = getattr(move, 'product_uom', False)
-        sale_uom = sale_line.product_uom if sale_line else False
+        sale_uom = sale_line.product_uom_id if sale_line else False
         if move_uom and sale_uom and move_uom.id != sale_uom.id:
             qty = move_uom._compute_quantity(qty, sale_uom)
         return qty
@@ -428,8 +428,8 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     @api.model
     def _qty_equal(self, demand_qty, required_qty, sale_line):
         rounding = (
-            sale_line.product_uom.rounding
-            if sale_line and sale_line.product_uom else 0.01
+            sale_line.product_uom_id.rounding
+            if sale_line and sale_line.product_uom_id else 0.01
         )
         return float_compare(
             demand_qty, required_qty, precision_rounding=rounding,
