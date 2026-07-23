@@ -142,16 +142,21 @@ class TestFulfillmentMode2Engine(TransactionCase):
         vals.update(overrides)
         return self.Evidence.sudo().create(vals)
 
-    def _fulfillment_node(self, status='SUCCESS', lines=None):
+    def _fulfillment_node(self, status='SUCCESS', lines=None,
+                          fulfillment_gid=FULFILLMENT_GID):
         """A Fulfillment node as returned by _read_order_fulfillments (used by
-        _c3 / _c14)."""
+        _c3 / _c14). ``fulfillment_gid`` defaults to the shared constant but
+        must be passed explicitly (or derived from the evidence under test)
+        whenever the evidence carries a non-default
+        ``shopify_fulfillment_gid``, so the positive-path node's ``id``
+        always matches what Condition 3/14 look for."""
         if lines is None:
             lines = [{
                 'id': FL_GID, 'quantity': 2,
                 'lineItem': {'id': LINE_ITEM_GID},
             }]
         return {
-            'id': FULFILLMENT_GID,
+            'id': fulfillment_gid,
             'status': status,
             'displayStatus': 'FULFILLED',
             'trackingInfo': [{'number': 'TN1', 'url': '', 'company': 'UPS'}],
@@ -196,7 +201,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         """Like `_mock_picking`, but carries one real-shaped move whose
         aggregated pending demand exactly matches `qty` for `sale_line` --
         for tests that must pass the exact-quantity relock/recheck gate
-        (Corrections P0-1/P1-1) on the way into `_apply_mode2`."""
+        (Corrections P0-1/P1-1) on the way into `_apply_mode2`. The move's
+        `product_id` is the real (untracked, `tracking == 'none'`) fixture
+        product and `move_line_ids` a concrete empty recordset stand-in, so
+        a full-pass evaluation genuinely reaching Condition 11
+        (`_c11_lot_serial`) skips its tracked-product branch instead of
+        operating on unconstrained `Mock` attributes."""
         picking = self._mock_picking(**overrides)
         line = sale_line or self.sale_line
         move = Mock()
@@ -204,6 +214,8 @@ class TestFulfillmentMode2Engine(TransactionCase):
         move.sale_line_id.id = line.id
         move.product_uom_qty = qty
         move.product_uom = line.product_uom_id
+        move.product_id = line.product_id
+        move.move_line_ids = _FakeRecordset()
         picking.move_ids = [move]
         return picking
 
@@ -243,7 +255,14 @@ class TestFulfillmentMode2Engine(TransactionCase):
                 ))
             else:
                 if fulfillments is self._UNSET:
-                    fulfillments = [self._fulfillment_node()]
+                    # Default positive-path node: its GID must always match
+                    # the evidence under test, not the shared module-level
+                    # default, so a test that overrides
+                    # evidence.shopify_fulfillment_gid still passes
+                    # Condition 3/14's exact-GID match.
+                    fulfillments = [self._fulfillment_node(
+                        fulfillment_gid=evidence.shopify_fulfillment_gid,
+                    )]
                 stack.enter_context(patch.object(
                     type(Service), '_read_order_fulfillments',
                     return_value=fulfillments,
@@ -437,7 +456,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         # exact Shopify-confirmed quantity.
         picking = self._real_picking_with_moves([(self.sale_line, 10.0)])
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 3)},
             'order_binding': order_binding, 'plan': {},
@@ -453,7 +472,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             (self.sale_line, 1.0), (self.sale_line, 1.0),
         ])
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
@@ -469,7 +488,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             (self.sale_line, 2.0), (self.sale_line, 2.0),
         ])
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
@@ -496,7 +515,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             'state': 'confirmed',
         })
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
             'order_binding': order_binding, 'plan': {},
@@ -544,7 +563,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             'sale_line_id': sale_line.id,
         })
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {'gid://shopify/LineItem/UOM-DOZEN': (sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
@@ -689,20 +708,34 @@ class TestFulfillmentMode2Engine(TransactionCase):
     def test_c14_second_read_is_executed_separately(self):
         # _read_order_fulfillments must be called twice during one evaluation
         # pass: once for condition 3, once (genuinely re-invoked) for
-        # condition 14.
+        # condition 14. This test calls `_evaluate_mode2` directly rather
+        # than through the `_evaluate()` wrapper, so it must supply every
+        # seam that wrapper normally patches by default: the fulfillment
+        # node's GID matching the evidence GID, the sanctioned location
+        # seam, and a single consistent picking instance used by both the
+        # quantity-compatible candidate list and the deterministic
+        # selector, so Condition 8/9/14 are genuinely exercised instead of
+        # failing closed on an unmapped location.
         evidence = self._evidence()
-        node = self._fulfillment_node()
+        node = self._fulfillment_node(
+            fulfillment_gid=evidence.shopify_fulfillment_gid,
+        )
+        picking = self._mock_picking()
         Service = self.Service
+        LocationModel = type(self.env['shopify.connector.location'])
         with patch.object(type(Service), '_read_order_fulfillments',
                           return_value=[node]) as mocked, \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(LocationModel, '_resolve_odoo_location',
+                             return_value=self.stock_loc), \
                 patch.object(type(Service), '_quantity_compatible_pickings',
-                             return_value=[self._mock_picking()]), \
+                             return_value=[picking]), \
                 patch.object(type(Service), '_select_deterministic_picking',
-                             return_value=self._mock_picking()):
+                             return_value=picking):
             result = Service._evaluate_mode2(evidence)
         self.assertTrue(result['passed'])
+        self.assertEqual(result['plan']['picking'], picking)
         self.assertEqual(mocked.call_count, 2)
 
     def test_c14_first_read_cannot_be_reused(self):
@@ -1038,7 +1071,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             lambda m: m.sale_line_id == sibling_sale_line)
         sibling_state_before = sibling_move.state
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
@@ -1057,7 +1090,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         picking = self._real_picking_with_moves([(self.sale_line, 2.0)])
         picking.move_ids._action_confirm()
         order_binding = Mock()
-        order_binding.sale_order_id = self.sale
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
@@ -1333,7 +1366,18 @@ class TestFulfillmentMode2Engine(TransactionCase):
             evidence, quantity_compatible=[picking],
             mapped_location=self.stock_loc,
         )
+        # GID-coherence regression (Correction A): the evidence carries a
+        # custom fulfillment GID; the default positive-path node built by
+        # _evaluate() must carry that exact same GID so Condition 3 passes
+        # and evaluation genuinely reaches this test's own intended
+        # condition (8) rather than stopping early at
+        # 'fulfillment_order_unresolved'.
+        self.assertEqual(
+            evidence.shopify_fulfillment_gid,
+            'gid://shopify/Fulfillment/F4-EXACT',
+        )
         self.assertTrue(result['passed'])
+        self.assertNotEqual(result['reason'], 'fulfillment_order_unresolved')
 
     def test_c8_mapped_parent_with_descendant_picking_source_passes(self):
         child_loc = self.env['stock.location'].create({

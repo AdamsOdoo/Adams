@@ -223,6 +223,15 @@ class TestFulfillmentIdempotency(TransactionCase):
     # ------------------------------------------------------------------
 
     def _mode2_ctx(self, location_gid='gid://shopify/Location/1'):
+        # Direct C14 context (Correction C): calling `_c14_remote_state` in
+        # isolation bypasses Conditions 8/9, which normally establish
+        # `mapped_odoo_location_id` and the selected `picking` in the real
+        # 16-condition pipeline before Condition 14 ever runs. Supply that
+        # same context explicitly: a real internal stock location, and a
+        # picking test double whose `location_id` is that same location.
+        stock_location = self.env.ref('stock.stock_location_stock')
+        picking = Mock()
+        picking.location_id = stock_location
         sale_line = Mock()
         sale_line.id = 1
         order_binding = Mock()
@@ -237,6 +246,8 @@ class TestFulfillmentIdempotency(TransactionCase):
                 'gid://shopify/LineItem/1': (sale_line, 2),
             },
             'location_gid': location_gid,
+            'mapped_odoo_location_id': stock_location.id,
+            'picking': picking,
             'plan': {},
         }
 
@@ -264,10 +275,18 @@ class TestFulfillmentIdempotency(TransactionCase):
         ctx = self._mode2_ctx()
         node, fo = self._mode2_second_read_fixture()
         before = self.Attempt.search_count([])
+        # Sanctioned seam (Correction C): the second FulfillmentOrder read
+        # must re-confirm the SAME mapped Odoo location Conditions 8/9
+        # already established in `ctx` (here: the picking's own
+        # `location_id`), through `shopify.connector.location`'s own
+        # extension point -- never a direct location-mapping read.
+        LocationModel = type(self.env['shopify.connector.location'])
         with patch.object(type(self.Service), '_read_order_fulfillments',
                           return_value=[node]), \
                 patch.object(type(self.Service), '_read_fulfillment_orders',
-                             return_value=[fo]):
+                             return_value=[fo]), \
+                patch.object(LocationModel, '_resolve_odoo_location',
+                             return_value=ctx['picking'].location_id):
             ok, _detail = self.Service._c14_remote_state(ctx)
         self.assertTrue(ok)
         self.assertEqual(self.Attempt.search_count([]), before)
