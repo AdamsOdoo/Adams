@@ -40,6 +40,12 @@ REVIEW_REASON_SELECTION = [
     ('delivered_not_validated', 'Delivered Per Carrier — Odoo Not Validated'),
     ('cancelled_after_validation', 'Shopify Cancelled After Odoo Validation'),
     ('unknown_status_value', 'Unknown Status Value'),
+    # Theme H (decision-lock Decision C): the routine Mode-1 "confirmed-
+    # external fulfillment observed" baseline case -- distinct from
+    # `remote_state_changed` (Condition 14's narrow live-second-read-changed
+    # gate) and `mode_not_enabled` (Condition 16's mid-flight mode-switch
+    # cancellation). Zero Odoo stock modification either way.
+    ('external_fulfillment_observed', 'External Fulfillment Observed'),
 ]
 
 RECONCILED_STATE_SELECTION = [

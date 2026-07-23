@@ -71,6 +71,79 @@ def _call_target_names(node):
     return names
 
 
+def _references_exitcode(node):
+    """True if `node` is an Attribute `.exitcode` or a Subscript keyed by the
+    literal string `'exitcode'` -- either shape production code uses."""
+    if isinstance(node, ast.Attribute) and node.attr == 'exitcode':
+        return True
+    if isinstance(node, ast.Subscript):
+        sl = node.slice
+        if isinstance(sl, ast.Constant) and sl.value == 'exitcode':
+            return True
+    return False
+
+
+def _compare_references_exitcode(node):
+    if not isinstance(node, ast.Compare):
+        return False
+    for operand in [node.left] + list(node.comparators):
+        if any(_references_exitcode(n) for n in ast.walk(operand)):
+            return True
+    return False
+
+
+def _contains_raise(node):
+    return any(isinstance(n, ast.Raise) for n in ast.walk(node))
+
+
+def _names_assigned_from_exitcode_compare(nodes):
+    """Names assigned from a list/generator/set comprehension whose element
+    expression involves a genuine exitcode comparison -- e.g. the production
+    `bad_exits = [r for r in records if r['exitcode'] not in (0, None) and
+    not r['exception_class']]` shape."""
+    names = set()
+    for stmt in nodes:
+        if not isinstance(stmt, ast.Assign):
+            continue
+        value = stmt.value
+        if not isinstance(value, (ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+            continue
+        if not any(_compare_references_exitcode(n) for n in ast.walk(value)):
+            continue
+        names |= {t.id for t in stmt.targets if isinstance(t, ast.Name)}
+    return names
+
+
+def _has_genuine_exitcode_comparison_reaching_raise(nodes):
+    """True only when the closure contains a REAL comparison against an
+    exit code (not mere attribute/subscript presence, which the prior guard
+    wrongly accepted) that feeds a conditional raise/assert -- either
+    directly (`if crasher.exitcode != 37: raise ...`) or indirectly via a
+    comprehension assigned to a name later tested (`bad_exits = [...
+    exitcode ...]; if bad_exits: raise ...`, the shared `_run_children`
+    shape). Mere capture (`record['exitcode'] = process.exitcode`) with no
+    reachable comparison never satisfies this (Theme K)."""
+    for node in nodes:
+        if (
+            isinstance(node, ast.If)
+            and _compare_references_exitcode(node.test)
+            and _contains_raise(node)
+        ):
+            return True
+    derived_names = _names_assigned_from_exitcode_compare(nodes)
+    if not derived_names:
+        return False
+    for node in nodes:
+        if not (isinstance(node, ast.If) and _contains_raise(node)):
+            continue
+        test_names = {
+            n.id for n in ast.walk(node.test) if isinstance(n, ast.Name)
+        }
+        if test_names & derived_names:
+            return True
+    return False
+
+
 def _is_trivial_stub_return(func_node):
     """True if `func_node`'s own body (ignoring a leading docstring) is
     nothing but `return {<dict literal>}` -- the exact shape of the
@@ -176,12 +249,11 @@ def audit_concurrency_harness_scenarios(source):
         if not (closure_calls & _CLEANUP_CALLS):
             violations.append(
                 '%s: no cleanup/residue verification reachable' % scenario)
-        if not any(
-                isinstance(n, ast.Attribute) and n.attr == 'exitcode'
-                for n in closure):
+        if not _has_genuine_exitcode_comparison_reaching_raise(closure):
             violations.append(
-                '%s: parent result never inspects a child exit code'
-                % scenario)
+                '%s: no genuine exit-code comparison reaching a raise/assert '
+                'was found (mere attribute/subscript presence is not '
+                'sufficient)' % scenario)
 
     return violations
 
@@ -315,6 +387,85 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'DELETE FROM shopify_connector_store WHERE id = %s', (store_id,),
             )
             cr.commit()
+
+    # -- Theme B: concurrent Mode-2 evaluations of two separate Fulfillment
+    #    events on the SAME sale line must not double-spend the ledger.
+
+    def test_c6_no_overrun_fails_closed_under_genuine_concurrent_lock(self):
+        """A genuine independent-connection lock held on the sale line (as a
+        second, concurrent Mode-2 evaluation would hold it while it is still
+        mid-transaction) makes `_c6_no_overrun` fail closed rather than
+        proceed on a possibly-stale read -- proven with two real, separate
+        PostgreSQL connections, not a mock."""
+        with db_connect(self.dbname).cursor() as setup_cr:
+            env = api.Environment(setup_cr, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07', 'state': 'connected',
+            })
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id, 'fulfillment_domain_enabled': True,
+            })
+            partner = env['res.partner'].create({'name': 'C'})
+            product = env['product.product'].create({
+                'name': 'P', 'type': 'consu',
+            })
+            sale = env['sale.order'].create({'partner_id': partner.id})
+            sale_line = env['sale.order.line'].create({
+                'order_id': sale.id, 'product_id': product.id,
+                'product_uom_qty': 2.0,
+                'shopify_line_item_gid': 'gid://shopify/LineItem/LOCK',
+            })
+            order_binding = env['shopify.connector.order.binding'].create({
+                'store_id': store.id,
+                'shopify_gid': 'gid://shopify/Order/LOCK',
+                'sale_order_id': sale.id, 'status': 'active',
+            })
+            store_id = store.id
+            sale_line_id = sale_line.id
+            order_binding_id = order_binding.id
+            setup_cr.commit()
+        self.addCleanup(self._cleanup_store, store_id)
+
+        # Holder connection: locks the sale line and keeps the transaction
+        # open (uncommitted), simulating a concurrent in-flight evaluation.
+        holder_cr = db_connect(self.dbname).cursor()
+        try:
+            holder_env = api.Environment(holder_cr, SUPERUSER_ID, {})
+            holder_line = holder_env['sale.order.line'].browse(sale_line_id)
+            locked = holder_line.try_lock_for_update()
+            self.assertTrue(locked)
+
+            # A second, genuinely independent connection attempts the SAME
+            # overrun check while the holder still has the row locked.
+            with db_connect(self.dbname).cursor() as other_cr:
+                other_cr.execute('SET LOCAL lock_timeout = %s', ('2s',))
+                other_env = api.Environment(other_cr, SUPERUSER_ID, {})
+                other_store = other_env['shopify.connector.store'].browse(store_id)
+                other_sale_line = other_env['sale.order.line'].browse(
+                    sale_line_id,
+                )
+                other_evidence = other_env[
+                    'shopify.connector.fulfillment.inbound.evidence'
+                ].create({
+                    'store_id': store_id,
+                    'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/LOCK-2',
+                    'order_binding_id': order_binding_id,
+                })
+                ctx = {
+                    'evidence': other_evidence, 'store': other_store,
+                    'line_mapping': {
+                        'gid://shopify/LineItem/LOCK': (other_sale_line, 1),
+                    },
+                }
+                Service = other_env['shopify.connector.fulfillment.service']
+                ok, detail = Service._c6_no_overrun(ctx)
+                self.assertFalse(ok)
+                self.assertIn('locked by a concurrent evaluation', detail)
+                other_cr.rollback()
+        finally:
+            holder_cr.rollback()
+            holder_cr.close()
 
     # -- P2 correction: Mode 2 condition 14's separately fresh read --------
 
@@ -499,23 +650,56 @@ class TestFulfillmentConcurrency(TransactionCase):
 
     def test_no_fake_success_guard_accepts_genuine_orchestration(self):
         """Negative-of-the-negative: a runner that genuinely spawns via
-        get_context/Process, inspects a durable outcome, checks an exit
-        code, and calls a cleanup helper must NOT be flagged, so the guard
-        cannot be satisfied by trivially banning every dict return."""
+        get_context/Process, synchronizes via real Event/Queue wait/set/get,
+        inspects a fixture-scoped durable outcome, calls the cleanup helper
+        at the real 3-arg production arity, and genuinely COMPARES a child
+        exit code before conditionally raising must NOT be flagged -- so the
+        guard cannot be satisfied by trivially banning every dict return, and
+        is not itself hollow (Theme K: the prior bundled fixture here was
+        confirmed semantically hollow on all four counts -- a no-op process
+        target, zero synchronization, an unscoped `search([])`, and a
+        wrong-arity `_finish_cleanup` call -- yet still passed the guard)."""
         genuine_source = (
+            "import multiprocessing\n\n\n"
             "SCENARIOS = ('operation_scope_serialization',)\n\n\n"
-            "def _finish_cleanup(settings, fixture):\n"
+            "def _finish_cleanup(summary, settings, fixture):\n"
             "    return {}\n\n\n"
+            "def _child_worker(settings, fixture, name, ready_queue,\n"
+            "                   start_event, result_queue, timeout):\n"
+            "    ready_queue.put({'child': name})\n"
+            "    if not start_event.wait(timeout):\n"
+            "        raise TimeoutError('start signal timeout')\n"
+            "    result_queue.put({'child': name, 'exception_class': False})\n\n\n"
             "def run_operation_scope_serialization(settings, timeout):\n"
+            "    summary = {'scenario': 'operation_scope_serialization',\n"
+            "               'passed': False}\n"
+            "    fixture = {'store_id': 1}\n"
             "    context = multiprocessing.get_context('spawn')\n"
-            "    process = context.Process(target=lambda: None)\n"
+            "    ready_queue = context.Queue()\n"
+            "    result_queue = context.Queue()\n"
+            "    start_event = context.Event()\n"
+            "    process = context.Process(\n"
+            "        target=_child_worker,\n"
+            "        args=(settings, fixture, 'worker-1', ready_queue,\n"
+            "              start_event, result_queue, timeout))\n"
             "    process.start()\n"
-            "    process.join()\n"
-            "    code = process.exitcode\n"
-            "    job = environment['shopify.connector.job'].search([])\n"
-            "    _finish_cleanup(settings, {})\n"
-            "    return {'scenario': 'operation_scope_serialization',\n"
-            "            'passed': bool(job) and code == 0}\n\n\n"
+            "    ready_queue.get(timeout=timeout)\n"
+            "    start_event.set()\n"
+            "    process.join(timeout)\n"
+            "    records = [result_queue.get(timeout=timeout)]\n"
+            "    bad_exits = [\n"
+            "        r for r in records\n"
+            "        if process.exitcode not in (0, None)\n"
+            "        and not r['exception_class']\n"
+            "    ]\n"
+            "    if bad_exits:\n"
+            "        raise AssertionError('child exited non-zero: %r' % (bad_exits,))\n"
+            "    job = environment['shopify.connector.job'].search([\n"
+            "        ('store_id', '=', fixture['store_id']),\n"
+            "    ])\n"
+            "    _finish_cleanup(summary, settings, fixture)\n"
+            "    summary['passed'] = bool(job)\n"
+            "    return summary\n\n\n"
             "RUNNERS = {\n"
             "    'operation_scope_serialization': "
             "run_operation_scope_serialization,\n"
@@ -529,3 +713,54 @@ class TestFulfillmentConcurrency(TransactionCase):
             scenario_violations, [],
             'the guard false-positived on genuine orchestration: %r'
             % (scenario_violations,))
+
+    def test_no_fake_success_guard_rejects_capture_without_comparison(self):
+        """Proves the strengthened guard requires a genuine exit-code
+        COMPARISON reaching a raise/assert, not mere attribute/subscript
+        presence -- the exact shape 7 of the 9 real scenario runners had
+        before the Theme K correction: exit codes captured into each
+        record via the shared `_run_children` helper, but never compared
+        against an expected value anywhere in the runner's own closure."""
+        capture_only_source = (
+            "import multiprocessing\n\n\n"
+            "SCENARIOS = ('operation_scope_serialization',)\n\n\n"
+            "def _finish_cleanup(summary, settings, fixture):\n"
+            "    return {}\n\n\n"
+            "def _child_worker(settings, fixture, name, ready_queue,\n"
+            "                   start_event, result_queue, timeout):\n"
+            "    ready_queue.put({'child': name})\n"
+            "    start_event.wait(timeout)\n"
+            "    result_queue.put({'child': name, 'exception_class': False})\n\n\n"
+            "def run_operation_scope_serialization(settings, timeout):\n"
+            "    fixture = {'store_id': 1}\n"
+            "    context = multiprocessing.get_context('spawn')\n"
+            "    ready_queue = context.Queue()\n"
+            "    result_queue = context.Queue()\n"
+            "    start_event = context.Event()\n"
+            "    process = context.Process(\n"
+            "        target=_child_worker,\n"
+            "        args=(settings, fixture, 'worker-1', ready_queue,\n"
+            "              start_event, result_queue, timeout))\n"
+            "    process.start()\n"
+            "    ready_queue.get(timeout=timeout)\n"
+            "    start_event.set()\n"
+            "    process.join(timeout)\n"
+            "    record = result_queue.get(timeout=timeout)\n"
+            "    record['exitcode'] = process.exitcode\n"
+            "    job = environment['shopify.connector.job'].search([\n"
+            "        ('store_id', '=', fixture['store_id']),\n"
+            "    ])\n"
+            "    _finish_cleanup({}, settings, fixture)\n"
+            "    return {'scenario': 'operation_scope_serialization',\n"
+            "            'passed': bool(job), 'children': [record]}\n\n\n"
+            "RUNNERS = {\n"
+            "    'operation_scope_serialization': "
+            "run_operation_scope_serialization,\n"
+            "}\n"
+        )
+        violations = audit_concurrency_harness_scenarios(capture_only_source)
+        self.assertTrue(
+            violations,
+            'the guard failed to reject exitcode capture without comparison')
+        joined = ' '.join(violations)
+        self.assertIn('exit-code comparison', joined)

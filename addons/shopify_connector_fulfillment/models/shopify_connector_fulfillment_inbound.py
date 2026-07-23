@@ -3,6 +3,9 @@ import logging
 
 from odoo import api, fields, models
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
+    TERMINAL_JOB_STATES,
+)
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
@@ -86,12 +89,19 @@ class ShopifyConnectorFulfillmentInbound(models.AbstractModel):
         ]).ids
         if not picking_ids:
             return False
+        # Theme J: reuse the canonical TERMINAL_JOB_STATES (already imported
+        # and used elsewhere in this exact addon) rather than a hand-
+        # maintained, divergence-prone local tuple. The prior
+        # `('succeeded', 'skipped')` literal missed BOTH `cancelled` and
+        # `failed_final`, permanently blocking Mode-2 origin confirmation
+        # after an admin/disconnect-sweep cancelled or finally failed a
+        # stuck create job with no mutation_attempt.
         jobs = self.env['shopify.connector.job'].search([
             ('store_id', '=', store.id),
             ('job_type', '=', 'fulfillment_create'),
             ('res_model', '=', 'stock.picking'),
             ('res_id', 'in', picking_ids),
-            ('state', 'not in', ('succeeded', 'skipped')),
+            ('state', 'not in', list(TERMINAL_JOB_STATES)),
         ])
         for job in jobs:
             attempt = job.mutation_attempt_id or self.env[
@@ -171,11 +181,15 @@ class ShopifyConnectorFulfillmentInbound(models.AbstractModel):
             )
             return
         # Mode 1 (or unconfirmed origin): a review case with zero stock change.
+        # Theme H: the routine, everyday "merchant fulfilled in Shopify
+        # admin" baseline case is `external_fulfillment_observed` — never the
+        # unrelated `remote_state_changed` (Condition 14's own narrow,
+        # Mode-2-only live-second-read-changed gate).
         if evidence.reconciled_state != 'review':
             evidence.write({
                 'reconciled_state': 'review',
                 'review_reason': 'origin_unconfirmed'
-                if not origin_confirmed else 'remote_state_changed',
+                if not origin_confirmed else 'external_fulfillment_observed',
             })
 
     # ------------------------------------------------------------------

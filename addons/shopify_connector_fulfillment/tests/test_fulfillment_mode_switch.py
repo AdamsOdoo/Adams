@@ -1,11 +1,16 @@
 import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
     TERMINAL_JOB_STATES,
+)
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
 )
 from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
@@ -318,3 +323,91 @@ class TestFulfillmentModeSwitch(TransactionCase):
             ('shopify_fulfillment_gid', '=', 'gid://shopify/Fulfillment/EXT'),
         ], limit=1)
         self.assertEqual(evidence.reconciled_state, 'review')
+
+    # ------------------------------------------------------------------
+    # Theme E — watermark-boundary pagination beyond the old 200-row window
+    # ------------------------------------------------------------------
+
+    def test_mode_switch_scan_processes_more_than_200_order_bindings(self):
+        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
+        OrderBinding = self.env['shopify.connector.order.binding']
+        for i in range(201):
+            sale = self.env['sale.order'].create({
+                'partner_id': self.partner.id,
+            })
+            OrderBinding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Order/MSBULK-%d' % i,
+                'sale_order_id': sale.id, 'status': 'active',
+            })
+        job = self._scan_job()
+        call_count = {'n': 0}
+
+        def _counting_read(store, order_gid):
+            call_count['n'] += 1
+            return []
+
+        with patch.object(type(self.Service), '_read_order_fulfillments',
+                          side_effect=_counting_read):
+            self.Service._handle_fulfillment_mode_switch_scan(job)
+        self.assertGreaterEqual(call_count['n'], 201)
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.sudo().fulfillment_operating_mode, 'mode2',
+        )
+
+    def test_mode_switch_scan_incomplete_pass_fails_closed(self):
+        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
+        OrderBinding = self.env['shopify.connector.order.binding']
+        for i in range(3):
+            sale = self.env['sale.order'].create({
+                'partner_id': self.partner.id,
+            })
+            OrderBinding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Order/MSCAP-%d' % i,
+                'sale_order_id': sale.id, 'status': 'active',
+            })
+        job = self._scan_job()
+        with patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.MAX_SCAN_PAGES', 1,
+        ), patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 2,
+        ), patch.object(
+            type(self.Service), '_read_order_fulfillments', return_value=[],
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.Service._handle_fulfillment_mode_switch_scan(job)
+        self.settings.invalidate_recordset()
+        # A failed/incomplete pass never completes the switch either way.
+        self.assertTrue(self.settings.sudo().fulfillment_switch_in_progress)
+
+    def test_mode_switch_scan_boundary_excludes_bindings_before_watermark(self):
+        # PD-B4: the switch scan boundary derives from the watermark (minus
+        # overlap); an order binding touched well BEFORE that boundary and
+        # with no unresolved evidence is outside the scan's scope.
+        self.settings.sudo().write({
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_last_reconciliation_at': fields.Datetime.now(),
+        })
+        boundary = self.Service._mode_switch_scan_boundary(
+            self.store, self.settings.sudo(),
+        )
+        self.assertTrue(boundary)
+        # The default lookback floor bounds the boundary to at most 30 days
+        # back from now, and no earlier than that even with no watermark.
+        floor = fields.Datetime.now() - timedelta(days=30)
+        self.assertGreaterEqual(boundary, floor - timedelta(minutes=1))
+
+    def test_mode_switch_scan_boundary_defaults_to_thirty_day_floor(self):
+        # No watermark and no unresolved evidence yet (first-ever scan):
+        # bounded by the 30-day default lookback, never unbounded.
+        boundary = self.Service._mode_switch_scan_boundary(
+            self.store, self.settings.sudo(),
+        )
+        expected_floor = fields.Datetime.now() - timedelta(days=30)
+        self.assertAlmostEqual(
+            boundary, expected_floor, delta=timedelta(minutes=5),
+        )

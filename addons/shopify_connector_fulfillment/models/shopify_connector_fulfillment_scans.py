@@ -1,6 +1,7 @@
 import json
 import logging
 import uuid
+from datetime import timedelta
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
@@ -18,8 +19,21 @@ from .shopify_connector_job import (
 
 _logger = logging.getLogger(__name__)
 
-# Bounded batch of bound fulfillments refreshed per reconciliation-check run.
+# Theme E correction: the per-page size for local ORM keyset pagination (never
+# a hard cap -- every scan below paginates to full completion). A partial pass
+# is never reported clean/complete: reaching MAX_SCAN_PAGES before the
+# eligible set is exhausted fails closed (JobHandlerError), exactly like the
+# reader's own fail-closed page-cap contract (§11.4).
 RECONCILE_BATCH = 200
+MAX_SCAN_PAGES = 250
+
+# PD-B4: the mode-switch scan's boundary is the earlier of (a) the last
+# successful watermark minus a configured overlap, and (b) the oldest
+# still-unresolved external-fulfillment evidence boundary -- bounded by a
+# default lookback so an admin never accidentally triggers an unbounded
+# historic re-scan. `fulfillment-operating-modes.md` §6 rule 2.
+MODE_SWITCH_DEFAULT_LOOKBACK_DAYS = 30
+MODE_SWITCH_WATERMARK_OVERLAP = timedelta(minutes=15)
 
 
 class ShopifyConnectorFulfillmentScans(models.AbstractModel):
@@ -32,6 +46,59 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     _inherit = 'shopify.connector.fulfillment.service'
 
     # ------------------------------------------------------------------
+    # Shared local-ORM keyset pagination (Theme E)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _paginate_local_to_completion(self, Model, domain):
+        """Page `Model.search(domain)` to full completion via id-keyset
+        pagination (never OFFSET, which is unsafe under concurrent writes).
+        Bounded by `MAX_SCAN_PAGES`: a cap reached before the eligible set is
+        exhausted fails closed (raises) rather than silently returning a
+        partial set that a caller could mistake for the complete population."""
+        records = Model.browse()
+        cursor_id = 0
+        for _page in range(MAX_SCAN_PAGES):
+            page = Model.search(
+                domain + [('id', '>', cursor_id)],
+                order='id asc', limit=RECONCILE_BATCH,
+            )
+            if not page:
+                return records
+            records |= page
+            cursor_id = max(page.ids)
+            if len(page) < RECONCILE_BATCH:
+                return records
+        raise JobHandlerError(
+            'data_shape_schema_mismatch',
+            'A fulfillment scan exceeded its fail-closed page cap before '
+            'completing; the result is incomplete and cannot be treated as '
+            'a full pass.',
+        )
+
+    @api.model
+    def _mode_switch_scan_boundary(self, store, settings):
+        """PD-B4: earlier-of(watermark - overlap, oldest unresolved evidence),
+        bounded by the default lookback floor."""
+        now = fields.Datetime.now()
+        floor = now - timedelta(days=MODE_SWITCH_DEFAULT_LOOKBACK_DAYS)
+        candidates = [floor]
+        if settings.fulfillment_last_reconciliation_at:
+            candidates.append(
+                settings.fulfillment_last_reconciliation_at
+                - MODE_SWITCH_WATERMARK_OVERLAP
+            )
+        oldest_unresolved = self.env[
+            'shopify.connector.fulfillment.inbound.evidence'
+        ].sudo().search([
+            ('store_id', '=', store.id),
+            ('reconciled_state', '=', 'review'),
+        ], order='first_observed_at asc', limit=1)
+        if oldest_unresolved:
+            candidates.append(oldest_unresolved.first_observed_at)
+        return max(floor, min(candidates))
+
+    # ------------------------------------------------------------------
     # fulfillment_reconciliation_check (cron; D-014-8)
     # ------------------------------------------------------------------
 
@@ -39,8 +106,12 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     def _handle_fulfillment_reconciliation_check(self, job):
         store = job.store_id
         Binding = self.env['shopify.connector.fulfillment.binding'].sudo()
-        bindings = Binding.search(
-            [('store_id', '=', store.id)], limit=RECONCILE_BATCH, order='id asc',
+        # Theme E: paginate the COMPLETE current population every run (never a
+        # fixed 200-row window) so a store's reconciliation coverage never
+        # permanently stops growing beyond an arbitrary cutoff. The watermark
+        # below is stamped only once this full pass has genuinely completed.
+        bindings = self._paginate_local_to_completion(
+            Binding, [('store_id', '=', store.id)],
         )
         for binding in bindings:
             try:
@@ -113,8 +184,11 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     def _handle_fulfillment_reconnect_catchup(self, job):
         store = job.store_id
         Binding = self.env['shopify.connector.order.binding'].sudo()
-        order_bindings = Binding.search(
-            [('store_id', '=', store.id)], limit=RECONCILE_BATCH, order='id desc',
+        # Theme E: the complete current population every run, never a fixed
+        # 200-row window -- a gap-period external must never be permanently
+        # skipped merely for living past an arbitrary cutoff.
+        order_bindings = self._paginate_local_to_completion(
+            Binding, [('store_id', '=', store.id)],
         )
         for order_binding in order_bindings:
             if not order_binding.shopify_gid:
@@ -144,9 +218,13 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             # Idempotent: a re-run after the switch already completed/aborted is
             # a no-op.
             return
+        # PD-B4: the scan boundary + a complete (never fixed-200) pagination of
+        # every order binding touched since that boundary.
+        boundary = self._mode_switch_scan_boundary(store, settings)
         Binding = self.env['shopify.connector.order.binding'].sudo()
-        order_bindings = Binding.search(
-            [('store_id', '=', store.id)], limit=RECONCILE_BATCH, order='id desc',
+        order_bindings = self._paginate_local_to_completion(
+            Binding,
+            [('store_id', '=', store.id), ('write_date', '>=', boundary)],
         )
         blockers = 0
         for order_binding in order_bindings:
@@ -170,11 +248,19 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                 )
                 if evidence.reconciled_state == 'review':
                     blockers += 1
+        # The scan pass itself (the loop above) completed exhaustively --
+        # `_paginate_local_to_completion` would have raised otherwise, and no
+        # watermark advancement below is ever reached from a raised exception.
+        # Advance the shared watermark on any genuinely completed pass,
+        # whether or not blockers were found: only the MODE transition
+        # depends on `blockers`, never whether the read pass finished.
+        now = fields.Datetime.now()
         if blockers:
             # Abort back to Mode 1; the switch does not complete.
             settings.sudo().write({
                 'fulfillment_switch_in_progress': False,
                 'fulfillment_operating_mode': 'mode1',
+                'fulfillment_last_reconciliation_at': now,
             })
             job._log_transition(
                 'note',
@@ -186,7 +272,8 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         settings.sudo().write({
             'fulfillment_switch_in_progress': False,
             'fulfillment_operating_mode': 'mode2',
-            'fulfillment_last_mode_switch_at': fields.Datetime.now(),
+            'fulfillment_last_mode_switch_at': now,
+            'fulfillment_last_reconciliation_at': now,
         })
         job._log_transition(
             'note', 'Mode-switch scan clean; Mode 2 activated.',
@@ -201,18 +288,30 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     @api.model
     def _cron_enqueue_reconciliation_checks(self):
         """Cron entry point: enqueue one reconciliation-check job (per-run uuid
-        nonce) per connected, fulfillment-enabled store."""
+        nonce) per connected, fulfillment-enabled store.
+
+        The expected `(store, operation_scope_key)` collision is already
+        handled inside `_enqueue_once` itself; a genuinely unexpected
+        per-store enqueue failure is logged and does not starve the remaining
+        stores in the same cron run (Theme A)."""
         Settings = self.env['shopify.connector.store.settings'].sudo()
         for settings in Settings.search([('fulfillment_domain_enabled', '=', True)]):
             store = settings.store_id
             if store.state != 'connected':
                 continue
             from .shopify_connector_job import JOB_TYPE_RECONCILIATION_CHECK
-            self._enqueue_once(
-                store, 'reconciliation', JOB_TYPE_RECONCILIATION_CHECK,
-                'reconciliation_check:%d:%s' % (store.id, uuid.uuid4().hex[:8]),
-                'shopify.connector.store', store.id,
-            )
+            try:
+                self._enqueue_once(
+                    store, 'reconciliation', JOB_TYPE_RECONCILIATION_CHECK,
+                    'reconciliation_check:%d:%s' % (store.id, uuid.uuid4().hex[:8]),
+                    'shopify.connector.store', store.id,
+                )
+            except Exception:
+                _logger.exception(
+                    'Unexpected failure enqueuing a reconciliation-check job '
+                    'for store %d; continuing with the remaining stores.',
+                    store.id,
+                )
         return True
 
 

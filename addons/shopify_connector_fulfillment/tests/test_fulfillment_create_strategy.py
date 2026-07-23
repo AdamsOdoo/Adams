@@ -188,6 +188,83 @@ class TestFulfillmentCreateStrategy(TransactionCase):
         self.assertEqual(consequence['observed_outcome'], 'uncertain')
 
     # ------------------------------------------------------------------
+    # Theme F — a real Fulfillment id alone is not positive success
+    # evidence; status must be exactly 'SUCCESS'.
+    # ------------------------------------------------------------------
+
+    def test_classify_real_id_cancelled_status_reconciles(self):
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {
+                'id': 'gid://shopify/Fulfillment/1', 'status': 'CANCELLED',
+            },
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'reconcile')
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+        self.assertNotEqual(consequence['observed_outcome'], 'failed_clean')
+
+    def test_classify_real_id_error_status_reconciles(self):
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {
+                'id': 'gid://shopify/Fulfillment/1', 'status': 'ERROR',
+            },
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'reconcile')
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_classify_real_id_failure_status_reconciles(self):
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {
+                'id': 'gid://shopify/Fulfillment/1', 'status': 'FAILURE',
+            },
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'reconcile')
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_classify_real_id_missing_status_reconciles(self):
+        # A real id but the status key is entirely absent (not merely a
+        # deprecated value) must not be trusted as success either.
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {'id': 'gid://shopify/Fulfillment/1'},
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'reconcile')
+        self.assertEqual(consequence['observed_outcome'], 'uncertain')
+
+    def test_classify_real_id_deprecated_open_status_reconciles(self):
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {
+                'id': 'gid://shopify/Fulfillment/1', 'status': 'OPEN',
+            },
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'reconcile')
+
+    def test_classify_real_id_success_status_succeeds(self):
+        consequence = self.Service._classify_direct_fulfillment_create({
+            'outcome': None,
+            'user_errors': [],
+            'fulfillment': {
+                'id': 'gid://shopify/Fulfillment/1', 'status': 'SUCCESS',
+            },
+            'evidence': {},
+        })
+        self.assertEqual(consequence['action'], 'succeed')
+        self.assertEqual(consequence['observed_outcome'], 'succeeded')
+
+    # ------------------------------------------------------------------
     # _build_tracking_info request builder
     # ------------------------------------------------------------------
 

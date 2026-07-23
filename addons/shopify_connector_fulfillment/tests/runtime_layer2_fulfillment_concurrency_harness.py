@@ -258,6 +258,20 @@ def _run_children(settings, scenario, fixture, timeout, child_target,
     for record in records:
         record['exitcode'] = exit_codes.get(
             'fulfillment-%s-%s' % (scenario, record['child']))
+    # Theme K: every one of the 7 scenarios that share this helper must
+    # compare child exit codes against the expected outcome, not merely
+    # capture them. A child that already reported no exception (the
+    # `failures` check above) but still exited non-zero crashed silently
+    # outside its own try/except -- a genuine test-infrastructure failure,
+    # never treated as a passing scenario.
+    bad_exits = [
+        record for record in records
+        if record['exitcode'] not in (0, None) and not record['exception_class']
+    ]
+    if bad_exits:
+        raise AssertionError(
+            'child exited non-zero without a captured exception: %r'
+            % (bad_exits,))
     return sorted(records, key=lambda record: record['child'])
 
 

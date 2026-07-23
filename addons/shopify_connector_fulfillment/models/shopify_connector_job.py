@@ -42,6 +42,19 @@ FULFILLMENT_MUTATION_JOB_TYPES = (
     MUTATION_DOMAIN_TRACKING,
 )
 
+# Theme A correction: the two whole-store scan job types (both keyed on
+# `(store, 'shopify.connector.store', store.id)` with no target GID) that
+# would otherwise collide with each other under core's generic, job-type-
+# agnostic default `_compute_operation_scope_key` formula. Job-type-prefixed
+# below exactly like the two mutation domains, so an in-flight reconciliation
+# check can never collide with an in-flight mode-switch scan for the same
+# store. `fulfillment_reconnect_catchup` is registered but never enqueued by
+# this addon today, so it is intentionally not included here.
+FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES = FULFILLMENT_MUTATION_JOB_TYPES + (
+    JOB_TYPE_RECONCILIATION_CHECK,
+    JOB_TYPE_MODE_SWITCH_SCAN,
+)
+
 # Trigger-origin vocabulary. `fulfillment_picking_validation` is a merged core
 # value; `fulfillment_tracking_change` is the DEC-019 extension this module adds
 # via selection_add (Q4).
@@ -156,21 +169,31 @@ class ShopifyConnectorJobFulfillmentExtension(models.Model):
         'superseded_by_job_id', 'job_type',
     )
     def _compute_operation_scope_key(self):
-        """Override the operation-scope key for the two mutation types only
-        (the Q1 literals); every other job_type — including the shared
-        `fulfillment_mutation_reconcile` — keeps core's default behaviour, so
-        the reconcile job owns/inherits no remote-effect scope. Same
-        non-terminal/terminal lifecycle rule as core; only a different literal
-        for the two mutation types."""
+        """Override the operation-scope key for the two mutation types and the
+        two whole-store scan types (the Q1 literals, widened by the Theme A
+        correction); every other job_type — including the shared
+        `fulfillment_mutation_reconcile` and the two per-record admission/
+        observation types (already uniquely scoped by their own distinct
+        res_model) — keeps core's default behaviour, so the reconcile job
+        owns/inherits no remote-effect scope. Same non-terminal/terminal
+        lifecycle rule as core; only a different literal for the prefixed
+        types. The two mutation types additionally require a non-empty
+        `shopify_target_gid` (their Q1 identity component); the two scan
+        types never carry one, so that requirement is scoped to the mutation
+        types only — a scan job's scope key must not be forced empty merely
+        because it has no target GID."""
         super()._compute_operation_scope_key()
         for job in self:
-            if job.job_type not in FULFILLMENT_MUTATION_JOB_TYPES:
+            if job.job_type not in FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES:
                 continue
             if (
                 job.state in TERMINAL_JOB_STATES
                 or job.superseded_by_job_id
-                or not job.shopify_target_gid
                 or not job.res_id
+                or (
+                    job.job_type in FULFILLMENT_MUTATION_JOB_TYPES
+                    and not job.shopify_target_gid
+                )
             ):
                 job.operation_scope_key = False
             else:

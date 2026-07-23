@@ -99,6 +99,22 @@ class TestFulfillmentLocationResolution(TransactionCase):
             self.Service._resolve_single_location(self.store, fos)
         self.assertEqual(ctx.exception.error_class, 'ambiguous_match')
 
+    def test_cached_but_deactivated_location_fails_closed(self):
+        # Theme I (F-6): a cached-but-`shopify_location_active=False` location
+        # must fail closed exactly like its three siblings (null GID,
+        # ambiguous multi-location, absent-from-cache) -- never silently
+        # accepted merely because a stale cache row still exists.
+        self.Location.create({
+            'store_id': self.store.id,
+            'shopify_location_gid': 'gid://shopify/Location/3',
+            'name': 'Deactivated Warehouse',
+            'shopify_location_active': False,
+        })
+        fos = [_fo('gid://shopify/Location/3')]
+        with self.assertRaises(FulfillmentReadError) as ctx:
+            self.Service._resolve_single_location(self.store, fos)
+        self.assertEqual(ctx.exception.error_class, 'ambiguous_match')
+
     def test_resolver_never_references_location_mapping(self):
         # The location.mapping model belongs to the inventory domain and is not
         # a dependency of this module; the resolver must resolve through the

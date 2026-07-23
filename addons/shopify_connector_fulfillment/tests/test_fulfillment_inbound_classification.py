@@ -168,6 +168,10 @@ class TestFulfillmentInboundClassification(TransactionCase):
         self.assertEqual(evidence.reconciled_state, 'applied')
 
     def test_observe_external_mode1_opens_review_case(self):
+        # Theme H: the routine Mode-1 baseline case uses the frozen new
+        # value `external_fulfillment_observed`, never the unrelated
+        # `remote_state_changed` (Condition 14's own narrow, Mode-2-only
+        # live-second-read-changed gate).
         fgid = 'gid://shopify/Fulfillment/EXT2'
         node = self._node(fgid)
         evidence = self.Service._observe_fulfillment(
@@ -176,7 +180,8 @@ class TestFulfillmentInboundClassification(TransactionCase):
         self.assertEqual(evidence.origin_class, 'external_merchant')
         # Mode 1 external -> a review case, zero automatic Odoo stock change.
         self.assertEqual(evidence.reconciled_state, 'review')
-        self.assertEqual(evidence.review_reason, 'remote_state_changed')
+        self.assertEqual(evidence.review_reason, 'external_fulfillment_observed')
+        self.assertNotEqual(evidence.review_reason, 'remote_state_changed')
 
     def test_observe_external_unknown_mode1_review_origin_unconfirmed(self):
         job, token = self._running_create_job()
@@ -190,3 +195,67 @@ class TestFulfillmentInboundClassification(TransactionCase):
         self.assertFalse(evidence.origin_confirmed)
         self.assertEqual(evidence.reconciled_state, 'review')
         self.assertEqual(evidence.review_reason, 'origin_unconfirmed')
+
+    # ------------------------------------------------------------------
+    # Theme J — _has_unresolved_create_attempt terminal-state gap
+    # ------------------------------------------------------------------
+
+    def _create_job_in_state(self, state, res_id=None):
+        job = self.Job.sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'odoo_event',
+            'trigger_origin': 'fulfillment_picking_validation',
+            'job_type': 'fulfillment_create',
+            'state': 'queued',
+            'res_model': 'stock.picking',
+            'res_id': res_id if res_id is not None else self.picking.id,
+            'shopify_target_gid': 'gid://shopify/FulfillmentOrder/1',
+            'payload_hash': 'theme-j-%s' % state,
+        })
+        vals = {'state': state}
+        if state == 'cancelled':
+            vals['cancel_reason'] = 'admin cancelled'
+            vals['finished_at'] = job.create_date
+        elif state == 'failed_final':
+            vals['finished_at'] = job.create_date
+            vals['error_class'] = 'shopify_temporary_server_network'
+        job.sudo().write(vals)
+        return job
+
+    def test_cancelled_attempt_less_job_does_not_block_origin_confirmation(self):
+        # A `cancelled` job (e.g. an admin/disconnect-sweep cancellation)
+        # with no mutation_attempt must NOT permanently block origin
+        # confirmation -- the prior hand-rolled ('succeeded', 'skipped')
+        # tuple missed this exact case.
+        self._create_job_in_state('cancelled')
+        blocked = self.Service._has_unresolved_create_attempt(
+            self.store, self.order_binding,
+        )
+        self.assertFalse(blocked)
+
+    def test_failed_final_attempt_less_job_does_not_block_origin_confirmation(self):
+        # Independently reachable with zero mutation_attempt via the same
+        # production path -- the corrected fix must not leave an identical,
+        # undetected twin defect live for `failed_final`.
+        self._create_job_in_state('failed_final')
+        blocked = self.Service._has_unresolved_create_attempt(
+            self.store, self.order_binding,
+        )
+        self.assertFalse(blocked)
+
+    def test_genuinely_non_terminal_job_still_blocks(self):
+        self._create_job_in_state('running')
+        blocked = self.Service._has_unresolved_create_attempt(
+            self.store, self.order_binding,
+        )
+        self.assertTrue(blocked)
+
+    def test_existing_attempt_aware_safeguard_unchanged_for_pending_attempt(self):
+        # The existing attempt-aware safeguard (a running job WITH a still-
+        # pending/unresolved mutation attempt) remains unchanged.
+        job, token = self._running_create_job()
+        self._pending_attempt(job, token)
+        blocked = self.Service._has_unresolved_create_attempt(
+            self.store, self.order_binding,
+        )
+        self.assertTrue(blocked)

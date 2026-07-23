@@ -173,23 +173,30 @@ class TestFulfillmentMode2Engine(TransactionCase):
         }
 
     def _mock_picking(self, state='assigned', move_ids=None,
-                      carrier_id=False, carrier_tracking_ref=''):
+                      carrier_id=False, carrier_tracking_ref='',
+                      location_id=None):
         """A stand-in for the deterministically-selected picking exposing only
         the exact attributes the post-selection conditions read
-        (_c10 state, _c11 move_ids, _c13 id)."""
+        (_c10 state, _c11 move_ids, _c13 id, _c8/_c14 location_id)."""
         picking = Mock()
         picking.id = self.picking.id
         picking.state = state
         picking.move_ids = [] if move_ids is None else move_ids
         picking.carrier_id = carrier_id
         picking.carrier_tracking_ref = carrier_tracking_ref
+        # Theme I (F-4): defaults to the real fixture warehouse location, so
+        # the shared _evaluate() helper's default mapped-location patch
+        # (also self.stock_loc) keeps every pre-existing test's 16/16 happy
+        # path passing condition 8 unchanged.
+        picking.location_id = self.stock_loc if location_id is None else location_id
         return picking
 
     _UNSET = object()
 
     def _evaluate(self, evidence, fulfillments=_UNSET, fos=_UNSET,
                   picking=_UNSET, quantity_compatible=_UNSET,
-                  fulfillments_side_effect=None, fos_side_effect=None):
+                  fulfillments_side_effect=None, fos_side_effect=None,
+                  mapped_location=_UNSET, mapped_location_side_effect=None):
         """Run _evaluate_mode2 with the two reads + the deterministic selector
         stubbed. Defaults produce a fully-valid 16/16 pass; a test overrides one
         input to break exactly one condition.
@@ -203,8 +210,15 @@ class TestFulfillmentMode2Engine(TransactionCase):
         ``fos_side_effect``, when given, let a test return a genuinely
         different value on condition 14's second call than condition 3/8's
         first call (proving the second read is separate, not reused).
+        ``mapped_location``/``mapped_location_side_effect`` patch the F-4 core
+        seam (``shopify.connector.location._resolve_odoo_location``) directly
+        — default is ``self.stock_loc``, matching every mock picking's own
+        default ``location_id``, so the happy path passes condition 8/14
+        unchanged; pass ``False`` for an unmapped/disabled seam, or a
+        different real location for a mismatched-subtree case.
         """
         Service = self.Service
+        LocationModel = type(self.env['shopify.connector.location'])
         with ExitStack() as stack:
             if fulfillments_side_effect is not None:
                 stack.enter_context(patch.object(
@@ -229,6 +243,18 @@ class TestFulfillmentMode2Engine(TransactionCase):
                 stack.enter_context(patch.object(
                     type(Service), '_read_fulfillment_orders',
                     return_value=fos,
+                ))
+            if mapped_location_side_effect is not None:
+                stack.enter_context(patch.object(
+                    LocationModel, '_resolve_odoo_location',
+                    side_effect=mapped_location_side_effect,
+                ))
+            else:
+                if mapped_location is self._UNSET:
+                    mapped_location = self.stock_loc
+                stack.enter_context(patch.object(
+                    LocationModel, '_resolve_odoo_location',
+                    return_value=mapped_location,
                 ))
             if quantity_compatible is not self._UNSET:
                 stack.enter_context(patch.object(
@@ -445,15 +471,22 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self._assert_stopped(result, evidence, 'location_unmapped')
 
     def test_c9_picking_ambiguous(self):
-        # Low-level unit check of condition 9 in isolation: the (mocked)
-        # deterministic selector itself reports no resolvable picking. See
+        # Low-level unit check of condition 9 IN ISOLATION (direct call, not
+        # through the full engine): the deterministic selector itself
+        # reports no resolvable picking, independent of conditions 7/8's own
+        # candidate-filtering logic. See
         # test_c9_picking_ambiguous_multiple_quantity_compatible_candidates
         # above for the real end-to-end genuine-ambiguity path, and
         # test_c7_quantity_mismatch_no_compatible_picking_end_to_end for the
         # corrected quantity_mismatch routing this must never fall back to.
-        evidence = self._evidence()
-        result = self._evaluate(evidence, picking=False)
-        self._assert_stopped(result, evidence, 'picking_ambiguous')
+        ctx = {'quantity_compatible_pickings': None, 'plan': {}}
+        with patch.object(
+            type(self.Service), '_select_deterministic_picking',
+            return_value=False,
+        ):
+            ok, _detail = self.Service._c9_picking(ctx)
+        self.assertFalse(ok)
+        self.assertNotIn('picking', ctx['plan'])
 
     def test_c10_reservation_invalid(self):
         # The selected picking is not fully reserved (state != assigned).
@@ -642,10 +675,13 @@ class TestFulfillmentMode2Engine(TransactionCase):
         first = self._fulfillment_node()
         job = self._mode2_job(evidence)
         Service = self.Service
+        LocationModel = type(self.env['shopify.connector.location'])
         with patch.object(type(Service), '_read_order_fulfillments',
                           side_effect=[[first], ConnectionError('down')]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(LocationModel, '_resolve_odoo_location',
+                             return_value=self.stock_loc), \
                 patch.object(type(Service), '_quantity_compatible_pickings',
                              return_value=[self._mock_picking()]), \
                 patch.object(type(Service), '_select_deterministic_picking',
@@ -712,13 +748,17 @@ class TestFulfillmentMode2Engine(TransactionCase):
         # The happy path: a 16/16 pass applies (evidence -> 'applied') after the
         # carrier fail-closed check clears (no carrier here). The local validate
         # is stubbed to a no-op so no real stock engine runs in the unit test.
+        # Theme B: the cross-fulfillment ledger row is genuinely written.
         evidence = self._evidence()
         job = self._mode2_job(evidence)
         Service = self.Service
+        LocationModel = type(self.env['shopify.connector.location'])
         with patch.object(type(Service), '_read_order_fulfillments',
                           return_value=[self._fulfillment_node()]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
                              return_value=[self._fo_node()]), \
+                patch.object(LocationModel, '_resolve_odoo_location',
+                             return_value=self.stock_loc), \
                 patch.object(type(Service), '_quantity_compatible_pickings',
                              return_value=[self._mock_picking(carrier_id=False)]), \
                 patch.object(type(Service), '_select_deterministic_picking',
@@ -728,6 +768,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
             Service._handle_fulfillment_mode2_evaluation(job)
         evidence.invalidate_recordset()
         self.assertEqual(evidence.reconciled_state, 'applied')
+        Line = self.env['shopify.connector.fulfillment.inbound.evidence.line']
+        ledger_rows = Line.search([('evidence_id', '=', evidence.id)])
+        self.assertEqual(len(ledger_rows), 1)
+        self.assertEqual(ledger_rows.line_item_gid, LINE_ITEM_GID)
+        self.assertEqual(ledger_rows.sale_line_id, self.sale_line)
+        self.assertEqual(ledger_rows.reconciled_quantity, 2)
 
     # ------------------------------------------------------------------
     # Q6 carrier fail-closed (real delivery.carrier + picking)
@@ -765,3 +811,295 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertEqual(evidence.review_reason, 'carrier_would_book')
         # Not applied: no stock change.
         self.assertNotEqual(evidence.reconciled_state, 'applied')
+
+    # ------------------------------------------------------------------
+    # Theme B — P0-B: partial fulfillment must not validate sibling moves
+    # ------------------------------------------------------------------
+
+    def _real_picking_with_moves(self, line_specs):
+        """A real outbound picking with one stock.move per (sale_line, qty)."""
+        picking = self.env['stock.picking'].create({
+            'picking_type_id': self.pt_out.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_id': self.sale.id,
+        })
+        for sale_line, qty in line_specs:
+            self.env['stock.move'].create({
+                'product_id': sale_line.product_id.id,
+                'product_uom_qty': qty,
+                'product_uom': sale_line.product_id.uom_id.id,
+                'picking_id': picking.id,
+                'location_id': self.stock_loc.id,
+                'location_dest_id': self.customer_loc.id,
+                'sale_line_id': sale_line.id,
+            })
+        return picking
+
+    def test_sibling_unevidenced_move_excludes_picking(self):
+        # Theme B P0-B baseline: a candidate picking carrying a move for a
+        # sale line this fulfillment does NOT evidence must never be
+        # quantity-compatible -- it would otherwise be whole-picking-
+        # validated, silently stock-deducting the sibling, un-evidenced line.
+        sibling_sale_line = self.env['sale.order.line'].create({
+            'order_id': self.sale.id, 'product_id': self.product.id,
+            'product_uom_qty': 1.0,
+            'shopify_line_item_gid': 'gid://shopify/LineItem/SIBLING-UNIT',
+        })
+        picking = Mock()
+        picking.picking_type_code = 'outgoing'
+        picking.location_dest_id.usage = 'customer'
+        picking.state = 'assigned'
+        move_a = Mock()
+        move_a.state = 'confirmed'
+        move_a.sale_line_id.id = self.sale_line.id
+        move_a.product_uom_qty = 2.0
+        move_sibling = Mock()
+        move_sibling.state = 'confirmed'
+        move_sibling.sale_line_id.id = sibling_sale_line.id
+        move_sibling.product_uom_qty = 1.0
+        picking.move_ids = [move_a, move_sibling]
+        order_binding = Mock()
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertEqual(compatible, [])
+
+    def test_sibling_move_end_to_end_zero_stock_change(self):
+        # Real picking, real moves: the sibling line's move is proven
+        # completely untouched (never validated) when only the OTHER line
+        # is evidenced by this fulfillment.
+        sibling_sale_line = self.env['sale.order.line'].create({
+            'order_id': self.sale.id, 'product_id': self.product.id,
+            'product_uom_qty': 1.0,
+            'shopify_line_item_gid': 'gid://shopify/LineItem/SIBLING-E2E',
+        })
+        picking = self._real_picking_with_moves([
+            (self.sale_line, 2.0), (sibling_sale_line, 1.0),
+        ])
+        picking.move_ids._action_confirm()
+        sibling_move = picking.move_ids.filtered(
+            lambda m: m.sale_line_id == sibling_sale_line)
+        sibling_state_before = sibling_move.state
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertNotIn(picking, compatible)
+        sibling_move.invalidate_recordset()
+        self.assertEqual(sibling_move.state, sibling_state_before)
+        self.assertNotEqual(sibling_move.state, 'done')
+        self.assertNotEqual(picking.state, 'done')
+
+    def test_no_sibling_move_still_compatible(self):
+        # Control: an otherwise-identical picking with NO sibling move (only
+        # the evidenced line) remains a genuine candidate -- the sibling
+        # check must not over-exclude.
+        picking = self._real_picking_with_moves([(self.sale_line, 2.0)])
+        picking.move_ids._action_confirm()
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertIn(picking, compatible)
+
+    def test_c6_no_overrun_sums_other_applied_evidence_not_own(self):
+        # Theme B: the ledger sums OTHER applied evidence records' lines for
+        # this exact sale line -- never the current (always-empty at
+        # evaluation time) evidence's own lines.
+        other_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-OTHER-1',
+            reconciled_state='applied',
+        )
+        self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo().create({
+            'evidence_id': other_evidence.id,
+            'line_item_gid': LINE_ITEM_GID,
+            'sale_line_id': self.sale_line.id,
+            'quantity': 1, 'reconciled_quantity': 1,
+        })
+        current_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-CURRENT-1',
+        )
+        ctx = {
+            'evidence': current_evidence, 'store': self.store,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
+        }
+        ok, _detail = self.Service._c6_no_overrun(ctx)
+        self.assertTrue(ok)  # 1 (other, applied) + 1 (this) == ordered (2)
+
+    def test_c6_no_overrun_rejects_cumulative_over_ordered(self):
+        # Repeated partial fulfillments cumulatively exceeding the ordered
+        # quantity are rejected BEFORE any local stock mutation (this is a
+        # pure evaluation-time check; _apply_mode2/_validate_picking_local
+        # are never reached when this returns False).
+        other_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-OTHER-2',
+            reconciled_state='applied',
+        )
+        self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo().create({
+            'evidence_id': other_evidence.id,
+            'line_item_gid': LINE_ITEM_GID,
+            'sale_line_id': self.sale_line.id,
+            'quantity': 2, 'reconciled_quantity': 2,
+        })
+        current_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-CURRENT-2',
+        )
+        ctx = {
+            'evidence': current_evidence, 'store': self.store,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
+        }
+        ok, detail = self.Service._c6_no_overrun(ctx)
+        self.assertFalse(ok)
+        self.assertIn('quantity_overrun', detail)
+
+    def test_c6_no_overrun_ignores_non_applied_evidence(self):
+        # An observed/review (not-yet-applied) evidence record's lines must
+        # never count toward the overrun ledger.
+        other_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-OTHER-3',
+            reconciled_state='observed',
+        )
+        self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo().create({
+            'evidence_id': other_evidence.id,
+            'line_item_gid': LINE_ITEM_GID,
+            'sale_line_id': self.sale_line.id,
+            'quantity': 2, 'reconciled_quantity': 2,
+        })
+        current_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/C6-CURRENT-3',
+        )
+        ctx = {
+            'evidence': current_evidence, 'store': self.store,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        ok, _detail = self.Service._c6_no_overrun(ctx)
+        self.assertTrue(ok)
+
+    def test_apply_mode2_rollback_on_validation_failure_writes_no_ledger(self):
+        # A local-validation failure must leave no applied ledger row and no
+        # incorrect fulfillment binding survives as "applied" -- evidence
+        # reverts to a review-safe state.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/ROLLBACK-1',
+        )
+        plan = {
+            'picking': self._mock_picking(),
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        with patch.object(
+            type(self.Service), '_validate_picking_local',
+            side_effect=RuntimeError('simulated validation failure'),
+        ):
+            self.Service._apply_mode2(evidence, plan)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'review')
+        self.assertEqual(evidence.review_reason, 'reservation_invalid')
+        Line = self.env['shopify.connector.fulfillment.inbound.evidence.line']
+        self.assertFalse(Line.search([('evidence_id', '=', evidence.id)]))
+
+    # ------------------------------------------------------------------
+    # Theme I — F-4 permanent location cross-check
+    # ------------------------------------------------------------------
+
+    def test_c8_mapped_exact_picking_source_passes(self):
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-EXACT',
+        )
+        picking = self._mock_picking(location_id=self.stock_loc)
+        result = self._evaluate(
+            evidence, quantity_compatible=[picking],
+            mapped_location=self.stock_loc,
+        )
+        self.assertTrue(result['passed'])
+
+    def test_c8_mapped_parent_with_descendant_picking_source_passes(self):
+        child_loc = self.env['stock.location'].create({
+            'name': 'F4 Child', 'usage': 'internal',
+            'location_id': self.stock_loc.id,
+        })
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-DESC',
+        )
+        picking = self._mock_picking(location_id=child_loc)
+        result = self._evaluate(
+            evidence, quantity_compatible=[picking],
+            mapped_location=self.stock_loc,
+        )
+        self.assertTrue(result['passed'])
+
+    def test_c8_picking_source_outside_mapped_subtree_fails_closed(self):
+        other_loc = self.env['stock.location'].create({
+            'name': 'F4 Unrelated', 'usage': 'internal',
+            'location_id': self.env.ref('stock.stock_location_locations').id,
+        })
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-OUTSIDE',
+        )
+        picking = self._mock_picking(location_id=other_loc)
+        result = self._evaluate(
+            evidence, quantity_compatible=[picking],
+            mapped_location=self.stock_loc,
+        )
+        self._assert_stopped(result, evidence, 'location_unmapped')
+
+    def test_c8_missing_mapping_fails_closed(self):
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-MISSING',
+        )
+        result = self._evaluate(evidence, mapped_location=False)
+        self._assert_stopped(result, evidence, 'location_unmapped')
+
+    def test_c8_no_seam_available_fails_closed(self):
+        # No inventory addon/override available -> the core base seam
+        # (`shopify.connector.location._resolve_odoo_location`'s own
+        # unconditional `return False`) fails closed exactly like a known
+        # mapping absence -- the fulfillment layer cannot and must not
+        # distinguish the two causes; both yield `location_unmapped`.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-NOSEAM',
+        )
+        result = self._evaluate(evidence, mapped_location=False)
+        self._assert_stopped(result, evidence, 'location_unmapped')
+
+    def test_c14_mapping_changed_between_c8_and_c14_fails_closed(self):
+        other_loc = self.env['stock.location'].create({
+            'name': 'F4 Changed Mapping', 'usage': 'internal',
+            'location_id': self.env.ref('stock.stock_location_locations').id,
+        })
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-CHANGED',
+        )
+        # C8's read resolves to self.stock_loc; C14's genuinely separate
+        # second read resolves the SAME Shopify location GID to a DIFFERENT
+        # Odoo location -- the mapping changed between the two reads.
+        result = self._evaluate(
+            evidence,
+            mapped_location_side_effect=[self.stock_loc, other_loc],
+        )
+        self._assert_stopped(result, evidence, 'remote_state_changed')
+
+    def test_c14_mapping_unchanged_permits_continuation(self):
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/F4-UNCHANGED',
+        )
+        result = self._evaluate(
+            evidence,
+            mapped_location_side_effect=[self.stock_loc, self.stock_loc],
+        )
+        self.assertTrue(result['passed'])

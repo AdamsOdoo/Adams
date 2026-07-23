@@ -1,6 +1,25 @@
 # Wave 4 Tier-1 Findings Ledger — PR #189 Independent Review Synthesis
 
-> **Status: TIER-1 FINDINGS SYNTHESIZED — CORRECTION NOT YET AUTHORIZED.**
+> **Status (2026-07-23, correction session): all 11 authorized themes below
+> (A, B, C, E, F, G, H, I — permanent F-4 — J, K) are `CORRECTED —
+> IMPLEMENTED, RUNTIME PENDING`.** Per the one-loop control-room ruling
+> (PR #189 review comments `4766049839`/`4766053529`), a dedicated
+> implementation session corrected every finding this ledger classifies
+> below as immediately correctable (not the two/three items explicitly
+> marked **OUTSIDE ACCEPTED WAVE 4 SCOPE** — Theme D and Theme L remain
+> genuinely deferred, unchanged). Theme I's F-4 sub-finding (`W4-R-P2-007`)
+> was corrected with the **permanent** architecture (superseding the
+> decision-lock's earlier interim-only authorization for this specific
+> campaign), not merely the interim fail-closed patch. See
+> `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` §
+> "WAVE 4 CLOSURE CORRECTION CAMPAIGN" for the full theme-by-theme
+> production/test-file/evidence record. **This historical record below
+> (findings, root causes, dispositions as originally synthesized) is
+> preserved unchanged** — it documents what was found and why, not the
+> current implementation state.
+>
+> Prior status (2026-07-23, synthesis session, superseded by the above):
+> **TIER-1 FINDINGS SYNTHESIZED — CORRECTION NOT YET AUTHORIZED.**
 > This is the authoritative, deduplicated, source-verified ledger of every
 > finding raised by the independent Tier-1 review of Wave 4 PR #189. It was
 > built by a dedicated synthesis session per the binding control-room ruling

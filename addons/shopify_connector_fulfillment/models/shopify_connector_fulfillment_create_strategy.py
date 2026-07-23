@@ -335,7 +335,26 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
                 'id; reconciling before trusting this as applied.',
                 evidence,
             )
+        # Theme F: a real Fulfillment id alone is not positive success
+        # evidence -- the reconcile path already requires status == 'SUCCESS'
+        # twice (a strictly stronger bar); the direct-result path must match
+        # it. Shopify's active FulfillmentStatus enum is exactly
+        # SUCCESS/CANCELLED/ERROR/FAILURE (OPEN/PENDING deprecated); only
+        # SUCCESS is proof the fulfillment actually completed. A non-SUCCESS
+        # or missing status is routed through the existing uncertain/
+        # reconcile path — never classified as `failed_clean` merely for not
+        # being SUCCESS, since the id itself proves Shopify accepted the
+        # request.
         evidence['fulfillment'] = fulfillment
+        status = fulfillment.get('status')
+        if status != 'SUCCESS':
+            return self._uncertain_consequence(
+                'data_shape_schema_mismatch',
+                'fulfillmentCreate returned a real Fulfillment id but status '
+                '%r is not SUCCESS; reconciling before trusting this as '
+                'applied.' % (status,),
+                evidence,
+            )
         return {
             'observed_outcome': 'succeeded',
             'error_class': False,

@@ -265,13 +265,22 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
         """RA-023 explicit matching. For each done move line on the picking,
         resolve its Shopify line-item GID (via sale_line_id.shopify_line_item_gid)
         to a FulfillmentOrderLineItem GID through the 2-hop
-        order-LineItem-GID -> FO-line lineItem.id -> FO-line id, capping the sent
-        quantity at the FO line's remainingQuantity.
+        order-LineItem-GID -> FO-line lineItem.id -> FO-line id.
 
-        Returns (line_inputs, diagnostics) where line_inputs is a dict keyed by
-        FulfillmentOrder GID -> list of {id, quantity}. Never fulfils by guess:
-        an unresolved line raises FulfillmentReadError('mapping_missing') and an
-        over-remaining quantity raises FulfillmentReadError('ambiguous_match').
+        Theme C correction: every resolved move line's quantity is first
+        converted through Odoo's UoM API into the resolved sale line's own
+        UoM (the unit Shopify's `remainingQuantity` is expressed against),
+        then AGGREGATED per FulfillmentOrder line — never compared
+        individually — before the single aggregate is capped at that line's
+        `remainingQuantity`. A lot/serial-split shipment whose individual
+        move lines each pass alone but jointly exceed the remaining quantity
+        is rejected exactly like a single over-large line would be.
+
+        Returns (line_inputs, diagnostics) where line_inputs is a dict keyed
+        by FulfillmentOrder GID -> list of exactly one {id, quantity} entry
+        per matched FO line. Never fulfils by guess: an unresolved line
+        raises FulfillmentReadError('mapping_missing') and an
+        over-remaining aggregate raises FulfillmentReadError('ambiguous_match').
         """
         # Build the reverse index: order LineItem GID -> [(fo_gid, fo_line_id,
         # remaining)]. Skip null-GID FO lines.
@@ -292,12 +301,15 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
                     'remaining': fo_line.get('remainingQuantity'),
                 })
 
-        line_inputs = {}
+        # Aggregate every done move line's UoM-normalized quantity by the
+        # single FulfillmentOrder line it resolves to, BEFORE any
+        # remainingQuantity comparison (Theme C).
+        aggregated = {}
         diagnostics = {'matched_lines': 0}
         for move_line in self._picking_done_move_lines(picking):
             sale_line = move_line.move_id.sale_line_id
             order_line_gid = sale_line.shopify_line_item_gid if sale_line else False
-            quantity = int(round(move_line.quantity or 0.0))
+            quantity = self._fo_line_uom_quantity(move_line, sale_line)
             if quantity <= 0:
                 continue
             if not order_line_gid:
@@ -320,25 +332,50 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
                     'FulfillmentOrder line.' % order_line_gid,
                 )
             candidate = candidates[0]
-            remaining = candidate['remaining']
-            if not isinstance(remaining, int) or quantity > remaining:
+            fo_line_id = candidate['fo_line_id']
+            entry = aggregated.setdefault(fo_line_id, {
+                'fo_gid': candidate['fo_gid'],
+                'remaining': candidate['remaining'],
+                'quantity': 0,
+            })
+            entry['quantity'] += quantity
+            diagnostics['matched_lines'] += 1
+
+        line_inputs = {}
+        for fo_line_id, entry in aggregated.items():
+            remaining = entry['remaining']
+            if not isinstance(remaining, int) or entry['quantity'] > remaining:
                 raise FulfillmentReadError(
                     'ambiguous_match',
-                    'Shipped quantity %d exceeds the remaining fulfillable '
-                    'quantity for FulfillmentOrder line %s.'
-                    % (quantity, candidate['fo_line_id']),
+                    'Aggregate shipped quantity %d exceeds the remaining '
+                    'fulfillable quantity for FulfillmentOrder line %s.'
+                    % (entry['quantity'], fo_line_id),
                 )
-            line_inputs.setdefault(candidate['fo_gid'], []).append({
-                'id': candidate['fo_line_id'],
-                'quantity': quantity,
+            line_inputs.setdefault(entry['fo_gid'], []).append({
+                'id': fo_line_id,
+                'quantity': entry['quantity'],
             })
-            diagnostics['matched_lines'] += 1
         if not line_inputs:
             raise FulfillmentReadError(
                 'mapping_missing',
                 'No shipped line resolved to an open FulfillmentOrder line.',
             )
         return line_inputs, diagnostics
+
+    @api.model
+    def _fo_line_uom_quantity(self, move_line, sale_line):
+        """The move line's `quantity` (Odoo 19: never qty_done/quantity_done),
+        UoM-converted to the resolved sale line's own UoM — the unit Shopify's
+        `remainingQuantity` is expressed against — via the standard Odoo UoM
+        conversion API. Falls back to the raw quantity when no sale line or
+        no UoM is resolvable (an unmapped line already fails closed
+        separately on the caller side)."""
+        quantity = move_line.quantity or 0.0
+        move_uom = move_line.product_uom_id
+        target_uom = sale_line.product_uom if sale_line else False
+        if move_uom and target_uom and move_uom != target_uom:
+            quantity = move_uom._compute_quantity(quantity, target_uom)
+        return int(round(quantity))
 
     @api.model
     def _picking_done_move_lines(self, picking):
@@ -383,6 +420,16 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
                 'ambiguous_match',
                 'Shopify location %s is not present in the core location '
                 'cache for this store.' % gid,
+            )
+        if not cache.shopify_location_active:
+            # Theme I (F-6): a cached-but-deactivated location must fail
+            # closed exactly like the three sibling checks above (null GID,
+            # ambiguous multi-location, absent-from-cache) — it must not be
+            # silently accepted merely because a stale cache row exists.
+            raise FulfillmentReadError(
+                'ambiguous_match',
+                'Shopify location %s is present in the core location cache '
+                'but is no longer active.' % gid,
             )
         return gid
 

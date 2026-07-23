@@ -110,6 +110,20 @@ Shopify order, which items/quantities, from which Shopify location, by whom
 per the state vocabulary in
 [`shopify-fulfillment-status-model.md`](shopify-fulfillment-status-model.md).
 
+> **[Proposed product decision, Theme H, 2026-07-23]** The routine "any
+> external fulfillment observed" case above persists the code review-reason
+> `external_fulfillment_observed` ("External Fulfillment Observed"). This is
+> distinct from `remote_state_changed` (§4 condition 14's narrow, Mode-2-only
+> "a live second read detected the fulfillment changed/vanished between
+> observation and application" gate) and from `mode_not_enabled` (§4
+> condition 16's mid-flight mode-switch cancellation) — three independently
+> wired values that must never collide. See
+> `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` and
+> `docs/07-implementation-plan/wave-4-tier1-decision-lock.md` Decision C for
+> the full record; implemented in
+> `addons/shopify_connector_fulfillment/models/shopify_connector_fulfillment_inbound.py`
+> and `shopify_connector_fulfillment_inbound_evidence.py`.
+
 ---
 
 ## 3. External-fulfillment detection and review-case design

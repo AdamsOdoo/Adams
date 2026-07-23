@@ -137,16 +137,45 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
                 return False, 'ambiguous line %s' % gid
             mapping[gid] = (sale_line, line.get('quantity') or 0)
         ctx['line_mapping'] = mapping
+        # Carried into the plan so `_apply_mode2` can write the real
+        # cross-fulfillment reconciled-quantity ledger once local validation
+        # genuinely succeeds (Theme B) -- never before.
+        ctx['plan']['line_mapping'] = mapping
         return True, None
 
     @api.model
     def _c6_no_overrun(self, ctx):
-        ledger = ctx['evidence'].reconciled_quantity_ledger()
+        # Theme B: a real cross-fulfillment ledger, keyed consistently by the
+        # order-level LineItem GID (never `fo_line_item_gid`, which is a
+        # different id space -- `reconciled_quantity_ledger()`'s own per-
+        # record arithmetic is unrelated and untouched here). Sums only
+        # OTHER, already-`applied` evidence records' lines for this exact
+        # sale line -- this record's own lines are always empty at
+        # evaluation time (the ledger writer runs only after a successful
+        # apply, see `_record_reconciled_lines`).
+        Line = self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo()
         for gid, (sale_line, qty) in ctx['line_mapping'].items():
-            already = sum(
-                l.reconciled_quantity for l in ctx['evidence'].line_ids
-                if l.line_item_gid == gid
-            )
+            # Serialize concurrent Mode-2 evaluations of two separate
+            # Fulfillment events on the SAME sale line: without this, both
+            # evaluations could read the same "already reconciled" sum and
+            # both pass, double-spending the ordered quantity (a genuine
+            # TOCTOU window). A lock that cannot be acquired right now is
+            # itself an inconclusive overrun check -- fail closed rather
+            # than proceed on a possibly-stale read.
+            locked = sale_line.try_lock_for_update()
+            if not locked:
+                return False, (
+                    'quantity_overrun on %s (locked by a concurrent '
+                    'evaluation)' % gid
+                )
+            already = sum(Line.search([
+                ('line_item_gid', '=', gid),
+                ('evidence_id.store_id', '=', ctx['store'].id),
+                ('evidence_id', '!=', ctx['evidence'].id),
+                ('evidence_id.reconciled_state', '=', 'applied'),
+            ]).mapped('reconciled_quantity'))
             ordered = int(round(sale_line.product_uom_qty or 0))
             if qty + already > ordered:
                 return False, 'quantity_overrun on %s' % gid
@@ -171,6 +200,20 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
 
     @api.model
     def _c8_location(self, ctx):
+        """F-4 permanent seam: resolve the Shopify fulfillment location
+        (already fail-closed on absence/ambiguity/inactive via
+        `_resolve_single_location`), then cross-check it against the actual
+        picking source warehouse through the sanctioned core extension point
+        only (`shopify.connector.location._resolve_odoo_location`) -- never a
+        direct read of `shopify.connector.location.mapping`. Condition 7 has
+        already narrowed `ctx['quantity_compatible_pickings']` to pickings
+        whose demand covers the required lines with no sibling moves; this
+        condition further narrows that same list to only the candidates
+        whose own source location is the mapped Odoo location or one of its
+        descendants, so condition 9's deterministic selection can never land
+        on a picking from an incompatible warehouse. No valid mapping (core
+        seam absent/returns False; no candidate is location-compatible)
+        fails closed to `location_unmapped`, exactly as it always has."""
         node_fos = self._read_fulfillment_orders(
             ctx['store'], ctx['order_binding'].shopify_gid,
         )
@@ -182,8 +225,40 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             )
         except FulfillmentReadError:
             return False, 'location unmapped'
+        mapped_location = self.env[
+            'shopify.connector.location'
+        ]._resolve_odoo_location(ctx['store'], location_gid)
+        if not mapped_location:
+            return False, 'location unmapped'
+        candidates = ctx.get('quantity_compatible_pickings') or []
+        compatible = [
+            picking for picking in candidates
+            if self._picking_location_in_subtree(picking, mapped_location)
+        ]
+        if not compatible:
+            return False, 'location unmapped'
+        ctx['quantity_compatible_pickings'] = compatible
         ctx['location_gid'] = location_gid
+        ctx['mapped_odoo_location_id'] = mapped_location.id
         return True, None
+
+    @api.model
+    def _picking_location_in_subtree(self, picking, mapped_location):
+        """True when `picking`'s source location IS the mapped Odoo location
+        or a genuine descendant of it, using Odoo's own location-hierarchy
+        `parent_path` semantics (the same idiom
+        `shopify_connector_location_mapping.py`'s own ancestor/descendant
+        overlap guard uses)."""
+        if not picking or not mapped_location:
+            return False
+        source = picking.location_id
+        if not source:
+            return False
+        if source.id == mapped_location.id:
+            return True
+        mapped_path = mapped_location.parent_path or ''
+        source_path = source.parent_path or ''
+        return bool(mapped_path) and source_path.startswith(mapped_path)
 
     @api.model
     def _c9_picking(self, ctx):
@@ -281,6 +356,24 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             return False, 'location evidence changed on second read'
         if second_location_gid != ctx.get('location_gid'):
             return False, 'location evidence changed on second read'
+        # F-4: re-resolve and re-confirm the Odoo-location correspondence
+        # immediately before local application, through the same sanctioned
+        # core seam condition 8 used. A mapping that changed (re-pointed to a
+        # different Odoo location, or been disabled/removed) between the
+        # first and second read fails closed exactly like any other changed
+        # evidence here — never silently reused from condition 8's context.
+        second_mapped_location = self.env[
+            'shopify.connector.location'
+        ]._resolve_odoo_location(store, second_location_gid)
+        if (
+            not second_mapped_location
+            or second_mapped_location.id != ctx.get('mapped_odoo_location_id')
+        ):
+            return False, 'location evidence changed on second read'
+        if not self._picking_location_in_subtree(
+            ctx.get('picking'), second_mapped_location,
+        ):
+            return False, 'location evidence changed on second read'
         return True, None
 
     @api.model
@@ -302,8 +395,16 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     @api.model
     def _quantity_compatible_pickings(self, ctx):
         """Every open outgoing candidate picking whose pending per-line demand
-        covers the required fulfillment quantities (Modes §4.1). Read-only,
-        no selection/ambiguity judgement — condition 7 uses this to decide
+        covers the required fulfillment quantities AND whose non-done moves
+        are exclusively for sale lines this fulfillment evidences (Modes
+        §4.1; Theme B P0-B baseline). A picking carrying so much as one
+        sibling, un-evidenced move is never a candidate at all -- it is
+        excluded here, never validated as a whole and never speculatively
+        split; the caller (condition 7/9) surfaces the existing
+        `quantity_mismatch`/`picking_ambiguous` review reasons exactly as it
+        already does for insufficient coverage or genuine selection
+        ambiguity, with no new vocabulary. Read-only, no other selection/
+        ambiguity judgement — condition 7 uses this to decide
         `quantity_mismatch`; condition 9's `_select_deterministic_picking`
         uses the same list to decide `picking_ambiguous`."""
         order = ctx['order_binding'].sale_order_id
@@ -316,12 +417,24 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
         compatible = []
         for picking in candidates:
             demand = {}
+            has_sibling_move = False
             for move in picking.move_ids:
-                if move.sale_line_id.id in required:
-                    demand[move.sale_line_id.id] = demand.get(
-                        move.sale_line_id.id, 0.0
-                    ) + move.product_uom_qty
-            if not demand:
+                if move.state == 'done':
+                    # Historical fact from an earlier, already-completed
+                    # partial pass on this same picking; not part of this
+                    # candidate's own pending-demand evaluation.
+                    continue
+                sale_line_id = move.sale_line_id.id
+                if sale_line_id not in required:
+                    # A sibling, un-evidenced move: this exact Shopify
+                    # fulfillment never proves this line, so the whole
+                    # picking may never be auto-validated by it.
+                    has_sibling_move = True
+                    break
+                demand[sale_line_id] = demand.get(
+                    sale_line_id, 0.0
+                ) + move.product_uom_qty
+            if has_sibling_move or not demand:
                 continue
             covers = all(
                 demand.get(line_id, 0.0) >= qty
@@ -378,10 +491,37 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             )
             self._open_review(evidence, 'reservation_invalid')
             return
+        # The ledger is written ONLY here, after local validation has
+        # genuinely succeeded (Theme B) -- never at evaluation time, so a
+        # validation failure (the except branch above) never records a
+        # quantity for an application that did not happen. Runs inside the
+        # same transaction as the write below; a later failure in this same
+        # job execution rolls both back together.
+        self._record_reconciled_lines(
+            evidence, plan.get('line_mapping') if isinstance(plan, dict) else None,
+        )
         evidence.sudo().write({
             'reconciled_state': 'applied',
             'resolution_at': fields.Datetime.now(),
         })
+
+    @api.model
+    def _record_reconciled_lines(self, evidence, line_mapping):
+        """Write the cross-fulfillment reconciled-quantity ledger rows
+        `_c6_no_overrun` consults for future evaluations (Theme B)."""
+        if not line_mapping:
+            return
+        Line = self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo()
+        for gid, (sale_line, qty) in line_mapping.items():
+            Line.create({
+                'evidence_id': evidence.id,
+                'line_item_gid': gid,
+                'sale_line_id': sale_line.id,
+                'quantity': qty,
+                'reconciled_quantity': qty,
+            })
 
     @api.model
     def _bind_external_fulfillment(self, evidence, picking):

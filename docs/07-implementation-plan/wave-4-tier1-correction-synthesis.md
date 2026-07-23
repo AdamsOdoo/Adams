@@ -1,6 +1,19 @@
 # Wave 4 Tier-1 Correction Synthesis — PR #189
 
-> **Status: TIER-1 FINDINGS SYNTHESIZED — CORRECTION NOT YET AUTHORIZED.**
+> **Superseded (2026-07-23): the correction this document scoped has been
+> implemented.** Per the one-loop control-room ruling (PR #189 review
+> comments `4766049839`/`4766053529`), all themes this document lists as
+> immediately correctable (A, B, C, E, F, G, H, I[`F-6`+interim], J, K, M)
+> are now `CORRECTED — IMPLEMENTED, RUNTIME PENDING`; Theme I's F-4
+> sub-finding was corrected with the **permanent** architecture, exceeding
+> this document's own §6 recommendation of "interim-in-PR, permanent
+> deferred." See `docs/05-qa/task-014-fulfillment-tracking-validation-results.md`
+> § "WAVE 4 CLOSURE CORRECTION CAMPAIGN". This document's own analysis
+> (root causes, correction boundaries, test/runtime matrix, migration
+> analysis) is preserved unchanged below as the historical design record.
+>
+> Prior status (superseded): **TIER-1 FINDINGS SYNTHESIZED — CORRECTION NOT
+> YET AUTHORIZED.**
 > Companion to [`wave-4-tier1-findings-ledger.md`](../05-qa/wave-4-tier1-findings-ledger.md).
 > No production, test, or runtime correction was performed to produce this
 > document. No Odoo.sh runtime was executed. No Shopify request or mutation

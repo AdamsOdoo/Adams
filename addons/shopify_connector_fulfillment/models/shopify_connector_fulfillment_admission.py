@@ -1,8 +1,14 @@
 import hashlib
 import logging
 
-from odoo import api, models
+from psycopg2 import IntegrityError
 
+from odoo import api, models
+from odoo.exceptions import ValidationError
+
+from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
+    TERMINAL_JOB_STATES,
+)
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
@@ -23,6 +29,19 @@ from .shopify_connector_job import (
 )
 
 _logger = logging.getLogger(__name__)
+
+# The exact DB-level identifiers for the
+# `shopify.connector.job._store_operation_scope_key_uniq` collision (core) --
+# mirrored here, not imported from `shopify_connector_inventory`, per DEC-008's
+# dependency direction. Byte-identical to the values
+# `shopify_connector_inventory_service.py::_try_enqueue_push_sync` matches for
+# the same constraint (decision-lock Decision D.3).
+OPERATION_SCOPE_CONSTRAINT_MESSAGE = (
+    'A non-terminal job already holds this operation scope for this store.'
+)
+OPERATION_SCOPE_CONSTRAINT_NAME = (
+    'shopify_connector_job_store_operation_scope_key_uniq'
+)
 
 
 class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
@@ -110,7 +129,27 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
         Enforces the merged source/origin invariant at the single enqueue choke
         point: a non-`odoo_event` source can never carry a trigger origin (the
         core `_check_trigger_origin_required` constraint), so any caller-supplied
-        trigger origin is cleared for such sources."""
+        trigger origin is cleared for such sources.
+
+        Centralizes the expected `(store_id, operation_scope_key)` collision
+        recovery once, here, for every one of this addon's call sites
+        (decision-lock Decision D.1): the fast idempotency-key search above is
+        a plain optimization keyed on payload_hash; the actual serialization
+        guard is the DB-level `_store_operation_scope_key_uniq` constraint,
+        which does not depend on payload_hash. The create attempt below runs
+        inside a savepoint (mirroring the established
+        `shopify_connector_inventory_service.py::_try_enqueue_push_sync`
+        precedent) so a benign collision never poisons the caller's own
+        enclosing transaction. Only the exact operation-scope collision is
+        ever swallowed: it is matched against the constraint's own message
+        AND its raw DB constraint name (Odoo only substitutes the friendly
+        text at the HTTP boundary, not inside an inline savepoint flush), then
+        independently re-verified by re-querying for the actual non-terminal
+        job now holding this exact operation identity before being treated as
+        benign. Every other exception — including a genuine ambiguity where
+        the constraint matched but no such job is found — propagates
+        unchanged, never silently absorbed.
+        """
         if store.state != 'connected':
             return self.env['shopify.connector.job']
         if job_source != 'odoo_event':
@@ -125,13 +164,33 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
         ], limit=1)
         if existing:
             return existing
-        return self.env['shopify.connector.job.enqueue'].enqueue(
-            store, job_source, job_type,
-            payload_hash=payload_hash,
-            res_model=res_model, res_id=res_id,
-            shopify_target_gid=shopify_target_gid,
-            trigger_origin=trigger_origin,
-        )
+        try:
+            with self.env.cr.savepoint():
+                return self.env['shopify.connector.job.enqueue'].enqueue(
+                    store, job_source, job_type,
+                    payload_hash=payload_hash,
+                    res_model=res_model, res_id=res_id,
+                    shopify_target_gid=shopify_target_gid,
+                    trigger_origin=trigger_origin,
+                )
+        except (ValidationError, IntegrityError) as exc:
+            message = str(exc)
+            if (
+                OPERATION_SCOPE_CONSTRAINT_MESSAGE not in message
+                and OPERATION_SCOPE_CONSTRAINT_NAME not in message
+            ):
+                raise
+            scope_holder = Job.search([
+                ('store_id', '=', store.id),
+                ('job_type', '=', job_type),
+                ('res_model', '=', res_model),
+                ('res_id', '=', res_id),
+                ('shopify_target_gid', '=', shopify_target_gid),
+                ('state', 'not in', list(TERMINAL_JOB_STATES)),
+            ], limit=1)
+            if not scope_holder:
+                raise
+            return scope_holder
 
     # ------------------------------------------------------------------
     # Picking-admission handler

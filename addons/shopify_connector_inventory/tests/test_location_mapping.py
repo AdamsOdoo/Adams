@@ -247,3 +247,87 @@ class TestLocationMapping(TransactionCase):
                 'odoo_location_id': self.internal_location.id,
                 'match_key': 'manual',
             })
+
+    # ------------------------------------------------------------------
+    # Theme I — F-4 permanent seam: the inventory override of core's
+    # `shopify.connector.location._resolve_odoo_location()`.
+    # ------------------------------------------------------------------
+
+    def test_resolve_odoo_location_returns_mapped_location(self):
+        self._make_mapping(
+            self.internal_location, 'gid://shopify/Location/F4-1',
+        )
+        Location = self.env['shopify.connector.location']
+        result = Location._resolve_odoo_location(
+            self.store, 'gid://shopify/Location/F4-1',
+        )
+        self.assertEqual(result, self.internal_location)
+
+    def test_resolve_odoo_location_returns_false_for_unmapped_gid(self):
+        Location = self.env['shopify.connector.location']
+        result = Location._resolve_odoo_location(
+            self.store, 'gid://shopify/Location/F4-NEVER-MAPPED',
+        )
+        self.assertFalse(result)
+
+    def test_resolve_odoo_location_returns_false_when_push_disabled(self):
+        mapping = self._make_mapping(
+            self.internal_location, 'gid://shopify/Location/F4-2',
+        )
+        mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        Location = self.env['shopify.connector.location']
+        result = Location._resolve_odoo_location(
+            self.store, 'gid://shopify/Location/F4-2',
+        )
+        self.assertFalse(result)
+
+    def test_resolve_odoo_location_returns_false_for_non_internal_target(self):
+        # The mapping model's own constraint already forbids creating a
+        # non-internal mapping; this proves the resolution seam independently
+        # fails closed too, defense-in-depth, rather than trusting the
+        # constraint alone.
+        if not self.customer_location:
+            self.skipTest('No customer-usage location available in demo data.')
+        Location = self.env['shopify.connector.location']
+        with self.assertRaises(Exception):
+            self._make_mapping(
+                self.customer_location, 'gid://shopify/Location/F4-3',
+            )
+        result = Location._resolve_odoo_location(
+            self.store, 'gid://shopify/Location/F4-3',
+        )
+        self.assertFalse(result)
+
+    def test_resolve_odoo_location_returns_false_for_different_store(self):
+        other_store = self.env['shopify.connector.store'].create({
+            'name': 'Other Store',
+            'shop_domain': 'other-location-mapping-test.myshopify.com',
+            'api_version': '2026-07',
+        })
+        self._make_mapping(
+            self.internal_location, 'gid://shopify/Location/F4-4',
+        )
+        Location = self.env['shopify.connector.location']
+        result = Location._resolve_odoo_location(
+            other_store, 'gid://shopify/Location/F4-4',
+        )
+        self.assertFalse(result)
+
+    def test_resolve_odoo_location_returns_false_for_empty_gid(self):
+        Location = self.env['shopify.connector.location']
+        self.assertFalse(Location._resolve_odoo_location(self.store, False))
+        self.assertFalse(Location._resolve_odoo_location(self.store, ''))
+
+    def test_resolve_odoo_location_no_ambiguous_result(self):
+        # The model's own UNIQUE(store, shopify_gid) constraint makes a
+        # genuine duplicate row unreachable; this proves the seam's own
+        # `len(matches) != 1` guard is real by construction (exactly one
+        # match resolves cleanly, never more).
+        self._make_mapping(
+            self.internal_location, 'gid://shopify/Location/F4-5',
+        )
+        Location = self.env['shopify.connector.location']
+        result = Location._resolve_odoo_location(
+            self.store, 'gid://shopify/Location/F4-5',
+        )
+        self.assertEqual(len(result), 1)

@@ -1,11 +1,91 @@
 # Task 014 — Fulfillment / Tracking Validation Results (Wave 4 Gate B)
 
+> **Status (2026-07-23, this session):** `WAVE 4 CLOSURE CANDIDATE
+> IMPLEMENTED — RUNTIME PENDING`. Per the binding one-loop control-room
+> ruling (PR #189 review comments `4766049839`/`4766053529`, exact base
+> `ef991bf08ff55c4393fa2c0c971cd1dbef04ab2d`), this session implemented all
+> eleven authorized Wave 4 Tier-1 correction themes (A, B, C, E, F, G, H,
+> I — including the **permanent** F-4 core+inventory location seam, not the
+> earlier-authorized interim fail-closed variant, superseding decision-lock
+> Decision B.5 for this campaign — J, K, M) in one coherent campaign. No
+> Odoo.sh runtime is available in this session's container (`import odoo`
+> fails; no local Odoo/PostgreSQL). All correctness claims below are
+> `IMPLEMENTED — RUNTIME PENDING`, verified only by `py_compile`, AST-based
+> source/vocabulary/dependency guards, and manual code-path tracing — never
+> claimed as `EXECUTED—PASS`. No live Shopify request or mutation occurred.
+> Draft PR #189, unmerged, not marked ready, not self-accepted — this
+> session performed no self-review. See §"WAVE 4 CLOSURE CORRECTION
+> CAMPAIGN" below for the full theme-by-theme record; the sections below it
+> are the prior sessions' historical record, preserved unchanged.
+
 > **Status:** Gate B implementation candidate — **STAGE R2A CONCURRENCY-PROOF
 > P1 CORRECTED; FRESH EXACT-SHA ODOO.SH VERIFICATION REQUIRED**. Draft
 > PR #189, unmerged, not marked ready, not self-accepted. No live Shopify
 > mutation occurred. Gate C (Odoo.sh runtime) and Gate D (Shopify dev-store)
 > evidence is classified `IMPLEMENTED—RUNTIME PENDING` / `NOT PROVEN` — never
 > fabricated. CV-013 (#185) remains open and critical.
+
+---
+
+## WAVE 4 CLOSURE CORRECTION CAMPAIGN — 2026-07-23 (this session)
+
+**Base:** `mvp/program-integration@dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+**Starting head:** `ef991bf08ff55c4393fa2c0c971cd1dbef04ab2d`.
+**Authorization:** the one-loop control-room ruling (PR #189 review
+`4766049839`, reinforced `4766053529`), which explicitly supersedes the
+split interim/permanent F-4 sequencing in comments `5060656594`/`5060689967`
+and `wave-4-tier1-decision-lock.md` Decision B.5's interim-only
+authorization for this specific campaign.
+
+### Theme-by-theme result
+
+| Theme | Production files | Test files | Static result | Runtime result |
+| --- | --- | --- | --- | --- |
+| A — `_enqueue_once` transaction safety | `shopify_connector_fulfillment_admission.py`, `stock_picking.py`, `shopify_connector_job.py`, `shopify_connector_fulfillment_scans.py` | `test_fulfillment_admission.py`, `test_fulfillment_trigger.py` | py_compile clean; savepoint/catch/re-search centralized once in `_enqueue_once`; both `stock_picking.py` hooks narrowed to log-and-reraise; two scan job types job-type-prefixed | RUNTIME PENDING |
+| B — Mode-2 partial-fulfillment (P0-B) | `shopify_connector_fulfillment_mode2.py` | `test_fulfillment_mode2_engine.py`, `test_fulfillment_concurrency.py` | py_compile clean; sibling-move exclusion in `_quantity_compatible_pickings`; real cross-fulfillment ledger in `_c6_no_overrun` keyed by `line_item_gid`; ledger written only after successful validation; `try_lock_for_update()` serializes concurrent evaluations | RUNTIME PENDING |
+| C — FO-line aggregation/UoM | `shopify_connector_fulfillment_reader.py` | `test_fulfillment_matching.py` | py_compile clean; aggregation-before-comparison; UoM conversion via `product_uom_id._compute_quantity` | RUNTIME PENDING |
+| E — Watermark scans | `shopify_connector_fulfillment_scans.py` | `test_fulfillment_scans.py`, `test_fulfillment_mode_switch.py` | py_compile clean; `_paginate_local_to_completion` replaces all three fixed `limit=200` reads; PD-B4 boundary formula implemented; fail-closed on cap; watermark advances only on a genuinely complete pass | RUNTIME PENDING |
+| F — Direct-result classification | `shopify_connector_fulfillment_create_strategy.py` | `test_fulfillment_create_strategy.py` | py_compile clean; `status == 'SUCCESS'` required | RUNTIME PENDING |
+| G — Vocabulary guard genuineness | (test-only) | `test_fulfillment_vocabulary_guard.py` | py_compile clean; AST-derived persisted-class scan verified by standalone script to yield the correct 11-member set including `unknown_system_error`, matching the merged core registry exactly | Verified by standalone Python execution (not Odoo) — see below |
+| H — `external_fulfillment_observed` | `shopify_connector_fulfillment_inbound_evidence.py`, `shopify_connector_fulfillment_inbound.py` | `test_fulfillment_inbound_classification.py`, `test_fulfillment_vocabulary_guard.py` | py_compile clean; `review_reason` count verified 21 (script-counted) | RUNTIME PENDING |
+| I — F-4 **permanent** seam | `shopify_connector_core/models/shopify_connector_location.py`, `shopify_connector_inventory/models/shopify_connector_location_mapping.py`, `shopify_connector_fulfillment_mode2.py`, `shopify_connector_fulfillment_reader.py` (F-6) | core `test_shopify_connector_location.py` (new, authorized), `test_location_mapping.py` (inventory), `test_fulfillment_mode2_engine.py`, `test_fulfillment_location_resolution.py` | py_compile clean; no `shopify_connector_inventory` manifest dependency added; fulfillment never imports an inventory model or reads `location.mapping` directly (grep-verified, comments only) | RUNTIME PENDING |
+| J — Terminal job states | `shopify_connector_fulfillment_inbound.py` | `test_fulfillment_inbound_classification.py` | py_compile clean; `TERMINAL_JOB_STATES` reused | RUNTIME PENDING |
+| K — Concurrency harness rigor | `runtime_layer2_fulfillment_concurrency_harness.py` (test-only) | `test_fulfillment_concurrency.py` | py_compile clean; verified by standalone script: all 9 real scenarios pass the strengthened guard with zero violations; the disclosed-stub fixture is rejected; a new capture-without-comparison fixture is rejected; the guard's own "genuine" fixture was rewritten to be genuinely non-hollow | Structural guard verified by standalone execution; the 9-process external multiprocessing campaign itself remains `DEFERRED BY PRODUCT OWNER — NOT PROVEN` (unchanged) |
+| M — Governance record | this file + others below | — | this session | — |
+
+### What "verified by standalone Python execution" means
+
+This session's container has no `odoo` package (`import odoo` raises
+`ModuleNotFoundError`) and no local PostgreSQL — no Odoo `TransactionCase`
+could be executed. Two of the pure-Python static-analysis payloads
+(Theme G's AST vocabulary scanner and Theme K's strengthened AST guard,
+plus its three fixture strings) were extracted and executed directly as
+standalone Python (outside Odoo, using only `ast`/stdlib) against the real,
+final production/test source to confirm their logic is internally
+consistent and produces the exact expected result. This is genuine evidence
+that the *static-analysis code itself* is correct — it is **not** a
+substitute for running the actual `TransactionCase` suites (`py_compile`
+plus manual code-path tracing is the evidence class for everything else).
+
+### Migration / backfill
+
+Per the control-room ruling's explicit item 7: **no historical migration or
+stored-key backfill was performed** for Theme A's widened scope-key formula.
+This connector is unreleased with no supported live merchant database;
+corrected behavior is provable only on newly created rows and a future
+fresh exact-SHA Odoo.sh database, exactly as authorized.
+
+### No-Shopify / no-SEC-2/U1 proof
+
+`git diff --stat` for this session's commit range touches only the allowed
+`addons/shopify_connector_fulfillment/**`, `addons/shopify_connector_core/
+models/shopify_connector_location.py` + `tests/__init__.py` +
+`tests/test_shopify_connector_location.py`, and `addons/
+shopify_connector_inventory/models/shopify_connector_location_mapping.py`
++ `tests/test_location_mapping.py`, plus the documentation files listed in
+this session's PR handoff. No `security/`, `data/`, `__manifest__.py`, CI,
+or `docs/07-implementation-plan/wave-5-u1-gate-a/**` file was touched. No
+network call, HTTP client, or Shopify API credential was exercised.
 >
 > **Stage R2A correction (2026-07-22).** The control room (PR #189 comment
 > `5045580551` / issue #186 comment `5045582535`) disclosed a P1

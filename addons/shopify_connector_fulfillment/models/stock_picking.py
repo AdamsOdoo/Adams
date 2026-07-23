@@ -23,16 +23,26 @@ class ShopifyConnectorStockPickingFulfillment(models.Model):
 
     def _action_done(self, *args, **kwargs):
         result = super()._action_done(*args, **kwargs)
-        try:
-            Service = self.env['shopify.connector.fulfillment.service']
-            for picking in self:
-                if picking._is_fulfillment_admission_eligible():
+        Service = self.env['shopify.connector.fulfillment.service']
+        for picking in self:
+            if picking._is_fulfillment_admission_eligible():
+                try:
                     Service._enqueue_picking_admission(picking)
-        except Exception:
-            _logger.exception(
-                'Failed to enqueue fulfillment admission after a picking '
-                'validation; the picking itself is unaffected.'
-            )
+                except Exception:
+                    # The expected `(store, operation_scope_key)` collision is
+                    # already handled inside `_enqueue_once` itself (returns
+                    # the existing job). Anything reaching here is genuinely
+                    # unexpected: log it durably, then re-raise so the whole
+                    # validation transaction rolls back atomically. Never
+                    # silently preserve the picking after an unexpected
+                    # enqueue-hook failure.
+                    _logger.exception(
+                        'Unexpected failure enqueuing a fulfillment picking '
+                        'admission after validating picking %d; the '
+                        'validation transaction is rolled back atomically.',
+                        picking.id,
+                    )
+                    raise
         return result
 
     def _is_fulfillment_admission_eligible(self):
@@ -50,18 +60,26 @@ class ShopifyConnectorStockPickingFulfillment(models.Model):
         tracking_changed = bool(set(vals) & _TRACKING_TRIGGER_FIELDS)
         result = super().write(vals)
         if tracking_changed:
-            try:
-                Service = self.env['shopify.connector.fulfillment.service']
-                Binding = self.env['shopify.connector.fulfillment.binding']
-                for picking in self:
-                    binding = Binding.search(
-                        [('picking_id', '=', picking.id)], limit=1,
-                    )
-                    if binding:
-                        Service._enqueue_tracking_admission(binding)
-            except Exception:
-                _logger.exception(
-                    'Failed to enqueue a fulfillment tracking admission after '
-                    'a picking write; the picking write is unaffected.'
+            Service = self.env['shopify.connector.fulfillment.service']
+            Binding = self.env['shopify.connector.fulfillment.binding']
+            for picking in self:
+                binding = Binding.search(
+                    [('picking_id', '=', picking.id)], limit=1,
                 )
+                if binding:
+                    try:
+                        Service._enqueue_tracking_admission(binding)
+                    except Exception:
+                        # See _action_done: the expected operation-scope
+                        # collision is already handled inside `_enqueue_once`.
+                        # An unexpected failure here is logged durably and
+                        # re-raised so the whole write transaction rolls back
+                        # atomically -- never silently preserved.
+                        _logger.exception(
+                            'Unexpected failure enqueuing a fulfillment '
+                            'tracking admission after writing picking %d; '
+                            'the picking write is rolled back atomically.',
+                            picking.id,
+                        )
+                        raise
         return result

@@ -193,3 +193,73 @@ class TestFulfillmentTrigger(TransactionCase):
         # An empty recordset is returned and no job row is created.
         self.assertFalse(result)
         self.assertEqual(after, before)
+
+    # ------------------------------------------------------------------
+    # Theme A — transaction safety around the two foreground hooks
+    # ------------------------------------------------------------------
+
+    def test_second_tracking_write_persists_while_first_job_non_terminal(self):
+        # Two sequential tracking-admission writes on the same picking while
+        # the first admission job remains non-terminal: the SECOND write's
+        # own picking-field change must persist (never discarded by an
+        # operation-scope collision poisoning the caller's transaction).
+        picking = self._make_picking(
+            'outgoing', self.stock_loc, self.customer_loc, state='done',
+        )
+        self.env['shopify.connector.fulfillment.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Fulfillment/SEQ1',
+            'picking_id': picking.id,
+            'order_binding_id': self.order_binding.id,
+        })
+        picking.write({'carrier_tracking_ref': 'TN-FIRST'})
+        first_jobs = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'fulfillment_tracking_admission'),
+            ('res_model', '=', 'shopify.connector.fulfillment.binding'),
+        ])
+        self.assertTrue(first_jobs)
+        self.assertNotIn(first_jobs[:1].state, ('succeeded', 'failed_final',
+                                                  'skipped', 'cancelled'))
+        # The second write changes the SAME tracking field to a different
+        # value -- a different payload_hash, so it targets a genuinely new
+        # operation-scope collision surface if one exists.
+        picking.write({'carrier_tracking_ref': 'TN-SECOND'})
+        picking.invalidate_recordset()
+        # No exception was raised and the picking write is fully persisted --
+        # the caller's own transaction was never poisoned by the admission
+        # hook's internal enqueue attempt.
+        self.assertEqual(picking.carrier_tracking_ref, 'TN-SECOND')
+
+    def test_unexpected_action_done_hook_failure_rolls_back_atomically(self):
+        # An unexpected (non-collision) enqueue-hook exception during
+        # `_action_done` must propagate, rolling back the whole validation
+        # transaction atomically -- never silently preserving the picking.
+        picking = self._deliverable_picking()
+        picking.move_ids._action_confirm()
+        picking.move_ids._action_assign()
+        for line in picking.move_ids.move_line_ids:
+            line.quantity = 2.0
+            line.picked = True
+        with patch.object(
+            type(self.Service), '_enqueue_picking_admission',
+            side_effect=RuntimeError('unexpected admission failure'),
+        ):
+            with self.assertRaises(RuntimeError):
+                picking._action_done()
+
+    def test_unexpected_write_hook_failure_rolls_back_atomically(self):
+        picking = self._make_picking(
+            'outgoing', self.stock_loc, self.customer_loc, state='done',
+        )
+        self.env['shopify.connector.fulfillment.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Fulfillment/UNEXPECTED-WRITE',
+            'picking_id': picking.id,
+            'order_binding_id': self.order_binding.id,
+        })
+        with patch.object(
+            type(self.Service), '_enqueue_tracking_admission',
+            side_effect=RuntimeError('unexpected tracking admission failure'),
+        ):
+            with self.assertRaises(RuntimeError):
+                picking.write({'carrier_tracking_ref': 'TN-UNEXPECTED'})

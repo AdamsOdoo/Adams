@@ -3,6 +3,10 @@ from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
+
 
 class TestFulfillmentScans(TransactionCase):
     """Reconciliation-check cron + handler, and reconnect catch-up (D-014-8).
@@ -156,6 +160,166 @@ class TestFulfillmentScans(TransactionCase):
     # ------------------------------------------------------------------
     # Reconnect catch-up: gap-period externals -> review in BOTH modes
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Theme A — per-store isolation in the cron entry point
+    # ------------------------------------------------------------------
+
+    def test_cron_one_store_unexpected_failure_does_not_starve_other_stores(self):
+        store_2 = self.env['shopify.connector.store'].create({
+            'name': 'FUL Test 2',
+            'shop_domain': 'ful2-%s.myshopify.com' % uuid.uuid4().hex,
+            'api_version': '2026-07', 'state': 'connected',
+        })
+        self.env['shopify.connector.store.settings'].create({
+            'store_id': store_2.id, 'fulfillment_domain_enabled': True,
+        })
+        real_enqueue_once = type(self.Service)._enqueue_once
+
+        def _flaky_enqueue_once(service_self, store, *args, **kwargs):
+            if store.id == self.store.id:
+                raise RuntimeError('simulated unexpected failure for store 1')
+            return real_enqueue_once(service_self, store, *args, **kwargs)
+
+        with patch.object(
+            type(self.Service), '_enqueue_once', _flaky_enqueue_once,
+        ):
+            self.Service._cron_enqueue_reconciliation_checks()
+        jobs_2 = self.Job.search([
+            ('store_id', '=', store_2.id),
+            ('job_type', '=', 'fulfillment_reconciliation_check'),
+        ])
+        self.assertTrue(jobs_2)
+        self.assertFalse(self._reconciliation_check_jobs())
+
+    # ------------------------------------------------------------------
+    # Theme E — complete pagination beyond the old fixed 200-row window
+    # ------------------------------------------------------------------
+
+    def test_reconciliation_check_processes_more_than_200_bindings(self):
+        for i in range(201):
+            picking = self.env['stock.picking'].create({
+                'picking_type_id': self.pt_out.id,
+                'location_id': self.stock_loc.id,
+                'location_dest_id': self.customer_loc.id,
+                'sale_id': self.sale.id,
+            })
+            self.Binding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Fulfillment/BULK-%d' % i,
+                'picking_id': picking.id,
+                'order_binding_id': self.order_binding.id,
+            })
+        job = self._scan_job('fulfillment_reconciliation_check')
+        with patch.object(
+            type(self.Service), '_read_fulfillment',
+            return_value={'id': 'x', 'status': 'SUCCESS', 'trackingInfo': []},
+        ):
+            self.Service._handle_fulfillment_reconciliation_check(job)
+        self.settings.invalidate_recordset()
+        self.assertTrue(self.settings.fulfillment_last_reconciliation_at)
+        # Every binding's snapshot was refreshed -- not just the first 200 of
+        # a fixed window; row 201+ is proven reached.
+        refreshed = self.Binding.search_count([
+            ('store_id', '=', self.store.id),
+            ('shopify_status_snapshot', '=', 'SUCCESS'),
+        ])
+        self.assertGreaterEqual(refreshed, 201)
+
+    def test_reconciliation_check_incomplete_pass_fails_closed_never_advances_watermark(self):
+        # A safety-cap-exceeding pass must fail closed (raise), never
+        # advance the watermark and never be silently reported as complete.
+        for i in range(3):
+            picking = self.env['stock.picking'].create({
+                'picking_type_id': self.pt_out.id,
+                'location_id': self.stock_loc.id,
+                'location_dest_id': self.customer_loc.id,
+                'sale_id': self.sale.id,
+            })
+            self.Binding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Fulfillment/CAP-%d' % i,
+                'picking_id': picking.id,
+                'order_binding_id': self.order_binding.id,
+            })
+        job = self._scan_job('fulfillment_reconciliation_check')
+        before = self.settings.sudo().fulfillment_last_reconciliation_at
+        with patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.MAX_SCAN_PAGES', 1,
+        ), patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 2,
+        ), patch.object(
+            type(self.Service), '_read_fulfillment',
+            return_value={'id': 'x', 'status': 'SUCCESS', 'trackingInfo': []},
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.Service._handle_fulfillment_reconciliation_check(job)
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.sudo().fulfillment_last_reconciliation_at, before,
+        )
+
+    def test_reconnect_catchup_processes_more_than_200_order_bindings(self):
+        OrderBinding = self.env['shopify.connector.order.binding']
+        for i in range(201):
+            sale = self.env['sale.order'].create({
+                'partner_id': self.partner.id,
+            })
+            OrderBinding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Order/BULK-%d' % i,
+                'sale_order_id': sale.id,
+                'status': 'active',
+            })
+        job = self._scan_job('fulfillment_reconnect_catchup')
+        node = {
+            'id': 'gid://shopify/Fulfillment/BULK-CATCHUP',
+            'status': 'SUCCESS', 'displayStatus': 'FULFILLED',
+            'trackingInfo': [],
+        }
+        call_count = {'n': 0}
+        real_read = self.Service._read_order_fulfillments
+
+        def _counting_read(store, order_gid):
+            call_count['n'] += 1
+            return [dict(node, id='%s-%d' % (node['id'], call_count['n']))]
+
+        with patch.object(
+            type(self.Service), '_read_order_fulfillments',
+            side_effect=_counting_read,
+        ):
+            self.Service._handle_fulfillment_reconnect_catchup(job)
+        # Every one of the 201 order bindings (beyond the old 200-row
+        # window) was reached -- proven by the read being invoked 201 times,
+        # once per order binding with a Shopify GID.
+        self.assertGreaterEqual(call_count['n'], 201)
+
+    def test_reconnect_catchup_incomplete_pass_fails_closed(self):
+        OrderBinding = self.env['shopify.connector.order.binding']
+        for i in range(3):
+            sale = self.env['sale.order'].create({
+                'partner_id': self.partner.id,
+            })
+            OrderBinding.sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Order/CAP-%d' % i,
+                'sale_order_id': sale.id,
+                'status': 'active',
+            })
+        job = self._scan_job('fulfillment_reconnect_catchup')
+        with patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.MAX_SCAN_PAGES', 1,
+        ), patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 2,
+        ), patch.object(
+            type(self.Service), '_read_order_fulfillments', return_value=[],
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.Service._handle_fulfillment_reconnect_catchup(job)
 
     def test_reconnect_catchup_external_is_review_even_in_mode2(self):
         # The store is nominally in Mode 2 ...

@@ -5,6 +5,16 @@
 > — the four load-bearing decisions this handoff's synthesis left open (Theme D,
 > Theme I/F-4, Theme H, Theme A) are now frozen. Current status:
 > `WAVE 4 DECISION LOCK COMPLETE — READY FOR CONTROL-ROOM IMPLEMENTATION AUTHORIZATION`.
+>
+> **Further superseded (2026-07-23):** implementation of all eleven
+> authorized themes is now complete — see
+> `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` §
+> "WAVE 4 CLOSURE CORRECTION CAMPAIGN". Current status: `WAVE 4 CLOSURE
+> CANDIDATE IMPLEMENTED AND SELF-VERIFIED — READY FOR ONE CONTROL-ROOM
+> REVIEW`. Theme I/F-4 was corrected with the **permanent** architecture,
+> per the one-loop control-room ruling (PR #189 review comments
+> `4766049839`/`4766053529`), not the interim-only disposition the decision
+> lock above had authorized.
 
 ## What this session did
 

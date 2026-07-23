@@ -38,3 +38,5 @@ from . import test_ui_actions
 from . import test_ui_performance
 from . import test_ui_tours
 from . import test_ui_source_guards
+# F-4 permanent location-resolution seam (Theme I, Wave 4 closure).
+from . import test_shopify_connector_location

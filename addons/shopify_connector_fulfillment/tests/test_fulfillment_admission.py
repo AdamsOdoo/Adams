@@ -229,6 +229,72 @@ class TestFulfillmentPickingAdmission(TransactionCase):
     # Idempotency: one picking is one fulfillment event
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Theme A — centralized `_enqueue_once` collision recovery
+    # ------------------------------------------------------------------
+
+    def test_duplicate_admission_enqueue_collision_returns_existing_job(self):
+        # Two _enqueue_once calls for the SAME picking under the SAME
+        # job_type but with different payload_hash: the fast idempotency-key
+        # search misses (different hash), so the DB-level operation-scope-
+        # key collision genuinely fires -- the loser must recover by
+        # returning the winner's existing job, with the caller's cursor
+        # remaining fully usable afterward (never a poisoned transaction).
+        picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
+        first = self.Service._enqueue_once(
+            self.store, 'odoo_event', 'fulfillment_picking_admission',
+            'admission:%d:first' % picking.id, 'stock.picking', picking.id,
+            trigger_origin='fulfillment_picking_validation',
+        )
+        self.assertTrue(first)
+        second = self.Service._enqueue_once(
+            self.store, 'odoo_event', 'fulfillment_picking_admission',
+            'admission:%d:second' % picking.id, 'stock.picking', picking.id,
+            trigger_origin='fulfillment_picking_validation',
+        )
+        self.assertEqual(second, first)
+        # The caller's cursor remains usable after the internally-recovered
+        # collision -- a subsequent, unrelated ORM call succeeds normally.
+        self.assertTrue(self.env['shopify.connector.store'].search(
+            [('id', '=', self.store.id)],
+        ))
+
+    def test_unexpected_enqueue_exception_propagates(self):
+        # An exception outside the caught (ValidationError, IntegrityError)
+        # tuple must propagate unchanged, never silently absorbed as if it
+        # were the benign collision.
+        picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
+        with patch.object(
+            type(self.env['shopify.connector.job.enqueue']), 'enqueue',
+            side_effect=ValueError('genuinely unrelated failure'),
+        ):
+            with self.assertRaises(ValueError):
+                self.Service._enqueue_once(
+                    self.store, 'odoo_event', 'fulfillment_picking_admission',
+                    'admission:%d:unexpected' % picking.id,
+                    'stock.picking', picking.id,
+                    trigger_origin='fulfillment_picking_validation',
+                )
+
+    def test_validation_error_with_unrelated_message_propagates(self):
+        # A genuine ValidationError whose message does NOT match the exact
+        # operation-scope-collision message/constraint name must also
+        # propagate unchanged -- the match is on the specific constraint,
+        # never any ValidationError.
+        from odoo.exceptions import ValidationError
+        picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
+        with patch.object(
+            type(self.env['shopify.connector.job.enqueue']), 'enqueue',
+            side_effect=ValidationError('An unrelated validation failure.'),
+        ):
+            with self.assertRaises(ValidationError):
+                self.Service._enqueue_once(
+                    self.store, 'odoo_event', 'fulfillment_picking_admission',
+                    'admission:%d:unrelated-validation' % picking.id,
+                    'stock.picking', picking.id,
+                    trigger_origin='fulfillment_picking_validation',
+                )
+
     def test_existing_binding_short_circuits_before_read(self):
         picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
         self.env['shopify.connector.fulfillment.binding'].sudo().create({

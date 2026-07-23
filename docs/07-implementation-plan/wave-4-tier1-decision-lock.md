@@ -1,13 +1,29 @@
 # Wave 4 Tier-1 Correction — Decision Lock (PR #189)
 
-> **Status: `PROPOSED — AWAITING CONTROL-ROOM ACCEPTANCE` (binding for the locked
-> implementation prompt's purposes; not a ChatGPT-approved product/architecture
-> `Decision` under CLAUDE.md §8 until the control room reviews this document).**
-> **The implementation prompt this document updates remains NOT AUTHORIZED for
-> use until the control room reviews this decision-lock output.** No
-> production/test/manifest/security/CI file was created or modified to produce
-> this document. No Odoo.sh runtime was executed. No Shopify request or
-> mutation occurred.
+> **Partially superseded (2026-07-23).** The one-loop control-room ruling
+> (PR #189 review comments `4766049839`/`4766053529`) accepted this
+> document's Decisions A, C, D in full and authorized implementation, which
+> a later session completed. **Decision B.5 (F-4's interim-only-for-this-PR
+> disposition) was explicitly superseded**: the same ruling widened this
+> campaign's scope to implement Decision B's **permanent** architecture
+> (§B.1-B.4) directly, removing the need for the interim
+> always-fails-closed `_c8_location` patch B.5 describes. Decision B's
+> §B.1-B.4 target-architecture design (the core seam + inventory override
+> shape) was implemented essentially as frozen here. Decision A (Theme D /
+> SEC-3) remains genuinely deferred, unchanged. See
+> `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` §
+> "WAVE 4 CLOSURE CORRECTION CAMPAIGN" for the implementation record. The
+> rest of this document (the frozen decisions themselves) is preserved
+> unchanged below as the governing design record.
+>
+> Prior status (superseded): `PROPOSED — AWAITING CONTROL-ROOM ACCEPTANCE`
+> (binding for the locked implementation prompt's purposes; not a
+> ChatGPT-approved product/architecture `Decision` under CLAUDE.md §8 until
+> the control room reviews this document). The implementation prompt this
+> document updates remains NOT AUTHORIZED for use until the control room
+> reviews this decision-lock output. No production/test/manifest/security/CI
+> file was created or modified to produce this document. No Odoo.sh runtime
+> was executed. No Shopify request or mutation occurred.
 
 - **Repository:** `AdamsOdoo/Adams`
 - **PR:** #189 ("Wave 4 Gate B: fulfillment and tracking backend")
