@@ -295,6 +295,39 @@ class TestFulfillmentPickingAdmission(TransactionCase):
                     trigger_origin='fulfillment_picking_validation',
                 )
 
+    # ------------------------------------------------------------------
+    # Correction P0-2 — anti-redundant-admission
+    # ------------------------------------------------------------------
+
+    def test_enqueue_picking_admission_skips_when_binding_already_exists(self):
+        # When the picking already carries a fulfillment binding (the
+        # inbound Mode-2 apply creates one inside its own atomic savepoint
+        # immediately before calling _action_done()), the outbound picking-
+        # admission enqueue seam must be a pure no-op -- no redundant
+        # fulfillment_create is ever queued for a fulfillment the connector
+        # already knows this picking IS.
+        picking = self._picking([('gid://shopify/LineItem/REDUNDANT', 2.0)])
+        self.env['shopify.connector.fulfillment.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Fulfillment/REDUNDANT',
+            'picking_id': picking.id,
+            'order_binding_id': self.order_binding.id,
+        })
+        before = self.Job.search_count([
+            ('job_type', '=', 'fulfillment_picking_admission'),
+        ])
+        with patch.object(
+            type(self.Service), '_enqueue_once',
+            side_effect=AssertionError(
+                'must not enqueue when a binding already exists'),
+        ):
+            result = self.Service._enqueue_picking_admission(picking)
+        after = self.Job.search_count([
+            ('job_type', '=', 'fulfillment_picking_admission'),
+        ])
+        self.assertFalse(result)
+        self.assertEqual(after, before)
+
     def test_existing_binding_short_circuits_before_read(self):
         picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
         self.env['shopify.connector.fulfillment.binding'].sudo().create({

@@ -78,25 +78,33 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
 
     @api.model
     def _mode_switch_scan_boundary(self, store, settings):
-        """PD-B4: earlier-of(watermark - overlap, oldest unresolved evidence),
-        bounded by the default lookback floor."""
+        """PD-B4: `boundary = max(floor, min(watermark - overlap, latest
+        unresolved evidence boundary))`, using whichever of the two real
+        boundaries exist -- the 30-day floor is a lower BOUND only, never a
+        candidate inside the `min()` itself (a prior defect made the floor
+        win over a later, more precise watermark/evidence boundary whenever
+        one existed). The unresolved-evidence boundary is the LATEST (not
+        oldest) unresolved external-fulfillment evidence, ordered by
+        `first_observed_at desc`."""
         now = fields.Datetime.now()
         floor = now - timedelta(days=MODE_SWITCH_DEFAULT_LOOKBACK_DAYS)
-        candidates = [floor]
+        real_candidates = []
         if settings.fulfillment_last_reconciliation_at:
-            candidates.append(
+            real_candidates.append(
                 settings.fulfillment_last_reconciliation_at
                 - MODE_SWITCH_WATERMARK_OVERLAP
             )
-        oldest_unresolved = self.env[
+        latest_unresolved = self.env[
             'shopify.connector.fulfillment.inbound.evidence'
         ].sudo().search([
             ('store_id', '=', store.id),
             ('reconciled_state', '=', 'review'),
-        ], order='first_observed_at asc', limit=1)
-        if oldest_unresolved:
-            candidates.append(oldest_unresolved.first_observed_at)
-        return max(floor, min(candidates))
+        ], order='first_observed_at desc', limit=1)
+        if latest_unresolved:
+            real_candidates.append(latest_unresolved.first_observed_at)
+        if not real_candidates:
+            return floor
+        return max(floor, min(real_candidates))
 
     # ------------------------------------------------------------------
     # fulfillment_reconciliation_check (cron; D-014-8)
@@ -113,10 +121,16 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         bindings = self._paginate_local_to_completion(
             Binding, [('store_id', '=', store.id)],
         )
+        # Correction P1-2: a binding read that cannot complete is collected,
+        # not silently skipped-and-forgotten -- the pass still processes
+        # every OTHER binding it can, but a decision-critical read failure
+        # must never let this handler report a successful, complete pass.
+        read_failures = 0
         for binding in bindings:
             try:
                 node = self._read_fulfillment(store, binding.shopify_gid)
             except FulfillmentReadError:
+                read_failures += 1
                 continue
             if not node:
                 continue
@@ -131,6 +145,18 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                     'inbound:%d:%s' % (order_binding.id, uuid.uuid4().hex[:8]),
                     'shopify.connector.order.binding', order_binding.id,
                 )
+        if read_failures:
+            # Fail-closed: the watermark is never stamped, and this handler
+            # never reports success, when any decision-critical read was
+            # incomplete -- partial local changes from the bindings that DID
+            # read successfully above are real and kept, but they never
+            # masquerade as a completed pass.
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'A fulfillment reconciliation check could not read %d of %d '
+                'binding(s); the watermark was not advanced and this pass '
+                'is not reported as complete.' % (read_failures, len(bindings)),
+            )
         self._settings(store).sudo().write({
             'fulfillment_last_reconciliation_at': fields.Datetime.now(),
         })
@@ -190,6 +216,12 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         order_bindings = self._paginate_local_to_completion(
             Binding, [('store_id', '=', store.id)],
         )
+        # Correction P1-2: a failed order-fulfillment read must not be
+        # treated as a successful catch-up -- collect the failure and keep
+        # processing every other order binding, but the handler as a whole
+        # fails/retries rather than reporting completion, so the affected
+        # order is retried, never permanently skipped.
+        read_failures = 0
         for order_binding in order_bindings:
             if not order_binding.shopify_gid:
                 continue
@@ -198,6 +230,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                     store, order_binding.shopify_gid,
                 )
             except FulfillmentReadError:
+                read_failures += 1
                 continue
             for node in fulfillments:
                 if isinstance(node, dict) and node.get('id'):
@@ -205,6 +238,14 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                     # retroactively authorise gap-period interleavings, so
                     # gap-period externals land as review in both modes.
                     self._observe_fulfillment(store, order_binding, node, 'mode1')
+        if read_failures:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Reconnect catch-up could not read %d of %d order '
+                'binding(s); this pass is not reported as a successful '
+                'catch-up and the affected orders are retried, never '
+                'permanently skipped.' % (read_failures, len(order_bindings)),
+            )
 
     # ------------------------------------------------------------------
     # fulfillment_mode_switch_scan — the Mode 1 -> Mode 2 switch scan

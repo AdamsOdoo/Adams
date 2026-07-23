@@ -6,6 +6,9 @@ from odoo.tests.common import TransactionCase
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (  # noqa: E501
+    FulfillmentReadError,
+)
 
 
 class TestFulfillmentScans(TransactionCase):
@@ -144,6 +147,36 @@ class TestFulfillmentScans(TransactionCase):
         # A Shopify cancellation never auto-reverses Odoo stock.
         self.picking.invalidate_recordset()
         self.assertEqual(self.picking.state, before_state)
+
+    # ------------------------------------------------------------------
+    # Correction P1-2 — a read failure must never masquerade as a pass
+    # ------------------------------------------------------------------
+
+    def test_reconciliation_check_read_failure_leaves_watermark_unchanged_and_raises(self):
+        self._fulfillment_binding('gid://shopify/Fulfillment/RCFAIL')
+        job = self._scan_job('fulfillment_reconciliation_check')
+        before = self.settings.sudo().fulfillment_last_reconciliation_at
+        with patch.object(
+            type(self.Service), '_read_fulfillment',
+            side_effect=FulfillmentReadError(
+                'data_shape_schema_mismatch', 'boom'),
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.Service._handle_fulfillment_reconciliation_check(job)
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.sudo().fulfillment_last_reconciliation_at, before,
+        )
+
+    def test_reconnect_catchup_read_failure_raises_never_successful_completion(self):
+        job = self._scan_job('fulfillment_reconnect_catchup')
+        with patch.object(
+            type(self.Service), '_read_order_fulfillments',
+            side_effect=FulfillmentReadError(
+                'data_shape_schema_mismatch', 'boom'),
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.Service._handle_fulfillment_reconnect_catchup(job)
 
     def test_reconciliation_check_sets_watermark(self):
         self._fulfillment_binding('gid://shopify/Fulfillment/RC2')

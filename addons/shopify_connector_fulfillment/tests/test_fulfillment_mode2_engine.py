@@ -2,6 +2,7 @@ import uuid
 from contextlib import ExitStack
 from unittest.mock import Mock, patch
 
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase
 
 from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (
@@ -191,6 +192,21 @@ class TestFulfillmentMode2Engine(TransactionCase):
         picking.location_id = self.stock_loc if location_id is None else location_id
         return picking
 
+    def _mock_picking_with_matching_move(self, qty=2.0, sale_line=None, **overrides):
+        """Like `_mock_picking`, but carries one real-shaped move whose
+        aggregated pending demand exactly matches `qty` for `sale_line` --
+        for tests that must pass the exact-quantity relock/recheck gate
+        (Corrections P0-1/P1-1) on the way into `_apply_mode2`."""
+        picking = self._mock_picking(**overrides)
+        line = sale_line or self.sale_line
+        move = Mock()
+        move.state = 'confirmed'
+        move.sale_line_id.id = line.id
+        move.product_uom_qty = qty
+        move.product_uom = line.product_uom
+        picking.move_ids = [move]
+        return picking
+
     _UNSET = object()
 
     def _evaluate(self, evidence, fulfillments=_UNSET, fos=_UNSET,
@@ -375,9 +391,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         picking.picking_type_code = 'outgoing'
         picking.location_dest_id.usage = 'customer'
         picking.state = 'assigned'
+        line = sale_line or self.sale_line
         move = Mock()
-        move.sale_line_id.id = (sale_line or self.sale_line).id
+        move.state = 'confirmed'
+        move.sale_line_id.id = line.id
         move.product_uom_qty = qty
+        move.product_uom = line.product_uom
         picking.move_ids = [move]
         return picking
 
@@ -394,19 +413,144 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertEqual(ctx['required_qty'], {self.sale_line.id: 2})
         self.assertEqual(ctx['quantity_compatible_pickings'], [covering])
 
-    def test_c7_excess_demand_still_covers(self):
-        # Over-provisioning (demand > required) is safe and still covers;
-        # only under-coverage is a quantity mismatch.
-        generous = self._covering_picking(qty=5.0)
+    def test_c7_surplus_demand_now_fails_closed_quantity_mismatch(self):
+        # Correction P0-1: automatic Mode 2 application now requires EXACT
+        # per-line equality. A same-line surplus (Odoo pending demand 10 vs
+        # Shopify-confirmed quantity 3, per the control-room's own concrete
+        # failure scenario) must fail closed as quantity_mismatch, never
+        # silently validate the larger picking. Over-provisioning is no
+        # longer "safe and still covers" -- it is now excluded.
+        surplus = self._covering_picking(qty=10.0)
         order_binding = Mock()
-        order_binding.sale_order_id.picking_ids = _FakeRecordset([generous])
+        order_binding.sale_order_id.picking_ids = _FakeRecordset([surplus])
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 3)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        ok, _detail = self.Service._c7_quantity_match(ctx)
+        self.assertFalse(ok)
+        self.assertEqual(ctx['quantity_compatible_pickings'], [])
+
+    def test_surplus_end_to_end_zero_stock_change(self):
+        # Real picking, real move: the surplus picking is proven completely
+        # untouched (never validated) when its pending demand exceeds the
+        # exact Shopify-confirmed quantity.
+        picking = self._real_picking_with_moves([(self.sale_line, 10.0)])
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 3)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertEqual(compatible, [])
+        self.assertNotEqual(picking.state, 'done')
+
+    def test_two_moves_same_line_aggregate_to_exact_quantity_eligible(self):
+        # Two separate Odoo moves for the SAME evidenced sale line, summing
+        # exactly to the Shopify-confirmed quantity, are eligible.
+        picking = self._real_picking_with_moves([
+            (self.sale_line, 1.0), (self.sale_line, 1.0),
+        ])
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
             'order_binding': order_binding, 'plan': {},
         }
-        ok, _detail = self.Service._c7_quantity_match(ctx)
-        self.assertTrue(ok)
-        self.assertEqual(ctx['quantity_compatible_pickings'], [generous])
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertIn(picking, compatible)
+
+    def test_two_moves_same_line_aggregate_above_required_fails_closed(self):
+        # Two moves for the same line summing ABOVE the Shopify quantity:
+        # review, zero stock change -- aggregation surplus is exactly as
+        # unsafe as single-move surplus.
+        picking = self._real_picking_with_moves([
+            (self.sale_line, 2.0), (self.sale_line, 2.0),
+        ])
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertEqual(compatible, [])
+        self.assertNotEqual(picking.state, 'done')
+
+    def test_backorder_chain_candidate_exact_remaining_demand(self):
+        # A picking carrying one DONE move (an earlier, already-completed
+        # partial pass -- a backorder-chain predecessor) plus one PENDING
+        # move for the same sale line: only the pending portion counts
+        # toward this candidate's demand, and it must match exactly.
+        picking = self._real_picking_with_moves([(self.sale_line, 1.0)])
+        picking.move_ids.write({'state': 'done'})
+        self.env['stock.move'].create({
+            'product_id': self.sale_line.product_id.id,
+            'product_uom_qty': 1.0,
+            'product_uom': self.sale_line.product_id.uom_id.id,
+            'picking_id': picking.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_line_id': self.sale_line.id,
+            'state': 'confirmed',
+        })
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertIn(picking, compatible)
+
+    def test_move_qty_uom_conversion_to_sale_line_uom(self):
+        # Direct unit test of the UoM-conversion helper: a move recorded in
+        # Units converts correctly into the sale line's own Dozens.
+        dozen = self.env.ref('uom.product_uom_dozen')
+        unit = self.env.ref('uom.product_uom_unit')
+        sale_line = Mock()
+        sale_line.product_uom = dozen
+        move = Mock()
+        move.product_uom_qty = 24.0
+        move.product_uom = unit
+        qty = self.Service._move_qty_in_sale_uom(move, sale_line)
+        self.assertAlmostEqual(qty, 2.0)
+
+    def test_c7_uom_converted_exact_equality_end_to_end(self):
+        # A REAL sale line ordered in Dozens, fulfilled by a REAL stock.move
+        # recorded in Units: the aggregation must convert the move's UoM
+        # into the sale line's own UoM before the exact-equality check, so
+        # 24 units == 2 dozen is correctly recognised as an exact match.
+        dozen = self.env.ref('uom.product_uom_dozen')
+        unit = self.env.ref('uom.product_uom_unit')
+        sale_line = self.env['sale.order.line'].create({
+            'order_id': self.sale.id, 'product_id': self.product.id,
+            'product_uom_qty': 2.0, 'product_uom': dozen.id,
+            'shopify_line_item_gid': 'gid://shopify/LineItem/UOM-DOZEN',
+        })
+        picking = self.env['stock.picking'].create({
+            'picking_type_id': self.pt_out.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_id': self.sale.id,
+        })
+        self.env['stock.move'].create({
+            'product_id': self.product.id,
+            'product_uom_qty': 24.0, 'product_uom': unit.id,
+            'picking_id': picking.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_line_id': sale_line.id,
+        })
+        order_binding = Mock()
+        order_binding.sale_order_id = self.sale
+        ctx = {
+            'line_mapping': {'gid://shopify/LineItem/UOM-DOZEN': (sale_line, 2)},
+            'order_binding': order_binding, 'plan': {},
+        }
+        compatible = self.Service._quantity_compatible_pickings(ctx)
+        self.assertIn(picking, compatible)
 
     def test_c7_insufficient_quantity_no_compatible_candidate(self):
         short = self._covering_picking(qty=1.0)  # required is 2
@@ -753,6 +897,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
         job = self._mode2_job(evidence)
         Service = self.Service
         LocationModel = type(self.env['shopify.connector.location'])
+        picking = self._mock_picking_with_matching_move(qty=2.0, carrier_id=False)
         with patch.object(type(Service), '_read_order_fulfillments',
                           return_value=[self._fulfillment_node()]), \
                 patch.object(type(Service), '_read_fulfillment_orders',
@@ -760,9 +905,9 @@ class TestFulfillmentMode2Engine(TransactionCase):
                 patch.object(LocationModel, '_resolve_odoo_location',
                              return_value=self.stock_loc), \
                 patch.object(type(Service), '_quantity_compatible_pickings',
-                             return_value=[self._mock_picking(carrier_id=False)]), \
+                             return_value=[picking]), \
                 patch.object(type(Service), '_select_deterministic_picking',
-                             return_value=self._mock_picking(carrier_id=False)), \
+                             return_value=picking), \
                 patch.object(type(Service), '_validate_picking_local',
                              return_value=None):
             Service._handle_fulfillment_mode2_evaluation(job)
@@ -774,6 +919,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertEqual(ledger_rows.line_item_gid, LINE_ITEM_GID)
         self.assertEqual(ledger_rows.sale_line_id, self.sale_line)
         self.assertEqual(ledger_rows.reconciled_quantity, 2)
+        # Correction P0-2: exactly one binding survives the atomic unit.
+        Binding = self.env['shopify.connector.fulfillment.binding']
+        binding = Binding.search([
+            ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
+        ])
+        self.assertEqual(len(binding), 1)
 
     # ------------------------------------------------------------------
     # Q6 carrier fail-closed (real delivery.carrier + picking)
@@ -854,10 +1005,12 @@ class TestFulfillmentMode2Engine(TransactionCase):
         move_a.state = 'confirmed'
         move_a.sale_line_id.id = self.sale_line.id
         move_a.product_uom_qty = 2.0
+        move_a.product_uom = self.sale_line.product_uom
         move_sibling = Mock()
         move_sibling.state = 'confirmed'
         move_sibling.sale_line_id.id = sibling_sale_line.id
         move_sibling.product_uom_qty = 1.0
+        move_sibling.product_uom = sibling_sale_line.product_uom
         picking.move_ids = [move_a, move_sibling]
         order_binding = Mock()
         order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
@@ -991,20 +1144,24 @@ class TestFulfillmentMode2Engine(TransactionCase):
         ok, _detail = self.Service._c6_no_overrun(ctx)
         self.assertTrue(ok)
 
-    def test_apply_mode2_rollback_on_validation_failure_writes_no_ledger(self):
-        # A local-validation failure must leave no applied ledger row and no
-        # incorrect fulfillment binding survives as "applied" -- evidence
-        # reverts to a review-safe state.
+    # -- Correction P0-2: atomic Mode-2 application ------------------------
+
+    def test_apply_mode2_expected_validation_failure_rolls_back_atomically(self):
+        # An EXPECTED business/applicability failure (UserError) during
+        # local validation must roll back the ENTIRE bind/validate/ledger
+        # unit atomically via savepoint: no binding, no ledger row, and the
+        # evidence reverts to a review-safe state.
         evidence = self._evidence(
             shopify_fulfillment_gid='gid://shopify/Fulfillment/ROLLBACK-1',
         )
+        picking = self._mock_picking_with_matching_move(qty=2.0)
         plan = {
-            'picking': self._mock_picking(),
+            'picking': picking,
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
         }
         with patch.object(
             type(self.Service), '_validate_picking_local',
-            side_effect=RuntimeError('simulated validation failure'),
+            side_effect=UserError('simulated expected validation failure'),
         ):
             self.Service._apply_mode2(evidence, plan)
         evidence.invalidate_recordset()
@@ -1012,6 +1169,156 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertEqual(evidence.review_reason, 'reservation_invalid')
         Line = self.env['shopify.connector.fulfillment.inbound.evidence.line']
         self.assertFalse(Line.search([('evidence_id', '=', evidence.id)]))
+        Binding = self.env['shopify.connector.fulfillment.binding']
+        self.assertFalse(Binding.search([
+            ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
+        ]))
+
+    def test_apply_mode2_unexpected_exception_propagates_after_rollback(self):
+        # An UNEXPECTED exception (not a recognised business/applicability
+        # error) must propagate after the savepoint rolls back -- never be
+        # silently reinterpreted as a normal applicability failure, and
+        # never leave a binding behind.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/UNEXPECTED-1',
+        )
+        picking = self._mock_picking_with_matching_move(qty=2.0)
+        plan = {
+            'picking': picking,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        with patch.object(
+            type(self.Service), '_validate_picking_local',
+            side_effect=RuntimeError('simulated unexpected failure'),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.Service._apply_mode2(evidence, plan)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'observed')
+        self.assertFalse(evidence.review_reason)
+        Binding = self.env['shopify.connector.fulfillment.binding']
+        self.assertFalse(Binding.search([
+            ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
+        ]))
+
+    def test_apply_mode2_failure_after_validation_before_ledger_rolls_back(self):
+        # Local validation SUCCEEDS, but a later failure inside the same
+        # atomic unit (ledger creation) still rolls back the EARLIER binding
+        # creation too -- proving true atomicity of the whole unit, not just
+        # the validation step.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/AFTER-VALIDATE',
+        )
+        picking = self._mock_picking_with_matching_move(qty=2.0)
+        plan = {
+            'picking': picking,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        with patch.object(type(self.Service), '_validate_picking_local',
+                           return_value=None), \
+                patch.object(type(self.Service), '_record_reconciled_lines',
+                             side_effect=UserError('simulated ledger failure')):
+            self.Service._apply_mode2(evidence, plan)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'review')
+        self.assertEqual(evidence.review_reason, 'reservation_invalid')
+        Binding = self.env['shopify.connector.fulfillment.binding']
+        self.assertFalse(Binding.search([
+            ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
+        ]))
+
+    def test_retry_after_rolled_back_failure_can_succeed(self):
+        # After a failed+rolled-back attempt, retrying the same evidence
+        # must be able to succeed cleanly -- nothing left over from the
+        # rolled-back attempt spuriously blocks the retry.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/RETRY-SAFE',
+        )
+        picking = self._mock_picking_with_matching_move(qty=2.0)
+        plan = {
+            'picking': picking,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        with patch.object(
+            type(self.Service), '_validate_picking_local',
+            side_effect=UserError('first attempt fails'),
+        ):
+            self.Service._apply_mode2(evidence, plan)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'review')
+        evidence.sudo().write({
+            'reconciled_state': 'observed', 'review_reason': False,
+        })
+        with patch.object(
+            type(self.Service), '_validate_picking_local', return_value=None,
+        ):
+            self.Service._apply_mode2(evidence, plan)
+        evidence.invalidate_recordset()
+        self.assertEqual(evidence.reconciled_state, 'applied')
+        Binding = self.env['shopify.connector.fulfillment.binding']
+        binding = Binding.search([
+            ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
+        ])
+        self.assertEqual(len(binding), 1)
+
+    # -- Correction P1-1: no lock across Shopify reads, locked re-check ----
+
+    def test_lock_affected_sale_lines_acquires_in_ascending_id_order(self):
+        line_a = self.sale_line
+        line_b = self.env['sale.order.line'].create({
+            'order_id': self.sale.id, 'product_id': self.product.id,
+            'product_uom_qty': 1.0,
+            'shopify_line_item_gid': 'gid://shopify/LineItem/ORDER-B',
+        })
+        # Intentionally inserted out of ID order.
+        line_mapping = {'gid-b': (line_b, 1), 'gid-a': (line_a, 2)}
+        ordered_ids = sorted([line_a.id, line_b.id])
+        call_order = []
+        SaleLine = type(self.env['sale.order.line'])
+
+        def _fake_lock(rec):
+            call_order.append(rec.id)
+            return rec
+
+        with patch.object(
+            SaleLine, 'try_lock_for_update', autospec=True, side_effect=_fake_lock,
+        ):
+            locked = self.Service._lock_affected_sale_lines(line_mapping)
+        self.assertEqual(call_order, ordered_ids)
+        self.assertEqual(sorted(locked.ids), ordered_ids)
+
+    def test_relock_recheck_rereads_ledger_fresh_not_reused_from_c6(self):
+        # The locked re-check must genuinely re-read the ledger, not reuse
+        # any value cached from condition 6's earlier (now-stale) pass.
+        evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/RELOCK-LEDGER',
+        )
+        ctx = {
+            'evidence': evidence, 'store': self.store,
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        # C6's preliminary check passes (nothing applied yet).
+        ok, _detail = self.Service._c6_no_overrun(ctx)
+        self.assertTrue(ok)
+        # Another evaluation "wins the race" and applies in between.
+        other_evidence = self._evidence(
+            shopify_fulfillment_gid='gid://shopify/Fulfillment/RELOCK-OTHER',
+            reconciled_state='applied',
+        )
+        self.env[
+            'shopify.connector.fulfillment.inbound.evidence.line'
+        ].sudo().create({
+            'evidence_id': other_evidence.id, 'line_item_gid': LINE_ITEM_GID,
+            'sale_line_id': self.sale_line.id,
+            'quantity': 2, 'reconciled_quantity': 2,
+        })
+        plan = {
+            'picking': self._covering_picking(qty=2.0),
+            'line_mapping': {LINE_ITEM_GID: (self.sale_line, 2)},
+        }
+        ok, reason = self.Service._relock_and_recheck(evidence, plan)
+        self.assertFalse(ok)
+        self.assertEqual(reason, 'quantity_overrun')
 
     # ------------------------------------------------------------------
     # Theme I — F-4 permanent location cross-check

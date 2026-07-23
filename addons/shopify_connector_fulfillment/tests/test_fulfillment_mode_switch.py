@@ -411,3 +411,87 @@ class TestFulfillmentModeSwitch(TransactionCase):
         self.assertAlmostEqual(
             boundary, expected_floor, delta=timedelta(minutes=5),
         )
+
+    # ------------------------------------------------------------------
+    # Correction P1-2 — PD-B4 boundary formula: the floor is a lower bound
+    # only, never a candidate inside the min(); the unresolved-evidence
+    # boundary is the LATEST unresolved record, not the oldest.
+    # ------------------------------------------------------------------
+
+    def test_boundary_selects_watermark_when_earlier_than_unresolved(self):
+        now = fields.Datetime.now()
+        watermark_time = now - timedelta(hours=2)
+        self.settings.sudo().write({
+            'fulfillment_last_reconciliation_at': watermark_time,
+        })
+        self.env['shopify.connector.fulfillment.inbound.evidence'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/BOUNDARY-1',
+            'order_binding_id': self.order_binding.id,
+            'reconciled_state': 'review', 'review_reason': 'origin_unconfirmed',
+            'first_observed_at': now - timedelta(minutes=10),
+        })
+        boundary = self.Service._mode_switch_scan_boundary(
+            self.store, self.settings.sudo(),
+        )
+        expected = watermark_time - timedelta(minutes=15)
+        self.assertAlmostEqual(boundary, expected, delta=timedelta(seconds=10))
+        floor = now - timedelta(days=30)
+        self.assertGreater(boundary, floor)
+
+    def test_boundary_selects_latest_unresolved_when_earlier_than_watermark(self):
+        now = fields.Datetime.now()
+        watermark_time = now - timedelta(minutes=10)
+        self.settings.sudo().write({
+            'fulfillment_last_reconciliation_at': watermark_time,
+        })
+        older_unresolved_at = now - timedelta(hours=3)
+        self.env['shopify.connector.fulfillment.inbound.evidence'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/BOUNDARY-2',
+            'order_binding_id': self.order_binding.id,
+            'reconciled_state': 'review', 'review_reason': 'origin_unconfirmed',
+            'first_observed_at': older_unresolved_at,
+        })
+        boundary = self.Service._mode_switch_scan_boundary(
+            self.store, self.settings.sudo(),
+        )
+        self.assertAlmostEqual(
+            boundary, older_unresolved_at, delta=timedelta(seconds=10),
+        )
+
+    def test_boundary_unresolved_lookup_uses_latest_not_oldest(self):
+        now = fields.Datetime.now()
+        older_at = now - timedelta(hours=5)
+        newer_at = now - timedelta(hours=1)
+        Evidence = self.env['shopify.connector.fulfillment.inbound.evidence'].sudo()
+        Evidence.create({
+            'store_id': self.store.id,
+            'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/BOUNDARY-OLD',
+            'order_binding_id': self.order_binding.id,
+            'reconciled_state': 'review', 'review_reason': 'origin_unconfirmed',
+            'first_observed_at': older_at,
+        })
+        Evidence.create({
+            'store_id': self.store.id,
+            'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/BOUNDARY-NEW',
+            'order_binding_id': self.order_binding.id,
+            'reconciled_state': 'review', 'review_reason': 'origin_unconfirmed',
+            'first_observed_at': newer_at,
+        })
+        boundary = self.Service._mode_switch_scan_boundary(
+            self.store, self.settings.sudo(),
+        )
+        self.assertAlmostEqual(boundary, newer_at, delta=timedelta(seconds=10))
+
+    def test_clean_scan_advances_watermark_exactly_once(self):
+        self.settings.sudo().write({
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_last_reconciliation_at': False,
+        })
+        job = self._scan_job()
+        with patch.object(type(self.Service), '_read_order_fulfillments',
+                          return_value=[]):
+            self.Service._handle_fulfillment_mode_switch_scan(job)
+        self.settings.invalidate_recordset()
+        self.assertTrue(self.settings.sudo().fulfillment_last_reconciliation_at)

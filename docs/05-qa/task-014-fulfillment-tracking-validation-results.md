@@ -1,6 +1,23 @@
 # Task 014 — Fulfillment / Tracking Validation Results (Wave 4 Gate B)
 
-> **Status (2026-07-23, this session):** `WAVE 4 CLOSURE CANDIDATE
+> **Status (2026-07-23, consolidated correction session):** `WAVE 4
+> CONSOLIDATED CORRECTION IMPLEMENTED — RUNTIME VERIFICATION NEXT`. Per the
+> binding control-room review (PR #189 comment `5061975312`, exact reviewed
+> head `35a7179e0f9c41a9182a6fe540e09a97673cb7a3`), this session fixed all
+> five confirmed Tier-1 findings (P0-1 same-line partial-quantity
+> over-validation, P0-2 non-atomic Mode-2 application, P1-1 sale-line locks
+> spanning Shopify reads, P1-2 scan fail-open + PD-B4 boundary bug, P1-3
+> connector-ACL blocking ordinary stock users) in one coherent correction on
+> the same branch/PR. No Odoo.sh runtime is available in this session's
+> container (`import odoo` fails; no local Odoo/PostgreSQL). All correctness
+> claims below are `IMPLEMENTED — RUNTIME PENDING`, verified only by
+> `py_compile`, AST-based structural guards, and manual code-path tracing —
+> never claimed as `EXECUTED—PASS`. No live Shopify request or mutation
+> occurred. Draft PR #189, unmerged, not marked ready, not self-accepted —
+> this session performed no self-review. See §"WAVE 4 CONSOLIDATED
+> CORRECTION" below for the full finding-by-finding record.
+
+> **Status (2026-07-23, prior session):** `WAVE 4 CLOSURE CANDIDATE
 > IMPLEMENTED — RUNTIME PENDING`. Per the binding one-loop control-room
 > ruling (PR #189 review comments `4766049839`/`4766053529`, exact base
 > `ef991bf08ff55c4393fa2c0c971cd1dbef04ab2d`), this session implemented all
@@ -17,6 +34,51 @@
 > session performed no self-review. See §"WAVE 4 CLOSURE CORRECTION
 > CAMPAIGN" below for the full theme-by-theme record; the sections below it
 > are the prior sessions' historical record, preserved unchanged.
+
+---
+
+## WAVE 4 CONSOLIDATED CORRECTION — 2026-07-23 (this session)
+
+**Base (unchanged):** `mvp/program-integration@dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+**Prior head:** `35a7179e0f9c41a9182a6fe540e09a97673cb7a3`.
+**Authorization:** the exhaustive control-room review, PR #189 comment
+[`5061975312`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5061975312)
+(`REVISE — ONE CONSOLIDATED IMPLEMENTATION CORRECTION`) — the complete
+correction contract for this session; the earlier 24-finding synthesis and
+first decision lock were not reopened.
+
+### Finding-by-finding result
+
+| Finding | Root cause | Correction | Production files | Test files | Static result |
+| --- | --- | --- | --- | --- | --- |
+| P0-1 — same-line partial-quantity over-validation | `_quantity_compatible_pickings` accepted `demand >= required` (coverage), not exact equality, so a picking with surplus pending demand on the evidenced line could be whole-picking-validated | Aggregation (UoM-converted, via `uom.uom._compute_quantity`) now requires EXACT per-line equality (`float_compare(...) == 0`); any surplus/shortage fails closed to `quantity_mismatch` before any local write | `shopify_connector_fulfillment_mode2.py` | `test_fulfillment_mode2_engine.py` | py_compile clean; exact-equality source proof (`_qty_equal`/`float_compare`, no bare `>=`); sibling-exclusion preserved |
+| P0-2 — non-atomic Mode-2 application / false-binding residue | Binding creation preceded local validation with no savepoint; a validation exception (or a DB-level error) could leave a binding without a corresponding applied state | Binding creation, local validation, ledger creation, and the `applied` transition are now one `cr.savepoint()`-protected unit; only `(UserError, ValidationError)` convert to review (after rollback); everything else propagates; `_enqueue_picking_admission` now no-ops when a binding already exists (anti-redundant-admission), no caller-controlled bypass flag | `shopify_connector_fulfillment_mode2.py`, `shopify_connector_fulfillment_admission.py` | `test_fulfillment_mode2_engine.py`, `test_fulfillment_admission.py` | py_compile clean; savepoint wraps bind+validate+ledger+write; narrow expected-error tuple confirmed by source read |
+| P1-1 — sale-line locks spanning Shopify reads | Condition 6 acquired `try_lock_for_update()` and held it across conditions 8/14's Shopify reads; multi-line locks were acquired in payload order, not deterministic order | Condition 6 is now read-only (no lock); a new `_lock_affected_sale_lines`/`_relock_and_recheck` pair acquires every affected sale-line lock in ascending-ID order ONLY after every Shopify read has completed, re-reads the ledger and re-verifies exact demand under lock, immediately before the atomic application unit | `shopify_connector_fulfillment_mode2.py` | `test_fulfillment_mode2_engine.py`, `test_fulfillment_concurrency.py` | py_compile clean; AST proof C6 has no lock call; AST proof no Shopify-read call reachable from the locking helpers; independent-cursor test proves a second connection can lock during C14's read |
+| P1-2 — scan read failures silently reported as success; PD-B4 boundary bug | Reconciliation/reconnect handlers caught `FulfillmentReadError` and continued to a "successful" watermark stamp; the boundary formula included the 30-day floor inside `min()` (making it win whenever a real boundary was later) and used the OLDEST, not latest, unresolved evidence | Both handlers now count read failures and raise `JobHandlerError` (fail-closed, no watermark advance) when any occur; the boundary formula is now `max(floor, min(watermark - overlap, latest_unresolved))`, using whichever real boundaries exist, floor as lower bound only, ordered `first_observed_at desc` | `shopify_connector_fulfillment_scans.py` | `test_fulfillment_scans.py`, `test_fulfillment_mode_switch.py` | py_compile clean; reused existing `data_shape_schema_mismatch` error_class (no new vocabulary) |
+| P1-3 — connector ACLs block an ordinary stock user | `_picking_store`, `_fulfillment_settings`, the binding lookup in `stock.picking.write`, and `_enqueue_once`'s job searches ran non-sudo in the validating user's own environment, and those models are connector-group-only | Minimal technical-sudo added at exactly those four seams; the picking's own business validation (`_action_done`/`write` themselves) is never sudo'd; `create_uid` still reflects the real initiating actor (`sudo()` bypasses ACL only, not `env.uid`) | `shopify_connector_fulfillment_admission.py`, `stock_picking.py` | `test_fulfillment_trigger.py` | py_compile clean; AST proof `stock_picking.py` never calls `sudo()` on the picking recordset itself; real-user tests prove validate/tracking-write succeed and direct connector-model access remains denied |
+
+### Self-verification summary
+
+`py_compile` clean on all 10 changed files; AST parse clean on all 10;
+forbidden-path audit clean (no manifest/security/views/data/CI file
+touched); no new dependency; no new `review_reason`/`error_class`
+vocabulary (only pre-existing values reused); secret/leak scan clean;
+sudo-scope audit confirms every new `sudo()` call targets one of the five
+sanctioned technical-service seams, never the picking recordset or its
+business validation. No Odoo runtime available in this session's
+container — every claim above is `IMPLEMENTED — RUNTIME PENDING`, not
+`EXECUTED — PASS`. No Shopify request or mutation occurred. The
+nine-process external-multiprocessing campaign remains `DEFERRED BY
+PRODUCT OWNER — NOT PROVEN`, unchanged by this correction. All themes
+A–M from the prior session's closure campaign (§ below) were preserved
+unchanged except where this table's five rows describe a narrow, targeted
+fix.
+
+**Next state:** a fresh exact-SHA Odoo.sh runtime campaign (fresh install,
+fulfillment/inventory/sale/core suites, warm upgrade, the concurrency
+scenarios) — the required next step before any final acceptance. No
+self-review, self-acceptance, ready-marking, or merge was performed by
+this session.
 
 > **Status:** Gate B implementation candidate — **STAGE R2A CONCURRENCY-PROOF
 > P1 CORRECTED; FRESH EXACT-SHA ODOO.SH VERIFICATION REQUIRED**. Draft

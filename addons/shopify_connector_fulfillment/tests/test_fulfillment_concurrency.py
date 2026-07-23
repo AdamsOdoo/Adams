@@ -388,15 +388,14 @@ class TestFulfillmentConcurrency(TransactionCase):
             )
             cr.commit()
 
-    # -- Theme B: concurrent Mode-2 evaluations of two separate Fulfillment
-    #    events on the SAME sale line must not double-spend the ledger.
+    # -- Correction P1-1: condition 6 no longer locks; the locked re-check
+    #    moved to immediately before the atomic application unit.
 
-    def test_c6_no_overrun_fails_closed_under_genuine_concurrent_lock(self):
-        """A genuine independent-connection lock held on the sale line (as a
-        second, concurrent Mode-2 evaluation would hold it while it is still
-        mid-transaction) makes `_c6_no_overrun` fail closed rather than
-        proceed on a possibly-stale read -- proven with two real, separate
-        PostgreSQL connections, not a mock."""
+    def test_c6_no_overrun_acquires_no_row_lock(self):
+        """Correction P1-1: `_c6_no_overrun` is now a preliminary, read-only
+        check -- calling it must never hold or block on a row lock. A
+        concurrent, genuinely independent connection can freely FOR-UPDATE-
+        lock the same sale line immediately afterward."""
         with db_connect(self.dbname).cursor() as setup_cr:
             env = api.Environment(setup_cr, SUPERUSER_ID, {})
             store = env['shopify.connector.store'].create({
@@ -414,21 +413,277 @@ class TestFulfillmentConcurrency(TransactionCase):
             sale_line = env['sale.order.line'].create({
                 'order_id': sale.id, 'product_id': product.id,
                 'product_uom_qty': 2.0,
-                'shopify_line_item_gid': 'gid://shopify/LineItem/LOCK',
+                'shopify_line_item_gid': 'gid://shopify/LineItem/C6NOLOCK',
             })
             order_binding = env['shopify.connector.order.binding'].create({
                 'store_id': store.id,
-                'shopify_gid': 'gid://shopify/Order/LOCK',
+                'shopify_gid': 'gid://shopify/Order/C6NOLOCK',
                 'sale_order_id': sale.id, 'status': 'active',
+            })
+            evidence = env[
+                'shopify.connector.fulfillment.inbound.evidence'
+            ].create({
+                'store_id': store.id,
+                'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/C6NOLOCK',
+                'order_binding_id': order_binding.id,
+            })
+            store_id = store.id
+            sale_line_id = sale_line.id
+            evidence_id = evidence.id
+            setup_cr.commit()
+        self.addCleanup(self._cleanup_store, store_id)
+
+        with db_connect(self.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            sale_line = env['sale.order.line'].browse(sale_line_id)
+            evidence = env[
+                'shopify.connector.fulfillment.inbound.evidence'
+            ].browse(evidence_id)
+            ctx = {
+                'evidence': evidence, 'store': env[
+                    'shopify.connector.store'
+                ].browse(store_id),
+                'line_mapping': {
+                    'gid://shopify/LineItem/C6NOLOCK': (sale_line, 1),
+                },
+            }
+            Service = env['shopify.connector.fulfillment.service']
+            ok, _detail = Service._c6_no_overrun(ctx)
+            self.assertTrue(ok)
+            # C6 must not still be holding the row lock: a second,
+            # genuinely independent connection can acquire it immediately.
+            with db_connect(self.dbname).cursor() as other_cr:
+                other_cr.execute('SET LOCAL lock_timeout = %s', ('2s',))
+                other_env = api.Environment(other_cr, SUPERUSER_ID, {})
+                other_line = other_env['sale.order.line'].browse(sale_line_id)
+                locked = other_line.try_lock_for_update()
+                self.assertTrue(locked)
+                other_cr.rollback()
+            cr.rollback()
+
+    def test_c6_no_overrun_source_has_no_lock_call(self):
+        # Condition 6's function body must never call a locking helper
+        # (mirrors the pre-existing C14 source guard below).
+        path = (Path(__file__).resolve().parents[1] / 'models'
+                / 'shopify_connector_fulfillment_mode2.py')
+        tree = ast.parse(path.read_text('utf-8'))
+        c6 = next(
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == '_c6_no_overrun'
+        )
+        calls = {
+            node.func.attr for node in ast.walk(c6)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        self.assertNotIn('try_lock_for_update', calls)
+        self.assertNotIn('lock_for_update', calls)
+
+    def test_no_shopify_read_reachable_from_the_locking_helpers(self):
+        # No Shopify-read method may ever be called from `_apply_mode2`,
+        # `_relock_and_recheck`, or `_lock_affected_sale_lines` -- every
+        # Shopify read has already completed by the time locking starts.
+        path = (Path(__file__).resolve().parents[1] / 'models'
+                / 'shopify_connector_fulfillment_mode2.py')
+        tree = ast.parse(path.read_text('utf-8'))
+        functions = {
+            n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
+        }
+        forbidden = {
+            '_read_order_fulfillments', '_read_fulfillment_orders',
+            '_read_fulfillment', '_resolve_single_location',
+        }
+        for name in ('_apply_mode2', '_relock_and_recheck',
+                      '_lock_affected_sale_lines'):
+            node = functions[name]
+            calls = {
+                n.func.attr for n in ast.walk(node)
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+            }
+            overlap = calls & forbidden
+            self.assertFalse(
+                overlap,
+                '%s must never call a Shopify-read method after/while '
+                'locking (found %r)' % (name, overlap),
+            )
+
+    def test_condition14_independent_cursor_can_lock_sale_line_during_the_read(self):
+        """Correction P1-1: condition 14's Shopify read must run with NO row
+        lock held -- proven by a genuine independent connection successfully
+        FOR-UPDATE-locking the affected sale line WHILE condition 14's read
+        is in flight (from inside the patched reader itself)."""
+        with db_connect(self.dbname).cursor() as setup_cr:
+            env = api.Environment(setup_cr, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07', 'state': 'connected',
+            })
+            settings = env['shopify.connector.store.settings'].create({
+                'store_id': store.id, 'fulfillment_domain_enabled': True,
+            })
+            settings.write({'fulfillment_operating_mode': 'mode2'})
+            product = env['product.product'].create({
+                'name': 'P', 'type': 'consu', 'is_storable': True,
+            })
+            partner = env['res.partner'].create({'name': 'C'})
+            sale = env['sale.order'].create({'partner_id': partner.id})
+            sale_line = env['sale.order.line'].create({
+                'order_id': sale.id, 'product_id': product.id,
+                'product_uom_qty': 2.0,
+                'shopify_line_item_gid': 'gid://shopify/LineItem/C14LOCK',
+            })
+            order_binding = env['shopify.connector.order.binding'].create({
+                'store_id': store.id, 'shopify_gid': 'gid://shopify/Order/C14LOCK',
+                'sale_order_id': sale.id, 'status': 'active',
+            })
+            env['shopify.connector.location'].create({
+                'store_id': store.id,
+                'shopify_location_gid': 'gid://shopify/Location/C14LOCK',
+                'name': 'L', 'shopify_location_active': True,
+            })
+            evidence = env[
+                'shopify.connector.fulfillment.inbound.evidence'
+            ].create({
+                'store_id': store.id,
+                'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/C14LOCK',
+                'shopify_order_gid': 'gid://shopify/Order/C14LOCK',
+                'order_binding_id': order_binding.id,
+                'origin_class': 'external_merchant', 'origin_confirmed': True,
+                'fulfillment_status_raw': 'SUCCESS',
+                'fulfillment_status_normalized': 'Success',
+                'fulfillment_status_is_success': True,
+                'reconciled_state': 'observed',
+            })
+            store_id = store.id
+            sale_line_id = sale_line.id
+            evidence_id = evidence.id
+            stock_loc_id = self.env.ref('stock.stock_location_stock').id
+            setup_cr.commit()
+        self.addCleanup(self._cleanup_store, store_id)
+
+        def _node():
+            return {
+                'id': 'gid://shopify/Fulfillment/C14LOCK', 'status': 'SUCCESS',
+                'fulfillmentLineItems': {'nodes': [{
+                    'id': 'gid://shopify/FulfillmentLineItem/C14LOCK',
+                    'quantity': 2,
+                    'lineItem': {'id': 'gid://shopify/LineItem/C14LOCK'},
+                }]},
+            }
+        fo = {
+            'id': 'gid://shopify/FulfillmentOrder/C14LOCK', 'status': 'OPEN',
+            'assignedLocation': {
+                'location': {'id': 'gid://shopify/Location/C14LOCK'}},
+            'line_items': [],
+        }
+        lock_result = {}
+        call_state = {'n': 0}
+
+        def _read_fn(store_arg, order_gid):
+            call_state['n'] += 1
+            if call_state['n'] == 2:
+                # This is condition 14's SECOND, separately fresh read:
+                # probe for the sale-line lock from a genuinely independent
+                # connection WHILE this read is in flight.
+                with db_connect(self.dbname).cursor() as probe_cr:
+                    probe_cr.execute('SET LOCAL lock_timeout = %s', ('2s',))
+                    probe_env = api.Environment(probe_cr, SUPERUSER_ID, {})
+                    probe_line = probe_env['sale.order.line'].browse(
+                        sale_line_id,
+                    )
+                    lock_result['locked'] = bool(
+                        probe_line.try_lock_for_update(),
+                    )
+                    probe_cr.rollback()
+            return [_node()]
+
+        holder_cr = db_connect(self.dbname).cursor()
+        try:
+            holder_env = api.Environment(holder_cr, SUPERUSER_ID, {})
+            Service = holder_env['shopify.connector.fulfillment.service']
+            evidence = holder_env[
+                'shopify.connector.fulfillment.inbound.evidence'
+            ].browse(evidence_id)
+            picking = Mock()
+            picking.id = 8888888
+            picking.state = 'assigned'
+            picking.move_ids = []
+            picking.location_id = holder_env['stock.location'].browse(
+                stock_loc_id,
+            )
+            LocationModel = type(holder_env['shopify.connector.location'])
+            with patch.object(type(Service), '_read_order_fulfillments',
+                               side_effect=_read_fn), \
+                    patch.object(type(Service), '_read_fulfillment_orders',
+                                 return_value=[fo]), \
+                    patch.object(
+                        LocationModel, '_resolve_odoo_location',
+                        return_value=holder_env['stock.location'].browse(
+                            stock_loc_id,
+                        ),
+                    ), \
+                    patch.object(type(Service), '_quantity_compatible_pickings',
+                                 return_value=[picking]), \
+                    patch.object(type(Service), '_select_deterministic_picking',
+                                 return_value=picking):
+                result = Service._evaluate_mode2(evidence)
+            self.assertTrue(result['passed'])
+        finally:
+            holder_cr.rollback()
+            holder_cr.close()
+        self.assertIn('locked', lock_result)
+        self.assertTrue(
+            lock_result['locked'],
+            'an independent connection could not lock the sale line while '
+            "condition 14's Shopify read was executing -- a lock is still "
+            'held across the read',
+        )
+
+    def test_apply_lock_unavailable_fails_closed_review_zero_stock_change(self):
+        """Correction P1-1: when the sale-line lock cannot be acquired at
+        apply time (held by a genuinely independent, concurrent
+        connection), `_apply_mode2` must fail closed to review with ZERO
+        local mutation -- proving only one concurrent application may ever
+        proceed for the same sale line."""
+        with db_connect(self.dbname).cursor() as setup_cr:
+            env = api.Environment(setup_cr, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Ful', 'shop_domain': 'ful-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07', 'state': 'connected',
+            })
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id, 'fulfillment_domain_enabled': True,
+            })
+            partner = env['res.partner'].create({'name': 'C'})
+            product = env['product.product'].create({
+                'name': 'P', 'type': 'consu',
+            })
+            sale = env['sale.order'].create({'partner_id': partner.id})
+            sale_line = env['sale.order.line'].create({
+                'order_id': sale.id, 'product_id': product.id,
+                'product_uom_qty': 2.0,
+                'shopify_line_item_gid': 'gid://shopify/LineItem/APPLY-LOCK',
+            })
+            order_binding = env['shopify.connector.order.binding'].create({
+                'store_id': store.id,
+                'shopify_gid': 'gid://shopify/Order/APPLY-LOCK',
+                'sale_order_id': sale.id, 'status': 'active',
+            })
+            pt_out = env['stock.picking.type'].search(
+                [('code', '=', 'outgoing')], limit=1,
+            )
+            picking = env['stock.picking'].create({
+                'picking_type_id': pt_out.id,
+                'location_id': env.ref('stock.stock_location_stock').id,
+                'location_dest_id': env.ref('stock.stock_location_customers').id,
+                'sale_id': sale.id,
             })
             store_id = store.id
             sale_line_id = sale_line.id
             order_binding_id = order_binding.id
+            picking_id = picking.id
             setup_cr.commit()
         self.addCleanup(self._cleanup_store, store_id)
 
-        # Holder connection: locks the sale line and keeps the transaction
-        # open (uncommitted), simulating a concurrent in-flight evaluation.
         holder_cr = db_connect(self.dbname).cursor()
         try:
             holder_env = api.Environment(holder_cr, SUPERUSER_ID, {})
@@ -436,32 +691,43 @@ class TestFulfillmentConcurrency(TransactionCase):
             locked = holder_line.try_lock_for_update()
             self.assertTrue(locked)
 
-            # A second, genuinely independent connection attempts the SAME
-            # overrun check while the holder still has the row locked.
             with db_connect(self.dbname).cursor() as other_cr:
                 other_cr.execute('SET LOCAL lock_timeout = %s', ('2s',))
                 other_env = api.Environment(other_cr, SUPERUSER_ID, {})
-                other_store = other_env['shopify.connector.store'].browse(store_id)
+                Service = other_env['shopify.connector.fulfillment.service']
                 other_sale_line = other_env['sale.order.line'].browse(
                     sale_line_id,
                 )
+                other_picking = other_env['stock.picking'].browse(picking_id)
                 other_evidence = other_env[
                     'shopify.connector.fulfillment.inbound.evidence'
                 ].create({
                     'store_id': store_id,
-                    'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/LOCK-2',
+                    'shopify_fulfillment_gid': 'gid://shopify/Fulfillment/APPLY-LOCK-2',
                     'order_binding_id': order_binding_id,
                 })
-                ctx = {
-                    'evidence': other_evidence, 'store': other_store,
+                plan = {
+                    'picking': other_picking,
                     'line_mapping': {
-                        'gid://shopify/LineItem/LOCK': (other_sale_line, 1),
+                        'gid://shopify/LineItem/APPLY-LOCK': (other_sale_line, 1),
                     },
                 }
-                Service = other_env['shopify.connector.fulfillment.service']
-                ok, detail = Service._c6_no_overrun(ctx)
-                self.assertFalse(ok)
-                self.assertIn('locked by a concurrent evaluation', detail)
+                with patch.object(
+                    type(Service), '_validate_picking_local',
+                    side_effect=AssertionError(
+                        'a lock-unavailable application must never reach '
+                        'local validation'),
+                ):
+                    Service._apply_mode2(other_evidence, plan)
+                other_evidence.invalidate_recordset()
+                self.assertEqual(other_evidence.reconciled_state, 'review')
+                self.assertEqual(other_evidence.review_reason, 'quantity_overrun')
+                other_picking.invalidate_recordset()
+                self.assertNotEqual(other_picking.state, 'done')
+                Binding = other_env['shopify.connector.fulfillment.binding']
+                self.assertFalse(Binding.search([
+                    ('store_id', '=', store_id), ('picking_id', '=', picking_id),
+                ]))
                 other_cr.rollback()
         finally:
             holder_cr.rollback()

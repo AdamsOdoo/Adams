@@ -61,7 +61,13 @@ class ShopifyConnectorStockPickingFulfillment(models.Model):
         result = super().write(vals)
         if tracking_changed:
             Service = self.env['shopify.connector.fulfillment.service']
-            Binding = self.env['shopify.connector.fulfillment.binding']
+            # Correction P1-3: a minimal technical-sudo lookup only -- an
+            # ordinary warehouse user with no connector role has no ACL on
+            # `shopify.connector.fulfillment.binding` but must still be able
+            # to trigger a tracking-change admission on their own picking
+            # write. The picking write itself (`super().write(vals)` above)
+            # and its own business validation are never sudo'd.
+            Binding = self.env['shopify.connector.fulfillment.binding'].sudo()
             for picking in self:
                 binding = Binding.search(
                     [('picking_id', '=', picking.id)], limit=1,

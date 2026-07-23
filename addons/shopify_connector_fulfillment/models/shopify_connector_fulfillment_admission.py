@@ -63,7 +63,13 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
 
     @api.model
     def _fulfillment_settings(self, store):
-        return self.env['shopify.connector.store.settings'].search(
+        # Correction P1-3: a minimal technical-sudo read. This seam runs
+        # inside `stock.picking._action_done`/`.write()` in the VALIDATING
+        # user's own environment; an ordinary warehouse user with no
+        # connector role must still be able to trigger it. sudo() here only
+        # bypasses this one settings-existence read -- never the picking's
+        # own business validation.
+        return self.env['shopify.connector.store.settings'].sudo().search(
             [('store_id', '=', store.id)], limit=1,
         )
 
@@ -77,6 +83,21 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
             return self.env['shopify.connector.job']
         settings = self._fulfillment_settings(store)
         if not settings or not settings.fulfillment_domain_enabled:
+            return self.env['shopify.connector.job']
+        # Correction P0-2 (anti-redundant-admission): the Mode-2 inbound
+        # apply creates the external fulfillment binding INSIDE its own
+        # atomic savepoint immediately before calling `_action_done()`. A
+        # minimal technical-sudo existence check here -- never a caller-
+        # controlled context flag an RPC caller could use to suppress normal
+        # admission -- means this picking's fulfillment event already IS
+        # that external one, so no redundant outbound `fulfillment_create`
+        # is ever enqueued for it. If validation later fails, the containing
+        # savepoint rolls the binding back too, so a genuinely new inbound
+        # attempt (or a normal outbound validation) sees no binding here and
+        # proceeds normally.
+        if self.env['shopify.connector.fulfillment.binding'].sudo().search_count([
+            ('store_id', '=', store.id), ('picking_id', '=', picking.id),
+        ]):
             return self.env['shopify.connector.job']
         return self._enqueue_once(
             store, job_source, JOB_TYPE_PICKING_ADMISSION,
@@ -103,7 +124,11 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
 
     @api.model
     def _picking_store(self, picking):
-        binding = self.env['shopify.connector.order.binding'].search([
+        # Correction P1-3: minimal technical-sudo read (see
+        # `_fulfillment_settings` above) -- an ordinary warehouse user has no
+        # ACL on `shopify.connector.order.binding` but must still be able to
+        # trigger this technical lookup.
+        binding = self.env['shopify.connector.order.binding'].sudo().search([
             ('sale_order_id', '=', picking.sale_id.id),
         ], limit=1)
         return binding.store_id if binding else False
@@ -149,12 +174,21 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
         benign. Every other exception — including a genuine ambiguity where
         the constraint matched but no such job is found — propagates
         unchanged, never silently absorbed.
+
+        Correction P1-3: both job searches below run via a minimal
+        technical-sudo `Job` handle -- an ordinary warehouse user has no ACL
+        on `shopify.connector.job` but must still be able to trigger this
+        idempotent enqueue seam. The job row itself is created by
+        `shopify.connector.job.enqueue.enqueue()`, which already writes via
+        its own `sudo()` while leaving `create_uid` as the real initiating
+        actor (`sudo()` bypasses access rights; it does not change
+        `env.uid`).
         """
         if store.state != 'connected':
             return self.env['shopify.connector.job']
         if job_source != 'odoo_event':
             trigger_origin = False
-        Job = self.env['shopify.connector.job']
+        Job = self.env['shopify.connector.job'].sudo()
         existing = Job.search([
             ('store_id', '=', store.id),
             ('job_type', '=', job_type),

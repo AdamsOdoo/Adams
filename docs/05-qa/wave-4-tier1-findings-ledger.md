@@ -1,5 +1,17 @@
 # Wave 4 Tier-1 Findings Ledger — PR #189 Independent Review Synthesis
 
+> **Addendum (2026-07-23, consolidated correction session):** a SEPARATE,
+> subsequent exhaustive control-room review of the corrected candidate this
+> ledger's 11 themes produced (exact reviewed head
+> `35a7179e0f9c41a9182a6fe540e09a97673cb7a3`, PR #189 comment
+> [`5061975312`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5061975312))
+> found five further candidate-owned Tier-1 defects, now corrected in one
+> consolidated session — see
+> `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` §"WAVE 4
+> CONSOLIDATED CORRECTION" for the full finding-by-finding record. These
+> five findings are NOT part of the 24-finding synthesis below; this
+> ledger's own historical record is unchanged.
+>
 > **Status (2026-07-23, correction session): all 11 authorized themes below
 > (A, B, C, E, F, G, H, I — permanent F-4 — J, K) are `CORRECTED —
 > IMPLEMENTED, RUNTIME PENDING`.** Per the one-loop control-room ruling

@@ -1,6 +1,9 @@
+import ast
 import uuid
+from pathlib import Path
 from unittest.mock import patch
 
+from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase
 
 
@@ -39,6 +42,16 @@ class TestFulfillmentTrigger(TransactionCase):
         cls.stock_loc = cls.env.ref('stock.stock_location_stock')
         cls.customer_loc = cls.env.ref('stock.stock_location_customers')
         cls.supplier_loc = cls.env.ref('stock.stock_location_suppliers')
+        # Correction P1-3: an ordinary warehouse user with normal stock
+        # permissions and NO Shopify connector group whatsoever.
+        cls.stock_user = cls.env['res.users'].create({
+            'name': 'FUL Stock User',
+            'login': 'ful-stockuser-%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref('stock.group_stock_user').id,
+            ])],
+        })
 
     # ------------------------------------------------------------------
     # Helpers
@@ -263,3 +276,103 @@ class TestFulfillmentTrigger(TransactionCase):
         ):
             with self.assertRaises(RuntimeError):
                 picking.write({'carrier_tracking_ref': 'TN-UNEXPECTED'})
+
+    # ------------------------------------------------------------------
+    # Correction P1-3 — an ordinary warehouse user with no connector role
+    # ------------------------------------------------------------------
+
+    def test_ordinary_stock_user_denied_direct_connector_model_access(self):
+        # ACLs are unchanged: a plain stock user still cannot read connector
+        # jobs, order bindings, or fulfillment bindings directly.
+        with self.assertRaises(AccessError):
+            self.env['shopify.connector.job'].with_user(
+                self.stock_user).search([])
+        with self.assertRaises(AccessError):
+            self.env['shopify.connector.order.binding'].with_user(
+                self.stock_user).search([])
+        with self.assertRaises(AccessError):
+            self.env['shopify.connector.fulfillment.binding'].with_user(
+                self.stock_user).search([])
+
+    def test_ordinary_stock_user_validates_delivery_enqueues_one_job(self):
+        picking = self._deliverable_picking()
+        picking.move_ids._action_confirm()
+        picking.move_ids._action_assign()
+        for line in picking.move_ids.move_line_ids:
+            line.quantity = 2.0
+            line.picked = True
+        picking.with_user(self.stock_user)._action_done()
+        self.assertEqual(picking.state, 'done')
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('job_type', '=', 'fulfillment_picking_admission'),
+            ('res_model', '=', 'stock.picking'), ('res_id', '=', picking.id),
+        ])
+        self.assertEqual(len(jobs), 1)
+        # The real initiating actor is preserved -- the enqueue seam is
+        # sudo'd for ACL bypass only, never for actor attribution.
+        self.assertEqual(jobs.create_uid.id, self.stock_user.id)
+
+    def test_ordinary_stock_user_tracking_write_enqueues_one_job(self):
+        picking = self._make_picking(
+            'outgoing', self.stock_loc, self.customer_loc, state='done',
+        )
+        binding = self.env['shopify.connector.fulfillment.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Fulfillment/STOCKUSER-1',
+            'picking_id': picking.id,
+            'order_binding_id': self.order_binding.id,
+        })
+        picking.with_user(self.stock_user).write({
+            'carrier_tracking_ref': 'TN-STOCKUSER',
+        })
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('job_type', '=', 'fulfillment_tracking_admission'),
+            ('res_model', '=', 'shopify.connector.fulfillment.binding'),
+            ('res_id', '=', binding.id),
+        ])
+        self.assertEqual(len(jobs), 1)
+
+    def test_ordinary_stock_user_unexpected_hook_failure_rolls_back(self):
+        picking = self._deliverable_picking()
+        picking.move_ids._action_confirm()
+        picking.move_ids._action_assign()
+        for line in picking.move_ids.move_line_ids:
+            line.quantity = 2.0
+            line.picked = True
+        with patch.object(
+            type(self.Service), '_enqueue_picking_admission',
+            side_effect=RuntimeError('unexpected admission failure'),
+        ):
+            with self.assertRaises(RuntimeError):
+                picking.with_user(self.stock_user)._action_done()
+
+    def test_stock_picking_hooks_never_sudo_the_picking_itself(self):
+        # `stock_picking.py` DOES sudo() the fulfillment-binding lookup (one
+        # of the explicitly sanctioned technical-service seams -- "fulfilment
+        # binding lookup"), since there is no admission.py delegation point
+        # for that specific read. What it must NEVER do is sudo() the
+        # picking recordset itself or its own business validation -- every
+        # sudo() call's receiver must be a fresh `self.env[...]` model
+        # lookup, never the bare `self`/`picking` name.
+        path = (Path(__file__).resolve().parents[1] / 'models'
+                / 'stock_picking.py')
+        tree = ast.parse(path.read_text('utf-8'))
+        violations = []
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == 'sudo'
+            ):
+                continue
+            receiver = node.func.value
+            if isinstance(receiver, ast.Name) and receiver.id in (
+                'self', 'picking',
+            ):
+                violations.append(receiver.id)
+        self.assertEqual(
+            violations, [],
+            'stock_picking.py must never call sudo() on the picking '
+            'recordset itself or its own business validation (found sudo() '
+            'on: %r)' % (violations,),
+        )
