@@ -1,3 +1,35 @@
+### Wave 5 U1 Gate A — fulfillment operator experience Definition-of-Ready + implementation packet (2026-07-23)
+
+- **Branch / PR:** `claude/wave-5-u1-gate-a`, draft PR into `mvp/program-integration`
+  (docs-only). Base = integration tip `dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+  **Not self-accepted, not ready-marked, not merged.** No `addons/**` change; no
+  Shopify operation; no U1 implementation.
+- **Objective (met):** produced the complete Wave 5 U1 (fulfillment operator
+  experience) Gate A package under
+  `docs/07-implementation-plan/wave-5-u1-gate-a/**` (13 outputs — see that
+  directory's `README.md`) while Wave 4 PR #189 proceeds through independent Tier 1
+  review. U1 is defined strictly around the accepted Wave 4 backend, consumed
+  read-only / via sanctioned actions, with no UI-owned mutation or business logic.
+- **Method:** the backend UI-contract inventory was built by reading the **exact
+  Wave 4 source at head `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`** (read-only
+  worktree); every referenced model/field/selection/action is source-verified.
+  A 5-agent research fan-out extracted governance/SEC-2/UI-prototype/U0-pattern/
+  product-UX material with citations (documented in the package).
+- **Headline rulings:** SEC-2 = `DEFINED — U1 GATE A NOT BLOCKED` (not a hard
+  stop; sequencing is a control-room decision); branch strategy = wait for PR #189
+  merge then branch (Option A); module = inside `shopify_connector_fulfillment`
+  (PD-2/DEC-016(A)); UI-phase numbering re-based (task-U1 = fulfillment experience
+  ≠ the merged U0 core surface). Overall: `U1 GATE A READY FOR CONTROL-ROOM
+  REVIEW`.
+- **Key finding:** product docs carry vocabulary superseded by the shipped code
+  (`external_service`/`carrier_event_only`, `over_fulfillment`, `under_review`/
+  `auto_matched`/`rejected`); U1 must bind to the code values — logged as TD-003.
+- **Next session:** independent Claude review of this docs-only package (memoryless
+  of this session's reasoning, not repository-blind) — exact prompt in
+  `docs/07-implementation-plan/wave-5-u1-gate-a/u1-gate-a-handoff.md` §7.
+
+---
+
 ### U0 PR #192 — Stage R1 Odoo.sh runtime campaign + one consolidated correction (2026-07-22)
 
 - **Branch / PR:** `claude/u0-operator-ui-foundation`, draft PR

@@ -25,6 +25,19 @@
 | Wave 6 | Not started |
 | Shopify development store | Critical external dependency for CV-013 and Wave 4 final validation |
 
+### Wave 5 U1 Gate A — status note (2026-07-23)
+
+**Wave 5 U1 (fulfillment operator experience) Gate A / Definition-of-Ready is
+prepared and awaiting independent review** — docs-only, on branch
+`claude/wave-5-u1-gate-a`, draft PR into `mvp/program-integration`, no `addons/**`
+change. Package: `docs/07-implementation-plan/wave-5-u1-gate-a/**`. Rulings:
+SEC-2 defined → not a hard stop (sequencing is a control-room decision); U1
+implementation branches from the tip **after PR #189 merges** (Option A); U1 UI
+lives inside `shopify_connector_fulfillment` (PD-2). This is Gate-A planning only:
+**no U1 implementation is authorized**, and U1 code remains gated on PR #189 merge,
+SEC-2 sequencing (D-P0-2), and the wave-5 gates. `U1 GATE A READY FOR
+CONTROL-ROOM REVIEW`.
+
 ## 2. Product-owner calibration — effective 2026-07-22
 
 The product owner directed the control room to preserve full rigor for load-bearing risks while stopping uniform maximum-ceremony review. The governing files now implement:
