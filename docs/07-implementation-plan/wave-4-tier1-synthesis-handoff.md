@@ -1,6 +1,10 @@
 # Wave 4 Tier-1 Synthesis Handoff
 
 > **Status: TIER-1 FINDINGS SYNTHESIZED — CORRECTION NOT YET AUTHORIZED.**
+> **Superseded in part (2026-07-23):** see [`wave-4-tier1-decision-lock.md`](wave-4-tier1-decision-lock.md)
+> — the four load-bearing decisions this handoff's synthesis left open (Theme D,
+> Theme I/F-4, Theme H, Theme A) are now frozen. Current status:
+> `WAVE 4 DECISION LOCK COMPLETE — READY FOR CONTROL-ROOM IMPLEMENTATION AUTHORIZATION`.
 
 ## What this session did
 
@@ -20,17 +24,19 @@ request or mutation occurred.**
 ## Prior head → new docs-only head
 
 - **Prior head (reviewed/rejected):** `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`
-- **New docs-only synthesis head:** recorded in the commit immediately following
-  this handoff on branch `claude/wave-4-fulfillment-gate-b` — see the PR
-  timeline for the exact SHA (`Synthesize Wave 4 Tier-1 correction findings`).
+- **Synthesis docs-only head (this handoff's own commit):** `d3c157c1d4c369c1880fffc69ee6b4801ab9c05c`.
+- **Decision-lock docs-only head (2026-07-23, later session):** recorded in
+  [`wave-4-tier1-decision-lock.md`](wave-4-tier1-decision-lock.md) and the PR
+  #189 timeline — see that document and `research-handoff.md`'s top entry for
+  the exact SHA.
 
 ## Normalized counts
 
 | | Count |
 | --- | --- |
 | Distinct reviewer-raised findings | **24** (2 P0 + 9 P1 + 13 material P2) |
-| Confirmed | 20 |
-| Confirmed with reclassification | 4 (`P1-1`, `F-5`, `P1-7`, `F-4`, `F-7` — *five*, see ledger §3 for the exact list; one entry, `F-11`, is CONFIRMED but disposed OUTSIDE ACCEPTED WAVE 4 SCOPE rather than "with reclassification") |
+| Confirmed (as-is) | 19 |
+| Confirmed with reclassification | 5 (`P1-1`, `F-5`, `P1-7`, `F-4`, `F-7` — see ledger §3 for the exact list; `F-11` is CONFIRMED but disposed OUTSIDE ACCEPTED WAVE 4 SCOPE, a separate tag from "with reclassification," and is counted in "Confirmed (as-is)" above, not here) |
 | Refuted | 0 |
 | Duplicate | 0 |
 | Outside this PR's implementable scope (fully) | 2 (`P1-7`, `F-11`) |
@@ -84,11 +90,13 @@ No live Shopify request or mutation occurred in this session.
 
 `WAVE 4 FINDINGS SYNTHESIS COMPLETE — READY FOR CONTROL-ROOM REVIEW`
 
+**Superseded (2026-07-23):** the control room accepted this synthesis in substance and ordered one narrow decision-lock pass before implementation authorization (PR #189 comment `5059969776`). That pass is complete — see [`wave-4-tier1-decision-lock.md`](wave-4-tier1-decision-lock.md). Current state: `WAVE 4 DECISION LOCK COMPLETE — READY FOR CONTROL-ROOM IMPLEMENTATION AUTHORIZATION`.
+
 ## Remaining control-room decisions
 
-1. Accept (or revise) this synthesis and its recommended correction structure (**B**).
-2. Authorize a new DEC scoping the `shopify_connector_core` multi-company `ir.rule` fix (Theme D) as a separate, later work item.
-3. Authorize a new architecture decision closing DEC-011's open cross-check-mechanism item (Theme I's `F-4`) before that sub-finding can be scheduled.
+1. Accept (or revise) this synthesis and its recommended correction structure (**B**) — **and the four decisions frozen by the decision-lock pass** (`wave-4-tier1-decision-lock.md`).
+2. ~~Authorize a new DEC scoping the `shopify_connector_core` multi-company `ir.rule` fix (Theme D) as a separate, later work item.~~ **Disposition frozen (decision-lock Decision A):** does not block PR #189 merge; blocks UAT/RC; owner is a new task (candidate "SEC-3"); target architecture recorded. Control room must still authorize that future task.
+3. ~~Authorize a new architecture decision closing DEC-011's open cross-check-mechanism item (Theme I's `F-4`) before that sub-finding can be scheduled.~~ **Disposition frozen (decision-lock Decision B):** permanent core+inventory seam architecture recorded as a separate future task; an interim fail-closed correction to `_c8_location` is now authorized inside PR #189's own correction batch.
 4. Route Theme L's dashboard-label fix to the Wave 5/U0 dashboard owner, or grant an explicit scope amendment.
-5. If accepted, issue the locked correction prompt (`wave-4-tier1-correction-locked-candidate.md`) to a future implementation session — **not this one, and not without control-room acceptance first.**
-6. The nine-process campaign deferment, issue #185 (CV-013), and issue #193 remain unresolved, carried, and unaffected by this synthesis.
+5. If accepted, issue the locked correction prompt (`wave-4-tier1-correction-locked-candidate.md`, now normalized against the decision-lock) to a future implementation session — **not this one, and not the decision-lock session, and not without control-room acceptance first.**
+6. The nine-process campaign deferment, issue #185 (CV-013), and issue #193 remain unresolved, carried, and unaffected by this synthesis or the decision-lock pass.
