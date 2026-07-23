@@ -14,6 +14,28 @@
 > [`fulfillment-operating-modes.md`](fulfillment-operating-modes.md)
 > (Modes 1/2, review-case and reconciliation semantics referenced throughout).
 
+> **⚠ Superseded-vocabulary note (Wave 5 U1 Gate A, 2026-07-23 — non-destructive;
+> this document remains `Proposed`, status unchanged).** The **Layer C
+> (connector-derived)** vocabulary in §1 is **superseded by the shipped Wave 4
+> `shopify_connector_fulfillment` code** (verified at exact head
+> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`). The **Layer A** Shopify enums below
+> are unaffected (they are verbatim Shopify values). U1 binds to the **code** Layer-C
+> values; do not copy the superseded strings into any view/selection/test. The
+> section text below is **left unchanged** pending a separate product-doc
+> reconciliation (logged as **TD-003**; full reconciliation in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §10). **Pending edits** (anchored by section + context):
+>
+> | Section · anchor | Superseded value | Code-authoritative replacement |
+> |---|---|---|
+> | §1 "Layer C — connector-derived states", reconciliation-state enumeration | `under_review` / `auto_matched` / `rejected` | `review`; `auto_matched` and `rejected` are **absent** (not stored states); full set: `observed`/`review`/`acknowledged`/`applied`/`superseded` |
+> | §1 "Layer C — connector-derived states", origin-classes enumeration | `external_service` / `carrier_event_only` | `external_app` / (removed origin — carrier milestones via `delivered_inconsistency` / status fields); full set: `connector`/`external_merchant`/`external_app`/`external_unknown` |
+>
+> **Not superseded — leave untouched (false positives):** the word "rejected" in the
+> **Layer A** Shopify tables (`REQUEST_DECLINED` "a fulfillment service rejected some
+> items"; `REJECTED` / `fo_req_rejected`; `CANCELLATION_REJECTED`) is a **Shopify**
+> enum/prose value, **not** the Layer C reconciliation state.
+
 ---
 
 ## 1. Authoritative fulfillment-state taxonomy (four layers)

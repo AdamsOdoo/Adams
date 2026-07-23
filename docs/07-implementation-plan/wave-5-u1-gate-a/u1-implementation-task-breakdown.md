@@ -19,12 +19,12 @@ consolidated correction max.
 |---|---|---|
 | S1 | **Menu + actions** — `Fulfillment` branch under core root; 3 act_windows (review/bindings/jobs) | core `menu_shopify_connector_root`; `inbound.evidence`, `fulfillment.binding`, `job` |
 | S2 | **Store form mode section** — mode display (statusbar/chip), switch buttons (admin), Mode-2 readiness surfacing | `fulfillment_operating_mode` + switch-state fields; readiness checks |
-| S3 | **Mode-switch confirmation wizard** — `TransientModel` (display-and-delegate) computing the consequences preview from bounded reads; calls `action_start_mode2_switch` / `action_rollback_to_mode1` | wizard → sanctioned actions; bounded reads of `job`/`inbound.evidence` |
+| S3 | **Mode-switch confirmation wizard** — `TransientModel` (display-and-delegate) showing current/requested mode, STATIC consequences, the switch-in-progress flag, and bounded, ACL-safe, **non-authoritative informational** counts (never deciding eligibility, blockers, review-required, target mode, or action arguments); on confirm calls `action_start_mode2_switch` / `action_rollback_to_mode1` | wizard → sanctioned actions; bounded, labelled-informational reads of `job`/`inbound.evidence` |
 | S4 | **Review workspace** — `inbound.evidence` list/search/form (evidence-left/decision-right); role-gated action buttons | `inbound.evidence` + `action_import_tracking`/`action_acknowledge_external`/`action_validate_proposed`; `fulfillment.binding.action_release_fulfillment_review` |
 | S5 | **Binding + lineage views** — `fulfillment.binding` list/form with smart buttons to picking/order/jobs; job list filtered to the 10 fulfillment job types; mutation-attempt safe summary reuse | `fulfillment.binding`, `job`, `mutation.attempt` (read-only) |
 | S6 | **Status/failure UX** — badge taxonomy (Layer A/C), manual-review-as-decision styling, delivered-inconsistency + unknown-status surfacing | evidence status/flag fields |
 | S7 | **Copy deck** — `docs/06-prompts/ui-u1-copy-deck.md` mapping every code value → label (incl. contract §10 reconciliations) | — |
-| S8 | **Tests** — PY visibility matrix + negative RPC + action wiring; XMLG source guards (no raw evidence / no business logic / no controller); TOUR primary flows; validation-results doc | all sanctioned actions + groups |
+| S8 | **Tests** — two-role UI visibility matrix (Connector User vs Connector Administrator affordances) + internal implied-group closure + negative direct-RPC (server denial through the internal groups, zero side effects, no privilege escalation) + action wiring; **import-structure tests** (root imports `wizards` once; wizard model registered after install; no circular/duplicate import); XMLG source guards (no raw evidence / no business logic / wizard is display-and-delegate only — no eligibility/blocker/review-required determination, no Job creation, no mutation / no controller); TOUR primary flows; validation-results doc | all sanctioned actions + two-role/internal groups + package `__init__` structure |
 
 ## 3. Ordered dependencies
 
@@ -40,21 +40,24 @@ through S4/S5; S7/S8 last. **Odoo-19 data load order:** wizard/actions defined
 `views/shopify_connector_fulfillment_review_views.xml`,
 `views/shopify_connector_fulfillment_binding_views.xml`,
 `views/shopify_connector_job_fulfillment_views.xml`,
-`wizards/__init__.py`,
+`__init__.py` (addon ROOT — add `from . import wizards`; keep the existing
+`from . import models`; this is the ONLY place the wizards package is registered),
+`wizards/__init__.py` (NEW — `from . import shopify_connector_fulfillment_mode_switch_wizard`, once),
 `wizards/shopify_connector_fulfillment_mode_switch_wizard.py`,
 `wizards/shopify_connector_fulfillment_mode_switch_wizard_views.xml`,
 `security/ir.model.access.csv` (wizard TransientModel row only),
 `__manifest__.py` (data/assets additions; add `web` explicitly only if not
 transitively resolved),
-`models/__init__.py` (only to import the wizard package if needed),
 `tests/test_ui_visibility_matrix.py`, `tests/test_ui_actions.py`,
-`tests/test_ui_source_guards.py`, `tests/test_ui_tours.py`,
-`static/tests/**` (only if a tour bundle is needed),
+`tests/test_ui_import_structure.py`, `tests/test_ui_source_guards.py`,
+`tests/test_ui_tours.py`, `static/tests/**` (only if a tour bundle is needed),
 `docs/06-prompts/ui-u1-copy-deck.md`,
 `docs/05-qa/ui-u1-validation-results.md`,
 plus AR-log append + handoff + program-state top entry.
 
-**Forbidden:** any `models/**` business file except the new wizard; any file in
+**Forbidden:** any `models/**` business file (the mode-switch wizard is a NEW
+`wizards/**` TransientModel, not a `models/**` file, and `models/__init__.py` must
+NOT import the sibling `wizards` package); any file in
 `shopify_connector_core`/`_sale`/`_product`/`_inventory`/`_product_export`/
 `adams_base`; any new backend business logic, mutation path, Shopify request,
 webhook/OAuth/controller, cron, or new job/error/selection value; any Owl
@@ -65,10 +68,14 @@ mappings/config outside fulfillment operator scope; U0 redesign.
 
 1. PR #189 merged; U1 branches from the new integration tip
    (`u1-branch-dependency-strategy.md`, Option A).
-2. SEC-2 status resolved per `u1-sec2-preflight-ruling.md` (D-P0-2) — either SEC-2
-   merged (DoR sequence) or explicit authorization to gate on the four internal
-   capability groups.
-3. Wave-5 gates G5-1 (master spec accepted), G5-3 (U1 fidelity baseline), G5-7
+2. SEC-2 accepted, implemented, independently reviewed, Odoo.sh runtime-green, and
+   **merged** into `mvp/program-integration` (D-P0-2 resolved **SEC-2-first**,
+   binding via control-room comment 5056513213). There is **no** parallel
+   four-internal-group path. U1 customer-facing view/button **visibility** then
+   gates on the two SEC-2 roles (Connector User, Connector Administrator); the four
+   internal groups remain the **server-side** capability primitives they resolve to.
+3. The load-bearing Proposed product/UX contracts (D-P0-3) independently accepted,
+   Wave-5 gates G5-1 (master spec accepted), G5-3 (U1 fidelity baseline), G5-7
    (SEC-1 intact) satisfied; U1 gate opened by the control room.
 4. Numbering reconciliation (D-P1-1) accepted so the fresh U1 locked prompt (not
    the packet's core-surface prompt) is used.

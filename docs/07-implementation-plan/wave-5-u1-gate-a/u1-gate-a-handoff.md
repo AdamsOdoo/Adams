@@ -1,8 +1,11 @@
 # Wave 5 U1 — Gate A Handoff
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Not self-accepted,
-> not ready-marked, not merged.** Produced 2026-07-23. Follows
-> `docs/06-prompts/session-handoff-template.md` adapted to the macro-wave model.
+> not ready-marked, not merged.** Produced 2026-07-23; **corrected 2026-07-23** per
+> control-room comment `5056513213` (`REVISE — one consolidated docs-only
+> correction`). **`DOCS CORRECTED — AWAITING FRESH INDEPENDENT GATE-A REVIEW`.**
+> Follows `docs/06-prompts/session-handoff-template.md` adapted to the macro-wave
+> model.
 
 ## 1. Session objective (met)
 
@@ -27,27 +30,45 @@ The 13 outputs under `docs/07-implementation-plan/wave-5-u1-gate-a/**` (see
 directly reading the Wave 4 source at exact head `2d9cff0` (via a read-only
 worktree); every referenced model/field/selection/action was source-verified.
 
-## 4. Key rulings (for the control room)
+## 4. Key rulings (control-room comment `5056513213` applied — 2026-07-23 correction)
 
-- **SEC-2:** defined sufficiently → **not a hard stop**; U1 implementation
-  sequencing is a control-room decision (D-P0-2).
-- **Branch:** Option A (wait for PR #189 merge; do not stack). U1 implementation
-  should not start before the Wave 4 merge and its own gate.
+- **SEC-2:** defined sufficiently → Gate A planning **not blocked**; **D-P0-2
+  resolved SEC-2-FIRST (binding)** — U1 implementation blocked until SEC-2 merges
+  runtime-green. No parallel four-internal-group path. U1 customer-facing UI
+  **visibility** gates on the two SEC-2 roles (Connector User, Connector
+  Administrator); the four internal groups remain server-side capability primitives.
+- **Branch:** **Option A ACCEPTED (binding)** — wait for PR #189 (and SEC-2) merge;
+  do not stack.
 - **Module:** inside `shopify_connector_fulfillment` (PD-2/DEC-016(A)); no `_ui`
-  addon.
+  addon — ACCEPTED.
 - **Numbering:** task-U1 (fulfillment experience) ≠ packet-U1 (core surface,
-  delivered by U0); a **fresh** U1 locked prompt is supplied (D-P1-1).
-- **Overall:** `U1 GATE A READY FOR CONTROL-ROOM REVIEW`.
+  delivered by U0); a **fresh** U1 locked prompt is supplied (D-P1-1 ACCEPTED; old
+  prompt retired).
+- **Wizard:** `TransientModel` **display-and-delegate only** (D-P1-5 ACCEPTED
+  CONDITIONALLY) — no eligibility/blocker/review-required decision.
+- **Package import:** addon root `__init__.py` imports `wizards` (once);
+  `models/__init__.py` must **not** import the sibling wizards package.
+- **Browser/render evidence:** **REQUIRED before U1 merge** (D-P1-6); not
+  auto-inherited from U0 deferments.
+- **Product/UX contracts (D-P0-3):** **NOT YET ACCEPTED** — still-Proposed; see the
+  Gate-A prerequisite & status table (`README.md` §4).
+- **Overall:** `DOCS CORRECTED — AWAITING FRESH INDEPENDENT GATE-A REVIEW`.
 
-## 5. Open decisions the control room must resolve before U1 code
+## 5. Decision status after the correction (control-room comment `5056513213`)
 
-- **P0:** D-P0-1 (branch), D-P0-2 (SEC-2 sequencing), D-P0-3 (accept load-bearing
-  product specs / G5-1 / two-role direction).
-- **P1:** D-P1-1 (numbering), D-P1-2 (module AR), D-P1-3 (SEC-2 fulfillment scope
-  gap), D-P1-4 (Mode-2↔inventory boundary), D-P1-5 (confirmation wizard), D-P1-6
-  (browser-evidence posture).
-- **P2:** vocabulary reconciliation, tracking-timeline surface, mode-switch history,
-  theme parity, consequences read-model. (Full detail: `u1-risks-and-open-questions.md`.)
+- **P0:** D-P0-1 (branch) **ACCEPTED**; D-P0-2 (SEC-2 sequencing) **RESOLVED
+  SEC-2-first**; D-P0-3 (load-bearing Proposed product/UX contracts) **NOT YET
+  ACCEPTED — the one remaining open P0** (independent acceptance required; the
+  Wave-5 gates G5-1…G5-9 all remain unchecked).
+- **P1:** D-P1-1…D-P1-6 all **resolved** by the control-room comment (numbering
+  accepted; module accepted; SEC-2 fulfillment scope = two-role UI + internal-group
+  server; inventory boundary display-only; wizard display-and-delegate; browser
+  evidence required before merge).
+- **P2:** D-P2-1 (vocabulary — code authoritative, product docs annotated),
+  D-P2-2 (native tracking timeline), D-P2-3 (no mode-switch history model),
+  D-P2-4 (dark mode outside U1), D-P2-5 (consequences = display-only; dynamic
+  preflight is a separate backend task) — all **resolved**. (Full detail:
+  `u1-risks-and-open-questions.md`; status table: `README.md` §4.)
 
 ## 6. Learning feedback loop (per CLAUDE.md §12)
 
@@ -66,18 +87,31 @@ worktree); every referenced model/field/selection/action was source-verified.
 - **Debt logged:** doc↔code vocabulary divergence recorded as documentation TD
   (see technical-debt register update) with the copy-deck reconciliation as the fix.
 - **Carry-forward:** U1 code must generate its own Odoo.sh runtime evidence once
-  Wave 4 merges; U0's deferred browser/lifecycle evidence classes remain
-  `DEFERRED — NOT PROVEN` and must not be represented as passed.
+  Wave 4 (and SEC-2) merge; U1 is a **premium UI gate** whose browser/render
+  evidence is **required before merge** (not auto-inherited from U0's deferments) —
+  a browser class may be deferred only after a concrete attempt + a separate
+  control-room ruling, and a deferred class is never represented as passed.
+- **Correction-cycle learning (2026-07-23, control-room comment `5056513213`):** the
+  most valuable catch was that a role-sequencing model can be *locally* plausible in
+  each file yet *globally* contradictory across the package — the SEC-2-first
+  intent lived in one doc while a "parallel four-internal-group" alternative
+  survived in the locked prompt and risk log. Fix: bind customer-facing UI
+  **visibility** to the two SEC-2 roles and keep the four internal groups strictly
+  server-side, then sweep every file for the removed alternative. Second lesson: an
+  Odoo **package-import boundary** (root `__init__.py` imports `wizards`;
+  `models/__init__.py` must not) is easy to state loosely and get wrong — pin it
+  with structural tests. Both are now enforced by acceptance rows A20/A21 and the
+  consistency sweep.
 
 ## 7. Exact next-session prompt
 
 ```text
-CLAUDE CODE — WAVE 5 U1 GATE A INDEPENDENT REVIEW (docs-only gate)
+CLAUDE CODE — WAVE 5 U1 GATE A FRESH INDEPENDENT REVIEW (docs-only gate; post-correction)
 
-Run in a FRESH top-level Claude session (or a fresh subagent), memoryless of this
-authoring session's reasoning but NOT repository-blind. Independently review the
-Wave 5 U1 Gate A package on branch claude/wave-5-u1-gate-a (draft PR to
-mvp/program-integration).
+Run in a FRESH top-level Claude session (or a fresh subagent), memoryless of the
+authoring/correction sessions' reasoning but NOT repository-blind. Independently
+review the CORRECTED Wave 5 U1 Gate A package on branch claude/wave-5-u1-gate-a
+(draft PR #194 to mvp/program-integration), at the new corrected head SHA.
 
 This is a DOCUMENTATION/GOVERNANCE-ONLY batch (DEC-040): verify by repository/diff/
 path/link/consistency checks — NO Odoo.sh runtime campaign is required or to be
@@ -85,17 +119,35 @@ fabricated.
 
 Verify from scratch:
   1. Identity gate holds live (integration tip dd0af5d…; PR #189 head 2d9cff0
-     open/draft/unmerged; PR #192 merged; issues #185/#193 open).
+     open/draft/unmerged unless legitimately merged; PR #192 merged; issues
+     #185/#193 open).
   2. NO addons/** file changed by this branch; diff is docs-only.
   3. Every model/field/selection/action cited in u1-backend-ui-contract-inventory.md
      EXISTS at exact Wave 4 head 2d9cff0 (spot-check against the source), and no
-     invented selection/job/error/source value appears.
+     invented selection/job/error/source or group XML id appears.
   4. The SEC-2 ruling, branch strategy, and module recommendation are consistent
      with wave-5-definition-of-ready.md, final-mvp-module-and-dependency-architecture.md
      (PD-2/PD-7), DEC-016/036/038/039/040, and the rejected-approaches log.
   5. The locked prompt's allowed/forbidden files are exact and internally consistent
      with the task breakdown and module recommendation.
   6. Markdown links resolve; no Shopify operation occurred; working tree clean.
+  7. SEC-2 sequencing is coherent everywhere: SEC-2-first is binding, NO parallel
+     four-internal-group implementation path survives; U1 customer-facing UI
+     visibility = the two SEC-2 roles (Connector User = new group_shopify_connector_user,
+     Connector Administrator = existing group_shopify_connector_admin), server
+     authorization = the four internal groups; both layers are tested.
+  8. The package-import allowlist is correct: addon root __init__.py imports wizards
+     (once); wizards/__init__.py imports the wizard model; models/__init__.py does
+     NOT import the sibling wizards package; import-structure tests are required.
+  9. The mode-switch wizard is frozen display-and-delegate: no eligibility/blocker/
+     review-required decision, no target-mode/argument choice, no Job/mutation; any
+     count is bounded, ACL-safe, and labelled non-authoritative.
+ 10. Proposed product/UX documents remain Proposed (not silently accepted); the
+     Gate-A prerequisite & status table (README §4) is accurate; browser/render
+     evidence is required before U1 merge (not silently waived); superseded
+     vocabulary is annotated non-destructively (docs unchanged).
+ 11. AR-079, TD-003, mvp-program-state.md, research-handoff.md, and the handoff all
+     agree with the corrected package.
 Post the verbatim review at the exact reviewed SHA. Do not accept/ready-mark/merge
 if you are also the author. Recommend ACCEPT or REVISE (one consolidated correction).
 ```

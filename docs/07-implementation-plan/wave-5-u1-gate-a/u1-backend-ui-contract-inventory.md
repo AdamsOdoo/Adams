@@ -13,9 +13,9 @@
 
 - **Wave 4 head inspected:** `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`.
 - **Integration base of this planning session:** `mvp/program-integration@dd0af5d94a7f730e738dca955971e00bb4cc9122`.
-- **Addon inspected:** `addons/shopify_connector_fulfillment/**` (17 model files,
-  1 ACL CSV, 1 security XML, 1 cron XML) plus consumed core surfaces in
-  `addons/shopify_connector_core/**`.
+- **Addon inspected:** `addons/shopify_connector_fulfillment/**` (15 model modules
+  + `models/__init__.py`, 1 ACL CSV, 1 security XML, 1 cron XML; verified at
+  `2d9cff0`) plus consumed core surfaces in `addons/shopify_connector_core/**`.
 - **Method:** direct `Read`/`Grep` of the checked-out source. No inference; a
   surface not found in source is recorded as ABSENT (§9/§10), never assumed.
 
@@ -198,11 +198,16 @@ Terminal: `succeeded`, `failed_final`, `skipped`, `cancelled`.
 
 ## 6. UI-callable public actions (the ONLY sanctioned action surface)
 
-Every action mirrors a **server-side** group check; a U1 button must be gated by the **same** group (UI/ACL agreement — wave-5 DoR hard-stop 9).
+Every action mirrors a **server-side** group check. U1 **customer-facing
+visibility** gates on the two SEC-2 roles (Connector User / Connector
+Administrator); the **server** enforces the internal capability group shown in
+"Server gate" below (the two roles resolve to it via implied-group closure). A
+hidden button is never the security control (UI/ACL agreement — wave-5 DoR
+hard-stop 9): a denied caller gets `AccessError` with zero side effects.
 
 | Action | Model | Server gate | Legal precondition | Legal result | Refusal behaviour |
 |---|---|---|---|---|---|
-| `action_start_mode2_switch()` | `store.settings` | Admin (`_assert_mode_switch_admin`) | store connected, currently `mode1` | sets `switch_in_progress`+nonce, enqueues `fulfillment_mode_switch_scan`; scan completes/aborts async | `AccessError` if not admin; **idempotent no-op** if already `mode2` |
+| `action_start_mode2_switch()` | `store.settings` | Admin (`_assert_mode_switch_admin`) | currently `mode1` (idempotent no-op if already `mode2`). *Note: the action itself enforces only the admin gate + the already-`mode2` no-op; a `store connected` check is applied upstream/by the reconciliation cron, **not** by this action — the wizard must not re-derive or gate on it.* | sets `switch_in_progress`+nonce, enqueues `fulfillment_mode_switch_scan`; scan completes/aborts async | `AccessError` if not admin; **idempotent no-op** if already `mode2` |
 | `action_rollback_to_mode1()` | `store.settings` | Admin | any time (always allowed) | sets `mode1`, clears switch flag, cancels in-flight `fulfillment_mode2_evaluation` jobs | `AccessError` if not admin |
 | `action_release_fulfillment_review(reason=False)` | `fulfillment.binding` | Reviewer **or** Admin (`_release_blocked_mutation`) | exactly one blocked mutation for the binding; pre-C2 (no attempt) **or** `failed_clean` attempt | supersedes the blocked job → one `manual_sync` replacement job | `AccessError` (role); `UserError` (empty reason / not exactly one / **post-C2 uncertain → refused, reconcile-only** / lock contention) |
 | `action_import_tracking()` | `inbound.evidence` | Operator/Reviewer/Admin (`_assert_reviewer`) | resolvable outgoing customer picking | writes `carrier_tracking_ref` (non-stock); marks evidence `acknowledged` | `AccessError`; `UserError` if no picking resolves |
@@ -251,11 +256,19 @@ models carry rows; strategy/scan/mode2/service models are Abstract (no table):
 No `unlink` for any role. Multi-company `ir.rule` scopes binding/evidence to the
 bound picking's / order's company (global rules; `sudo` bypasses).
 
-**SEC-2 interaction:** SEC-2 (see `u1-sec2-preflight-ruling.md`) layers two
-customer-facing roles (`Connector User`, `Connector Administrator`) **on top of**
-these four via `implied_ids` (Option M-A, additive, no XML-ID rename). The four
-groups above **persist** as internal capability primitives; U1 gating on them
-stays valid post-SEC-2 (User ⇒ operator∪reviewer∪auditor; Administrator ⇒ all).
+**SEC-2 interaction (binding SEC-2-first — D-P0-2, control-room comment
+`5056513213`):** SEC-2 introduces the two customer-facing roles via `implied_ids`
+(Option M-A, additive, no XML-ID rename) — **Connector User** = the **new**
+`group_shopify_connector_user` (implies operator∪reviewer∪auditor); **Connector
+Administrator** = the **existing** `group_shopify_connector_admin`, re-purposed
+(implies User → all). U1 **customer-facing UI visibility gates on these two roles**;
+the four internal capability groups above **persist as the server-side authorization
+primitives** the two roles resolve to. SEC-2 defines the final two-role group XML
+IDs (notably the new `group_shopify_connector_user`); U1 must **not** treat that XML
+ID as existing before SEC-2 merges runtime-green, and must **not** gate
+customer-facing visibility directly on the four internal groups. U1 tests prove
+**both** layers (two-role UI visibility + direct-RPC server denial through the
+internal groups).
 
 ---
 
@@ -312,11 +325,13 @@ operator label.
 | Review workspace record + 3 review actions | Present (`inbound.evidence` + actions) | **Ready for U1** |
 | Fulfillment binding + review-release | Present | **Ready for U1** |
 | Job/mutation/tracking lineage | Present (job, mutation.attempt, binding, picking) | **Ready for U1** |
-| Mode-switch **consequences preview** (blocked/running work, review-required, unresolved-external count) as a single backend read | **ABSENT** — the data exists (query jobs/evidence) but no single accepted read-model/method returns a "consequences summary" | **Optional-later** for U1: U1 composes it from bounded ACL-safe searches in the view/wizard layer (no new business logic); a future read-only aggregate endpoint could be added if needed — **decision for control room** |
+| Mode-switch **consequences display** (static consequences + a bounded informational count of open review cases) | **No single backend "consequences summary" read-model exists** (the data exists via jobs/evidence queries) | **Display-and-delegate ONLY** for U1: the wizard shows STATIC consequences + a bounded, ACL-safe, **non-authoritative** informational count (a `search_count` of `inbound.evidence reconciled_state='review'`), labelled non-authoritative; it does **not** compute "review-required", classify blockers, or decide eligibility — the server reconciliation scan is authoritative. An authoritative dynamic preflight would be a **separate backend read-model task (D-P2-5)**, never U1 wizard logic |
 | Mode-switch **history list** | Partial — only `fulfillment_last_mode_switch_at/uid` scalars exist (no per-switch log model) | **Optional-later**: U1 surfaces the scalars + the `fulfillment_mode_switch_scan` job log; a dedicated history model is out of U1 scope |
 | Read-only aggregate/dashboard endpoint for fulfillment | ABSENT in fulfillment addon (U0's dashboard aggregate lives in core, generic) | **Out of U1 scope** (dashboards are U0/later); U1 uses standard list/search views with bounded defaults |
 | Any Shopify read/mutation from UI | Forbidden by design | **Out of scope** |
 
 **No missing surface is inferred.** Where U1 needs a composite (e.g. the switch
 consequences), it is built by **reading** existing ACL-safe records with bounded
-domains in the view/wizard layer — never by adding backend business logic.
+domains in the view/wizard layer — never by adding backend business logic, and
+never used to decide eligibility, classify blockers, or determine "review required"
+(those stay server-authoritative; the wizard is display-and-delegate only).

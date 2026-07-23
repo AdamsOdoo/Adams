@@ -13,10 +13,18 @@
 DO NOT USE UNTIL ALL OF THESE HOLD:
   1. PR #189 (Wave 4 fulfillment backend) is MERGED into mvp/program-integration,
      and this session branches from the NEW integration tip (STOP on drift).
-  2. SEC-2 sequencing is resolved (D-P0-2): either SEC-2 is merged runtime-green,
-     OR the control room has explicitly authorized U1 to gate on the four internal
-     capability groups (auditor/operator/reviewer/admin) in parallel with SEC-2.
-  3. Wave-5 gates G5-1 (premium UX master spec accepted), G5-3 (U1 fidelity
+  2. SEC-2 is ACCEPTED, implemented, independently reviewed, Odoo.sh runtime-green,
+     and MERGED into mvp/program-integration (D-P0-2 resolved SEC-2-FIRST, binding
+     via control-room comment 5056513213). There is NO parallel path: U1 production
+     implementation is NOT authorized before SEC-2 lands. U1 customer-facing
+     view/menu/button VISIBILITY is gated on the two SEC-2 customer-facing roles
+     (Connector User, Connector Administrator); the four internal capability groups
+     (auditor/operator/reviewer/admin) remain the SERVER-side authorization
+     primitives those two roles resolve to via SEC-2 implied-group closure. SEC-2
+     defines the final two-role group XML IDs — do NOT invent them.
+  3. The load-bearing Proposed product/UX contracts (D-P0-3 — see the Gate-A
+     prerequisite & status table in the package README) are independently accepted,
+     Wave-5 gates G5-1 (premium UX master spec accepted), G5-3 (U1 fidelity
      baseline), G5-7 (SEC-1 intact) are satisfied, and the control room OPENS the
      U1 gate and verifies the current base SHA.
   4. This Gate A package (docs/07-implementation-plan/wave-5-u1-gate-a/**) is
@@ -41,20 +49,33 @@ ALLOWED FILES (all NEW/edited under addons/shopify_connector_fulfillment/):
   views/shopify_connector_fulfillment_review_views.xml
   views/shopify_connector_fulfillment_binding_views.xml
   views/shopify_connector_job_fulfillment_views.xml
-  wizards/__init__.py
+  __init__.py                                 (addon ROOT package — edit: add
+      `from . import wizards`; the existing `from . import models` stays. This is
+      the ONLY place the wizards package is registered. `models/__init__.py` must
+      NOT import the sibling wizards package.)
+  wizards/__init__.py                         (NEW: exactly `from . import
+      shopify_connector_fulfillment_mode_switch_wizard` — one import, once)
   wizards/shopify_connector_fulfillment_mode_switch_wizard.py   (TransientModel;
-      display-and-delegate ONLY: reads consequences via bounded ACL-safe searches,
-      calls action_start_mode2_switch / action_rollback_to_mode1; NO mode decision,
-      NO mutation, NO Shopify call, NO protected/snapshot write)
+      display-and-delegate ONLY: shows current mode, requested mode, STATIC
+      consequences, the switch-in-progress flag, and bounded, ACL-safe,
+      non-authoritative informational counts labelled as such; on confirm calls
+      action_start_mode2_switch / action_rollback_to_mode1. NO mode decision, NO
+      eligibility/blocker/review-required determination, NO prediction of switch
+      success, NO target-mode choice, NO action-argument alteration, NO Job
+      creation, NO mutation, NO Shopify call, NO protected/snapshot write. See the
+      display-and-delegate boundary in UX/IA §6 and the acceptance matrix.)
   wizards/shopify_connector_fulfillment_mode_switch_wizard_views.xml
   security/ir.model.access.csv                (edit: wizard TransientModel row ONLY)
-  models/__init__.py                          (edit: import wizards pkg if needed)
   __manifest__.py                             (edit: data + optional test assets;
       add 'web' explicitly ONLY if not resolved transitively via core)
-  tests/test_ui_visibility_matrix.py
+  tests/test_ui_visibility_matrix.py          (two-role UI visibility + internal
+      implied-group closure + negative direct-RPC server denial)
   tests/test_ui_actions.py
+  tests/test_ui_import_structure.py           (root imports wizards exactly once;
+      wizard model registered after install; no circular/duplicate import)
   tests/test_ui_source_guards.py              (AST/source guards: no raw evidence
-      field on any template; no business logic in the wizard; no controller/
+      field on any template; wizard is display-and-delegate only — no eligibility/
+      blocker/review-required decision, no Job creation, no mutation; no controller/
       webhook/OAuth; no Shopify call)
   tests/test_ui_tours.py
   static/tests/**                             (ONLY if a tour bundle is needed)
@@ -65,7 +86,9 @@ ALLOWED FILES (all NEW/edited under addons/shopify_connector_fulfillment/):
   docs/07-implementation-plan/mvp-program-state.md (Wave 5/U1 row)
 
 FORBIDDEN FILES / ACTIONS:
-  - ANY models/** business file except the new wizard package.
+  - ANY models/** business file (the mode-switch wizard is a NEW wizards/**
+    TransientModel, not a models/** file; models/__init__.py must NOT import the
+    sibling wizards package).
   - ANY file in shopify_connector_core / _sale / _product / _inventory /
     _product_export / adams_base.
   - ANY new backend business logic, mutation path, Shopify request or mutation,
@@ -80,9 +103,17 @@ HARD CONSTRAINTS:
     UI-contract inventory (verified at Wave 4 head 2d9cff0). Do NOT use superseded
     product-doc vocabulary (external_service, carrier_event_only, over_fulfillment,
     under_review, auto_matched, rejected) — see contract §10.
-  - Every action button gated by the SAME group that its server method enforces
-    (UI/ACL agreement; a hidden button is NEVER the security control). Non-admin
-    reaching an admin action → server AccessError with zero side effects.
+  - UI VISIBILITY gates on the two SEC-2 customer-facing roles (Connector User,
+    Connector Administrator); the SERVER method enforces its internal capability
+    group (auditor/operator/reviewer/admin), which the two roles resolve to via
+    implied-group closure. A hidden button is NEVER the security control: a
+    non-authorized caller (a Connector User reaching an Administrator-only action,
+    or a direct RPC by any role the server denies) gets a server AccessError with
+    zero side effects. Tests MUST prove BOTH layers — (a) two-role UI affordance
+    visibility (Connector User vs Connector Administrator), and (b) direct-RPC
+    server authorization/denial through the internal implied groups, with no
+    privilege escalation and no UI/ACL disagreement. SEC-2 defines the final
+    two-role group XML IDs; do NOT invent group XML IDs.
   - NEVER render remote_mutation_intent / preconditions_snapshot / *_fingerprint /
     shopify_idempotency_key / remote_evidence_refs / mode_switch_nonce / tokens.
     Parse JSON snapshots; never dump raw. No raw traceback/payload/credential.
@@ -94,10 +125,21 @@ HARD CONSTRAINTS:
   - No live Shopify request or mutation anywhere. Never present live fulfillment
     mutation as proven (CV-013 / #185 open).
 
-EVIDENCE (DEC-040): ship PY tests + genuine Odoo.sh RUN (build id, fresh-install,
-fulfillment/U0/sale/inventory regressions) + a driven WALK before independent
-review. Execute TOUR/HOOT/SHOT where the environment supports them; otherwise
-record DEFERRED BY PRODUCT OWNER — NOT PROVEN (never "passed").
+EVIDENCE (DEC-040; U1 is a PREMIUM UI gate). Before independent review AND before
+any U1 merge, ship: PY tests + genuine Odoo.sh RUN (build id; fresh-install and
+warm-upgrade; fulfillment/U0/sale/inventory regressions) + import-structure tests
+(root package imports `wizards` exactly once; wizard model registered after install;
+no circular or duplicate import) + a driven, Odoo-RENDERED WALK-through + the agreed
+SCREENSHOT set covering key roles/states + browser-level visibility/action-behaviour
+verification + accessibility/render checks + responsive-width checks + RTL checks
+where applicable — with NO sensitive evidence or credential leakage. U1 does NOT
+automatically inherit U0's browser deferments: browser/render evidence is REQUIRED,
+not automatically deferred. HOOT/TOUR may be classified separately based on actual
+environment support, but their deferment is NOT pre-authorized here. A product-owner
+deferment of any browser class may be requested ONLY after a concrete execution
+attempt, exact environment-limitation evidence, and a separate control-room ruling;
+never record a deferred class as "passed". Server tests and XML/source guards alone
+are NOT sufficient for U1 acceptance.
 
 STOP CONDITION: draft PR "UI Phase U1: fulfillment operator experience" targeting
 mvp/program-integration; gate closes on draft-open; no U2/U3/export/SEC-2/PERF-1

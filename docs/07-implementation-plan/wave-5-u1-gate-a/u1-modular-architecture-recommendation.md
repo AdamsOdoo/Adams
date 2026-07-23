@@ -55,17 +55,39 @@ addon, alongside the backend it surfaces. This preserves:
 U1 needs a "confirm + show consequences" step before `action_start_mode2_switch`.
 Two Odoo-native mechanisms:
 
-- a button `confirm=` attribute (static text) — too weak to render *dynamic*
-  consequences (blocked/running work, unresolved-external count); **and**
-- a small **`TransientModel` wizard** that reads consequences (bounded ACL-safe
-  searches) and, on confirm, **delegates to the accepted backend action**
-  (`action_start_mode2_switch` / `action_rollback_to_mode1`).
+- a button `confirm=` attribute (static text) — too weak to render the switch
+  context (current/requested mode, static consequences); **and**
+- a small **`TransientModel` wizard** that **displays** the switch context and, on
+  confirm, **delegates to the accepted backend action** (`action_start_mode2_switch`
+  / `action_rollback_to_mode1`).
 
-**Recommendation:** a display-and-delegate `TransientModel` wizard (mirrors U0's
-already-shipped `job_cancel_wizard` / `mutation_resolution_wizard` pattern). It is
-**not** "UI-owned business logic": it performs no mutation, computes no mode-switch
-decision, and only reads records + calls the sanctioned action. This wizard is
-**not** the forbidden "setup wizard" (that is the U2 11-step connect wizard).
+**Recommendation:** a **display-and-delegate** `TransientModel` wizard (mirrors U0's
+already-shipped `job_cancel_wizard` / `mutation_resolution_wizard` pattern), frozen
+to a strict boundary (control-room comment 5056513213, finding 3; D-P1-5 accepted
+conditionally):
+
+- **It MAY display:** current mode; requested mode; static operational consequences;
+  the current switch-in-progress flag; safe, bounded, ACL-safe **informational**
+  counts (each labelled non-authoritative); and wording that the server-side
+  reconciliation scan is authoritative.
+- **It MUST NOT:** decide whether switching is legal; decide whether blockers exist;
+  decide whether review is required; predict switch success; choose a target mode;
+  alter server-action arguments; create a Job directly; write protected/snapshot
+  settings; duplicate any of the 16 Mode-2 conditions; duplicate scan
+  classification; suppress a server-legal action because of its own read result; or
+  contact Shopify.
+- Any displayed count is bounded, ACL-safe, non-sensitive, labelled
+  informational/non-authoritative, and **never** used for eligibility or action
+  routing.
+
+The authoritative flow stays server-side: the Administrator confirms → the wizard
+calls the accepted server action → the server records/enqueues the switch → the
+server-side reconciliation scan determines blockers → the server activates Mode 2 or
+aborts to Mode 1 and records audit evidence. This wizard is therefore **not**
+"UI-owned business logic", and it is **not** the forbidden "setup wizard" (that is
+the U2 11-step connect wizard). When an authoritative *dynamic* preflight is desired
+later, record a separate backend read-model task (D-P2-5) — do not implement it in
+U1.
 
 ## 4. Proposed manifest deltas (`shopify_connector_fulfillment/__manifest__.py`)
 
@@ -78,6 +100,26 @@ decision, and only reads records + calls the sanctioned action. This wizard is
 - `assets`: only if a browser tour/HOOT bundle is added under `static/tests/**`
   (test assets). **No production Owl surface** (PD-7).
 
+### 4.1 Package / import structure (Odoo addon boundary — control-room finding 2)
+
+The wizard is a new **`wizards`** sub-package, imported the Odoo-standard way (not
+from a sibling package):
+
+- **addon root `__init__.py`** imports both sub-packages: the existing
+  `from . import models` **plus** a new `from . import wizards`. This is the **only**
+  place the `wizards` package is registered.
+- **`wizards/__init__.py`** (new) imports the wizard model exactly once:
+  `from . import shopify_connector_fulfillment_mode_switch_wizard`.
+- **`models/__init__.py`** imports **only** model modules and **must NOT** import the
+  sibling `wizards` package (importing a sibling package from `models/__init__.py`
+  is the wrong package boundary and can leave the wizard model unregistered or create
+  fragile import ordering).
+
+Import-structure acceptance checks (carried into the acceptance matrix and locked
+prompt): the root package imports `wizards` exactly once; the wizard package imports
+the wizard model exactly once; the wizard model is registered after install; no
+circular or duplicate import exists.
+
 ## 5. Proposed file map (smallest safe set)
 
 **Allowed (NEW/edited) — all inside `addons/shopify_connector_fulfillment/`:**
@@ -89,20 +131,25 @@ decision, and only reads records + calls the sanctioned action. This wizard is
 | `views/shopify_connector_fulfillment_review_views.xml` | `inbound.evidence` list/form/search (review workspace) + review-action buttons |
 | `views/shopify_connector_fulfillment_binding_views.xml` | `fulfillment.binding` list/form (lineage) + release-review button |
 | `views/shopify_connector_job_fulfillment_views.xml` | Job list/search filters for the 10 fulfillment job types (lineage) — inherit core job views |
-| `wizards/shopify_connector_fulfillment_mode_switch_wizard.py` + `.xml` | `TransientModel` confirm-consequences-and-delegate wizard |
+| `__init__.py` (addon ROOT, edit) | add `from . import wizards` (keep `from . import models`); the ONLY registration of the wizards package (see §4.1) |
+| `wizards/__init__.py` (NEW) | `from . import shopify_connector_fulfillment_mode_switch_wizard` (once) |
+| `wizards/shopify_connector_fulfillment_mode_switch_wizard.py` + `.xml` | `TransientModel` display-and-delegate wizard (§3.1 boundary) |
 | `security/ir.model.access.csv` (edit) | ACL row(s) for the wizard TransientModel only |
 | `__manifest__.py` (edit) | register the new `data` (+ test `assets`) |
-| `tests/test_ui_visibility_matrix.py` | four-group (SEC-2-aware) visibility + button→action wiring tests |
-| `tests/test_ui_source_guards.py` | AST/source guards: no `env.cr`, no Shopify call, no protected-field write, no raw-payload template |
-| `tests/test_ui_tours.py` + `static/tests/**` | `HttpCase.start_tour` browser tours + (only if any Owl) HOOT — *note browser-evidence deferment, see acceptance matrix* |
+| `tests/test_ui_visibility_matrix.py` | **two customer-facing role** visibility (Connector User vs Connector Administrator affordances) + internal implied-group closure + negative direct-RPC server denial |
+| `tests/test_ui_actions.py` | button→action wiring: each sanctioned action reached only via its role-gated button; delegate-only wizard confirm paths |
+| `tests/test_ui_import_structure.py` | root imports `wizards` once; wizard model registered after install; no circular/duplicate import |
+| `tests/test_ui_source_guards.py` | AST/source guards: no `env.cr`, no Shopify call, no protected-field write, no raw-payload template, wizard is display-and-delegate only (no eligibility/blocker/review decision, no Job creation, no mutation) |
+| `tests/test_ui_tours.py` + `static/tests/**` | `HttpCase.start_tour` browser tours + (only if any Owl) HOOT — *browser/render evidence is REQUIRED before U1 merge, NOT auto-deferred; see acceptance matrix* |
 | `docs/06-prompts/ui-u1-copy-deck.md` | U1 copy deck (code→label mapping incl. §10 reconciliation) |
 | `docs/05-qa/ui-u1-validation-results.md` | U1 validation evidence |
 
 **Forbidden (no-scope-creep):**
 
-- Any change to a fulfillment **model/business** `.py` file (`models/**` except
-  the wizard file, which is a new UI-orchestration TransientModel), any
-  strategy/scan/mode2/dispatch/reader logic.
+- Any change to a fulfillment **model/business** `.py` file under `models/**` (the
+  mode-switch wizard is a NEW `wizards/**` UI-orchestration TransientModel, not a
+  `models/**` file; and `models/__init__.py` must NOT import the sibling `wizards`
+  package — see §4.1), any strategy/scan/mode2/dispatch/reader logic.
 - Any file in `shopify_connector_core`, `_sale`, `_product`, `_inventory`,
   `_product_export`, or `adams_base` (fulfillment contributes its screens without
   editing other modules — the "contribute, never fork" rule).

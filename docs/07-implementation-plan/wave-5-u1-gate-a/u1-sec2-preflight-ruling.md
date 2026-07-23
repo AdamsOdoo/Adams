@@ -1,8 +1,11 @@
 # Wave 5 U1 — SEC-2 Preflight Ruling
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted.** Produced
-> 2026-07-23. Answers the mandatory SEC-2 preflight (Gate A prompt §7). **The
-> repository defines SEC-2 sufficiently → this is NOT a HARD STOP.**
+> 2026-07-23; **corrected 2026-07-23** per control-room comment `5056513213`.
+> Answers the mandatory SEC-2 preflight (Gate A prompt §7). **The repository
+> defines SEC-2 sufficiently → Gate A planning is NOT a HARD STOP — but U1
+> production implementation is BLOCKED until SEC-2 merges runtime-green
+> (SEC-2-first is binding; D-P0-2 resolved).**
 
 ## 1. What SEC-2 specifically means
 
@@ -39,6 +42,8 @@ SEC-2 does exactly two things (packet §A):
 - **Wave placement (packet §F, wave-5 DoR §1/§3):** SEC-2 is the **first stage of
   Wave 5**, sequenced **before U1** — binding sequence **SEC-2 → PERF-1 → U1 → U2
   → U3**. The DoR §3 explicitly **rejected** "U1-first, SEC-2 flips afterwards."
+  This SEC-2-first sequence is now **binding for U1 via control-room comment
+  `5056513213`** (D-P0-2 resolved).
 
 ## 3. Which security requirements U0 and Wave 4 already cover
 
@@ -70,29 +75,42 @@ SEC-2 does exactly two things (packet §A):
 
 ## 5. Can U1 safely proceed without implementing SEC-2 first?
 
-**Ruling: SEC-2 is sufficiently defined; U1 Gate A is NOT blocked; U1
-implementation is governed by a control-room sequencing decision — not a missing
-definition.** Reasoning:
+**Ruling (control-room comment 5056513213, binding): Gate A *planning* is NOT
+blocked by SEC-2 — the repository defines SEC-2 sufficiently. But U1 *production
+implementation* is BLOCKED until SEC-2 is accepted, implemented, independently
+reviewed, Odoo.sh runtime-green, and MERGED into `mvp/program-integration`
+(D-P0-2 resolved SEC-2-FIRST). There is NO parallel four-internal-group path.**
+Reasoning:
 
 1. **The PII-masking half does not touch U1 at all.** Fulfillment stores no PII;
    U1 renders no `*_masked` field and introduces no new PII surface. This half is
    a no-op for U1.
-2. **The role half is Option-M-A additive.** Because SEC-2 keeps the four internal
-   groups as hidden capability primitives (no XML-ID rename), a U1 that gates its
-   views/buttons on the **four internal capability groups** — which is exactly
-   what Wave 4 enforces server-side — **remains correct after SEC-2** (User ⇒
-   operator∪reviewer∪auditor; Administrator ⇒ all). U1 built this way is
-   **order-independent** of SEC-2.
-3. **However**, the **wave-5 DoR §3 binds the sequence SEC-2 → PERF-1 → U1** and
-   rejected U1-first, to avoid proving the visibility matrix twice and to avoid a
-   mid-wave window where UI gating and ACLs disagree. That is a **live control-room
-   sequencing decision**, not a definitional gap.
+2. **U1 must build against the FINAL two-role model, not the four internal groups.**
+   SEC-2 introduces the two customer-facing roles via Option-M-A additive
+   `implied_ids` — Connector User (the **new** `group_shopify_connector_user`) and
+   Connector Administrator (the **existing** `group_shopify_connector_admin`,
+   re-purposed — never renamed). U1 **customer-facing view/menu/button visibility
+   gates on those two roles**; the four internal capability groups
+   (auditor/operator/reviewer/admin) remain the **server-side authorization
+   primitives** the two roles resolve to via the implied-group closure
+   (Administrator → User → operator/reviewer → auditor). Gating U1 visibility
+   directly on the four internal groups (the earlier alternative) is **removed**:
+   it would make the customer-facing UI contract depend on hidden legacy groups and
+   prove the visibility matrix twice — exactly the rework/UI-vs-ACL-disagreement the
+   SEC-2-first sequence exists to prevent (DoR §3 **rejects** "U1 on the old four
+   groups, SEC-2 flips afterwards").
+3. **The wave-5 DoR §3 binding sequence SEC-2 → PERF-1 → U1** is now reinforced by
+   the control-room ruling: SEC-2 lands first; then U1 builds role-gated views
+   against the final two-role model.
 
 **Therefore:** the repository **does** define SEC-2 sufficiently to rule on U1;
-**no HARD STOP is required.** U1 *implementation* should either (a) follow the
-DoR's binding SEC-2-first sequence, or (b) proceed under an explicit control-room
-authorization to gate strictly on the four internal capability groups
-(server-mirrored) so it is SEC-2-order-independent. This is recorded as **open P0
+Gate A planning proceeds now; **U1 implementation waits for SEC-2 to merge
+runtime-green.** Tests must prove BOTH layers: (1) customer-facing two-role
+visibility (Connector User vs Connector Administrator affordances), and (2)
+direct-RPC server authorization/denial through the internal implied groups, with no
+privilege escalation and no UI/ACL disagreement. SEC-2 defines the final two-role
+group XML IDs (notably the new `group_shopify_connector_user`); U1 must not treat
+that XML ID as existing before SEC-2 merges. This is recorded as **resolved P0
 decision D-P0-2** in `u1-risks-and-open-questions.md`.
 
 ## 6. One genuine SEC-2 scope gap to surface (not a U1 blocker)
@@ -109,8 +127,13 @@ U1.
 
 ## 7. Verdict
 
-**`SEC-2 DEFINED — U1 GATE A NOT BLOCKED BY SEC-2`.** SEC-2 is a Wave-5
-implementation obligation, recommended before U1 by the DoR; the only open items
-are **sequencing** (D-P0-2) and a **scope-coverage** clarification (D-P1-3) — both
-control-room decisions, neither a definitional hard stop. U1 must ship **no**
-masking surface and gate on capability groups that survive SEC-2.
+**`SEC-2 DEFINED — U1 GATE A (PLANNING) NOT BLOCKED; U1 IMPLEMENTATION BLOCKED
+UNTIL SEC-2 MERGES`.** SEC-2 is a Wave-5 implementation obligation, **REQUIRED
+before U1 implementation** (binding SEC-2-first via control-room comment
+`5056513213`, DoR §3). **D-P0-2 is RESOLVED SEC-2-first** — there is no parallel
+four-internal-group path; the only remaining SEC-2-adjacent item is the
+**scope-coverage** clarification D-P1-3 (fulfillment continues relying on the four
+internal groups as server-side primitives; no Wave 4 backend security is rewritten
+by U1). U1 must ship **no** masking surface, gate **customer-facing UI visibility on
+the two SEC-2 roles**, and keep the four internal capability groups as the
+server-side authorization primitives those roles resolve to.

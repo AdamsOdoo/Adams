@@ -15,17 +15,33 @@
   worktree); every referenced model/field/selection/action is source-verified.
   A 5-agent research fan-out extracted governance/SEC-2/UI-prototype/U0-pattern/
   product-UX material with citations (documented in the package).
-- **Headline rulings:** SEC-2 = `DEFINED — U1 GATE A NOT BLOCKED` (not a hard
-  stop; sequencing is a control-room decision); branch strategy = wait for PR #189
-  merge then branch (Option A); module = inside `shopify_connector_fulfillment`
-  (PD-2/DEC-016(A)); UI-phase numbering re-based (task-U1 = fulfillment experience
-  ≠ the merged U0 core surface). Overall: `U1 GATE A READY FOR CONTROL-ROOM
-  REVIEW`.
-- **Key finding:** product docs carry vocabulary superseded by the shipped code
-  (`external_service`/`carrier_event_only`, `over_fulfillment`, `under_review`/
-  `auto_matched`/`rejected`); U1 must bind to the code values — logged as TD-003.
-- **Next session:** independent Claude review of this docs-only package (memoryless
-  of this session's reasoning, not repository-blind) — exact prompt in
+- **Headline rulings (control-room comment `5056513213` applied — 2026-07-23
+  correction):** **D-P0-2 resolved SEC-2-FIRST (binding)** — U1 implementation
+  blocked until SEC-2 merges runtime-green; **no** parallel four-internal-group path;
+  U1 customer-facing UI **visibility** = the two SEC-2 roles (Connector User,
+  Connector Administrator), server authorization = the four internal groups. Branch =
+  **Option A ACCEPTED (binding)**; module = inside `shopify_connector_fulfillment`
+  (ACCEPTED); UI-phase numbering re-based (ACCEPTED). Overall: `DOCS CORRECTED —
+  AWAITING FRESH INDEPENDENT GATE-A REVIEW`.
+- **Consolidated docs-only correction (2026-07-23, PR #194):** one commit corrected
+  five areas per the control-room `REVISE` ruling — (1) SEC-2/UI role-sequencing
+  (SEC-2-first; two-role UI visibility vs internal-group server authorization);
+  (2) the Odoo package-import allowlist (addon root `__init__.py` imports `wizards`;
+  `models/__init__.py` must not import the sibling wizards package); (3) the
+  mode-switch wizard frozen as display-and-delegate only; (4) a Gate-A
+  prerequisite/status table distinguishing accepted facts/decisions from
+  still-Proposed product/UX contracts and the unchecked Wave-5 G5 gates; (5)
+  premium-UI browser/render evidence required before U1 merge (not auto-deferred).
+  Product docs `fulfillment-operating-modes.md` / `shopify-fulfillment-status-model.md`
+  received non-destructive superseded-vocabulary annotations (docs stay `Proposed`).
+  No `addons/**` change; no Shopify operation.
+- **Key finding (unchanged):** product docs carry vocabulary superseded by the
+  shipped code (`external_service`/`carrier_event_only`, `over_fulfillment`,
+  `under_review`/`auto_matched`/`rejected`); U1 binds to the code values — logged as
+  TD-003, and the product docs are now annotated.
+- **Next session:** **fresh** independent Claude review of the corrected docs-only
+  package (memoryless of the authoring/correction sessions' reasoning, not
+  repository-blind) — exact prompt in
   `docs/07-implementation-plan/wave-5-u1-gate-a/u1-gate-a-handoff.md` §7.
 
 ---

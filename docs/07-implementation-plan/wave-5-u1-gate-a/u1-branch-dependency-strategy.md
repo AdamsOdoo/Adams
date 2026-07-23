@@ -1,10 +1,11 @@
 # Wave 5 U1 — Branch & Dependency Strategy (recommendation)
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted.** Produced
-> 2026-07-23. Recommends exactly one branch strategy for the **future** U1
-> implementation session. This Gate A (docs-only) session itself already uses
-> `claude/wave-5-u1-gate-a` branched from the integration tip
-> `dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+> 2026-07-23; **corrected 2026-07-23** — **Option A is ACCEPTED (binding) by
+> control-room comment `5056513213`** (D-P0-1). Recommends exactly one branch
+> strategy for the **future** U1 implementation session. This Gate A (docs-only)
+> session itself already uses `claude/wave-5-u1-gate-a` branched from the
+> integration tip `dd0af5d94a7f730e738dca955971e00bb4cc9122`.
 
 ## 1. The dependency fact that drives everything
 
@@ -62,7 +63,12 @@ Branch U1 from `dd0af5d9` and defer any compile/test against Wave 4 fields.
 | If PR #189 gets a correction | **Unaffected** (wait) | Must rebase onto corrected head | Unaffected but still can't build |
 | Fastest safe route to a *reviewable, buildable* U1 | **Yes** | Faster start, slower/ riskier finish | Blocked |
 
-## 5. Recommendation — **Option A**
+## 5. Decision — **Option A (ACCEPTED, binding — control-room comment `5056513213`)**
+
+**Option A is the accepted, binding branch strategy (D-P0-1). Option B is a
+contingency the control room did NOT authorize.** Additionally, because D-P0-2 is
+resolved **SEC-2-first**, U1 implementation must also wait for **SEC-2** to merge
+runtime-green (and PERF-1 per the DoR sequence), not only PR #189.
 
 **Wait for PR #189 to merge, then branch the U1 implementation session from the new
 `mvp/program-integration` tip.** Rationale:

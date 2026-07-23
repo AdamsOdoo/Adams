@@ -35,12 +35,12 @@ and manual-review UX — **without owning any mutation or business logic**.
 |---|---|---|
 | C1 | **Fulfillment mode display** | `store.settings.fulfillment_operating_mode` (`mode1`/`mode2`) |
 | C2 | **Mode-change entry point** | `action_start_mode2_switch`, `action_rollback_to_mode1` (admin) |
-| C3 | **Confirmation of consequences** (current mode; requested mode; operational consequences; blocked/running work; whether review is required) | Composed from bounded reads of `shopify.connector.job` (states/job_types), `inbound.evidence` (`reconciled_state='review'`), `fulfillment_switch_in_progress`; rendered by the confirm wizard |
+| C3 | **Confirmation of consequences** (current mode; requested mode; STATIC operational consequences; the switch-in-progress flag; bounded, **non-authoritative informational** counts of blocked/running work and open review cases — the server reconciliation scan, NOT the wizard, decides whether review is required or switching is legal) | Composed from bounded, ACL-safe reads of `shopify.connector.job` (states/job_types), `inbound.evidence` (`reconciled_state='review'`), `fulfillment_switch_in_progress`; **displayed only** (never used for eligibility or action routing) by the confirm wizard |
 | C4 | **Mode-switch progress + final status** | `fulfillment_switch_in_progress`, `fulfillment_last_mode_switch_at/uid`, the `fulfillment_mode_switch_scan` job + its log |
 | C5 | **Review workspace** (store; company; order; picking; fulfillment binding; job; mutation attempt; review reason; safe evidence summary; available accepted actions) | `inbound.evidence` (+ `order_binding_id`, `fulfillment_binding_id`, `store_id`, `review_reason`, safe fields) → picking via binding; job/mutation via lineage; actions per §6 |
 | C6 | **Fulfillment/tracking lineage** (source trigger; job family; mutation domain; operation scope; remote resource refs; local picking; reconciliation state; audit logs) | `job.trigger_origin`, `job.job_type`, `mutation.attempt.mutation_domain`, `job.operation_scope_key`, `shopify_*_gid` fields, `binding.picking_id`, `reconciled_state`, `shopify.connector.job.log` |
 | C7 | **Failure & manual-review UX** (actionable operator language; no raw traceback/payload/token/credential; clear retry/review/resolve boundaries) | `review_reason`, `review_detail` (sanitized), `job.error_class`/`manual_review_subreason`/`state`, safe mutation-attempt summary |
-| C8 | **Role behavior** (Administrator, Reviewer, Operator, Auditor, ordinary user) | four core groups; per-action gates in §6 of the contract |
+| C8 | **Role behavior** — customer-facing **UI visibility** gates on the two SEC-2 roles (Connector User, Connector Administrator); the **server** enforces the four internal capability groups (auditor/operator/reviewer/admin) the two roles resolve to via implied-group closure | UI visibility: two SEC-2 roles; server authorization: four internal groups; per-action gates in §6 of the contract |
 | C9 | **Accessibility & responsive behavior** | view-level (design-system tokens, keyboard/focus, RTL) |
 | C10 | **Bounded queries & safe list defaults** | view search/list defaults, `limit`, sane default filters |
 
@@ -53,23 +53,32 @@ wizard; mappings/configuration outside fulfillment operator scope; broad redesig
 of U0; any Owl production surface (PD-7 excludes fulfillment); any live Shopify
 request or mutation.
 
-## 4. Role → capability matrix (from server gates)
+## 4. Role → capability matrix (server-enforced) + UI visibility model
+
+**UI visibility** gates on the two SEC-2 customer-facing roles (Connector User,
+Connector Administrator). The columns below are the **server-enforced internal
+capability groups** those two roles resolve to via SEC-2 implied-group closure
+(Administrator → User → operator/reviewer → auditor). A hidden button is never the
+security control; the server enforces these gates regardless of the UI.
 
 | Capability | Auditor | Operator | Reviewer | Administrator |
 |---|---|---|---|---|
 | View mode, review workspace, lineage (read) | ✔ (read-only) | ✔ | ✔ | ✔ |
-| `action_start_mode2_switch` / `action_rollback_to_mode1` | �’ | ✗ | ✗ | ✔ |
+| `action_start_mode2_switch` / `action_rollback_to_mode1` | ✗ | ✗ | ✗ | ✔ |
 | `action_import_tracking` / `action_acknowledge_external` | ✗ | ✔ | ✔ | ✔ |
 | `action_validate_proposed` | ✗ | ✗ | ✔ | ✔ |
 | `action_release_fulfillment_review` | ✗ | ✗ | ✔ | ✔ |
 
-(✗ = server refuses with `AccessError`; the U1 button must be hidden/disabled for
-that group so UI and ACL agree — wave-5 DoR hard-stop 9.) An **ordinary internal
-user** (no connector group) sees no fulfillment menu and is denied every action.
+(✗ = server refuses with `AccessError` and zero side effects; the U1 button must be
+hidden/disabled for that role so UI and ACL agree — wave-5 DoR hard-stop 9.) An
+**ordinary internal user** (no connector group) sees no fulfillment menu and is
+denied every action.
 
-Post-SEC-2: **Connector User** ⇒ operator∪reviewer∪auditor (so a User can review,
-import tracking, validate proposed, release review); **Connector Administrator** ⇒
-all (adds mode switching).
+Post-SEC-2 mapping (what the two customer-facing roles resolve to): **Connector
+User** ⇒ operator∪reviewer∪auditor (so a User can review, import tracking, validate
+proposed, release review); **Connector Administrator** ⇒ all (adds mode switching).
+U1 tests prove **both** the two-role UI visibility **and** the direct-RPC server
+denial through these internal groups.
 
 ## 5. Operator mental model U1 must convey (from `fulfillment-operating-modes.md`)
 

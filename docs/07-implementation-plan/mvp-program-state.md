@@ -25,18 +25,27 @@
 | Wave 6 | Not started |
 | Shopify development store | Critical external dependency for CV-013 and Wave 4 final validation |
 
-### Wave 5 U1 Gate A — status note (2026-07-23)
+### Wave 5 U1 Gate A — status note (2026-07-23; corrected 2026-07-23)
 
-**Wave 5 U1 (fulfillment operator experience) Gate A / Definition-of-Ready is
-prepared and awaiting independent review** — docs-only, on branch
-`claude/wave-5-u1-gate-a`, draft PR into `mvp/program-integration`, no `addons/**`
-change. Package: `docs/07-implementation-plan/wave-5-u1-gate-a/**`. Rulings:
-SEC-2 defined → not a hard stop (sequencing is a control-room decision); U1
-implementation branches from the tip **after PR #189 merges** (Option A); U1 UI
-lives inside `shopify_connector_fulfillment` (PD-2). This is Gate-A planning only:
-**no U1 implementation is authorized**, and U1 code remains gated on PR #189 merge,
-SEC-2 sequencing (D-P0-2), and the wave-5 gates. `U1 GATE A READY FOR
-CONTROL-ROOM REVIEW`.
+**Wave 5 U1 (fulfillment operator experience) Gate A / Definition-of-Ready was
+prepared, then corrected once per control-room comment `5056513213`
+(`REVISE — one consolidated docs-only correction`)** — docs-only, on branch
+`claude/wave-5-u1-gate-a`, draft PR #194 into `mvp/program-integration`, no
+`addons/**` change. Package: `docs/07-implementation-plan/wave-5-u1-gate-a/**`.
+Corrected rulings: **D-P0-2 resolved SEC-2-FIRST (binding)** — no parallel
+four-internal-group path; U1 customer-facing UI **visibility** = the two SEC-2 roles
+(Connector User, Connector Administrator), server authorization = the four internal
+groups. Branch = **Option A (binding)** — U1 implementation branches from the tip
+**after PR #189 (and SEC-2) merge**; U1 UI lives inside
+`shopify_connector_fulfillment` (PD-2); the mode-switch wizard is
+**display-and-delegate only**; the package-import allowlist is corrected (addon root
+`__init__.py` imports `wizards`; `models/__init__.py` must not import the sibling
+wizards package); premium-UI browser/render evidence is **required before U1
+merge**. This is Gate-A planning only: **no U1 implementation is authorized**, and
+U1 code remains gated on PR #189 merge, **SEC-2 merge (runtime-green)**, D-P0-3
+(load-bearing Proposed product/UX contracts still need independent acceptance), and
+the wave-5 gates (G5-1…G5-9 all unchecked). `DOCS CORRECTED — AWAITING FRESH
+INDEPENDENT GATE-A REVIEW`.
 
 ## 2. Product-owner calibration — effective 2026-07-22
 

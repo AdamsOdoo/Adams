@@ -44,6 +44,16 @@ parallel app. U0's root is `shopify_connector_core.menu_shopify_connector_root`
 Dashboard / Stores / Sync Center / Error & Review Center (→ Mutation Evidence) /
 Logs.
 
+**Two-role visibility (SEC-2, binding SEC-2-first — D-P0-2).** U1's customer-facing
+menu/button **visibility** gates on the two SEC-2 roles: fulfillment review/lineage
+menus are visible to **Connector User** (which resolves to auditor∪operator∪reviewer,
+so the tree still hides for non-connector users), and mode-change controls are
+visible only to **Connector Administrator** (the existing
+`group_shopify_connector_admin`). The four internal capability groups remain the
+**server-side** authorization primitives those roles resolve to. SEC-2 defines the
+final `group_shopify_connector_user` XML ID; U1 must **not** treat it as existing
+before SEC-2 merges runtime-green.
+
 **U1 adds a `Fulfillment` first-level branch** (contributed by
 `shopify_connector_fulfillment`, parented to the core root):
 
@@ -63,7 +73,10 @@ screen; it renders through shared surfaces + a store sub-surface).
 ## 3. Store form additions — mode display + mode change
 
 Extend the core store (or store-settings) form with a **Fulfillment mode** group
-(admin-gated to match the model `groups=`):
+(admin-gated to match the model field-level `groups=` — Administrator here is the
+customer-facing **Connector Administrator**, i.e. the existing
+`group_shopify_connector_admin`; the review-workspace affordances in §4 are visible
+to **Connector User**, server-enforced by the operator/reviewer groups):
 
 - **Mode chip / statusbar** showing `fulfillment_operating_mode`
   (Mode 1 — Odoo-Controlled · *default* / Mode 2 — Bidirectional Exact
@@ -133,26 +146,36 @@ Realized by the prototypes as the **External fulfillment review center**
   reconciliation state**. In U1 this can be a form section over
   `state_snapshot`/`tracking_snapshot`, not a new Owl surface (PD-7).
 
-## 6. Mode-switch confirmation flow (the canonical consequences pattern)
+## 6. Mode-switch confirmation flow (display-and-delegate consequences pattern)
 
-A `TransientModel` wizard (display-and-delegate) opened by the admin mode buttons,
-mirroring the prototype's **Mode 2 consequences drawer**
+A `TransientModel` wizard (**display-and-delegate only** — see the frozen boundary
+in `u1-modular-architecture-recommendation.md` §3.1 and acceptance A6/A21) opened by
+the admin mode buttons, mirroring the prototype's **Mode 2 consequences drawer**
 (`docs/09-ui-prototype/settings-permissions/` `role="dialog"`, `aria-modal`):
 
-- Heading names the store; body states: 16-condition gate; **first failure →
-  review case**; **history never replayed** (applies only to fulfillments observed
-  after the switch); **read-only reconciliation scan runs first, automation only
-  after clean completion**; **live count of unresolved external-fulfillment review
-  cases that stay in review** (composed from a bounded search of `inbound.evidence`
-  where `reconciled_state='review'`); **rollback-safe** (evidence/bindings/audit
-  untouched); **audited who/when/from→to**.
-- Footer: Cancel (secondary) / Enable Mode 2 (primary). On confirm → calls
-  `action_start_mode2_switch`. Rollback path uses a simpler confirm →
-  `action_rollback_to_mode1`.
+- Heading names the store; body states, as **static informational** wording: the
+  16-condition gate; **first failure → review case**; **history never replayed**
+  (applies only to fulfillments observed after the switch); **read-only
+  reconciliation scan runs first, automation only after clean completion**;
+  **rollback-safe** (evidence/bindings/audit untouched); **audited who/when/from→to**.
+- It MAY also show a **bounded, ACL-safe, non-authoritative informational count** of
+  open external-fulfillment review cases (a bounded `search_count` of
+  `inbound.evidence` where `reconciled_state='review'`), explicitly **labelled
+  non-authoritative** and captioned that **the server reconciliation scan is
+  authoritative**. This count never decides whether switching is legal, never
+  classifies blockers, never determines "review required", never chooses the target
+  mode, and never alters the server-action arguments.
+- Footer: Cancel (secondary) / Enable Mode 2 (primary). On confirm the wizard
+  simply **calls** `action_start_mode2_switch`; the rollback path calls
+  `action_rollback_to_mode1`. The server action records/enqueues the switch, and the
+  server-side reconciliation scan determines blockers and activates Mode 2 or aborts
+  to Mode 1 with audit evidence — the wizard predicts nothing.
 - **Progress/final status** — after start, show `fulfillment_switch_in_progress`
   ("Reconciliation scan running…"), then the mode-switch-scan job + log, resolving
   to Mode 2 (clean) or back to Mode 1 (blockers/abort). This is **not** UI-owned
-  business logic — the wizard computes no mode decision and performs no mutation.
+  business logic — the wizard computes no mode decision, classifies no blocker, and
+  performs no mutation. When an authoritative *dynamic* preflight is later desired,
+  it is a **separate backend read-model task (D-P2-5)**, never wizard logic.
 
 ## 7. Failure & manual-review UX (operator language)
 

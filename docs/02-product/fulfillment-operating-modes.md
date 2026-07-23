@@ -14,6 +14,34 @@
 > order-ID alone / without exact FO-line matching) — see
 > [`../05-qa/rejected-approaches-log.md`](../05-qa/rejected-approaches-log.md).
 
+> **⚠ Superseded-vocabulary note (Wave 5 U1 Gate A, 2026-07-23 — non-destructive;
+> this document remains `Proposed`, status unchanged).** Some review-case/origin/
+> reconciliation vocabulary below is **superseded by the shipped Wave 4
+> `shopify_connector_fulfillment` code** (verified at exact head
+> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`). U1 (and any future implementation)
+> binds to the **code** values; do not copy the superseded strings into any
+> view/selection/test. The section text below is **left unchanged** pending a
+> separate product-doc reconciliation (logged as **TD-003**; full reconciliation in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §10). **Pending edits** (anchored by section + context so they survive line
+> shifts):
+>
+> | Section · anchor | Superseded value | Code-authoritative replacement |
+> |---|---|---|
+> | §3 evidence-stacking table, row "None of the above resolves" | `external` (unnamed unknown origin) | `external_unknown` |
+> | §3 "resulting origin classes" list, item 3 | `external_service` | `external_app` |
+> | §3 "resulting origin classes" list, item 4 | `carrier_event_only` | (no such origin class — carrier milestones surface via `delivered_inconsistency` / status fields) |
+> | §4 16-condition table, condition 6 ("No over-fulfillment"), review-reason cell | `over_fulfillment` | `quantity_overrun` (on evidence) **+** `ambiguous_match` (as `manual_review_subreason` on the core job) — semantic split, not a rename |
+> | §4 16-condition table, condition 15 ("Confirmed external") | `external_*` / "unknown-pending" scheme | code origin classes per §5.2 (`external_unknown` for unknown) |
+> | §5 inbound-record field table, "Origin classification" row | `external_service` / `carrier_event_only` | `external_app` / (removed origin) |
+> | §5 inbound-record field table, "Reconciliation state" row | `under_review` / `auto_matched` / `rejected` | `review`; `auto_matched` and `rejected` are **absent** (not stored states); full set: `observed`/`review`/`acknowledged`/`applied`/`superseded` |
+> | §6 mode-switching rules, rule 4 (rollback) | `under_review` | `review` |
+> | §5 per-line evidence prose + edge table ("over-fulfillment ledger", "over-fulfillment vs chain total") | concept only | the concept behind `quantity_overrun` (prose, not a stored value) |
+>
+> **Not superseded — leave untouched (false positives):** the word "rejected" in the
+> status banner above is the governance term *Rejected-approach* and the filename
+> `rejected-approaches-log.md`, **not** a reconciliation state.
+
 ---
 
 ## 1. Mode overview and selection setting
