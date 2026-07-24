@@ -141,5 +141,5 @@ The correction reduces documents and rulings. It does **not** reduce gates.
 
 - PR #189 exact-SHA runtime at `25639f17` continues in parallel and is not gated by this decision.
 - PR #189/PR #194 bodies are not modified by this governance session.
-- SEC-2, SEC-3, inventory-test residue, PERF-0, Shopify dev-store provisioning, and CI remain separate owned tasks.
+- [SEC-2 #196](https://github.com/AdamsOdoo/Adams/issues/196), [SEC-3 #197](https://github.com/AdamsOdoo/Adams/issues/197), [inventory-test residue #198](https://github.com/AdamsOdoo/Adams/issues/198), [PERF-0 #199](https://github.com/AdamsOdoo/Adams/issues/199), and [Shopify dev-store provisioning #200](https://github.com/AdamsOdoo/Adams/issues/200) are now separate owned tasks; CI remains separately authorized by D8.
 - This decision does not accept Wave 4, authorize Gate D, merge a PR, begin Wave 5 implementation, or authorize UAT.
