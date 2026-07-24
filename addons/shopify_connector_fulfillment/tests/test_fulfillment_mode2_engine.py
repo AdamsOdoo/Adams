@@ -507,69 +507,96 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertNotEqual(picking.state, 'done')
 
     def test_backorder_chain_candidate_exact_remaining_demand(self):
-        # A picking carrying one completed predecessor portion (an earlier,
-        # already-completed partial pass) plus one live pending portion for
-        # the same sale line: only the pending portion counts toward this
-        # candidate's demand, and it must match exactly. The predecessor is
-        # driven to 'done' through the genuine Odoo stock workflow -- real
-        # on-hand stock, confirm, reserve, record the picked quantity, then
-        # validate that ONE move directly (never a direct `state`/quantity
-        # write, and never the whole picking -- which would leave nothing
-        # pending on it to discover) -- reproducing a real completed-then-
-        # still-open picking instead of an inconsistent hand-set state.
+        # A genuine partial-completion / backorder chain. The ORIGINAL outgoing
+        # picking is created for the full ordered demand (2.0); a real 1.0
+        # portion is reserved, picked and validated through the genuine Odoo
+        # stock workflow, and Odoo itself spins off a SEPARATE backorder
+        # picking carrying the live remaining 1.0 move. Candidate discovery
+        # must exclude the completed original (genuinely 'done') and select
+        # exactly the live backorder, whose pending demand is exactly 1.0 in
+        # the sale line's own UoM.
+        #
+        # This shape is mandated by the genuine Odoo 19 stock source: a move
+        # created on a 'done' picking is forced to state='done'
+        # (stock.move.create), and _action_confirm() skips any non-'draft'
+        # move, so a live pending move can only ever exist on a distinct
+        # backorder picking -- never as a second move hand-added to the
+        # completed original. No workflow state is ever written directly.
         self.env['stock.quant'].create({
             'product_id': self.product.id,
             'location_id': self.stock_loc.id,
-            'quantity': 1.0,
+            'quantity': 2.0,
         })
-        picking = self._real_picking_with_moves([(self.sale_line, 1.0)])
-        predecessor = picking.move_ids
-        predecessor._action_confirm()
-        predecessor._action_assign()
-        self.assertEqual(predecessor.state, 'assigned')
-        for line in predecessor.move_line_ids:
+        original = self._real_picking_with_moves([(self.sale_line, 2.0)])
+        original_move = original.move_ids
+        original.action_confirm()
+        original.action_assign()
+        self.assertEqual(original_move.state, 'assigned')
+        # Record a genuine 1.0 picked portion (never a direct `state`/quantity
+        # write on the move) and validate that ONE picking through the real
+        # workflow; the 1.0 shortfall makes Odoo create a backorder for the
+        # remaining 1.0.
+        for line in original_move.move_line_ids:
             line.quantity = 1.0
-            line.picked = True
-        predecessor._action_done()
-        predecessor.invalidate_recordset()
-        self.assertEqual(predecessor.state, 'done')
+        original_move.picked = True
+        original._action_done()
 
-        pending = self.env['stock.move'].create({
-            'product_id': self.sale_line.product_id.id,
-            'product_uom_qty': 1.0,
-            'product_uom': self.sale_line.product_id.uom_id.id,
-            'picking_id': picking.id,
-            'location_id': self.stock_loc.id,
-            'location_dest_id': self.customer_loc.id,
-            'sale_line_id': self.sale_line.id,
-        })
-        pending._action_confirm()
-        pending.invalidate_recordset()
-        self.assertNotIn(pending.state, ('draft', 'cancel', 'done'))
+        original.invalidate_recordset()
+        original_move.invalidate_recordset()
+        self.assertEqual(original_move.state, 'done')
+        self.assertEqual(original.state, 'done')
 
-        picking.invalidate_recordset()
-        self.assertNotEqual(picking.state, 'done')
+        # Odoo created exactly one genuine backorder: a DIFFERENT record linked
+        # back to the completed original through the real backorder
+        # relationship, still open and eligible for candidate discovery.
+        backorder = original.backorder_ids
+        self.assertEqual(len(backorder), 1)
+        self.assertNotEqual(backorder, original)
+        self.assertEqual(backorder.backorder_id, original)
+        self.assertIn(backorder.state, ('assigned', 'confirmed', 'waiting'))
 
+        # The live remaining move on the backorder: genuinely pending (not
+        # draft/done/cancel), exactly 1.0 in the sale line's own UoM, and still
+        # bound to the evidenced sale line.
+        remaining = backorder.move_ids
+        self.assertEqual(len(remaining), 1)
+        self.assertNotIn(remaining.state, ('draft', 'done', 'cancel'))
+        self.assertEqual(remaining.sale_line_id, self.sale_line)
+        self.assertEqual(
+            self.Service._move_qty_in_sale_uom(remaining, self.sale_line), 1.0,
+        )
+
+        # Candidate discovery is exposed to BOTH the completed original and the
+        # live backorder; only the backorder is selected.
         order_binding = Mock()
-        order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
+        order_binding.sale_order_id.picking_ids = _FakeRecordset(
+            [original, backorder],
+        )
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
             'order_binding': order_binding, 'plan': {},
         }
-        # Direct proof that the completed predecessor's demand is excluded:
-        # if it leaked into the aggregate, demand would be 2.0 (not 1.0)
-        # and neither this check nor the compatibility check below would
-        # pass.
         required, required_lines = self.Service._required_from_line_mapping(
             ctx['line_mapping'],
         )
-        demand = self.Service._picking_pending_demand(
-            picking, required, required_lines,
+        # The completed original contributes zero pending demand (all done).
+        self.assertEqual(
+            self.Service._picking_pending_demand(
+                original, required, required_lines,
+            ),
+            {},
         )
-        self.assertEqual(demand, {self.sale_line.id: 1.0})
+        # The live backorder's pending demand is exactly the remaining 1.0.
+        self.assertEqual(
+            self.Service._picking_pending_demand(
+                backorder, required, required_lines,
+            ),
+            {self.sale_line.id: 1.0},
+        )
 
         compatible = self.Service._quantity_compatible_pickings(ctx)
-        self.assertIn(picking, compatible)
+        self.assertEqual(compatible, [backorder])
+        self.assertNotIn(original, compatible)
 
     def test_move_qty_uom_conversion_to_sale_line_uom(self):
         # Direct unit test of the UoM-conversion helper: a move recorded in
