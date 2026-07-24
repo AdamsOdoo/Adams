@@ -407,6 +407,81 @@ class TestFulfillmentConcurrency(TransactionCase):
             )
             cr.commit()
 
+    def _cleanup_business_records(self, ids):
+        """Delete exact fixture-owned, independently-committed business
+        records captured before setup commit -- constrained entirely to the
+        captured ids (never by name, domain, or model-wide search). Safe on
+        a partially created fixture (each `DELETE ... WHERE id = ANY(%s)`/
+        `.exists()` is a no-op for an id that was never committed or is
+        already gone -- idempotent by construction) and committed only once
+        every step below has succeeded, so a failure here rolls back this
+        cleanup's own independent cursor without ever touching, let alone
+        masking, the calling test's own already-recorded outcome.
+
+        FK-safe order (child before parent): move lines before moves before
+        pickings (each `stock.move`/`stock.move.line` references its own
+        parent row); pickings before sale order lines and sale orders
+        (`stock.move.sale_line_id`/picking `sale_id`); sale order lines
+        before products (`sale.order.line.product_id`); sale orders before
+        partners (core `sale.order.partner_id` is `ondelete='restrict'`).
+        Must run AFTER `_cleanup_store` (registered as a LATER `addCleanup`
+        so it executes FIRST, LIFO): `shopify.connector.order.binding.
+        sale_order_id` is itself `ondelete='restrict'` onto `sale.order`, so
+        the connector binding has to be gone before a fixture sale order can
+        be deleted at all.
+
+        Products/templates are removed through the ORM (`unlink()`, not raw
+        SQL) so Odoo's own product-deletion semantics (e.g. an
+        auto-created template with no variants left of its own) apply;
+        every other category is a direct, exact-ID `DELETE`.
+        """
+        move_line_ids = tuple(ids.get('move_line_ids', ()))
+        move_ids = tuple(ids.get('move_ids', ()))
+        picking_ids = tuple(ids.get('picking_ids', ()))
+        sale_order_line_ids = tuple(ids.get('sale_order_line_ids', ()))
+        sale_order_ids = tuple(ids.get('sale_order_ids', ()))
+        product_variant_ids = tuple(ids.get('product_variant_ids', ()))
+        product_template_ids = tuple(ids.get('product_template_ids', ()))
+        partner_ids = tuple(ids.get('partner_ids', ()))
+        with db_connect(self.dbname).cursor() as cr:
+            if move_line_ids:
+                cr.execute(
+                    'DELETE FROM stock_move_line WHERE id = ANY(%s)',
+                    (list(move_line_ids),),
+                )
+            if move_ids:
+                cr.execute(
+                    'DELETE FROM stock_move WHERE id = ANY(%s)',
+                    (list(move_ids),),
+                )
+            if picking_ids:
+                cr.execute(
+                    'DELETE FROM stock_picking WHERE id = ANY(%s)',
+                    (list(picking_ids),),
+                )
+            if sale_order_line_ids:
+                cr.execute(
+                    'DELETE FROM sale_order_line WHERE id = ANY(%s)',
+                    (list(sale_order_line_ids),),
+                )
+            if sale_order_ids:
+                cr.execute(
+                    'DELETE FROM sale_order WHERE id = ANY(%s)',
+                    (list(sale_order_ids),),
+                )
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            if product_variant_ids:
+                env['product.product'].browse(
+                    product_variant_ids,
+                ).exists().unlink()
+            if product_template_ids:
+                env['product.template'].browse(
+                    product_template_ids,
+                ).exists().unlink()
+            if partner_ids:
+                env['res.partner'].browse(partner_ids).exists().unlink()
+            cr.commit()
+
     # -- Correction P1-1: condition 6 no longer locks; the locked re-check
     #    moved to immediately before the atomic application unit.
 
@@ -449,7 +524,18 @@ class TestFulfillmentConcurrency(TransactionCase):
             store_id = store.id
             sale_line_id = sale_line.id
             evidence_id = evidence.id
+            sale_id = sale.id
+            partner_id = partner.id
+            product_id = product.id
+            product_tmpl_id = product.product_tmpl_id.id
             setup_cr.commit()
+        self.addCleanup(self._cleanup_business_records, {
+            'sale_order_line_ids': (sale_line_id,),
+            'sale_order_ids': (sale_id,),
+            'product_variant_ids': (product_id,),
+            'product_template_ids': (product_tmpl_id,),
+            'partner_ids': (partner_id,),
+        })
         self.addCleanup(self._cleanup_store, store_id)
 
         with db_connect(self.dbname).cursor() as cr:
@@ -576,7 +662,18 @@ class TestFulfillmentConcurrency(TransactionCase):
             sale_line_id = sale_line.id
             evidence_id = evidence.id
             stock_loc_id = self.env.ref('stock.stock_location_stock').id
+            sale_id = sale.id
+            partner_id = partner.id
+            product_id = product.id
+            product_tmpl_id = product.product_tmpl_id.id
             setup_cr.commit()
+        self.addCleanup(self._cleanup_business_records, {
+            'sale_order_line_ids': (sale_line_id,),
+            'sale_order_ids': (sale_id,),
+            'product_variant_ids': (product_id,),
+            'product_template_ids': (product_tmpl_id,),
+            'partner_ids': (partner_id,),
+        })
         self.addCleanup(self._cleanup_store, store_id)
 
         def _node():
@@ -700,7 +797,19 @@ class TestFulfillmentConcurrency(TransactionCase):
             sale_line_id = sale_line.id
             order_binding_id = order_binding.id
             picking_id = picking.id
+            sale_id = sale.id
+            partner_id = partner.id
+            product_id = product.id
+            product_tmpl_id = product.product_tmpl_id.id
             setup_cr.commit()
+        self.addCleanup(self._cleanup_business_records, {
+            'picking_ids': (picking_id,),
+            'sale_order_line_ids': (sale_line_id,),
+            'sale_order_ids': (sale_id,),
+            'product_variant_ids': (product_id,),
+            'product_template_ids': (product_tmpl_id,),
+            'partner_ids': (partner_id,),
+        })
         self.addCleanup(self._cleanup_store, store_id)
 
         holder_cr = db_connect(self.dbname).cursor()

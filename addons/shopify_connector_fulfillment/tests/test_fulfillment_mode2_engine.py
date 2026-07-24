@@ -467,10 +467,19 @@ class TestFulfillmentMode2Engine(TransactionCase):
 
     def test_two_moves_same_line_aggregate_to_exact_quantity_eligible(self):
         # Two separate Odoo moves for the SAME evidenced sale line, summing
-        # exactly to the Shopify-confirmed quantity, are eligible.
+        # exactly to the Shopify-confirmed quantity, are eligible. The moves
+        # are put through the genuine Odoo confirmation transition (never a
+        # direct `state` write) -- a picking whose moves are all still
+        # 'draft' is correctly excluded by `_quantity_compatible_pickings`'s
+        # own candidate filter, so a draft fixture can never reach this
+        # assertion honestly.
         picking = self._real_picking_with_moves([
             (self.sale_line, 1.0), (self.sale_line, 1.0),
         ])
+        picking.move_ids._action_confirm()
+        for move in picking.move_ids:
+            move.invalidate_recordset()
+            self.assertNotIn(move.state, ('draft', 'done'))
         order_binding = Mock()
         order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
@@ -498,13 +507,34 @@ class TestFulfillmentMode2Engine(TransactionCase):
         self.assertNotEqual(picking.state, 'done')
 
     def test_backorder_chain_candidate_exact_remaining_demand(self):
-        # A picking carrying one DONE move (an earlier, already-completed
-        # partial pass -- a backorder-chain predecessor) plus one PENDING
-        # move for the same sale line: only the pending portion counts
-        # toward this candidate's demand, and it must match exactly.
+        # A picking carrying one completed predecessor portion (an earlier,
+        # already-completed partial pass) plus one live pending portion for
+        # the same sale line: only the pending portion counts toward this
+        # candidate's demand, and it must match exactly. The predecessor is
+        # driven to 'done' through the genuine Odoo stock workflow -- real
+        # on-hand stock, confirm, reserve, record the picked quantity, then
+        # validate that ONE move directly (never a direct `state`/quantity
+        # write, and never the whole picking -- which would leave nothing
+        # pending on it to discover) -- reproducing a real completed-then-
+        # still-open picking instead of an inconsistent hand-set state.
+        self.env['stock.quant'].create({
+            'product_id': self.product.id,
+            'location_id': self.stock_loc.id,
+            'quantity': 1.0,
+        })
         picking = self._real_picking_with_moves([(self.sale_line, 1.0)])
-        picking.move_ids.write({'state': 'done'})
-        self.env['stock.move'].create({
+        predecessor = picking.move_ids
+        predecessor._action_confirm()
+        predecessor._action_assign()
+        self.assertEqual(predecessor.state, 'assigned')
+        for line in predecessor.move_line_ids:
+            line.quantity = 1.0
+            line.picked = True
+        predecessor._action_done()
+        predecessor.invalidate_recordset()
+        self.assertEqual(predecessor.state, 'done')
+
+        pending = self.env['stock.move'].create({
             'product_id': self.sale_line.product_id.id,
             'product_uom_qty': 1.0,
             'product_uom': self.sale_line.product_id.uom_id.id,
@@ -512,14 +542,32 @@ class TestFulfillmentMode2Engine(TransactionCase):
             'location_id': self.stock_loc.id,
             'location_dest_id': self.customer_loc.id,
             'sale_line_id': self.sale_line.id,
-            'state': 'confirmed',
         })
+        pending._action_confirm()
+        pending.invalidate_recordset()
+        self.assertNotIn(pending.state, ('draft', 'cancel', 'done'))
+
+        picking.invalidate_recordset()
+        self.assertNotEqual(picking.state, 'done')
+
         order_binding = Mock()
         order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
             'line_mapping': {LINE_ITEM_GID: (self.sale_line, 1)},
             'order_binding': order_binding, 'plan': {},
         }
+        # Direct proof that the completed predecessor's demand is excluded:
+        # if it leaked into the aggregate, demand would be 2.0 (not 1.0)
+        # and neither this check nor the compatibility check below would
+        # pass.
+        required, required_lines = self.Service._required_from_line_mapping(
+            ctx['line_mapping'],
+        )
+        demand = self.Service._picking_pending_demand(
+            picking, required, required_lines,
+        )
+        self.assertEqual(demand, {self.sale_line.id: 1.0})
+
         compatible = self.Service._quantity_compatible_pickings(ctx)
         self.assertIn(picking, compatible)
 
@@ -554,7 +602,7 @@ class TestFulfillmentMode2Engine(TransactionCase):
             'location_dest_id': self.customer_loc.id,
             'sale_id': self.sale.id,
         })
-        self.env['stock.move'].create({
+        move = self.env['stock.move'].create({
             'product_id': self.product.id,
             'product_uom_qty': 24.0, 'product_uom': unit.id,
             'picking_id': picking.id,
@@ -562,6 +610,14 @@ class TestFulfillmentMode2Engine(TransactionCase):
             'location_dest_id': self.customer_loc.id,
             'sale_line_id': sale_line.id,
         })
+        # Genuine Odoo confirmation transition (never a direct `state`
+        # write) -- the picking's own candidate-filter state is computed
+        # from its moves, so a still-draft move would make this picking
+        # ineligible before the UoM-conversion/exact-equality check under
+        # test is even reached.
+        move._action_confirm()
+        move.invalidate_recordset()
+        self.assertNotIn(move.state, ('draft', 'done'))
         order_binding = Mock()
         order_binding.sale_order_id.picking_ids = _FakeRecordset([picking])
         ctx = {
