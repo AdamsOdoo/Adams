@@ -1,5 +1,7 @@
 # CLAUDE.md — Project Governance Contract
 
+> **MVP role-model supersession — 2026-07-25.** [The dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) supersede conflicting role assignments below: Claude is the independent reviewer unless a dated product-owner instruction explicitly assigns a separate Claude session another role; Sol/Codex is the implementation worker; Runtime Claude is the runtime verifier; ChatGPT is strategic control room. No session may combine roles or self-accept.
+
 > **Read this file at the start of every session before doing anything else.**
 > It is the governance contract for the premium **Odoo 19 ↔ Shopify Connector**
 > project. If a task prompt conflicts with this file, stop and raise the
