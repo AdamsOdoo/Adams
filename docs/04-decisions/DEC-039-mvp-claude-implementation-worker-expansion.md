@@ -1,5 +1,7 @@
 # DEC-039: MVP Program Role Expansion — Claude Added as Implementation Worker (alongside GPT-5.6 Sol)
 
+> **Superseded in default-role assignment — 2026-07-25.** Preserved for history. No-self-acceptance remains; [the role-model addendum](2026-07-25-mvp-role-model-addendum.md) and [DEC-041](DEC-041-evidence-first-process-reallocation.md) replace Claude-as-standing/default-builder wording.
+
 - **Status:** Accepted — see Status note below for the procedural basis.
 - **Date:** 2026-07-22
 - **Deciders:** Product owner (direct, explicit written instruction, this session — via `AskUserQuestion`, selecting "Explicitly change Claude's role now"). No separate ChatGPT review was performed before acceptance; see Status note.
