@@ -1,5 +1,7 @@
 # ChatGPT Control-Room Operating Guide
 
+> **Role-model supersession — 2026-07-25.** For MVP-program work, [the dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) are authoritative: ChatGPT is strategic control room; Sol/Codex is implementation worker; Runtime Claude is runtime verifier; separate Claude is independent reviewer; the product owner is final authority. Earlier role text below is preserved as history where it conflicts.
+
 > Purpose: preserve the operating style, project definition, product goals, lessons learned, and handover rules for future ChatGPT sessions on the Odoo 19 Shopify Connector project. This file is an operational guide, not an architecture decision by itself. Architecture truth remains in `docs/04-decisions/`, `docs/03-architecture/`, `docs/05-qa/architecture-review-log.md`, and accepted PR records.
 
 ## 1. Project definition and product goal
