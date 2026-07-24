@@ -10,7 +10,7 @@
 
 | Item | Current state |
 | --- | --- |
-| Program integration | `mvp/program-integration@dd0af5d94a7f730e738dca955971e00bb4cc9122` is the verified base of current PR #189/#194 work and of this governance branch. Fetch live state before execution. |
+| Program integration | `mvp/program-integration@a5bcfa63cfbe01b655b3a8172cbac72df26864e2` is the current live integration tip after PR #195. PR #189/#194 remain based on `dd0af5d94a7f730e738dca955971e00bb4cc9122`; this governance branch began there and reconciled the intervening `CHATGPT.md` change. Fetch live state before execution. |
 | Wave 1 | Accepted, runtime-green, merged via PR #172 (`d18f9a9`); exact-head build `34986844`. |
 | Wave 2 | Accepted, runtime-green, merged via PR #176 (`22bfb9a`); runtime-tested `63607dd`, build `35100725`, 728/728 and 86/86 Wave-2 methods green. |
 | Wave 3 Stage 0 | Accepted, runtime-green, merged via PR #178 (`e48cfb1`); build `35145929`, 825/825. External process harness was explicitly infrastructure-deferred, not claimed executed. |
