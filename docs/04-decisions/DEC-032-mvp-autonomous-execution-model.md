@@ -1,5 +1,7 @@
 # DEC-032: MVP Autonomous Execution Model — Claude Control Room, GPT-5.6 Sol Executor
 
+> **Superseded in role assignment only — 2026-07-25.** Preserved for history. The macro-wave/checkpoint/GitHub/no-self-acceptance controls remain; [the role-model addendum](2026-07-25-mvp-role-model-addendum.md) and [DEC-041](DEC-041-evidence-first-process-reallocation.md) replace Claude-control-room and sole-merge-gatekeeper wording.
+
 - **Status:** Accepted — see Status note below for the procedural basis.
 - **Date:** 2026-07-15
 - **Deciders:** Product owner (direct, explicit written instruction, this session — "MVP Program Bootstrap"). No separate ChatGPT review was performed before acceptance; see Status note.
