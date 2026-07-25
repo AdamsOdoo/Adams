@@ -18,7 +18,9 @@
 > this document remains `Proposed`, status unchanged).** The **Layer C
 > (connector-derived)** vocabulary in §1 is **superseded by the shipped Wave 4
 > `shopify_connector_fulfillment` code** (verified at exact head
-> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`). The **Layer A** Shopify enums below
+> `2583081f97c94428dfd10325589b1b891eea240b`, re-verified 2026-07-25; the original
+> 2026-07-23 pass read the Wave 4 head `2d9cff0` *(historical)* and no binding
+> changed). The **Layer A** Shopify enums below
 > are unaffected (they are verbatim Shopify values). U1 binds to the **code** Layer-C
 > values; do not copy the superseded strings into any view/selection/test. The
 > section text below is **left unchanged** pending a separate product-doc
@@ -38,7 +40,7 @@
 >
 > **U1-backing disposition (Wave 5 U1 Gate A status-layer reset, 2026-07-23 — ruling
 > `5058042330`).** This document describes the full Shopify platform taxonomy
-> (Layer-A families A1–A7). **Wave 4 code at `2d9cff0` backs only a subset**, so U1
+> (Layer-A families A1–A7). **the integrated connector code at `2583081f` backs only a subset**, so U1
 > renders only the backed layers; the authoritative U1 status/badge source-of-truth
 > is the canonical matrix in
 > [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
@@ -46,7 +48,7 @@
 > `display_status_*` (display-only — never a carrier milestone); **A5** carrier
 > milestones (§5) are **not** stored as a normalized enum and surface only via
 > `delivered_inconsistency` + parsed `tracking_snapshot`; **A2** (§3.1), **A3**
-> (§3.2), **A6** (§3.3) have **no U1 backing field** at `2d9cff0` (deferred/outside
+> (§3.2), **A6** (§3.3) have **no U1 backing field** at `2583081f` (deferred/outside
 > U1). This annotation is non-destructive; the section values below are unchanged and
 > the document stays **Proposed**.
 

@@ -1,7 +1,8 @@
 # Wave 5 U1 — Implementation Task Breakdown
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Authorizes no
-> implementation.** Produced 2026-07-23. Decomposes the future U1 code work into
+> implementation.** Produced 2026-07-23; **reconciled 2026-07-25** against the final
+> integrated backend at `2583081f`. Decomposes the future U1 code work into
 > one coherent, independently-revertable batch (DEC-040 large-batch cadence), with
 > internal steps. **No code is written by this document.**
 
@@ -23,8 +24,8 @@ consolidated correction max.
 | S4 | **Review workspace** — `inbound.evidence` list/search/form (evidence-left/decision-right); role-gated action buttons | `inbound.evidence` + `action_import_tracking`/`action_acknowledge_external`/`action_validate_proposed`; `fulfillment.binding.action_release_fulfillment_review` |
 | S5 | **Binding + lineage views** — `fulfillment.binding` list/form with smart buttons to picking/order/jobs; job list filtered to the 10 fulfillment job types; mutation-attempt safe summary reuse | `fulfillment.binding`, `job`, `mutation.attempt` (read-only) |
 | S6 | **Status/failure UX** — badge taxonomy **per the canonical `u1-backend-ui-contract-inventory.md` §12 matrix** (A4=A4, A7=A7 display-only never carrier-milestone, A5 only from `tracking_snapshot`+`delivered_inconsistency`, **no A2 badge** — deferred, one badge per layer never merged), manual-review-as-decision styling, delivered-inconsistency + unknown-status surfacing (acceptance A22) | evidence status/flag fields per §12 |
-| S7 | **Copy deck** — `docs/06-prompts/ui-u1-copy-deck.md` mapping every code value → label (incl. contract §10 reconciliations) | — |
-| S8 | **Tests** — two-role UI visibility matrix (Connector User vs Connector Administrator affordances) + internal implied-group closure + negative direct-RPC (server denial through the internal groups, zero side effects, no privilege escalation) + action wiring; **import-structure tests** (root imports `wizards` once; wizard model registered after install; no circular/duplicate import); XMLG source guards (no raw evidence / no business logic / wizard is display-and-delegate only — no eligibility/blocker/review-required determination, no Job creation, no mutation / no controller); TOUR primary flows; validation-results doc | all sanctioned actions + two-role/internal groups + package `__init__` structure |
+| S7 | **Copy deck** — `docs/06-prompts/ui-u1-copy-deck.md` mapping every code value → label (incl. contract §10 reconciliations). **All 21 `review_reason` values** (Δ1, incl. `external_fulfillment_observed`), 19 `error_class`, 9 `manual_review_subreason`, 10 job states, 10 job types, 4 origin classes, 5 reconciled states; plus the shipped role labels `User`/`Administrator` under the `Shopify Connector` privilege (OQ-5) | — |
+| S8 | **Tests** — two-role UI visibility matrix (Connector User vs Connector Administrator affordances, against the **effective** runtime record-rule set — OQ-4) + internal implied-group closure + negative direct-RPC (server denial through the internal groups, zero side effects, no privilege escalation) + **SEC-3 closure (A23): cross-company and quarantined rows absent from every U1 read shape while the owning company's user sees the same row, and the inventory-driven completeness guard proves U1 adds no new durable store-scoped model or relation** + action wiring; **import-structure tests** (root imports `wizards` once; wizard model registered after install; no circular/duplicate import); XMLG source guards (no raw evidence / no business logic / wizard is display-and-delegate only — no eligibility/blocker/review-required determination, no Job creation, no mutation / no controller); TOUR primary flows; validation-results doc | all sanctioned actions + two-role/internal groups + package `__init__` structure |
 
 ## 3. Ordered dependencies
 
@@ -52,6 +53,7 @@ are **repo-root** paths (not under the addon):
 transitively resolved),
 `tests/test_ui_visibility_matrix.py`, `tests/test_ui_actions.py`,
 `tests/test_ui_import_structure.py`, `tests/test_ui_source_guards.py`,
+`tests/test_ui_sec3_scope.py` (NEW — SEC-3 closure per acceptance **A23**),
 `tests/test_ui_tours.py`, `static/tests/**` (only if a tour bundle is needed),
 `docs/06-prompts/ui-u1-copy-deck.md`,
 `docs/05-qa/ui-u1-validation-results.md`,
@@ -68,19 +70,35 @@ mappings/config outside fulfillment operator scope; U0 redesign.
 
 ## 5. Prerequisites before this batch may start (control-room gated)
 
-1. PR #189 merged; U1 branches from the new integration tip
-   (`u1-branch-dependency-strategy.md`, Option A).
-2. SEC-2 accepted, implemented, independently reviewed, Odoo.sh runtime-green, and
-   **merged** into `mvp/program-integration` (D-P0-2 resolved **SEC-2-first**,
+0. **NOT SATISFIED — exact base bound.** The control room has replaced the locked
+   prompt's `<U1-IMPLEMENTATION-BASE-SHA>` placeholder with a specific
+   `mvp/program-integration` commit, after PR #194 was accepted and merged.
+   `2583081f` is PR #194's docs reconciliation anchor, **not** an implementation
+   base.
+1. **SATISFIED 2026-07-25.** PR #189 merged (merge commit `3a1afa43`; accepted head
+   `e12145ce`; runtime candidate `25639f17`) — the Wave 4 backend is on the
+   integration tip (`u1-branch-dependency-strategy.md`, Option A).
+2. **SATISFIED 2026-07-25.** SEC-2 accepted, implemented, independently reviewed and
+   **merged**; issue #196 **closed as completed** (D-P0-2 resolved **SEC-2-first**,
    binding via control-room comment 5056513213). There is **no** parallel
-   four-internal-group path. U1 customer-facing view/button **visibility** then
-   gates on the two SEC-2 roles (Connector User, Connector Administrator); the four
-   internal groups remain the **server-side** capability primitives they resolve to.
-3. The load-bearing Proposed product/UX contracts (D-P0-3) independently accepted,
-   Wave-5 gates G5-1 (master spec accepted), G5-3 (U1 fidelity baseline), G5-7
-   (SEC-1 intact) satisfied; U1 gate opened by the control room.
-4. Numbering reconciliation (D-P1-1) accepted so the fresh U1 locked prompt (not
-   the packet's core-surface prompt) is used.
+   four-internal-group path. U1 customer-facing view/button **visibility** gates on
+   the two SEC-2 roles — exact XML IDs
+   `shopify_connector_core.group_shopify_connector_user` /
+   `...group_shopify_connector_admin` (contract §8.1) — while the four internal
+   groups remain the **server-side** capability primitives they resolve to.
+2b. **OPEN — not a blocker, a constraint.** Current-backend SEC-3 is merged but
+   issue **#197 remains open**: any new durable store-scoped U1 model or
+   connector-to-connector relation must join the inventory-driven SEC-3 guard
+   (acceptance **A23**, contract §8.2). PERF-0 baseline is merged but issue **#199
+   remains open**: PERF-0 numbers stay baseline-only, never guarantees.
+3. **NOT SATISFIED.** The load-bearing Proposed product/UX contracts (D-P0-3)
+   independently accepted, and Wave-5 gates G5-1 (master spec accepted), G5-3 (U1
+   fidelity baseline), G5-4 (PERF-1 budgets) and G5-7 (SEC-1 intact) satisfied; U1
+   gate opened by the control room.
+4. **NOT SATISFIED.** This Gate-A package independently reviewed **since the
+   2026-07-25 re-anchor** and accepted, including the numbering reconciliation
+   (D-P1-1) so the fresh U1 locked prompt (not the packet's core-surface prompt) is
+   used.
 
 ## 6. Estimated review posture
 

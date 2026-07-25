@@ -1,8 +1,11 @@
 # Wave 5 U1 — Product Scope Contract (Fulfillment Operator Experience)
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Authorizes no
-> implementation.** Produced 2026-07-23. Defines U1 strictly around the
-> **already-accepted Wave 4 backend** (`u1-backend-ui-contract-inventory.md`).
+> implementation.** Produced 2026-07-23; **reconciled 2026-07-25** against the final
+> integrated backend. Defines U1 strictly around the **merged Wave 4 backend as it
+> now exists on `mvp/program-integration@2583081f`**
+> (`u1-backend-ui-contract-inventory.md` §0/§0.1). **U1 implementation remains
+> unauthorized.**
 
 ## 0. Numbering reconciliation (important)
 
@@ -37,10 +40,10 @@ and manual-review UX — **without owning any mutation or business logic**.
 | C2 | **Mode-change entry point** | `action_start_mode2_switch`, `action_rollback_to_mode1` (admin) |
 | C3 | **Confirmation of consequences** (current mode; requested mode; STATIC operational consequences; the switch-in-progress flag; bounded, **non-authoritative informational** counts of blocked/running work and open review cases — the server reconciliation scan, NOT the wizard, decides whether review is required or switching is legal) | Composed from bounded, ACL-safe reads of `shopify.connector.job` (states/job_types), `inbound.evidence` (`reconciled_state='review'`), `fulfillment_switch_in_progress`; **displayed only** (never used for eligibility or action routing) by the confirm wizard |
 | C4 | **Mode-switch progress + final status** | `fulfillment_switch_in_progress`, `fulfillment_last_mode_switch_at/uid`, the `fulfillment_mode_switch_scan` job + its log |
-| C5 | **Review workspace** (store; company; order; picking; fulfillment binding; job; mutation attempt; review reason; safe evidence summary; available accepted actions) | `inbound.evidence` (+ `order_binding_id`, `fulfillment_binding_id`, `store_id`, `review_reason`, safe fields) → picking via binding; job/mutation via lineage; actions per §6 |
+| C5 | **Review workspace** (store; company — now a real stored `company_id` inherited from the owning store, displayed read-only and never as a selector (SEC-3, contract §8.2); order; picking; fulfillment binding; job; mutation attempt; review reason — **21 values**; safe evidence summary; available accepted actions) | `inbound.evidence` (+ `order_binding_id`, `fulfillment_binding_id`, `store_id`, `review_reason`, safe fields) → picking via binding; job/mutation via lineage; actions per §6 |
 | C6 | **Fulfillment/tracking lineage** (source trigger; job family; mutation domain; operation scope; remote resource refs; local picking; reconciliation state; audit logs) | `job.trigger_origin`, `job.job_type`, `mutation.attempt.mutation_domain`, `job.operation_scope_key`, `shopify_*_gid` fields, `binding.picking_id`, `reconciled_state`, `shopify.connector.job.log` |
 | C7 | **Failure & manual-review UX** (actionable operator language; no raw traceback/payload/token/credential; clear retry/review/resolve boundaries) | `review_reason`, `review_detail` (sanitized), `job.error_class`/`manual_review_subreason`/`state`, safe mutation-attempt summary |
-| C8 | **Role behavior** — customer-facing **UI visibility** gates on the two SEC-2 roles (Connector User, Connector Administrator); the **server** enforces the four internal capability groups (auditor/operator/reviewer/admin) the two roles resolve to via implied-group closure | UI visibility: two SEC-2 roles; server authorization: four internal groups; per-action gates in §6 of the contract |
+| C8 | **Role behavior** — customer-facing **UI visibility** gates on the two **merged** SEC-2 roles (`group_shopify_connector_user` / `group_shopify_connector_admin`, contract §8.1); the **server** enforces the four internal capability groups (auditor/operator/reviewer/admin) the two roles resolve to via implied-group closure | UI visibility: two SEC-2 roles; server authorization: four internal groups; per-action gates in §6 of the contract |
 | C9 | **Accessibility & responsive behavior** | view-level (design-system tokens, keyboard/focus, RTL) |
 | C10 | **Bounded queries & safe list defaults** | view search/list defaults, `limit`, sane default filters |
 

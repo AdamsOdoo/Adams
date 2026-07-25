@@ -17,8 +17,12 @@
 > **⚠ Superseded-vocabulary note (Wave 5 U1 Gate A, 2026-07-23 — non-destructive;
 > this document remains `Proposed`, status unchanged).** Some review-case/origin/
 > reconciliation vocabulary below is **superseded by the shipped Wave 4
-> `shopify_connector_fulfillment` code** (verified at exact head
-> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`). U1 (and any future implementation)
+> `shopify_connector_fulfillment` code** (originally verified at the Wave 4 head
+> `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a` *(historical)*; **re-verified against
+> the current integrated implementation
+> `2583081f97c94428dfd10325589b1b891eea240b` on 2026-07-25 — every superseded value
+> below is still superseded, and the evidence `review_reason` selection now carries
+> a 21st value, `external_fulfillment_observed`**). U1 (and any future implementation)
 > binds to the **code** values; do not copy the superseded strings into any
 > view/selection/test. The section text below is **left unchanged** pending a
 > separate product-doc reconciliation (logged as **TD-003**; full reconciliation in
@@ -44,7 +48,7 @@
 >
 > **U1 status-layer backing (Wave 5 U1 Gate A status-layer reset, 2026-07-23 — ruling
 > `5058042330`).** For which Shopify status layers U1 actually renders vs defers at
-> Wave 4 `2d9cff0`, the authoritative source-of-truth is the canonical status-source &
+> the current integrated backend `2583081f`, the authoritative source-of-truth is the canonical status-source &
 > badge matrix in
 > [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
 > §12 (A7 `display_status_*` display-only; A5 via `delivered_inconsistency` +

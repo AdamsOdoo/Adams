@@ -1,8 +1,19 @@
 # Wave 5 U1 — Modular Architecture Recommendation
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Authorizes no
-> implementation.** Produced 2026-07-23. Proposes the smallest safe module/file
-> map for the U1 fulfillment operator UI.
+> implementation.** Produced 2026-07-23; **reconciled 2026-07-25** against the final
+> integrated backend at `2583081f`. Proposes the smallest safe module/file map for
+> the U1 fulfillment operator UI.
+>
+> **SEC-3 constraint carried into this map (contract §8.2, acceptance A23):** the
+> recommended map introduces **no new durable store-scoped model** — the only new
+> Python model is a `TransientModel` wizard, which is not store-scoped and therefore
+> needs no `company_id`, no scope-mixin inheritance, no fail-closed company rule and
+> no SEC-3 inventory entry. If any future revision of this map were to add a durable
+> store-scoped model or a connector-to-connector relation, that model **must** join
+> the inventory-driven SEC-3 guard in full. Issue **#197 remains open**; U1 does not
+> close it. One new test file, `tests/test_ui_sec3_scope.py`, proves the "no new
+> durable surface" property rather than asserting it.
 
 ## 1. The governing rule (already decided at planning level)
 

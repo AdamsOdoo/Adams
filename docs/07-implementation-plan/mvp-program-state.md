@@ -18,11 +18,38 @@
 | U0 | Accepted, runtime-verified, merged via PR #192 (`8818c77`); exact head `a13f672`, build `35308219`, U0/Test Connection 67/67, sale 194/194, inventory 247/247. Driven browser/visual evidence remains deferred to UAT/release readiness. |
 | Wave 4 Gate A | Accepted and merged via PR #188 (`01f072d`). |
 | Wave 4 Gate B | [PR #189](https://github.com/AdamsOdoo/Adams/pull/189) is backend-accepted and merged at `3a1afa43f8d07a7dae1799968273fa0ab8049490`. Runtime-tested implementation candidate `25639f17`, Odoo.sh build `35422036`, [runtime record 5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652), and [independent acceptance 5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326) remain authoritative. The post-runtime head added only two accepted tracker files and no `addons/**` or test change. Live Shopify Gate D/CV-013 is deferred until the Wave-5 implementation candidate freezes; it remains open and unclaimed. |
-| Wave 5 | U1 Gate-A [PR #194](https://github.com/AdamsOdoo/Adams/pull/194) remains open/draft/frozen at `b38e687`. It may be transferred only after this pre-Wave-5 stabilization gate closes, including SEC-2 #196 and all inherited non-Shopify debt. The transfer must remove or suppress unsupported “Delivered”. No Wave-5 implementation is authorized yet. |
+| Wave 5 | U1 Gate-A [PR #194](https://github.com/AdamsOdoo/Adams/pull/194) is **open/draft/unmerged**, **re-anchored 2026-07-25** from its frozen head `b38e687` onto the current integration tip `2583081f97c94428dfd10325589b1b891eea240b` via an ordinary merge commit (parents `b38e6874` + `2583081f`; no rebase, no force-push), plus exactly one bounded documentation reconciliation commit, per the binding dependency-freeze ruling [`5058829593`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5058829593). The pre-Wave-5 stabilization gate has closed (PR #203 merged; SEC-2 #196 closed), so the transfer condition is satisfied. Unsupported “Delivered” is **suppressed**: it is neither claimed, displayed nor offered by the U1 contract, and the two fulfillment/tracking prototypes now carry a binding suppression annotation marking their “Delivered” chips as illustrative-only. The reconciliation re-verified the whole U1 backend contract against the actual source at `2583081f` (delta table: `u1-backend-ui-contract-inventory.md` §0.1) — notably `review_reason` is now **21** values, and SEC-3 added `company_id` + `sec3_scope_quarantined` to every U1-visible model (acceptance A23). Scope held to exactly the same 24 `docs/**` paths; no `addons/**` change. **A fresh independent Gate-A review is still required; PR #194 is not accepted, not ready-marked, not merged; no Wave-5 implementation is authorized yet.** |
 | Release dependencies | Pre-Wave-5: warm-update fixtures #193/#157, inventory residue #198, SEC-2 #196, current-backend SEC-3 #197, external multiprocessing/lifecycle proof, minimal CI/full-suite, and pre-Wave-5 PERF-0 #199 baseline. Post-Wave-5 external package: Shopify provisioning #200, Gate D/CV-013 #185/#186, Wave-5 live scenarios, UI-delta SEC-3, performance comparison, UAT and product-owner release sign-off. |
 | Wave 6 / release | Not started; no UAT or release acceptance claim. |
 
-### Wave 5 U1 Gate A — status note (2026-07-23; corrected 2026-07-23; status-layer synthesis reset 2026-07-23)
+### Wave 5 U1 Gate A — status note (2026-07-23; corrected 2026-07-23; status-layer synthesis reset 2026-07-23; **final-backend re-anchor + bounded reconciliation 2026-07-25**)
+
+> **PRESENT STATE (2026-07-25).** PR #194 has been re-anchored onto
+> `mvp/program-integration@2583081f97c94428dfd10325589b1b891eea240b` and reconciled
+> against the final integrated backend. **Everything below this banner that speaks in
+> the present tense about PR #189 being unmerged, SEC-2 being unmerged, the accepted
+> backend being `2d9cff0`, or integration being `dd0af5d` is a HISTORICAL snapshot of
+> 2026-07-23 and is superseded.** Current: Wave 4 backend **merged** (merge commit
+> `3a1afa43`; accepted head `e12145ce`; runtime candidate `25639f17`); SEC-2 **merged**,
+> issue #196 **closed**; current-backend SEC-3 **merged** with issue **#197 still open**
+> (narrowed to future Wave-5-added surfaces + external multi-user UAT/RC); PERF-0
+> baseline **merged** with issue **#199 still open** (Shopify-read reconciliation
+> handlers + release thresholds; all values baseline-only, never guarantees);
+> pre-Wave-5 stabilization **merged** through PR #203. The branch/SEC-2 preconditions
+> (D-P0-1, D-P0-2) are therefore **satisfied**. What still blocks U1: this re-anchored
+> package has **not** been independently reviewed, **D-P0-3** is unresolved, the
+> Wave-5 **G5-1…G5-9** gates are unchecked, and the control room has **not** opened the
+> U1 gate or bound an implementation base SHA — the locked prompt carries an unbound
+> `<U1-IMPLEMENTATION-BASE-SHA>` placeholder, and `2583081f` is the docs PR's
+> reconciliation anchor, **not** an implementation base. The U1 Gate-A
+> architecture-review row was **renumbered AR-079 → AR-083** to resolve a duplicate the
+> merge introduced. Two items were raised for the control room and deliberately **not**
+> fixed: **OQ-4** (two `ir.rule` XML IDs declared twice inside
+> `shopify_connector_fulfillment`) and **OQ-5** (shipped group labels `User`/
+> `Administrator` vs the "Connector User"/"Connector Administrator" role concepts).
+> **No U1 implementation; no acceptance, ready-marking or merge; no issue action; no
+> Shopify operation; no browser/render or runtime evidence produced or claimed.**
+
 
 **Wave 5 U1 (fulfillment operator experience) Gate A / Definition-of-Ready was
 prepared, then corrected once per control-room comment `5056513213`

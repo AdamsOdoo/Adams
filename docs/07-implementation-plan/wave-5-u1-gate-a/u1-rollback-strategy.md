@@ -1,8 +1,17 @@
 # Wave 5 U1 — Rollback Strategy
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted.** Produced
-> 2026-07-23. Rollback plan for the future U1 code batch and for this Gate A
-> docs branch.
+> 2026-07-23; **reconciled 2026-07-25** against the final integrated backend at
+> `2583081f`. Rollback plan for the future U1 code batch and for this Gate A docs
+> branch.
+>
+> **Confirmed against the merged backend:** U1 still adds no durable store-scoped
+> model, no stored field on an existing model, no security-file change and no
+> selection value, so the SEC-2 role layer and the SEC-3 ownership/quarantine
+> machinery (contract §8.1/§8.2) are **untouched by a U1 revert** — reverting U1
+> neither removes a group, a `company_id`, a `sec3_scope_quarantined` flag, nor a
+> record rule. That is what keeps the one-revert property true after the final
+> backend merge.
 
 ## 1. Why rollback is cheap for U1
 

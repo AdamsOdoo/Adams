@@ -1,10 +1,12 @@
 # Wave 5 U1 — UX & Information Architecture
 
 > **Status: Gate A planning artifact — Docs-only. NOT accepted. Authorizes no
-> implementation.** Produced 2026-07-23. Grounded in the accepted U0 design
-> language + the (Proposed) gap-closure prototypes under `docs/09-ui-prototype/**`
-> and the exact Wave 4 backend (`u1-backend-ui-contract-inventory.md`). **Reuses
-> U0's design system and Odoo-19 idioms — introduces no new design system.**
+> implementation.** Produced 2026-07-23; **reconciled 2026-07-25** against the final
+> integrated backend at `2583081f` (no §8 badge binding changed — contract §0.1 Δ7).
+> Grounded in the accepted U0 design language + the (Proposed) gap-closure
+> prototypes under `docs/09-ui-prototype/**` and the current integrated backend
+> (`u1-backend-ui-contract-inventory.md`). **Reuses U0's design system and Odoo-19
+> idioms — introduces no new design system.**
 
 ## 1. Design-language reuse (mandatory)
 
@@ -50,9 +52,14 @@ menus are visible to **Connector User** (which resolves to auditor∪operator∪
 so the tree still hides for non-connector users), and mode-change controls are
 visible only to **Connector Administrator** (the existing
 `group_shopify_connector_admin`). The four internal capability groups remain the
-**server-side** authorization primitives those roles resolve to. SEC-2 defines the
-final `group_shopify_connector_user` XML ID; U1 must **not** treat it as existing
-before SEC-2 merges runtime-green.
+**server-side** authorization primitives those roles resolve to. **SEC-2 is merged
+(#196 closed), so `shopify_connector_core.group_shopify_connector_user` now exists**
+— U1 uses that exact XML ID and invents none (contract §8.1). *(Historical,
+superseded: this paragraph previously ended "SEC-2 defines the final
+`group_shopify_connector_user` XML ID; U1 must not treat it as existing before SEC-2
+merges runtime-green.")* Note the shipped group `name` strings are `User` and
+`Administrator` under the `Shopify Connector` privilege — match the shipped label
+wherever copy names a group (OQ-5).
 
 **U1 adds a `Fulfillment` first-level branch** (contributed by
 `shopify_connector_fulfillment`, parented to the core root):
@@ -146,7 +153,7 @@ Realized by the prototypes as the **External fulfillment review center**
 - **Tracking timeline** (optional, from the prototype) — a read-only carrier
   milestone (**A5**) view; **a milestone never validates Odoo stock nor changes the
   reconciliation state**. In U1 this is a form section over the parsed
-  `tracking_snapshot` (carrier/number/url — the only A5 evidence backed at `2d9cff0`)
+  `tracking_snapshot` (carrier/number/url — the only A5 evidence backed at `2583081f`)
   plus the `delivered_inconsistency` case, not a new Owl surface (PD-7). A **full
   normalized A5 milestone-enum timeline is deferred** (no backing enum field — §12);
   `state_snapshot` is an **A4+A7** audit blob, not an A5 source.
@@ -196,10 +203,12 @@ the admin mode buttons, mirroring the prototype's **Mode 2 consequences drawer**
 - **Delivered-inconsistency (A5, §12)** — surface the `delivered_inconsistency`
   flag as a high-visibility case: "Delivered per carrier — Odoo delivery not
   validated"; never auto-resolves by stock change. *(The `delivered_inconsistency`
-  field and the `review_reason='delivered_not_validated'` value exist at `2d9cff0`
+  field and the `review_reason='delivered_not_validated'` value exist at `2583081f`
   but are **not yet written by any Wave-4 code path** — U1 renders them when the
   backend populates them and must never synthesize the A5 case from the A7
-  `display_status_*` fields; see `u1-risks-and-open-questions.md`.)*
+  `display_status_*` fields; re-grepped and still data-inert at `2583081f`; see
+  `u1-risks-and-open-questions.md`.)* **"Delivered" is never claimed, displayed or
+  offered as a supported outcome.**
 - **Unknown-status** — `schema_warning` renders "Unknown status (raw value)",
   degraded health chip, never silently success.
 
@@ -207,7 +216,8 @@ the admin mode buttons, mirroring the prototype's **Mode 2 consequences drawer**
 
 **The single source of truth for every badge below is the canonical Authoritative
 status-source & badge matrix in `u1-backend-ui-contract-inventory.md` §12**
-(source-verified at Wave 4 head `2d9cff0`). This section renders that matrix as the
+(re-verified at the current integrated implementation `2583081f`, 2026-07-25; the
+historical `2d9cff0` reading is superseded and no binding changed — §0.1 Δ7). This section renders that matrix as the
 UI/badge contract; it does **not** re-derive it, and no badge here may contradict
 §12. The Shopify platform exposes **seven Layer-A enum families (A1–A7)** inside the
 status model's four-layer (Layer A/B/C/D) taxonomy; **Wave 4 code backs only a
@@ -227,15 +237,16 @@ a field merely because Shopify exposes the enum.
   merchant-facing roll-up, **display-only, never an automation input**, and is
   **never labelled or iconized as a carrier milestone** (it is not A5).
 - **A5 carrier milestone (display only)** — `FulfillmentEventStatus` is **not stored
-  as a normalized enum** at `2d9cff0`. U1 represents accepted milestone evidence
+  as a normalized enum** at `2583081f`. U1 represents accepted milestone evidence
   **only** from the `delivered_inconsistency` case (§7) and safely parsed
   `tracking_snapshot` chips — **never** from the A7 `display_status_*` fields, and
   never as a full A5 enum timeline (that surface is deferred — no backing enum).
 - **Connector reconciliation** — `reconciled_state`; **review/error condition** —
-  `review_reason` (+ core job `error_class`/`state`); **origin** — `origin_class`;
+  `review_reason` (**21 values** — Δ1, incl. `external_fulfillment_observed`) (+ core
+  job `error_class` (19) / `state` (10)); **origin** — `origin_class`;
   **unknown value** — `schema_warning` (fails closed, never success).
 
-**Deferred / outside U1** (no backing seam at `2d9cff0` — **no badge**):
+**Deferred / outside U1** (no backing seam at `2583081f` — **no badge**):
 
 - **A2 `FulfillmentOrderStatus`** — **DEFERRED — BACKEND READ SEAM NOT AVAILABLE**:
   no field on `inbound.evidence` or `fulfillment.binding` backs it
@@ -263,6 +274,15 @@ status).
   facets that show the exception subset while "the full list stays available";
   exception regions cap at ≤3; any U1 aggregate read uses the U0 constant-query,
   capped-read `AbstractModel` shape (`search_count` + `limit`-ed read).
+- **SEC-3 visibility caveat (2026-07-25, contract §8.2)** — every U1-visible model is
+  now company-scoped **and** excludes `sec3_scope_quarantined` rows from **every**
+  interactive read shape (search, direct known-id read, `search_count`, grouped
+  read). A U1 list, facet or count therefore reports **visible** rows, never all
+  rows. Consequences for the copy: no count is presented as authoritative; empty
+  states stay calm/directive and never assert "there are none"; and U1 renders **no**
+  quarantine control and never calls `action_sec3_release_scope_quarantine` (that
+  administrative remediation belongs to the SEC-3 workstream, #197, not to U1).
+  `company_id` is displayed read-only where useful, never as a selector.
 - **Accessibility** — word + icon (never colour alone, WCAG 1.4.1); real
   `<th scope>`; comparison tables reflow to labelled cards ≤640px; ordered
   checklists/timelines as real `<ol>`; drawers `role="dialog"` `aria-modal`,

@@ -10,14 +10,33 @@
 > (resolving the confirmed material-P2 in independent review
 > [`5057796514`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5057796514)
 > — see the canonical status-source & badge matrix in
-> `u1-backend-ui-contract-inventory.md` §12). **`STATUS-LAYER SYNTHESIS RESET
-> COMPLETE — AWAITING FRESH INDEPENDENT REVIEW`.** Not self-accepted, not
-> ready-marked, not merged.
+> `u1-backend-ui-contract-inventory.md` §12); then **re-anchored onto the current
+> integration tip and reconciled against the final integrated backend on
+> 2026-07-25** per the binding dependency-freeze ruling
+> [`5058829593`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5058829593).
+> **`RE-ANCHORED AND RECONCILED — FRESH INDEPENDENT GATE-A REVIEW STILL REQUIRED`.**
+> Not self-accepted, not ready-marked, not merged. **U1 implementation remains
+> unauthorized.**
 
 **U1 = the fulfillment operator experience** (the re-based UI phase after the
 merged U0 core surface — see `u1-product-scope.md` §0). Built entirely against the
-**already-accepted Wave 4 backend** (PR #189 head `2d9cff0`), consumed read-only /
-via sanctioned actions, with **no UI-owned mutation or business logic**.
+**merged Wave 4 fulfillment backend as it now exists on
+`mvp/program-integration@2583081f`**, consumed read-only / via sanctioned actions,
+with **no UI-owned mutation or business logic**.
+
+### Present authoritative state (2026-07-25)
+
+| Item | State |
+|---|---|
+| Wave 4 fulfillment backend (PR #189) | **MERGED** — merge commit `3a1afa43`; accepted head `e12145ce`; runtime-tested candidate `25639f17` |
+| SEC-2 customer-facing roles (#196) | **MERGED**; issue #196 **closed as completed** |
+| Current-backend SEC-3 (#197) | **MERGED**; issue **#197 remains OPEN** — narrowed to future Wave-5-added surfaces + external multi-user UAT / RC confirmation |
+| PERF-0 baseline (#199) | Admission-path + local-ledger baseline **MERGED**; issue **#199 remains OPEN** — Shopify-read reconciliation handlers + release thresholds. Baseline values are **baseline-only, never guarantees** |
+| Pre-Wave-5 stabilization (PR #203) | **MERGED** — accepted head `d282ab03`, merge commit `2583081f` (the current integration tip) |
+| This PR (#194) | **Re-anchored onto `2583081f` and reconciled**; still **draft, unaccepted, unmerged**; a **fresh independent Gate-A review is still required** |
+| U1 implementation | **NOT AUTHORIZED** |
+| Live-Shopify validation (Gate D, CV-013 #185, provisioning #200, external UAT, release readiness) | **DEFERRED and UNCLAIMED** until the Wave 5 implementation candidate is complete and frozen |
+| Premium-UI browser/render evidence | **STILL REQUIRED** before any future U1 implementation PR can be accepted. This docs-only reconciliation supplies **none** of it |
 
 ## 1. Package contents (the 13 required Gate A outputs)
 
@@ -44,15 +63,25 @@ strategy).
 
 ## 2. Headline rulings (control-room comment `5056513213` applied)
 
-- **SEC-2:** `SEC-2 DEFINED — U1 GATE A PLANNING NOT BLOCKED; U1 IMPLEMENTATION
-  BLOCKED UNTIL SEC-2 MERGES` — **D-P0-2 resolved SEC-2-FIRST (binding)**. No
-  parallel four-internal-group path. U1 customer-facing UI **visibility** gates on
-  the two SEC-2 roles (Connector User = new `group_shopify_connector_user`;
-  Connector Administrator = existing `group_shopify_connector_admin`); the four
-  internal groups remain the **server-side** capability primitives those roles
-  resolve to.
-- **Branch strategy:** **Option A ACCEPTED (binding)** — wait for PR #189 merge (and
-  SEC-2 merge), then branch U1 from the new integration tip. No stacked branch.
+- **SEC-2:** `SEC-2 MERGED (#196 CLOSED)` — the SEC-2-first sequencing condition
+  (D-P0-2) is **satisfied**. The shipped model is exactly Option M-A (additive
+  `implied_ids`, no XML-ID rename): the **new** customer-facing
+  `group_shopify_connector_user` and the **existing**
+  `group_shopify_connector_admin` carry the `Shopify Connector` privilege; the four
+  internal capability groups (`auditor`/`operator`/`reviewer`/`admin`) persist,
+  hidden, as the **server-side** authorization primitives those roles resolve to.
+  Exact IDs and the implied closure: contract `§8.1`. U1 customer-facing UI
+  **visibility** still gates on the two roles, never directly on the internal
+  groups; both layers are still tested separately.
+- **SEC-3 (new, Δ3):** every U1-visible model is now **store-rooted** with a stored
+  related `company_id` and a `sec3_scope_quarantined` flag, behind fail-closed
+  global record rules. U1 counts are never authoritative, quarantined rows are
+  invisible, and any new durable store-scoped U1 model/relation must join the
+  inventory-driven SEC-3 guard (acceptance **A23**). Contract `§8.2`.
+- **Branch strategy:** **Option A ACCEPTED (binding)** — its precondition (PR #189
+  **and** SEC-2 merged) is now **satisfied**; the future U1 implementation branches
+  from the integration tip the control room binds when it opens the U1 gate. No
+  stacked branch.
 - **Module architecture:** **ACCEPTED** — U1 UI lives inside
   `shopify_connector_fulfillment` (PD-2 / DEC-016(A)); no separate `_ui` addon.
 - **Mode-switch wizard:** **ACCEPTED CONDITIONALLY** — a `TransientModel` frozen as
@@ -65,15 +94,21 @@ strategy).
 - **Product/UX contracts (D-P0-3):** **NOT YET ACCEPTED** — still-Proposed;
   independent acceptance required before U1 implementation (see the Gate-A
   prerequisite & status table, §4).
-- **Status-layer & badge taxonomy (synthesis reset, ruling `5058042330`):** the
-  single **canonical status-source & badge matrix** is
-  `u1-backend-ui-contract-inventory.md` **§12** (dependent docs/prototypes link to
-  it, never re-derive it). `display_status_*` = **A7** (display-only, never a carrier
-  milestone); **A5** carrier milestones only from `delivered_inconsistency` + parsed
-  `tracking_snapshot`; **A2 `FulfillmentOrderStatus` DEFERRED — no backing seam, no
-  badge**; layers never merged; acceptance **A22** verifies per-layer correctness.
-- **Overall:** `STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING FRESH INDEPENDENT
-  REVIEW`.
+- **Status-layer & badge taxonomy (synthesis reset, ruling `5058042330`;
+  re-verified at `2583081f` 2026-07-25):** the single **canonical status-source &
+  badge matrix** is `u1-backend-ui-contract-inventory.md` **§12** (dependent
+  docs/prototypes link to it, never re-derive it). `display_status_*` = **A7**
+  (display-only, never a carrier milestone); **A5** carrier milestones only from
+  `delivered_inconsistency` + parsed `tracking_snapshot`; **A2
+  `FulfillmentOrderStatus` DEFERRED — no backing seam, no badge**; layers never
+  merged; acceptance **A22** verifies per-layer correctness. **Unsupported
+  "Delivered" is never claimed, displayed or offered.** The final-backend
+  re-verification found **no change** to any A-family binding (Δ7).
+- **Review-reason vocabulary (Δ1):** the evidence `review_reason` selection is now
+  **21 values**, not 20 — `external_fulfillment_observed` was added by the Wave 4
+  Tier-1 correction. The U1 copy deck must map 21.
+- **Overall:** `RE-ANCHORED AND RECONCILED — FRESH INDEPENDENT GATE-A REVIEW STILL
+  REQUIRED`.
 
 ## 3. U1 resource inventory (existing U1-related documentation found)
 
@@ -118,15 +153,19 @@ Inventoried before authoring; **reused/cited** rather than duplicated.
 - `docs/05-qa/ui-u0-validation-results.md` (U0 patterns + deferments),
   `fulfillment-mode-uat-matrix.md`, `cod-uat-matrix.md`,
   `ui-ux-design-review-checklist.md`.
-- **ABSENT:** `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` — no
-  runtime operator-surface record exists yet (Wave 4 not merged). *(Note: the Wave
-  4 branch carries a task-014 validation file; it is not present on the integration
-  tip until PR #189 merges.)*
+- `docs/05-qa/task-014-fulfillment-tracking-validation-results.md` — **now PRESENT**
+  on the integration tip (arrived with the Wave 4 merge). *(Historical note: this
+  entry previously read "ABSENT — Wave 4 not merged"; that statement is superseded.)*
+  It records the Wave 4 **backend** runtime campaign; it is **not** operator-surface
+  (U1) runtime evidence, which does not exist and must be generated by the future U1
+  implementation batch.
 
 ### Exact backend source (authoritative)
-- `addons/shopify_connector_fulfillment/**` and consumed core surfaces at Wave 4
-  head `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a` — the basis of
-  `u1-backend-ui-contract-inventory.md`.
+- `addons/shopify_connector_fulfillment/**` and the consumed core surfaces at the
+  **current integrated implementation `2583081f97c94428dfd10325589b1b891eea240b`** —
+  the basis of `u1-backend-ui-contract-inventory.md`. *(Historical: the original
+  2026-07-23 pass read the earlier PR #189 head `2d9cff0`; that snapshot is
+  superseded — the delta is enumerated in the contract inventory §0.1.)*
 
 **No pre-existing canonical "U1 Gate A" file existed**, so this package is new;
 cross-cutting canonical files were updated in place rather than duplicated.
@@ -143,18 +182,21 @@ G5-1…G5-9 all remain **unchecked**.
 
 | Item | Source | Status |
 |---|---|---|
-| Wave 4 fulfillment backend (models/fields/actions/selections/groups) | `2d9cff0` (PR #189 head); `u1-backend-ui-contract-inventory.md` | **Accepted at Wave 4 Gate A / candidate runtime-green** (focused fresh-install + domain suites; the Wave 4 **nine-process concurrency campaign remains `DEFERRED — NOT PROVEN`**, §4.5), but **not on the integration tip until PR #189 merges** |
-| Module placement (inside `shopify_connector_fulfillment`) | PD-2, DEC-016(A), AR-079 | **Accepted** (D-P1-2) |
+| Wave 4 fulfillment backend (models/fields/actions/selections/groups) | Verified at `2583081f` (current integration tip); `u1-backend-ui-contract-inventory.md` §0/§0.1 | **Accepted and MERGED** — merge commit `3a1afa43`, accepted head `e12145ce`, runtime-tested candidate `25639f17`. Now present on the integration tip |
+| SEC-2 customer-facing role layer (`group_shopify_connector_user` + `group_shopify_connector_admin`, Option M-A additive closure) | `core/security/shopify_connector_security.xml` at `2583081f`; contract §8.1 | **Implemented, independently accepted, MERGED**; issue #196 **closed as completed** |
+| Current-backend SEC-3 store-rooted ownership (stored related `company_id`, `sec3_scope_quarantined`, fail-closed global rules, same-store ORM constraints) | `core/models/shopify_connector_scope_mixin.py` + `*_company_rules.xml` at `2583081f`; contract §8.2 | **MERGED for the current backend**; issue **#197 remains OPEN** for future Wave-5-added surfaces + external multi-user UAT/RC confirmation |
+| PERF-0 admission-path / local-ledger baseline | PR #203 evidence | **MERGED — baseline-only values, never performance guarantees**; issue **#199 remains OPEN** for the Shopify-read reconciliation handlers and release thresholds |
+| Module placement (inside `shopify_connector_fulfillment`) | PD-2, DEC-016(A), **AR-083** (renumbered from AR-079 on 2026-07-25 — the merge brought a different, already-merged AR-079 onto the branch) | **Accepted** (D-P1-2) |
 | Design system (tokens/scales/a11y/screenshot criteria) | `premium-ui-ux-design-system.md` §4–§7/§12–§14 | **Accepted** |
 | UI/UX design-review checklist | `ui-ux-design-review-checklist.md` (AR-023) | **Accepted**, but still encodes the **four-role** model — the two-role SEC-2 acceptance must land first so U1 is built two-role |
-| Four internal capability groups (server) | `core/security/shopify_connector_security.xml` | **Exist / enforced** (`group_shopify_connector_{auditor,operator,reviewer,admin}`) |
+| Four internal capability groups (server) | `core/security/shopify_connector_security.xml` | **Exist / enforced, unchanged by SEC-2** (`group_shopify_connector_{auditor,operator,reviewer,admin}`; now hidden primitives with `privilege_id = False`). Every Wave 4 server gate and every ACL row still resolves them |
 
 ### 4.2 Decisions accepted by control-room comment `5056513213`
 
 | Decision | Disposition |
 |---|---|
-| D-P0-1 branch | **Option A** — wait for PR #189 merge; no stacked branch (binding) |
-| D-P0-2 SEC-2 sequencing | **SEC-2-FIRST** — binding; **no** parallel four-internal-group path |
+| D-P0-1 branch | **Option A** — binding; **precondition satisfied 2026-07-25** (PR #189 merged). The future U1 implementation branches from the integration tip the control room binds when it opens the U1 gate |
+| D-P0-2 SEC-2 sequencing | **SEC-2-FIRST** — binding; **condition satisfied 2026-07-25** (SEC-2 merged, #196 closed). No parallel four-internal-group path; UI visibility still gates on the two roles, server still enforces the internal groups |
 | D-P1-1 numbering | **ACCEPTED**; old packet §6 U1 prompt retired as superseded |
 | D-P1-2 module | **ACCEPTED** (inside fulfillment addon) |
 | D-P1-3 SEC-2 fulfillment scope | Final UI = two roles; backend retains internal groups; U1 does not rewrite Wave 4 security |
@@ -198,12 +240,25 @@ the still-Proposed DoR as a whole.**
 | CV-013 live Shopify inventory mutation (issue #185) | **OPEN / CRITICAL — NOT PROVEN**; U1 must never present live fulfillment mutation as proven |
 | Fulfillment dev-store UAT | **NOT PROVEN** — release/UAT blocker |
 | Wave 4 nine-process concurrency campaign (PR #189) | **DEFERRED — NOT PROVEN** (not U1's obligation) |
-| U1 browser/render evidence | **REQUIRED before U1 merge** — deferment only after a concrete attempt + separate control-room ruling |
+| U1 browser/render evidence | **REQUIRED before U1 merge** — deferment only after a concrete attempt + separate control-room ruling. **This docs-only reconciliation supplies none of it, and does not claim the browser tour or the real process-death harness as proven** |
+| Live-Shopify validation sequencing | **DEFERRED** until the Wave 5 implementation candidate is complete and frozen (2026-07-25 product-owner ruling). Gate D, CV-013 #185, provisioning #200, external UAT and release readiness are **open and unclaimed** — the deferral is not a waiver |
 
 ### 4.6 U1 implementation gate
 
-**`CLOSED`** until **all** hold: PR #189 merged; **SEC-2 accepted / implemented /
-independently reviewed / Odoo.sh runtime-green / merged** into
-`mvp/program-integration`; D-P0-3 load-bearing Proposed contracts independently
-accepted; the Wave-5 G5 gates satisfied; and the control room opens the U1 gate on a
-verified base SHA.
+**`CLOSED`.** Satisfied as of 2026-07-25: PR #189 **merged**; SEC-2 accepted,
+implemented, independently reviewed and **merged** (#196 closed); pre-Wave-5
+stabilization **merged** (PR #203). Still outstanding, and each on its own
+sufficient to keep the gate closed:
+
+1. **This Gate-A package has not been independently reviewed since the re-anchor** —
+   a fresh independent Gate-A review of the reconciled head is required, and this
+   reconciliation session is not it.
+2. **D-P0-3** — the load-bearing Proposed product/UX contracts (§4.3) are still
+   **Proposed, not accepted**.
+3. The Wave-5 **G5-1…G5-9** gates remain **unchecked** (§4.4).
+4. The control room has **not** opened the U1 gate and has **not** bound the exact
+   implementation base SHA. The locked prompt therefore carries an unbound
+   `<U1-IMPLEMENTATION-BASE-SHA>` placeholder — `2583081f` is the *reconciliation*
+   anchor of this docs PR, **not** a pre-authorized implementation base.
+
+**U1 implementation remains unauthorized.**

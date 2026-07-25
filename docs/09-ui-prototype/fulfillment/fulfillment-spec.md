@@ -13,14 +13,15 @@
 > extend them. All on-screen strings are illustrative (MBQ-22).
 
 > **⚠ U1 backing reconciliation (Wave 5 U1 Gate A status-layer reset, 2026-07-23 —
-> control-room ruling `5058042330`; non-destructive — this prototype stays
-> `Proposed`).** This screen renders the **full status-model taxonomy vision**; the
-> **U1 implementation binds only to layers backed by the accepted Wave 4 code at
-> `2d9cff0`**, per the canonical status-source & badge matrix in
+> control-room ruling `5058042330`; **re-verified against the current integrated
+> backend `2583081f` on 2026-07-25, unchanged**; non-destructive — this prototype
+> stays `Proposed`).** This screen renders the **full status-model taxonomy vision**;
+> the **U1 implementation binds only to the layers backed by the integrated
+> connector code at `2583081f`**, per the canonical status-source & badge matrix in
 > [`../../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
 > §12. Two columns shown here are **not backed for U1** and are illustrative-only /
 > deferred: the **"FulfillmentOrder work-state" (A2 `FulfillmentOrderStatus`)** column
-> has **no backing field at `2d9cff0` → DEFERRED, no U1 badge**; the **"Carrier
+> has **no backing field at `2583081f` → DEFERRED, no U1 badge**; the **"Carrier
 > milestone" (A5)** column is **not** a normalized enum in code — U1 shows carrier
 > evidence only from parsed `tracking_snapshot` + the `delivered_inconsistency` case,
 > **never from the A7 `display_status_*` fields**. Backed for U1: Odoo picking state,
@@ -28,6 +29,16 @@
 > (`display_status_*`, display-only), and connector reconciliation state. Layer-C
 > reconciliation vocabulary (e.g. "under review") follows **TD-003** (code value:
 > `review`). Layers are never merged (§12 / status model §1).
+>
+> **Unsupported "Delivered" is SUPPRESSED for U1 (binding).** The "Delivered"
+> carrier-milestone chips rendered on this prototype are **illustrative content
+> only**. U1 must **not claim, display or offer** a "Delivered" outcome: no A5
+> `DELIVERED` milestone is backed by a stored enum, and `delivered_inconsistency` /
+> `review_reason='delivered_not_validated'` are declared but **never written** at
+> `2583081f`. The only permitted delivered-adjacent surface is the
+> **delivered-inconsistency case when the backend actually sets the flag**, rendered
+> as a warning, never as a delivery confirmation. This suppression stands until a
+> real backend seam is separately authorized, implemented and independently proven.
 
 ## Purpose
 Give the **Connector User** one honest working view of delivery/fulfillment
