@@ -245,38 +245,75 @@ class Fixture:
         looks like evidence. Sized from --batch so the dataset and the workload
         scale together.
 
+        The inventory pair is UNIQUE on (store, variant binding, location
+        mapping), so scale comes from N distinct product variants against one
+        mapping, not from N copies of one pair.
+
         Everything here is local: partners, orders, products, locations and
         connector rows. No Shopify request or mutation of any kind.
         """
         if self.dataset_built:
             return
         env = self.env
+        company = self.store.company_id
         partner = env['res.partner'].create({'name': 'PERF-0 partner %s' % self.tag})
-        template = env['product.template'].create({
-            'name': 'PERF-0 product %s' % self.tag, 'type': 'consu',
-        })
-        location = env['stock.location'].search(
-            [('usage', '=', 'internal')], limit=1)
 
-        template_binding = env['shopify.connector.product.template.binding'].sudo().create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Product/perf0-%s' % self.tag,
-            'product_template_id': template.id,
-        })
-        variant_binding = env['shopify.connector.product.variant.binding'].sudo().create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/ProductVariant/perf0-%s' % self.tag,
-            'product_variant_id': template.product_variant_id.id,
-            'product_template_binding_id': template_binding.id,
-        })
-        mapping = None
+        # Pick a location the STORE's company can actually use. Taking the
+        # first internal location regardless of company is how this fixture
+        # first built a cross-company pair -- which SEC-3's `_check_company`
+        # correctly refused. The benchmark dataset must be a legal dataset.
+        location = env['stock.location'].search([
+            ('usage', '=', 'internal'),
+            '|', ('company_id', '=', False), ('company_id', '=', company.id),
+        ], limit=1)
+
+        templates = env['product.template'].create([
+            {'name': 'PERF-0 product %s %d' % (self.tag, index), 'type': 'consu'}
+            for index in range(rows)
+        ])
+        template_bindings = env['shopify.connector.product.template.binding'].sudo().create([
+            {
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Product/perf0-%s-%d' % (self.tag, index),
+                'product_template_id': template.id,
+            }
+            for index, template in enumerate(templates)
+        ])
+        variant_bindings = env['shopify.connector.product.variant.binding'].sudo().create([
+            {
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/ProductVariant/perf0-%s-%d' % (self.tag, index),
+                'product_variant_id': template.product_variant_id.id,
+                'product_template_binding_id': template_binding.id,
+            }
+            for index, (template, template_binding)
+            in enumerate(zip(templates, template_bindings))
+        ])
+
         if location:
-            mapping = env['shopify.connector.location.mapping'].sudo().create({
+            # `with_company` is required, not incidental: the mapping's own
+            # guard `_check_location_company_consistency` fails closed when the
+            # mapped location is outside `env.company`, and this harness runs as
+            # the framework superuser whose active company need not match.
+            mapping = env['shopify.connector.location.mapping'].sudo(
+            ).with_company(location.company_id or company).create({
                 'store_id': self.store.id,
                 'shopify_gid': 'gid://shopify/Location/perf0-%s' % self.tag,
                 'odoo_location_id': location.id,
                 'match_key': 'manual',
             })
+            env['shopify.connector.inventory.level.binding'].sudo().with_company(
+                location.company_id or company
+            ).create([
+                {
+                    'store_id': self.store.id,
+                    'product_variant_binding_id': variant_binding.id,
+                    'location_mapping_id': mapping.id,
+                    'shopify_inventory_item_gid':
+                        'gid://shopify/InventoryItem/perf0-%s-%d' % (self.tag, index),
+                }
+                for index, variant_binding in enumerate(variant_bindings)
+            ])
 
         orders = env['sale.order'].create([
             {'partner_id': partner.id} for _ in range(rows)
@@ -286,15 +323,6 @@ class Fixture:
             'shopify_gid': 'gid://shopify/Order/perf0-%s-%d' % (self.tag, index),
             'sale_order_id': order.id,
         } for index, order in enumerate(orders)])
-
-        if mapping:
-            env['shopify.connector.inventory.level.binding'].sudo().create([{
-                'store_id': self.store.id,
-                'product_variant_binding_id': variant_binding.id,
-                'location_mapping_id': mapping.id,
-                'shopify_inventory_item_gid':
-                    'gid://shopify/InventoryItem/perf0-%s-%d' % (self.tag, index),
-            } for index in range(rows)])
 
         env['shopify.connector.fulfillment.inbound.evidence'].sudo().create([{
             'store_id': self.store.id,
@@ -524,7 +552,8 @@ def scenario_layer2_reconcile(env, fixture, batch):
         ('store_id', '=', fixture.store.id),
     ], limit=batch)
     attempts.read([
-        'state', 'job_id', 'store_id',
+        'observed_outcome', 'resolution_disposition', 'transport_attempted',
+        'job_id', 'store_id',
         'business_intent_fingerprint', 'exact_request_fingerprint',
     ])
 
