@@ -298,22 +298,6 @@ cat > "$SUMMARY" <<EOF
   "evidence_class": "CI supporting evidence, NOT Odoo.sh exact-SHA acceptance (DEC-041 D8)"
 }
 EOF
-{
-  "connector_sha": "${SHA}",
-  "connector_worktree_dirty": ${WORKTREE_DIRTY},
-  "odoo_ref": "${ODOO_REF}",
-  "odoo_sha": "${ODOO_SHA}",
-  "python": "$("$VENV/bin/python" --version 2>&1)",
-  "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
-  "modules": "${MODULES}",
-  "extra_modules": "${EXTRA_MODULES}",
-  "test_tags": "${TEST_TAGS}",
-  "fresh_install": {"status": "${FRESH_STATUS}", "result": "${FRESH_RESULT}"},
-  "warm_update":   {"status": "${WARM_STATUS}",  "result": "${WARM_RESULT}"},
-  "shopify_operations": "none",
-  "evidence_class": "CI supporting evidence, NOT Odoo.sh exact-SHA acceptance (DEC-041 D8)"
-}
-EOF
 
 log "summary written to ${SUMMARY}"
 cat "$SUMMARY"
