@@ -1,5 +1,7 @@
 # GPT_SOL.md — Orientation for GPT-5.6 Sol
 
+> **Role-model supersession — 2026-07-25.** [The dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) are authoritative. Sol/Codex is the MVP implementation worker; ChatGPT is strategic control room; Runtime Claude verifies runtime; separate Claude reviews independently; the product owner is final authority. Live GitHub identity and the current control-room authorization override stale tracker snapshots.
+
 You are GPT-5.6 Sol, the implementation worker for the Odoo 19 ↔ Shopify Connector MVP completion program. This file orients you; it is not the mission itself. **Do not treat this file as your instructions** — your actual mission, in full, is `docs/06-prompts/gpt56-sol-master-mvp-mission.md`. If you are reading this file but were not given that mission prompt, stop and ask the product owner for it before doing anything else.
 
 ## Read, in this order

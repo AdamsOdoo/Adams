@@ -4,7 +4,7 @@
 >
 > **Product-owner calibration — 2026-07-22.** Review depth is risk-tiered. Mutation safety, concurrency, idempotency, security, credentials and data integrity keep full rigor. Architecture/design receives one normal review and one consolidated correction at most. Wording, cross-references, terminology and documentation structure are light-touch and non-blocking unless they alter a functional contract. This policy changes review ceremony, not the accepted mutation-safety architecture, Odoo.sh runtime requirement, citation discipline or checkpoint protections.
 >
-> **Builder/reviewer independence — DEC-039/DEC-040 (2026-07-22).** Claude is now a default implementation worker for this program (alongside Sol), and Claude also performs gate reviews by default (ChatGPT is the strategic control room but is no longer required to review every gate). The one rule this depends on: **the session that implemented a PR may never review or accept its own PR.** Satisfy this with either a separate top-level Claude session, or a fresh `Agent`-tool subagent instructed to adversarially re-verify. Batches should target a full wave, or a large independently-revertable slice of one, per iteration; review depth scales *up* with batch size, never down.
+> **Canonical roles — 2026-07-25.** Per the [role-model addendum](../04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](../04-decisions/DEC-041-evidence-first-process-reallocation.md): ChatGPT is strategic control room; Sol/Codex is implementation worker; Runtime Claude is runtime verifier; a separate Claude session is independent reviewer; the product owner is final authority. No session combines roles or self-accepts. Batches target a full wave or large independently-revertable slice; review depth scales up with risk and size.
 >
 > **Reviewer evidence access and durability — PR #191 correction (2026-07-22), per binding review comment `5043912321` items 2–3, 6.** Memoryless means the reviewer's briefing excludes the implementing session's reasoning, its defenses of its own choices, and any selective summary meant to sway the verdict — **it does not mean repository-blind.** The reviewer independently reads the exact base/head checkout, the complete diff, governing DECs/packets, acceptance criteria, the actual Odoo 19 source, automated-test output, genuine Odoo.sh runtime evidence for code batches, screenshots/browser evidence where relevant, and current official sources when a version-dependent fact needs verification; a diff-only review is insufficient for Tier 1. The complete report is posted **verbatim** to the PR, stating the **exact reviewed SHA** — the implementing session may not rewrite, selectively summarize, suppress, override, accept, ready-mark, or merge it. After `ACCEPT`, a **separate top-level closure session** (or another explicitly authorized independent actor) — never the implementing session — verifies the exact accepted SHA and that required evidence still corresponds to it before ready-marking/merge. Reviewer silence, a partial report, or a summary-only report is never acceptance. Mandatory tests + genuine Odoo.sh runtime apply to **every implementation/code batch regardless of size**; a **documentation/governance-only batch** is verified by repository/diff/path/link/consistency checks instead and must never fabricate runtime evidence.
 
@@ -12,11 +12,13 @@
 
 State one tier and the reason at the start of every gate review.
 
-| Tier | Applies to | Required depth | Merge impact |
-| --- | --- | --- | --- |
-| **Tier 1 — full rigor, blocking** | Shopify/Odoo mutation logic; Layer 1/2 replay safety; concurrency/CAS/locks; idempotency and duplicate prevention; security, credentials, permissions, PII/redaction; irreversible migrations; data integrity; production runtime failures; performance defects that can corrupt, block or destabilize operations | Exact identity gate; full accepted-contract and code review; adversarial review; source/official-evidence verification where behavior may have changed; genuine Odoo.sh runtime evidence; concurrency/crash/recovery proof where applicable; security/lifecycle/residue checks | Any unresolved P0/P1 blocks acceptance and merge |
-| **Tier 2 — normal review, single round expected** | Architecture/design decisions; new domain contracts; module boundaries; job and state taxonomies; API-shape choices that do not yet execute a mutation; test plans; UI information architecture; performance benchmark design | Exact base/scope verification; focused architecture and contract review; evidence/citations for factual claims; implementation/testability check; one consolidated correction pass if required | Material contract gaps block; routine correction count is capped at one |
-| **Tier 3 — light-touch, non-blocking** | Wording; cross-references; headings; terminology consistency; documentation structure; stale status text; formatting; PR-body/handoff polish | Verify the change does not alter a functional contract, authority, scope, acceptance criterion or evidence claim; fix in the same pass or roll into the next already-authorized batch | Must not independently block merge or trigger a full identity/runtime cycle |
+| Deterministic trigger | Tier | Required process |
+| --- | --- | --- |
+| Production **or proof** changes involving mutation, concurrency, transactions/locks, idempotency/reconciliation, security, credentials/PII, permissions, irreversible migration, or data-integrity invariants | **Tier 1** | Full independent review; exact-SHA Odoo.sh runtime; risk-specific concurrency/recovery/security/lifecycle/residue proof |
+| Domain contracts, architecture/module boundaries, manifests/dependency direction, job/state vocabulary, API shapes, or UI actions without Tier-1 behavior | **Tier 2** | One normal independent review and at most one consolidated correction |
+| Docs/wording/status/cross-references, plus tests/fixtures that do not alter Tier-1/2 proof semantics | **Tier 3** | Fix in-pass; no independent cycle and no runtime solely for this diff |
+
+Classify from changed paths **and semantics**, never by session negotiation. A test-only change that changes whether a Tier-1 invariant is genuinely proved is Tier 1. Mixed changes use the highest tier for the risky portion without applying Tier-1 ceremony to unrelated Tier-3 edits.
 
 ### Tier-escalation rule
 
@@ -25,6 +27,18 @@ A Tier 3-looking item becomes Tier 2 or Tier 1 only when the wording changes or 
 ### Mixed changes
 
 Use the highest applicable tier for the risky portion, but do not apply Tier 1 ceremony to unrelated Tier 3 edits. Record findings by tier so documentation polish cannot hold a safe implementation hostage.
+
+### Ground-truth-first gate
+
+Before reviewing or authoring any Odoo/Shopify-dependent behavior or fixture assumption:
+
+- [ ] Odoo behavior is traced to the actual target Odoo 19 source or pinned `odoo/odoo@19.0` file and line range.
+- [ ] Shopify behavior is traced to current official Shopify documentation with API version, URL, and access date.
+- [ ] The handoff/PR record cites the source. A code comment is present only when the dependency is non-obvious or regression-prone.
+- [ ] No framework-dependent claim is accepted from `py_compile`, AST inspection, mocks, or memory alone.
+- [ ] Missing source access is recorded as unproven and stops the dependent change.
+
+This gate applies to production code and tests.
 
 ## 1. Correction-cycle cap and synthesis rule
 
@@ -52,6 +66,7 @@ Apply the full list for Tier 1. For Tier 2, verify the exact base, PR identity, 
 - [ ] PR #150 and PR #151 are unchanged unless the task explicitly owns their disposition.
 - [ ] The PR base is `mvp/program-integration` at the expected SHA; drift is explicitly resolved.
 - [ ] The stated commits and changed files match the live diff; no undisclosed commits or history rewrite.
+- [ ] Every pushed implementation SHA has the DEC-041 D2 PR comment: exact SHA/parent, changed files, evidence classification, and remaining gates.
 
 ## 4. Scope review
 
@@ -80,6 +95,7 @@ Mandatory for Tier 1; focused to the changed contract for Tier 2; normally not a
 - [ ] Evidence labels distinguish `EXECUTED—PASS`, `STATICALLY VERIFIED`, `IMPLEMENTED—RUNTIME PENDING` and `NOT PROVEN`.
 - [ ] Tier 1 implementation acceptance includes genuine Odoo.sh build identity, fresh install, focused suites, required regressions, security/lifecycle/residue checks and relevant concurrency/recovery evidence.
 - [ ] No success claim exists without actual execution evidence.
+- [ ] Runtime output is preserved as a sanitized durable GitHub record before ephemeral storage/session teardown; chat-only or `/tmp`-only output is not sole evidence.
 - [ ] Mutation-domain concurrency uses independent transactions/processes where required, not a sequential simulation presented as concurrency.
 - [ ] Runtime failures are collected into one root-cause set and fixed in one consolidated batch before the targeted rerun plus regressions.
 
@@ -135,7 +151,12 @@ At every wave boundary, record:
 5. actual elapsed time vs forecast;
 6. next-wave timeline and critical dependencies;
 7. UI slice and performance benchmark status;
-8. one process adjustment, or `none` with evidence that the process is on target.
+8. one process adjustment, or `none` with evidence that the process is on target;
+9. correction rounds (target ≤ 2);
+10. documents authored per code commit (target < 1);
+11. rulings superseded within 24 h (target 0);
+12. push-to-exact-SHA-runtime-record elapsed time (target same day);
+13. framework-dependent changes with upstream citation (target 100%).
 
 ## 13. Next-wave authorization
 
