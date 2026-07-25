@@ -121,6 +121,19 @@ campaign, so the numbers stay directly comparable) + PostgreSQL 16.13, Python
 connector suite on the corrected head: **0 failed, 0 errors of 1503 tests**. No
 Shopify store, credential, request or mutation was involved at any point.
 
+**Correction-round validation, executed locally on the corrected head.**
+
+| Campaign | Result |
+| --- | --- |
+| Fresh install + connector suite | 0 failed, 0 errors of 1504 |
+| Warm `-u` + connector suite | 0 failed, 0 errors of 1504 |
+| Non-standard `-standard` tag suite | 0 failed, 0 errors of 18 |
+| Core external-process Layer-2 harness | 3/3 scenarios, distinct OS pids, zero residue |
+| Fulfillment external-process harness | 9/9 scenarios, distinct OS pids, zero residue |
+| Install → uninstall → residue sweep → reinstall | 21 tables → 0 (zero `ir_model_data`/`ir_model`/`ir_rule`/group residue) → 21 |
+| PERF-0 | 11 scenarios, zero residue failures; contention `conclusive=true`, `wait_event_type=Lock` |
+| Suite runner exit code | 0, artifact records the exact SHA and `worktree_dirty=false` |
+
 **Correction round — 2026-07-25.** The control room reviewed the first
 stabilization head (`d28633b`) and returned `REVISE ONCE BEFORE EXACT-SHA ODOO.SH
 VALIDATION` with a complete finding set: the implementation record understated
