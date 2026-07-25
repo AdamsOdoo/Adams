@@ -11,8 +11,6 @@
     "shopify_connector_fulfillment_binding": 0,
     "shopify_connector_fulfillment_inbound_evidence": 0,
     "shopify_connector_fulfillment_inbound_evidence_line": 0,
-    "shopify_connector_fulfillment_mode_switch_wizard": 0,
-    "shopify_connector_fulfillment_review_release_wizard": 0,
     "shopify_connector_inventory_level_binding": 0,
     "shopify_connector_job": 0,
     "shopify_connector_job_cancel_wizard": 0,
@@ -30,14 +28,14 @@
     "shopify_connector_tax_mapping": 0
   },
   "environment": {
-    "connector_sha": "bbe6b049decfd18cc066f33b3978e844b1fb54e1",
+    "connector_sha": "87f1763a1ca699947d665c92bef614bd1fc3168d",
     "connector_worktree_dirty": false,
-    "database": "perf_u1b",
+    "database": "perf_base",
     "odoo_pin": "30bde9ff758834a4912c5ae55843d3a7dad849f1",
     "odoo_pin_verified": true,
     "odoo_sha": "30bde9ff758834a4912c5ae55843d3a7dad849f1",
     "odoo_version": "19.0",
-    "pid": 12144,
+    "pid": 8441,
     "postgres": "PostgreSQL 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
     "postgres_server_version": "16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)",
     "python": "3.12.3"
@@ -56,18 +54,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 49.453,
-          "mean_ms": 46.113,
-          "min_ms": 42.219,
-          "p50_ms": 46.668,
-          "p95_ms": 49.453,
-          "p99_ms": 49.453,
+          "max_ms": 42.162,
+          "mean_ms": 41.673,
+          "min_ms": 41.389,
+          "p50_ms": 41.466,
+          "p95_ms": 42.162,
+          "p99_ms": 42.162,
           "samples": 3,
-          "stdev_ms": 3.649
+          "stdev_ms": 0.426
         },
         "max_rss_kb_delta": 1792,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 53,
@@ -83,7 +81,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "job_enqueue",
-        "sql_exec_time_ms_delta": 42.494,
+        "sql_exec_time_ms_delta": 34.937,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -97,18 +95,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 0.767,
-          "mean_ms": 0.691,
-          "min_ms": 0.648,
-          "p50_ms": 0.659,
-          "p95_ms": 0.767,
-          "p99_ms": 0.767,
+          "max_ms": 0.652,
+          "mean_ms": 0.576,
+          "min_ms": 0.508,
+          "p50_ms": 0.567,
+          "p95_ms": 0.652,
+          "p99_ms": 0.652,
           "samples": 3,
-          "stdev_ms": 0.066
+          "stdev_ms": 0.072
         },
         "max_rss_kb_delta": 0,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 1,
@@ -123,7 +121,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "job_drain",
-        "sql_exec_time_ms_delta": 10.94,
+        "sql_exec_time_ms_delta": 9.033,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -139,18 +137,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 215.5,
-          "mean_ms": 210.699,
-          "min_ms": 205.402,
-          "p50_ms": 211.196,
-          "p95_ms": 215.5,
-          "p99_ms": 215.5,
+          "max_ms": 216.891,
+          "mean_ms": 209.664,
+          "min_ms": 204.258,
+          "p50_ms": 207.844,
+          "p95_ms": 216.891,
+          "p99_ms": 216.891,
           "samples": 3,
-          "stdev_ms": 5.067
+          "stdev_ms": 6.511
         },
-        "max_rss_kb_delta": 640,
+        "max_rss_kb_delta": 512,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 303,
@@ -169,7 +167,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "layer2_intent",
-        "sql_exec_time_ms_delta": 87.825,
+        "sql_exec_time_ms_delta": 77.1,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -185,18 +183,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 271.238,
-          "mean_ms": 267.231,
-          "min_ms": 261.575,
-          "p50_ms": 268.879,
-          "p95_ms": 271.238,
-          "p99_ms": 271.238,
+          "max_ms": 261.191,
+          "mean_ms": 255.92,
+          "min_ms": 248.317,
+          "p50_ms": 258.253,
+          "p95_ms": 261.191,
+          "p99_ms": 261.191,
           "samples": 3,
-          "stdev_ms": 5.038
+          "stdev_ms": 6.747
         },
-        "max_rss_kb_delta": 256,
+        "max_rss_kb_delta": 384,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 404,
@@ -215,7 +213,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "layer2_outcome",
-        "sql_exec_time_ms_delta": 106.842,
+        "sql_exec_time_ms_delta": 97.29,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -229,18 +227,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 0.572,
-          "mean_ms": 0.497,
-          "min_ms": 0.403,
-          "p50_ms": 0.517,
-          "p95_ms": 0.572,
-          "p99_ms": 0.572,
+          "max_ms": 0.505,
+          "mean_ms": 0.44,
+          "min_ms": 0.353,
+          "p50_ms": 0.462,
+          "p95_ms": 0.505,
+          "p99_ms": 0.505,
           "samples": 3,
-          "stdev_ms": 0.087
+          "stdev_ms": 0.078
         },
         "max_rss_kb_delta": 0,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 1,
@@ -255,7 +253,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "layer2_reconcile",
-        "sql_exec_time_ms_delta": 11.283,
+        "sql_exec_time_ms_delta": 7.322,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -284,18 +282,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 6.64,
-          "mean_ms": 6.305,
-          "min_ms": 5.99,
-          "p50_ms": 6.284,
-          "p95_ms": 6.64,
-          "p99_ms": 6.64,
+          "max_ms": 5.105,
+          "mean_ms": 4.443,
+          "min_ms": 4.107,
+          "p50_ms": 4.116,
+          "p95_ms": 5.105,
+          "p99_ms": 5.105,
           "samples": 3,
-          "stdev_ms": 0.325
+          "stdev_ms": 0.574
         },
-        "max_rss_kb_delta": 4612,
+        "max_rss_kb_delta": 4480,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 7,
@@ -325,7 +323,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "order_binding_projection",
-        "sql_exec_time_ms_delta": 87.464,
+        "sql_exec_time_ms_delta": 75.483,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -354,18 +352,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 4.561,
-          "mean_ms": 3.973,
-          "min_ms": 3.418,
-          "p50_ms": 3.939,
-          "p95_ms": 4.561,
-          "p99_ms": 4.561,
+          "max_ms": 4.548,
+          "mean_ms": 4.26,
+          "min_ms": 3.825,
+          "p50_ms": 4.407,
+          "p95_ms": 4.548,
+          "p99_ms": 4.548,
           "samples": 3,
-          "stdev_ms": 0.572
+          "stdev_ms": 0.383
         },
-        "max_rss_kb_delta": 640,
+        "max_rss_kb_delta": 896,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 7,
@@ -395,7 +393,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "inventory_pair_projection",
-        "sql_exec_time_ms_delta": 78.607,
+        "sql_exec_time_ms_delta": 81.003,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -424,18 +422,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 5.303,
-          "mean_ms": 5.068,
-          "min_ms": 4.878,
-          "p50_ms": 5.023,
-          "p95_ms": 5.303,
-          "p99_ms": 5.303,
+          "max_ms": 5.018,
+          "mean_ms": 4.579,
+          "min_ms": 3.752,
+          "p50_ms": 4.967,
+          "p95_ms": 5.018,
+          "p99_ms": 5.018,
           "samples": 3,
-          "stdev_ms": 0.216
+          "stdev_ms": 0.716
         },
         "max_rss_kb_delta": 128,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 7,
@@ -465,7 +463,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "fulfillment_evidence_projection",
-        "sql_exec_time_ms_delta": 78.619,
+        "sql_exec_time_ms_delta": 75.153,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -495,18 +493,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 3.613,
-          "mean_ms": 3.162,
-          "min_ms": 2.804,
-          "p50_ms": 3.069,
-          "p95_ms": 3.613,
-          "p99_ms": 3.613,
+          "max_ms": 3.501,
+          "mean_ms": 3.171,
+          "min_ms": 2.932,
+          "p50_ms": 3.079,
+          "p95_ms": 3.501,
+          "p99_ms": 3.501,
           "samples": 3,
-          "stdev_ms": 0.412
+          "stdev_ms": 0.295
         },
-        "max_rss_kb_delta": 384,
+        "max_rss_kb_delta": 256,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 5,
@@ -538,7 +536,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "order_scan_admission",
-        "sql_exec_time_ms_delta": 79.53,
+        "sql_exec_time_ms_delta": 83.067,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -568,18 +566,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 7.1,
-          "mean_ms": 5.971,
-          "min_ms": 5.352,
-          "p50_ms": 5.46,
-          "p95_ms": 7.1,
-          "p99_ms": 7.1,
+          "max_ms": 5.541,
+          "mean_ms": 5.175,
+          "min_ms": 4.787,
+          "p50_ms": 5.198,
+          "p95_ms": 5.541,
+          "p99_ms": 5.541,
           "samples": 3,
-          "stdev_ms": 0.979
+          "stdev_ms": 0.378
         },
-        "max_rss_kb_delta": 0,
+        "max_rss_kb_delta": 128,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 7,
@@ -611,7 +609,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "inventory_push_scan_admission",
-        "sql_exec_time_ms_delta": 78.243,
+        "sql_exec_time_ms_delta": 81.933,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -641,18 +639,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 7.126,
-          "mean_ms": 6.628,
-          "min_ms": 6.282,
-          "p50_ms": 6.477,
-          "p95_ms": 7.126,
-          "p99_ms": 7.126,
+          "max_ms": 8.017,
+          "mean_ms": 7.535,
+          "min_ms": 7.216,
+          "p50_ms": 7.371,
+          "p95_ms": 8.017,
+          "p99_ms": 8.017,
           "samples": 3,
-          "stdev_ms": 0.442
+          "stdev_ms": 0.425
         },
-        "max_rss_kb_delta": 256,
+        "max_rss_kb_delta": 128,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 12,
@@ -684,7 +682,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "fulfillment_reconciliation_admission",
-        "sql_exec_time_ms_delta": 78.15,
+        "sql_exec_time_ms_delta": 81.328,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -713,18 +711,18 @@
           "mail_message": 50
         },
         "latency": {
-          "max_ms": 4.369,
-          "mean_ms": 4.101,
-          "min_ms": 3.639,
-          "p50_ms": 4.295,
-          "p95_ms": 4.369,
-          "p99_ms": 4.369,
+          "max_ms": 3.463,
+          "mean_ms": 2.915,
+          "min_ms": 2.461,
+          "p50_ms": 2.819,
+          "p95_ms": 3.463,
+          "p99_ms": 3.463,
           "samples": 3,
-          "stdev_ms": 0.402
+          "stdev_ms": 0.508
         },
-        "max_rss_kb_delta": 128,
+        "max_rss_kb_delta": 0,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 3,
@@ -754,7 +752,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "fulfillment_ledger_reconcile",
-        "sql_exec_time_ms_delta": 87.633,
+        "sql_exec_time_ms_delta": 82.143,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -768,18 +766,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 20.738,
-          "mean_ms": 20.275,
-          "min_ms": 19.841,
-          "p50_ms": 20.247,
-          "p95_ms": 20.738,
-          "p99_ms": 20.738,
+          "max_ms": 19.138,
+          "mean_ms": 17.314,
+          "min_ms": 15.945,
+          "p50_ms": 16.858,
+          "p95_ms": 19.138,
+          "p99_ms": 19.138,
           "samples": 3,
-          "stdev_ms": 0.449
+          "stdev_ms": 1.645
         },
         "max_rss_kb_delta": 0,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 50,
@@ -794,7 +792,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "binding_lookup",
-        "sql_exec_time_ms_delta": 12.604,
+        "sql_exec_time_ms_delta": 12.877,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1
@@ -808,18 +806,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 0.522,
-          "mean_ms": 0.435,
-          "min_ms": 0.382,
-          "p50_ms": 0.4,
-          "p95_ms": 0.522,
-          "p99_ms": 0.522,
+          "max_ms": 0.507,
+          "mean_ms": 0.46,
+          "min_ms": 0.416,
+          "p50_ms": 0.458,
+          "p95_ms": 0.507,
+          "p99_ms": 0.507,
           "samples": 3,
-          "stdev_ms": 0.076
+          "stdev_ms": 0.046
         },
         "max_rss_kb_delta": 0,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 1,
@@ -843,23 +841,23 @@
         "batch_size": 50,
         "contention": {
           "database_lock_calibration": {
-            "blocked_ms": 250.341,
-            "blocked_pid": 12526,
-            "blocking_pid": 12525,
+            "blocked_ms": 250.386,
+            "blocked_pid": 8460,
+            "blocking_pid": 8459,
             "conclusive": true,
             "label": "database lock calibration -- NOT connector acquisition",
             "skip_locked_rows": 0,
-            "skip_locked_waited": 0.376,
+            "skip_locked_waited": 0.396,
             "wait_event": "transactionid",
             "wait_event_type": "Lock"
           },
           "production_claim": {
             "blocking_expected": false,
-            "claim_elapsed_ms": 2.733,
+            "claim_elapsed_ms": 3.637,
             "claimed_ids": [],
             "conclusive": true,
             "held_job_claimed": false,
-            "holder_backend_pid": 12525,
+            "holder_backend_pid": 8459,
             "production_method": "shopify.connector.job._claim_for_dispatch -> try_lock_for_update (FOR UPDATE SKIP LOCKED)"
           }
         },
@@ -871,18 +869,18 @@
         },
         "framework_noise_rows_by_table": {},
         "latency": {
-          "max_ms": 1.086,
-          "mean_ms": 0.995,
-          "min_ms": 0.851,
-          "p50_ms": 1.047,
-          "p95_ms": 1.086,
-          "p99_ms": 1.086,
+          "max_ms": 1.04,
+          "mean_ms": 1.031,
+          "min_ms": 1.021,
+          "p50_ms": 1.034,
+          "p95_ms": 1.04,
+          "p99_ms": 1.04,
           "samples": 3,
-          "stdev_ms": 0.126
+          "stdev_ms": 0.01
         },
-        "max_rss_kb_delta": 128,
+        "max_rss_kb_delta": 160,
         "new_rows_by_table": {},
-        "os_pid": 12144,
+        "os_pid": 8441,
         "pass": 1,
         "queries_per_repetition": {
           "max": 1,
@@ -898,7 +896,7 @@
           "shopify.connector.store.settings": 1
         },
         "scenario": "job_claim_contention",
-        "sql_exec_time_ms_delta": 11.073,
+        "sql_exec_time_ms_delta": 10.668,
         "sql_exec_time_source": "pg_stat_statements.total_exec_time",
         "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
         "warmup_discarded": 1

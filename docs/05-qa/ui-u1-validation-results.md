@@ -90,38 +90,66 @@ behaviour is unchanged while the additive property is restored.
 **Regression proof:** §2.2's numbers are the **post-fix** re-run. The failing
 assertion is part of the standing suite and now passes.
 
-### 2.4 Deterministic performance comparison (PERF-0 harness)
+### 2.4 Deterministic performance comparison — base vs head
 
-`[Fact]` The existing `tools/perf0_baseline.py` harness was run at the U1 head on
-the same pinned Odoo/PostgreSQL environment. Durable report:
-[`evidence/u1-browser-2026-07-25/perf0-at-u1-head.json`](evidence/u1-browser-2026-07-25/perf0-at-u1-head.json).
+`[Fact]` The existing `tools/perf0_baseline.py` harness was run **twice on the
+same machine, same pinned Odoo, same PostgreSQL**: once against the base SHA
+`87f1763a` (in a `git worktree`, its own fresh database) and once against the U1
+head (its own fresh database). 15 scenarios, 1 warm-up discarded, 3 timed
+repetitions.
 
-- **15 scenarios executed**, 1 warm-up discarded, 3 timed repetitions each.
-- **`residue_clean: true` for every scenario**; `residue_failures: []`.
-- **`shopify_operations: "none"`.**
-- Every scenario reports `threshold_status: "BASELINE ONLY -- no accepted
-  threshold exists (issue #199)"`.
+Durable reports:
+[`perf0-at-base-87f1763a.json`](evidence/u1-browser-2026-07-25/perf0-at-base-87f1763a.json)
+and [`perf0-at-u1-head.json`](evidence/u1-browser-2026-07-25/perf0-at-u1-head.json).
 
-Selected p50 / p95 (ms): `job_drain` 0.66 / 0.78 · `layer2_reconcile` 0.65 / 0.70
-· `lock_skiplocked` 0.47 / 0.54 · `job_claim_contention` 1.09 / 1.11 ·
-`fulfillment_evidence_projection` 4.35 / 4.43 ·
-`fulfillment_ledger_reconcile` 2.75 / 3.05 ·
-`fulfillment_reconciliation_admission` 12.41 / 12.89 · `binding_lookup` 21.69 /
-21.81 · `job_enqueue` 51.72 / 89.77 · `layer2_intent` 193.68 / 207.01 ·
-`layer2_outcome` 248.76 / 257.37.
+**The deterministic result: query count per repetition is IDENTICAL on all 15
+scenarios.**
 
-**Interpretation `[Inference]`, stated conservatively.** U1 changes no backend
-code path: the diff adds views, menus, two `TransientModel` wizards that execute
-only while a dialog is open, and test files. None of the fifteen measured
-scenarios traverses U1 code, so **no regression is expected by construction**,
-and the run is consistent with that. This is recorded as a **baseline at the U1
-head**, not as a proof of no regression: a like-for-like comparison would need
-the same harness run on the base SHA in the same session, which was not done.
+| Scenario | queries/rep base → head | p50 ms base → head |
+| --- | --- | --- |
+| `job_enqueue` | 53 → 53 | 41.5 → 46.7 |
+| `job_drain` | 1 → 1 | 0.57 → 0.66 |
+| `layer2_intent` | 303 → 303 | 207.8 → 211.2 |
+| `layer2_outcome` | 404 → 404 | 258.3 → 268.9 |
+| `layer2_reconcile` | 1 → 1 | 0.46 → 0.52 |
+| `order_binding_projection` | 7 → 7 | 4.12 → 6.28 |
+| `inventory_pair_projection` | 7 → 7 | 4.41 → 3.94 |
+| `fulfillment_evidence_projection` | 7 → 7 | 4.97 → 5.02 |
+| `order_scan_admission` | 5 → 5 | 3.08 → 3.07 |
+| `inventory_push_scan_admission` | 7 → 7 | 5.20 → 5.46 |
+| `fulfillment_reconciliation_admission` | 12 → 12 | 7.37 → 6.48 |
+| `fulfillment_ledger_reconcile` | 3 → 3 | 2.82 → 4.30 |
+| `binding_lookup` | 50 → 50 | 16.9 → 20.2 |
+| `lock_skiplocked` | 1 → 1 | 0.46 → 0.40 |
+| `job_claim_contention` | 1 → 1 | 1.03 → 1.05 |
 
-**No number above is a guarantee, budget, threshold or SLA.** Issue #199 stays
-open, and the harness itself records that the per-record reconciliation
-**handlers** perform Shopify reads and are therefore **not measured** — no fake
-transport was introduced to manufacture a figure.
+`residue_failures: []` and `shopify_operations: "none"` on **both** runs.
+
+**How to read this.** Query count is deterministic and is the meaningful signal:
+identical counts everywhere mean U1 adds **no backend query to any measured
+path**, which matches the diff (U1 adds views, menus, two `TransientModel`
+wizards that execute only while a dialog is open, and tests). The p50 deltas
+scatter in **both** directions (−12.7% to +52.7%) on a shared machine that was
+running CI and other work concurrently, with only 3 repetitions — that is
+**noise, not signal**, and no latency delta here should be read as a regression
+or an improvement.
+
+**A false finding was caught and corrected during this work `[Fact]`.** The
+first head run crashed part-way (`pg_stat_statements` was not preloaded) *after*
+seeding, leaving **1 store** behind. Re-running against that same database
+produced apparent regressions of up to **+68%** with *different* query counts on
+the three per-store admission scenarios — because those scans iterate stores, so
+the leftover row was extra work. Comparing against a genuinely fresh database
+removed the difference entirely. The contaminated numbers are **not** reported
+as a finding. This is the same failure mode the stabilization campaign recorded
+for PERF-0 ("residue claims excluded business fixtures"): residue silently
+becomes measurement.
+
+**No number above is a guarantee, budget, threshold or SLA.** Every scenario
+carries the harness's own `BASELINE ONLY -- no accepted threshold exists (issue
+#199)` status, #199 stays open, and the harness records that the per-record
+reconciliation **handlers** perform Shopify reads and are therefore **not
+measured** — no fake transport was introduced.
 
 ## 3. Driven browser / render evidence — PRODUCED, NOT DEFERRED
 
