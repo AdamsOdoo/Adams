@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U1 fulfillment job view: the existing core `shopify.connector.job` model,
+        filtered to the ten fulfillment job types.
+
+        This adds NO field, NO action and NO job type. It is an act_window with a
+        domain plus a search view offering the fulfillment-specific facets. Retry
+        / cancel / resolve-manual-review remain exactly where U0 put them, wired
+        to the same sanctioned core methods with the same server-side role and
+        state matrix — U1 does not re-expose or re-gate them.
+
+        Mode switching is NOT a job type, and `fulfillment_review_release` is NOT
+        a job type. Neither appears in the domain below.
+    -->
+
+    <record id="view_shopify_connector_job_fulfillment_search" model="ir.ui.view">
+        <field name="name">shopify.connector.job.fulfillment.search</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="arch" type="xml">
+            <search string="Fulfillment jobs">
+                <field name="store_id"/>
+                <field name="job_type"/>
+                <field name="error_class"/>
+                <filter name="filter_needs_attention" string="Needs attention"
+                        domain="[('state', 'in', ('failed_retryable', 'retry_waiting', 'blocked_manual_review'))]"/>
+                <filter name="filter_blocked_review" string="Waiting on a decision"
+                        domain="[('state', '=', 'blocked_manual_review')]"/>
+                <separator/>
+                <filter name="filter_mutation_types" string="Shopify mutations"
+                        domain="[('job_type', 'in', ('fulfillment_create', 'fulfillment_tracking_update'))]"/>
+                <filter name="filter_observation_types" string="Observation and reconciliation"
+                        domain="[('job_type', 'in', ('fulfillment_inbound_observation', 'fulfillment_reconciliation_check', 'fulfillment_mutation_reconcile', 'fulfillment_reconnect_catchup'))]"/>
+                <filter name="filter_mode_types" string="Mode 2"
+                        domain="[('job_type', 'in', ('fulfillment_mode_switch_scan', 'fulfillment_mode2_evaluation'))]"/>
+                <separator/>
+                <filter name="filter_has_evidence" string="Has mutation evidence"
+                        domain="[('mutation_attempt_id', '!=', False)]"/>
+                <group>
+                    <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_job_type" string="Job type" context="{'group_by': 'job_type'}"/>
+                    <filter name="group_error_class" string="Error class" context="{'group_by': 'error_class'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_fulfillment_job" model="ir.actions.act_window">
+        <field name="name">Fulfillment Jobs</field>
+        <field name="res_model">shopify.connector.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shopify_connector_job_fulfillment_search"/>
+        <!-- The exact ten fulfillment job types, in the order they are declared
+             in models/shopify_connector_job.py. No other type is in scope. -->
+        <field name="domain">[('job_type', 'in', ('fulfillment_picking_admission', 'fulfillment_create', 'fulfillment_tracking_admission', 'fulfillment_tracking_update', 'fulfillment_mutation_reconcile', 'fulfillment_inbound_observation', 'fulfillment_reconciliation_check', 'fulfillment_reconnect_catchup', 'fulfillment_mode_switch_scan', 'fulfillment_mode2_evaluation'))]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No fulfilment job matches this filter.
+            </p>
+            <p>
+                Fulfilment work runs as background jobs. Anything that needs a
+                person appears in the Error &amp; Review Center or the Fulfillment
+                Review Workspace.
+            </p>
+            <p class="text-muted">
+                Records withheld pending an administrator review are not listed
+                here, so an empty list does not by itself prove there are none.
+            </p>
+        </field>
+    </record>
+</odoo>

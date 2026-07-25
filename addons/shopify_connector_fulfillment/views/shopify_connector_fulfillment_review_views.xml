@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U1 review workspace over `shopify.connector.fulfillment.inbound.evidence`.
+
+        STATUS LAYERS ARE NEVER MERGED (canonical matrix:
+        u1-backend-ui-contract-inventory.md section 12; acceptance A22). One badge
+        per layer, each mapped to an exact backing field:
+
+          A4 FulfillmentStatus  -> fulfillment_status_normalized
+                                   + fulfillment_status_is_success
+          A7 FulfillmentDisplayStatus -> display_status_normalized
+                                   DISPLAY ONLY. Never a carrier milestone.
+          A5 carrier milestone  -> ONLY delivered_inconsistency. Carrier tracking
+                                   chips would require parsing tracking_snapshot,
+                                   and U1 owns no models/** compute field, so
+                                   NO tracking chip is rendered. No badge without
+                                   backing evidence.
+          A2 FulfillmentOrderStatus -> DEFERRED. No backing field exists, so there
+                                   is no A2 badge anywhere in U1.
+
+        A4 success is not Odoo stock completion and the A7 roll-up is not carrier
+        delivery; only `stock.picking.state = done` proves stock movement.
+
+        "Delivered" is NEVER claimed, displayed or offered as a supported state.
+        `delivered_inconsistency` is rendered strictly as the INCONSISTENCY case
+        ("Delivered per carrier - Odoo delivery NOT validated"), which is what the
+        backend actually records, and it is never synthesised from the A7 fields.
+
+        RAW SNAPSHOTS ARE NEVER DUMPED. `state_snapshot`, `tracking_snapshot` and
+        every fingerprint / intent / idempotency-key / nonce field are absent from
+        every view in this file.
+
+        Buttons wire ONLY to the sanctioned actions in contract section 6.
+        Visibility gates on the two SEC-2 roles; the server re-checks the internal
+        capability group and refuses with AccessError regardless.
+    -->
+
+    <!-- ============================================================ -->
+    <!-- Search                                                              -->
+    <!-- ============================================================ -->
+    <record id="view_shopify_connector_fulfillment_evidence_search" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.inbound.evidence.search</field>
+        <field name="model">shopify.connector.fulfillment.inbound.evidence</field>
+        <field name="arch" type="xml">
+            <search string="Fulfillment review">
+                <field name="shopify_fulfillment_gid"/>
+                <field name="shopify_order_gid"/>
+                <field name="store_id"/>
+                <field name="order_binding_id"/>
+                <field name="review_reason"/>
+
+                <filter name="filter_open_review" string="Needs a decision"
+                        domain="[('reconciled_state', '=', 'review')]"/>
+                <filter name="filter_delivered_inconsistency"
+                        string="Delivered per carrier, Odoo not validated"
+                        domain="[('delivered_inconsistency', '=', True)]"/>
+                <filter name="filter_schema_warning" string="Unknown status value"
+                        domain="[('schema_warning', '=', True)]"/>
+                <separator/>
+                <filter name="filter_observed" string="Observed"
+                        domain="[('reconciled_state', '=', 'observed')]"/>
+                <filter name="filter_acknowledged" string="Acknowledged"
+                        domain="[('reconciled_state', '=', 'acknowledged')]"/>
+                <filter name="filter_applied" string="Applied to Odoo"
+                        domain="[('reconciled_state', '=', 'applied')]"/>
+                <filter name="filter_superseded" string="Superseded"
+                        domain="[('reconciled_state', '=', 'superseded')]"/>
+                <separator/>
+                <filter name="filter_external" string="Externally created"
+                        domain="[('origin_class', 'in', ('external_merchant', 'external_app', 'external_unknown'))]"/>
+                <filter name="filter_origin_unconfirmed" string="Origin unconfirmed"
+                        domain="[('origin_confirmed', '=', False)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="Reconciled state"
+                            context="{'group_by': 'reconciled_state'}"/>
+                    <filter name="group_reason" string="Review reason"
+                            context="{'group_by': 'review_reason'}"/>
+                    <filter name="group_origin" string="Origin"
+                            context="{'group_by': 'origin_class'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- List                                                                -->
+    <!-- ============================================================ -->
+    <record id="view_shopify_connector_fulfillment_evidence_list" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.inbound.evidence.list</field>
+        <field name="model">shopify.connector.fulfillment.inbound.evidence</field>
+        <field name="arch" type="xml">
+            <!-- Severity by word AND decoration, never colour alone: the
+                 reconciled_state and review_reason columns carry the meaning in
+                 text. Tokens reuse the U0 layer (calm/info/warning/danger). -->
+            <list string="Fulfillment review"
+                  create="false" delete="false" edit="false"
+                  decoration-danger="reconciled_state == 'review'"
+                  decoration-warning="delivered_inconsistency or schema_warning"
+                  decoration-muted="reconciled_state == 'superseded'">
+                <field name="last_observed_at" string="Last seen"/>
+                <field name="store_id"/>
+                <field name="shopify_fulfillment_gid" string="Fulfillment"/>
+                <field name="order_binding_id" string="Order"/>
+                <field name="origin_class" string="Origin"/>
+                <field name="reconciled_state" string="Reconciled state"/>
+                <field name="review_reason" string="Review reason"/>
+                <!-- A4: the automation-authority layer. -->
+                <field name="fulfillment_status_normalized" string="A4 fulfillment status"/>
+                <!-- A7: display only. The column title says so, so the label can
+                     never be read as a carrier milestone. -->
+                <field name="display_status_normalized" string="A7 display status (display only)"/>
+                <field name="delivered_inconsistency" string="Delivered/Odoo mismatch"/>
+                <field name="schema_warning" string="Unknown value"/>
+                <!-- SEC-3: company is shown read-only for context and is NEVER a
+                     selector anywhere in U1. -->
+                <field name="company_id" string="Company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Form: evidence on the left, decision on the right                   -->
+    <!-- ============================================================ -->
+    <record id="view_shopify_connector_fulfillment_evidence_form" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.inbound.evidence.form</field>
+        <field name="model">shopify.connector.fulfillment.inbound.evidence</field>
+        <field name="arch" type="xml">
+            <form string="Fulfillment review case" create="false" delete="false" edit="false">
+                <header>
+                    <!--
+                        Sanctioned actions only (contract section 6).
+                        Visibility = the two SEC-2 roles. Authorization = the
+                        server's internal capability group, re-checked on every
+                        call. `invisible` here approximates the server
+                        precondition; the server is the final authority.
+                    -->
+                    <button name="action_import_tracking" type="object"
+                            string="Import tracking to delivery"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            invisible="reconciled_state in ('acknowledged', 'applied', 'superseded')"
+                            help="Copy the carrier tracking reference onto the matching Odoo delivery and mark this observation acknowledged. This never moves stock."/>
+                    <button name="action_acknowledge_external" type="object"
+                            string="Acknowledge (handled outside Odoo)"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            invisible="reconciled_state in ('acknowledged', 'applied', 'superseded')"
+                            confirm="This records that the fulfilment was handled outside Odoo. No stock is moved and nothing is sent to Shopify."
+                            help="Close this observation without changing Odoo stock."/>
+                    <!--
+                        Mode-2 explicit validation is Reviewer/Administrator on
+                        the server. Only the Administrator role is a
+                        customer-facing role that certainly resolves to Reviewer,
+                        so visibility uses the Connector User role and the server
+                        refuses a caller who lacks Reviewer or Admin.
+                    -->
+                    <button name="action_validate_proposed" type="object"
+                            string="Validate proposed fulfilment"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            invisible="reconciled_state != 'review'"
+                            confirm="Odoo will re-run the full 16-condition Mode 2 checklist. If any condition fails the case stays open and nothing is applied."
+                            help="Apply the observed Shopify fulfilment to Odoo, but only if every Mode 2 condition passes."/>
+                    <field name="reconciled_state" widget="statusbar"
+                           statusbar_visible="observed,review,acknowledged,applied"/>
+                </header>
+                <sheet>
+                    <!--
+                        SEC-3 quarantine: U1 renders NO quarantine control and
+                        never calls action_sec3_release_scope_quarantine. A
+                        quarantined row is invisible to an interactive read in the
+                        first place; this banner exists for the administrative
+                        case where a row is read with the flag set.
+                    -->
+                    <div class="alert alert-warning" role="status"
+                         invisible="not sec3_scope_quarantined">
+                        <i class="fa fa-lock" role="img" aria-label="Quarantined"/>
+                        <strong>Withheld pending an administrator review.</strong>
+                        This record points at data belonging to another company, so
+                        it is held back from operator screens. An administrator
+                        resolves it outside this workspace.
+                    </div>
+
+                    <div class="alert alert-warning" role="status"
+                         invisible="not delivered_inconsistency">
+                        <i class="fa fa-exclamation-triangle" role="img" aria-label="Warning"/>
+                        <strong>Delivered per carrier &#8212; the Odoo delivery is
+                        not validated.</strong>
+                        A carrier milestone never moves stock. Only a validated Odoo
+                        delivery (<code>Done</code>) proves stock movement.
+                    </div>
+
+                    <div class="alert alert-info" role="status"
+                         invisible="not schema_warning">
+                        <i class="fa fa-question-circle" role="img" aria-label="Unknown value"/>
+                        <strong>Shopify reported a status this connector does not
+                        recognise.</strong>
+                        The raw value is preserved and is never treated as success.
+                    </div>
+
+                    <div class="oe_title">
+                        <h1><field name="shopify_fulfillment_gid" readonly="1"/></h1>
+                        <h3><field name="store_id" readonly="1"/></h3>
+                    </div>
+
+                    <group>
+                        <!-- LEFT: the evidence. -->
+                        <group string="What Shopify reported">
+                            <field name="shopify_order_gid" readonly="1"/>
+                            <field name="origin_class" readonly="1"/>
+                            <field name="origin_confirmed" readonly="1"
+                                   help="An unconfirmed origin is never treated as confirmed-external for automation."/>
+                            <field name="first_observed_at" readonly="1"/>
+                            <field name="last_observed_at" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <!-- RIGHT: the decision. -->
+                        <group string="Decision">
+                            <field name="reconciled_state" readonly="1"/>
+                            <field name="review_reason" readonly="1"
+                                   invisible="not review_reason"/>
+                            <field name="review_detail" readonly="1"
+                                   invisible="not review_detail"/>
+                            <field name="resolution_actor_uid" readonly="1"
+                                   invisible="not resolution_actor_uid"/>
+                            <field name="resolution_at" readonly="1"
+                                   invisible="not resolution_at"/>
+                        </group>
+                    </group>
+
+                    <group string="Status layers (each layer is shown separately and never merged)">
+                        <group string="A4 &#8212; Fulfillment status (automation authority)">
+                            <field name="fulfillment_status_normalized" string="Normalised"
+                                   readonly="1"/>
+                            <field name="fulfillment_status_raw" string="Raw" readonly="1"/>
+                            <field name="fulfillment_status_is_success" string="Counts as success"
+                                   readonly="1"
+                                   help="A4 success is a Shopify fulfilment result. It is NOT Odoo stock completion."/>
+                        </group>
+                        <group string="A7 &#8212; Display status (display only)">
+                            <field name="display_status_normalized" string="Normalised"
+                                   readonly="1"/>
+                            <field name="display_status_raw" string="Raw" readonly="1"/>
+                            <div class="text-muted" colspan="2">
+                                A7 is Shopify's own display roll-up. It is never a
+                                carrier milestone and never proves delivery.
+                            </div>
+                        </group>
+                    </group>
+
+                    <group string="A5 &#8212; Carrier milestone">
+                        <field name="delivered_inconsistency"
+                               string="Delivered per carrier, Odoo delivery not validated"
+                               readonly="1"/>
+                        <div class="text-muted" colspan="2">
+                            U1 surfaces the delivered/Odoo inconsistency case only.
+                            Per-carrier tracking chips need a parsed read seam that
+                            the backend does not expose, so no other carrier
+                            milestone is displayed &#8212; no badge is shown without a
+                            backing field.
+                        </div>
+                    </group>
+
+                    <notebook>
+                        <page string="Reconciled lines" name="lines">
+                            <field name="line_ids" readonly="1">
+                                <list create="false" delete="false" edit="false">
+                                    <field name="fo_line_item_gid" string="Fulfillment order line"/>
+                                    <field name="line_item_gid" string="Order line"/>
+                                    <field name="sale_line_id" string="Odoo sale line"/>
+                                    <field name="quantity" string="Observed qty"/>
+                                    <field name="reconciled_quantity" string="Applied qty"/>
+                                </list>
+                            </field>
+                            <div class="text-muted">
+                                The applied-quantity ledger is the duplicate-application
+                                backstop. Counts on this screen exclude records withheld
+                                for an administrator review, so they are indicative and
+                                not authoritative totals.
+                            </div>
+                        </page>
+                        <page string="Lineage" name="lineage">
+                            <group>
+                                <field name="order_binding_id" readonly="1"/>
+                                <field name="fulfillment_binding_id" readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Action                                                              -->
+    <!-- ============================================================ -->
+    <record id="action_shopify_connector_fulfillment_review" model="ir.actions.act_window">
+        <field name="name">Fulfillment Review Workspace</field>
+        <field name="res_model">shopify.connector.fulfillment.inbound.evidence</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_fulfillment_evidence_search"/>
+        <field name="context">{'search_default_filter_open_review': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No fulfilment observation matches this filter.
+            </p>
+            <p>
+                Observations appear here as Shopify reports fulfilments for your
+                connected stores. Anything that needs a human decision is opened
+                as a review case.
+            </p>
+            <p class="text-muted">
+                Records withheld pending an administrator review are not listed
+                here, so an empty list does not by itself prove there are none.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U1 fulfillment binding + lineage views.
+
+        One binding row per created Shopify Fulfillment. This screen is the
+        lineage surface: picking, order binding, jobs and (read-only) mutation
+        evidence hang off it.
+
+        NEVER RENDERED here: remote_mutation_intent, preconditions_snapshot, any
+        *_fingerprint, shopify_idempotency_key, remote_evidence_refs,
+        mode_switch_nonce, or any token. `tracking_numbers_snapshot` and
+        `tracking_urls_snapshot` are JSON text and are NOT dumped raw; only the
+        scalar `tracking_company_snapshot` is shown.
+
+        The single action here is `action_release_fulfillment_review`, which is
+        Reviewer-or-Administrator on the server and refuses a post-C2 uncertain
+        mutation (reconcile-only). It takes a mandatory reason, so it is driven
+        through a wizard rather than a bare button.
+    -->
+
+    <record id="view_shopify_connector_fulfillment_binding_search" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.binding.search</field>
+        <field name="model">shopify.connector.fulfillment.binding</field>
+        <field name="arch" type="xml">
+            <search string="Fulfillments">
+                <field name="shopify_gid"/>
+                <field name="store_id"/>
+                <field name="picking_id"/>
+                <field name="order_binding_id"/>
+                <field name="tracking_company_snapshot" string="Carrier"/>
+                <filter name="filter_active" string="Active"
+                        domain="[('status', '=', 'active')]"/>
+                <filter name="filter_notified" string="Customer was notified"
+                        domain="[('notify_customer_sent', '=', True)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_carrier" string="Carrier"
+                            context="{'group_by': 'tracking_company_snapshot'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_fulfillment_binding_list" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.binding.list</field>
+        <field name="model">shopify.connector.fulfillment.binding</field>
+        <field name="arch" type="xml">
+            <list string="Fulfillments" create="false" delete="false" edit="false">
+                <field name="shopify_last_synced_at" string="Last synced"/>
+                <field name="store_id"/>
+                <field name="shopify_gid" string="Shopify fulfillment"/>
+                <field name="picking_id" string="Odoo delivery"/>
+                <field name="order_binding_id" string="Order"/>
+                <field name="tracking_company_snapshot" string="Carrier"/>
+                <!-- A4 layer on the binding: the normalised Shopify status
+                     snapshot. Never presented as carrier delivery. -->
+                <field name="shopify_status_normalized" string="Shopify status"/>
+                <field name="notify_customer_sent" string="Customer notified" optional="hide"/>
+                <field name="company_id" string="Company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_fulfillment_binding_form" model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.binding.form</field>
+        <field name="model">shopify.connector.fulfillment.binding</field>
+        <field name="arch" type="xml">
+            <form string="Fulfillment" create="false" delete="false" edit="false">
+                <header>
+                    <button name="%(action_shopify_connector_fulfillment_review_release)d"
+                            type="action"
+                            string="Release blocked mutation"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            help="Supersede exactly one blocked fulfilment mutation and hand off a single replacement job. A mutation whose outcome is uncertain is never resent."/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="status"
+                         invisible="not sec3_scope_quarantined">
+                        <i class="fa fa-lock" role="img" aria-label="Quarantined"/>
+                        <strong>Withheld pending an administrator review.</strong>
+                        This record points at data belonging to another company.
+                    </div>
+
+                    <!-- No smart buttons: a stat button would need a new
+                         `models/**` method, which U1 must not add. The picking,
+                         order-binding and company relations below are ordinary
+                         clickable many2one links, which reach the same records
+                         without introducing backend code. -->
+
+                    <div class="oe_title">
+                        <h1><field name="shopify_gid" readonly="1"/></h1>
+                        <h3><field name="store_id" readonly="1"/></h3>
+                    </div>
+
+                    <group>
+                        <group string="Odoo side">
+                            <field name="picking_id" readonly="1"/>
+                            <field name="order_binding_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                            <div class="text-muted" colspan="2">
+                                Only a validated Odoo delivery
+                                (<code>Done</code>) proves stock movement.
+                            </div>
+                        </group>
+                        <group string="Shopify side">
+                            <field name="shopify_status_normalized" string="Status (normalised)"
+                                   readonly="1"/>
+                            <field name="shopify_status_snapshot" string="Status (raw)"
+                                   readonly="1"/>
+                            <field name="shopify_last_synced_at" readonly="1"/>
+                            <field name="status" string="Binding state" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <group string="Carrier and notification">
+                        <group>
+                            <field name="tracking_company_snapshot" string="Carrier" readonly="1"/>
+                            <div class="text-muted" colspan="2">
+                                Tracking numbers and URLs are stored as structured
+                                snapshots and are shown on the Odoo delivery rather
+                                than dumped here.
+                            </div>
+                        </group>
+                        <group>
+                            <field name="notify_customer_sent"
+                                   string="Customer notification was sent" readonly="1"
+                                   help="Decided once when the fulfilment was enqueued. It is never re-read or recomputed on a retry."/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_fulfillment_binding" model="ir.actions.act_window">
+        <field name="name">Fulfillments</field>
+        <field name="res_model">shopify.connector.fulfillment.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_fulfillment_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No fulfilment has been created for a connected store yet.
+            </p>
+            <p>
+                A row appears here for each Shopify fulfilment this connector
+                creates from a validated Odoo delivery.
+            </p>
+            <p class="text-muted">
+                Records withheld pending an administrator review are not listed
+                here, so an empty list does not by itself prove there are none.
+            </p>
+        </field>
+    </record>
+</odoo>

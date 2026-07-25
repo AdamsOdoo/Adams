@@ -1,5 +1,7 @@
 # Exhaustive frozen test list (locked prompt §5). No additional test file may be
-# added without a control-room allowlist amendment. The runtime concurrency
+# added without a control-room allowlist amendment. The Wave 5 U1 locked prompt
+# is such an amendment: it authorises exactly the six `test_ui_*` modules at the
+# end of this list, and no others. The runtime concurrency
 # harness (runtime_layer2_fulfillment_concurrency_harness.py) is deliberately
 # NOT imported here — it is an out-of-band multiprocessing script, never an
 # Odoo test.
@@ -25,3 +27,10 @@ from . import test_fulfillment_readiness
 from . import test_fulfillment_vocabulary_guard
 from . import test_fulfillment_source_guards
 from . import test_fulfillment_concurrency
+# --- Wave 5 U1 operator UI (authorised by u1-locked-implementation-prompt.md) ---
+from . import test_ui_import_structure
+from . import test_ui_source_guards
+from . import test_ui_visibility_matrix
+from . import test_ui_actions
+from . import test_ui_sec3_scope
+from . import test_ui_tours

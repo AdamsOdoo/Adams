@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Mode-switch confirmation and review-release wizards.
+
+        Odoo 19 data load order: both wizard actions are defined HERE, before the
+        views that reference them are loaded (see __manifest__.py ordering). A
+        view referencing an act_window that has not been loaded yet fails at
+        install time — the U0 lesson.
+
+        Accessibility: each dialog carries role="dialog" and aria-modal="true",
+        an explicit aria-label, and consequence copy that reads as words rather
+        than colour alone.
+    -->
+
+    <!-- ============================================================ -->
+    <!-- Mode switch                                                         -->
+    <!-- ============================================================ -->
+    <record id="view_shopify_connector_fulfillment_mode_switch_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.mode.switch.wizard.form</field>
+        <field name="model">shopify.connector.fulfillment.mode.switch.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Change fulfillment operating mode"
+                  role="dialog" aria-modal="true"
+                  aria-label="Change fulfillment operating mode">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <span invisible="target_mode != 'mode2'">Switch to Mode 2</span>
+                            <span invisible="target_mode != 'mode1'">Return to Mode 1</span>
+                        </h1>
+                        <h3><field name="store_id" readonly="1"/></h3>
+                    </div>
+
+                    <div class="alert alert-info" role="status"
+                         invisible="not switch_in_progress">
+                        <i class="fa fa-hourglass-half" role="img" aria-label="In progress"/>
+                        <strong>A mode switch is already running for this store.</strong>
+                        Mode 2 auto-application stays suspended until the safe
+                        reconciliation scan finishes.
+                    </div>
+
+                    <group>
+                        <group string="Now">
+                            <field name="current_mode" readonly="1"/>
+                            <field name="switch_in_progress" readonly="1"/>
+                            <field name="last_switch_at" readonly="1"
+                                   invisible="not last_switch_at"/>
+                        </group>
+                        <group string="Requested">
+                            <field name="target_mode" readonly="1"/>
+                            <field name="settings_id" invisible="1"/>
+                        </group>
+                    </group>
+
+                    <!--
+                        STATIC consequence copy. Identical every time; never
+                        computed from this store's data, and never a prediction
+                        that the switch will succeed.
+                    -->
+                    <group string="What this does" invisible="target_mode != 'mode2'">
+                        <div colspan="2">
+                            <ul>
+                                <li>Odoo runs a safe reconciliation scan first.
+                                    Mode 2 begins applying only after that scan
+                                    completes cleanly.</li>
+                                <li>Once active, a fulfilment created in Shopify can
+                                    be applied to the matching Odoo delivery
+                                    automatically &#8212; but only when every one of the
+                                    16 safety conditions passes. Anything else is
+                                    opened as a review case for a person.</li>
+                                <li>Deliveries already in flight are not cancelled.</li>
+                                <li>You can return to Mode 1 at any time.</li>
+                            </ul>
+                        </div>
+                    </group>
+                    <group string="What this does" invisible="target_mode != 'mode1'">
+                        <div colspan="2">
+                            <ul>
+                                <li>Shopify fulfilments stop being applied to Odoo
+                                    automatically. New observations become review
+                                    cases instead.</li>
+                                <li>Mode 2 evaluations that have not run yet are
+                                    cancelled back to review.</li>
+                                <li>Evidence, reconciliations already applied,
+                                    fulfilment records and the audit trail are left
+                                    exactly as they are.</li>
+                                <li>Deliveries already in flight are not cancelled.</li>
+                            </ul>
+                        </div>
+                    </group>
+
+                    <group string="For context only">
+                        <field name="open_review_count" readonly="1"
+                               string="Review cases currently open"/>
+                        <field name="in_flight_job_count" readonly="1"
+                               string="Sync jobs not yet finished"/>
+                        <div class="text-muted" colspan="2">
+                            These numbers are indicative and are not a complete
+                            count: records withheld pending an administrator review
+                            are excluded. They do not decide whether the switch may
+                            proceed &#8212; Odoo checks that itself when you confirm.
+                        </div>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Confirm"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_fulfillment_mode_switch"
+            model="ir.actions.act_window">
+        <field name="name">Change fulfillment operating mode</field>
+        <field name="res_model">shopify.connector.fulfillment.mode.switch.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Review release                                                      -->
+    <!-- ============================================================ -->
+    <record id="view_shopify_connector_fulfillment_review_release_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.fulfillment.review.release.wizard.form</field>
+        <field name="model">shopify.connector.fulfillment.review.release.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Release blocked fulfilment mutation"
+                  role="dialog" aria-modal="true"
+                  aria-label="Release blocked fulfilment mutation">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>Release a blocked fulfilment</h1>
+                        <h3><field name="store_id" readonly="1"/></h3>
+                    </div>
+
+                    <div class="alert alert-info" role="status">
+                        <i class="fa fa-info-circle" role="img" aria-label="Information"/>
+                        Odoo supersedes the blocked job and hands off exactly one
+                        replacement. A mutation whose outcome Shopify never
+                        confirmed is <strong>never</strong> resent &#8212; it is
+                        reconciled instead. If the conditions are not met, Odoo
+                        refuses and nothing changes.
+                    </div>
+
+                    <group>
+                        <field name="binding_id" readonly="1"/>
+                        <field name="picking_id" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="reason" required="1"
+                               placeholder="Why is this being released? Recorded on the audit trail."/>
+                    </group>
+                </sheet>
+                <footer>
+                    <button name="action_confirm" type="object" string="Release"
+                            class="btn-primary" data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"
+                            data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_fulfillment_review_release"
+            model="ir.actions.act_window">
+        <field name="name">Release blocked fulfilment mutation</field>
+        <field name="res_model">shopify.connector.fulfillment.review.release.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_binding_id': active_id}</field>
+        <field name="binding_model_id" eval="False"/>
+    </record>
+</odoo>

@@ -56,6 +56,16 @@ ALLOWED_TEST_FILES = frozenset((
     'test_fulfillment_vocabulary_guard.py', 'test_fulfillment_source_guards.py',
     'test_fulfillment_concurrency.py',
     'runtime_layer2_fulfillment_concurrency_harness.py',
+    # Wave 5 U1 allowlist amendment. The U1 locked implementation prompt
+    # (docs/07-implementation-plan/wave-5-u1-gate-a/u1-locked-implementation-prompt.md)
+    # authorises exactly these six new test files for the fulfillment operator
+    # UI. Without extending this frozen set, the U1 batch would fail its own
+    # boundary guard -- so the amendment is part of the authorised batch, not a
+    # relaxation of the guard: the set stays exhaustive and still fails on any
+    # file not named here.
+    'test_ui_visibility_matrix.py', 'test_ui_actions.py',
+    'test_ui_import_structure.py', 'test_ui_source_guards.py',
+    'test_ui_sec3_scope.py', 'test_ui_tours.py',
 ))
 
 

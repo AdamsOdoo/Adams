@@ -5,7 +5,7 @@
 # mutation in Gate B.
 {
     'name': 'Shopify Connector - Fulfillment',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'category': 'Connector',
     'summary': 'Odoo 19 <-> Shopify fulfillment and tracking synchronisation',
     'author': 'Adams',
@@ -21,6 +21,17 @@
         'security/ir.model.access.csv',
         'security/shopify_connector_fulfillment_company_rules.xml',
         'data/shopify_connector_fulfillment_cron.xml',
+        # U1 operator UI. ORDER MATTERS (Odoo 19 data load order, U0 lesson):
+        # the wizard act_windows are defined FIRST, because the settings and
+        # binding views below reference them by `%(...)d`. A view that names an
+        # action not yet loaded fails at install time.
+        'wizards/shopify_connector_fulfillment_mode_switch_wizard_views.xml',
+        'views/shopify_connector_store_settings_fulfillment_views.xml',
+        'views/shopify_connector_fulfillment_review_views.xml',
+        'views/shopify_connector_fulfillment_binding_views.xml',
+        'views/shopify_connector_job_fulfillment_views.xml',
+        # Menus last: every act_window they reference now exists.
+        'views/shopify_connector_fulfillment_menus.xml',
     ],
     'installable': True,
     'application': False,

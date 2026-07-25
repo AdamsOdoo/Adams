@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U1 fulfillment operating-mode surface on `shopify.connector.store.settings`.
+
+        The mode fields carry `groups="...group_shopify_connector_admin"` at the
+        Python field-security layer, so a Connector User simply does not receive
+        them — Odoo strips restricted fields from the view for that user. The
+        wizard buttons are additionally Administrator-gated here, and both
+        sanctioned actions re-assert the Administrator gate server-side and raise
+        AccessError otherwise. Three independent layers; the hidden button is
+        never the one doing the work.
+
+        `fulfillment_mode_switch_nonce` is a protected per-run value and is NEVER
+        rendered.
+    -->
+
+    <record id="view_shopify_connector_store_settings_fulfillment_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.fulfillment.list</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <list string="Fulfillment settings" create="false" delete="false" edit="false">
+                <field name="store_id"/>
+                <field name="fulfillment_operating_mode" string="Operating mode"/>
+                <field name="fulfillment_switch_in_progress" string="Switch running"/>
+                <field name="fulfillment_notification_confirmed"
+                       string="Customer notification confirmed"/>
+                <field name="fulfillment_last_reconciliation_at"
+                       string="Last reconciliation"/>
+                <field name="company_id" string="Company" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_store_settings_fulfillment_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.fulfillment.form</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <form string="Fulfillment settings" create="false" delete="false" edit="false">
+                <header>
+                    <button name="%(action_shopify_connector_fulfillment_mode_switch)d"
+                            type="action"
+                            string="Switch to Mode 2"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            context="{'default_settings_id': id}"
+                            invisible="fulfillment_operating_mode != 'mode1'"
+                            help="Review what changes, then confirm. Odoo runs a safe reconciliation scan before Mode 2 begins applying anything."/>
+                    <button name="%(action_shopify_connector_fulfillment_mode_switch)d"
+                            type="action"
+                            string="Return to Mode 1"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            context="{'default_settings_id': id}"
+                            invisible="fulfillment_operating_mode != 'mode2'"
+                            help="Stop applying Shopify fulfilments to Odoo automatically. Always available."/>
+                    <field name="fulfillment_operating_mode" widget="statusbar"
+                           statusbar_visible="mode1,mode2"
+                           groups="shopify_connector_core.group_shopify_connector_admin"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="status"
+                         invisible="not fulfillment_switch_in_progress"
+                         groups="shopify_connector_core.group_shopify_connector_admin">
+                        <i class="fa fa-hourglass-half" role="img" aria-label="In progress"/>
+                        <strong>A mode switch is running.</strong>
+                        Mode 2 auto-application stays suspended until the safe
+                        reconciliation scan completes.
+                    </div>
+
+                    <div class="oe_title">
+                        <h1><field name="store_id" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Operating mode"
+                               groups="shopify_connector_core.group_shopify_connector_admin">
+                            <field name="fulfillment_operating_mode" readonly="1"/>
+                            <field name="fulfillment_switch_in_progress" readonly="1"/>
+                            <field name="fulfillment_last_mode_switch_at" readonly="1"
+                                   invisible="not fulfillment_last_mode_switch_at"/>
+                            <field name="fulfillment_last_mode_switch_uid" readonly="1"
+                                   invisible="not fulfillment_last_mode_switch_uid"/>
+                            <div class="text-muted" colspan="2">
+                                Mode 1 keeps Odoo in control of fulfilment. Mode 2
+                                additionally applies a Shopify-created fulfilment to
+                                the matching Odoo delivery, and only when every one
+                                of the 16 safety conditions passes.
+                            </div>
+                        </group>
+                        <group string="Customer notification">
+                            <field name="fulfillment_notification_confirmed" readonly="1"
+                                   string="Notification confirmed for this store"/>
+                            <div class="text-muted" colspan="2">
+                                A customer notification is sent only when the store
+                                default is enabled <em>and</em> this confirmation is
+                                set. Otherwise the fulfilment is held for review
+                                rather than sent silently.
+                            </div>
+                        </group>
+                    </group>
+
+                    <group string="Reconciliation">
+                        <field name="fulfillment_last_reconciliation_at" readonly="1"/>
+                        <field name="company_id" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_fulfillment_settings"
+            model="ir.actions.act_window">
+        <field name="name">Fulfillment Settings</field>
+        <field name="res_model">shopify.connector.store.settings</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_store_settings_fulfillment_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_store_settings_fulfillment_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No store is configured yet.
+            </p>
+            <p>
+                Fulfillment settings appear here once a store exists. The operating
+                mode is managed by a Shopify Connector Administrator.
+            </p>
+        </field>
+    </record>
+</odoo>
