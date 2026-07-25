@@ -1,3 +1,119 @@
+### Wave 5 U1 Gate A — final-backend re-anchor and bounded reconciliation (2026-07-25)
+
+- **Branch / PR:** `claude/wave-5-u1-gate-a`, draft PR
+  [#194](https://github.com/AdamsOdoo/Adams/pull/194) into `mvp/program-integration`.
+  **Docs-only.** Re-anchored from the frozen head `b38e6874c45559dbf1219cfaec43f05ba5fc959a`
+  onto the current integration tip `2583081f97c94428dfd10325589b1b891eea240b` with an
+  **ordinary merge commit (first parent `b38e6874`, second parent `2583081f`)** —
+  **no rebase, no force-push, no squash, no new branch or PR, no history rewrite** —
+  followed by exactly **one** bounded documentation reconciliation commit.
+  **Not self-accepted, not ready-marked, not merged. No `addons/**` change; no
+  Shopify operation; no U1 implementation.**
+- **Authorization:** the binding dependency-freeze ruling on PR #194
+  ([comment `5058829593`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5058829593)),
+  whose conditions 1–3 (preserve the package; wait for the corrected Wave 4 source;
+  perform one bounded backend-contract delta reconciliation) are now discharged.
+  **Condition 4 — the fresh independent U1 Gate-A review — has NOT happened, and
+  this session is not it.**
+- **Present dependency state (all verified live before mutation):** Wave 4 PR #189
+  **merged** (merge commit `3a1afa43f8d07a7dae1799968273fa0ab8049490`; accepted head
+  `e12145ce8bb88c099208f025d3cbb656bf0393ca`; runtime-tested candidate
+  `25639f17be14b30a52a8453f0813aa0b764de310`); pre-Wave-5 stabilization PR #203
+  **merged** at `2583081f` (accepted head `d282ab03af6b27025f261788dd53dc354e1aa25e`);
+  **SEC-2 merged, issue #196 closed as completed**; **issues #197 (SEC-3) and #199
+  (PERF-0) remain open**; comment `5058829593` still the last control-room ruling on
+  PR #194.
+- **Method:** the U1 backend contract was **re-verified against the actual production
+  source at `2583081f`** — not re-read from the package. The enumerated delta is
+  `u1-backend-ui-contract-inventory.md` **§0.1** (Δ1–Δ10), which states unchanged
+  surfaces explicitly so an absent row never reads as "not checked".
+- **Load-bearing findings:** **Δ1** the evidence `review_reason` selection is **21**
+  values, not 20 (`external_fulfillment_observed`, added by Wave 4 Tier-1 Theme H) —
+  the U1 copy deck must map 21. **Δ2** SEC-2 shipped exactly as Option M-A (additive
+  `implied_ids`, no XML-ID rename): both customer-facing role XML IDs now exist, and
+  every server gate and ACL row still resolves the four internal capability groups
+  **unchanged**. **Δ3–Δ6** current-backend **SEC-3** added a stored related
+  `company_id` and a readonly `sec3_scope_quarantined` to every U1-visible model,
+  fail-closed global record rules, same-store ORM constraints, and one
+  Administrator-gated `action_sec3_release_scope_quarantine` recorded as **outside U1
+  scope** (new acceptance **A23**). **Δ7** the entire canonical §12 status-source &
+  badge matrix is **unchanged** — A2/A3/A6 still have no seam, `display_status_*` is
+  still A7 display-only, `delivered_inconsistency` /
+  `review_reason='delivered_not_validated'` are still declared and **never written**,
+  so unsupported "Delivered" stays suppressed (now a binding suppression annotation
+  on the two fulfillment/tracking prototypes). **Δ8–Δ10** every other vocabulary, the
+  six sanctioned actions and their gates, the admin field-level `groups=`, and the
+  ACL matrix are unchanged.
+- **Locked prompt:** revalidated against the current code and now carries an
+  **unbound `<U1-IMPLEMENTATION-BASE-SHA>` placeholder** — `2583081f` is this docs
+  PR's reconciliation anchor and is explicitly **not** an authorized implementation
+  base; the control room binds the real base after PR #194 is accepted and merged.
+- **Merge conflicts:** exactly two, both in authorized documentation paths, resolved
+  conservatively with integration as the baseline — this file (both sides prepended
+  to a reverse-chronological log; integration's 2026-07-23 block kept verbatim and
+  first, the U1 Gate-A entry retained immediately after it, nothing dropped) and
+  `docs/05-qa/technical-debt-register.md` (integration's newer **TD-002** row kept
+  verbatim; the U1 package's **TD-003** row retained).
+- **Merge-induced correction:** the U1 Gate-A architecture-review row was authored as
+  `AR-079` on the assumption that AR-078 was reserved by the then-unmerged PR #189.
+  The merge brought a different, already-merged AR-079 onto the branch, so the U1 row
+  was **renumbered to AR-083** (next free); no other row was touched.
+- **Raised, not fixed (code is out of scope):** **OQ-4** — two `ir.rule` XML IDs are
+  declared twice inside `shopify_connector_fulfillment`
+  (`fulfillment_inbound_evidence_company_rule`,
+  `fulfillment_inbound_evidence_line_company_rule`), once in `..._security.xml`
+  (`noupdate="1"`) and again in `..._company_rules.xml` (`noupdate="0"`);
+  `[Inference]` the later declaration replaces rather than augments the earlier
+  domain. Referred to the control room / SEC-3 (#197) workstream. **OQ-5** — the
+  shipped SEC-2 group `name` strings are `User`/`Administrator` under the
+  `Shopify Connector` privilege, not the literal "Connector User"/"Connector
+  Administrator" role concepts. Also flagged, deliberately unedited: the base-branch
+  **TD-002** row that arrived through the merge still carries "PR #189 is still an
+  open, unmerged draft" wording — a stabilization/Wave-4 tracker row, not a U1
+  assertion, so editing it here would be unrelated documentation modernization.
+- **Items deferred / not claimed:** no U1 implementation; no independent Gate-A
+  review, acceptance, ready-marking or merge; no production/test/security/manifest/
+  CI/configuration change; no issue action; no Shopify request, mutation or
+  credential read; **no browser/render or runtime evidence produced or claimed** —
+  the premium-UI browser/render gate for the future U1 implementation PR is untouched
+  and still required, and neither the browser tour nor a real process-death harness
+  is claimed as proven. Live-Shopify validation stays deferred until the Wave 5
+  implementation candidate is complete and frozen; **Gate D, CV-013 #185,
+  provisioning #200, external UAT and release readiness remain open and unclaimed.**
+- **Learning feedback loop:** *New issues discovered:* a planning package pinned to an
+  exact source SHA ages in a specific, detectable way — every claim stays true *of
+  that snapshot* while silently ceasing to describe the repository; the two things
+  that actually changed (`review_reason` 20→21, and the entire SEC-3 ownership layer)
+  were findable only by re-reading the **code**, never by re-reading the package.
+  Also: an architecture-review-log row that "reserves" a number against an unmerged
+  PR is a latent merge conflict — AR-079 duplicated on exactly the merge it was
+  numbered around. *Repeated issue patterns:* second occurrence in this program of a
+  docs branch drifting silently behind a moving integration tip; the mitigation both
+  times was a source re-read plus an explicit delta table rather than in-place edits.
+  *Rules/checklists updated:* none (the existing dependency-freeze ruling already
+  prescribed exactly this sequence and worked). *New rejected approaches:* none —
+  `rejected-approaches-log.md` checked; no approach was proposed. *New technical
+  debt:* none logged by this session; two open questions (OQ-4, OQ-5) raised for the
+  control room instead, because both are backend/copy decisions rather than accepted
+  debt. *Architecture concerns:* OQ-4 is the only one, and it is referred, not
+  resolved. *Tests or review gates needed:* the fresh independent Gate-A review of
+  the re-anchored head is the explicit, sole next step; acceptance **A23** was added
+  so the future U1 batch proves SEC-3 closure rather than assuming it. *Should future
+  prompts change?* No — the bounded reconciliation prompt was correctly scoped.
+- **Quality gate confirmation:** handoff updated · feedback loop checked · learning
+  captured · rejected-approach check performed (none new) · no new technical debt
+  logged · repeated-issue pattern noted above · scope held to exactly the 24
+  authorized `docs/**` paths — all YES.
+- **Next recommended session:** the **fresh independent Claude Gate-A review** of the
+  re-anchored, reconciled head — exact prompt in
+  `docs/07-implementation-plan/wave-5-u1-gate-a/u1-gate-a-handoff.md` §8. Never this
+  session; never the authoring/correction/reset sessions.
+- **Stop condition:** `RE-ANCHORED AND RECONCILED — FRESH INDEPENDENT GATE-A REVIEW
+  STILL REQUIRED.` PR #194 remains draft, unaccepted and unmerged; U1 implementation
+  remains unauthorized; no Shopify operation occurred.
+
+---
+
 ### Wave 4 narrow Odoo 19 runtime correction — compact handoff (2026-07-23)
 
 - **Branch / PR:** `claude/wave-4-fulfillment-gate-b`; PR #189 → `mvp/program-integration`, draft/open (unmerged, not ready, not self-accepted).
@@ -111,7 +227,8 @@
   `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` (NEW),
   `docs/07-implementation-plan/wave-4-tier1-synthesis-handoff.md` (NEW);
   updates to `docs/05-qa/technical-debt-register.md`,
-  `docs/05-qa/architecture-review-log.md` (AR-079),
+  `docs/05-qa/architecture-review-log.md` (AR-079 as authored; **renumbered AR-083**
+  on 2026-07-25 — see the re-anchor entry at the top of this file),
   `docs/07-implementation-plan/mvp-program-state.md`, and this file.
 
 - **Learning feedback loop:**
@@ -156,6 +273,72 @@
   the two carved-out themes (multi-company job/mutation.attempt scoping;
   U0 dashboard labels) without their own separate control-room decisions.
   #185 (CV-013) remains open; no live Shopify mutation is authorized."*
+
+---
+
+### Wave 5 U1 Gate A — fulfillment operator experience Definition-of-Ready + implementation packet (2026-07-23) — **HISTORICAL SNAPSHOT; SUPERSEDED by the 2026-07-25 re-anchor entry at the top of this file**
+
+- **Branch / PR:** `claude/wave-5-u1-gate-a`, draft PR into `mvp/program-integration`
+  (docs-only). Base = integration tip `dd0af5d94a7f730e738dca955971e00bb4cc9122`.
+  **Not self-accepted, not ready-marked, not merged.** No `addons/**` change; no
+  Shopify operation; no U1 implementation.
+- **Objective (met):** produced the complete Wave 5 U1 (fulfillment operator
+  experience) Gate A package under
+  `docs/07-implementation-plan/wave-5-u1-gate-a/**` (13 outputs — see that
+  directory's `README.md`) while Wave 4 PR #189 proceeds through independent Tier 1
+  review. U1 is defined strictly around the accepted Wave 4 backend, consumed
+  read-only / via sanctioned actions, with no UI-owned mutation or business logic.
+- **Method:** the backend UI-contract inventory was built by reading the **exact
+  Wave 4 source at head `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a`** (read-only
+  worktree); every referenced model/field/selection/action is source-verified.
+  A 5-agent research fan-out extracted governance/SEC-2/UI-prototype/U0-pattern/
+  product-UX material with citations (documented in the package).
+- **Headline rulings (control-room comment `5056513213` applied — 2026-07-23
+  correction):** **D-P0-2 resolved SEC-2-FIRST (binding)** — U1 implementation
+  blocked until SEC-2 merges runtime-green; **no** parallel four-internal-group path;
+  U1 customer-facing UI **visibility** = the two SEC-2 roles (Connector User,
+  Connector Administrator), server authorization = the four internal groups. Branch =
+  **Option A ACCEPTED (binding)**; module = inside `shopify_connector_fulfillment`
+  (ACCEPTED); UI-phase numbering re-based (ACCEPTED). Overall: `DOCS CORRECTED —
+  AWAITING FRESH INDEPENDENT GATE-A REVIEW`.
+- **Consolidated docs-only correction (2026-07-23, PR #194):** one commit corrected
+  five areas per the control-room `REVISE` ruling — (1) SEC-2/UI role-sequencing
+  (SEC-2-first; two-role UI visibility vs internal-group server authorization);
+  (2) the Odoo package-import allowlist (addon root `__init__.py` imports `wizards`;
+  `models/__init__.py` must not import the sibling wizards package); (3) the
+  mode-switch wizard frozen as display-and-delegate only; (4) a Gate-A
+  prerequisite/status table distinguishing accepted facts/decisions from
+  still-Proposed product/UX contracts and the unchecked Wave-5 G5 gates; (5)
+  premium-UI browser/render evidence required before U1 merge (not auto-deferred).
+  Product docs `fulfillment-operating-modes.md` / `shopify-fulfillment-status-model.md`
+  received non-destructive superseded-vocabulary annotations (docs stay `Proposed`).
+  No `addons/**` change; no Shopify operation.
+- **Status-layer synthesis reset (2026-07-23, PR #194, control-room ruling
+  `5058042330`; independent review `5057796514`):** a confirmed material-P2 —
+  UX/IA §8 mapped the code fields `display_status_*` to A5 `FulfillmentEventStatus`
+  (they are A7 `FulfillmentDisplayStatus`) and asserted a phantom A2
+  `FulfillmentOrderStatus` badge with no backing field — was re-derived from the
+  exact Wave 4 source and reset into **one canonical status-source & badge matrix**
+  (`u1-backend-ui-contract-inventory.md` §12). Bindings verified at `2d9cff0`: A7 =
+  `display_status_*` (display-only, never a carrier milestone); A5 only via
+  `delivered_inconsistency` + parsed `tracking_snapshot` (both declared-but-data-inert
+  at `2d9cff0` for `delivered_inconsistency`); **A2 DEFERRED — no read seam, no
+  badge**; A4 = `fulfillment_status_*`; layers never merged; acceptance **A22** proves
+  per-layer correctness. The independent review's six Tier-3 items (error_class count
+  16→19; README runtime-green qualifier; ALLOWED FILES header wording; residual
+  `under_review` locations logged in TD-003; new-glyph registration + "four-layer"
+  phrasing; prototype validate-role copy) were normalized in the same docs-only reset
+  commit. Prototypes (`fulfillment/`, `tracking-timeline/`, `external-fulfillment-review/`)
+  reconciled to §12. No `addons/**` change; no Shopify operation.
+  `STATUS-LAYER SYNTHESIS RESET COMPLETE — AWAITING FRESH INDEPENDENT REVIEW`.
+- **Key finding (unchanged):** product docs carry vocabulary superseded by the
+  shipped code (`external_service`/`carrier_event_only`, `over_fulfillment`,
+  `under_review`/`auto_matched`/`rejected`); U1 binds to the code values — logged as
+  TD-003, and the product docs are now annotated.
+- **Next session:** **fresh** independent Claude review of the corrected docs-only
+  package (memoryless of the authoring/correction sessions' reasoning, not
+  repository-blind) — exact prompt in
+  `docs/07-implementation-plan/wave-5-u1-gate-a/u1-gate-a-handoff.md` §7.
 
 ---
 

@@ -13,6 +13,35 @@
 > (File A §3 class 4 `carrier_event_only`, §5 multi-package edge row).
 > All strings illustrative (MBQ-22).
 
+> **⚠ U1 backing reconciliation (Wave 5 U1 Gate A status-layer reset, 2026-07-23 —
+> control-room ruling `5058042330`; non-destructive — this prototype stays
+> `Proposed`).** This screen renders the **full status-model carrier-milestone (A5)
+> vision**; the **U1 implementation binds only to what the accepted Wave 4 code backs
+> at `2583081f`**, per the canonical status-source & badge matrix in
+> [`../../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §12. At `2583081f` **A5 `FulfillmentEventStatus` is NOT stored as a normalized enum**,
+> so a **full A5 milestone-enum timeline is deferred**; U1's tracking surface renders
+> parsed `tracking_snapshot` (carrier/number/url) chips + the `delivered_inconsistency`
+> case (the delivered-inconsistency case itself lives on the fulfillment workspace /
+> review center — §8) and **never** derives A5 from the A7 `display_status_*` fields.
+> The taxonomy strip's **"FulfillmentOrder state" (A2)** chip has **no U1 backing field
+> → DEFERRED, no badge**. `carrier_event_only` is superseded origin vocabulary (no such
+> code origin class; see the status-model annotation / TD-003). Layers are never
+> merged (§12 / status model §1).
+>
+> **Unsupported "Delivered" is SUPPRESSED for U1 (binding).** Every "Delivered"
+> milestone rendered on this prototype is **illustrative content only**. U1 must
+> **not claim, display or offer** a "Delivered" outcome: no A5 `DELIVERED` milestone
+> is backed by a stored enum, and `delivered_inconsistency` /
+> `review_reason='delivered_not_validated'` are declared but **never written** at
+> `2583081f`. The only permitted delivered-adjacent surface is the
+> **delivered-inconsistency case when the backend actually sets the flag**, rendered
+> as a warning, never as a delivery confirmation. This suppression stands until a
+> real backend seam is separately authorized, implemented and independently proven.
+
+> **Re-verified 2026-07-25** against the current integrated backend `2583081f`: the
+> A5/A7/A2 dispositions above are unchanged (contract §0.1 Δ7).
+
 ## Purpose
 Answer one question — *where is the parcel physically?* — as a vertical
 carrier-milestone timeline for a single fulfillment, while making the

@@ -67,6 +67,19 @@ the accepted "waiting on a decision" presentation: danger family + hand icon
 | Leave for later | User | No change; case stays in the queue. |
 | Enable/disable Mode 2 | **Administrator** (not on this screen) | Context only — condition 16 and the mode chips reference it. |
 
+> **⚠ U1 role reconciliation (Wave 5 U1 Gate A status-layer reset, 2026-07-23 —
+> control-room ruling `5058042330`; non-destructive — this prototype stays
+> `Proposed`).** This surface is a **Connector User** surface (User =
+> operator∪reviewer∪auditor), but the individual actions are **server-gated per the
+> backend UI-contract inventory §6**, not uniformly "any User": the primary
+> **"Confirm — validate"** (`action_validate_proposed`) is a **Reviewer+** action
+> (server gate = reviewer **or** admin) — a pure **Operator cannot validate**;
+> **Import tracking** (`action_import_tracking`) and **Acknowledge**
+> (`action_acknowledge_external`) are **Operator+**. The status badge shown on the
+> case ("Shipped (confirmed)") is A4 `FulfillmentStatus` (`fulfillment_status_*`) —
+> correct per the canonical §12 matrix. A hidden/disabled button is never the
+> security control; the server enforces the gate.
+
 Blocked by design: no auto-apply on any failed condition; no lot/serial
 choice by the connector; unknown-origin fulfillments never treated as
 connector-created; no stock reversal from here.

@@ -1,0 +1,202 @@
+# Wave 5 U1 — SEC-2 Preflight Ruling
+
+> **Status: Gate A planning artifact — Docs-only. NOT accepted.** Produced
+> 2026-07-23; **corrected 2026-07-23** per control-room comment `5056513213`;
+> **reconciled 2026-07-25** against the merged SEC-2 implementation at
+> `2583081f97c94428dfd10325589b1b891eea240b`. Answers the mandatory SEC-2 preflight
+> (Gate A prompt §7).
+>
+> **PRESENT STATE: `SEC-2 IMPLEMENTED, INDEPENDENTLY ACCEPTED AND MERGED` — issue
+> #196 is CLOSED as completed.** The SEC-2-first blocking condition (D-P0-2) is
+> therefore **satisfied**. U1 implementation is still **not authorized**, but no
+> longer for SEC-2 reasons — see §7.
+>
+> *(Historical, superseded: this banner previously read "U1 production
+> implementation is BLOCKED until SEC-2 merges runtime-green." That described
+> 2026-07-23.)*
+
+## 1. What SEC-2 specifically means
+
+SEC-2 = **"Two-Role Migration & PII-Masking Simplification."** Governing
+documents (all present in-repo):
+
+- `docs/07-implementation-plan/task-sec2-two-role-and-pii-simplification-packet.md`
+  (implementation packet — Proposed 2026-07-16; technical method **Decided
+  2026-07-17, TA-C5**: Option 1 controlled full removal; retention cron rescoped
+  to log/audit redaction only).
+- `docs/02-product/connector-roles-and-permissions.md` (§3 no-masking, §4 4→2
+  migration, Option M-A).
+
+SEC-2 does exactly two things (packet §A):
+
+1. **Role migration (4 → 2 customer-facing roles).** Collapse the four internal
+   groups (`operator`, `reviewer`, `auditor`, `admin`) into two **customer-facing**
+   roles — **Connector User** and **Connector Administrator** — where
+   Administrator inherits every User capability. Method is **Option M-A**
+   (packet §D, roles §6): purely **additive** `implied_ids` — the four legacy
+   groups **remain as hidden capability primitives**, **no XML-ID rename**.
+   (Packet §H test 14: "admin resolves to all connector groups; user resolves to
+   user+operator+reviewer+auditor.")
+2. **PII-masking removal.** Remove the masked display field, the manual masking
+   action, and the scheduled masking of **customer-binding** snapshot fields from
+   the MVP. **Log/audit/credential/header redaction stays mandatory** (redaction ≠
+   masking).
+
+## 2. Status of SEC-2 — **MERGED (present tense, 2026-07-25)**
+
+- **The role half (issue #196) is implemented, independently reviewed, accepted and
+  MERGED** into `mvp/program-integration`; **issue #196 is closed as completed**.
+  It shipped exactly as the accepted method predicted — **Option M-A, purely
+  additive `implied_ids`, no XML-ID rename**. Exact XML IDs, `privilege_id`
+  assignment and the implied closure are recorded in
+  `u1-backend-ui-contract-inventory.md` **§8.1**, source-verified at `2583081f`.
+- **The PII-masking half is NOT implemented** at `2583081f`
+  (`shopify_connector_sale/models/shopify_connector_customer_binding.py` still
+  declares `pii_snapshot_masked`;
+  `core/models/shopify_connector_pii_retention.py` still declares
+  `action_mask_customer_pii`). Issue #196 was scoped to the roles only. This half
+  is **outside the fulfillment domain and outside U1** (see §3) — it neither blocks
+  U1 nor may be recorded as done.
+- **Wave placement (packet §F, wave-5 DoR §1/§3):** SEC-2 was the **first stage of
+  Wave 5**, sequenced **before U1** — binding sequence **SEC-2 → PERF-1 → U1 → U2
+  → U3**. The DoR §3 explicitly **rejected** "U1-first, SEC-2 flips afterwards."
+  That sequence was honoured: SEC-2 landed first.
+
+*(Historical, superseded: this section previously read "**Proposed**, with an
+accepted technical method (TA-C5, 2026-07-17). It is **not yet a merged
+implementation**." That described 2026-07-23.)*
+
+## 3. Which security requirements U0 and Wave 4 already cover
+
+- **Four connector groups exist and are enforced server-side**
+  (`core/security/shopify_connector_security.xml`): `group_shopify_connector_
+  auditor/operator/reviewer/admin`.
+- **Wave 4 fulfillment gates on these four groups** — field-level `groups=` on the
+  mode fields (admin), `has_group` checks in mode-switch/review/release actions,
+  and a four-row ACL matrix (auditor R / operator R,C / reviewer R,W / admin R,W,C).
+- **Wave 4 stores no customer PII in the fulfillment domain** — the fulfillment
+  binding declares `_pii_snapshot_fields() → []`; the evidence model holds no
+  name/email/phone/address field; **tracking data is not PII**. So the
+  PII-masking half of SEC-2 has **no surface inside U1**.
+- **U0 hardening** (merged): admin-boundary guards on store lifecycle actions;
+  redaction on logs; no raw tokens/tracebacks on screens; five-action security
+  matrix proven.
+- **SEC-1** (Wave 1, merged): protected-field enforcement, sanctioned sudo
+  writers, company isolation, credential secrecy, log/audit redaction — all
+  in force and unweakened.
+
+## 4. Which SEC-2 requirements remain missing — **present state**
+
+- **The two customer-facing roles now EXIST** and are merged:
+  `shopify_connector_core.group_shopify_connector_user` (**new**, group `name` =
+  `User`) and `shopify_connector_core.group_shopify_connector_admin` (**existing**
+  XML ID re-purposed, group `name` = `Administrator`), both carrying
+  `privilege_shopify_connector`. The four internal groups persist with
+  `privilege_id = False`. *(Historical, superseded: "do not exist yet; today only
+  the four internal groups exist.")*
+  - **Copy-deck caution `[Fact]`:** the shipped group `name` strings are `User` and
+    `Administrator` **within the `Shopify Connector` privilege** — not the literal
+    strings "Connector User" / "Connector Administrator" that this package uses as
+    role *concepts*. U1 copy must match the shipped labels wherever it names a
+    group, and must never rename a group.
+- **The Wave-1 masking artifacts still exist** in `shopify_connector_sale` /
+  `shopify_connector_core` (masked compute field, manual mask action, masking
+  sweep) — the SEC-2 packet removes them and **that removal has not happened**.
+  **None of these are in the fulfillment domain**, so this is not a U1 dependency;
+  it is tracked as remaining SEC-2 packet scope, not as U1 work, and is **not**
+  closed by issue #196.
+
+## 5. Can U1 safely proceed without implementing SEC-2 first?
+
+**Ruling (control-room comment 5056513213, binding): Gate A *planning* is NOT
+blocked by SEC-2. U1 *production implementation* was BLOCKED until SEC-2 was
+accepted, implemented, independently reviewed, Odoo.sh runtime-green, and MERGED
+into `mvp/program-integration` (D-P0-2 resolved SEC-2-FIRST). There is NO parallel
+four-internal-group path.**
+
+**That condition is now SATISFIED (2026-07-25): SEC-2 is merged and #196 is
+closed.** The binding *content* of the ruling — build against the final two-role
+model, never gate customer-facing visibility on the four internal groups — remains
+fully in force and is now buildable against real XML IDs. Reasoning (unchanged,
+and now confirmed against the shipped code):
+
+1. **The PII-masking half does not touch U1 at all.** Fulfillment stores no PII;
+   U1 renders no `*_masked` field and introduces no new PII surface. This half is
+   a no-op for U1.
+2. **U1 must build against the FINAL two-role model, not the four internal groups.**
+   SEC-2 **has introduced** the two customer-facing roles via Option-M-A additive
+   `implied_ids` — Connector User (the **new** `group_shopify_connector_user`) and
+   Connector Administrator (the **existing** `group_shopify_connector_admin`,
+   re-purposed — never renamed) — verified in source at `2583081f`. U1 **customer-facing view/menu/button visibility
+   gates on those two roles**; the four internal capability groups
+   (auditor/operator/reviewer/admin) remain the **server-side authorization
+   primitives** the two roles resolve to via the implied-group closure
+   (Administrator → User → operator/reviewer → auditor). Gating U1 visibility
+   directly on the four internal groups (the earlier alternative) is **removed**:
+   it would make the customer-facing UI contract depend on hidden legacy groups and
+   prove the visibility matrix twice — exactly the rework/UI-vs-ACL-disagreement the
+   SEC-2-first sequence exists to prevent (DoR §3 **rejects** "U1 on the old four
+   groups, SEC-2 flips afterwards").
+3. **The wave-5 DoR §3 binding sequence SEC-2 → PERF-1 → U1** was honoured: SEC-2
+   landed first; U1 will build role-gated views against the final two-role model.
+
+**Therefore:** Gate A planning proceeded; **SEC-2 has merged**, so the SEC-2 gate on
+U1 implementation is **satisfied**. Tests must still prove BOTH layers: (1)
+customer-facing two-role visibility (Connector User vs Connector Administrator
+affordances), and (2) direct-RPC server authorization/denial through the internal
+implied groups, with no privilege escalation and no UI/ACL disagreement. The final
+two-role group XML IDs are now **fixed and verifiable** in
+`core/security/shopify_connector_security.xml` — U1 uses those exact IDs and invents
+none. This is recorded as **resolved P0 decision D-P0-2** in
+`u1-risks-and-open-questions.md`.
+
+**SEC-3 addendum (2026-07-25).** Current-backend SEC-3 merged alongside SEC-2 in PR
+#203 and is a *separate* obligation from the role layer. Issue **#197 remains
+OPEN**, narrowed to future Wave-5-added surfaces and external multi-user UAT / RC
+confirmation. Consequently: every **new durable store-scoped U1 model or
+connector-to-connector relation**, if the U1 implementation introduces one, must be
+added to the inventory-driven SEC-3 guard, carry a stored related `company_id`,
+declare its parent scope relations, receive a fail-closed global company rule, and
+be covered by the SEC-3 matrix tests (acceptance **A23**; contract §8.2). U1's own
+design introduces no new durable model — only a `TransientModel` wizard, which is
+not store-scoped — so the expected result is "no new SEC-3 entry required", to be
+**proven, not assumed**. **#197 is not complete and U1 must not mark it so.**
+
+## 6. One genuine SEC-2 scope gap to surface (not a U1 blocker)
+
+SEC-2's **allowed-files list (packet §G) predates Wave 4** and lists only
+`core`/`sale` files; its **forbidden** list explicitly excludes "fulfillment …
+code." But Wave 4's fulfillment ACLs and `has_group` checks reference the four
+legacy groups. Under Option M-A this is harmless (the four groups persist, so the
+implied-role model still resolves), **but** if the control room later wants the
+two-role model *reflected in* fulfillment security wording/labels, SEC-2's scope
+must be extended, or fulfillment continues to rely on the four internal groups by
+design. Logged as **open P1 decision D-P1-3**. No change to Wave 4 is proposed by
+U1.
+
+## 7. Verdict (2026-07-25)
+
+**`SEC-2 MERGED — THE SEC-2 GATE ON U1 IMPLEMENTATION IS SATISFIED; U1
+IMPLEMENTATION REMAINS UNAUTHORIZED FOR OTHER REASONS`.**
+
+- **D-P0-2 is RESOLVED SEC-2-first and its condition is met** — SEC-2 is merged and
+  #196 is closed. There is no parallel four-internal-group path.
+- The remaining SEC-2-adjacent item is the **scope-coverage** clarification D-P1-3
+  (fulfillment continues relying on the four internal groups as server-side
+  primitives; no Wave 4 backend security is rewritten by U1) — unchanged and
+  confirmed against the shipped code, which added no ACL row and rewrote no
+  `has_group` check.
+- The SEC-2 packet's **PII-masking removal half remains unimplemented** and is
+  outside U1's surface; it is not claimed complete here.
+- U1 must still ship **no** masking surface, gate **customer-facing UI visibility on
+  the two SEC-2 roles** (never directly on the four internal groups), and keep the
+  four internal capability groups as the server-side authorization primitives those
+  roles resolve to.
+
+**What still blocks U1 implementation** (none of it SEC-2): a fresh independent
+Gate-A review of this re-anchored package; **D-P0-3**; the unchecked Wave-5
+G5-1…G5-9 gates; and the control room opening the U1 gate on an explicitly bound
+base SHA.
+
+*(Historical, superseded: the earlier verdict string was `SEC-2 DEFINED — U1 GATE A
+(PLANNING) NOT BLOCKED; U1 IMPLEMENTATION BLOCKED UNTIL SEC-2 MERGES`.)*

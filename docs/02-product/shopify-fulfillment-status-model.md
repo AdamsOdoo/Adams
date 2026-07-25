@@ -14,6 +14,44 @@
 > [`fulfillment-operating-modes.md`](fulfillment-operating-modes.md)
 > (Modes 1/2, review-case and reconciliation semantics referenced throughout).
 
+> **⚠ Superseded-vocabulary note (Wave 5 U1 Gate A, 2026-07-23 — non-destructive;
+> this document remains `Proposed`, status unchanged).** The **Layer C
+> (connector-derived)** vocabulary in §1 is **superseded by the shipped Wave 4
+> `shopify_connector_fulfillment` code** (verified at exact head
+> `2583081f97c94428dfd10325589b1b891eea240b`, re-verified 2026-07-25; the original
+> 2026-07-23 pass read the Wave 4 head `2d9cff0` *(historical)* and no binding
+> changed). The **Layer A** Shopify enums below
+> are unaffected (they are verbatim Shopify values). U1 binds to the **code** Layer-C
+> values; do not copy the superseded strings into any view/selection/test. The
+> section text below is **left unchanged** pending a separate product-doc
+> reconciliation (logged as **TD-003**; full reconciliation in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §10). **Pending edits** (anchored by section + context):
+>
+> | Section · anchor | Superseded value | Code-authoritative replacement |
+> |---|---|---|
+> | §1 "Layer C — connector-derived states", reconciliation-state enumeration | `under_review` / `auto_matched` / `rejected` | `review`; `auto_matched` and `rejected` are **absent** (not stored states); full set: `observed`/`review`/`acknowledged`/`applied`/`superseded` |
+> | §1 "Layer C — connector-derived states", origin-classes enumeration | `external_service` / `carrier_event_only` | `external_app` / (removed origin — carrier milestones surface via `delivered_inconsistency` + parsed `tracking_snapshot`, **not** the A7 `display_status_*` fields); full set: `connector`/`external_merchant`/`external_app`/`external_unknown` |
+>
+> **Not superseded — leave untouched (false positives):** the word "rejected" in the
+> **Layer A** Shopify tables (`REQUEST_DECLINED` "a fulfillment service rejected some
+> items"; `REJECTED` / `fo_req_rejected`; `CANCELLATION_REJECTED`) is a **Shopify**
+> enum/prose value, **not** the Layer C reconciliation state.
+>
+> **U1-backing disposition (Wave 5 U1 Gate A status-layer reset, 2026-07-23 — ruling
+> `5058042330`).** This document describes the full Shopify platform taxonomy
+> (Layer-A families A1–A7). **the integrated connector code at `2583081f` backs only a subset**, so U1
+> renders only the backed layers; the authoritative U1 status/badge source-of-truth
+> is the canonical matrix in
+> [`../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md`](../07-implementation-plan/wave-5-u1-gate-a/u1-backend-ui-contract-inventory.md)
+> §12. In particular: **A4** = `fulfillment_status_*`; **A7** (§4.1) =
+> `display_status_*` (display-only — never a carrier milestone); **A5** carrier
+> milestones (§5) are **not** stored as a normalized enum and surface only via
+> `delivered_inconsistency` + parsed `tracking_snapshot`; **A2** (§3.1), **A3**
+> (§3.2), **A6** (§3.3) have **no U1 backing field** at `2583081f` (deferred/outside
+> U1). This annotation is non-destructive; the section values below are unchanged and
+> the document stays **Proposed**.
+
 ---
 
 ## 1. Authoritative fulfillment-state taxonomy (four layers)
