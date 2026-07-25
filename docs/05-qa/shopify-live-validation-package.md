@@ -1,0 +1,220 @@
+# Shopify Live-Validation Package (executable)
+
+> **Status: Executable campaign package. Docs-only — NOT an acceptance, and
+> NOT authorisation to begin.** Produced 2026-07-25 on
+> `fable/wave-5-completion`. Execution is gated on a provisioned disposable
+> development store ([#200](https://github.com/AdamsOdoo/Adams/issues/200)) and
+> an explicit control-room instruction. **No step here has been executed, and
+> no result in it is claimed.**
+>
+> This package exists so that, the moment a store is provisioned, the campaign
+> can be run by someone who was not part of building the connector, in order,
+> without re-deriving anything.
+>
+> Residual alignment (issues are **not** modified by this package):
+> Gate D / CV-013 → [#185](https://github.com/AdamsOdoo/Adams/issues/185) ·
+> provisioning → [#200](https://github.com/AdamsOdoo/Adams/issues/200) ·
+> external multi-user confirmation → [#197](https://github.com/AdamsOdoo/Adams/issues/197) ·
+> Shopify-read performance and release thresholds → [#199](https://github.com/AdamsOdoo/Adams/issues/199).
+
+## 1. Entry criteria — all must hold before case 1
+
+| # | Criterion | Verified by |
+| --- | --- | --- |
+| E1 | A **disposable** Shopify development store exists, used by no other workload | Provisioner, recorded on #200 |
+| E2 | The exact connector SHA under test is frozen and recorded | `git rev-parse HEAD` in the run record |
+| E3 | Exact-SHA Odoo.sh runtime for that SHA is green | Odoo.sh build id |
+| E4 | Credentials are least-privilege per §2 and are **not** production credentials | Scope dump in §2.3 |
+| E5 | A named human owner is on point for the run and for revocation | Run record |
+| E6 | Rollback (§8) has been read and the store's pre-run state is captured (§3.3) | Baseline snapshot file |
+
+**If any entry criterion fails, STOP.** Do not partially run the campaign.
+
+## 2. Provisioning and least-privilege scopes
+
+### 2.1 Store
+
+A Shopify **development store** (never a live merchant store), created solely
+for this campaign, with no real customer data and no real payment method.
+
+### 2.2 App / credential
+
+A custom app on that store with an Admin API access token. The token is stored
+through the connector's own credential path — never pasted into a file, a
+document, a test fixture, a log, or a GitHub comment.
+
+### 2.3 Required scopes — request exactly these, and record the granted set
+
+| Scope | Why it is needed | Domain |
+| --- | --- | --- |
+| `read_orders` | Order import and order-binding reconciliation | Sale |
+| `read_products`, `read_inventory` | Product/variant read, inventory levels | Product, Inventory |
+| `write_inventory` | The CV-013 inventory mutation cases only | Inventory |
+| `read_assigned_fulfillment_orders`, `read_merchant_managed_fulfillment_orders` | FulfillmentOrder read | Fulfillment |
+| `write_assigned_fulfillment_orders`, `write_merchant_managed_fulfillment_orders` | Fulfillment create + tracking update | Fulfillment |
+| `read_customers` | Customer matching | Sale |
+
+**Explicitly NOT requested:** `write_orders`, `write_products`,
+`write_customers`, payments, price rules, discounts, files, themes, or any
+scope not named above. **Record the granted scope set verbatim** in the run
+record; a granted set wider than this table is itself a finding.
+
+### 2.4 Authorization gates
+
+- Every mutating case (M-*, R-*) requires a **named approver** recorded before
+  execution. Read-only cases (D-*) do not.
+- No case may run against any store other than the provisioned one. Each case
+  asserts the store identity (§3.2) before acting.
+- The connector's own Layer-2 substrate remains the only mutation path; no case
+  calls the Shopify API by hand.
+
+## 3. Synthetic data and identity guards
+
+### 3.1 Fixtures — synthetic only
+
+Products `ADAMS-UAT-P1..P5`, customers `Adams UAT Customer 1..3` with
+`@example.com` addresses and no real phone numbers, orders `#ADAMS-UAT-*`. No
+real person's name, address, email or phone enters the store at any point.
+
+### 3.2 Store-identity guard
+
+Before every case: assert the connector store record's `shop_domain` equals the
+provisioned store's domain **and** the connector's recorded shop identity
+matches. A mismatch is an immediate hard stop.
+
+### 3.3 Baseline snapshot
+
+Before case 1, record: product/variant count, inventory levels per location,
+order count, fulfillment count, and the FulfillmentOrder set for each seeded
+order. Cleanup (§7) is verified against this baseline.
+
+## 4. Numbered cases
+
+Legend — **Expected** is the observable result; **Evidence** is what must be
+captured, sanitized, and attached to the run record.
+
+### 4.1 Read / discovery (no mutation) — `D-*`
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| D-1 | Test connection with a valid credential | Succeeds; readiness reports API version and granted scopes | Redacted result, API version |
+| D-2 | Test connection with a revoked credential | Fails closed with an operator-readable reason; **no** token value in any log | Redacted log excerpt |
+| D-3 | Product + variant read | Seeded products import; no duplicate binding | Binding count, before/after |
+| D-4 | Customer read + deterministic matching | Each customer matches once; re-run creates no duplicate | Match keys, re-run delta |
+| D-5 | Order import | Seeded orders import to Odoo sale orders with correct totals/currency | Order bindings, totals |
+| D-6 | Order import **replay** (same page twice) | Zero duplicate orders or lines | Count delta = 0 |
+| D-7 | Inventory level read | Levels match Shopify per location | Level table |
+| D-8 | FulfillmentOrder read for a seeded order | FO GIDs and line items resolve | FO GID list |
+| D-9 | Pagination beyond one page | Every page consumed exactly once; no gap, no repeat | Cursor trace |
+| D-10 | Unknown/future enum value present | Preserved raw, flagged `schema_warning`, never treated as success | Evidence row |
+
+### 4.2 Inventory mutation — `M-INV-*` (closes CV-013 / #185)
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| M-INV-1 | Push a level change for one variant/location | Shopify reflects the exact quantity; one mutation attempt; one binding | Before/after level, attempt id |
+| M-INV-2 | Read-after-write | Read matches the written value | Level read |
+| M-INV-3 | Replay the same mutation | **No** second remote write; idempotency short-circuits | Attempt count = 1 |
+| M-INV-4 | Concurrent push of the same pair from two workers | Exactly one remote write; the other yields cleanly | Attempt ledger, PIDs |
+| M-INV-5 | Push while the store is disconnecting | Refused; no remote call | Job state |
+| M-INV-6 | Drift introduced in Shopify, then reconcile | Review case first; no silent overwrite | Review case, no write |
+| M-INV-7 | Uncertain outcome (transport interrupted mid-mutation) | **Reconcile-only**; never a blind resend | Attempt state, reconcile job |
+
+### 4.3 Fulfillment mutation — `M-FUL-*` (Gate D)
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| M-FUL-1 | Validate an Odoo delivery → create a Shopify fulfillment | One Fulfillment created; one binding; `notifyCustomer` follows the persisted enqueue-time decision | Fulfillment GID, binding |
+| M-FUL-2 | Replay the create | No second Fulfillment | Fulfillment count |
+| M-FUL-3 | Backorder: one FO fulfilled by two pickings | Two Fulfillments, one binding each; no FO-GID uniqueness violation | Binding rows |
+| M-FUL-4 | Tracking update on an existing fulfillment | Tracking reflected in Shopify | Tracking snapshot |
+| M-FUL-5 | Tracking update replay | No duplicate remote write | Attempt count |
+| M-FUL-6 | Uncertain outcome after C2 | Refused for resend; reconcile-only; the U1 release action **refuses** it | Attempt state, UI refusal |
+| M-FUL-7 | Externally created fulfillment observed (Mode 1) | Review case, `external_fulfillment_observed`, **zero** Odoo stock change | Evidence row, picking state |
+| M-FUL-8 | Mode 2 with all 16 conditions passing | Applied exactly once; ledger updated | Evidence, ledger |
+| M-FUL-9 | Mode 2 with one condition failing (each of the 16, in turn) | Held for review; nothing applied | 16 evidence rows |
+| M-FUL-10 | Carrier reports delivered, Odoo picking not validated | `delivered_inconsistency` set; **no** stock movement; U1 shows the qualified banner | Evidence row, screenshot |
+| M-FUL-11 | Mode switch 1→2 with the safe scan | Scan completes before any auto-apply | Job trace |
+| M-FUL-12 | Mode rollback 2→1 mid-flight | Pending evaluations cancelled to review; applied work untouched | Job states |
+
+### 4.4 Reconnect / reconciliation — `R-*`
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| R-1 | Disconnect, change data in Shopify, reconnect | Catch-up reconciles; no duplicate | Job trace, counts |
+| R-2 | Reconnect against a **different** store | Store-identity mismatch refuses fail-closed | Refusal record |
+| R-3 | Reconciliation scan watermark | Second scan does not re-process settled work | Scan trace |
+
+### 4.5 Security / privacy — `S-*`
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| S-1 | Grep every produced log/artifact for the token | Zero occurrences | Grep output |
+| S-2 | Force an API error and inspect the operator message | Redacted; no token, no raw payload | Message |
+| S-3 | Two-company / two-store isolation with real remote data | No cross-store or cross-company read | Matrix |
+| S-4 | Connector User attempts an Administrator-only remote action by direct RPC | `AccessError`, zero remote call | Attempt ledger empty |
+
+### 4.6 Performance (#199) — `P-*`
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| P-1 | Per-record Shopify-read reconciliation handler, 3 runs | Recorded as a **baseline only** | Timing table |
+| P-2 | Queue drain with real remote latency | Recorded as a **baseline only** | Throughput table |
+
+**No threshold is asserted by this package.** #199 remains open, and every
+number produced here is baseline-only, never a guarantee, budget or SLA.
+
+## 5. Expected-result discipline
+
+A case **passes** only when the observable result matches the Expected column
+exactly. "No error" is not a pass. A case that cannot be executed is recorded
+**NOT EXECUTED**, never inferred from a neighbouring case.
+
+## 6. Evidence handling (DEC-041 D3)
+
+Every result is converted to a **sanitized durable GitHub record before the
+runtime environment is torn down**. Ephemeral `/tmp` files, chat-only summaries
+and untransferred tool output are **not admissible**. Each record states the
+exact connector SHA, the Odoo.sh build id, the store domain, the case id, the
+observed result, and the evidence class. Screenshots are cropped to remove any
+credential surface.
+
+## 7. Cleanup and verification
+
+1. Delete every synthetic order, customer, product and variant created by the
+   campaign.
+2. Restore inventory levels to the §3.3 baseline.
+3. Re-read the store and **verify** the baseline matches; a residual row is a
+   finding, not a footnote.
+4. Record the residue sweep result even when it is zero.
+
+## 8. Credential revocation and rollback
+
+- **Revoke the access token immediately** after the final case, before the run
+  record is closed. Record the revocation timestamp.
+- Uninstall the custom app from the development store.
+- Rollback of connector behaviour is the ordinary branch revert; no case in this
+  package writes to production Odoo data.
+- If the campaign is aborted mid-way: revoke first, then record which cases ran,
+  then perform §7 for whatever was created.
+
+## 9. Triage
+
+| Severity | Definition | Action |
+| --- | --- | --- |
+| **P0** | Data loss, duplicate remote mutation, credential exposure, cross-company leak, or a blind resend after an uncertain outcome | **STOP the campaign.** Revoke, record, escalate to the control room immediately |
+| **P1** | A domain contract violated (idempotency, reconciliation, fail-closed) without data loss | Stop that domain; continue other domains; consolidated correction |
+| **P2** | Wrong or misleading operator-visible behaviour | Record; continue; fix in the consolidated correction batch |
+| **P3** | Wording/cosmetic | Record; fix in pass |
+
+Findings are consolidated into **one** correction batch per campaign (DEC-041
+D6), followed by one exact-SHA rerun of the affected cases.
+
+## 10. Exit criteria
+
+- Every case is **executed** and recorded as pass / fail / NOT EXECUTED.
+- No P0 and no P1 remains open.
+- Cleanup §7 verified against baseline, with the residue sweep recorded.
+- The token is revoked and the app uninstalled.
+- All records are durable on GitHub, sanitized, and name the exact SHA.
+- The control room, not the executing session, accepts the campaign.

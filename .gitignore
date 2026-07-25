@@ -214,3 +214,10 @@ __marimo__/
 .odoo-src/
 .connector-venv/
 ci-artifacts/
+
+# Local suite artifacts: logs are large and machine-specific. The durable
+# evidence is the sanitized record in docs/05-qa/, plus the screenshot set and
+# summary.json which ARE committed below.
+ci-artifacts/*.log
+ci-artifacts/odoo-data/
+ci-artifacts/odoo.conf
