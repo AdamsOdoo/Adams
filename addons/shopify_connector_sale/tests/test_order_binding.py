@@ -146,6 +146,12 @@ class TestOrderBinding(OrderImportCase):
             # forgery attempt like any other protected field -- including the
             # attempt to CLEAR it, which the loop below also exercises.
             'company_id': self.env.company.id,
+            # SEC-3 (#197): the scope quarantine is set only by the upgrade
+            # sweep and cleared only by the administrative release action, so
+            # a caller supplying it is forging exactly like any other
+            # protected field -- a writable quarantine flag would let the rows
+            # it hides unhide themselves.
+            'sec3_scope_quarantined': True,
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Order/Forged',
             'sale_order_id': other_order.id,
