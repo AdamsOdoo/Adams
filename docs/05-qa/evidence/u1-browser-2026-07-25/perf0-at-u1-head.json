@@ -1,0 +1,934 @@
+{
+  "baseline_row_ceiling": {
+    "product_product": 1,
+    "product_template": 1,
+    "res_partner": 5,
+    "sale_order": 0,
+    "sale_order_line": 0,
+    "shopify_connector_attribute_lock": 1,
+    "shopify_connector_call_lease": 0,
+    "shopify_connector_customer_binding": 0,
+    "shopify_connector_fulfillment_binding": 0,
+    "shopify_connector_fulfillment_inbound_evidence": 0,
+    "shopify_connector_fulfillment_inbound_evidence_line": 0,
+    "shopify_connector_fulfillment_mode_switch_wizard": 0,
+    "shopify_connector_fulfillment_review_release_wizard": 0,
+    "shopify_connector_inventory_level_binding": 0,
+    "shopify_connector_job": 0,
+    "shopify_connector_job_cancel_wizard": 0,
+    "shopify_connector_job_log": 0,
+    "shopify_connector_location": 0,
+    "shopify_connector_location_mapping": 0,
+    "shopify_connector_mutation_attempt": 0,
+    "shopify_connector_mutation_resolution_wizard": 0,
+    "shopify_connector_order_binding": 0,
+    "shopify_connector_product_template_binding": 0,
+    "shopify_connector_product_variant_binding": 0,
+    "shopify_connector_store": 1,
+    "shopify_connector_store_credential": 0,
+    "shopify_connector_store_settings": 1,
+    "shopify_connector_tax_mapping": 0
+  },
+  "environment": {
+    "connector_sha": "497b7e5f420897526bb0e5469c1cb53c03ffd71d",
+    "connector_worktree_dirty": false,
+    "database": "perf_u1",
+    "odoo_pin": "30bde9ff758834a4912c5ae55843d3a7dad849f1",
+    "odoo_pin_verified": true,
+    "odoo_sha": "30bde9ff758834a4912c5ae55843d3a7dad849f1",
+    "odoo_version": "19.0",
+    "pid": 4703,
+    "postgres": "PostgreSQL 16.14 (Ubuntu 16.14-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+    "postgres_server_version": "16.14 (Ubuntu 16.14-0ubuntu0.24.04.1)",
+    "python": "3.12.3"
+  },
+  "issue": "199 (PERF-0)",
+  "not_measured": "Per-record reconciliation HANDLERS perform Shopify reads and are not measured by this harness at any batch size. Issue #199 stays open for them; no fake transport was introduced.",
+  "passes": [
+    [
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.job": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 89.766,
+          "mean_ms": 62.544,
+          "min_ms": 46.144,
+          "p50_ms": 51.722,
+          "p95_ms": 89.766,
+          "p99_ms": 89.766,
+          "samples": 3,
+          "stdev_ms": 23.74
+        },
+        "max_rss_kb_delta": 1536,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 53,
+          "mean": 53.0,
+          "min": 53
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.job": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "job_enqueue",
+        "sql_exec_time_ms_delta": 25.41,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 0.777,
+          "mean_ms": 0.667,
+          "min_ms": 0.567,
+          "p50_ms": 0.657,
+          "p95_ms": 0.777,
+          "p99_ms": 0.777,
+          "samples": 3,
+          "stdev_ms": 0.105
+        },
+        "max_rss_kb_delta": 0,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "job_drain",
+        "sql_exec_time_ms_delta": 0.806,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.job": 200,
+          "shopify.connector.mutation.attempt": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 207.011,
+          "mean_ms": 198.008,
+          "min_ms": 193.334,
+          "p50_ms": 193.678,
+          "p95_ms": 207.011,
+          "p99_ms": 207.011,
+          "samples": 3,
+          "stdev_ms": 7.799
+        },
+        "max_rss_kb_delta": 1024,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 303,
+          "mean": 303.0,
+          "min": 303
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "shopify.connector.mutation.attempt": 200
+        },
+        "rows_before_teardown": {
+          "shopify.connector.job": 200,
+          "shopify.connector.mutation.attempt": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "layer2_intent",
+        "sql_exec_time_ms_delta": 71.903,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.job": 200,
+          "shopify.connector.mutation.attempt": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 257.371,
+          "mean_ms": 250.284,
+          "min_ms": 244.722,
+          "p50_ms": 248.76,
+          "p95_ms": 257.371,
+          "p99_ms": 257.371,
+          "samples": 3,
+          "stdev_ms": 6.46
+        },
+        "max_rss_kb_delta": 256,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 404,
+          "mean": 404.0,
+          "min": 404
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "shopify.connector.mutation.attempt": 200
+        },
+        "rows_before_teardown": {
+          "shopify.connector.job": 200,
+          "shopify.connector.mutation.attempt": 200,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "layer2_outcome",
+        "sql_exec_time_ms_delta": 86.801,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 0.698,
+          "mean_ms": 0.656,
+          "min_ms": 0.624,
+          "p50_ms": 0.646,
+          "p95_ms": 0.698,
+          "p99_ms": 0.698,
+          "samples": 3,
+          "stdev_ms": 0.038
+        },
+        "max_rss_kb_delta": 0,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "layer2_reconcile",
+        "sql_exec_time_ms_delta": 0.823,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 5.623,
+          "mean_ms": 4.923,
+          "min_ms": 4.388,
+          "p50_ms": 4.758,
+          "p95_ms": 5.623,
+          "p99_ms": 5.623,
+          "samples": 3,
+          "stdev_ms": 0.634
+        },
+        "max_rss_kb_delta": 4480,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 7,
+          "mean": 7.0,
+          "min": 7
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "order_binding_projection",
+        "sql_exec_time_ms_delta": 73.778,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 4.752,
+          "mean_ms": 4.592,
+          "min_ms": 4.45,
+          "p50_ms": 4.576,
+          "p95_ms": 4.752,
+          "p99_ms": 4.752,
+          "samples": 3,
+          "stdev_ms": 0.152
+        },
+        "max_rss_kb_delta": 896,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 7,
+          "mean": 7.0,
+          "min": 7
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "inventory_pair_projection",
+        "sql_exec_time_ms_delta": 64.731,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 4.428,
+          "mean_ms": 4.231,
+          "min_ms": 3.916,
+          "p50_ms": 4.349,
+          "p95_ms": 4.428,
+          "p99_ms": 4.428,
+          "samples": 3,
+          "stdev_ms": 0.275
+        },
+        "max_rss_kb_delta": 128,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 7,
+          "mean": 7.0,
+          "min": 7
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "fulfillment_evidence_projection",
+        "sql_exec_time_ms_delta": 68.464,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 2,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 4.149,
+          "mean_ms": 3.555,
+          "min_ms": 3.195,
+          "p50_ms": 3.32,
+          "p95_ms": 4.149,
+          "p99_ms": 4.149,
+          "samples": 3,
+          "stdev_ms": 0.518
+        },
+        "max_rss_kb_delta": 256,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 7,
+          "mean": 7.0,
+          "min": 7
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50,
+          "shopify.connector.job": 2
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 2,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "order_scan_admission",
+        "sql_exec_time_ms_delta": 66.293,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 8,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 6.871,
+          "mean_ms": 6.664,
+          "min_ms": 6.471,
+          "p50_ms": 6.649,
+          "p95_ms": 6.871,
+          "p99_ms": 6.871,
+          "samples": 3,
+          "stdev_ms": 0.201
+        },
+        "max_rss_kb_delta": 128,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 9,
+          "mean": 9.0,
+          "min": 9
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50,
+          "shopify.connector.job": 8
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 8,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "inventory_push_scan_admission",
+        "sql_exec_time_ms_delta": 70.647,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 2,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 12.89,
+          "mean_ms": 12.453,
+          "min_ms": 12.059,
+          "p50_ms": 12.409,
+          "p95_ms": 12.89,
+          "p99_ms": 12.89,
+          "samples": 3,
+          "stdev_ms": 0.418
+        },
+        "max_rss_kb_delta": 0,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 22,
+          "mean": 22.0,
+          "min": 22
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50,
+          "shopify.connector.job": 2
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.job": 2,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "fulfillment_reconciliation_admission",
+        "sql_exec_time_ms_delta": 72.037,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {
+          "mail_message": 50
+        },
+        "latency": {
+          "max_ms": 3.049,
+          "mean_ms": 2.804,
+          "min_ms": 2.609,
+          "p50_ms": 2.754,
+          "p95_ms": 3.049,
+          "p99_ms": 3.049,
+          "samples": 3,
+          "stdev_ms": 0.224
+        },
+        "max_rss_kb_delta": 128,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 3,
+          "mean": 3.0,
+          "min": 3
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {
+          "product.value": 50
+        },
+        "rows_before_teardown": {
+          "product.product": 50,
+          "product.template": 50,
+          "product.value": 50,
+          "res.partner": 1,
+          "sale.order": 50,
+          "sale.order.line": 50,
+          "shopify.connector.fulfillment.inbound.evidence": 50,
+          "shopify.connector.fulfillment.inbound.evidence.line": 100,
+          "shopify.connector.inventory.level.binding": 50,
+          "shopify.connector.location.mapping": 1,
+          "shopify.connector.order.binding": 50,
+          "shopify.connector.product.template.binding": 50,
+          "shopify.connector.product.variant.binding": 50,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "fulfillment_ledger_reconcile",
+        "sql_exec_time_ms_delta": 68.808,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 21.812,
+          "mean_ms": 21.235,
+          "min_ms": 20.2,
+          "p50_ms": 21.692,
+          "p95_ms": 21.812,
+          "p99_ms": 21.812,
+          "samples": 3,
+          "stdev_ms": 0.898
+        },
+        "max_rss_kb_delta": 0,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 50,
+          "mean": 50.0,
+          "min": 50
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "binding_lookup",
+        "sql_exec_time_ms_delta": 1.975,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 0.537,
+          "mean_ms": 0.47,
+          "min_ms": 0.398,
+          "p50_ms": 0.474,
+          "p95_ms": 0.537,
+          "p99_ms": 0.537,
+          "samples": 3,
+          "stdev_ms": 0.07
+        },
+        "max_rss_kb_delta": 0,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "lock_skiplocked",
+        "sql_exec_time_ms_delta": 1.07,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      },
+      {
+        "batch_size": 50,
+        "contention": {
+          "database_lock_calibration": {
+            "blocked_ms": 250.419,
+            "blocked_pid": 5081,
+            "blocking_pid": 5080,
+            "conclusive": true,
+            "label": "database lock calibration -- NOT connector acquisition",
+            "skip_locked_rows": 0,
+            "skip_locked_waited": 0.358,
+            "wait_event": "transactionid",
+            "wait_event_type": "Lock"
+          },
+          "production_claim": {
+            "blocking_expected": false,
+            "claim_elapsed_ms": 2.997,
+            "claimed_ids": [],
+            "conclusive": true,
+            "held_job_claimed": false,
+            "holder_backend_pid": 5080,
+            "production_method": "shopify.connector.job._claim_for_dispatch -> try_lock_for_update (FOR UPDATE SKIP LOCKED)"
+          }
+        },
+        "exact_id_survivors": {},
+        "fixture_rows_by_model": {
+          "shopify.connector.job": 1,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "framework_noise_rows_by_table": {},
+        "latency": {
+          "max_ms": 1.114,
+          "mean_ms": 1.063,
+          "min_ms": 0.987,
+          "p50_ms": 1.089,
+          "p95_ms": 1.114,
+          "p99_ms": 1.114,
+          "samples": 3,
+          "stdev_ms": 0.067
+        },
+        "max_rss_kb_delta": 256,
+        "new_rows_by_table": {},
+        "os_pid": 4703,
+        "pass": 1,
+        "queries_per_repetition": {
+          "max": 1,
+          "mean": 1.0,
+          "min": 1
+        },
+        "repeats": 3,
+        "residue_clean": true,
+        "rows_adopted_from_production_paths": {},
+        "rows_before_teardown": {
+          "shopify.connector.job": 1,
+          "shopify.connector.store": 1,
+          "shopify.connector.store.settings": 1
+        },
+        "scenario": "job_claim_contention",
+        "sql_exec_time_ms_delta": 1.249,
+        "sql_exec_time_source": "pg_stat_statements.total_exec_time",
+        "threshold_status": "BASELINE ONLY -- no accepted threshold exists (issue #199)",
+        "warmup_discarded": 1
+      }
+    ]
+  ],
+  "residue_failures": [],
+  "shopify_operations": "none",
+  "workload": {
+    "batch_size": 50,
+    "passes": 1,
+    "repeats": 3,
+    "scale": 1,
+    "scenarios": [
+      "job_enqueue",
+      "job_drain",
+      "layer2_intent",
+      "layer2_outcome",
+      "layer2_reconcile",
+      "order_binding_projection",
+      "inventory_pair_projection",
+      "fulfillment_evidence_projection",
+      "order_scan_admission",
+      "inventory_push_scan_admission",
+      "fulfillment_reconciliation_admission",
+      "fulfillment_ledger_reconcile",
+      "binding_lookup",
+      "lock_skiplocked",
+      "job_claim_contention"
+    ],
+    "warmup": 1
+  }
+}

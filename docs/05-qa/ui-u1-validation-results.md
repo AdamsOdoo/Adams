@@ -90,6 +90,39 @@ behaviour is unchanged while the additive property is restored.
 **Regression proof:** §2.2's numbers are the **post-fix** re-run. The failing
 assertion is part of the standing suite and now passes.
 
+### 2.4 Deterministic performance comparison (PERF-0 harness)
+
+`[Fact]` The existing `tools/perf0_baseline.py` harness was run at the U1 head on
+the same pinned Odoo/PostgreSQL environment. Durable report:
+[`evidence/u1-browser-2026-07-25/perf0-at-u1-head.json`](evidence/u1-browser-2026-07-25/perf0-at-u1-head.json).
+
+- **15 scenarios executed**, 1 warm-up discarded, 3 timed repetitions each.
+- **`residue_clean: true` for every scenario**; `residue_failures: []`.
+- **`shopify_operations: "none"`.**
+- Every scenario reports `threshold_status: "BASELINE ONLY -- no accepted
+  threshold exists (issue #199)"`.
+
+Selected p50 / p95 (ms): `job_drain` 0.66 / 0.78 · `layer2_reconcile` 0.65 / 0.70
+· `lock_skiplocked` 0.47 / 0.54 · `job_claim_contention` 1.09 / 1.11 ·
+`fulfillment_evidence_projection` 4.35 / 4.43 ·
+`fulfillment_ledger_reconcile` 2.75 / 3.05 ·
+`fulfillment_reconciliation_admission` 12.41 / 12.89 · `binding_lookup` 21.69 /
+21.81 · `job_enqueue` 51.72 / 89.77 · `layer2_intent` 193.68 / 207.01 ·
+`layer2_outcome` 248.76 / 257.37.
+
+**Interpretation `[Inference]`, stated conservatively.** U1 changes no backend
+code path: the diff adds views, menus, two `TransientModel` wizards that execute
+only while a dialog is open, and test files. None of the fifteen measured
+scenarios traverses U1 code, so **no regression is expected by construction**,
+and the run is consistent with that. This is recorded as a **baseline at the U1
+head**, not as a proof of no regression: a like-for-like comparison would need
+the same harness run on the base SHA in the same session, which was not done.
+
+**No number above is a guarantee, budget, threshold or SLA.** Issue #199 stays
+open, and the harness itself records that the per-record reconciliation
+**handlers** perform Shopify reads and are therefore **not measured** — no fake
+transport was introduced to manufacture a figure.
+
 ## 3. Driven browser / render evidence — PRODUCED, NOT DEFERRED
 
 `[Fact]` Real Chromium against a real Odoo 19 HTTP server rendering the real U1
