@@ -76,3 +76,26 @@ class ShopifyConnectorProductVariantBinding(models.Model):
         'UNIQUE(store_id, product_variant_id)',
         'This product.product is already bound for this store.',
     )
+
+    # ------------------------------------------------------------------
+    # SEC-3 (#197): same-store consistency with the connector parent.
+    #
+    # Company equality is NOT enough here. One Odoo company may own several
+    # Shopify stores, so a row in store A pointing at a parent in store B is
+    # company-consistent and store-inconsistent -- two different shops' records
+    # mixed together, which no company check can see. `init()` additionally
+    # quarantines rows written before this constraint existed; it never guesses
+    # which half is wrong and never re-homes anything.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (('product_template_binding_id', 'store'),)
+
+    @api.constrains('store_id', 'product_template_binding_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()

@@ -20,6 +20,10 @@ class TestCustomerBinding(TransactionCase):
         # SEC-3 (#197): the store-derived company. Protected, not caller input
         # -- a binding's company is whatever its store's company is.
         'company_id',
+        # SEC-3 (#197): set only by the upgrade scope sweep and cleared only by
+        # the administrative release action. A caller-writable quarantine flag
+        # would let exactly the rows it hides unhide themselves.
+        'sec3_scope_quarantined',
         'store_id',
         'shopify_gid',
         'partner_id',
@@ -250,6 +254,7 @@ class TestCustomerBinding(TransactionCase):
             # forgery attempt like any other protected field -- including the
             # attempt to CLEAR it, which the loop below also exercises.
             'company_id': self.env.company.id,
+            'sec3_scope_quarantined': True,
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Customer/Forged',
             'partner_id': other_partner.id,

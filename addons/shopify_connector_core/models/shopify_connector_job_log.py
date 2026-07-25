@@ -14,6 +14,7 @@ class ShopifyConnectorJobLog(models.Model):
     """
 
     _name = 'shopify.connector.job.log'
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Job Log'
 
     job_id = fields.Many2one(
@@ -102,3 +103,26 @@ class ShopifyConnectorJobLog(models.Model):
             'payload_snapshot': redact(payload_snapshot) if payload_snapshot else payload_snapshot,
             'actor_uid': self.env.uid,
         })
+
+    # ------------------------------------------------------------------
+    # SEC-3 (#197): same-store consistency with the connector parent.
+    #
+    # Company equality is NOT enough here. One Odoo company may own several
+    # Shopify stores, so a row in store A pointing at a parent in store B is
+    # company-consistent and store-inconsistent -- two different shops' records
+    # mixed together, which no company check can see. `init()` additionally
+    # quarantines rows written before this constraint existed; it never guesses
+    # which half is wrong and never re-homes anything.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (('job_id', 'store'),)
+
+    @api.constrains('store_id', 'job_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()

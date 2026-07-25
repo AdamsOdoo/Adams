@@ -117,6 +117,14 @@ CORE_SUDO_SITES = [
      '_drain_cron_active_state', 'cron', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'Job', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'job', 1),
+    # SEC-3 (#197) scope-mixin seams. The upgrade sweep must see rows that the
+    # fail-closed rules hide from every ordinary reader -- including, by
+    # design, rows it is about to quarantine. The release action re-runs the
+    # consistency check under sudo before clearing anything.
+    ('shopify_connector_scope_mixin.py',
+     '_sec3_quarantine_scope_mismatches', 'self', 1),
+    ('shopify_connector_scope_mixin.py',
+     'action_sec3_release_scope_quarantine', 'self', 1),
     ('shopify_connector_stale_owner_sweep.py',
      '_positive_int_parameter', "self.env['ir.config_parameter']", 1),
     ('shopify_connector_stale_owner_sweep.py', 'run_sweep', 'job', 1),
@@ -205,6 +213,12 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_drain_cron_active_state'): 'Read cron configuration.',
     ('shopify_connector_readiness_check.py',
      'run_for_store'): 'Readiness audit job lifecycle.',
+    ('shopify_connector_scope_mixin.py',
+     '_sec3_quarantine_scope_mismatches'):
+        'SEC-3 historic scope sweep over fail-closed rows.',
+    ('shopify_connector_scope_mixin.py',
+     'action_sec3_release_scope_quarantine'):
+        'SEC-3 administrative quarantine release re-check.',
     ('shopify_connector_stale_owner_sweep.py',
      '_positive_int_parameter'): 'Read sweep configuration.',
     ('shopify_connector_stale_owner_sweep.py',

@@ -23,6 +23,10 @@ class TestProductVariantBinding(TransactionCase):
         # SEC-3 (#197): the store-derived company. Protected, not caller input
         # -- a binding's company is whatever its store's company is.
         'company_id',
+        # SEC-3 (#197): set only by the upgrade scope sweep and cleared only by
+        # the administrative release action. A caller-writable quarantine flag
+        # would let exactly the rows it hides unhide themselves.
+        'sec3_scope_quarantined',
         'store_id',
         'shopify_gid',
         'product_variant_id',
@@ -268,8 +272,14 @@ class TestProductVariantBinding(TransactionCase):
             'shop_domain': 'protected-variant-target.myshopify.com',
             'api_version': '2026-07',
         })
+        # SEC-3 (#197): the binding lives in the SAME store as its template
+        # binding. It previously lived in `other_store` while pointing at a
+        # template binding in `self.store` -- a cross-store pair that the
+        # same-store constraint now refuses outright. `other_store` keeps its
+        # role as the forgery TARGET below, which is what the test is actually
+        # about.
         binding = self.VariantBinding.sudo().create({
-            'store_id': other_store.id,
+            'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/ProtectedSurface',
             'product_variant_id': variant.id,
             'product_template_binding_id': template_binding.id,
@@ -292,7 +302,8 @@ class TestProductVariantBinding(TransactionCase):
             # forgery attempt like any other protected field -- including the
             # attempt to CLEAR it, which the loop below also exercises.
             'company_id': self.env.company.id,
-            'store_id': self.store.id,
+            'sec3_scope_quarantined': True,
+            'store_id': other_store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/Forged',
             'product_variant_id': other_variant.id,
             'status': 'manually_overridden',

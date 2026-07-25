@@ -18,6 +18,10 @@ class TestInventoryLevelBinding(TransactionCase):
         # SEC-3 (#197): the store-derived company. Protected, not caller input
         # -- a binding's company is whatever its store's company is.
         'company_id',
+        # SEC-3 (#197): set only by the upgrade scope sweep and cleared only by
+        # the administrative release action. A caller-writable quarantine flag
+        # would let exactly the rows it hides unhide themselves.
+        'sec3_scope_quarantined',
         'store_id',
         'shopify_gid',
         'status',

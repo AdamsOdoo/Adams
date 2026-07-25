@@ -28,6 +28,21 @@
             Historic stores with no company are invisible here by design;
             `shopify.connector.store.action_assign_company` is the
             administrative remediation path.
+
+            SECOND LEAF — `sec3_scope_quarantined`. Company alone cannot
+            express same-STORE agreement, because one company may own
+            several stores: a job log in store A pointing at a job in
+            store B passes every company check while mixing two shops'
+            records. A record-rule domain cannot compare two of a
+            record's own fields, so there is no
+            `('store_id', '=', 'job_id.store_id')` to write. Rows that
+            disagree with a connector parent are therefore flagged by the
+            upgrade sweep in `shopify.connector.scope.mixin` and excluded
+            here. New rows of that shape are refused outright by
+            `_check_sec3_parent_scope`; the flag exists for rows written
+            before that constraint did. Nothing is ever re-homed
+            automatically — see the mixin's module docstring for why
+            guessing which half is wrong would be worse than hiding both.
         -->
 
         <record id="store_company_rule" model="ir.rule">
@@ -61,21 +76,21 @@
         <record id="job_company_rule" model="ir.rule">
             <field name="name">Shopify job: own company only</field>
             <field name="model_id" ref="model_shopify_connector_job"/>
-            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="job_log_company_rule" model="ir.rule">
             <field name="name">Shopify job log: own company only</field>
             <field name="model_id" ref="model_shopify_connector_job_log"/>
-            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
             <field name="global" eval="True"/>
         </record>
 
         <record id="mutation_attempt_company_rule" model="ir.rule">
             <field name="name">Shopify mutation attempt: own company only</field>
             <field name="model_id" ref="model_shopify_connector_mutation_attempt"/>
-            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
             <field name="global" eval="True"/>
         </record>
 

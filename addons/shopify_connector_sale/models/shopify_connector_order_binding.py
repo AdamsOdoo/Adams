@@ -267,3 +267,12 @@ class ShopifyConnectorOrderBinding(models.Model):
                 )
             )
         return True
+
+    # ------------------------------------------------------------------
+    # SEC-3 (#197). This model owns no connector-to-connector relation: the
+    # link to a fulfillment binding is declared in the OTHER direction, on
+    # `shopify.connector.fulfillment.binding.order_binding_id`, and is
+    # constrained there. The binding mixin still contributes
+    # `sec3_scope_quarantined`, so an order binding whose parent chain is
+    # quarantined stays hidden with it.
+    # ------------------------------------------------------------------

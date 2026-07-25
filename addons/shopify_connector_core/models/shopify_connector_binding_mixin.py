@@ -21,6 +21,12 @@ _AUTOMATIC_BINDING_FIELDS = frozenset((
 ))
 _COMMON_PROTECTED_BINDING_FIELDS = frozenset((
     'store_id',
+    # SEC-3 (#197): the scope quarantine flag is set only by the upgrade scan
+    # and cleared only by the administrative release action. Listing it here
+    # makes any attempt to pass it through an ordinary create/write raise
+    # AccessError -- a caller-writable quarantine flag would let exactly the
+    # rows it hides unhide themselves.
+    'sec3_scope_quarantined',
     # SEC-3 (#197): company is derived from the owning store, so it is
     # structure, never caller input. Listing it here does two things at once:
     # it satisfies `_assert_binding_field_classification`, and it makes any
@@ -42,6 +48,12 @@ class ShopifyConnectorBindingMixin(models.AbstractModel):
     """The per-domain-concrete-on-core-contract shape (DEC-013)."""
 
     _name = 'shopify.connector.binding.mixin'
+    # SEC-3 (#197): every binding inherits the same-store scope machinery.
+    # Bindings are exactly where connector-to-connector relations live (a
+    # variant binding points at a template binding, an inventory pair at both a
+    # variant binding and a location mapping), and a company check cannot catch
+    # a cross-STORE link inside one company.
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Binding Mixin'
 
     store_id = fields.Many2one(

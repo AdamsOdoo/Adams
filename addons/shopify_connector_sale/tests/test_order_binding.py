@@ -55,6 +55,10 @@ class TestOrderBinding(OrderImportCase):
         # SEC-3 (#197): the store-derived company. Protected, not caller input
         # -- a binding's company is whatever its store's company is.
         'company_id',
+        # SEC-3 (#197): set only by the upgrade scope sweep and cleared only by
+        # the administrative release action. A caller-writable quarantine flag
+        # would let exactly the rows it hides unhide themselves.
+        'sec3_scope_quarantined',
         'store_id', 'shopify_gid', 'sale_order_id', 'status', 'match_key',
         'matched_by_uid', 'matched_at', 'override_uid', 'override_at',
         'override_previous_candidate',
@@ -92,8 +96,8 @@ class TestOrderBinding(OrderImportCase):
             self.Binding._protected_binding_fields(),
             self.EXPECTED_PROTECTED_FIELDS,
         )
-        # 50 + SEC-3 `company_id` (#197).
-        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 51)
+        # 50 + SEC-3 `company_id` and `sec3_scope_quarantined` (#197).
+        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 52)
 
     def test_every_stored_connector_field_is_classified(self):
         stored = {
