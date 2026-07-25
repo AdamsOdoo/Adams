@@ -42,5 +42,6 @@ from . import test_ui_source_guards
 from . import test_shopify_connector_location
 # Issue #193/#157 regression guard for the Odoo 19 test-phase contract.
 from . import test_phase_contract
+from . import test_sec3_store_ownership
 # SEC-2 (issue #196) customer-facing connector roles.
 from . import test_sec2_roles

@@ -3,6 +3,7 @@ import re
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+from odoo.exceptions import UserError
 
 from ..models.shopify_connector_order_importer import ORDER_HEADER_QUERY
 from .test_order_import_mapping import OrderImportCase
@@ -131,11 +132,28 @@ class TestOrderCustomerResolution(OrderImportCase):
             'name': 'Other Company Customer',
             'company_id': other_company.id,
         })
-        self.env['shopify.connector.customer.binding'].sudo().create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Customer/OtherCompany',
-            'partner_id': partner.id,
-        })
+        # SEC-3 (#197): this binding can no longer be CREATED through the ORM
+        # -- a store belongs to exactly one company and Odoo's `_check_company`
+        # refuses a foreign-company partner, under `sudo()` too. Assert that
+        # first (it is the stronger, earlier protection), then plant the row
+        # with SQL so the importer's own company boundary is still exercised
+        # against a HISTORIC binding, which is the case it exists for.
+        with self.assertRaises(UserError):
+            with self.env.cr.savepoint():
+                self.env['shopify.connector.customer.binding'].sudo().create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/Customer/OtherCompany',
+                    'partner_id': partner.id,
+                })
+        self.env.cr.execute(
+            "INSERT INTO shopify_connector_customer_binding "
+            "(store_id, company_id, shopify_gid, partner_id, status, "
+            " create_uid, create_date, write_uid, write_date) "
+            "VALUES (%s, %s, 'gid://shopify/Customer/OtherCompany', %s, "
+            "'active', 1, now(), 1, now())",
+            (self.store.id, self.store.company_id.id, partner.id),
+        )
+        self.env['shopify.connector.customer.binding'].invalidate_model()
         payload = self._payload('gid://shopify/Order/OtherCompany')
         payload['customer'] = {
             'id': 'gid://shopify/Customer/OtherCompany',

@@ -38,21 +38,33 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         super().setUpClass()
         cls.company_a = cls.env.company
         cls.company_b = cls.env['res.company'].create({'name': 'SEC-3 inv company B'})
-        cls.store = cls.env['shopify.connector.store'].create({
-            'name': 'SEC-3 inventory store',
-            'shop_domain': 'sec3-inventory.myshopify.com',
-            'api_version': '2026-07',
-        })
+        # SEC-3 ownership correction (control-room MVP decision, 2026-07-25):
+        # a store belongs to exactly ONE company, so each company gets its own
+        # store. Binding a company-B location or product to a company-A store is
+        # now refused outright by Odoo's `_check_company`.
+        cls.store = cls._store('A', cls.company_a)
+        cls.store_b = cls._store('B', cls.company_b)
         cls.user_a = cls._role_user('a', cls.company_a)
         cls.user_b = cls._role_user('b', cls.company_b)
 
         cls.location_a = cls._location('A', cls.company_a)
         cls.location_b = cls._location('B', cls.company_b)
-        cls.mapping_a = cls._mapping(cls.location_a, 'A')
-        cls.mapping_b = cls._mapping(cls.location_b, 'B')
+        cls.mapping_a = cls._mapping(cls.store, cls.location_a, 'A')
+        cls.mapping_b = cls._mapping(cls.store_b, cls.location_b, 'B')
 
-        cls.template_a, cls.variant_binding_a = cls._product('A', cls.company_a)
-        cls.template_b, cls.variant_binding_b = cls._product('B', cls.company_b)
+        cls.template_a, cls.variant_binding_a = cls._product(
+            cls.store, 'A', cls.company_a)
+        cls.template_b, cls.variant_binding_b = cls._product(
+            cls.store_b, 'B', cls.company_b)
+
+    @classmethod
+    def _store(cls, tag, company):
+        return cls.env['shopify.connector.store'].sudo().create({
+            'name': 'SEC-3 inventory store %s' % tag,
+            'shop_domain': 'sec3-inventory-%s.myshopify.com' % tag.lower(),
+            'api_version': '2026-07',
+            'company_id': company.id,
+        })
 
     @classmethod
     def _role_user(cls, label, company):
@@ -76,7 +88,7 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         })
 
     @classmethod
-    def _mapping(cls, location, tag):
+    def _mapping(cls, store, location, tag):
         # `with_company` is required, not incidental: the connector's write-side
         # guard `_check_location_company_consistency` fails closed when the
         # mapped location is outside `self.env.company`. Building the company-B
@@ -86,14 +98,14 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         return cls.env['shopify.connector.location.mapping'].sudo().with_company(
             location.company_id
         ).create({
-            'store_id': cls.store.id,
+            'store_id': store.id,
             'shopify_gid': 'gid://shopify/Location/SEC3%s' % tag,
             'odoo_location_id': location.id,
             'match_key': 'manual',
         })
 
     @classmethod
-    def _product(cls, tag, company):
+    def _product(cls, store, tag, company):
         template = cls.env['product.template'].sudo().with_company(company).create({
             'name': 'SEC-3 product %s' % tag,
             'company_id': company.id,
@@ -101,21 +113,21 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         template_binding = cls.env[
             'shopify.connector.product.template.binding'
         ].sudo().with_company(company).create({
-            'store_id': cls.store.id,
+            'store_id': store.id,
             'shopify_gid': 'gid://shopify/Product/SEC3%s' % tag,
             'product_template_id': template.id,
         })
         variant_binding = cls.env[
             'shopify.connector.product.variant.binding'
         ].sudo().with_company(company).create({
-            'store_id': cls.store.id,
+            'store_id': store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/SEC3%s' % tag,
             'product_variant_id': template.product_variant_id.id,
             'product_template_binding_id': template_binding.id,
         })
         return template, variant_binding
 
-    def _pair(self, variant_binding, mapping, tag, company=None):
+    def _pair(self, variant_binding, mapping, tag, company=None, store=None):
         """Create a pair. `company` must match both parents' company.
 
         `_check_company_consistency` is an `@api.constrains` validation, so it
@@ -127,7 +139,7 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         if company is not None:
             model = model.with_company(company)
         return model.create({
-            'store_id': self.store.id,
+            'store_id': (store or self.store).id,
             'product_variant_binding_id': variant_binding.id,
             'location_mapping_id': mapping.id,
             'shopify_inventory_item_gid': 'gid://shopify/InventoryItem/SEC3%s' % tag,
@@ -226,6 +238,7 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
     def test_pair_hidden_when_both_parents_are_foreign(self):
         pair = self._pair(
             self.variant_binding_b, self.mapping_b, 'BB', company=self.company_b,
+            store=self.store_b,
         )
         visible = self._as(
             self.user_a, 'shopify.connector.inventory.level.binding'
@@ -283,7 +296,7 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
         """sudo() must keep bypassing, or synchronisation breaks."""
         pair = self._pair(
             self.variant_binding_b, self.mapping_b, 'SUDO',
-            company=self.company_b,
+            company=self.company_b, store=self.store_b,
         )
         self.assertIn(
             pair.id,
@@ -302,11 +315,17 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
                 'record rule' % model,
             )
 
-    def test_neutral_models_carry_no_company_rule(self):
-        """The audit classifies these NEUTRAL; a rule here would be wrong.
+    def test_control_plane_models_carry_a_fail_closed_company_rule(self):
+        """The inverse of the assertion this replaces.
 
-        Scoping the store-scoped control plane by company would hide an
-        operator's own store and jobs from them.
+        The superseded version asserted these four models carry NO record rule,
+        on the reasoning that the store-scoped control plane is company-neutral.
+        That is precisely the gap #197 reported: it left every store,
+        credential, job and log cross-readable. Each now carries a fail-closed
+        rule, and the domain is checked -- not merely the rule's existence --
+        because a rule with the permissive `company_id = False` escape would
+        satisfy a presence-only assertion while still leaking every row whose
+        owner could not be proven.
         """
         Rule = self.env['ir.rule'].sudo()
         for model in ('shopify.connector.store',
@@ -314,8 +333,17 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
                       'shopify.connector.job.log',
                       'shopify.connector.store.credential'):
             rules = Rule.search([('model_id.model', '=', model)])
-            self.assertFalse(
+            self.assertTrue(
                 rules,
-                '%s is classified NEUTRAL in the SEC-3 audit but carries a '
-                'record rule: %s' % (model, rules.mapped('name')),
+                '%s is store-scoped and must carry a company record rule' % model,
+            )
+            domains = ' '.join(rules.mapped('domain_force'))
+            self.assertIn(
+                "('company_id', 'in', company_ids)", domains,
+                '%s must be scoped to the reader activated companies' % model,
+            )
+            self.assertNotIn(
+                "('company_id', '=', False)", domains,
+                '%s must be FAIL-CLOSED: a row with no provable owner is '
+                'visible to nobody, not shared with everybody' % model,
             )

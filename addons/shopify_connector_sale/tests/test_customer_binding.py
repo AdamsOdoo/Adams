@@ -17,6 +17,9 @@ from odoo.tools import mute_logger
 class TestCustomerBinding(TransactionCase):
 
     EXPECTED_PROTECTED_FIELDS = frozenset((
+        # SEC-3 (#197): the store-derived company. Protected, not caller input
+        # -- a binding's company is whatever its store's company is.
+        'company_id',
         'store_id',
         'shopify_gid',
         'partner_id',
@@ -243,6 +246,10 @@ class TestCustomerBinding(TransactionCase):
             'shopify_last_imported_at': '2000-01-03 00:00:00',
         })
         attempted_values = {
+            # SEC-3 (#197): company is store-derived, so supplying it is a
+            # forgery attempt like any other protected field -- including the
+            # attempt to CLEAR it, which the loop below also exercises.
+            'company_id': self.env.company.id,
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Customer/Forged',
             'partner_id': other_partner.id,

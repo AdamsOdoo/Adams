@@ -33,11 +33,14 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
         cls.company_a = cls.env.company
         cls.company_b = cls.env['res.company'].create({'name': 'SEC-3 company B'})
 
-        cls.store = cls.env['shopify.connector.store'].create({
-            'name': 'SEC-3 isolation store',
-            'shop_domain': 'sec3-isolation.myshopify.com',
-            'api_version': '2026-07',
-        })
+        # SEC-3 ownership correction (control-room MVP decision, 2026-07-25):
+        # a store belongs to exactly ONE company, so the two companies get one
+        # store EACH. The previous shape -- a single store carrying bindings for
+        # both companies -- is now refused by Odoo's `_check_company`, and that
+        # refusal is itself asserted in
+        # shopify_connector_core/tests/test_sec3_store_ownership.py.
+        cls.store = cls._store('A', cls.company_a)
+        cls.store_b = cls._store('B', cls.company_b)
 
         # A reader that may only ever see company A.
         cls.user_a = cls._role_user('a', cls.company_a)
@@ -46,8 +49,17 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
 
         cls.partner_a = cls._partner('SEC-3 partner A', cls.company_a)
         cls.partner_b = cls._partner('SEC-3 partner B', cls.company_b)
-        cls.binding_a = cls._customer_binding(cls.partner_a, 'A')
-        cls.binding_b = cls._customer_binding(cls.partner_b, 'B')
+        cls.binding_a = cls._customer_binding(cls.store, cls.partner_a, 'A')
+        cls.binding_b = cls._customer_binding(cls.store_b, cls.partner_b, 'B')
+
+    @classmethod
+    def _store(cls, tag, company):
+        return cls.env['shopify.connector.store'].sudo().create({
+            'name': 'SEC-3 isolation store %s' % tag,
+            'shop_domain': 'sec3-isolation-%s.myshopify.com' % tag.lower(),
+            'api_version': '2026-07',
+            'company_id': company.id,
+        })
 
     @classmethod
     def _role_user(cls, label, company):
@@ -69,9 +81,9 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
         })
 
     @classmethod
-    def _customer_binding(cls, partner, tag):
+    def _customer_binding(cls, store, partner, tag):
         return cls.env['shopify.connector.customer.binding'].sudo().create({
-            'store_id': cls.store.id,
+            'store_id': store.id,
             'shopify_gid': 'gid://shopify/Customer/SEC3%s' % tag,
             'partner_id': partner.id,
             'match_key': 'email',
@@ -152,8 +164,8 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
     def test_order_binding_visible_only_within_its_company(self):
         order_a = self._sale_order(self.company_a, self.partner_a)
         order_b = self._sale_order(self.company_b, self.partner_b)
-        ob_a = self._order_binding(order_a, 'A')
-        ob_b = self._order_binding(order_b, 'B')
+        ob_a = self._order_binding(self.store, order_a, 'A')
+        ob_b = self._order_binding(self.store_b, order_b, 'B')
 
         visible = self._as(self.user_a, 'shopify.connector.order.binding').search([])
         self.assertIn(ob_a.id, visible.ids)
@@ -164,31 +176,34 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
             'partner_id': partner.id, 'company_id': company.id,
         })
 
-    def _order_binding(self, order, tag):
+    def _order_binding(self, store, order, tag):
         return self.env['shopify.connector.order.binding'].sudo().create({
-            'store_id': self.store.id,
+            'store_id': store.id,
             'shopify_gid': 'gid://shopify/Order/SEC3%s' % tag,
             'sale_order_id': order.id,
         })
 
     # ------------------------------------------------------------------
-    # Neutral models must stay readable (the rules must not over-reach)
+    # The control plane is OWNED, not neutral
     # ------------------------------------------------------------------
 
-    def test_store_and_job_remain_visible_across_companies(self):
-        """The store is store-scoped and NEUTRAL by design (audit §3.3).
+    def test_each_company_sees_its_own_store_and_not_the_other(self):
+        """This assertion is the inverse of the one it replaces.
 
-        If a future change accidentally scopes the control plane by company,
-        every operator loses their own store; this guards that direction.
+        The superseded version asserted that BOTH companies could see the same
+        connector store, on the reasoning that a Shopify store is not an Odoo
+        company. That reading left the whole control plane cross-readable and
+        did not satisfy #197. Under the MVP ownership decision each store has
+        exactly one owner -- so the guard now runs in both directions: you keep
+        seeing your own store, and you never see the other company's.
         """
-        for user in (self.user_a, self.user_b):
-            stores = self._as(user, 'shopify.connector.store').search(
-                [('id', '=', self.store.id)]
-            )
-            self.assertEqual(
-                stores.ids, [self.store.id],
-                '%s must still see the connector store' % user.login,
-            )
+        visible_a = self._as(self.user_a, 'shopify.connector.store').search([]).ids
+        self.assertIn(self.store.id, visible_a)
+        self.assertNotIn(self.store_b.id, visible_a)
+
+        visible_b = self._as(self.user_b, 'shopify.connector.store').search([]).ids
+        self.assertIn(self.store_b.id, visible_b)
+        self.assertNotIn(self.store.id, visible_b)
 
     # ------------------------------------------------------------------
     # sudo() must still bypass, or synchronisation breaks

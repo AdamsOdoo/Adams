@@ -122,6 +122,12 @@ CORE_SUDO_SITES = [
     ('shopify_connector_stale_owner_sweep.py', 'run_sweep', 'job', 1),
     ('shopify_connector_store.py', '_apply_probe_failure', 'job', 1),
     ('shopify_connector_store.py', '_audit_probe_superseded', 'job', 1),
+    # SEC-3 (#197) ownership seams. Both are deliberate and both are recorded
+    # here because this guard is the audit: a new sudo() in core is a change to
+    # the trust surface, not an implementation detail.
+    ('shopify_connector_store.py', '_backfill_company',
+     "self.env['res.company']", 1),
+    ('shopify_connector_store.py', 'action_assign_company', 'self', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
      'Job', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
@@ -207,6 +213,17 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_apply_probe_failure'): 'Probe failure transition.',
     ('shopify_connector_store.py',
      '_audit_probe_superseded'): 'Probe supersession audit.',
+    # Reads res.company to decide whether ownership is PROVABLE (exactly one
+    # company) during install/update. Never writes a company it guessed.
+    ('shopify_connector_store.py',
+     '_backfill_company'): 'SEC-3 ownership backfill probe.',
+    # Resolves a company-less historic store by explicit id -- it is invisible
+    # to a normal read by construction, which is the point of the fail-closed
+    # rule. Administrator-gated, refuses to re-home an already-owned store, and
+    # validates the target company against the caller's own company_ids rather
+    # than trusting the value passed in.
+    ('shopify_connector_store.py',
+     'action_assign_company'): 'SEC-3 administrative ownership remediation.',
     ('shopify_connector_store.py',
      '_create_lifecycle_audit_job'): 'Lifecycle audit carrier.',
     ('shopify_connector_store.py',

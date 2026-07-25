@@ -1,8 +1,11 @@
 import json
+import logging
 import re
 
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 
 class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
@@ -59,10 +62,19 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
     )
     order_import_include_test = fields.Boolean(default=False)
     order_scheduled_sync_enabled = fields.Boolean(default=False)
+    # SEC-3 (#197) / control-room MVP ownership decision, 2026-07-25: this is
+    # NO LONGER an independent ownership selector. The connector store owns the
+    # company; this field must agree with it (`_check_order_company_matches_store`
+    # below) and defaults from it. It is kept as a real field rather than made a
+    # related one because the existing `write()` guard -- order company may not
+    # change once an order binding or tax mapping exists -- is genuine
+    # protection worth keeping, and because a related field's inverse would
+    # write through and silently re-home the STORE, which is exactly what the
+    # MVP decision forbids.
     order_company_id = fields.Many2one(
         comodel_name='res.company',
         required=True,
-        default=lambda self: self.env.company,
+        default=lambda self: self._default_order_company(),
         ondelete='restrict',
     )
     order_pricelist_id = fields.Many2one(
@@ -75,6 +87,93 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
         comodel_name='account.payment.term', ondelete='restrict',
     )
     sale_order_last_import_checkpoint_at = fields.Datetime()
+
+    def init(self):
+        """Supply the sale module's share of the SEC-3 ownership backfill.
+
+        `shopify.connector.store._backfill_company` can only prove ownership
+        when the database has exactly one company. This module knows one more
+        *provable* fact: a store whose settings already name an
+        `order_company_id` was already operating in that company, so adopting
+        it is a record of what was, not a guess. Stores with no such evidence
+        are left NULL and stay fail-closed.
+        """
+        super().init()
+        self.env.cr.execute("""
+            UPDATE shopify_connector_store AS store
+               SET company_id = settings.order_company_id
+              FROM shopify_connector_store_settings AS settings
+             WHERE settings.store_id = store.id
+               AND store.company_id IS NULL
+               AND settings.order_company_id IS NOT NULL
+        """)
+        if self.env.cr.rowcount:
+            _logger.info(
+                'SEC-3: adopted the configured order company as the owning '
+                'company for %d historic Shopify store(s).',
+                self.env.cr.rowcount,
+            )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Derive the order company from the store on every create path.
+
+        `default_get` only sees the context, so it can serve the UI (where
+        `default_store_id` is present) but not a plain ORM
+        `create({'store_id': ...})`. Filling it here means the field is correct
+        by construction in both, instead of defaulting to whichever company the
+        acting user happened to have active and then failing the agreement
+        constraint below. An explicitly supplied value is left alone -- and then
+        validated, so an explicit wrong answer is still refused.
+        """
+        for vals in vals_list:
+            if not vals.get('order_company_id') and vals.get('store_id'):
+                store = self.env['shopify.connector.store'].browse(
+                    vals['store_id'])
+                if store.company_id:
+                    vals['order_company_id'] = store.company_id.id
+        return super().create(vals_list)
+
+    @api.model
+    def _default_order_company(self):
+        """Default the order company from the store being configured.
+
+        `default_get` runs with the create context, so a settings row created
+        for a store (UI or ORM) picks up that store's company rather than
+        whichever company the acting user happens to have active. Falls back to
+        `env.company` only when there is no store in context yet.
+        """
+        store_id = self.env.context.get('default_store_id')
+        if store_id:
+            store = self.env['shopify.connector.store'].browse(store_id)
+            if store.exists() and store.company_id:
+                return store.company_id
+        return self.env.company
+
+    @api.constrains('order_company_id', 'store_id')
+    def _check_order_company_matches_store(self):
+        """The order company must be the store's company (SEC-3 / #197.11).
+
+        Before this, `order_company_id` was a second, independent ownership
+        selector: a store could be read by company A while its orders were
+        created in company B. The MVP ownership decision is that a store
+        belongs to exactly one company, so the two must agree.
+
+        A store with no company yet (historic, awaiting the administrative
+        backfill) is skipped here -- it is already fail-closed at read time,
+        and blocking its settings write would remove the only path to fixing
+        it.
+        """
+        for settings in self:
+            store_company = settings.store_id.company_id
+            if not store_company:
+                continue
+            if settings.order_company_id != store_company:
+                raise ValidationError(
+                    'The order company must be the company that owns the '
+                    'Shopify store (%s). A store belongs to exactly one '
+                    'company.' % (store_company.display_name,)
+                )
 
     @api.constrains('order_import_window', 'pending_wait_expiry')
     def _check_order_window_policy(self):

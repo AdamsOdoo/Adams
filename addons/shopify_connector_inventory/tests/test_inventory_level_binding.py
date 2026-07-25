@@ -15,6 +15,9 @@ from odoo.tools import mute_logger
 class TestInventoryLevelBinding(TransactionCase):
 
     EXPECTED_PROTECTED_FIELDS = frozenset((
+        # SEC-3 (#197): the store-derived company. Protected, not caller input
+        # -- a binding's company is whatever its store's company is.
+        'company_id',
         'store_id',
         'shopify_gid',
         'status',
@@ -262,29 +265,21 @@ class TestInventoryLevelBinding(TransactionCase):
         other_template = self.env['product.template'].create({
             'name': 'Other Co Product', 'company_id': other_company.id,
         })
-        other_template_binding = self.env[
-            'shopify.connector.product.template.binding'
-        ].create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/Product/109',
-            'product_template_id': other_template.id,
-        })
-        other_variant_binding = self.env[
-            'shopify.connector.product.variant.binding'
-        ].create({
-            'store_id': self.store.id,
-            'shopify_gid': 'gid://shopify/ProductVariant/109',
-            'product_variant_id': other_template.product_variant_id.id,
-            'product_template_binding_id': other_template_binding.id,
-        })
+        # SEC-3 (#197) moved this refusal EARLIER. A store belongs to exactly
+        # one company, so a foreign-company product can no longer be bound to
+        # this store at all -- the template binding itself is now refused by
+        # Odoo's `_check_company`, before an inventory pair could ever be
+        # attempted. Assert at the point the refusal now happens; the pair-level
+        # guard is still proven by `test_cross_company_location_rejected` and by
+        # the SQL-planted historic pairs in test_sec3_company_isolation.py.
         with self.assertRaises(UserError):
             with self.env.cr.savepoint():
-                self.Binding.sudo().create({
+                self.env[
+                    'shopify.connector.product.template.binding'
+                ].create({
                     'store_id': self.store.id,
-                    'product_variant_binding_id': other_variant_binding.id,
-                    'location_mapping_id': self.mapping.id,
-                    'shopify_inventory_item_gid':
-                        'gid://shopify/InventoryItem/110',
+                    'shopify_gid': 'gid://shopify/Product/109',
+                    'product_template_id': other_template.id,
                 })
 
     # ------------------------------------------------------------------

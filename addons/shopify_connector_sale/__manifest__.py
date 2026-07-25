@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.1.0',
+    'version': '19.0.2.2.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '

@@ -87,6 +87,32 @@ class TestPiiLeastPrivilege(TransactionCase):
             self._backdate(binding, create_date)
         return self.Binding.browse(binding.id)
 
+    def _plant_historic_binding(self, partner, gid):
+        """Plant a binding whose partner is in ANOTHER company, with SQL.
+
+        SEC-3 (#197) makes this shape impossible to create through the ORM: a
+        store belongs to one company, and Odoo's `_check_company` refuses to
+        bind a foreign-company partner to it -- under `sudo()` too, because it
+        is a constraint rather than an access rule.
+
+        The row is planted directly so the override guard is still exercised
+        against exactly the case it exists for: a HISTORIC binding, created
+        before that invariant existed, that a reviewer must not be able to
+        override. Deleting this test instead would silently drop the only
+        coverage of that legacy path.
+        """
+        self.env.cr.execute(
+            "INSERT INTO shopify_connector_customer_binding "
+            "(store_id, company_id, shopify_gid, partner_id, status, "
+            " match_key, create_uid, create_date, write_uid, write_date) "
+            "VALUES (%s, %s, %s, %s, 'active', 'email', 1, now(), 1, now()) "
+            "RETURNING id",
+            (self.store.id, self.store.company_id.id, gid, partner.id),
+        )
+        binding_id = self.env.cr.fetchone()[0]
+        self.Binding.invalidate_model()
+        return self.Binding.browse(binding_id)
+
     def _backdate(self, record, create_date):
         """Back-date ``create_date`` in a phase-independent way.
 
@@ -252,7 +278,8 @@ class TestPiiLeastPrivilege(TransactionCase):
     def test_current_company_mismatch_has_no_write_or_audit(self):
         current = self._partner('Current mismatch current', self.other_company)
         target = self._partner('Current mismatch target', self.company)
-        binding = self._binding(current)
+        binding = self._plant_historic_binding(
+            current, 'gid://shopify/Customer/HistoricMismatch')
         before = self._audit_jobs()
         with self.assertRaises(UserError):
             binding.with_user(self.roles['reviewer']).action_override_binding(

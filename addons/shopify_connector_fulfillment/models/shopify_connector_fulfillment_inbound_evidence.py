@@ -79,6 +79,16 @@ class ShopifyConnectorFulfillmentInboundEvidence(models.Model):
         readonly=True,
         ondelete='restrict',
     )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
+    )
     order_binding_id = fields.Many2one(
         comodel_name='shopify.connector.order.binding',
         index=True,
@@ -197,6 +207,17 @@ class ShopifyConnectorFulfillmentInboundEvidenceLine(models.Model):
         index=True,
         readonly=True,
         ondelete='cascade',
+    )
+    # SEC-3 (#197): one hop further than its parent -- the line has no store of
+    # its own, so it inherits the company through the evidence row it belongs
+    # to. Without this the lines would be readable across companies even while
+    # their parent evidence rows were correctly hidden.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='evidence_id.store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     fo_line_item_gid = fields.Char(index=True, readonly=True)
     line_item_gid = fields.Char(index=True, readonly=True)

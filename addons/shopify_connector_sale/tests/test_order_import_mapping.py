@@ -359,7 +359,7 @@ class TestOrderImportMappingStatic(TransactionCase):
         # version accordingly. This assertion is a frozen-contract guard: it is
         # meant to catch an *unintended* manifest change, so an intended one is
         # recorded here deliberately rather than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.1.0')
+        self.assertEqual(manifest['version'], '19.0.2.2.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

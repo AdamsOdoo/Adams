@@ -83,6 +83,11 @@ DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 # an ORM magic column). Deliberately no token/credential/query/payload column.
 EXPECTED_LEASE_FIELDS = {
     'store_id', 'lease_key', 'job_id', 'worker_ref', 'admitted_at', 'expires_at',
+    # SEC-3 (#197): the owning store's company, stored so the fail-closed
+    # record rule can filter leases in SQL like every other store-scoped row.
+    # It is neither coordination state nor a secret, and the FORBIDDEN_LEASE_
+    # SUBSTRINGS check above still applies to it unchanged.
+    'company_id',
 }
 FORBIDDEN_LEASE_SUBSTRINGS = (
     'token', 'credential', 'secret', 'query', 'variable', 'payload', 'body',

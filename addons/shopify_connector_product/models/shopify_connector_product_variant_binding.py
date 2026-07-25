@@ -18,11 +18,18 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     _inherit = 'shopify.connector.binding.mixin'
     _description = 'Shopify Connector Product Variant Binding'
 
+    # SEC-3 (#197): opt in to Odoo 19's native company consistency check
+    # (`odoo/orm/models.py` L451/L4516/L4743). Together with `check_company=True`
+    # on the business relation below, a store can only ever bind a record of its
+    # own company -- enforced on create AND write, and under `sudo()`.
+    _check_company_auto = True
+
     product_variant_id = fields.Many2one(
         comodel_name='product.product',
         required=True,
         index=True,
         ondelete='restrict',
+        check_company=True,
     )
     product_template_binding_id = fields.Many2one(
         comodel_name='shopify.connector.product.template.binding',

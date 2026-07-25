@@ -486,7 +486,8 @@ class TestReadinessSlotClosure(TransactionCase):
 
     def test_source_level_store_health_and_sec1_sudo_inventory(self):
         """CORE-R1's health write remains singular while SEC-1 adds only
-        the nine named store-side protected job writer elevations."""
+        the nine named store-side protected job writer elevations, plus the
+        two SEC-3 (#197) ownership seams."""
         path = os.path.join(
             self._models_dir(), 'shopify_connector_store.py'
         )
@@ -501,6 +502,14 @@ class TestReadinessSlotClosure(TransactionCase):
                  'job', 1, 'Probe failure transition.'),
                 ('shopify_connector_store.py', '_audit_probe_superseded',
                  'job', 1, 'Probe supersession audit.'),
+                # SEC-3 (#197) ownership seams. Recorded here as well as in
+                # test_credential_service, because this assertion is the
+                # store-file-specific copy of the same trust-surface contract.
+                ('shopify_connector_store.py', '_backfill_company',
+                 "self.env['res.company']", 1,
+                 'SEC-3 ownership backfill probe.'),
+                ('shopify_connector_store.py', 'action_assign_company',
+                 'self', 1, 'SEC-3 administrative ownership remediation.'),
                 ('shopify_connector_store.py',
                  '_create_lifecycle_audit_job', 'Job', 1,
                  'Lifecycle audit carrier.'),

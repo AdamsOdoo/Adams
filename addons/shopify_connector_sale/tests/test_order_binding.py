@@ -52,6 +52,9 @@ class TestOrderBinding(OrderImportCase):
         'cod_cancelled_value_amount',
     ))
     EXPECTED_PROTECTED_FIELDS = frozenset((
+        # SEC-3 (#197): the store-derived company. Protected, not caller input
+        # -- a binding's company is whatever its store's company is.
+        'company_id',
         'store_id', 'shopify_gid', 'sale_order_id', 'status', 'match_key',
         'matched_by_uid', 'matched_at', 'override_uid', 'override_at',
         'override_previous_candidate',
@@ -89,7 +92,8 @@ class TestOrderBinding(OrderImportCase):
             self.Binding._protected_binding_fields(),
             self.EXPECTED_PROTECTED_FIELDS,
         )
-        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 50)
+        # 50 + SEC-3 `company_id` (#197).
+        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 51)
 
     def test_every_stored_connector_field_is_classified(self):
         stored = {
@@ -134,6 +138,10 @@ class TestOrderBinding(OrderImportCase):
         binding = self._binding('gid://shopify/Order/Protected')
         other_order = self._draft_order('protected-other')
         attempts = {
+            # SEC-3 (#197): company is store-derived, so supplying it is a
+            # forgery attempt like any other protected field -- including the
+            # attempt to CLEAR it, which the loop below also exercises.
+            'company_id': self.env.company.id,
             'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/Order/Forged',
             'sale_order_id': other_order.id,

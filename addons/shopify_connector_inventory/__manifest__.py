@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Inventory',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.2.0',
     'summary': (
         'Shopify inventory synchronization (Task 013): explicit location '
         'mapping, per-pair inventory-level bindings, first-push guard, and '

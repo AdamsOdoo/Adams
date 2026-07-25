@@ -37,6 +37,16 @@ class ShopifyConnectorJobLog(models.Model):
         index=True,
         readonly=True,
     )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
+    )
     event_type = fields.Selection(
         selection=[
             ('attempt', 'Attempt'),

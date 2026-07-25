@@ -9,9 +9,16 @@ class ShopifyConnectorOrderBinding(models.Model):
     _inherit = 'shopify.connector.binding.mixin'
     _description = 'Shopify Connector Order Binding'
 
+    # SEC-3 (#197): opt in to Odoo 19's native company consistency check
+    # (`odoo/orm/models.py` L451/L4516/L4743). Together with `check_company=True`
+    # on the business relation below, a store can only ever bind a record of its
+    # own company -- enforced on create AND write, and under `sudo()`.
+    _check_company_auto = True
+
     sale_order_id = fields.Many2one(
         comodel_name='sale.order', required=True, index=True,
         ondelete='restrict',
+        check_company=True,
     )
     shopify_order_name = fields.Char(readonly=True)
     shopify_legacy_resource_id = fields.Char(index=True, readonly=True)

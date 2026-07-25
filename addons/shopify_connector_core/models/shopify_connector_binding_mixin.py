@@ -21,6 +21,12 @@ _AUTOMATIC_BINDING_FIELDS = frozenset((
 ))
 _COMMON_PROTECTED_BINDING_FIELDS = frozenset((
     'store_id',
+    # SEC-3 (#197): company is derived from the owning store, so it is
+    # structure, never caller input. Listing it here does two things at once:
+    # it satisfies `_assert_binding_field_classification`, and it makes any
+    # attempt to pass `company_id` through a non-superuser create/write raise
+    # AccessError instead of silently re-homing a binding.
+    'company_id',
     'shopify_gid',
     'status',
     'match_key',
@@ -43,6 +49,16 @@ class ShopifyConnectorBindingMixin(models.AbstractModel):
         required=True,
         index=True,
         ondelete='restrict',
+    )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     shopify_gid = fields.Char(required=True, index=True, readonly=True)
     status = fields.Selection(
