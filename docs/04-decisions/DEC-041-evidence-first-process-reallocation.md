@@ -107,7 +107,7 @@ Because this session may not modify PR #189 or PR #194 content, their body corre
 
 ### D10 — Tracker truth as merge/continuation gate: MODIFY and ACCEPT
 
-Before merge, both trackers must describe the exact candidate honestly: accepted evidence, remaining gates, and “merge pending”; they must not predict a merge SHA. Immediately after merge, a tracker-only closure record must add the actual merge SHA and post-merge state **before the next dependent implementation wave, Gate D/UAT continuation, or release claim**.
+Before merge, `mvp-acceptance-matrix.md`, `mvp-program-state.md`, and `mvp-completion-program.md` §3 must describe the exact candidate honestly: accepted evidence, remaining gates, and “merge pending”; they must not predict a merge SHA. Immediately after merge, a tracker-only closure record must add the actual merge SHA and post-merge state to all three synchronized tracker surfaces **before the next dependent implementation wave, Gate D/UAT continuation, or release claim**.
 
 A stale tracker blocks merge closure and downstream continuation, not an already-running independent exact-SHA runtime session. This supersedes tracker handling that allowed PR #176/#182/#189 status to remain materially stale.
 
