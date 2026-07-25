@@ -5,7 +5,7 @@
 # mutation in Gate B.
 {
     'name': 'Shopify Connector - Fulfillment',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.1.0',
     'category': 'Connector',
     'summary': 'Odoo 19 <-> Shopify fulfillment and tracking synchronisation',
     'author': 'Adams',

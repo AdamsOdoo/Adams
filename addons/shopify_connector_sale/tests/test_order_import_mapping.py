@@ -355,13 +355,18 @@ class TestOrderImportMappingStatic(TransactionCase):
         manifest = ast.literal_eval(
             (MODULE_ROOT / '__manifest__.py').read_text(encoding='utf-8')
         )
-        self.assertEqual(manifest['version'], '19.0.2.0.0')
+        # SEC-3 (issue #197) added the company record-rule file and bumped the
+        # version accordingly. This assertion is a frozen-contract guard: it is
+        # meant to catch an *unintended* manifest change, so an intended one is
+        # recorded here deliberately rather than the guard being relaxed.
+        self.assertEqual(manifest['version'], '19.0.2.1.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
         )
         self.assertEqual(manifest['data'], [
             'security/ir.model.access.csv',
+            'security/shopify_connector_sale_company_rules.xml',
             'data/shopify_connector_sale_cron.xml',
         ])
 

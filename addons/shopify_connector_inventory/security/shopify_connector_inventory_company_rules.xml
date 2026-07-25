@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            SEC-3 (issue #197) multi-company isolation.
+
+            Ownership model. A connector store deliberately carries no
+            `company_id`: one Shopify store is not an Odoo company, and the
+            connector control-plane rows (store, credential, settings, location,
+            job, job.log, mutation.attempt, call.lease) are *store-scoped*, not
+            company-scoped. Company enters the connector only where a connector
+            row points at a company-bearing Odoo record; those rows are scoped
+            to the company of the record they point at. Every connector model is
+            classified in docs/03-architecture/sec3-company-isolation-audit.md,
+            which leaves none unclassified.
+
+            Rule shape. Each rule is `global` (it applies to every group) and
+            admits a row when its bound record has no company, or has one of the
+            reader allowed companies. Odoo 19 exposes that set to a record rule
+            as `company_ids` (odoo/odoo@19.0 30bde9ff,
+            odoo/addons/base/models/ir_rule.py `_eval_context`), which is the
+            multi-company switcher selection, so an allowed-but-unselected
+            company is correctly excluded.
+
+            Scope. Record rules constrain *interactive* access. Connector system
+            code runs `sudo()` and bypasses them by design, so these rules add
+            read isolation without changing synchronisation behaviour. The
+            server-side fail-closed company checks in the importers and mapping
+            models remain the write-side authority and are not replaced here.
+        -->
+
+        <record id="location_mapping_company_rule" model="ir.rule">
+            <field name="name">Shopify Location Mapping: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_location_mapping"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('odoo_location_id.company_id', '=', False), ('odoo_location_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!--
+            The inventory level binding reaches company only indirectly, through
+            BOTH of its parents. Scoping on either alone would leak the other
+            half of the pair, so the rule requires both to be visible. The
+            connector already refuses to build a pair whose product and location
+            disagree on company, so this rule and that guard state the same
+            invariant on the read and the write side respectively.
+        -->
+        <record id="inventory_level_binding_company_rule" model="ir.rule">
+            <field name="name">Shopify Inventory Level Binding: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_inventory_level_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', '|', ('product_variant_binding_id.product_variant_id.company_id', '=', False), ('product_variant_binding_id.product_variant_id.company_id', 'in', company_ids), '|', ('location_mapping_id.odoo_location_id.company_id', '=', False), ('location_mapping_id.odoo_location_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+    </data>
+</odoo>

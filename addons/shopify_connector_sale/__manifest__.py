@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.0.0',
+    'version': '19.0.2.1.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '
@@ -37,6 +37,7 @@ file.
     'depends': ['shopify_connector_core', 'shopify_connector_product', 'sale'],
     'data': [
         'security/ir.model.access.csv',
+        'security/shopify_connector_sale_company_rules.xml',
         'data/shopify_connector_sale_cron.xml',
     ],
     'installable': True,

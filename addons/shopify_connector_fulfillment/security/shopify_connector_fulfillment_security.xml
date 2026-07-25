@@ -22,5 +22,19 @@
             <field name="global" eval="True"/>
             <field name="domain_force">['|', ('order_binding_id', '=', False), '|', ('order_binding_id.sale_order_id.company_id', '=', False), ('order_binding_id.sale_order_id.company_id', 'in', company_ids)]</field>
         </record>
+
+        <!--
+            SEC-3 (issue #197): the evidence LINE reaches company through its
+            own sale line, which is not necessarily reachable from the parent
+            evidence record's rule. Scoping it explicitly means no evidence line
+            is readable across companies even when its parent is visible.
+        -->
+        <record id="fulfillment_inbound_evidence_line_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Inbound Evidence Line: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_inbound_evidence_line"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('sale_line_id', '=', False), '|', ('sale_line_id.company_id', '=', False), ('sale_line_id.company_id', 'in', company_ids)]</field>
+        </record>
+
     </data>
 </odoo>
