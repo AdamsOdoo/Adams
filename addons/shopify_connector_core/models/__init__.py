@@ -1,3 +1,11 @@
+# SEC-3 (#197): the scope mixin is imported FIRST, deliberately.
+# Odoo builds a module's models in registration order, which is import
+# order, and a model whose `_inherit` names a mixin that has not been
+# registered yet fails the whole registry load. `shopify_connector_api_client`
+# imports `shopify_connector_mutation_attempt` at module level, so the
+# attempt model registers on the very first line below unless the mixin is
+# already in place.
+from . import shopify_connector_scope_mixin
 from . import shopify_connector_api_client
 from . import shopify_connector_store
 from . import shopify_connector_store_credential

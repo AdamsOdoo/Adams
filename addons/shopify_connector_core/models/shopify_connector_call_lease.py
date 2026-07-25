@@ -43,6 +43,16 @@ class ShopifyConnectorCallLease(models.Model):
         readonly=True,
         ondelete='cascade',
     )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
+    )
     # Opaque UUID key generated at admission; the only stable handle used to
     # release exactly one lease. Opacity is a property of the value written by
     # `_admit` (a bare uuid4 hex), never derived from store/job/token.

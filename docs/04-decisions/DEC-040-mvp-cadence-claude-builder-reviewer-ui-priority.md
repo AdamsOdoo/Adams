@@ -1,5 +1,7 @@
 # DEC-040: MVP Program Cadence — Claude as Default Builder + Independent Reviewer, ChatGPT as Strategic Control Room, Large-Batch Waves, UI Priority
 
+> **Superseded in default-role and tier-selection mechanics — 2026-07-25.** Preserved for history. Risk tiers, independent review, consolidated corrections, coherent batching, and runtime rigor remain. [The role-model addendum](2026-07-25-mvp-role-model-addendum.md) assigns canonical roles; [DEC-041](DEC-041-evidence-first-process-reallocation.md) makes tier selection deterministic from diff paths and semantics.
+
 - **Status:** Accepted — see Status note below for the procedural basis.
 - **Date:** 2026-07-22
 - **Deciders:** Product owner (direct, explicit written instruction, this session).

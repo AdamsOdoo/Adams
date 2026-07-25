@@ -18,11 +18,18 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     _inherit = 'shopify.connector.binding.mixin'
     _description = 'Shopify Connector Product Variant Binding'
 
+    # SEC-3 (#197): opt in to Odoo 19's native company consistency check
+    # (`odoo/orm/models.py` L451/L4516/L4743). Together with `check_company=True`
+    # on the business relation below, a store can only ever bind a record of its
+    # own company -- enforced on create AND write, and under `sudo()`.
+    _check_company_auto = True
+
     product_variant_id = fields.Many2one(
         comodel_name='product.product',
         required=True,
         index=True,
         ondelete='restrict',
+        check_company=True,
     )
     product_template_binding_id = fields.Many2one(
         comodel_name='shopify.connector.product.template.binding',
@@ -69,3 +76,26 @@ class ShopifyConnectorProductVariantBinding(models.Model):
         'UNIQUE(store_id, product_variant_id)',
         'This product.product is already bound for this store.',
     )
+
+    # ------------------------------------------------------------------
+    # SEC-3 (#197): same-store consistency with the connector parent.
+    #
+    # Company equality is NOT enough here. One Odoo company may own several
+    # Shopify stores, so a row in store A pointing at a parent in store B is
+    # company-consistent and store-inconsistent -- two different shops' records
+    # mixed together, which no company check can see. `init()` additionally
+    # quarantines rows written before this constraint existed; it never guesses
+    # which half is wrong and never re-homes anything.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (('product_template_binding_id', 'store'),)
+
+    @api.constrains('store_id', 'product_template_binding_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()

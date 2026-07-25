@@ -51,6 +51,22 @@ class TestUiPerformance(TransactionCase):
                          'payload_hash': 'u0-perf-%d' % self._seq,
                          'finished_at': fields.Datetime.now()})
         self.Job.create(vals)
+        # Flush the fixture before anything is measured.
+        #
+        # Odoo defers stored-field recomputation to the next flush, and the next
+        # flush is whatever the test does afterwards. Without this line the
+        # pending recompute of the jobs just created (SEC-3 #197 added a stored
+        # related `company_id` on the job) is charged to the *dashboard* call,
+        # and the query count appears to grow with data volume: 17 -> 19, where
+        # both extra queries are `UPDATE shopify_connector_job SET company_id`.
+        #
+        # That is fixture cost, not dashboard cost -- the invariant this class
+        # exists to protect is that the dashboard's aggregate READ path is
+        # constant. Jobs are created by the dispatcher in their own
+        # transactions, so a real dashboard reader never pays a pending seed
+        # flush. The assertion below stays strict equality; it is the
+        # measurement window that is corrected, not the bound.
+        self.env.flush_all()
 
     def _count_queries(self, fn):
         cr = self.env.cr

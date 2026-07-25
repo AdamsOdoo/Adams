@@ -6,7 +6,7 @@ import uuid
 from contextlib import contextmanager
 from pathlib import Path
 
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
@@ -26,6 +26,16 @@ MODULE_ROOT = Path(__file__).resolve().parents[1]
 MODELS_ROOT = MODULE_ROOT / 'models'
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class OrderImportCase(TransactionCase):
     """Reusable, network-free Task-012 fixture substrate."""
 
@@ -236,6 +246,7 @@ class OrderImportCase(TransactionCase):
         })
 
 
+@tagged('post_install', '-at_install')
 class TestOrderImportMappingStatic(TransactionCase):
 
     def _source(self, filename):
@@ -344,13 +355,18 @@ class TestOrderImportMappingStatic(TransactionCase):
         manifest = ast.literal_eval(
             (MODULE_ROOT / '__manifest__.py').read_text(encoding='utf-8')
         )
-        self.assertEqual(manifest['version'], '19.0.2.0.0')
+        # SEC-3 (issue #197) added the company record-rule file and bumped the
+        # version accordingly. This assertion is a frozen-contract guard: it is
+        # meant to catch an *unintended* manifest change, so an intended one is
+        # recorded here deliberately rather than the guard being relaxed.
+        self.assertEqual(manifest['version'], '19.0.2.2.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
         )
         self.assertEqual(manifest['data'], [
             'security/ir.model.access.csv',
+            'security/shopify_connector_sale_company_rules.xml',
             'data/shopify_connector_sale_cron.xml',
         ])
 
@@ -527,6 +543,7 @@ class TestOrderImportMappingStatic(TransactionCase):
         )
 
 
+@tagged('post_install', '-at_install')
 class TestOrderImportMappingFunctional(OrderImportCase):
 
     def test_connector_service_products_are_idempotent_and_store_scoped(self):

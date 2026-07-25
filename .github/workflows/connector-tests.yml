@@ -1,0 +1,166 @@
+# Minimal install-and-run-suites CI, authorised by DEC-041 D8.
+#
+# Deliberately thin. All real logic lives in tools/run_connector_suite.sh so the
+# exact same command runs on a laptop and here; CI that cannot be reproduced
+# locally is how CI and reality drift apart.
+#
+# Scope and limits, stated in the file so they cannot be quoted out of context:
+#   * NO Shopify credentials, secrets, requests, or mutations. This workflow
+#     declares no secrets and the suite script has no Shopify code path.
+#   * This is SUPPORTING evidence. Until equivalence is separately proven, the
+#     exact-SHA Odoo.sh run remains the Tier-1 acceptance authority (DEC-041 D8).
+#     A green run here is not wave acceptance and must never be recorded as one.
+#   * Both a fresh install and a warm `-u` update run, because issue #193 proved
+#     a green fresh install says nothing about the warm path.
+#   * The eight `-standard` test classes -- including four genuine concurrency
+#     proofs -- run as a third pass. `--test-enable` alone never selects them,
+#     which is why they had gone unrun; they are no longer optional here.
+#   * The Odoo commit is pinned in tools/odoo-pin.txt and verified on every run,
+#     so a restored cache cannot quietly test a different Odoo.
+#   * On a `pull_request` event this checks out the PR HEAD COMMIT, not the
+#     synthetic merge ref. `actions/checkout` defaults to `refs/pull/N/merge`,
+#     an ephemeral commit GitHub creates by merging the head into the base. It
+#     is a real commit with a real SHA that exists in no branch and that nobody
+#     reviewed, so an artifact recording it reads as exact-SHA evidence for a
+#     commit the PR does not contain. Run 30153827606 recorded exactly that:
+#     `connector_sha: 60ea6690…`, the merge ref, while PR #203's head was
+#     `156a4a74…`. The suite additionally VERIFIES the checkout against the
+#     intended source head and fails rather than publishing a mismatch.
+
+name: Connector test suite
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - Shopify-connector
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Odoo 19 install + full connector suite
+    runs-on: ubuntu-24.04
+    # Raised from 90. The third pass includes the customer-matching benchmark,
+    # which builds a 100 000-partner dataset; on CI hardware that alone can take
+    # tens of minutes. A timeout that cuts the concurrency proofs short would
+    # recreate exactly the problem this pass exists to fix, only with a red run
+    # instead of a silent omission.
+    timeout-minutes: 180
+
+    services:
+      postgres:
+        # 16.x matches the Odoo.sh baseline recorded in issue #193.
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: odoo
+      PGPASSWORD: odoo
+      ARTIFACT_DIR: ${{ github.workspace }}/ci-artifacts
+      # The commit this run INTENDS to test. On `pull_request` that is the PR
+      # head; on `push`/`workflow_dispatch` it is the pushed commit. The suite
+      # compares its actual checkout against this and aborts on a mismatch, so
+      # "which commit did this artifact describe" is never a guess.
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      SOURCE_EVENT_NAME: ${{ github.event_name }}
+      SOURCE_PR_NUMBER: ${{ github.event.pull_request.number }}
+      SOURCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    steps:
+      - name: Check out the connector
+        uses: actions/checkout@v4
+        with:
+          # Explicit. Without this a `pull_request` run tests -- and reports --
+          # the synthetic merge commit instead of the PR head.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          # 3.12 is Odoo 19's Noble target; its requirements.txt splits its
+          # pin set on exactly this version.
+          python-version: '3.12'
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libxml2-dev libxslt1-dev libsasl2-dev libjpeg-dev \
+            libpq-dev postgresql-client
+
+      - name: Cache the Odoo source checkout
+        uses: actions/cache@v4
+        with:
+          path: .odoo-src
+          # Keyed on the CONTENTS of the pin file, not on a branch name. A
+          # branch-keyed cache is how a run ends up silently executing an Odoo
+          # commit from weeks ago while reporting "19.0". Changing the pin
+          # invalidates the cache, and the suite re-verifies the checked-out SHA
+          # anyway before running anything.
+          key: odoo-src-${{ hashFiles('tools/odoo-pin.txt') }}
+
+      - name: Run the connector suite
+        # No arguments on purpose. The script runs the fresh-install pass, the
+        # warm-update pass AND the complete non-standard tag suite by default,
+        # so no concurrency proof can be skipped by forgetting a flag here.
+        run: |
+          chmod +x tools/run_connector_suite.sh
+          tools/run_connector_suite.sh
+
+      - name: Publish durable artifacts
+        # Always: a failing run is exactly when the logs are worth keeping.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          # Named for the commit actually tested, not for `github.sha` -- which
+          # on a pull_request event is the merge ref and would misfile the
+          # artifact under a commit the branch does not contain.
+          name: connector-suite-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ci-artifacts/*.log
+            ci-artifacts/summary.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Summarise into the job page
+        if: always()
+        run: |
+          {
+            echo '## Connector suite'
+            echo
+            echo "Tested commit (source head): \`${SOURCE_HEAD_SHA}\`"
+            echo "GitHub event: \`${SOURCE_EVENT_NAME}\`"
+            echo "\`github.sha\` (merge ref on pull_request; NOT what ran): \`${{ github.sha }}\`"
+            echo
+            if [ -f ci-artifacts/summary.json ]; then
+              echo '```json'
+              cat ci-artifacts/summary.json
+              echo '```'
+            else
+              echo '_No summary produced -- the suite failed before it could write one._'
+            fi
+            echo
+            echo '> Supporting evidence only. Exact-SHA Odoo.sh remains the Tier-1'
+            echo '> acceptance authority under DEC-041 D8. No Shopify operation occurs here.'
+          } >> "$GITHUB_STEP_SUMMARY"

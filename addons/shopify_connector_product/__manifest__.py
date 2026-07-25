@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.1.2',
+    'version': '19.0.2.3.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '
@@ -37,6 +37,7 @@ logic. No UI, wizard, webhook, or OAuth file.
     'depends': ['shopify_connector_core', 'product'],
     'data': [
         'security/ir.model.access.csv',
+        'security/shopify_connector_product_company_rules.xml',
         'data/shopify_connector_attribute_lock.xml',
     ],
     'installable': True,

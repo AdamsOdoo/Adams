@@ -54,6 +54,13 @@ The MVP still includes:
 
 Confirmed excluded from this MVP remain: payout reconciliation; advanced refunds/accounting automation; Shopify Markets; subscriptions; gift cards; POS; B2B; metafields; advanced analytics; app-store packaging; complex multi-company; broad multi-store orchestration.
 
+### D10 synchronized state — 2026-07-25
+
+- `mvp/program-integration@3a1afa43f8d07a7dae1799968273fa0ab8049490` contains accepted governance PR #202 and the backend-accepted Wave-4 PR #189.
+- Wave-4 runtime evidence remains tied to implementation candidate `25639f17be14b30a52a8453f0813aa0b764de310`, Odoo.sh build `35422036`; the later two-file reconciliation changed trackers only and no `addons/**` or test path.
+- Wave 5 has not started. `sol/pre-wave-5-stabilization` must close all inherited non-Shopify debt before PR #194 is transferred or U1 implementation begins.
+- Live Shopify Gate D/CV-013 and provisioning issues #185/#186/#200 are deferred until the Wave-5 implementation candidate is complete and frozen. They remain open and unclaimed; no external UAT or release-readiness claim exists.
+
 ## 4. Risk-tiered review model
 
 Every gate declares its tier and reason.

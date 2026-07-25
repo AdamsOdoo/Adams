@@ -1,3 +1,164 @@
+### Wave 4 narrow Odoo 19 runtime correction — compact handoff (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`; PR #189 → `mvp/program-integration`, draft/open (unmerged, not ready, not self-accepted).
+- **Authorization:** the binding control-room runtime-failure ruling (PR #189 comment `5062917634`, mirrored in issue #167 comment `5062920724`) on the exact-head Odoo.sh runtime campaign for candidate `cc87088e46d1707d35a3271a420034f9762c9562` (build `35372226`, database `adamsmen-claude-wave-4-fulfillment-gate-b-35372226`, Odoo 19.0/PG 16.14): fulfillment suite `10 failed + 35 errors / 281`, `EXECUTED — FAIL`.
+- **Files changed:** `addons/shopify_connector_fulfillment/models/{shopify_connector_fulfillment_mode2,shopify_connector_fulfillment_reader}.py`; `addons/shopify_connector_fulfillment/tests/{test_fulfillment_mode2_engine,test_fulfillment_matching,test_fulfillment_concurrency}.py`; `docs/05-qa/task-014-fulfillment-tracking-validation-results.md`; `docs/07-implementation-plan/mvp-program-state.md`; this file. No manifest/security/views/data/CI file.
+- **What changed / residue fixed:** the primary candidate-owned P0 (`sale.order.line.product_uom` doesn't exist in Odoo 19; the field is `product_uom_id`) corrected in `_move_qty_in_sale_uom`/`_qty_equal`, plus the same pre-existing defect in `_fo_line_uom_quantity`; every invalid sale-line test fixture/mock corrected to match (`stock.move`'s own genuine `product_uom` field verified untouched); the nonexistent `stock.stock_location_locations` XML ID replaced with the fixture-derived `self.stock_loc.location_id`; `test_fulfillment_concurrency.py::_cleanup_store` corrected to an FK-safe delete order (evidence → location → order_binding → job → store_settings → store, matching each model's actual `ondelete='restrict'` field definition); the Condition-14 race test given a real F-4 location seam result (real `stock.stock_location_stock` on both the mocked picking and the patched `_resolve_odoo_location`) so it genuinely reaches Condition 14 instead of failing closed earlier at Condition 8.
+- **Environment constraint:** no Odoo runtime available in this session's container (`import odoo` fails; no local PostgreSQL). All results are `IMPLEMENTED — RUNTIME PENDING`, verified by `py_compile`/`ast.parse` on all 5 changed files, forbidden-path audit (clean), repo-wide grep confirming zero remaining invalid sale-line `product_uom` (non-`_id`) or `stock.stock_location_locations` references, and call-site tracing of the two renamed helpers. Never claimed as `EXECUTED—PASS`.
+- **Items deferred:** everything the prior sessions already deferred (Theme D/SEC-3, Theme L, SEC-2, U1, live Shopify operations, the nine-process external-multiprocessing campaign — `DEFERRED BY PRODUCT OWNER — NOT PROVEN`, unchanged).
+- **Learning feedback loop:** *New issues discovered:* the field rename from `product_uom` to `product_uom_id` on `sale.order.line` (an Odoo 17+ change) had not been caught by any prior session's static review because it only manifests as a runtime `AttributeError`/`ValueError` — reinforces that a genuine Odoo.sh runtime pass is load-bearing evidence, not a formality, even after thorough `py_compile`/AST review; a `product.uom`-family field rename is easy to miss because `stock.move` genuinely kept the old name (`product_uom`), so a blanket rename would have been wrong — each occurrence had to be traced to its actual owning model. *Repeated issue patterns:* this is the second runtime-only defect class in this PR's history (after Stage R1's pre-19 API mismatches) that no amount of `py_compile`/AST/manual tracing caught — both were genuine Odoo-19-version field/API renames. *Rules/checklists updated:* none. *New rejected approaches:* none. *New technical debt:* none beyond what was already logged. *Architecture concerns:* none new — this was a pure runtime-compatibility correction, no design change. *Tests or review gates needed:* the fresh exact-head Odoo.sh runtime rerun (fulfillment/inventory/sale/core suites, warm upgrade, concurrency scenarios) is the explicit, sole next step. *Should future prompts change?* No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked · learning captured · rejected-approach check performed (none new) · no new technical debt · repeated-issue pattern noted above (version-specific field renames only surface at runtime) — all YES.
+- **Next recommended session:** a fresh exact-head Odoo.sh runtime rerun of the halted matrix against head `a2d4e3b95ba8514fbbc3c410b67ad574d5859309` — the required next step before any final acceptance. Not another synthesis/decision-lock/architecture/broad-review cycle.
+- **Stop condition:** `WAVE 4 NARROW CORRECTION COMPLETE — FRESH EXACT-HEAD ODOO.SH RERUN REQUIRED NEXT.` PR #189 remains draft/unmerged; not self-accepted; not ready-marked; not merged; no Shopify operation occurred.
+
+---
+
+### Wave 4 consolidated correction — compact handoff (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`; PR #189 → `mvp/program-integration`, draft/open (unmerged, not ready, not self-accepted).
+- **Files changed:** `addons/shopify_connector_fulfillment/models/{shopify_connector_fulfillment_mode2,shopify_connector_fulfillment_scans,shopify_connector_fulfillment_admission,stock_picking}.py`; `addons/shopify_connector_fulfillment/tests/{test_fulfillment_mode2_engine,test_fulfillment_concurrency,test_fulfillment_scans,test_fulfillment_mode_switch,test_fulfillment_trigger,test_fulfillment_admission}.py`; `docs/05-qa/task-014-fulfillment-tracking-validation-results.md`; `docs/05-qa/wave-4-tier1-findings-ledger.md`; `docs/05-qa/architecture-review-log.md` (AR-082); `docs/07-implementation-plan/mvp-program-state.md`; this file. No manifest/security/CI file; no `shopify_connector_fulfillment_inbound_evidence.py` change was needed.
+- **What changed / residue fixed:** per the exhaustive control-room review of exact head `35a7179e0f9c41a9182a6fe540e09a97673cb7a3` (PR #189 comment `5061975312`, verdict `REVISE — ONE CONSOLIDATED IMPLEMENTATION CORRECTION`), fixed all five confirmed findings in one session: **P0-1** same-line partial-quantity over-validation (`_quantity_compatible_pickings` now requires exact, UoM-converted per-line demand equality, never mere coverage); **P0-2** non-atomic Mode-2 application (`_apply_mode2` now wraps binding creation + local validation + ledger + `applied` transition in one `cr.savepoint()`, converts only `(UserError, ValidationError)` to review, `_enqueue_picking_admission` no-ops when a binding already exists — no redundant outbound admission, no bypass flag); **P1-1** sale-line locks spanning Shopify reads (condition 6 no longer locks; a new `_lock_affected_sale_lines`/`_relock_and_recheck` pair locks in deterministic ascending-ID order and re-verifies the ledger/demand only after every Shopify read completes, immediately before the atomic unit); **P1-2** scan read failures silently reported as success + PD-B4 boundary bug (reconciliation-check/reconnect-catchup now raise `JobHandlerError` on any read failure, never advancing the watermark; boundary formula corrected to `max(floor, min(watermark - overlap, latest_unresolved))`, floor as lower bound only, latest not oldest unresolved evidence); **P1-3** connector ACLs blocking an ordinary stock user (minimal `sudo()` at exactly four technical seams — `_picking_store`, `_fulfillment_settings`, the binding lookup in `stock.picking.write`, `_enqueue_once`'s job searches — the picking's own business validation is never sudo'd).
+- **Environment constraint:** no Odoo runtime available in this session's container (`import odoo` fails; no local PostgreSQL). All results are `IMPLEMENTED — RUNTIME PENDING`, verified by `py_compile`/`ast.parse` on all 10 changed files, forbidden-path/dependency/secret-scan audits (clean), AST structural proofs (no lock in `_c6_no_overrun`; no Shopify-read call reachable from `_apply_mode2`/`_relock_and_recheck`/`_lock_affected_sale_lines`; `stock_picking.py` never `sudo()`s the picking recordset itself), and roughly 20 new/changed `TransactionCase` tests across the five findings. Never claimed as `EXECUTED—PASS`.
+- **Items deferred (unchanged, outside this correction's scope):** everything the prior session already deferred (Theme D/SEC-3, Theme L, SEC-2, U1, live Shopify operations); the nine-process external-multiprocessing campaign remains `DEFERRED BY PRODUCT OWNER — NOT PROVEN`.
+- **Learning feedback loop:** *New issues discovered:* the prior closure candidate's own required tests (`test_sibling_unevidenced_move_excludes_picking` and siblings) called `_quantity_compatible_pickings` with a `ctx` missing `required_qty`, which the pre-correction implementation actually read via `ctx['required_qty']` — a latent `KeyError` that had never been exercised (no Odoo runtime in any prior session to run it); resolved by having `_quantity_compatible_pickings` derive its own required set from `ctx['line_mapping']` directly, and updating the affected Mock fixtures. Also caught, before finalizing, that an early draft of the new `stock_picking.py` sudo-scope structural test asserted "zero sudo() calls in the file," which is wrong — "fulfillment-binding lookup" is one of the five explicitly sanctioned sudo seams and necessarily lives in that file; corrected the guard to check the sudo() receiver is never the bare `self`/`picking` name, not that sudo() is entirely absent. *Repeated issue patterns:* a runtime-unexecuted test suite can carry a real bug (the `required_qty` KeyError above) for multiple sessions without detection — reinforces why the exact-SHA Odoo.sh runtime campaign is the mandatory next step, not optional polish. *Rules/checklists updated:* none. *New rejected approaches:* none. *New technical debt:* none beyond what was already logged. *Architecture concerns:* none new. *Tests or review gates needed:* the fresh exact-SHA Odoo.sh runtime campaign (fulfillment/inventory/sale/core suites, warm upgrade, concurrency scenarios) is the explicit next step. *Should future prompts change?* No.
+- **Quality gate confirmation:** handoff updated · feedback loop checked · learning captured · rejected-approach check performed (none new) · no new technical debt · no repeated-issue pattern needed escalation into a new rule beyond the note above — all YES.
+- **Next recommended session:** a fresh exact-SHA Odoo.sh runtime campaign (fresh install, fulfillment/inventory/sale/core suites, warm upgrade, the concurrency scenarios where the environment supports them) against head SHA recorded in this session's PR #189 handoff comment — the required next step before any final acceptance, per the control room's own closure rules (no further broad implementation review unless a genuinely new P0/P1/material-P2 is discovered).
+- **Stop condition:** `WAVE 4 CONSOLIDATED CORRECTION COMPLETE — READY FOR EXACT-HEAD ODOO.SH RUNTIME.` PR #189 remains draft/unmerged; not self-accepted; not ready-marked; not merged; no Shopify operation occurred.
+
+---
+
+### Wave 4 closure correction implementation — compact handoff (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`; PR #189 → `mvp/program-integration`, draft/open (unmerged, not ready, not self-accepted).
+- **Authorization:** the one-loop control-room ruling (PR #189 review comments `4766049839`/`4766053529`, exact base `ef991bf08ff55c4393fa2c0c971cd1dbef04ab2d`) — supersedes the split interim/permanent F-4 sequencing in comments `5060656594`/`5060689967` and decision-lock Decision B.5's interim-only authorization, for this campaign only.
+- **What changed:** implemented all eleven authorized Wave 4 Tier-1 correction themes (A, B, C, E, F, G, H, I — **permanent** F-4 seam, J, K) in one coherent campaign, plus verified Theme M's governance corrections remain accurate. Production: `addons/shopify_connector_fulfillment/models/{shopify_connector_fulfillment_admission,stock_picking,shopify_connector_job,shopify_connector_fulfillment_scans,shopify_connector_fulfillment_reader,shopify_connector_fulfillment_mode2,shopify_connector_fulfillment_create_strategy,shopify_connector_fulfillment_inbound,shopify_connector_fulfillment_inbound_evidence}.py`, `addons/shopify_connector_core/models/shopify_connector_location.py` (new `_resolve_odoo_location` seam), `addons/shopify_connector_inventory/models/shopify_connector_location_mapping.py` (new override). Tests: 13 fulfillment test files strengthened/extended, one new core test file (`test_shopify_connector_location.py`, authorized) + its `tests/__init__.py` registration, `shopify_connector_inventory/tests/test_location_mapping.py` extended. No manifest/security/CI file touched; no new `shopify_connector_inventory` dependency added to fulfillment's manifest.
+- **Environment constraint:** no Odoo runtime is available in this session's container (`import odoo` fails; no local PostgreSQL). All results are `IMPLEMENTED — RUNTIME PENDING`, verified by `py_compile` (all 26 changed files), AST-based source/vocabulary/dependency guards (two of which — the Theme G vocabulary scanner and Theme K harness guard — were additionally extracted and executed standalone as plain Python outside Odoo to confirm their own logic against the real final source), and manual code-path tracing. Never claimed as `EXECUTED—PASS`.
+- **Items deferred (unchanged, outside this campaign's authorized scope):** Theme D (multi-company `ir.rule` gap, candidate "SEC-3", core-scoped); Theme L (U0 dashboard job-type labels, Wave 5 owner); SEC-2; U1; any live Shopify request/mutation; the nine-process external-multiprocessing runtime campaign (`DEFERRED BY PRODUCT OWNER — NOT PROVEN`, unchanged — Theme K's harness-rigor fix only makes that campaign's eventual signal trustworthy, it does not itself constitute execution).
+- **Quality gate confirmation:** handoff updated · theme-by-theme evidence table recorded (`docs/05-qa/task-014-fulfillment-tracking-validation-results.md`) · rejected-approaches log checked (no new approach proposed beyond what the prior synthesis already cleared) · no self-review/self-acceptance performed.
+- **Next recommended session:** an independent Claude review (a separate top-level session or a fresh subagent instructed to adversarially re-verify, never summarize) of the exact pushed head, per DEC-039/DEC-040 — the default routine gate for this program. ChatGPT strategic review remains available as a spot-check.
+- **Stop condition:** `WAVE 4 CLOSURE CANDIDATE IMPLEMENTED AND SELF-VERIFIED — READY FOR ONE CONTROL-ROOM REVIEW.` PR #189 remains draft/unmerged; not self-accepted; not ready-marked; not merged.
+
+---
+
+### Wave 4 Tier-1 correction decision lock — compact handoff (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`; PR #189 → `mvp/program-integration`, draft/open (unmerged, not ready, not self-accepted).
+- **Files changed:** `docs/07-implementation-plan/wave-4-tier1-decision-lock.md` (NEW); `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md`; `docs/07-implementation-plan/wave-4-tier1-correction-synthesis.md`; `docs/07-implementation-plan/wave-4-tier1-synthesis-handoff.md`; `docs/05-qa/wave-4-tier1-findings-ledger.md`; `docs/05-qa/architecture-review-log.md` (AR-080); `docs/07-implementation-plan/mvp-program-state.md`; this file. No `addons/**` file; no test/manifest/security/CI file.
+- **What changed / residue fixed:** per binding control-room ruling (PR #189 comment `5059969776`), froze the four load-bearing decisions the accepted findings-synthesis (prior head `d3c157c1d4c369c1880fffc69ee6b4801ab9c05c`) left open — **Theme D** (multi-company `ir.rule` gap): does not block PR #189 merge, blocks external UAT/RC, owner is a new dedicated task (candidate "SEC-3"), target architecture frozen (core `_check_access`/`_search` delegation override, `ir_attachment.py`-precedented); **Theme I/F-4**: permanent core+inventory location seam architecture frozen as a separate future task, plus a narrow interim fail-closed correction to `_c8_location` now authorized inside PR #189's own correction batch; **Theme H**: exact new review-reason value frozen as `external_fulfillment_observed` ("External Fulfillment Observed"), count 20→21; **Theme A**: `_enqueue_once`'s savepoint/catch/re-verify contract frozen as centralized (once, inside the shared method), exact caught-exception tuple, re-search/recovery, and caller-narrowing rules specified. Also fixed a pre-existing count bug in `wave-4-tier1-synthesis-handoff.md` ("Confirmed with reclassification | 4" vs. its own five listed identifiers — corrected to 19 Confirmed-as-is / 5 Confirmed-with-reclassification). Four parallel read-only research agents grounded every decision against exact source, DEC-008/011/031/036/038/039/040, `rejected-approaches-log.md` (zero collisions), and current official Odoo 19 + Shopify documentation (full citations in `wave-4-tier1-decision-lock.md`).
+- **Items deferred:** implementation of any of the 13 root-cause themes (still requires separate control-room authorization of the now-normalized locked prompt, per this session's own scope); the three future work items identified (SEC-3/Theme D, F-4's permanent seam, Theme L) each need their own control-room-scoped task/DEC.
+- **Learning feedback loop:** *New issues discovered:* none beyond what the synthesis already carried. *Repeated issue patterns:* a synthesis/handoff document's own summary-table arithmetic can drift from its own itemized list (second occurrence in this Wave 4 record, after the reviewer's own 24/25/26 headline-count drift) — worth a general reminder to re-derive summary counts from the itemized list rather than hand-carrying a running tally forward. *Rules/checklists updated:* none. *New rejected approaches:* none (checked `rejected-approaches-log.md` in full; a fulfillment-owned duplicate location-mapping table was considered and rejected in `wave-4-tier1-decision-lock.md` Decision B as violating DEC-010/DEC-011's single-source-of-truth principle, but this is reasoning recorded in the decision-lock document itself, not logged as a new formal RA row since no code was proposed or built). *New technical debt:* one minor item flagged (not logged as a formal TD row) — the two `_store_operation_scope_key_uniq` constant strings will be duplicated between `shopify_connector_inventory` and `shopify_connector_fulfillment` once Theme A is implemented, since fulfillment cannot import them from inventory; a future core refactor moving them to `shopify_connector_job.py` would remove the duplication. *Architecture concerns:* none new beyond the four now-frozen decisions. *Tests or review gates needed:* the locked prompt's acceptance-criteria/negative-tests sections were updated with the frozen designs' exact required tests. *Should future prompts change?* No — this was a narrowly-scoped decision-lock pass exactly matching its own governing prompt.
+- **Quality gate confirmation:** handoff updated · feedback loop checked · learning captured · rejected-approach check performed (none new) · technical debt noted (non-blocking, not formally logged) · no repeated-issue pattern needed escalation into a new rule this session — all YES.
+- **Next recommended session:** control-room review of `wave-4-tier1-decision-lock.md`; if accepted, a **separate future implementation session** (never this one) executes the now-normalized `wave-4-tier1-correction-locked-candidate.md`.
+- **Stop condition:** docs-only decision lock complete; no `addons/**`/test/manifest/CI file touched; no implementation performed; no Odoo.sh runtime executed; no Shopify operation occurred; PR #189 not marked ready, not self-accepted, not merged. `WAVE 4 DECISION LOCK COMPLETE — READY FOR CONTROL-ROOM IMPLEMENTATION AUTHORIZATION.`
+
+---
+
+### Wave 4 Tier-1 findings synthesis — PR #189 (docs-only) (2026-07-23)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`, draft PR
+  [#189](https://github.com/AdamsOdoo/Adams/pull/189) (unchanged; docs-only
+  commit; unmerged; not marked ready; not self-accepted). **No `addons/**`
+  change; no code/test/CI file changed; no Odoo.sh runtime executed; no
+  Shopify request or mutation occurred.**
+- **Trigger:** a fresh independent Tier-1 review of exact head
+  `2d9cff02dd5459f4ec7afee33c84fec5d00b0b8a` returned `REVISE` (PR #189
+  comment [`5058257403`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5058257403))
+  — 2 confirmed P0s, 9 P1s, 13 material P2s — but its own headline counts
+  were internally inconsistent (stating both "25" and "26" blocking findings
+  against its own severity subtotals of 24). The control room accepted the
+  `REVISE` verdict as a valid hard stop and ordered one dedicated
+  synthesis/reset session before any correction implementation (comment
+  [`5058826143`](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5058826143)).
+- **What this session did:** independently re-verified all 24 named findings
+  against the exact reviewed source (not the reviewer's summary), resolved
+  the 24/25/26 count discrepancy (24 is authoritative — the extra headline
+  counts trace to two findings each being mentioned in two dimension
+  write-ups without the review's own arithmetic being corrected to match its
+  own stated collapse), built 13 root-cause themes with full correction
+  boundaries/acceptance criteria/test-runtime matrices, assessed impact on
+  frozen PR #194 (Wave 5 U1 Gate A), and produced one locked (not-yet-
+  authorized) correction implementation prompt. Also corrected two
+  governance-doc findings the review itself raised: `technical-debt-register.md`'s
+  TD-002 row (reverted from a premature `Resolved` to `In progress`) and this
+  file's own stale Wave 4 Gate B "next-session prompt" (annotated, not
+  rewritten, to stop routing future review to ChatGPT — see that entry
+  below).
+- **Both P0s confirmed as binding baselines:** (P0-A) `stock_picking.py`
+  swallows a `UNIQUE(store_id, operation_scope_key)` collision with no
+  savepoint, silently discarding the caller's own transaction; (P0-B) Mode
+  2's picking-selection never checks for sibling, un-evidenced moves before
+  calling `picking._action_done()` on the whole picking, so a genuine partial
+  Shopify fulfillment can silently over-validate/stock-deduct an unrelated
+  order line.
+- **Recommended correction structure:** one correction campaign with ordered
+  internal stages on this same branch/PR (11 of 13 themes are immediately,
+  narrowly correctable within the existing allowed-files scope with no
+  destructive migration); 2 themes (multi-company `ir.rule` gap on
+  `shopify.connector.job`/`.mutation.attempt`; U0 dashboard job-type labels)
+  are fully outside this PR's implementable scope and require a separate
+  control-room-scoped DEC or scope amendment; 1 theme (picking-to-warehouse
+  cross-check) is partially so, pending an architecture decision closing
+  DEC-011's still-open item.
+- **Evidence classification (honest):** documentation-only synthesis —
+  verified by repository/diff/path/link/consistency checks, never a
+  fabricated runtime campaign. No correction test is claimed as executed.
+  The nine-process external-multiprocessing campaign remains `DEFERRED BY
+  PRODUCT OWNER — NOT PROVEN` (comment `5055372944`), unchanged by this
+  session. Issue #185 (CV-013) remains open/critical; issue #193 remains the
+  separate baseline owner.
+- **Files:** `docs/05-qa/wave-4-tier1-findings-ledger.md` (NEW),
+  `docs/07-implementation-plan/wave-4-tier1-correction-synthesis.md` (NEW),
+  `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` (NEW),
+  `docs/07-implementation-plan/wave-4-tier1-synthesis-handoff.md` (NEW);
+  updates to `docs/05-qa/technical-debt-register.md`,
+  `docs/05-qa/architecture-review-log.md` (AR-079),
+  `docs/07-implementation-plan/mvp-program-state.md`, and this file.
+
+- **Learning feedback loop:**
+  - *What worked:* dispatching one verification agent per root-cause theme
+    (rather than one pass over the whole review) let each theme's agent read
+    every relevant file in full and independently re-derive line-cited
+    evidence, which is how three refinements beyond the reviewer's own text
+    were caught: a broader exposure for the transaction-poisoning class (3
+    more unguarded `_enqueue_once` call sites), a second missing terminal
+    state (`failed_final`, not just `cancelled`) for the origin-confirmation
+    gap, and the concrete reason two findings (`P1-7`, `F-11`) cannot be
+    fixed inside this PR at all (they require editing `shopify_connector_core`,
+    forbidden by this PR's own locked allowed-files list without a
+    control-room amendment).
+  - *New lesson:* a review's own headline finding-count can be internally
+    inconsistent with its own itemized severity subtotals without any
+    individual finding being wrong — the fix is careful reconciliation
+    against the review's own text (which, in this case, already explained
+    the discrepancy in a parenthetical the headline arithmetic simply never
+    incorporated), not discarding or re-deriving the count from scratch.
+  - *Reinforced:* CLAUDE.md §13's no-self-acceptance rule applies exactly as
+    much to a synthesis/reset session as to an implementation session — this
+    session authored a correction *prompt* but did not, and may not, use it
+    itself.
+  - *Carry-forward risk:* the recommended correction batch, once
+    control-room-accepted, still requires full DEC-040 runtime rigor (fresh
+    exact-SHA Odoo.sh evidence, proportional to this Tier-1
+    mutation-safety/concurrency/data-integrity batch's risk and size) before
+    its own independent review — synthesizing the findings does not reduce
+    that requirement.
+
+- **Exact next-session prompt (control room or independent reviewer):**
+  *"Do not implement yet. First, the control room must accept or revise this
+  synthesis (`docs/07-implementation-plan/wave-4-tier1-correction-synthesis.md`)
+  and its recommended correction structure. Once accepted, a fresh
+  implementation session (never this synthesis session) may use
+  `docs/06-prompts/wave-4-tier1-correction-locked-candidate.md` to implement
+  the 11 authorized themes as one correction campaign with ordered internal
+  stages, run a full exact-SHA Odoo.sh campaign, and submit the result to
+  independent Claude review (a separate top-level session or a fresh
+  subagent — never ChatGPT-by-default, per DEC-039/DEC-040). Do not fold in
+  the two carved-out themes (multi-company job/mutation.attempt scoping;
+  U0 dashboard labels) without their own separate control-room decisions.
+  #185 (CV-013) remains open; no live Shopify mutation is authorized."*
+
+---
+
 ### Wave 5 U1 Gate A — fulfillment operator experience Definition-of-Ready + implementation packet (2026-07-23)
 
 - **Branch / PR:** `claude/wave-5-u1-gate-a`, draft PR into `mvp/program-integration`
@@ -131,6 +292,78 @@
   the security acceptance matrix on the **fresh build**, attempt browser
   tours/HOOT + screenshots + RD-1/RD-2 timings + upgrade/uninstall-reinstall
   zero-residue, and issue the durable independent review. Do **not** self-accept.
+
+### Wave 4 Gate B — fulfillment/tracking backend implemented (draft PR #189) (2026-07-22)
+
+- **Branch / PR:** `claude/wave-4-fulfillment-gate-b`, **draft PR
+  [#189](https://github.com/AdamsOdoo/Adams/pull/189)** into `mvp/program-integration`
+  (unmerged; not marked ready; not self-accepted). **No live Shopify mutation.**
+  Base `mvp/program-integration@01f072dd4d83b7b39737452a686244a3a8c00332`.
+- **Worker / authority:** Claude Code as the authorized Gate B implementation
+  worker (issue #186 comment `5043052341`). ChatGPT is the acceptance/merge
+  authority; the product owner is the business authority. No self-accept / ready
+  / merge; no Gate C/Gate D/Wave 5 work started.
+- **Delivered:** the new `shopify_connector_fulfillment` addon (one
+  `shopify.connector.fulfillment.service` split across the enumerated
+  responsibility files) + the one named core edit (`REQUIRED_MVP_SCOPES` swap +
+  its test). D-014-1..8; ten frozen job types + shared `fulfillment_mutation_reconcile`
+  + dedicated `_normalize_tracking_change_trigger_origin_on_uninstall`; Q1
+  operation-scope override; both 7-callback Layer 2 strategies (anonymous-form
+  GraphQL constants, **no `@idempotent`**, RA-022/RA-023) with **reconcile-only
+  post-C2 (APPLIED/INCONCLUSIVE only; read absence = INCONCLUSIVE; cap 3 →
+  `duplicate_risk`; no resend; no repeated notification)**; admission (one create
+  per picking; per-FO line decomposition); `stock.picking._action_done` trigger +
+  tracking hook; the 16-condition Mode 2 engine + Q6 carrier fail-closed; Mode 1
+  review actions + review-release helper; inbound observation + origin
+  classification + 7-family state normalization; scans + mode-switch state
+  machine + cron; the readiness seam (write-scope, API-version Q7, staff-permission
+  NOT_PROVEN Q8); ACL + multi-company rules. All 22 frozen test filenames + the
+  out-of-band spawn concurrency harness.
+- **Evidence classification (honest):** frozen **core** + fulfillment source
+  guards executed standalone → **0 violations**; `py_compile` clean. **No Odoo
+  runtime in this workspace** → the `TransactionCase` suite is
+  `IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh). Gate D dev-store + CV-013 are
+  `NOT PROVEN`/pending. **CV-013 (#185) open and critical.** Full detail:
+  [`../05-qa/task-014-fulfillment-tracking-validation-results.md`](../05-qa/task-014-fulfillment-tracking-validation-results.md);
+  review record AR-078 (renumbered during Wave 4/U0 base reconciliation;
+  U0's own AR-073..AR-077 sequence is unchanged — see
+  `architecture-review-log.md`).
+
+- **Learning feedback loop:**
+  - *What worked:* mapping the merged Layer 2 substrate (inventory
+    `_service.py`, job/dispatch/mutation_attempt, the frozen source guards)
+    exhaustively **before** writing a line of integration code prevented seam
+    drift; running the **frozen core guard logic standalone** against the new
+    production tree caught the single hardest architectural risk (the
+    un-editable `ACCEPTED_PREPARE_TRANSPORT_SPLIT` allowlist) early and proved
+    the anonymous-operation resolution empirically.
+  - *New lesson (LL — Gate B):* when a new domain mirrors an accepted
+    prepare/transport split but the **frozen** core guard's allowlist is exactly
+    scoped to the prior domains and cannot be widened, an **anonymous GraphQL
+    operation** (module constant, referenced by name) satisfies the guard's
+    named-mutation regex by construction while the domain's own guard provides
+    the real coverage — a reusable pattern for future domains that add mutation
+    strategies without touching frozen core tests.
+  - *Reinforced:* the reconcile-only P0 is safest enforced **in the reconcile
+    callback itself** (never returning `not_applied`) **and** re-enforced at the
+    shared handler (coercing any `not_applied` to inconclusive) — defence in
+    depth for the highest-consequence contract.
+  - *Carry-forward risk:* SRR-10 (no-tracking reconcile is weaker, fails closed
+    to `duplicate_risk` review) is retained by design; runtime proof (Gate C/D)
+    of the concurrency + reconcile paths is still pending.
+
+> **Stale-routing correction (2026-07-23, Wave 4 Tier-1 findings synthesis, finding F-13):** the "Exact next-session prompt" below still names "CHATGPT CONTROL ROOM" as the routine Gate B reviewer. That was already superseded by DEC-039/DEC-040 (Accepted 2026-07-22, merged via PR #191 ahead of every runtime/reconciliation commit on this branch), which make **independent Claude review** (a separate top-level session or a fresh subagent) the default routine gate, repositioning ChatGPT as an optional strategic spot-check — this file was simply never updated when those DECs landed. In fact, an independent Claude Tier-1 review of exact head `2d9cff0` already ran under the correct model and returned `REVISE` (PR #189 comment `5058257403`); the control room accepted that verdict and ordered a synthesis reset (comment `5058826143`), now complete — see the top-of-file entry for this synthesis session. The prompt text below is retained verbatim for history; do not follow its "CHATGPT CONTROL ROOM" routing for any future Gate B work.
+
+- **Exact next-session prompt (control room):** *"CHATGPT CONTROL ROOM — perform
+  the one exhaustive Wave 4 Gate B review of draft PR #189 (branch
+  `claude/wave-4-fulfillment-gate-b`, base `01f072dd`). Verify the identity gate,
+  the frozen §2/§5 allowlist, the source/origin matrix, the reconcile-only P0,
+  the ten-job taxonomy + shared reconcile, the 16-condition Mode 2 engine + Q6,
+  lifecycle/security, and the evidence classification in
+  `docs/05-qa/task-014-fulfillment-tracking-validation-results.md`. Report all
+  P0/P1/material-P2 findings in one consolidated ruling (issue #186 comment
+  `5043013284`). Do not run a second narrow correction loop. #185 (CV-013)
+  remains open; no live Shopify mutation is authorized."*
 
 ### Wave 4 Gate A — final control-room micro-correction applied (draft PR #188) (2026-07-22)
 

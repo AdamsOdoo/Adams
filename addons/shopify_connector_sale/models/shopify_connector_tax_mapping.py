@@ -102,9 +102,25 @@ class ShopifyConnectorTaxMapping(models.Model):
     _name = 'shopify.connector.tax.mapping'
     _description = 'Shopify Connector Tax Mapping'
 
+    # SEC-3 (#197): opt in to Odoo 19's native company consistency check
+    # (`odoo/orm/models.py` L451/L4516/L4743). Together with `check_company=True`
+    # on the business relation below, a store can only ever bind a record of its
+    # own company -- enforced on create AND write, and under `sudo()`.
+    _check_company_auto = True
+
     store_id = fields.Many2one(
         comodel_name='shopify.connector.store', required=True, index=True,
         ondelete='restrict',
+    )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     shopify_tax_evidence_key = fields.Char(
         required=True, index=True, readonly=True,
@@ -117,6 +133,7 @@ class ShopifyConnectorTaxMapping(models.Model):
     source_preview = fields.Char(readonly=True)
     account_tax_id = fields.Many2one(
         comodel_name='account.tax', required=True, ondelete='restrict',
+        check_company=True,
     )
 
     _store_evidence_key_uniq = models.Constraint(

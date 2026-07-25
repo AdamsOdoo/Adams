@@ -83,6 +83,11 @@ DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 # an ORM magic column). Deliberately no token/credential/query/payload column.
 EXPECTED_LEASE_FIELDS = {
     'store_id', 'lease_key', 'job_id', 'worker_ref', 'admitted_at', 'expires_at',
+    # SEC-3 (#197): the owning store's company, stored so the fail-closed
+    # record rule can filter leases in SQL like every other store-scoped row.
+    # It is neither coordination state nor a secret, and the FORBIDDEN_LEASE_
+    # SUBSTRINGS check above still applies to it unchanged.
+    'company_id',
 }
 FORBIDDEN_LEASE_SUBSTRINGS = (
     'token', 'credential', 'secret', 'query', 'variable', 'payload', 'body',
@@ -264,6 +269,16 @@ def guard_min_call_lineno(fn, attr, receiver_name=None):
     return min(linenos) if linenos else None
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestCallLeaseModelSchema(TransactionCase):
 
     def test_connector_tests_have_no_duplicate_class_methods(self):
@@ -400,6 +415,7 @@ class TestCallLeaseModelSchema(TransactionCase):
         self.assertIn('REASON_TEMPORARY', source)
 
 
+@tagged('post_install', '-at_install')
 class TestBusinessAdmission(TransactionCase):
     """The real `execute_business`/`_admit`/`_release_lease` admission path,
     including the `execute()`-parity contract and exception precedence."""
@@ -1451,6 +1467,7 @@ class _DisconnectHelpers:
         return self.env['ir.cron.trigger'].search([('cron_id', '=', cron.id)])
 
 
+@tagged('post_install', '-at_install')
 class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
     """Phase-1 two-phase `action_disconnect` + lifecycle request matrix.
 
@@ -1640,6 +1657,7 @@ class TestDisconnectPhase1(_DisconnectHelpers, TransactionCase):
         self.assertEqual(store.connection_generation, gen_before + 1)
 
 
+@tagged('post_install', '-at_install')
 class TestQuiescenceController(_DisconnectHelpers, TransactionCase):
     """The `_run_disconnect_quiesce` controller + direction-C finalization."""
 
@@ -1847,6 +1865,7 @@ class TestQuiescenceController(_DisconnectHelpers, TransactionCase):
                         self.assertNotIn(DUMMY_TOKEN, rec[fname])
 
 
+@tagged('post_install', '-at_install')
 class TestDisconnectSourceGuards(_DisconnectHelpers, TransactionCase):
     """Source-level guards for the Slice 2A store controller/lifecycle."""
 
@@ -2105,6 +2124,7 @@ class TestDisconnectControllerSelectionGenuine(TransactionCase):
             self._cleanup(dbname, store_ids)
 
 
+@tagged('post_install', '-at_install')
 class TestLifecycleRaceCorrections(_DisconnectHelpers, TransactionCase):
     """CORE-R2 review 4690639375 #1/#2: activation/reconnect TOCTOU + the
     reconnect_probe path. Controlled tests driving the REAL production
@@ -2204,6 +2224,7 @@ class TestLifecycleRaceCorrections(_DisconnectHelpers, TransactionCase):
         self.assertEqual(store.connection_generation, gen_before + 1)
 
 
+@tagged('post_install', '-at_install')
 class TestLifecycleProbeSupersession(_DisconnectHelpers, TransactionCase):
     """CORE-R2 reviews 4690804619 #1 + 4691182306: the lifecycle probe binds to
     ONE credential snapshot (single token read, credential id/version, store
@@ -2361,6 +2382,7 @@ class TestLifecycleProbeSupersession(_DisconnectHelpers, TransactionCase):
         self.assertIn('superseded', job.cancel_reason)
 
 
+@tagged('post_install', '-at_install')
 class TestCredentialClearPolicy(_DisconnectHelpers, TransactionCase):
     """CORE-R2 reviews 4690804619 #2 + 4690807427: the public/manual credential
     clear never bypasses two-phase quiescence. A live/recoverable store routes
@@ -2669,6 +2691,7 @@ class TestCredentialReplacementRaceGenuine(TransactionCase):
             self._cleanup(dbname, store_id, job_id)
 
 
+@tagged('post_install', '-at_install')
 class TestLifecycleAdmissionSourceGuards(TransactionCase):
     """CORE-R2 review 4691182306 #1 -- source guards for the ATOMIC lifecycle
     admission: `_admit_lifecycle` captures its snapshot in a short OWNED side
@@ -2783,6 +2806,7 @@ class TestLifecycleAdmissionSourceGuards(TransactionCase):
         self.assertIn('_audit_probe_superseded(job)', probe)
 
 
+@tagged('post_install', '-at_install')
 class TestSourceGuardDetectors(TransactionCase):
     """Detector self-tests (control-room review 4692156428) -- guard the guards.
 

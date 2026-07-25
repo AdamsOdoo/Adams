@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            Fulfillment reconciliation scan (D-014-8): enqueues one
+            reconciliation-check job (per-run uuid nonce) per connected,
+            fulfillment-enabled store. 60 minute default cadence. Read-only +
+            local; nothing auto-changes Odoo stock.
+        -->
+        <record id="ir_cron_shopify_connector_fulfillment_reconciliation"
+                model="ir.cron">
+            <field name="name">Shopify Connector: Fulfillment Reconciliation Check</field>
+            <field name="model_id"
+                   ref="model_shopify_connector_fulfillment_service"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_enqueue_reconciliation_checks()</field>
+            <field name="interval_number">60</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

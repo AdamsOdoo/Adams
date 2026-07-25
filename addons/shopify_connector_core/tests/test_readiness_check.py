@@ -4,11 +4,21 @@ import os
 import uuid
 from unittest.mock import patch
 
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestReadinessCheck(TransactionCase):
 
     @classmethod
@@ -350,6 +360,18 @@ class TestReadinessCheck(TransactionCase):
         self.assertFalse(self.store.granted_scopes)
         check = self.ReadinessCheck._check_required_scopes(self.store)
         self.assertEqual(check['result'], 'not_proven')
+
+    def test_required_scopes_use_merchant_managed_fulfillment_orders(self):
+        # TD-002 / D-014-2: the FulfillmentOrder-based mutation flow requires
+        # read_merchant_managed_fulfillment_orders; the legacy read_fulfillments
+        # scope (FulfillmentService apps) is no longer in the required set.
+        self.assertIn(
+            'read_merchant_managed_fulfillment_orders',
+            self.ReadinessCheck.REQUIRED_MVP_SCOPES,
+        )
+        self.assertNotIn(
+            'read_fulfillments', self.ReadinessCheck.REQUIRED_MVP_SCOPES,
+        )
 
     # ------------------------------------------------------------------
     # 14. Domain flag enablement: must pass only when at least one

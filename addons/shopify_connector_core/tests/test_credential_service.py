@@ -2,7 +2,7 @@ import ast
 import os
 
 from odoo.exceptions import AccessError, UserError, ValidationError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
 from ..models import shopify_connector_store_credential as credential_module
@@ -117,11 +117,25 @@ CORE_SUDO_SITES = [
      '_drain_cron_active_state', 'cron', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'Job', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'job', 1),
+    # SEC-3 (#197) scope-mixin seams. The upgrade sweep must see rows that the
+    # fail-closed rules hide from every ordinary reader -- including, by
+    # design, rows it is about to quarantine. The release action re-runs the
+    # consistency check under sudo before clearing anything.
+    ('shopify_connector_scope_mixin.py',
+     '_sec3_quarantine_scope_mismatches', 'self', 1),
+    ('shopify_connector_scope_mixin.py',
+     'action_sec3_release_scope_quarantine', 'self', 1),
     ('shopify_connector_stale_owner_sweep.py',
      '_positive_int_parameter', "self.env['ir.config_parameter']", 1),
     ('shopify_connector_stale_owner_sweep.py', 'run_sweep', 'job', 1),
     ('shopify_connector_store.py', '_apply_probe_failure', 'job', 1),
     ('shopify_connector_store.py', '_audit_probe_superseded', 'job', 1),
+    # SEC-3 (#197) ownership seams. Both are deliberate and both are recorded
+    # here because this guard is the audit: a new sudo() in core is a change to
+    # the trust surface, not an implementation detail.
+    ('shopify_connector_store.py', '_backfill_company',
+     "self.env['res.company']", 1),
+    ('shopify_connector_store.py', 'action_assign_company', 'self', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
      'Job', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
@@ -199,6 +213,12 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_drain_cron_active_state'): 'Read cron configuration.',
     ('shopify_connector_readiness_check.py',
      'run_for_store'): 'Readiness audit job lifecycle.',
+    ('shopify_connector_scope_mixin.py',
+     '_sec3_quarantine_scope_mismatches'):
+        'SEC-3 historic scope sweep over fail-closed rows.',
+    ('shopify_connector_scope_mixin.py',
+     'action_sec3_release_scope_quarantine'):
+        'SEC-3 administrative quarantine release re-check.',
     ('shopify_connector_stale_owner_sweep.py',
      '_positive_int_parameter'): 'Read sweep configuration.',
     ('shopify_connector_stale_owner_sweep.py',
@@ -207,6 +227,17 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_apply_probe_failure'): 'Probe failure transition.',
     ('shopify_connector_store.py',
      '_audit_probe_superseded'): 'Probe supersession audit.',
+    # Reads res.company to decide whether ownership is PROVABLE (exactly one
+    # company) during install/update. Never writes a company it guessed.
+    ('shopify_connector_store.py',
+     '_backfill_company'): 'SEC-3 ownership backfill probe.',
+    # Resolves a company-less historic store by explicit id -- it is invisible
+    # to a normal read by construction, which is the point of the fail-closed
+    # rule. Administrator-gated, refuses to re-home an already-owned store, and
+    # validates the target company against the caller's own company_ids rather
+    # than trusting the value passed in.
+    ('shopify_connector_store.py',
+     'action_assign_company'): 'SEC-3 administrative ownership remediation.',
     ('shopify_connector_store.py',
      '_create_lifecycle_audit_job'): 'Lifecycle audit carrier.',
     ('shopify_connector_store.py',
@@ -252,6 +283,16 @@ def collect_core_sudo_sites(models_dir):
     return tuple(sites)
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestCredentialService(TransactionCase):
 
     @classmethod
