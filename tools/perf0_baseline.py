@@ -10,11 +10,15 @@ different SHAs on the same environment without a test runner in the way.
 What it measures, per scenario, over N timed repetitions after a discarded
 warm-up:
 
-  * latency: p50 / p95 / p99 / min / max / mean, in milliseconds
+  * latency: p50 / p95 / p99 / min / max / mean / stdev, in milliseconds
   * SQL query count per repetition
-  * lock wait: total time blocked on PostgreSQL locks, from pg_stat_database
+  * SQL execution time: cumulative statement execution time delta, from
+    pg_stat_statements. This is EXECUTION time, not lock-wait time -- see the
+    note on `sql_exec_time_snapshot` below. Lock waiting is measured separately
+    and directly, by the `lock_contention_blocking` scenario.
   * memory: max RSS delta across the run
-  * residue: connector rows created and not reclaimed
+  * residue: connector rows created and not reclaimed, swept across every
+    connector table the fixture can touch
 
 Scenarios (all local; **no Shopify request or mutation of any kind**):
 
@@ -22,8 +26,13 @@ Scenarios (all local; **no Shopify request or mutation of any kind**):
   * ``job_drain``          -- dispatch/drain throughput over queued jobs
   * ``layer2_intent``      -- Layer-2 attempt intent creation overhead
   * ``layer2_outcome``     -- Layer-2 direct-outcome recording overhead
+  * ``layer2_reconcile``   -- Layer-2 reconciliation sweep over open attempts
+  * ``order_scan``         -- order scan/import reconciliation projection
+  * ``inventory_scan``     -- inventory scan/reconciliation projection
+  * ``fulfillment_scan``   -- fulfillment scan/reconciliation projection
   * ``binding_lookup``     -- indexed binding resolution at dataset scale
-  * ``lock_contention``    -- serialization cost of the pair lock under contention
+  * ``lock_skiplocked``    -- uncontended FOR UPDATE SKIP LOCKED acquire (floor)
+  * ``lock_contention_blocking`` -- GENUINE two-connection blocking contention
 
 Results are **baseline-only**. Issue #199 is explicit that values are labelled
 baseline until thresholds are separately accepted, so this script never emits a
@@ -52,8 +61,13 @@ SCENARIOS = (
     'job_drain',
     'layer2_intent',
     'layer2_outcome',
+    'layer2_reconcile',
+    'order_scan',
+    'inventory_scan',
+    'fulfillment_scan',
     'binding_lookup',
-    'lock_contention',
+    'lock_skiplocked',
+    'lock_contention_blocking',
 )
 
 
@@ -76,6 +90,7 @@ def bootstrap(config_path, database):
         'registry': Registry(database),
         'superuser_id': SUPERUSER_ID,
         'odoo': odoo,
+        'database': database,
     }
 
 
@@ -136,13 +151,26 @@ def has_pg_stat_statements(cursor):
     return bool(cursor.fetchone()[0])
 
 
-def lock_wait_snapshot(cursor, available):
-    """Cumulative statement execution time for this database, in milliseconds.
+def sql_exec_time_snapshot(cursor, available):
+    """Cumulative statement EXECUTION time for this database, in milliseconds.
+
+    ``pg_stat_statements.total_exec_time`` is the time PostgreSQL spent
+    *executing* statements. It is **not** lock-wait time, and an earlier version
+    of this harness reported it as ``lock_wait_ms_delta``, which was simply
+    wrong: a workload that never blocks on a lock still accumulates a large
+    ``total_exec_time``. The number is still useful -- it separates "the query
+    got slower" from "the Python around it got slower" -- so it is kept, under
+    its true name.
+
+    Genuine lock waiting is measured directly instead, by
+    ``scenario_lock_contention_blocking``: one connection holds a row lock while
+    another attempts the real acquisition path, and the wall-clock block plus
+    PostgreSQL's own ``wait_event`` are recorded.
 
     ``pg_stat_statements`` is cumulative, so the caller takes a before/after
     pair and subtracts. When the extension is absent the value is ``None``, not
-    zero: reporting a missing statistic as zero contention would be a lie, and
-    #199 asks for lock/wait behaviour to be recorded honestly or not at all.
+    zero: reporting a missing statistic as zero would be a lie, and #199 asks
+    for this to be recorded honestly or not at all.
     """
     if not available:
         return None
@@ -194,6 +222,7 @@ class Fixture:
         self.tag = uuid.uuid4().hex[:12]
         self.store = None
         self.job_ids = []
+        self.dataset_built = False
 
     def build(self):
         self.store = self.env['shopify.connector.store'].create({
@@ -207,6 +236,75 @@ class Fixture:
         self.store.write({'state': 'connected'})
         return self
 
+    def build_domain_dataset(self, rows):
+        """Create the durable rows the scan/reconciliation scenarios read.
+
+        Without this the scan scenarios would search empty tables and report a
+        latency that says nothing about reconciliation at dataset scale -- a
+        benchmark that measures nothing is worse than no benchmark, because it
+        looks like evidence. Sized from --batch so the dataset and the workload
+        scale together.
+
+        Everything here is local: partners, orders, products, locations and
+        connector rows. No Shopify request or mutation of any kind.
+        """
+        if self.dataset_built:
+            return
+        env = self.env
+        partner = env['res.partner'].create({'name': 'PERF-0 partner %s' % self.tag})
+        template = env['product.template'].create({
+            'name': 'PERF-0 product %s' % self.tag, 'type': 'consu',
+        })
+        location = env['stock.location'].search(
+            [('usage', '=', 'internal')], limit=1)
+
+        template_binding = env['shopify.connector.product.template.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/perf0-%s' % self.tag,
+            'product_template_id': template.id,
+        })
+        variant_binding = env['shopify.connector.product.variant.binding'].sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/perf0-%s' % self.tag,
+            'product_variant_id': template.product_variant_id.id,
+            'product_template_binding_id': template_binding.id,
+        })
+        mapping = None
+        if location:
+            mapping = env['shopify.connector.location.mapping'].sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Location/perf0-%s' % self.tag,
+                'odoo_location_id': location.id,
+                'match_key': 'manual',
+            })
+
+        orders = env['sale.order'].create([
+            {'partner_id': partner.id} for _ in range(rows)
+        ])
+        env['shopify.connector.order.binding'].sudo().create([{
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Order/perf0-%s-%d' % (self.tag, index),
+            'sale_order_id': order.id,
+        } for index, order in enumerate(orders)])
+
+        if mapping:
+            env['shopify.connector.inventory.level.binding'].sudo().create([{
+                'store_id': self.store.id,
+                'product_variant_binding_id': variant_binding.id,
+                'location_mapping_id': mapping.id,
+                'shopify_inventory_item_gid':
+                    'gid://shopify/InventoryItem/perf0-%s-%d' % (self.tag, index),
+            } for index in range(rows)])
+
+        env['shopify.connector.fulfillment.inbound.evidence'].sudo().create([{
+            'store_id': self.store.id,
+            'shopify_fulfillment_gid':
+                'gid://shopify/Fulfillment/perf0-%s-%d' % (self.tag, index),
+        } for index in range(rows)])
+
+        env.flush_all()
+        self.dataset_built = True
+
     def new_job(self, job_type='core_dispatch_selftest', state='queued'):
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': self.store.id,
@@ -218,37 +316,103 @@ class Fixture:
         self.job_ids.append(job.id)
         return job
 
+    # Every connector table that can end up owning a row because this fixture
+    # exists. Listing them explicitly -- rather than checking only the store row
+    # -- is the difference between "the store is gone" and "nothing this
+    # benchmark created is still here". The earlier version checked three
+    # tables and the store row, which could report a clean teardown while a
+    # credential, a lease or a binding survived and silently changed the
+    # dataset for the next run.
+    STORE_SCOPED_TABLES = (
+        'shopify_connector_job',
+        'shopify_connector_job_log',
+        'shopify_connector_mutation_attempt',
+        'shopify_connector_call_lease',
+        'shopify_connector_location',
+        'shopify_connector_store_credential',
+        'shopify_connector_store_settings',
+        'shopify_connector_customer_binding',
+        'shopify_connector_order_binding',
+        'shopify_connector_product_template_binding',
+        'shopify_connector_product_variant_binding',
+        'shopify_connector_location_mapping',
+        'shopify_connector_inventory_level_binding',
+        'shopify_connector_fulfillment_binding',
+        'shopify_connector_fulfillment_inbound_evidence',
+        'shopify_connector_tax_mapping',
+    )
+
+    def _existing_tables(self, cursor):
+        cursor.execute(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = 'public' AND table_name = ANY(%s)",
+            (list(self.STORE_SCOPED_TABLES),),
+        )
+        return [row[0] for row in cursor.fetchall()]
+
     def residue(self, cursor):
-        """Rows this fixture owns that are still present."""
+        """Every row this fixture owns, across every store-scoped table."""
         counts = {}
-        for table, column in (
-            ('shopify_connector_job_log', 'job_id'),
-            ('shopify_connector_mutation_attempt', 'job_id'),
-        ):
+        for table in self._existing_tables(cursor):
             cursor.execute(
-                'SELECT COUNT(*) FROM %s WHERE %s = ANY(%%s)' % (table, column),
-                (self.job_ids or [0],),
+                'SELECT COUNT(*) FROM %s WHERE store_id = %%s' % table,
+                (self.store.id,),
             )
             counts[table] = cursor.fetchone()[0]
         cursor.execute(
-            'SELECT COUNT(*) FROM shopify_connector_job WHERE store_id = %s',
+            'SELECT COUNT(*) FROM shopify_connector_fulfillment_inbound_evidence_line '
+            'WHERE evidence_id IN (SELECT id FROM '
+            'shopify_connector_fulfillment_inbound_evidence WHERE store_id = %s)',
             (self.store.id,),
         )
-        counts['shopify_connector_job'] = cursor.fetchone()[0]
+        counts['shopify_connector_fulfillment_inbound_evidence_line'] = \
+            cursor.fetchone()[0]
         return counts
 
+    # Child-before-parent order. Two things make this non-obvious:
+    #   * the job/attempt FK pair is CIRCULAR (job.mutation_attempt_id ->
+    #     attempt, attempt.job_id -> job), so neither side can be deleted first
+    #     -- the reverse pointer is cleared before either delete. This exact
+    #     defect broke the fulfillment harness the first time it was ever run.
+    #   * evidence lines must go before evidence even though the FK cascades,
+    #     so the residue sweep afterwards is meaningful rather than
+    #     accidentally satisfied.
+    TEARDOWN_STATEMENTS = (
+        'UPDATE shopify_connector_job SET mutation_attempt_id = NULL '
+        'WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_fulfillment_inbound_evidence_line '
+        'WHERE evidence_id IN (SELECT id FROM '
+        'shopify_connector_fulfillment_inbound_evidence WHERE store_id = %(store)s)',
+        'DELETE FROM shopify_connector_fulfillment_inbound_evidence WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_fulfillment_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_inventory_level_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_location_mapping WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_product_variant_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_product_template_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_order_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_customer_binding WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_tax_mapping WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_job_log WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_mutation_attempt WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_job WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_call_lease WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_location WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_store_credential WHERE store_id = %(store)s',
+        'DELETE FROM shopify_connector_store_settings WHERE store_id = %(store)s',
+    )
+
     def teardown(self, cursor):
-        """Exact-id, child-before-parent removal. Never name-based."""
+        """Exact-id, FK-safe, child-before-parent removal. Never name-based."""
         store_id = self.store.id
-        for statement in (
-            'DELETE FROM shopify_connector_job_log WHERE job_id IN '
-            '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
-            'DELETE FROM shopify_connector_mutation_attempt WHERE job_id IN '
-            '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
-            'DELETE FROM shopify_connector_job WHERE store_id = %s',
-            'DELETE FROM shopify_connector_store_settings WHERE store_id = %s',
-        ):
-            cursor.execute(statement, (store_id,))
+        existing = set(self._existing_tables(cursor)) | {
+            'shopify_connector_fulfillment_inbound_evidence_line'}
+        for statement in self.TEARDOWN_STATEMENTS:
+            table = statement.split(' FROM ')[-1].split()[0] \
+                if statement.startswith('DELETE') \
+                else statement.split('UPDATE ')[1].split()[0]
+            if table not in existing:
+                continue
+            cursor.execute(statement, {'store': store_id})
         cursor.execute(
             'DELETE FROM shopify_connector_store WHERE id = %s', (store_id,))
         cursor.commit()
@@ -347,17 +511,211 @@ def scenario_binding_lookup(env, fixture, batch):
         ], limit=50).mapped('payload_hash')
 
 
-def scenario_lock_contention(env, fixture, batch):
-    """Serialization cost of the non-blocking pair lock.
+def scenario_layer2_reconcile(env, fixture, batch):
+    """Reconciliation sweep over open Layer-2 attempts.
 
-    ``try_lock_for_update`` is ``FOR UPDATE SKIP LOCKED``, so an uncontended
-    acquire is the floor this measures. Genuine multi-process contention is the
-    external harnesses' job, not this one -- measuring it here would need a
-    second process and would stop being a clean latency number.
+    The real reconciliation read model: find attempts that are still open for
+    this store and project the fields the reconciler decides on. No transport,
+    no mutation -- issue #199 asks for the scan cost, and the scan is the part
+    that grows with the dataset.
+    """
+    Attempt = _layer2_attempt_model(env)
+    attempts = Attempt.search([
+        ('store_id', '=', fixture.store.id),
+    ], limit=batch)
+    attempts.read([
+        'state', 'job_id', 'store_id',
+        'business_intent_fingerprint', 'exact_request_fingerprint',
+    ])
+
+
+def scenario_order_scan(env, fixture, batch):
+    """Order scan / import reconciliation projection."""
+    fixture.build_domain_dataset(batch)
+    Binding = env['shopify.connector.order.binding'].sudo()
+    for _ in range(max(1, batch // 10)):
+        Binding.search([
+            ('store_id', '=', fixture.store.id),
+            ('status', 'in', ('active', 'review')),
+        ], limit=batch).read(['shopify_gid', 'status', 'store_id'])
+
+
+def scenario_inventory_scan(env, fixture, batch):
+    """Inventory scan / reconciliation projection."""
+    fixture.build_domain_dataset(batch)
+    Binding = env['shopify.connector.inventory.level.binding'].sudo()
+    for _ in range(max(1, batch // 10)):
+        Binding.search([
+            ('store_id', '=', fixture.store.id),
+        ], limit=batch).read(['shopify_gid', 'status', 'store_id'])
+
+
+def scenario_fulfillment_scan(env, fixture, batch):
+    """Fulfillment scan / reconciliation projection."""
+    fixture.build_domain_dataset(batch)
+    Evidence = env['shopify.connector.fulfillment.inbound.evidence'].sudo()
+    for _ in range(max(1, batch // 10)):
+        Evidence.search([
+            ('store_id', '=', fixture.store.id),
+        ], limit=batch).read(['store_id', 'last_observed_at'])
+
+
+def scenario_lock_skiplocked(env, fixture, batch):
+    """Uncontended ``FOR UPDATE SKIP LOCKED`` acquire -- the floor.
+
+    This is the cost of taking the lock when nobody holds it. It is NOT
+    contention, and it is named accordingly: the previous name
+    (``lock_contention``) claimed to measure contention while running
+    single-process and uncontended, so it could only ever report the floor.
+    Real blocking is measured by ``scenario_lock_contention_blocking``.
     """
     jobs = env['shopify.connector.job'].sudo().search([
         ('store_id', '=', fixture.store.id),
     ], limit=batch)
+    for job in jobs:
+        if hasattr(job, 'try_lock_for_update'):
+            job.try_lock_for_update()
+
+
+def measure_blocking_contention(runtime, fixture_job_id, hold_ms=250):
+    """Genuine two-connection lock contention, measured directly.
+
+    Design, and why each part is needed for the number to mean anything:
+
+      * a HOLDER connection opens its own transaction and takes
+        ``SELECT ... FOR UPDATE`` on one specific job row, then simply waits.
+        Two connections are two distinct PostgreSQL backends, so this is real
+        inter-process contention inside the database, not a simulation.
+      * a BLOCKER connection then attempts the same row with plain
+        ``FOR UPDATE``. It genuinely blocks. Wall-clock time around that call
+        is the blocked duration.
+      * while it is blocked, an OBSERVER connection reads
+        ``pg_stat_activity.wait_event_type/wait_event`` and ``pg_locks`` for
+        the blocker's backend pid. This is PostgreSQL's own account of the
+        wait, so the measurement does not rest on our stopwatch alone. If
+        `wait_event_type` is not `Lock`, the run is reported as inconclusive
+        rather than quietly counted as contention.
+      * finally the SAME row is attempted with ``FOR UPDATE SKIP LOCKED``,
+        which must return no row and must NOT wait. Recording both proves the
+        two behaviours are distinguished rather than assumed.
+
+    Returns a dict; never raises for a lock outcome, because "we could not
+    observe the wait" is a result worth publishing honestly, not a crash.
+    """
+    from odoo.sql_db import db_connect
+    import threading
+
+    database = runtime['database']
+    holder = db_connect(database).cursor()
+    blocker = db_connect(database).cursor()
+    observer = db_connect(database).cursor()
+    result = {
+        'blocked_ms': None,
+        'wait_event_type': None,
+        'wait_event': None,
+        'blocking_pid': None,
+        'blocked_pid': None,
+        'skip_locked_waited': None,
+        'skip_locked_rows': None,
+        'conclusive': False,
+    }
+    try:
+        holder.execute('SELECT pg_backend_pid()')
+        result['blocking_pid'] = holder.fetchone()[0]
+        # Bound the block. If the releasing thread ever failed to run, the
+        # blocker would wait forever and the whole harness would hang with no
+        # diagnostic; a timeout turns that into a reported inconclusive result.
+        blocker.execute("SET LOCAL statement_timeout = '%d'"
+                        % (hold_ms * 20,))
+        blocker.execute('SELECT pg_backend_pid()')
+        blocked_pid = blocker.fetchone()[0]
+        result['blocked_pid'] = blocked_pid
+
+        # HOLDER takes and keeps the row lock.
+        holder.execute(
+            'SELECT id FROM shopify_connector_job WHERE id = %s FOR UPDATE',
+            (fixture_job_id,),
+        )
+
+        release = threading.Event()
+
+        def _hold_then_release():
+            release.wait(hold_ms / 1000.0)
+            holder.rollback()
+
+        releaser = threading.Thread(target=_hold_then_release, daemon=True)
+        releaser.start()
+
+        # OBSERVER samples PostgreSQL's own view of the wait while it happens.
+        def _observe():
+            deadline = time.time() + (hold_ms / 1000.0)
+            while time.time() < deadline:
+                observer.execute(
+                    'SELECT wait_event_type, wait_event FROM pg_stat_activity '
+                    'WHERE pid = %s', (blocked_pid,),
+                )
+                row = observer.fetchone()
+                if row and row[0] == 'Lock':
+                    result['wait_event_type'], result['wait_event'] = row
+                    return
+                time.sleep(0.01)
+
+        watcher = threading.Thread(target=_observe, daemon=True)
+        watcher.start()
+
+        started = time.perf_counter()
+        blocker.execute(
+            'SELECT id FROM shopify_connector_job WHERE id = %s FOR UPDATE',
+            (fixture_job_id,),
+        )
+        result['blocked_ms'] = round((time.perf_counter() - started) * 1000.0, 3)
+        watcher.join(timeout=1.0)
+        releaser.join(timeout=2.0)
+        blocker.rollback()
+
+        # SKIP LOCKED against a held row must return nothing, immediately.
+        holder.execute(
+            'SELECT id FROM shopify_connector_job WHERE id = %s FOR UPDATE',
+            (fixture_job_id,),
+        )
+        started = time.perf_counter()
+        blocker.execute(
+            'SELECT id FROM shopify_connector_job WHERE id = %s '
+            'FOR UPDATE SKIP LOCKED', (fixture_job_id,),
+        )
+        rows = blocker.fetchall()
+        result['skip_locked_waited'] = round(
+            (time.perf_counter() - started) * 1000.0, 3)
+        result['skip_locked_rows'] = len(rows)
+        holder.rollback()
+        blocker.rollback()
+
+        result['conclusive'] = (
+            result['wait_event_type'] == 'Lock'
+            and result['blocked_ms'] is not None
+            and result['skip_locked_rows'] == 0
+        )
+    finally:
+        for connection in (holder, blocker, observer):
+            try:
+                connection.close()
+            except Exception:
+                pass
+    return result
+
+
+def scenario_lock_contention_blocking(env, fixture, batch):
+    """Placeholder body.
+
+    The contention measurement needs its own connections and its own timing, so
+    it is performed by `measure_blocking_contention` in the runner rather than
+    inside the generic repetition loop. This function exists so the scenario
+    still executes the ordinary acquisition path once per repetition, giving a
+    comparable latency series alongside the contention block.
+    """
+    jobs = env['shopify.connector.job'].sudo().search([
+        ('store_id', '=', fixture.store.id),
+    ], limit=1)
     for job in jobs:
         if hasattr(job, 'try_lock_for_update'):
             job.try_lock_for_update()
@@ -368,8 +726,13 @@ SCENARIO_FUNCTIONS = {
     'job_drain': scenario_job_drain,
     'layer2_intent': scenario_layer2_intent,
     'layer2_outcome': scenario_layer2_outcome,
+    'layer2_reconcile': scenario_layer2_reconcile,
+    'order_scan': scenario_order_scan,
+    'inventory_scan': scenario_inventory_scan,
+    'fulfillment_scan': scenario_fulfillment_scan,
     'binding_lookup': scenario_binding_lookup,
-    'lock_contention': scenario_lock_contention,
+    'lock_skiplocked': scenario_lock_skiplocked,
+    'lock_contention_blocking': scenario_lock_contention_blocking,
 }
 
 
@@ -387,7 +750,7 @@ def run_scenario(runtime, name, args):
         fixture = Fixture(env, args.scale).build()
         cursor.commit()
         stats_available = has_pg_stat_statements(cursor)
-        lock_before = lock_wait_snapshot(cursor, stats_available)
+        exec_time_before = sql_exec_time_snapshot(cursor, stats_available)
 
         # Warm-up repetitions are executed and DISCARDED. Without this the first
         # sample carries registry/cache/prepared-statement cost and skews p50.
@@ -403,16 +766,32 @@ def run_scenario(runtime, name, args):
                 latencies.append((time.perf_counter() - started) * 1000.0)
             query_counts.append(counter.count)
 
-        lock_after = lock_wait_snapshot(cursor, stats_available)
+        exec_time_after = sql_exec_time_snapshot(cursor, stats_available)
+
+        # Genuine contention is measured here, on its own connections, because
+        # it needs a second backend holding a real lock -- something the
+        # single-connection repetition loop above structurally cannot do.
+        contention = None
+        if name == 'lock_contention_blocking':
+            contention_job = fixture.new_job()
+            cursor.commit()
+            contention = measure_blocking_contention(runtime, contention_job.id)
+
         residue_before_teardown = fixture.residue(cursor)
         fixture.teardown(cursor)
 
+    # Re-open a CLEAN connection and re-sweep. Checking residue on the same
+    # transaction that deleted the rows would prove nothing; and sweeping only
+    # the store row would report "clean" while a credential, lease or binding
+    # survived and silently changed the dataset for the next run.
     with environment(runtime) as (cursor, _env):
         cursor.execute(
             'SELECT COUNT(*) FROM shopify_connector_store WHERE shop_domain = %s',
             ('perf0-%s.myshopify.com' % fixture.tag,),
         )
         leaked_stores = cursor.fetchone()[0]
+        residue_after_teardown = fixture.residue(cursor)
+        residue_after_teardown['shopify_connector_store'] = leaked_stores
 
     rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result = {
@@ -426,19 +805,30 @@ def run_scenario(runtime, name, args):
             'max': max(query_counts) if query_counts else None,
             'mean': round(statistics.fmean(query_counts), 1) if query_counts else None,
         },
-        'lock_wait_source': (
-            'pg_stat_statements' if stats_available
+        # NOTE the name. This is statement EXECUTION time, not lock-wait time.
+        # Genuine lock waiting is reported by the lock_contention_blocking
+        # scenario in its own `contention` block, measured directly.
+        'sql_exec_time_source': (
+            'pg_stat_statements.total_exec_time' if stats_available
             else 'UNAVAILABLE -- extension not installed; not reported as zero'
         ),
-        'lock_wait_ms_delta': (
-            round(lock_after - lock_before, 3)
-            if (lock_before is not None and lock_after is not None) else None
+        'sql_exec_time_ms_delta': (
+            round(exec_time_after - exec_time_before, 3)
+            if (exec_time_before is not None and exec_time_after is not None)
+            else None
         ),
         'max_rss_kb_delta': rss_after - rss_before,
+        'os_pid': os.getpid(),
         'rows_before_teardown': residue_before_teardown,
-        'residue_after_teardown': {'shopify_connector_store': leaked_stores},
+        'residue_after_teardown': residue_after_teardown,
+        'residue_clean': (
+            leaked_stores == 0
+            and not any(residue_after_teardown.values())
+        ),
         'threshold_status': 'BASELINE ONLY -- no accepted threshold exists (issue #199)',
     }
+    if contention is not None:
+        result['contention'] = contention
     return result
 
 
