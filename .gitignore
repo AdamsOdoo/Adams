@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Connector test runtime (tools/run_connector_suite.sh). These are large,
+# machine-specific build artifacts, never source:
+#   .odoo-src        the pinned odoo/odoo checkout (see tools/odoo-pin.txt)
+#   .connector-venv  the Python environment built from Odoo's requirements.txt
+#   ci-artifacts     per-run logs and summary.json
+.odoo-src/
+.connector-venv/
+ci-artifacts/

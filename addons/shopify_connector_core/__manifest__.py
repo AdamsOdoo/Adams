@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.10.0',
+    'version': '19.0.1.12.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -48,6 +48,10 @@ later, separately authorized tasks.
     'data': [
         'security/shopify_connector_security.xml',
         'security/ir.model.access.csv',
+        # SEC-3 (#197): store-rooted, fail-closed multi-company record rules.
+        # Loaded after the ACLs, because a record rule refines an access
+        # right that must already exist.
+        'security/shopify_connector_company_rules.xml',
         'data/shopify_connector_cron_drain.xml',
         'data/shopify_connector_cron_disconnect.xml',
         'data/shopify_connector_pii_retention_cron.xml',

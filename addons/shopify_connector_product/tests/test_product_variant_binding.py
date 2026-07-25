@@ -3,13 +3,30 @@ import os
 
 from odoo import fields
 from odoo.exceptions import AccessError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestProductVariantBinding(TransactionCase):
 
     EXPECTED_PROTECTED_FIELDS = frozenset((
+        # SEC-3 (#197): the store-derived company. Protected, not caller input
+        # -- a binding's company is whatever its store's company is.
+        'company_id',
+        # SEC-3 (#197): set only by the upgrade scope sweep and cleared only by
+        # the administrative release action. A caller-writable quarantine flag
+        # would let exactly the rows it hides unhide themselves.
+        'sec3_scope_quarantined',
         'store_id',
         'shopify_gid',
         'product_variant_id',
@@ -255,8 +272,14 @@ class TestProductVariantBinding(TransactionCase):
             'shop_domain': 'protected-variant-target.myshopify.com',
             'api_version': '2026-07',
         })
+        # SEC-3 (#197): the binding lives in the SAME store as its template
+        # binding. It previously lived in `other_store` while pointing at a
+        # template binding in `self.store` -- a cross-store pair that the
+        # same-store constraint now refuses outright. `other_store` keeps its
+        # role as the forgery TARGET below, which is what the test is actually
+        # about.
         binding = self.VariantBinding.sudo().create({
-            'store_id': other_store.id,
+            'store_id': self.store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/ProtectedSurface',
             'product_variant_id': variant.id,
             'product_template_binding_id': template_binding.id,
@@ -275,7 +298,12 @@ class TestProductVariantBinding(TransactionCase):
             'shopify_image_checksum': 'original-checksum',
         })
         attempted_values = {
-            'store_id': self.store.id,
+            # SEC-3 (#197): company is store-derived, so supplying it is a
+            # forgery attempt like any other protected field -- including the
+            # attempt to CLEAR it, which the loop below also exercises.
+            'company_id': self.env.company.id,
+            'sec3_scope_quarantined': True,
+            'store_id': other_store.id,
             'shopify_gid': 'gid://shopify/ProductVariant/Forged',
             'product_variant_id': other_variant.id,
             'status': 'manually_overridden',

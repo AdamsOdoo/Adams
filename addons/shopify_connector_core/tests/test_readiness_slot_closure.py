@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from .test_api_client import FakeResponse, _success_body
 from .test_credential_service import core_sudo_inventory_for_file
@@ -21,6 +21,16 @@ WEBHOOK_HMAC_NA_REASON = (
 )
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestReadinessSlotClosure(TransactionCase):
     """Task CORE-R1 -- capability-aware readiness correction (D-R1-1..5).
 
@@ -476,7 +486,8 @@ class TestReadinessSlotClosure(TransactionCase):
 
     def test_source_level_store_health_and_sec1_sudo_inventory(self):
         """CORE-R1's health write remains singular while SEC-1 adds only
-        the nine named store-side protected job writer elevations."""
+        the nine named store-side protected job writer elevations, plus the
+        two SEC-3 (#197) ownership seams."""
         path = os.path.join(
             self._models_dir(), 'shopify_connector_store.py'
         )
@@ -491,6 +502,14 @@ class TestReadinessSlotClosure(TransactionCase):
                  'job', 1, 'Probe failure transition.'),
                 ('shopify_connector_store.py', '_audit_probe_superseded',
                  'job', 1, 'Probe supersession audit.'),
+                # SEC-3 (#197) ownership seams. Recorded here as well as in
+                # test_credential_service, because this assertion is the
+                # store-file-specific copy of the same trust-surface contract.
+                ('shopify_connector_store.py', '_backfill_company',
+                 "self.env['res.company']", 1,
+                 'SEC-3 ownership backfill probe.'),
+                ('shopify_connector_store.py', 'action_assign_company',
+                 'self', 1, 'SEC-3 administrative ownership remediation.'),
                 ('shopify_connector_store.py',
                  '_create_lifecycle_audit_job', 'Job', 1,
                  'Lifecycle audit carrier.'),

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import ValidationError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from ..models import shopify_connector_job_dispatch as dispatch_module
 from ..models.shopify_connector_mutation_attempt import canonical_sha256
@@ -28,6 +28,22 @@ def _direct_statement_call_indices(function_node, predicate):
     return matches
 
 
+# Issue #193 / #157 -- DOCUMENTED EXEMPTION from the post_install test-phase
+# contract (docs/05-qa/odoo19-test-phase-contract.md), recorded in
+# `test_phase_contract.EXEMPTIONS`.
+#
+# `test_synthetic_registry_is_complete_and_domain_neutral` asserts that the CORE
+# mutation registry carries no domain strategy -- that is a module-boundary
+# assertion which is only meaningful while `shopify_connector_core` is loaded and
+# the inventory/fulfillment modules are not. Moving it to post_install makes the
+# assertion vacuous-then-false: every module is loaded, so `inventory_*` and
+# `fulfillment_*` strategies are legitimately registered and the test fails.
+#
+# The exemption is safe because this class's fixtures create only connector-owned
+# rows (store/job/job.log). It creates no res.users, res.partner or
+# product.template, so it cannot hit the #193 NOT NULL family. Verified by the
+# runtime baseline: this class was green in the pre-correction warm run.
+@tagged('at_install', '-post_install')
 class TestMutationDispatch(TransactionCase):
 
     @classmethod

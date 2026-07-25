@@ -25,8 +25,22 @@ same reason).
 Because a plain ``TransactionCase`` never commits, its uncommitted rows
 are invisible to a separate ``db_connect`` connection; every fixture is
 therefore created and committed through its own independent connection
-and torn down with raw SQL in ``addCleanup``. No Shopify transport of any
-kind occurs in this module.
+and torn down in ``addCleanup``. No Shopify transport of any kind occurs
+in this module.
+
+Teardown contract (issue #198). Committing fixtures means ``TransactionCase``
+rollback cannot reclaim them, so this module owns its own disposal:
+
+* every committed row -- connector **and** business -- is removed;
+* removal is keyed on the exact ids this module created. There is no
+  name-pattern match and no model-wide delete, so a shared database's
+  unrelated rows can never be caught by fixture teardown;
+* connector rows use exact-id SQL; business rows (``product.template``,
+  ``product.product``, ``stock.location``, ``res.users``, ``res.partner``)
+  go through the ORM so Odoo's own FK/``ondelete`` handling applies and a
+  blocked delete raises loudly instead of leaving residue;
+* ``TestInventoryConcurrencyResidue`` proves repeated create/teardown
+  cycles leave zero fixture-owned rows behind.
 """
 
 import uuid
@@ -195,12 +209,72 @@ class TestInventoryConcurrency(TransactionCase):
                     store.id, binding.shopify_inventory_item_gid,
                     mapping.shopify_gid,
                 ),
+                # Issue #198: the exact ids of every committed *business*
+                # record this fixture owns, so teardown can be exact-id and
+                # FK-safe instead of name-based or model-wide.
+                'location_id': location.id,
+                'product_template_id': template.id,
+                'product_variant_ids': template.product_variant_ids.ids,
             }
             cr.commit()
-        self.addCleanup(self._cleanup_store, info['store_id'])
+        self.addCleanup(self._cleanup_fixture, dict(info))
         return info
 
-    def _cleanup_store(self, store_id):
+    def _cleanup_fixture(self, info):
+        """Issue #198 -- exact-id, FK-safe teardown of everything committed.
+
+        Ordered child-before-parent so each ``DELETE``/``unlink`` is already
+        unreferenced when it runs; every statement is keyed on an id this
+        fixture created, never on a name pattern and never model-wide, so a
+        shared database's unrelated rows can never be touched.
+
+        Connector rows are removed with exact-id SQL (they carry no business
+        ``ondelete`` logic and the raw path stays independent of the module
+        under test). The *business* rows are removed through the ORM so Odoo's
+        own FK/`ondelete` handling applies and a genuinely blocked delete
+        raises here instead of silently leaving residue.
+        """
+        self._cleanup_connector_rows(info['store_id'])
+        self._cleanup_business_rows(info)
+
+    def _cleanup_business_rows(self, info):
+        """Remove the committed business fixtures by exact id."""
+        with db_connect(self.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            location_id = info.get('location_id')
+            if location_id:
+                # Quants are the only stock rows these fixtures can produce at
+                # the fixture location; they block `stock.location.unlink()`.
+                env['stock.quant'].sudo().search(
+                    [('location_id', '=', location_id)]
+                ).unlink()
+            template_id = info.get('product_template_id')
+            if template_id:
+                template = env['product.template'].browse(template_id).exists()
+                # Variants go with the template; unlink them explicitly first so
+                # a variant still referenced elsewhere fails loudly and visibly.
+                variants = env['product.product'].browse(
+                    info.get('product_variant_ids') or []
+                ).exists()
+                if variants:
+                    variants.unlink()
+                if template.exists():
+                    template.unlink()
+            if location_id:
+                env['stock.location'].browse(location_id).exists().unlink()
+            user_id = info.get('user_id')
+            if user_id:
+                user = env['res.users'].browse(user_id).exists()
+                partner_id = info.get('partner_id') or (
+                    user.partner_id.id if user else False
+                )
+                if user:
+                    user.unlink()
+                if partner_id:
+                    env['res.partner'].browse(partner_id).exists().unlink()
+            cr.commit()
+
+    def _cleanup_connector_rows(self, store_id):
         with db_connect(self.dbname).cursor() as cr:
             cr.execute(
                 'DELETE FROM shopify_connector_job_log WHERE job_id IN '
@@ -361,13 +435,19 @@ class TestInventoryConcurrency(TransactionCase):
                     ).id,
                 ])],
             })
+            reviewer_id = reviewer.id
+            partner_id = reviewer.partner_id.id
             cr.commit()
-            # A committed res.users is intentionally not torn down (its
-            # partner/mail FK graph makes raw-SQL deletion unsafe); a
-            # per-run reviewer with a unique login is harmless leftover,
-            # cleared on the next rebuild -- the same trade-off the existing
-            # fixtures make for stock.location / product.template.
-            return reviewer.id
+        # Issue #198: the committed reviewer IS torn down. Raw-SQL deletion was
+        # unsafe against the partner/mail FK graph, so teardown goes through the
+        # ORM by exact id instead -- Odoo's own `ondelete` handling resolves the
+        # graph, and a genuinely blocked delete raises here rather than leaving
+        # silent residue.
+        self.addCleanup(
+            self._cleanup_business_rows,
+            {'user_id': reviewer_id, 'partner_id': partner_id},
+        )
+        return reviewer_id
 
     # ------------------------------------------------------------------
     # Verification helpers (always through a fresh committed connection)
@@ -866,3 +946,169 @@ class TestInventoryConcurrency(TransactionCase):
         self.assertEqual(
             self._count_jobs(info, 'inventory_set_quantities'), 0,
         )
+
+
+@tagged('post_install', '-at_install')
+class TestInventoryConcurrencyResidue(TransactionCase):
+    """Issue #198 -- the committed fixtures leave zero residue, repeatedly.
+
+    ``TestInventoryConcurrency`` commits its fixtures through independent
+    connections, so ``TransactionCase`` rollback cannot reclaim them. This
+    class drives that module's own create/teardown helpers directly and then
+    asserts, from a *fresh committed connection*, that not one fixture-owned
+    row survives -- across repeated cycles, which is what a continuously
+    executed suite actually does.
+
+    It also asserts the negative half of the contract: teardown must not
+    delete anything it does not own.
+    """
+
+    #: Connector tables the fixture writes, checked by exact store id.
+    CONNECTOR_TABLES = (
+        'shopify_connector_job_log',
+        'shopify_connector_mutation_attempt',
+        'shopify_connector_job',
+        'shopify_connector_inventory_level_binding',
+        'shopify_connector_product_variant_binding',
+        'shopify_connector_product_template_binding',
+        'shopify_connector_location_mapping',
+        'shopify_connector_store_settings',
+        'shopify_connector_store',
+    )
+
+    #: Business tables the fixture writes, checked by exact record id.
+    BUSINESS_TABLES = (
+        ('product_template', 'product_template_id'),
+        ('stock_location', 'location_id'),
+        ('res_users', 'user_id'),
+        ('res_partner', 'partner_id'),
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.dbname = self.env.cr.dbname
+
+    def _fixture_case(self):
+        """A live ``TestInventoryConcurrency`` whose cleanups we drive by hand."""
+        case = TestInventoryConcurrency('test_simultaneous_admission_serializes_to_exactly_one_pair_job')
+        case.dbname = self.dbname
+        case._cleanups = []
+        case.addCleanup = lambda fn, *a, **kw: case._cleanups.append((fn, a, kw))
+        return case
+
+    def _row_exists(self, table, column, value):
+        with db_connect(self.dbname).cursor() as cr:
+            cr.execute(
+                'SELECT COUNT(*) FROM %s WHERE %s = %%s' % (table, column),
+                (value,),
+            )
+            return cr.fetchone()[0]
+
+    def _survivors(self, info):
+        """Every fixture-owned row still present, as ``table -> count``."""
+        survivors = {}
+        for table in self.CONNECTOR_TABLES:
+            column = 'id' if table == 'shopify_connector_store' else 'store_id'
+            if table in ('shopify_connector_job_log',
+                         'shopify_connector_mutation_attempt'):
+                # These are reached through the job, so check via the job's store.
+                with db_connect(self.dbname).cursor() as cr:
+                    cr.execute(
+                        'SELECT COUNT(*) FROM %s WHERE job_id IN '
+                        '(SELECT id FROM shopify_connector_job WHERE store_id = %%s)'
+                        % table, (info['store_id'],),
+                    )
+                    count = cr.fetchone()[0]
+            else:
+                count = self._row_exists(table, column, info['store_id'])
+            if count:
+                survivors[table] = count
+        for table, key in self.BUSINESS_TABLES:
+            value = info.get(key)
+            if value and self._row_exists(table, 'id', value):
+                survivors[table] = 1
+        for variant_id in info.get('product_variant_ids') or ():
+            if self._row_exists('product_product', 'id', variant_id):
+                survivors['product_product'] = (
+                    survivors.get('product_product', 0) + 1
+                )
+        return survivors
+
+    def _run_cycle(self):
+        """Create the committed fixtures, tear them down, report survivors."""
+        case = self._fixture_case()
+        info = case._durable_pair()
+        reviewer_id = case._durable_reviewer()
+        info = dict(info)
+        with db_connect(self.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            info['user_id'] = reviewer_id
+            info['partner_id'] = env['res.users'].browse(
+                reviewer_id
+            ).partner_id.id
+        # Everything above is committed and must therefore be observable.
+        self.assertTrue(
+            self._survivors(info),
+            'fixture creation committed nothing; the residue proof would be '
+            'vacuous',
+        )
+        for fn, args, kwargs in reversed(case._cleanups):
+            fn(*args, **kwargs)
+        return info
+
+    def test_repeated_fixture_cycles_leave_zero_residue(self):
+        """Two full create/teardown cycles must leave nothing behind."""
+        for cycle in (1, 2):
+            info = self._run_cycle()
+            survivors = self._survivors(info)
+            self.assertEqual(
+                survivors, {},
+                'cycle %d left fixture-owned residue: %s' % (cycle, survivors),
+            )
+
+    def test_teardown_deletes_nothing_it_does_not_own(self):
+        """Teardown is exact-id: an unrelated store/product is untouched."""
+        with db_connect(self.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            bystander_store = env['shopify.connector.store'].create({
+                'name': 'Residue bystander store',
+                'shop_domain': 'residue-bystander-%s.myshopify.com'
+                               % uuid.uuid4().hex[:10],
+                'api_version': '2026-07',
+            })
+            bystander_template = env['product.template'].create({
+                'name': 'Residue bystander product %s' % uuid.uuid4().hex[:8],
+            })
+            bystander = {
+                'store_id': bystander_store.id,
+                'template_id': bystander_template.id,
+                'variant_ids': bystander_template.product_variant_ids.ids,
+            }
+            cr.commit()
+        self.addCleanup(self._drop_bystander, bystander)
+
+        self._run_cycle()
+
+        self.assertEqual(
+            self._row_exists(
+                'shopify_connector_store', 'id', bystander['store_id']),
+            1, 'fixture teardown deleted an unrelated connector store')
+        self.assertEqual(
+            self._row_exists(
+                'product_template', 'id', bystander['template_id']),
+            1, 'fixture teardown deleted an unrelated product template')
+
+    def _drop_bystander(self, bystander):
+        with db_connect(self.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env['product.product'].browse(
+                bystander['variant_ids']).exists().unlink()
+            env['product.template'].browse(
+                bystander['template_id']).exists().unlink()
+            cr.execute(
+                'DELETE FROM shopify_connector_store_settings WHERE store_id = %s',
+                (bystander['store_id'],))
+            cr.execute(
+                'DELETE FROM shopify_connector_store WHERE id = %s',
+                (bystander['store_id'],))
+            cr.commit()

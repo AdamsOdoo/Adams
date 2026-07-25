@@ -69,6 +69,17 @@ store. Messages contain identifiers, counts, actor id, and mandatory reason
 only, after redaction — never raw PII, credentials, headers, tokens, or
 payload values.
 
+> **Superseded in part — 2026-07-25 (SEC-3 / #197 control-room decision).**
+> The sentence "No `company_id` is added to the store" below records the Wave-1
+> ruling and is **no longer current**: `shopify.connector.store.company_id` now
+> exists and is the connector's single ownership root. The rest of this rule —
+> resolve in the fixed comodel under the caller's own environment before any
+> `sudo`, accept genuinely company-less records, refuse a mismatch with
+> `UserError` before mutation or audit, and never take a caller-supplied model
+> or company argument — **still stands unchanged**, and is now reinforced by
+> Odoo's native `_check_company`. See
+> [`docs/03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md).
+
 **Current-company rule.** No `company_id` is added to the store. The current
 bound record and proposed target are resolved in the seam's fixed comodel under
 the caller's normal environment before any sudo. Where `company_id` exists,

@@ -1,8 +1,9 @@
 import json
+import logging
 import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 from ..tools.redaction import redact
 from .shopify_connector_api_client import (
@@ -15,6 +16,8 @@ from .shopify_connector_job_dispatch import (
     DISCONNECT_QUIESCE_TIMEOUT,
     POLL_DELAY,
 )
+
+_logger = logging.getLogger(__name__)
 
 # CORE-R2 Slice 2A: the disconnect controller's `timed_out` escalation snapshot
 # records at most this many outstanding holders (opaque lease_key + Integer
@@ -152,10 +155,137 @@ class ShopifyConnectorStore(models.Model):
     )
     disconnect_completed_at = fields.Datetime(readonly=True)
 
+    # SEC-3 (#197) ownership root. Every durable connector record derives its
+    # company from the store it belongs to, so this one field is the single
+    # place company ownership is decided for the whole connector.
+    #
+    # MVP ownership contract (control-room decision, 2026-07-25):
+    #   * a store belongs to exactly ONE company;
+    #   * a company may own many stores;
+    #   * sharing one store across companies is OUT of the MVP and must not
+    #     become possible by accident -- hence Many2one, not Many2many.
+    #
+    # Deliberately NOT `required=True`. A required field would make the warm
+    # `-u` update of a database that already holds stores fail outright, and
+    # Odoo would silently leave the column nullable anyway. Ownership is
+    # instead enforced at two places that cannot be bypassed by an upgrade:
+    # `_check_company_assigned` below (create-time) and the fail-closed record
+    # rule in `security/shopify_connector_company_rules.xml` (read-time). An
+    # un-backfilled historic store is therefore invisible to every interactive
+    # user rather than visible to the wrong one.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        string='Company',
+        index=True,
+        ondelete='restrict',
+        default=lambda self: self.env.company,
+        help='The Odoo company that owns this Shopify store. Every job, '
+             'credential, binding and log derived from this store inherits '
+             'this company.',
+    )
+
     _shop_domain_uniq = models.Constraint(
         'UNIQUE(shop_domain)',
         'A store already exists for this Shopify shop domain.',
     )
+
+    @api.constrains('company_id')
+    def _check_company_assigned(self):
+        """Refuse a store with no owning company.
+
+        Fires on create and on any write that clears `company_id`, so a new
+        store can never be created unowned and an owned store can never be
+        un-owned. It deliberately does NOT fire when other fields are written,
+        which is what lets an administrator keep operating on a historic
+        un-backfilled store long enough to assign it (see `_backfill_company`).
+
+        `@api.constrains` also fires under `sudo()`, so this is a genuine
+        write-side guard and not merely a UI convenience.
+        """
+        for store in self:
+            if not store.company_id:
+                raise ValidationError(
+                    'A Shopify store must belong to a company. Assign the '
+                    'owning company before saving this store.'
+                )
+
+    @api.model
+    def _backfill_company(self):
+        """Deterministically assign a company to historic stores, or fail closed.
+
+        Called from `init()` on every install/update. Two rules, both of which
+        require the answer to be *provable* from the database:
+
+        1. If the database has exactly one company, that company is the only
+           possible owner, so assign it.
+        2. Otherwise ownership is ambiguous. Do NOT guess. The store keeps a
+           NULL company and the fail-closed record rule makes it invisible to
+           every interactive user until an administrator assigns it through
+           `action_assign_company` (the durable remediation path).
+
+        A downstream module may supply further *provable* evidence for rule 2
+        -- `shopify_connector_sale` backfills from a store's already-configured
+        `order_company_id` -- but no module may guess.
+        """
+        self.env.cr.execute(
+            'SELECT id FROM shopify_connector_store WHERE company_id IS NULL'
+        )
+        unassigned = [row[0] for row in self.env.cr.fetchall()]
+        if not unassigned:
+            return
+        companies = self.env['res.company'].sudo().search([])
+        if len(companies) == 1:
+            self.env.cr.execute(
+                'UPDATE shopify_connector_store SET company_id = %s '
+                'WHERE company_id IS NULL',
+                (companies.id,),
+            )
+            _logger.info(
+                'SEC-3: assigned the single company %s to %d historic '
+                'Shopify store(s).', companies.display_name, len(unassigned),
+            )
+            return
+        _logger.warning(
+            'SEC-3: %d Shopify store(s) have no owning company and ownership '
+            'is not provable in a %d-company database. They are HIDDEN from '
+            'every interactive user until an administrator assigns a company '
+            '(Settings > Technical > Shopify > unassigned stores). Store ids: '
+            '%s', len(unassigned), len(companies), unassigned,
+        )
+
+    def init(self):
+        """Run the ownership backfill on every install and update."""
+        super().init()
+        self._backfill_company()
+
+    def action_assign_company(self, company):
+        """Administrative remediation path for an un-backfilled historic store.
+
+        The fail-closed record rule hides a company-less store from ordinary
+        reads, which is the point -- but it must still be *fixable*. This
+        method is the sanctioned way: it is Administrator-gated, it resolves
+        the store by explicit id under `sudo()` (the row is invisible to a
+        normal read by construction), and it refuses to move a store that
+        already has an owner, so it can never be used to re-home a live store
+        into another company.
+        """
+        self._ensure_connector_admin_boundary()
+        company = self.env['res.company'].browse(int(company))
+        if not company.exists():
+            raise UserError('The company to assign does not exist.')
+        if company not in self.env.user.company_ids:
+            raise AccessError(
+                'You may only assign a Shopify store to a company you belong '
+                'to.'
+            )
+        for store in self.sudo():
+            if store.company_id:
+                raise UserError(
+                    'This Shopify store already belongs to %s. Re-homing a '
+                    'store to another company is not supported.'
+                    % (store.company_id.display_name,)
+                )
+            store.company_id = company
 
     def _ensure_connector_admin_boundary(self):
         """Refuse a non-Administrator caller at a public action boundary

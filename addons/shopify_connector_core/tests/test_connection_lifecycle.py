@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import UserError, ValidationError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from ..models.shopify_connector_job import BUSINESS_JOB_SOURCES, TERMINAL_JOB_STATES
 from .test_api_client import FakeResponse, _success_body
@@ -14,6 +14,16 @@ CORE_JOB_SOURCES_NOT_GATED = ('setup_readiness_check', 'export_preview_dry_run')
 NON_CONNECTED_STATES = ('setup_incomplete', 'reconnect_needed', 'disconnected')
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestConnectionLifecycle(TransactionCase):
 
     @classmethod

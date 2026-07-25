@@ -107,6 +107,7 @@ class ShopifyConnectorJob(models.Model):
     """
 
     _name = 'shopify.connector.job'
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Job'
 
     store_id = fields.Many2one(
@@ -115,6 +116,16 @@ class ShopifyConnectorJob(models.Model):
         index=True,
         readonly=True,
         ondelete='restrict',
+    )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     job_source = fields.Selection(
         selection=[
@@ -790,6 +801,29 @@ class ShopifyConnectorJob(models.Model):
                 raise ValidationError(
                     'A reconciliation job and its mutation attempt must share a store.'
                 )
+
+    # SEC-3 (#197) scope closure. The write-side rule for this relation is
+    # already enforced above, so it is declared here only so the upgrade sweep
+    # covers rows written BEFORE that constraint existed -- a constraint can
+    # refuse a new row, it can never see an old one.
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (
+            ('mutation_attempt_id', 'store'),
+            # Found by the SEC-3 completeness guard rather than by reading the
+            # model: a superseding job is another job, so a job in store A can
+            # name a superseding job in store B and stay company-consistent
+            # throughout. Nothing else in the ownership model looks at it.
+            ('superseded_by_job_id', 'store'),
+        )
+
+    @api.constrains('store_id', 'superseded_by_job_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()
 
     @api.constrains('state', 'manual_review_subreason')
     def _check_manual_review_subreason_required(self):

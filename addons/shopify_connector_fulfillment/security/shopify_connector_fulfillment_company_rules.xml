@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!--
+            SEC-3 (issue #197) multi-company isolation for the fulfillment
+            domain.
+
+            This file is NEW. Before it, the fulfillment module had no record
+            rules at all: its binding and its inbound evidence (including the
+            per-line evidence rows, which carry sale line references and
+            Shopify fulfillment-order identifiers) were readable by any user of
+            any company who held the model ACL. That was the largest single
+            remaining cross-company read surface in the connector.
+
+            Ownership model (control-room MVP decision, 2026-07-25): a store
+            belongs to exactly ONE company, and every durable store-scoped row
+            inherits that company through a stored related `company_id`. All
+            three models below are store-scoped, so all three are fail-closed
+            on the store's company:
+
+              * `shopify.connector.fulfillment.binding` reaches its store
+                through the shared binding mixin;
+              * `shopify.connector.fulfillment.inbound.evidence` carries
+                `store_id` directly;
+              * `shopify.connector.fulfillment.inbound.evidence.line` has no
+                store of its own and inherits the company one hop further,
+                through its parent evidence row. Without its own rule the lines
+                would stay readable across companies while their parents were
+                correctly hidden — a child-record leak that is easy to miss
+                precisely because the parent looks protected.
+
+            The binding additionally keeps a business-record rule on
+            `picking_id`, so a fulfillment binding is visible only when BOTH
+            its store's company and its stock picking's company are readable.
+
+            `noupdate="0"`: a security-rule correction must reach databases
+            that already carry the old state on the next module update.
+        -->
+
+        <record id="fulfillment_binding_store_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Binding: owning store company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
+        </record>
+
+        <record id="fulfillment_binding_picking_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Binding: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('picking_id.company_id', '=', False), ('picking_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="fulfillment_inbound_evidence_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Inbound Evidence: owning store company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_inbound_evidence"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
+        </record>
+
+        <record id="fulfillment_inbound_evidence_line_company_rule" model="ir.rule">
+            <field name="name">Shopify Fulfillment Inbound Evidence Line: owning store company</field>
+            <field name="model_id" ref="model_shopify_connector_fulfillment_inbound_evidence_line"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
+        </record>
+
+    </data>
+</odoo>

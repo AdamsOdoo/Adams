@@ -1,5 +1,9 @@
+import logging
+
 from odoo import api, fields, models
 from odoo.exceptions import ValidationError
+
+_logger = logging.getLogger(__name__)
 
 # Origin classification (Modes §3). The own-GID ledger is the authoritative
 # signal; there is no app-attribution field on the Fulfillment object, so
@@ -69,6 +73,11 @@ class ShopifyConnectorFulfillmentInboundEvidence(models.Model):
     """
 
     _name = 'shopify.connector.fulfillment.inbound.evidence'
+    # SEC-3 (#197): this row points at TWO connector parents (an order binding
+    # and a fulfillment binding) that each carry their own store. Company
+    # equality cannot catch a cross-store link, because one company may own
+    # several stores.
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Fulfillment Inbound Evidence'
     _order = 'last_observed_at desc, id desc'
 
@@ -78,6 +87,16 @@ class ShopifyConnectorFulfillmentInboundEvidence(models.Model):
         index=True,
         readonly=True,
         ondelete='restrict',
+    )
+    # SEC-3 (#197): company is inherited from the owning store and is never an
+    # independent selector. Stored so record rules, searches and grouped reads
+    # filter on it in SQL; readonly so it can never diverge from its store.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
     )
     order_binding_id = fields.Many2one(
         comodel_name='shopify.connector.order.binding',
@@ -185,6 +204,116 @@ class ShopifyConnectorFulfillmentInboundEvidence(models.Model):
         return ledger
 
 
+    # ------------------------------------------------------------------
+    # SEC-3 (#197): same-store consistency with both connector parents.
+    #
+    # An evidence row names an order binding and a fulfillment binding, each
+    # with its own store. Company equality is not enough: one company may own
+    # several stores, so an observation recorded against store A could point at
+    # store B's order binding and still pass every company check -- two shops'
+    # fulfillment records merged, with the per-line ledger (the duplicate-
+    # application backstop) computed across both.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (
+            ('order_binding_id', 'store'),
+            ('fulfillment_binding_id', 'store'),
+        )
+
+    @api.constrains('store_id', 'order_binding_id', 'fulfillment_binding_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    @api.model
+    def _sec3_quarantine_scope_mismatches(self):
+        """Sweep this row's own parents, then its lines' sale-order lines.
+
+        A line has no store, so it cannot be quarantined on its own evidence;
+        it inherits the flag from this row. A historic line pointing at another
+        company's sale-order line therefore quarantines the EVIDENCE, which
+        hides the observation and its whole ledger together. Hiding the line
+        while leaving the observation readable would split one record across a
+        company boundary.
+        """
+        quarantined = super()._sec3_quarantine_scope_mismatches()
+        # `init()` runs during install, and on a FRESH install the line
+        # table does not exist yet when this model is initialised.
+        self.env.cr.execute(
+            "SELECT to_regclass('public."
+            "shopify_connector_fulfillment_inbound_evidence_line')")
+        if not self.env.cr.fetchone()[0]:
+            return quarantined
+        self.env.cr.execute(
+            'SELECT DISTINCT line.evidence_id '
+            'FROM shopify_connector_fulfillment_inbound_evidence_line line '
+            'JOIN shopify_connector_fulfillment_inbound_evidence evidence '
+            '  ON evidence.id = line.evidence_id '
+            'JOIN sale_order_line sol ON sol.id = line.sale_line_id '
+            'JOIN sale_order so ON so.id = sol.order_id '
+            'WHERE line.sale_line_id IS NOT NULL '
+            '  AND evidence.company_id IS NOT NULL '
+            '  AND so.company_id IS NOT NULL '
+            '  AND so.company_id != evidence.company_id '
+            '  AND evidence.sec3_scope_quarantined = FALSE'
+        )
+        evidence_ids = [row[0] for row in self.env.cr.fetchall()]
+        if evidence_ids:
+            _logger.warning(
+                'SEC-3 scope quarantine: evidence ids %s own a line whose '
+                'sale-order line belongs to another company. The evidence and '
+                'its whole ledger are hidden until an administrator resolves '
+                'it; nothing was re-homed.', evidence_ids,
+            )
+            self.env.cr.execute(
+                'UPDATE shopify_connector_fulfillment_inbound_evidence '
+                'SET sec3_scope_quarantined = TRUE WHERE id IN %s',
+                (tuple(evidence_ids),),
+            )
+            self.invalidate_model(['sec3_scope_quarantined'])
+            self.env['shopify.connector.fulfillment.inbound.evidence.line'
+                     ].invalidate_model(['sec3_scope_quarantined'])
+            quarantined += len(evidence_ids)
+        # The lines' stored related flag does not follow a SQL write to their
+        # parent. Propagate it, or the ledger stays readable under a hidden
+        # observation.
+        self._sec3_sync_line_quarantine()
+        return quarantined
+
+    def _sec3_sync_line_quarantine(self):
+        """Push this row's quarantine flag down onto its lines, in SQL.
+
+        The line's `sec3_scope_quarantined` is a stored RELATED field, and a
+        stored related field is only recomputed when its source is written
+        **through the ORM**. Both the upgrade sweep and the release action
+        write the parent in SQL -- deliberately, because several quarantinable
+        models are append-only evidence with a closed `write()` surface -- so
+        the related column would never be refreshed and the lines would stay
+        readable while their evidence was hidden. That is the same leak one
+        level down, so the flag is propagated explicitly.
+        """
+        self.env.cr.execute(
+            'UPDATE shopify_connector_fulfillment_inbound_evidence_line line '
+            'SET sec3_scope_quarantined = evidence.sec3_scope_quarantined '
+            'FROM shopify_connector_fulfillment_inbound_evidence evidence '
+            'WHERE evidence.id = line.evidence_id '
+            '  AND line.sec3_scope_quarantined '
+            '      IS DISTINCT FROM evidence.sec3_scope_quarantined'
+        )
+        self.env['shopify.connector.fulfillment.inbound.evidence.line'
+                 ].invalidate_model(['sec3_scope_quarantined'])
+
+    def action_sec3_release_scope_quarantine(self):
+        result = super().action_sec3_release_scope_quarantine()
+        self._sec3_sync_line_quarantine()
+        return result
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()
+
+
 class ShopifyConnectorFulfillmentInboundEvidenceLine(models.Model):
     """Per-line inbound evidence + the reconciled-quantity ledger row."""
 
@@ -197,6 +326,30 @@ class ShopifyConnectorFulfillmentInboundEvidenceLine(models.Model):
         index=True,
         readonly=True,
         ondelete='cascade',
+    )
+    # SEC-3 (#197): one hop further than its parent -- the line has no store of
+    # its own, so it inherits the company through the evidence row it belongs
+    # to. Without this the lines would be readable across companies even while
+    # their parent evidence rows were correctly hidden.
+    company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='evidence_id.store_id.company_id',
+        store=True,
+        index=True,
+        readonly=True,
+    )
+    # SEC-3 (#197): a line has no store or company of its own -- it is entirely
+    # a child of its evidence row -- so it inherits the quarantine too. Without
+    # this, quarantining an evidence row would hide the observation while
+    # leaving its per-line ledger readable, which is the same leak one level
+    # down. Stored so the record rule filters on it in SQL rather than
+    # traversing into the parent model (a dotted path would re-enter the parent
+    # model's own rules during rule evaluation).
+    sec3_scope_quarantined = fields.Boolean(
+        related='evidence_id.sec3_scope_quarantined',
+        store=True,
+        index=True,
+        readonly=True,
     )
     fo_line_item_gid = fields.Char(index=True, readonly=True)
     line_item_gid = fields.Char(index=True, readonly=True)
@@ -213,3 +366,27 @@ class ShopifyConnectorFulfillmentInboundEvidenceLine(models.Model):
         'CHECK(quantity >= 0 AND reconciled_quantity >= 0)',
         'Fulfillment evidence quantities cannot be negative.',
     )
+
+    @api.constrains('evidence_id', 'sale_line_id')
+    def _check_sale_line_company(self):
+        """The mapped sale-order line must belong to the evidence's company.
+
+        This is the one relation on this model that leaves the connector: a
+        line points at a `sale.order.line`. `_check_company_auto` cannot be
+        used for it, because the line carries no company column of its own --
+        its company is two hops away, through `evidence_id.store_id`. So the
+        check is written out.
+
+        The comparison is on COMPANY rather than store on purpose: a sale order
+        has no Shopify store, so the company is the strongest agreement that
+        exists between the two sides.
+        """
+        for line in self:
+            if not line.sale_line_id or not line.company_id:
+                continue
+            order_company = line.sale_line_id.order_id.company_id
+            if order_company and order_company != line.company_id:
+                raise ValidationError(
+                    'A fulfillment evidence line and its sale-order line must '
+                    'belong to the same company.'
+                )

@@ -16,11 +16,18 @@ class ShopifyConnectorProductTemplateBinding(models.Model):
     _inherit = 'shopify.connector.binding.mixin'
     _description = 'Shopify Connector Product Template Binding'
 
+    # SEC-3 (#197): opt in to Odoo 19's native company consistency check
+    # (`odoo/orm/models.py` L451/L4516/L4743). Together with `check_company=True`
+    # on the business relation below, a store can only ever bind a record of its
+    # own company -- enforced on create AND write, and under `sudo()`.
+    _check_company_auto = True
+
     product_template_id = fields.Many2one(
         comodel_name='product.template',
         required=True,
         index=True,
         ondelete='restrict',
+        check_company=True,
     )
     # Imported snapshot fields (readonly, informational/audit only --
     # never a second source of truth for matching; matching never reads

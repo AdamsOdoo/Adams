@@ -129,6 +129,16 @@ def _sanitized_exception_diagnostic(exc):
     )
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class _CustomerMatchingScalabilityBase(TransactionCase):
     """Shared fixtures + the test-only old-path reference implementation
     (D-011B-3 backstop) and source-path helpers."""
@@ -288,6 +298,7 @@ class _CustomerMatchingScalabilityBase(TransactionCase):
         return calls
 
 
+@tagged('post_install', '-at_install')
 class TestCustomerMatchingScalability(_CustomerMatchingScalabilityBase):
 
     # ==================================================================
@@ -1412,6 +1423,32 @@ class TestCustomerMatchingConcurrency(TransactionCase):
                 [('store_id', '=', store_id)]).unlink()
             env['shopify.connector.store.settings'].search(
                 [('store_id', '=', store_id)]).unlink()
+            # Every OTHER table that FK-references the store must go before the
+            # store itself. The original order removed only the rows this test
+            # creates deliberately and left the ones the production path creates
+            # as a side effect -- a credential (minted by the callsite token
+            # path), a mutation attempt, a cached location, and any job.log row
+            # carrying a store but no job. Deleting the store then failed with a
+            # ForeignKeyViolation, which `_verify_cleanup` correctly reported
+            # and the test correctly refused to pass. Verified against the live
+            # FK graph: pg_constraint lists exactly these connector tables as
+            # referencing shopify_connector_store.
+            # Raw SQL, not the ORM: the mutation attempt and the job log are
+            # deliberately append-only/undeletable through the ORM (that guard
+            # is what `test_attempt_write_surface_is_closed_and_unlink_forbidden`
+            # protects), and the credential model refuses unlink by design.
+            # Those guards exist to protect production evidence, not to make
+            # test fixtures undisposable. Every statement is scoped to the exact
+            # store id this test created -- never a name pattern, never
+            # model-wide -- so nothing outside the fixture can be reached.
+            for table in (
+                'shopify_connector_mutation_attempt',
+                'shopify_connector_job_log',
+                'shopify_connector_store_credential',
+                'shopify_connector_location',
+            ):
+                cr.execute(
+                    'DELETE FROM %s WHERE store_id = %%s' % table, (store_id,))
             partner = env['res.partner'].with_context(
                 active_test=False).browse(partner_id).exists()
             if partner:
