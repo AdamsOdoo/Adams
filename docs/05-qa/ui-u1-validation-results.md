@@ -52,6 +52,14 @@ worktree, Odoo pin verified:
 Fresh and warm are reported separately on purpose: issue #193 established that a
 green fresh install says nothing about the warm-upgrade path. Both were run.
 
+**Artifact identity `[Fact]`:** `connector_sha` = `5e50aa1c...`,
+`connector_worktree_dirty` = `false`, `odoo_pin_verified` = `true`. Every commit
+after `5e50aa1` on this branch is **docs-only**: the `addons/` tree is
+byte-identical at `5e50aa1` and at the branch head
+(`b301e577f5d10b3a000a48d421752114abd2fc1a`), so these results describe the code
+in the current head exactly. A durable copy of the summary is committed at
+[`evidence/u1-browser-2026-07-25/connector-suite-summary.json`](evidence/u1-browser-2026-07-25/connector-suite-summary.json).
+
 Durable artifacts: `ci-artifacts/summary.json`, `ci-artifacts/fresh.log`,
 `ci-artifacts/warm.log`, `ci-artifacts/nonstandard.log`. Each records the tested
 checkout SHA, the declared source head, worktree cleanliness, the Odoo pin, and

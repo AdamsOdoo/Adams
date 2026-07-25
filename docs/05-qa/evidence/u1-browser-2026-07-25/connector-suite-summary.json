@@ -1,7 +1,7 @@
 {
-  "tested_checkout_sha": "35aba507b3352a7e2b690b93e80356c0a4780c55",
-  "connector_sha": "35aba507b3352a7e2b690b93e80356c0a4780c55",
-  "source_head_sha": "35aba507b3352a7e2b690b93e80356c0a4780c55",
+  "tested_checkout_sha": "5e50aa1c0c29851c74fa8ea0d191f12b5fbc7889",
+  "connector_sha": "5e50aa1c0c29851c74fa8ea0d191f12b5fbc7889",
+  "source_head_sha": "5e50aa1c0c29851c74fa8ea0d191f12b5fbc7889",
   "source_base_sha": "",
   "source_head_verified": true,
   "github_event": "local",
@@ -20,9 +20,9 @@
   "extra_test_tags": "",
   "nonstandard_tags": "shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency",
   "passes": {
-    "fresh_install_standard": {"status": "fail", "result": "2026-07-25 23:02:56,178 8219 ERROR connector_fresh_7347 odoo.tests.result: 1 failed, 0 error(s) of 1563 tests when loading database 'connector_fresh_7347' ", "log": "fresh.log"},
-    "warm_update_standard":   {"status": "fail",  "result": "2026-07-25 23:04:40,456 11979 ERROR connector_warm_7347 odoo.tests.result: 1 failed, 0 error(s) of 1563 tests when loading database 'connector_warm_7347' ",  "log": "warm.log"},
-    "nonstandard_tags":       {"status": "pass", "result": "2026-07-25 23:08:10,691 12771 INFO connector_nonstandard_7347 odoo.tests.result: 0 failed, 0 error(s) of 18 tests when loading database 'connector_nonstandard_7347' ", "log": "nonstandard.log"}
+    "fresh_install_standard": {"status": "pass", "result": "2026-07-25 23:11:50,166 17084 INFO connector_fresh_17065 odoo.tests.result: 0 failed, 0 error(s) of 1563 tests when loading database 'connector_fresh_17065' ", "log": "fresh.log"},
+    "warm_update_standard":   {"status": "pass",  "result": "2026-07-25 23:13:34,939 18234 INFO connector_warm_17065 odoo.tests.result: 0 failed, 0 error(s) of 1563 tests when loading database 'connector_warm_17065' ",  "log": "warm.log"},
+    "nonstandard_tags":       {"status": "pass", "result": "2026-07-25 23:16:59,923 20466 INFO connector_nonstandard_17065 odoo.tests.result: 0 failed, 0 error(s) of 18 tests when loading database 'connector_nonstandard_17065' ", "log": "nonstandard.log"}
   },
   "shopify_operations": "none",
   "evidence_class": "CI supporting evidence, NOT Odoo.sh exact-SHA acceptance (DEC-041 D8)"
