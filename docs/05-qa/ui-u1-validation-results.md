@@ -188,6 +188,31 @@ computed field on `models/**`, which U1 must not add. Rather than dump raw JSON
 field, and says so on the screen. A parsed tracking read seam is a **separate
 backend task** for the control room to schedule.
 
+## 6a. P3 findings from the rendered evidence — recorded, not fixed
+
+Reviewing the screenshots rather than only the assertions surfaced one genuine
+minor defect. It is **not** fixed here because fixing it would require a
+forbidden path.
+
+**P3-U1-1 — connector many2one columns render an unhelpful label.** In the
+review workspace list (screenshot 01) the *Order* column shows
+`shopify.connector.orde…` rather than a recognisable order reference, because
+`shopify.connector.order.binding` declares no `_rec_name` and no
+`_compute_display_name`, so Odoo falls back to the model name. The same applies
+wherever U1 renders a connector binding as a many2one.
+
+- **Impact:** cosmetic but operator-visible — the column is not useful for
+  identifying a row at a glance. No data is wrong and nothing is misleading
+  about status, security or stock.
+- **Why it is not fixed here:** the fix belongs on the binding models in
+  `shopify_connector_sale` / `_fulfillment` (`models/**`), which the U1 locked
+  prompt forbids this batch from touching. Adding a UI-side workaround would
+  mean duplicating a label rule in the view layer — exactly the
+  business-logic-in-the-UI pattern U1 must not introduce.
+- **Recommendation:** a small, separate backend task giving the connector
+  bindings a `_rec_name` or `_compute_display_name` (e.g. the Shopify order
+  name plus the store). It would improve U0 and U1 together.
+
 ## 7. Rollback
 
 One revert of the single merge commit restores the exact prior behaviour. The
