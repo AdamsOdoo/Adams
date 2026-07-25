@@ -316,6 +316,18 @@ def _cleanup_fixture(settings, fixture):
                 (store_id, job_ids),
             )
             if attempt_ids:
+                # The job/attempt FK pair is CIRCULAR:
+                #   shopify_connector_mutation_attempt.job_id -> job
+                #   shopify_connector_job.mutation_attempt_id -> attempt
+                # (the reverse edge is set when a reconciliation job is created
+                # for an attempt). Deleting attempts first therefore violated
+                # shopify_connector_job_mutation_attempt_id_fkey; deleting jobs
+                # first would violate the forward edge. Break the cycle by
+                # clearing the reverse pointer, then delete child then parent.
+                cursor.execute(
+                    'UPDATE shopify_connector_job SET mutation_attempt_id = NULL '
+                    'WHERE mutation_attempt_id = ANY(%s)', (attempt_ids,),
+                )
                 cursor.execute(
                     'DELETE FROM shopify_connector_mutation_attempt '
                     'WHERE id = ANY(%s)', (attempt_ids,),
@@ -621,6 +633,20 @@ def run_operation_scope_serialization(settings, timeout):
                 raise AssertionError(
                     'unexpected live-scope holder set: %r (expected only %s)'
                     % (live.ids, winner['job_id']))
+            # The winner is `queued`, and `queued -> succeeded` is NOT a legal
+            # transition: LEGAL_JOB_TRANSITIONS (shopify_connector_job.py L23-L43)
+            # routes every terminal success through `running`. Writing the
+            # terminal state directly raised "Illegal Shopify job transition:
+            # queued -> succeeded" and aborted this scenario. Drive the real
+            # path instead -- the point of the scenario is that reaching a
+            # terminal state releases the operation scope, and short-circuiting
+            # the state machine to get there would prove that against a
+            # transition production never performs.
+            live.sudo().write({
+                'state': 'running',
+                'started_at': runtime['fields'].Datetime.now(),
+                'running_since': runtime['fields'].Datetime.now(),
+            })
             live.sudo().write({
                 'state': 'succeeded',
                 'finished_at': runtime['fields'].Datetime.now(),
