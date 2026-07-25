@@ -10,9 +10,12 @@
 > makes a synchronized post-merge tracker record a **precondition of the next
 > dependent implementation wave** — and PR #194 merged without one.
 >
-> **This session implements no Wave 5 code and accepts no gate.** It re-derives
-> gate state from durable evidence, closes the D10 record, and hard-stops on the
-> U1 implementation gate with the reasons stated in §5.
+> **Updated 2026-07-25 — U1 implemented.** The product owner subsequently issued
+> the instruction that opens the Wave 5 gate and directs completion, binding the
+> base to `87f1763a`. §5's hard stop is therefore **lifted by product-owner
+> instruction** and **U1 is implemented in this branch** — see §5a. This session
+> still **accepts no gate and reviews nothing of its own**: independent Claude
+> review at the exact SHA, then a separate closure session, remain required.
 
 ## 1. Identity and truth verification
 
@@ -156,6 +159,30 @@ evidence satisfies G5-7 or orders an exact-SHA Odoo.sh run at `87f1763a`; and
 prompt is otherwise ready: its base is bound, and §3 proves its contract holds at
 that base.
 
+## 5a. U1 delivered in this branch — 2026-07-25
+
+`[Fact — implemented and locally validated in this session; NOT accepted]`
+
+The product-owner instruction that bound the base to `87f1763a` also directed
+Wave 5 completion, which supersedes §5's hard stop. U1 was implemented per the
+locked contract.
+
+| Item | State |
+| --- | --- |
+| Scope | S1–S8: fulfillment menu branch, review workspace, binding/lineage, fulfillment job screen, operating-mode surface, mode-switch wizard, status/failure UX, tests |
+| Backend contract | Consumed unchanged; **no `models/**` file touched**, no schema change, no migration, no new durable model, no cron/controller/webhook/Owl surface |
+| Focused suite | **327/327 green** |
+| Full cross-wave suite | See [`../05-qa/ui-u1-validation-results.md`](../05-qa/ui-u1-validation-results.md) §2 |
+| Browser/render gate | **PRODUCED, not deferred** — 34 checks, 0 failed, 13 screenshots, both roles + outsider, desktop/390px/RTL |
+| Regression found and fixed | One real SEC-2 invariant violation (a direct ACL grant on the customer-facing role), fixed at `5e50aa1` with regression proof |
+| Declared deviations | Two, both recorded in the validation results §5 — a second wizard module, and the frozen test-file allowlist extension |
+| Known scope limit | Carrier tracking chips are not rendered; a parsed tracking read seam is a separate backend task (validation results §6) |
+| **Still required before U1 acceptance** | **Exact-SHA Odoo.sh runtime**; independent Claude review at the exact SHA; a separate closure session for any ready-mark/merge |
+
+**Gate bookkeeping is unchanged by this delivery.** G5-4 and G5-5 remain
+unearned control-room acts (§4); implementing U1 under a product-owner
+instruction does not check them, and this session checks none of them.
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record. Nothing
@@ -169,10 +196,10 @@ Task 015B.**
 | **SEC-2** | Two customer-facing roles over the internal capability groups | **DONE** — merged, #196 closed | — |
 | *(SEC-2 residual)* | MVP PII simplification — a **separate** obligation in `task-sec2-two-role-and-pii-simplification-packet.md`, explicitly **not** in #196 | **NOT STARTED, UNTRACKED BY ANY ISSUE** | G5-2 formal acceptance; needs an owner |
 | **PERF-1** | `_commit_progress()` drain-loop transaction model; ≥600 jobs/hour PB-19 budget | **NOT STARTED** | **G5-4** — packet not accepted |
-| **U1** | Fulfillment operator experience (S1–S8) | **PLANNED, GATE-A ACCEPTED AND MERGED; NOT IMPLEMENTED** | **§5 blocker 3/4** |
-| **U2** | Guided setup / readiness (acceptance-matrix row 4) | **NOT STARTED** | U1 first; U2 locked prompt in the UI phases packet (still Proposed) |
-| **U3** | Domain workspaces, mappings/config screens (rows 18, 19) | **NOT STARTED** | U2 first |
-| **Area 6 remainder** | Manual triggers + operator-visible cadence (rows 13, 14) | Backend merged; operator surfaces pending | Ships within U1–U3 |
+| **U1** | Fulfillment operator experience (S1–S8) | **IMPLEMENTED in this branch (§5a); NOT ACCEPTED** | Exact-SHA Odoo.sh runtime + independent review |
+| **U2** | Guided setup / readiness (acceptance-matrix row 4) | **NOT STARTED — see §6a** | U2 locked prompt in the UI phases packet is still **Proposed, not accepted** |
+| **U3** | Domain workspaces, mappings/config screens (rows 18, 19) | **NOT STARTED — see §6a** | U3 locked prompt still **Proposed, not accepted**; U2 first |
+| **Area 6 remainder** | Manual triggers + operator-visible cadence (rows 13, 14) | Backend merged; U0 already ships the Sync Center. Remaining operator surfaces **NOT STARTED** | Ships within U2/U3 |
 | **Task 015 / 015B** | Controlled product export + basic media export (row 6) | **NOT STARTED** | **G5-5** — export PDs not accepted |
 
 **Inference:** U1 is the only Wave 5 stage whose planning package is complete,
@@ -181,6 +208,24 @@ next implementation batch the moment §5's gate is opened. PERF-1 sits *before* 
 in the binding sequence but is blocked by G5-4; if the control room does not accept
 the PERF-1 packet, it must explicitly re-sequence rather than let the wave stall —
 that choice is a control-room act, recorded here as an open decision.
+
+### 6a. What this branch does NOT deliver — stated plainly
+
+`[Fact]` This branch delivers **U1 only**. **U2, U3, Task 015/015B controlled
+product/media export, and PERF-1 are NOT implemented here.** They are not
+deferred by this session's judgement — each is blocked on something a worker
+cannot supply:
+
+| Stage | Why it is not in this branch |
+| --- | --- |
+| **PERF-1** | **G5-4 unearned** — the PERF-1 packet is `Proposed … NOT accepted` and its §9 locked prompt is marked NOT usable. Its budgets (the `_commit_progress()` transaction model and the ≥600 jobs/hour PB-19 figure) are the acceptance bar; implementing against an unaccepted bar would be inventing product policy |
+| **Task 015 / 015B export** | **G5-5 unearned** — PD-PX-1..7 are not accepted and the Task 015/015B packets are not re-accepted. Export is a **mutation** domain: building it against unaccepted field-ownership, changed-since-read and destructive-list-guard contracts is exactly the class of work that must not proceed on inference |
+| **U2 / U3** | Their locked prompts in `ui-implementation-phases-packet.md` are still **Proposed — NOT accepted**, and that packet states its §6/§7 prompts are NOT usable. U1 had an independently reviewed, source-verified, accepted Gate-A packet; U2 and U3 do not |
+
+**This is a HARD STOP on those four stages, reported rather than worked
+around.** The honest position is that Wave 5 is **not complete**: one of its
+five stages is delivered. Proceeding on the rest would mean deriving product
+policy this session is not entitled to invent.
 
 **Wave 5 also does not close these `[Fact]`:** Gate D / CV-013 (#185), dev-store
 provisioning (#200), #186, SEC-3 (#197), PERF-0 release thresholds (#199), external

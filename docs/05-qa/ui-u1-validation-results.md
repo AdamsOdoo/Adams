@@ -40,11 +40,17 @@ recorded as wave acceptance.
 Executed through the repository's own harness `tools/run_connector_suite.sh`, so
 the same command reproduces on a laptop and in CI.
 
+Run at the post-fix head `5e50aa1c0c29851c74fa8ea0d191f12b5fbc7889`, clean
+worktree, Odoo pin verified:
+
 | Pass | Result |
 | --- | --- |
-| Fresh install + standard suite | see §2.3 |
-| Warm `-u` update + standard suite | see §2.3 |
-| Non-standard tag suite (the eight `-standard` classes, incl. the concurrency proofs) | **0 failed, 0 errors of 18 tests** |
+| Fresh install + standard suite | **0 failed, 0 errors of 1563 tests** |
+| Warm `-u` update + standard suite | **0 failed, 0 errors of 1563 tests** |
+| Non-standard tag suite (the eight `-standard` classes, incl. the four genuine concurrency proofs and the 100k-partner benchmark) | **0 failed, 0 errors of 18 tests** |
+
+Fresh and warm are reported separately on purpose: issue #193 established that a
+green fresh install says nothing about the warm-upgrade path. Both were run.
 
 Durable artifacts: `ci-artifacts/summary.json`, `ci-artifacts/fresh.log`,
 `ci-artifacts/warm.log`, `ci-artifacts/nonstandard.log`. Each records the tested
