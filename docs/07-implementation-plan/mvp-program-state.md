@@ -97,6 +97,28 @@ Required closure workstreams:
 8. audit and disposition TODO/FIXME, skipped/disabled tests, stale compatibility workarounds, known-failure classifications, and untracked P0/P1/material-P2 debt;
 9. synchronize the three D10 tracker surfaces and obtain independent acceptance before merge.
 
+### Stabilization implementation progress — 2026-07-25
+
+`[Fact — implemented, NOT accepted]`. PR #203 now carries the implementation for
+workstreams 1-8. **No issue is closed and nothing is accepted**: every item below
+still requires exact-SHA Odoo.sh runtime evidence and independent review.
+
+| Workstream | State |
+| --- | --- |
+| #193 / #157 warm-update fixtures | Implemented + locally executed. Warm `-u` went from 96 errors of 1270 tests to **0 failed, 0 errors of 1440**. Enforced by a new static phase-contract guard. |
+| #198 inventory residue | Implemented + locally executed. Exact-id FK-safe teardown; repeated-cycle zero-residue proof. |
+| #196 SEC-2 roles | Implemented + locally executed (20 tests). Additive Option M-A; role half only — the PII-masking half is a separate obligation. |
+| #197 SEC-3 isolation | Audited (35 models, none unclassified) + 8 record rules + 22-test two-company matrix. Gated on external UAT/RC; U1 delta out of scope. |
+| Multiprocessing / lifecycle | **Executed for the first time.** Core 3/3 and fulfillment 9/9 external-process scenarios pass with distinct OS PIDs and zero residue; three harness defects corrected. Uninstall→reinstall clean (21 tables → 0 → 21, zero metadata residue). |
+| CI (DEC-041 D8) | Implemented: `tools/run_connector_suite.sh` + a thin workflow. Supporting evidence only; Odoo.sh remains the Tier-1 authority. |
+| #199 PERF-0 | Implemented + executed. Six scenarios, p50/p95/p99, query counts, memory, residue. Baseline-only. |
+| Repository debt | 13 findings recorded in [`pre-wave-5-debt-discovery.md`](../05-qa/pre-wave-5-debt-discovery.md). Notably: 8 `-standard` classes never ran in any suite; now executed, 18/18 green after one correction. |
+
+Runtime used: local disposable Odoo 19 (`odoo/odoo@19.0` `30bde9ff`) +
+PostgreSQL 16.13. This is a faithful reproduction, **not** a substitute for
+Odoo.sh. Full connector suite on the stabilization head: **0 failed, 0 errors of
+1484 tests**. No Shopify store, credential, request or mutation was involved.
+
 ### Shopify-only deferred package
 
 The 2026-07-25 product-owner ruling defers only validation requiring a live Shopify store, credential, API request, or mutation until the Wave-5 implementation candidate is complete and frozen. Issues #185, #186, and #200 remain open. Gate D/CV-013, applicable Wave-5 live scenarios, external UAT, and release readiness are not waived or claimed.
