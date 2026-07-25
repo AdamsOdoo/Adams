@@ -14,6 +14,7 @@ not be reached.
 
 import ast
 import pathlib
+import re
 
 from odoo.tests.common import TransactionCase, tagged
 
@@ -132,6 +133,52 @@ class TestPhaseContract(TransactionCase):
             "These classes tag 'post_install' but do not remove the inherited "
             "'at_install', so they still run in both phases. Add '-at_install'. "
             'Offenders:\n  ' + '\n  '.join(offenders),
+        )
+
+    def test_every_nonstandard_class_is_selected_by_the_suite_runner(self):
+        """Every `-standard` class must be reachable by the continuous runner.
+
+        Eight connector test classes carry `-standard`, which is a legitimate
+        Odoo mechanism for expensive or process-spawning tests -- but it also
+        means `--test-enable` alone never selects them. That is exactly how four
+        genuine concurrency proofs went unexecuted for four waves while the
+        acceptance matrix recorded the suite as green (debt audit D-6).
+
+        `tools/run_connector_suite.sh` now runs them as a third pass, driven by
+        its `NONSTANDARD_TAGS` list. A hand-maintained list drifts, so this
+        asserts the invariant directly: for every class that opts OUT of the
+        standard phase, at least one of its remaining tags must appear in that
+        list. Adding a `-standard` class without adding its tag fails here,
+        rather than silently reintroducing an unrun test.
+        """
+        runner = (pathlib.Path(__file__).resolve().parents[3]
+                  / 'tools' / 'run_connector_suite.sh')
+        self.assertTrue(runner.is_file(), 'suite runner not found at %s' % runner)
+        match = re.search(r'^NONSTANDARD_TAGS="([^"]*)"', runner.read_text(),
+                          re.M)
+        self.assertIsNotNone(
+            match, 'NONSTANDARD_TAGS is not defined in the suite runner')
+        covered = {tag.strip() for tag in match.group(1).split(',') if tag.strip()}
+
+        unreachable = []
+        nonstandard_seen = 0
+        for path in _connector_test_files():
+            for class_name, tags in _test_classes(path):
+                if '-standard' not in tags:
+                    continue
+                nonstandard_seen += 1
+                selectors = {tag for tag in tags if not tag.startswith('-')}
+                if not selectors & covered:
+                    unreachable.append('%s::%s (tags: %s)' % (
+                        path.name, class_name, ', '.join(sorted(tags))))
+
+        self.assertFalse(unreachable, (
+            'These `-standard` test classes are not selected by any tag in '
+            'run_connector_suite.sh NONSTANDARD_TAGS, so continuous validation '
+            'would never execute them:\n  %s' % '\n  '.join(unreachable)))
+        self.assertGreater(
+            nonstandard_seen, 0,
+            'No `-standard` class was discovered at all; this guard is vacuous.',
         )
 
     def test_guard_actually_discovers_the_connector_suite(self):

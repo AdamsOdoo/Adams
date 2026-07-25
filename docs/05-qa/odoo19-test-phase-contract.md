@@ -126,6 +126,24 @@ standing rule for this repository is:
 mechanically, so a new untagged class fails the suite rather than silently
 reintroducing the #193 family on the next warm update.
 
+### 4.1 The second rule: `-standard` must stay reachable
+
+A class may also carry `-standard` when it is genuinely expensive or spawns OS
+processes. That is legitimate, but it has a consequence that is easy to miss:
+**`--test-enable` alone never selects such a class.** Eight connector classes
+carry it, four of them genuine concurrency proofs, and none of them ran in any
+suite for four waves while the acceptance matrix recorded the suite as green
+(debt audit D-6).
+
+> **A `-standard` class must be selected by at least one tag listed in
+> `NONSTANDARD_TAGS` in `tools/run_connector_suite.sh`,** which runs them as a
+> mandatory third pass.
+
+The same guard file enforces this
+(`test_every_nonstandard_class_is_selected_by_the_suite_runner`), so opting a
+class out of the standard phase without making it reachable by the runner fails
+the suite instead of quietly creating another test that never executes.
+
 ## 5. Open items
 
 - Exact-SHA Odoo.sh warm-update confirmation on the stabilization head

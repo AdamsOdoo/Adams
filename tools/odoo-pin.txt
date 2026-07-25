@@ -1,0 +1,18 @@
+# Immutable Odoo commit this connector's continuous validation runs against.
+#
+# WHY A FILE AND NOT A BRANCH NAME. `19.0` is a moving branch: two runs a day
+# apart can execute different Odoo code and produce different results while
+# reporting the same "odoo_ref: 19.0". A cached checkout makes it worse -- it can
+# keep executing a commit from weeks ago while every artifact still says 19.0.
+# Neither is a pin. This file is: `run_connector_suite.sh` checks the working
+# checkout against this exact SHA on EVERY run and refuses to continue if they
+# differ, so a stale cache fails loudly instead of quietly testing the wrong
+# Odoo.
+#
+# This is the same commit the pre-Wave-5 local campaign executed against, so the
+# stabilization numbers stay directly comparable across runs.
+#
+# To move the pin: change the SHA here in its own commit, re-run the full suite,
+# and record the before/after results. Never edit it as a side effect of another
+# change.
+30bde9ff758834a4912c5ae55843d3a7dad849f1

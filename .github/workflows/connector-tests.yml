@@ -12,6 +12,11 @@
 #     A green run here is not wave acceptance and must never be recorded as one.
 #   * Both a fresh install and a warm `-u` update run, because issue #193 proved
 #     a green fresh install says nothing about the warm path.
+#   * The eight `-standard` test classes -- including four genuine concurrency
+#     proofs -- run as a third pass. `--test-enable` alone never selects them,
+#     which is why they had gone unrun; they are no longer optional here.
+#   * The Odoo commit is pinned in tools/odoo-pin.txt and verified on every run,
+#     so a restored cache cannot quietly test a different Odoo.
 
 name: Connector test suite
 
@@ -57,7 +62,6 @@ jobs:
       PGPORT: 5432
       PGUSER: odoo
       PGPASSWORD: odoo
-      ODOO_REF: '19.0'
       ARTIFACT_DIR: ${{ github.workspace }}/ci-artifacts
 
     steps:
@@ -82,9 +86,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .odoo-src
-          key: odoo-src-${{ env.ODOO_REF }}
+          # Keyed on the CONTENTS of the pin file, not on a branch name. A
+          # branch-keyed cache is how a run ends up silently executing an Odoo
+          # commit from weeks ago while reporting "19.0". Changing the pin
+          # invalidates the cache, and the suite re-verifies the checked-out SHA
+          # anyway before running anything.
+          key: odoo-src-${{ hashFiles('tools/odoo-pin.txt') }}
 
       - name: Run the connector suite
+        # No arguments on purpose. The script runs the fresh-install pass, the
+        # warm-update pass AND the complete non-standard tag suite by default,
+        # so no concurrency proof can be skipped by forgetting a flag here.
         run: |
           chmod +x tools/run_connector_suite.sh
           tools/run_connector_suite.sh
