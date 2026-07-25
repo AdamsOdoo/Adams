@@ -1,0 +1,190 @@
+{
+  "checks": [
+    {
+      "check": "user_login",
+      "pass": true,
+      "detail": "http://127.0.0.1:8169/odoo"
+    },
+    {
+      "check": "review_list_renders",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "review_shows_open_case",
+      "pass": true,
+      "detail": "default filter = needs a decision"
+    },
+    {
+      "check": "a7_labelled_display_only",
+      "pass": true,
+      "detail": "the A7 column must say display-only"
+    },
+    {
+      "check": "no_leak_list:Second Company (must not leak)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_leak_list:gid://shopify/Order/2001",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_leak_list:gid://shopify/Fulfillment/2001",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_leak_list:gid://shopify/Fulfillment/1007",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "form_renders",
+      "pass": true,
+      "detail": "group titles are CSS-uppercased; compare case-insensitively"
+    },
+    {
+      "check": "status_layers_never_merged",
+      "pass": true,
+      "detail": "A4 and A7 must appear as separate labelled layers"
+    },
+    {
+      "check": "delivered_is_qualified",
+      "pass": true,
+      "detail": "any Delivered wording must be qualified"
+    },
+    {
+      "check": "no_a2_badge",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "sanctioned_buttons_present",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "single_h1",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "status_regions_have_role",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "user_cannot_see_operating_mode",
+      "pass": true,
+      "detail": "admin-only fields must be stripped for a Connector User"
+    },
+    {
+      "check": "binding_list_renders",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_protected_field:shopify_idempotency_key",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_protected_field:preconditions_snapshot",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_protected_field:mode_switch_nonce",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "no_protected_field:remote_mutation_intent",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "job_list_renders",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "empty_state_is_honest",
+      "pass": true,
+      "detail": "empty state must not assert \"there are none\""
+    },
+    {
+      "check": "no_horizontal_page_overflow_mobile",
+      "pass": true,
+      "detail": "scrollWidth=390 clientWidth=390"
+    },
+    {
+      "check": "admin_sees_operating_mode",
+      "pass": true,
+      "detail": "mode statusbar/field"
+    },
+    {
+      "check": "admin_sees_switch_button",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "admin_form_shows_mode_section",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "wizard_dialog_opens",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "wizard_counts_are_labelled_non_authoritative",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "wizard_consequences_are_static",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "check": "dialog_has_dialog_role",
+      "pass": true,
+      "detail": "count=1"
+    },
+    {
+      "check": "rtl_no_horizontal_overflow",
+      "pass": true,
+      "detail": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "check": "outsider_is_refused",
+      "pass": true,
+      "detail": "a user outside every connector group must be refused"
+    },
+    {
+      "check": "outsider_sees_no_evidence_data",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "screenshots": [
+    "/home/user/Adams/ci-artifacts/u1-screenshots/01-user-review-workspace.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/02-user-review-form.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/03-user-settings-no-mode.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/04-user-fulfillments.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/05-user-fulfillment-jobs.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/06-user-empty-state.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/07-user-review-mobile-390.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/08-admin-settings-mode.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/09-admin-settings-form.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/10-admin-mode-switch-dialog.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/11-admin-review-workspace.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/12-admin-review-rtl.png",
+    "/home/user/Adams/ci-artifacts/u1-screenshots/13-outsider-permission-denied.png"
+  ],
+  "failures": []
+}
