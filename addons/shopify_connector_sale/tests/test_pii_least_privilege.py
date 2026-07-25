@@ -5,9 +5,19 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestPiiLeastPrivilege(TransactionCase):
 
     @classmethod
@@ -72,10 +82,33 @@ class TestPiiLeastPrivilege(TransactionCase):
             'shopify_email_snapshot': 'jane.sensitive@example.com',
             'shopify_phone_snapshot': '+971501234567',
         }
-        if create_date:
-            values['create_date'] = create_date
         binding = self.Binding.sudo().create(values)
+        if create_date:
+            self._backdate(binding, create_date)
         return self.Binding.browse(binding.id)
+
+    def _backdate(self, record, create_date):
+        """Back-date ``create_date`` in a phase-independent way.
+
+        Passing ``create_date`` straight into ``create()`` only works while the
+        registry is still loading: Odoo 19 discards every ``LOG_ACCESS_COLUMNS``
+        entry from create values unless ``env.uid == SUPERUSER_ID and not
+        self.pool.ready``
+        (`odoo/orm/models.py` L4780-L4784, odoo/odoo@19.0
+        30bde9ff758834a4912c5ae55843d3a7dad849f1). ``pool.ready`` is False during
+        at_install and True afterwards, so the old fixture silently produced a
+        *freshly created* binding once this class moved to post_install under the
+        issue #193 test-phase contract -- and the retention sweep then correctly
+        declined to mask a record inside its retention window.
+
+        Writing the column directly keeps the fixture honest in either phase.
+        """
+        self.env.cr.execute(
+            'UPDATE shopify_connector_customer_binding '
+            'SET create_date = %s WHERE id = %s',
+            (create_date, record.id),
+        )
+        record.invalidate_recordset(['create_date'])
 
     def _audit_jobs(self, store=None):
         return self.Job.search([

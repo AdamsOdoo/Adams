@@ -5,7 +5,7 @@ import uuid
 from unittest.mock import patch
 
 from odoo.exceptions import ValidationError
-from odoo.tests.common import TransactionCase
+from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
     ShopifyClientError,
@@ -57,6 +57,16 @@ def _ok_send(json_body):
     return fake_send
 
 
+# Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
+# rows into Odoo business tables (res.users/res.partner/product.template/...) whose
+# NOT NULL columns are contributed by modules OUTSIDE this module's dependency
+# closure (e.g. account.autopost_bills, stock.tracking, mail.notification_type).
+# During a warm `-u` run those columns already exist in PostgreSQL, but at at_install
+# time the contributing module is not yet in the registry, so the ORM omits them from
+# the INSERT and PostgreSQL raises NOT NULL. post_install runs after every module is
+# loaded, which is the only phase where the field exists on the model.
+# See docs/05-qa/odoo19-test-phase-contract.md. Test-only; no production behaviour.
+@tagged('post_install', '-at_install')
 class TestCustomerImportMatching(TransactionCase):
 
     @classmethod
@@ -835,6 +845,7 @@ class TestCustomerImportMatching(TransactionCase):
         )
 
 
+@tagged('post_install', '-at_install')
 class TestCustomerCallsiteExecuteBusiness(TransactionCase):
     """CORE-R2 Slice 2B -- the customer importer's call-site migration to the
     admission-gated `execute_business()` lease (AR-047; packet §5.2 RD-C).

@@ -40,3 +40,5 @@ from . import test_ui_tours
 from . import test_ui_source_guards
 # F-4 permanent location-resolution seam (Theme I, Wave 4 closure).
 from . import test_shopify_connector_location
+# Issue #193/#157 regression guard for the Odoo 19 test-phase contract.
+from . import test_phase_contract
