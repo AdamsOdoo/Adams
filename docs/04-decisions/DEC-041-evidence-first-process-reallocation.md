@@ -16,7 +16,7 @@ The program is not over-rigorous. Ceremony has been misallocated. Durable eviden
 
 | ID | Verification | Result |
 | --- | --- | --- |
-| E1 | PR #189 history shows ruling [5069830526](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5069830526), then commits [aa295ef](https://github.com/AdamsOdoo/Adams/commit/aa295efb1f4cd833e56160e07b770a4ffa73a710) and [25639f17](https://github.com/AdamsOdoo/Adams/commit/25639f17be14b30a52a8453f0813aa0b764de310) without the mandated immediate push record. The later control-room comment [5073570894](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5073570894) repaired the record for `25639f17`; exact-pushed-SHA runtime remains pending because Odoo.sh deployed the parent build. The PR body is still stale. | Confirmed historical process defect; partially remediated, recurrence control required. |
+| E1 | PR #189 history shows ruling [5069830526](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5069830526), then commits [aa295ef](https://github.com/AdamsOdoo/Adams/commit/aa295efb1f4cd833e56160e07b770a4ffa73a710) and [25639f17](https://github.com/AdamsOdoo/Adams/commit/25639f17be14b30a52a8453f0813aa0b764de310) without the mandated immediate push record. The later control-room comment [5073570894](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5073570894) repaired the push record. Odoo.sh then initially deployed the wrong parent `aa295ef`, a preserved historical process defect. Exact candidate `25639f17` was subsequently executed on Odoo.sh build `35422036`; the safely executable exact-SHA matrix is green in durable runtime comment [5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652), and independent evidence review [5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326) accepted it with zero candidate-owned failures. Gate D/CV-013 and record closure remain; PR #189 remains draft, unmerged, and not finally accepted. | Historical missing-immediate-push-record and wrong-parent-deployment defects remain recorded; exact-SHA runtime evidence is now independently accepted. |
 | E2 | PR #189 comments [5067147430](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5067147430), [5067208834](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5067208834), and [5069830526](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5069830526) superseded the same transfer sequence within about five hours. The first instruction assumed one workspace could both execute Odoo and publish to GitHub. | Confirmed. |
 | E3 | [d3c157c](https://github.com/AdamsOdoo/Adams/commit/d3c157c1d4c369c1880fffc69ee6b4801ab9c05c) produced a findings synthesis and prompt; [ef991bf](https://github.com/AdamsOdoo/Adams/commit/ef991bf08ff55c4393fa2c0c971cd1dbef04ab2d) produced a decision lock and prompt normalization; ruling [5060656594](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5060656594) then stopped the docs loop. | Confirmed. |
 | E4 | PR #189 code/evidence records the invalid `sale.order.line.product_uom`, nonexistent `stock.stock_location_locations`, and latent `required_qty` KeyError. Odoo 19 source uses [`sale.order.line.product_uom_id`](https://github.com/odoo/odoo/blob/19.0/addons/sale_stock/models/sale_order_line.py#L548-L554), defines [stock location XML IDs](https://github.com/odoo/odoo/blob/19.0/addons/stock/data/stock_data.xml), and coerces a newly created move to `done` when its picking is already done in [`stock.move.create()`](https://github.com/odoo/odoo/blob/19.0/addons/stock/models/stock_move.py#L821-L834). | Confirmed. Earlier upstream-source inspection would have prevented or shortened all four families. |
@@ -61,7 +61,7 @@ This supersedes any handoff practice that treated ephemeral Odoo.sh files/tool o
 
 Every executable ruling begins with a capability declaration for the addressed environment: repository checkout/read/write, GitHub auth/push, Odoo/PostgreSQL runtime, Shopify access/mutation authority, and durable-output path. Instructions outside those capabilities are invalid.
 
-A ruling superseded within 24 hours is a **presumptive process defect** and counts against the metric unless the superseding record identifies genuinely new external evidence, a security emergency, or an environment capability change that could not reasonably have been known. “Refinement” alone is not an exemption.
+Every ruling supersession within 24 hours counts in the metric. Each event is classified separately as **preventable**, **justified by genuinely new external evidence**, **security-driven**, or **environment-capability-driven**. A justification changes the event's classification but never removes the event from the count; there is no exemption by which a real supersession disappears from measurement. “Refinement” alone is preventable.
 
 This supersedes PR #189 ruling 5067147430 and any later prompt that combines incompatible Runtime Claude and GitHub-worker capabilities.
 
@@ -111,6 +111,12 @@ Before merge, both trackers must describe the exact candidate honestly: accepted
 
 A stale tracker blocks merge closure and downstream continuation, not an already-running independent exact-SHA runtime session. This supersedes tracker handling that allowed PR #176/#182/#189 status to remain materially stale.
 
+## Delivered inconsistency / A5 disposition
+
+The current Delivered inconsistency is distinct from the historical validation-results **A5 KeyError** defect. It is not a PR #189 candidate defect and does not invalidate the accepted exact-SHA runtime record.
+
+It may be deferred from the Wave 4 backend merge because no real Delivered backend seam currently exists. U1 must not claim, display, or offer **Delivered** as a supported state until a real backend seam exists and is independently proven. The next authorized refresh of PR #194 must remove or suppress that representation unless the missing backend seam is implemented under separate authorization. PR #194 is not modified by this decision correction.
+
 ## Gates explicitly unchanged
 
 The following remain mandatory and are not reduced:
@@ -133,13 +139,13 @@ The correction reduces documents and rulings. It does **not** reduce gates.
 | --- | ---: | --- |
 | Correction rounds | ≤ 2 | Count consolidated post-review/runtime correction batches; safety resets are separately named |
 | Documents authored per code commit | < 1 | Count one-time wave/correction artifacts, excluding required durable evidence appendices and recurring trackers |
-| Rulings superseded within 24 h | 0 | Count unless the D4 new-evidence exception is explicitly proven |
+| Rulings superseded within 24 h | 0 | Count every supersession event; classify each separately under D4. Justification changes classification, never the count. |
 | Push to exact-SHA runtime record | Same day | Measure from GitHub push timestamp to durable exact-SHA runtime record; environment block is recorded, not hidden |
 | Framework-dependent changes with upstream citation | 100% | Audit production and test assumptions under D1 |
 
 ## Consequences and follow-up
 
-- PR #189 exact-SHA runtime at `25639f17` continues in parallel and is not gated by this decision.
+- PR #189 exact-SHA runtime at `25639f17` is complete and independently accepted through [runtime comment 5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652) and [review comment 5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326); no further code correction or runtime rerun is required. Gate D/CV-013 and record closure remain.
 - PR #189/PR #194 bodies are not modified by this governance session.
 - [SEC-2 #196](https://github.com/AdamsOdoo/Adams/issues/196), [SEC-3 #197](https://github.com/AdamsOdoo/Adams/issues/197), [inventory-test residue #198](https://github.com/AdamsOdoo/Adams/issues/198), [PERF-0 #199](https://github.com/AdamsOdoo/Adams/issues/199), and [Shopify dev-store provisioning #200](https://github.com/AdamsOdoo/Adams/issues/200) are now separate owned tasks; CI remains separately authorized by D8.
 - This decision does not accept Wave 4, authorize Gate D, merge a PR, begin Wave 5 implementation, or authorize UAT.

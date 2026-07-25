@@ -17,8 +17,8 @@
 | Wave 3 inventory | Accepted, runtime-green, merged via PR #182 (`ab4f12f`); inventory 247/247, concurrent 9/9, sequential recovery 3/3. Live Shopify proof remains CV-013 issue #185. |
 | U0 | Accepted, runtime-verified, merged via PR #192 (`8818c77`); exact head `a13f672`, build `35308219`, U0/Test Connection 67/67, sale 194/194, inventory 247/247. Driven browser/visual evidence remains deferred to UAT/release readiness. |
 | Wave 4 Gate A | Accepted and merged via PR #188 (`01f072d`). |
-| Wave 4 Gate B | PR #189 is open/draft/unmerged/mergeable at exact head `25639f17be14b30a52a8453f0813aa0b764de310`, base `dd0af5d`. Runtime Correction 5 was green on a content-equivalent Odoo.sh working tree (build `35414211`, fulfillment 281/281), but exact-pushed-SHA evidence is not established: the attempted session deployed parent `aa295ef` and correctly hard-stopped. Rebuild at `25639f17`, then rerun the authorized matrix. Gate D, CV-013, independent review, tracker closure, acceptance and merge remain pending. |
-| Wave 5 | U1 Gate-A PR #194 is open/draft/unmerged at `b38e687` and must be refreshed after Wave 4 because it was derived from an earlier candidate. [SEC-2 #196](https://github.com/AdamsOdoo/Adams/issues/196) and accepted Wave 4 block U1 implementation. No Wave-5 implementation is authorized here. |
+| Wave 4 Gate B | PR #189 is open/draft/unmerged/mergeable at exact head `25639f17be14b30a52a8453f0813aa0b764de310`, base `dd0af5d`. Odoo.sh build `35422036` completed the safely executable exact-SHA matrix green, preserved in [runtime comment 5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652). [Independent review comment 5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326) accepted the runtime evidence with zero candidate-owned P0/P1/material-P2 findings. No further code correction or runtime rerun is required. The next gate is controlled Gate D/CV-013 on disposable Shopify resources; Delivered/A5 disposition, tracker closure, product-owner/control-room acceptance, ready-marking and merge remain. PR #189 is not finally accepted; UAT/release readiness are not claimed. |
+| Wave 5 | U1 Gate-A PR #194 is open/draft/unmerged at `b38e687` and remains frozen pending accepted/merged Wave 4 and [SEC-2 #196](https://github.com/AdamsOdoo/Adams/issues/196). Its later authorized refresh must remove or suppress “Delivered” because no real backend seam exists, unless that seam is separately authorized, implemented, and independently proven. The current Delivered inconsistency is distinct from the historical A5 KeyError and is not a PR #189 candidate defect. No Wave-5 implementation is authorized here. |
 | Release dependencies | [SEC-3 #197](https://github.com/AdamsOdoo/Adams/issues/197) before external UAT/RC; [inventory fixture residue #198](https://github.com/AdamsOdoo/Adams/issues/198); [PERF-0 #199](https://github.com/AdamsOdoo/Adams/issues/199); [Shopify dev-store provisioning #200](https://github.com/AdamsOdoo/Adams/issues/200); CI/first continuous full-suite run; final lifecycle/configuration docs; product-owner release sign-off. |
 | Wave 6 / release | Not started; no UAT or release acceptance claim. |
 
@@ -74,20 +74,20 @@ The corrective action is risk-tiering plus one consolidated correction, not weak
 
 | Active work | Tier | Reason | Correction budget |
 | --- | --- | --- | --- |
-| Wave 4 Gate B fulfillment implementation | **Tier 1** | Shopify mutations, Layer 2, concurrency, idempotency, security, data integrity | One exhaustive independent review; one consolidated correction maximum; runtime failures collected into one batch |
+| Wave 4 Gate B fulfillment implementation | **Tier 1** | Shopify mutations, Layer 2, concurrency, idempotency, security, data integrity | Exact-SHA runtime and exhaustive independent evidence review complete; Gate D/CV-013 and closure remain |
 | U0 UI foundation | **Tier 2** with Tier 1 security/action checks | New operator information architecture on existing hardened actions; no UI-owned mutation logic | One normal independent review; Tier 3 polish fixed in-pass; Odoo.sh mandatory because this is code |
 | PERF-0 baseline | **Tier 2**, escalating to Tier 1 for unsafe findings | Benchmark design/measurement; lock/network or destabilizing regression becomes blocking | One normal review; performance defect batch consolidated |
 | Governance calibration | **Tier 2 — merged** | Program sequencing/review policy, no production code | One consolidated correction and one verification-only review completed through PR #191 |
 
 ## 5. Parallel execution and current boundaries — 2026-07-25
 
-### Critical path: Wave 4 exact-SHA runtime
+### Critical path: Wave 4 Gate D/CV-013 and closure
 
-1. End the stale Runtime Claude session so Odoo.sh can rebuild.
-2. Rebuild `claude/wave-4-fulfillment-gate-b` at exact `25639f17`.
-3. Run the already-authorized consolidated matrix; preserve the sanitized report durably under DEC-041 D3.
-4. If candidate-owned failures exist, collect all safe independent families and authorize one consolidated correction batch. Do not start another document chain.
-5. If green, run independent Tier-1 review, then controlled Gate D/CV-013 on disposable Shopify resources, tracker closure, acceptance and merge.
+1. Treat [runtime comment 5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652) and [independent review comment 5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326) as the accepted exact-SHA evidence for `25639f17`; do not rebuild or rerun the already-complete matrix.
+2. Execute controlled Gate D/CV-013 only on authorized disposable Shopify resources, with least-privilege credentials and durable sanitized evidence.
+3. Apply the controlling Delivered/A5 disposition: this is not the historical A5 KeyError or a PR #189 defect; do not expose “Delivered” in U1/PR #194 until a real backend seam is separately authorized and independently proven.
+4. Close the trackers, then obtain explicit product-owner/control-room acceptance.
+5. Ready-mark and merge only under separate authorization after every remaining gate is closed.
 
 This DEC-041 governance work proceeds in parallel and does not delay or modify PR #189.
 
@@ -107,9 +107,9 @@ The following may proceed on separate owned branches/issues without touching PR 
 
 ### Frozen until prerequisites close
 
-- PR #189 code/body remains frozen except its authorized runtime/closure sequence.
-- PR #194 content remains frozen until Wave 4 merges and SEC-2 is available.
-- No Wave 5 implementation, UAT authorization, ready-mark, acceptance, or merge occurs from this tracker update.
+- PR #189 code/body remains frozen except its authorized Gate D/CV-013 and closure sequence; no code correction or runtime rerun is required.
+- PR #194 content remains frozen until Wave 4 merges and SEC-2 is available; its later authorized refresh must remove or suppress unsupported “Delivered”.
+- No Wave 5 implementation, final Wave 4 acceptance, UAT authorization, release-readiness claim, ready-mark, approval, or merge occurs from this tracker update.
 
 ## 6. Realistic forward timeline
 
@@ -118,9 +118,9 @@ Assumptions: Odoo.sh remains accessible; a disposable Shopify development store 
 | Milestone | Expected window | Confidence / dependency |
 | --- | --- | --- |
 | Wave 3 residual live closure | 2026-07-23 to 2026-07-31 | Medium; depends on dev-store fixtures. Inventory code itself is already merged. |
-| Wave 4 implementation candidate | Already implemented on PR #189; synchronization/P2/runtime continuation begins now | High for code availability; runtime risk remains |
-| Wave 4 runtime + consolidated correction + rerun | 2026-07-23 to 2026-08-14 | Medium; one complete Odoo.sh campaign and one correction batch |
-| Wave 4 dev-store + CV-013 validation | 2026-08-12 to 2026-08-18 | Low/medium until store access is confirmed |
+| Wave 4 implementation candidate | Implemented on PR #189; exact-SHA runtime and independent evidence review completed 2026-07-25 | High for accepted runtime evidence; Gate D/CV-013 and closure remain |
+| Wave 4 exact-SHA runtime + independent evidence review | Complete 2026-07-25 | Build `35422036`; comments [5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652) and [5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326); no rerun required |
+| Wave 4 controlled Gate D/CV-013 validation | 2026-07-25 to 2026-08-18 | Low/medium until disposable store access is confirmed; next Wave 4 gate |
 | U0 first usable UI slice | 2026-07-23 to 2026-08-06 | Medium/high; read-only/hardened surfaces can run in parallel |
 | PERF-0 baseline + Wave 4 comparison | 2026-07-27 to 2026-08-10 | Medium/high if benchmark environment is available |
 | Wave 5 full UI/export/SEC-2/PERF-1 | 2026-08-10 to 2026-09-08 | Medium; use separate UI/export workstreams with one integration gate |
@@ -134,8 +134,8 @@ Assumptions: Odoo.sh remains accessible; a disposable Shopify development store 
 
 Critical path:
 
-1. Wave 4 backend correctness and runtime;
-2. Shopify dev-store availability for Wave 4 and CV-013;
+1. Wave 4 controlled Gate D/CV-013 and record closure;
+2. Shopify disposable dev-store availability;
 3. Wave 5 product export + remaining operator UI;
 4. Wave 6 integrated UAT.
 
@@ -149,10 +149,10 @@ If schedule slips, use these levers in order:
 
 ## 8. Next actions
 
-1. Continue Wave 4 PR #189 from the live integration tip under issue #186 comment `5044031518` and the calibrated one-correction rule.
-2. Start U0 UI foundation from the live integration tip as one large usable slice.
-3. Open PERF-0 benchmark definition/execution in parallel.
-4. Confirm the Shopify development-store fixture date; if not available by early August, escalate the release-date dependency immediately.
+1. Provision or confirm the authorized disposable Shopify fixtures, then execute controlled Gate D/CV-013 for PR #189.
+2. Close the Delivered/A5 and tracker records; obtain explicit product-owner/control-room acceptance before any ready-mark or merge.
+3. Refresh PR #194 only after authorization, suppressing unsupported “Delivered” unless a real backend seam has been separately implemented and independently proven.
+4. Continue PERF-0, SEC-2/SEC-3 and CI work on their separately owned scopes; escalate immediately if Shopify fixtures remain unavailable.
 
 ## 9. Wave-boundary calibration template
 
