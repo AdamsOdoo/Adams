@@ -98,6 +98,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+log() { printf '[connector-suite] %s\n' "$*"; }
+
 mkdir -p "$ARTIFACT_DIR"
 SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 # A dirty worktree makes `rev-parse HEAD` a LIE about what was executed: the
@@ -111,8 +113,6 @@ else
     WORKTREE_DIRTY=false
 fi
 SUMMARY="${ARTIFACT_DIR}/summary.json"
-
-log() { printf '[connector-suite] %s\n' "$*"; }
 
 # --- Odoo source (immutable pin, verified every run) -------------------------
 # `19.0` is a moving branch and a restored cache is an arbitrary old commit;
@@ -132,8 +132,10 @@ fi
 if [[ "$(git -C "$ODOO_SRC" rev-parse HEAD 2>/dev/null || echo none)" != "$ODOO_PIN" ]]; then
     log "checking out pinned Odoo commit ${ODOO_PIN}"
     git -C "$ODOO_SRC" fetch --filter=blob:none origin "$ODOO_PIN" 2>/dev/null \
-        || git -C "$ODOO_SRC" fetch --filter=blob:none --depth 400 origin 19.0
-    git -C "$ODOO_SRC" checkout --quiet --detach "$ODOO_PIN"
+        || git -C "$ODOO_SRC" fetch --filter=blob:none --depth 400 origin 19.0 || true
+    # `|| true`: a failed checkout must fall through to the verification below,
+    # so the operator gets the explanation rather than a bare git error.
+    git -C "$ODOO_SRC" checkout --quiet --detach "$ODOO_PIN" 2>/dev/null || true
 fi
 ODOO_SHA="$(git -C "$ODOO_SRC" rev-parse HEAD)"
 if [[ "$ODOO_SHA" != "$ODOO_PIN" ]]; then
