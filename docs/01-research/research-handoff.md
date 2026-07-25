@@ -1,3 +1,71 @@
+### Wave 5 U1 implementation — fulfillment operator experience (2026-07-25)
+
+- **Branch / PR:** `fable/wave-5-completion`, draft [PR #204](https://github.com/AdamsOdoo/Adams/pull/204)
+  into `mvp/program-integration`, from the bound base `87f1763a`. Head `eaf2fcb`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+- **Authorization:** the product-owner instruction that bound the base *and*
+  directed Wave 5 completion. This supersedes the hard stop recorded earlier the
+  same day in [`wave-5-completion-gate-state.md`](../07-implementation-plan/wave-5-completion-gate-state.md)
+  §5; that file's §5a records the supersession rather than deleting the stop.
+- **Delivered:** U1 S1–S8 exactly per the accepted, independently reviewed,
+  merged Gate-A packet. Views, menus, two `wizards/` TransientModels, two ACL
+  rows, six test modules. **No `models/**` file, no schema change, no migration,
+  no new durable model, no cron/controller/webhook/Owl/external asset, no
+  Shopify call.** Every button wires only to the six sanctioned actions.
+- **Evidence** (full detail: [`../05-qa/ui-u1-validation-results.md`](../05-qa/ui-u1-validation-results.md)):
+  focused suite **327/327**; full connector suite **fresh 1563/1563, warm
+  1563/1563, non-standard 18/18**; driven browser **34 checks / 0 failed / 13
+  screenshots**; PERF-0 base-vs-head with **identical query counts on all 15
+  scenarios**. Environment: Odoo 19 at the pinned `30bde9ff`, PostgreSQL 16.13,
+  Chromium 141. **DEC-041 D8 supporting evidence — Odoo.sh remains Tier-1 and
+  has NOT been run.**
+- **Regression introduced and fixed:** the customer-facing
+  `group_shopify_connector_user` must own no `ir.model.access` row (SEC-2's
+  purely-additive property). The release-wizard ACL violated it; re-keyed to the
+  internal Reviewer group, which is what the server action already requires.
+  Caught by the standing suite, not by inspection.
+- **False finding caught, not reported:** a crashed PERF-0 run left one store
+  behind, and re-running against that database showed apparent +68% regressions
+  with different query counts on the three per-store admission scans. A fresh
+  database removed the difference entirely. Residue silently became measurement
+  — the same failure mode the stabilization campaign recorded for PERF-0.
+- **Declared deviations:** a second wizard module (the release action takes a
+  mandatory reason and needs a transient form; the locked list names one), and
+  the frozen test-file allowlist extended to the six authorised `test_ui_*`
+  modules. Both are flagged for the control room to ratify or reject.
+- **HARD STOP on the rest of Wave 5.** U2, U3, Task 015/015B export and PERF-1
+  are **not** implemented: G5-4 (PERF-1 packet) and G5-5 (export PDs) are
+  unearned control-room acceptances, and the U2/U3 locked prompts are still
+  Proposed and marked unusable. Building against an unaccepted acceptance bar
+  would be inventing product policy. **Wave 5 is not complete — one of five
+  stages is delivered.**
+- **External packages committed, not executed:**
+  [`shopify-live-validation-package.md`](../05-qa/shopify-live-validation-package.md)
+  and [`external-uat-package.md`](../05-qa/external-uat-package.md), aligned to
+  #185/#200, #197 and #199 without modifying any issue.
+- **Not claimed:** no gate accepted or opened; no issue action; no Shopify
+  credential, request, mutation or webhook; **no Odoo.sh runtime**; no
+  live-Shopify, no external UAT, no release readiness; no PERF-0 number restated
+  as a guarantee; "Delivered" still suppressed; no accepted Wave 1–4/U0 code
+  changed.
+- **Learning feedback loop.** (1) The standing suite caught a security-invariant
+  violation that no amount of reading my own diff would have — the value was in
+  running the *whole* suite, not the focused one. (2) Reviewing the rendered
+  screenshots, not just the assertions, surfaced a real UX defect (unhelpful
+  many2one labels) that every green test missed; browser evidence earns its cost
+  as a *finding* mechanism, not just a compliance artifact. (3) A performance
+  comparison is worthless without a genuinely fresh database on both sides —
+  the deterministic signal is query count, and latency on a contended box is
+  noise that will happily tell whatever story you want. (4) Guards that scan
+  prose rather than rendered/executable content fire on their own documentation
+  and teach maintainers to delete the explanation instead of the violation.
+- **Next-session prompt:** obtain exact-SHA **Odoo.sh** runtime for `eaf2fcb`;
+  then **independent Claude review** at that exact SHA (a separate top-level
+  session or fresh subagent, never this one), which must rule on the two
+  declared deviations; then a **separate closure session** for any ready-mark or
+  merge. Separately, the control room must disposition **G5-4** and **G5-5**
+  before U2/U3/export/PERF-1 can start.
+
 ### Wave 5 completion — D10 post-merge closure and gate-state re-derivation (2026-07-25)
 
 - **Branch / PR:** `fable/wave-5-completion`, branched at exactly the bound base
