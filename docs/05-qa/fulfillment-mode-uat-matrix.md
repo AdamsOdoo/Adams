@@ -41,7 +41,7 @@
 | UAT-FM-1.3 | Multi-package / multi-tracking | Validate with multiple tracking references | All tracking numbers captured on the fulfillment (`numbers[]`); packages remain display/evidence only — no Odoo package auto-creation |
 | UAT-FM-1.4 | Tracking-only update | After UAT-FM-1.1, change `carrier_tracking_ref` on the picking | `fulfillmentTrackingInfoUpdate` runs in place; **no second fulfillment is ever created**; visibly distinct event in the log |
 | UAT-FM-1.5 | Notify-off proof | Run UAT-FM-1.1 against an order with a real (test) customer email | No Shopify customer notification is sent; the persisted-at-enqueue notification decision is visible on the job; recipient names never logged |
-| UAT-FM-1.6 | External fulfillment detection → review | Manually fulfill an order in Shopify admin (external origin) | Inbound record created; origin classified `external_merchant` via the §3 evidence stack (own-GID ledger miss + `service.handle`/event attribution); a User review case opens stating order, items/quantities, location, actor, tracking, and the exact proposed Odoo action; **zero stock change** |
+| UAT-FM-1.6 | External fulfillment detection → review | Manually fulfill an order in Shopify admin (external origin) | Inbound record created; origin classified `external_merchant` via the §3 evidence stack (own-GID ledger miss + `service.handle`/event attribution); a User review case opens stating order, items/quantities, location, actor, tracking, and the exact proposed Odoo action; **zero stock change**. `[Proposed product decision, Theme H, 2026-07-23]` Expected `review_reason` code: exactly `external_fulfillment_observed` (label "External Fulfillment Observed") — never `remote_state_changed` (reserved for condition 14's own narrow Mode-2 gate). |
 | UAT-FM-1.7 | Mode 1 User actions on the review case | From UAT-FM-1.6: (a) import tracking; (b) acknowledge; (c) explicitly validate the exact proposal | (a) writes only `carrier_tracking_ref`/URL (non-stock); (b) closes the case "handled outside Odoo", audited; (c) shows precise picking/lines/quantities/lots/locations and validates only on deliberate confirmation — the proposal equals the §4 evaluation output |
 | UAT-FM-1.8 | Connector-created fulfillment observed inbound | Let a **reconciliation scan** (no webhooks in Wave 4) re-observe the UAT-FM-1.1 fulfillment | Classified `connector` via own-GID ledger; snapshots refreshed; **never validates Odoo again**; no review case |
 | UAT-FM-1.9 | Uncertain outbound outcome (**reconcile-only**) | Simulate timeout on `fulfillmentCreate` after C2 commits `transport_attempted=true` (network fault injection) | The job is **reconcile-only — the mutation is never re-sent** (shared `fulfillment_mutation_reconcile`). Post-C2 the reconcile read (FO/fulfillments cursor-paginated to completion + own-GID ledger) yields only **APPLIED** (positive evidence) → adopt, or **INCONCLUSIVE** (**everything else**: **read absence**, incomplete scan, changed remote qty, missing tracking, concurrent activity) → after `INCONCLUSIVE_RECONCILIATION_CAP=3` `duplicate_risk` review. **Post-C2 `NOT_APPLIED` is not an actionable Wave 4 verdict and never authorizes a replacement**; a replacement is possible **only** from `transport_attempted=false` or a synchronous `userErrors` clean rejection; **never a second send from a read miss** ([Fact] no `@idempotent` — capture §6.5) |
@@ -206,3 +206,27 @@ cleanup/restoration · proof no unrelated resource changed.
 static / Odoo.sh work, but Wave 4 cannot receive final control-room acceptance,
 enter a release candidate, or begin UAT while #185 is open. This matrix is the
 canonical validation-plan carrier (no parallel validation doc is created).
+
+---
+
+## Gate B implementation evidence (2026-07-22, draft PR #189)
+
+Gate B implemented the backend behind every UAT-FM scenario in this matrix; the
+scenarios themselves are **runtime/dev-store validation plans** and remain
+`IMPLEMENTED—RUNTIME PENDING` (Gate C Odoo.sh) / `NOT PROVEN` (Gate D dev-store).
+The frozen unit suite that maps to these scenarios is present and compiles; the
+static source guards executed with **0 violations**. Key mutation-safety rows are
+covered by `tests/test_fulfillment_idempotency.py`:
+
+- **UAT-FM-1.9 / 1.9b / 1.9c** (uncertain outcome reconcile-only; no-tracking
+  fail-closed; possible-notification never repeated) → the reconcile callbacks
+  return only APPLIED / INCONCLUSIVE, the shared handler coerces any
+  `not_applied` to inconclusive, and `INCONCLUSIVE_RECONCILIATION_CAP=3` routes
+  to `duplicate_risk`. No second mutation is reachable from a post-C2 read.
+- **UAT-FM-2.0 … 2.18** (16-condition Mode 2, deterministic split, Q6 carrier
+  fail-closed) → `tests/test_fulfillment_mode2_engine.py`.
+- **UAT-FM-3.x** (mode switch, reconnect → review in both modes) →
+  `tests/test_fulfillment_mode_switch.py`, `tests/test_fulfillment_scans.py`.
+
+Full classification: `task-014-fulfillment-tracking-validation-results.md`.
+No live Shopify mutation occurred in Gate B. CV-013 (#185) remains open/critical.

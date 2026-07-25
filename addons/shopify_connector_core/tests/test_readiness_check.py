@@ -351,6 +351,18 @@ class TestReadinessCheck(TransactionCase):
         check = self.ReadinessCheck._check_required_scopes(self.store)
         self.assertEqual(check['result'], 'not_proven')
 
+    def test_required_scopes_use_merchant_managed_fulfillment_orders(self):
+        # TD-002 / D-014-2: the FulfillmentOrder-based mutation flow requires
+        # read_merchant_managed_fulfillment_orders; the legacy read_fulfillments
+        # scope (FulfillmentService apps) is no longer in the required set.
+        self.assertIn(
+            'read_merchant_managed_fulfillment_orders',
+            self.ReadinessCheck.REQUIRED_MVP_SCOPES,
+        )
+        self.assertNotIn(
+            'read_fulfillments', self.ReadinessCheck.REQUIRED_MVP_SCOPES,
+        )
+
     # ------------------------------------------------------------------
     # 14. Domain flag enablement: must pass only when at least one
     # accepted domain flag is True, not merely because a settings record

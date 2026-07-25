@@ -56,7 +56,12 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         'read_orders',
         'read_inventory',
         'read_locations',
-        'read_fulfillments',
+        # TD-002 / D-014-2: the FulfillmentOrder-based mutation flow requires
+        # read_merchant_managed_fulfillment_orders (read_fulfillments governs
+        # FulfillmentService apps, not this merchant-managed connector). The
+        # matching write scope is checked by the fulfillment domain's own
+        # readiness seam when the fulfillment domain is enabled.
+        'read_merchant_managed_fulfillment_orders',
     )
 
     # The four DEC-008 domain-module flags on

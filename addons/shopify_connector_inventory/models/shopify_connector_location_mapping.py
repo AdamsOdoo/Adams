@@ -114,3 +114,46 @@ class ShopifyConnectorLocationMapping(models.Model):
             )
         self.sudo().write({'push_enabled': bool(enabled)})
         return True
+
+
+class ShopifyConnectorLocationOdooResolution(models.Model):
+    """F-4 permanent seam: the inventory-owned override of core's
+    `shopify.connector.location._resolve_odoo_location()` extension point.
+
+    Ordinary Odoo model inheritance on the existing core model -- no new
+    table, no duplicated mapping state, no fulfillment-side dependency. A
+    sibling domain (fulfillment) never reads `shopify.connector.location.
+    mapping` directly; it only ever calls this core-defined method by name,
+    which loads via inheritance whenever `shopify_connector_inventory` is
+    installed in the same database.
+    """
+
+    _inherit = 'shopify.connector.location'
+
+    @api.model
+    def _resolve_odoo_location(self, store, shopify_location_gid):
+        result = super()._resolve_odoo_location(store, shopify_location_gid)
+        if result:
+            return result
+        if not store or not shopify_location_gid:
+            return False
+        matches = self.env['shopify.connector.location.mapping'].sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', '=', shopify_location_gid),
+        ])
+        # Exactly one unambiguous mapping; the model's own UNIQUE constraints
+        # already make more than one practically unreachable, but a corrupt
+        # or ambiguous result must still fail closed rather than guess.
+        if len(matches) != 1:
+            return False
+        mapping = matches
+        if not mapping.push_enabled:
+            return False
+        location = mapping.odoo_location_id
+        if not location or not location.exists():
+            return False
+        if location.usage != 'internal':
+            return False
+        if location.company_id and location.company_id != self.env.company:
+            return False
+        return location
