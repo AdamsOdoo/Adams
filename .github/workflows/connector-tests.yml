@@ -17,6 +17,15 @@
 #     which is why they had gone unrun; they are no longer optional here.
 #   * The Odoo commit is pinned in tools/odoo-pin.txt and verified on every run,
 #     so a restored cache cannot quietly test a different Odoo.
+#   * On a `pull_request` event this checks out the PR HEAD COMMIT, not the
+#     synthetic merge ref. `actions/checkout` defaults to `refs/pull/N/merge`,
+#     an ephemeral commit GitHub creates by merging the head into the base. It
+#     is a real commit with a real SHA that exists in no branch and that nobody
+#     reviewed, so an artifact recording it reads as exact-SHA evidence for a
+#     commit the PR does not contain. Run 30153827606 recorded exactly that:
+#     `connector_sha: 60ea6690…`, the merge ref, while PR #203's head was
+#     `156a4a74…`. The suite additionally VERIFIES the checkout against the
+#     intended source head and fails rather than publishing a mismatch.
 
 name: Connector test suite
 
@@ -68,10 +77,23 @@ jobs:
       PGUSER: odoo
       PGPASSWORD: odoo
       ARTIFACT_DIR: ${{ github.workspace }}/ci-artifacts
+      # The commit this run INTENDS to test. On `pull_request` that is the PR
+      # head; on `push`/`workflow_dispatch` it is the pushed commit. The suite
+      # compares its actual checkout against this and aborts on a mismatch, so
+      # "which commit did this artifact describe" is never a guess.
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      SOURCE_EVENT_NAME: ${{ github.event_name }}
+      SOURCE_PR_NUMBER: ${{ github.event.pull_request.number }}
+      SOURCE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     steps:
       - name: Check out the connector
         uses: actions/checkout@v4
+        with:
+          # Explicit. Without this a `pull_request` run tests -- and reports --
+          # the synthetic merge commit instead of the PR head.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -111,7 +133,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: connector-suite-${{ github.sha }}
+          # Named for the commit actually tested, not for `github.sha` -- which
+          # on a pull_request event is the merge ref and would misfile the
+          # artifact under a commit the branch does not contain.
+          name: connector-suite-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             ci-artifacts/*.log
             ci-artifacts/summary.json
@@ -124,7 +149,9 @@ jobs:
           {
             echo '## Connector suite'
             echo
-            echo "Connector SHA: \`${{ github.sha }}\`"
+            echo "Tested commit (source head): \`${SOURCE_HEAD_SHA}\`"
+            echo "GitHub event: \`${SOURCE_EVENT_NAME}\`"
+            echo "\`github.sha\` (merge ref on pull_request; NOT what ran): \`${{ github.sha }}\`"
             echo
             if [ -f ci-artifacts/summary.json ]; then
               echo '```json'

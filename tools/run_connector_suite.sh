@@ -17,8 +17,12 @@
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
 #        * the complete NON-STANDARD tag suite
-#   4. writes durable per-pass logs and a machine-readable summary under
-#      $ARTIFACT_DIR
+#   4. verifies the checked-out connector commit against the commit the caller
+#      says this run is testing ($SOURCE_HEAD_SHA), and ABORTS on a mismatch
+#   5. writes durable per-pass logs and a machine-readable summary under
+#      $ARTIFACT_DIR, recording the tested checkout SHA, the declared source
+#      head and base, the event type, the worktree state, the exact Odoo SHA
+#      and the Python/PostgreSQL versions
 #
 # Why the third pass exists. Eight connector test classes are tagged
 # `-standard`, which is correct -- they are expensive and some spawn real OS
@@ -46,6 +50,10 @@
 #   PGHOST/PGPORT PostgreSQL connection         (default: /tmp, 5432)
 #   ARTIFACT_DIR  where logs/summary land       (default: ./ci-artifacts)
 #   PYTHON        interpreter for the venv      (default: python3.12, else python3)
+#   SOURCE_HEAD_SHA   commit this run is meant to test; verified, abort on
+#                     mismatch (CI sets it; a laptop run normally does not)
+#   SOURCE_BASE_SHA / SOURCE_EVENT_NAME / SOURCE_PR_NUMBER / SOURCE_RUN_URL
+#                     recorded verbatim in the summary as provenance
 
 set -euo pipefail
 
@@ -113,6 +121,33 @@ else
     WORKTREE_DIRTY=false
 fi
 SUMMARY="${ARTIFACT_DIR}/summary.json"
+
+# --- Tested checkout vs intended source head ---------------------------------
+# The caller may declare which commit this run is SUPPOSED to be testing.
+# CI sets it; a laptop run normally does not.
+#
+# This exists because of a specific, confirmed failure. On a `pull_request`
+# event `actions/checkout` defaults to `refs/pull/N/merge` -- a synthetic
+# commit GitHub creates by merging the PR head into the base. It has a real
+# SHA, exists in no branch, and was never reviewed. Actions run 30153827606
+# published `connector_sha: 60ea6690…` for PR #203 whose head was `156a4a74…`;
+# every number in that artifact was real, and every one of them described a
+# commit the PR does not contain. Recording the difference is not enough -- a
+# run that cannot prove it tested the intended commit must FAIL, not publish.
+SOURCE_HEAD_SHA="${SOURCE_HEAD_SHA:-}"
+SOURCE_BASE_SHA="${SOURCE_BASE_SHA:-}"
+SOURCE_EVENT_NAME="${SOURCE_EVENT_NAME:-local}"
+SOURCE_PR_NUMBER="${SOURCE_PR_NUMBER:-}"
+SOURCE_RUN_URL="${SOURCE_RUN_URL:-}"
+if [[ -n "$SOURCE_HEAD_SHA" && "$SOURCE_HEAD_SHA" != "$SHA" ]]; then
+    log "FATAL: checked-out commit ${SHA} is not the intended source head"
+    log "       ${SOURCE_HEAD_SHA} (event: ${SOURCE_EVENT_NAME})."
+    log "Refusing to run. On a pull_request event this almost always means the"
+    log "checkout took GitHub's synthetic merge ref instead of the PR head, and"
+    log "every artifact this run produced would describe the wrong commit."
+    exit 2
+fi
+log "testing ${SHA} (event: ${SOURCE_EVENT_NAME}${SOURCE_HEAD_SHA:+, source head verified})"
 
 # --- Odoo source (immutable pin, verified every run) -------------------------
 # `19.0` is a moving branch and a restored cache is an arbitrary old commit;
@@ -277,13 +312,21 @@ fi
 # can never be quoted as Odoo.sh acceptance.
 cat > "$SUMMARY" <<EOF
 {
+  "tested_checkout_sha": "${SHA}",
   "connector_sha": "${SHA}",
+  "source_head_sha": "${SOURCE_HEAD_SHA}",
+  "source_base_sha": "${SOURCE_BASE_SHA}",
+  "source_head_verified": $([[ -n "$SOURCE_HEAD_SHA" ]] && echo true || echo false),
+  "github_event": "${SOURCE_EVENT_NAME}",
+  "source_pr_number": "${SOURCE_PR_NUMBER}",
+  "run_url": "${SOURCE_RUN_URL}",
   "connector_worktree_dirty": ${WORKTREE_DIRTY},
   "odoo_pin": "${ODOO_PIN}",
   "odoo_sha": "${ODOO_SHA}",
   "odoo_pin_verified": true,
   "python": "$("$VENV/bin/python" --version 2>&1)",
   "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
+  "postgres_server_version": "$(psql -tAc 'show server_version;' postgres 2>/dev/null | head -1 | tr -d '[:space:]')",
   "modules": "${MODULES}",
   "extra_modules": "${EXTRA_MODULES}",
   "standard_tags": "${STANDARD_TAGS}",
