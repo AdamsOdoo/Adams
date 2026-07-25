@@ -148,7 +148,7 @@ Every one carries a stored related `company_id` and a fail-closed rule
 | `shopify.connector.fulfillment.inbound.evidence.line` | `evidence_id.store_id.company_id` | `fulfillment_inbound_evidence_line_company_rule` |
 | `shopify.connector.tax.mapping` | `store_id.company_id` | `tax_mapping_store_company_rule` |
 
-### 3.2 Additional business-record rules retained (7)
+### 3.2 Additional business-record rules retained (8)
 
 The pre-existing rules that scope a connector row by the company of the Odoo
 record it points at are **kept alongside** the store rules. Both are global, so
@@ -166,7 +166,22 @@ still preventing another company's product from being reached through a binding.
 
 | Model | Why neutrality is a proven fact here |
 | --- | --- |
-| `shopify.connector.attribute.lock` | A **single seeded row** used only as a PostgreSQL mutex anchor (`_acquire_or_raise`, `FOR UPDATE SKIP LOCKED`). It holds no business data, is never created/written/unlinked at runtime, and reveals nothing about any store or company. Locking it tells a caller nothing except that someone else is importing attributes. |
+| `shopify.connector.attribute.lock` | A **single seeded row** used only as a PostgreSQL mutex anchor (`_acquire_or_raise`, `FOR UPDATE SKIP LOCKED`). It holds no business data, is never created/written/unlinked at runtime, and reveals nothing about any store or company. Locking it tells a caller nothing except that someone else is importing attributes. Its ACL is read-only for exactly one group and grants **no** create/write/unlink to anyone (`ir.model.access.csv`: `1,0,0,0`), so it cannot be renamed or removed either. |
+
+**Deviation recorded deliberately.** The correction brief lists "attribute
+locks" among the records that should inherit the store's company. This model is
+the one place that instruction is **not** followed, and the reason is
+functional rather than convenient: the lock is *global by design*. Attribute
+creation is serialized across the whole database because Odoo product
+attributes are themselves global; that is the invariant the lock exists to
+protect. Attaching a company would mean either keeping one row (no isolation
+gained, since a single row cannot be scoped to two companies at once) or
+creating one row per company — which would silently **change production
+locking semantics**, permitting two companies to create the same global
+attribute concurrently. That is a behavioural change well outside "the smallest
+coherent ownership correction", and it would reintroduce the duplicate-attribute
+race the lock was built to prevent. It is therefore left neutral, with the
+reasoning recorded here rather than decided silently.
 
 This is the only place in the connector where "company-neutral" survives
 examination. Everywhere else the previous revision used it, it meant

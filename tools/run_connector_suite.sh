@@ -100,6 +100,16 @@ done
 
 mkdir -p "$ARTIFACT_DIR"
 SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+# A dirty worktree makes `rev-parse HEAD` a LIE about what was executed: the
+# tests run against the files on disk, not against the commit. Record it, so a
+# reader can never mistake a work-in-progress run for exact-SHA evidence.
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]]; then
+    WORKTREE_DIRTY=true
+    log "WARNING: worktree is DIRTY -- connector_sha ${SHA} does NOT describe"
+    log "         what ran. This run is not exact-SHA evidence."
+else
+    WORKTREE_DIRTY=false
+fi
 SUMMARY="${ARTIFACT_DIR}/summary.json"
 
 log() { printf '[connector-suite] %s\n' "$*"; }
@@ -266,6 +276,7 @@ fi
 cat > "$SUMMARY" <<EOF
 {
   "connector_sha": "${SHA}",
+  "connector_worktree_dirty": ${WORKTREE_DIRTY},
   "odoo_pin": "${ODOO_PIN}",
   "odoo_sha": "${ODOO_SHA}",
   "odoo_pin_verified": true,
@@ -287,6 +298,7 @@ cat > "$SUMMARY" <<EOF
 EOF
 {
   "connector_sha": "${SHA}",
+  "connector_worktree_dirty": ${WORKTREE_DIRTY},
   "odoo_ref": "${ODOO_REF}",
   "odoo_sha": "${ODOO_SHA}",
   "python": "$("$VENV/bin/python" --version 2>&1)",

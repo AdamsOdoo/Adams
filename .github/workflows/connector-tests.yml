@@ -39,7 +39,12 @@ jobs:
   suite:
     name: Odoo 19 install + full connector suite
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Raised from 90. The third pass includes the customer-matching benchmark,
+    # which builds a 100 000-partner dataset; on CI hardware that alone can take
+    # tens of minutes. A timeout that cuts the concurrency proofs short would
+    # recreate exactly the problem this pass exists to fix, only with a red run
+    # instead of a silent omission.
+    timeout-minutes: 180
 
     services:
       postgres:

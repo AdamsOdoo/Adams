@@ -107,17 +107,28 @@ still requires exact-SHA Odoo.sh runtime evidence and independent review.
 | --- | --- |
 | #193 / #157 warm-update fixtures | Implemented + locally executed. Warm `-u` went from 96 errors of 1270 tests to **0 failed, 0 errors of 1440**. Enforced by a new static phase-contract guard. |
 | #198 inventory residue | Implemented + locally executed. Exact-id FK-safe teardown; repeated-cycle zero-residue proof. |
-| #196 SEC-2 roles | Implemented + locally executed (20 tests). Additive Option M-A; role half only — the PII-masking half is a separate obligation. |
-| #197 SEC-3 isolation | Audited (35 models, none unclassified) + 8 record rules + 22-test two-company matrix. Gated on external UAT/RC; U1 delta out of scope. |
+| #196 SEC-2 roles | Implemented + locally executed (20 tests). Additive Option M-A. [Issue #196](https://github.com/AdamsOdoo/Adams/issues/196) defines the SEC-2 **role layer** — two customer-facing roles over the existing internal capability groups — and that is exactly what is implemented. The earlier PR-body wording describing this as only "the role half" of #196, with a "PII-masking half" still outstanding *within #196*, was unsupported and is withdrawn: #196's own scope and definition of done contain no PII-masking obligation. The MVP PII simplification is a **separate** documented obligation in [`task-sec2-two-role-and-pii-simplification-packet.md`](task-sec2-two-role-and-pii-simplification-packet.md); it is neither claimed nor closed here, and it is not a precondition of #196. |
+| #197 SEC-3 isolation | **Reworked 2026-07-25 after control-room correction.** The first pass classified 9 control-plane models as NEUTRAL, leaving stores, credentials, settings, locations, jobs, logs, attempts and leases cross-company readable — which did not satisfy #197. Now store-rooted: `store.company_id` is the single ownership root, 17 durable models inherit it, 18 fail-closed record rules, Odoo-native `_check_company` on every binding, upgrade-safe backfill with an administrative remediation path, and `order_company_id` constrained to agree with the store. 41-test matrix. Gated on external UAT/RC; U1 delta out of scope. |
 | Multiprocessing / lifecycle | **Executed for the first time.** Core 3/3 and fulfillment 9/9 external-process scenarios pass with distinct OS PIDs and zero residue; three harness defects corrected. Uninstall→reinstall clean (21 tables → 0 → 21, zero metadata residue). |
-| CI (DEC-041 D8) | Implemented: `tools/run_connector_suite.sh` + a thin workflow. Supporting evidence only; Odoo.sh remains the Tier-1 authority. |
-| #199 PERF-0 | Implemented + executed. Six scenarios, p50/p95/p99, query counts, memory, residue. Baseline-only. |
-| Repository debt | 13 findings recorded in [`pre-wave-5-debt-discovery.md`](../05-qa/pre-wave-5-debt-discovery.md). Notably: 8 `-standard` classes never ran in any suite; now executed, 18/18 green after one correction. |
+| CI (DEC-041 D8) | **Corrected 2026-07-25.** The first version defaulted its tag list to empty and the workflow passed no tags, so the eight `-standard` classes were still never run continuously — D-6/D8 were reported fixed by a mechanism that excluded exactly the tests in question. The runner now executes fresh-standard, warm-standard and the complete non-standard tag set by default (skipping is opt-*out*), each into its own database with its own log and machine-readable result. Odoo is pinned to an immutable SHA in `tools/odoo-pin.txt`, verified every run, with the Actions cache keyed on the pin file. Supporting evidence only; Odoo.sh remains the Tier-1 authority, and no green Actions run exists yet. |
+| #199 PERF-0 | **Corrected 2026-07-25.** The first version reported `pg_stat_statements.total_exec_time` as `lock_wait_ms_delta` (it is statement execution time, not lock wait) and its "contention" scenario was single-process and uncontended. Now: the metric is named `sql_exec_time_ms_delta` and kept as an execution-time statistic only; genuine two-connection blocking contention is measured directly with PostgreSQL's own `wait_event` plus a SKIP-LOCKED comparison; order, inventory and fulfillment scan/reconciliation workloads added over seeded datasets; residue swept across 16 tables with FK-safe teardown. Baseline-only — no threshold is asserted. |
+| Repository debt | 20 findings recorded in [`pre-wave-5-debt-discovery.md`](../05-qa/pre-wave-5-debt-discovery.md) (13 original + D-14..D-20 from the control-room correction). Notably: 8 `-standard` classes never ran in any suite, and the first "fix" for that did not actually run them either. |
 
-Runtime used: local disposable Odoo 19 (`odoo/odoo@19.0` `30bde9ff`) +
-PostgreSQL 16.13. This is a faithful reproduction, **not** a substitute for
-Odoo.sh. Full connector suite on the stabilization head: **0 failed, 0 errors of
-1484 tests**. No Shopify store, credential, request or mutation was involved.
+Runtime used: local disposable Odoo 19 pinned to
+`30bde9ff758834a4912c5ae55843d3a7dad849f1` (the same commit as the first
+campaign, so the numbers stay directly comparable) + PostgreSQL 16.13, Python
+3.12. This is a faithful reproduction, **not** a substitute for Odoo.sh. Full
+connector suite on the corrected head: **0 failed, 0 errors of 1503 tests**. No
+Shopify store, credential, request or mutation was involved at any point.
+
+**Correction round — 2026-07-25.** The control room reviewed the first
+stabilization head (`d28633b`) and returned `REVISE ONCE BEFORE EXACT-SHA ODOO.SH
+VALIDATION` with a complete finding set: the implementation record understated
+the change (23 files described only the second push; the full PR is 94 changed
+paths), continuous validation excluded the non-standard classes it was meant to
+cover, SEC-3 classified the control-plane leak as neutral instead of closing it,
+and PERF-0 mislabelled execution time as lock wait. All findings are corrected on
+the same PR #203, with no rebase and no force-push.
 
 ### Shopify-only deferred package
 

@@ -25,14 +25,26 @@ when the code actually runs.
 | D-3 | Test phase | 79 test classes ran `at_install` and failed a warm `-u` with NOT NULL violations. | High | **FIXED** — issue #193/#157 |
 | D-4 | Fixture integrity | `test_pii_least_privilege` back-dated `create_date` through `create()` values, which Odoo honours **only while the registry is loading**. At `post_install` the back-date was silently dropped and the retention assertion stopped testing what it claimed. | Medium | **FIXED** |
 | D-5 | Test residue | `test_inventory_concurrency` left committed `stock.location`, `product.template`, `product.product`, `res.users` and `res.partner` rows behind. | Medium | **FIXED** — issue #198 |
-| D-6 | Non-executing tests | **8 test classes carry `-standard` and never run in a normal `--test-enable` pass**, including four *genuine concurrency proofs*. A "full suite green" claim silently excluded them. | **Material P2** | **FIXED** — see §3 |
+| D-6 | Non-executing tests | **8 test classes carry `-standard` and never run in a normal `--test-enable` pass**, including four *genuine concurrency proofs*. A "full suite green" claim silently excluded them. | **Material P2** | **FIXED** — see §3; the runner and CI now execute them automatically |
 | D-7 | Harness never executed | The fulfillment external-process harness had **two defects that made it fail on first run**, proving it had never actually been executed. | **Material P2** | **FIXED** — see §4 |
 | D-8 | Cross-company reads | 8 of 10 company-scoped connector models had no record rule. | Material P2 (for UAT/RC) | **FIXED** — issue #197, see the SEC-3 audit |
 | D-9 | Customer-facing roles | The two SEC-2 roles did not exist; only the four internal capability groups. | Blocks U1 | **FIXED** — issue #196 |
-| D-10 | No CI | `.github/` absent on every release-relevant branch (DEC-041 E5); all evidence manually produced. | Material P2 | **FIXED** — DEC-041 D8 |
+| D-10 | No CI | `.github/` absent on every release-relevant branch (DEC-041 E5); all evidence manually produced. | Material P2 | **FIXED** — DEC-041 D8; see §3 for the two defects the first version shipped with |
 | D-11 | No performance baseline | No reproducible benchmark existed to compare two SHAs. | Blocks perf acceptance | **FIXED** — issue #199 |
 | D-12 | Environment-gated skips | Two tests skip on capability, not on defect: `test_real_process_death_harness` ("opt-in outside Odoo.sh") and `test_ui_tours.test_navigation_tour` ("websocket-client module is not installed"). | Low | **Open — tracked** |
 | D-13 | `store.settings` company pointers | `order_company_id` may point at a company the acting administrator is not in. Product question, not a defect. | Low | **Open — tracked** |
+
+## 2b. Findings added by the 2026-07-25 control-room correction
+
+| ID | Area | Finding | Severity | Status |
+| --- | --- | --- | --- | --- |
+| D-14 | CI completeness | The first CI/runner shipped with `TEST_TAGS` defaulting to empty and the workflow calling the script with no `--tags`, so **the eight `-standard` classes were still never executed continuously**. D-6 and D8 were reported fixed while the mechanism that was supposed to fix them excluded exactly the tests in question. | **Material P2** | **FIXED** — the runner now runs a third pass over the complete tag set by default; skipping is opt-*out* only |
+| D-15 | Odoo pin | `ODOO_REF=19.0` is a *moving branch*, and the Actions cache was keyed `odoo-src-19.0`, so a restored cache could execute an arbitrary older Odoo commit forever while every artifact still read "19.0". Neither is a pin. | **Material P2** | **FIXED** — `tools/odoo-pin.txt` holds an immutable SHA, the runner verifies the checkout against it on every run and aborts on mismatch, and the cache key is `hashFiles('tools/odoo-pin.txt')` |
+| D-16 | PERF-0 validity | `pg_stat_statements.total_exec_time` was reported as `lock_wait_ms_delta`. It is statement **execution** time, not lock-wait time; a workload that never blocks still accumulates it. The `lock_contention` scenario was also single-process and uncontended, so it could only ever measure the uncontended floor. | **Material P2** | **FIXED** — renamed to `sql_exec_time_ms_delta`; genuine two-connection blocking contention added, with `wait_event` observation and a SKIP-LOCKED comparison |
+| D-17 | PERF-0 coverage | The order, inventory and fulfillment scan/reconciliation workloads required by #199 were absent, and the scan scenarios would have searched empty tables. | Material P2 | **FIXED** — three scan scenarios plus a reconciliation sweep, each seeding a real dataset sized from `--batch` |
+| D-18 | PERF-0 residue | The post-teardown check looked at the store row and three tables. A benchmark can leave a credential, lease or binding behind and still report "clean", silently changing the dataset for the next run. | Medium | **FIXED** — 16-table sweep, FK-safe teardown including the circular job/attempt pointer |
+| D-19 | SEC-3 ownership | Nine control-plane models were classified NEUTRAL, leaving stores, credentials, settings, locations, jobs, logs, attempts and leases cross-company readable. `order_company_id` was a second, independent ownership selector. | **Material P2** | **FIXED** — store-rooted ownership, fail-closed rules, `order_company_id` constrained to agree with the store; see the SEC-3 audit |
+| D-20 | Measurement window | `test_ui_performance` charged a pending ORM flush from its own fixture to the dashboard call, so a newly added stored field made the dashboard look super-linear (17 → 19 queries, both `UPDATE ... SET company_id`). | Low | **FIXED** — the fixture flushes before measurement; the assertion stays strict equality |
 
 ## 3. D-6 — the eight non-executing classes
 
@@ -115,5 +127,8 @@ a fourth instance appears.
   product-owner ruling until the Wave-5 candidate freezes. No Shopify operation
   occurred in this audit.
 - **UI-delta SEC-3** — U1 does not exist yet.
-- **Scheduled CI execution of the non-standard tags** (D-6).
+- **A first green GitHub Actions run.** The workflow is corrected and
+  syntax-validated, but this environment cannot execute Actions; until a run
+  exists on the corrected head, CI is `IMPLEMENTED — RUNTIME PENDING`, not
+  proven.
 - **Driven browser/visual UAT** — unchanged, still deferred.
