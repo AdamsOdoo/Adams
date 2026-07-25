@@ -1,3 +1,88 @@
+### Wave 5 completion — D10 post-merge closure and gate-state re-derivation (2026-07-25)
+
+- **Branch / PR:** `fable/wave-5-completion`, branched at exactly the bound base
+  `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d`; **draft** PR
+  into `mvp/program-integration`. **Docs-only — zero `addons/**` paths.** Not
+  self-accepted, not ready-marked, not merged. No protected ref, existing PR,
+  comment, or issue was altered; no rebase, force-push, or history rewrite.
+- **Authorization:** product-owner instruction binding the Wave 5 completion base to
+  `87f1763a` — the act anticipated by merge record
+  [`5080798692`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080798692)
+  §4 ("the candidate base … only once a control-room instruction binds it").
+- **Identity verification (all passed, §1 of the gate-state file):** required base
+  matches the live tip exactly; the tip is the ordinary merge of PR #194
+  (`2583081f` → `80fbb523`); both protected checkpoints
+  (`checkpoint/core-r2-readonly-uat-2026-07-15` at `acd8c469`,
+  `checkpoint/wave-2-order-import-2026-07-18` at `22bfb9a0`) are unmodified and
+  `acd8c469` is a verified ancestor; all eight accepted wave merges are present in
+  the ancestry. **No discrepancy found.**
+- **Primary finding — the D10 record was missing.** PR #194 merged at 22:15:01Z
+  without the DEC-041 **D10** post-merge tracker closure. At the bound base all
+  three synchronized surfaces were materially stale: `mvp-program-state.md` gave the
+  tip as `3a1afa43` and PR #194 as "open/draft/unmerged"; `mvp-acceptance-matrix.md`
+  called PR #194 frozen pending gates that had already closed;
+  `mvp-completion-program.md` §3 named `3a1afa43`. D10 makes this a **blocker of
+  downstream continuation**, so closing it was the precondition for any Wave 5 work.
+  All three are now corrected.
+- **Contract carry-over proven, not assumed.** The `addons/` tree is **byte-identical**
+  at `2583081f` (the contract's verification anchor) and `87f1763a` (the bound base) —
+  both `1b58f7c546de62edae0eabad3f6fc90c6a158323`; the diff is 24 paths, 0 non-docs.
+  The locked prompt's "re-verify at the bound base before writing a line" is
+  therefore discharged by tree identity, which is stronger than re-derivation.
+- **Gates re-derived, not restated.** The prior record said only "G5-1…G5-9 remain
+  unchecked". Per-gate: **six** (G5-1, G5-2, G5-3, G5-6, G5-8, and G5-9 for U1) are
+  substantively earned by merged, independently accepted evidence and need only a
+  control-room check; **G5-7** is supported at the bound base by exact-base Actions
+  run [`30177207908`](https://github.com/AdamsOdoo/Adams/actions/runs/30177207908)
+  (`success` on `87f1763a`), which is DEC-041 D8 **supporting** evidence pending a
+  Tier-1 authority decision; **G5-4** (PERF-1 packet) and **G5-5** (export PDs) are
+  **genuinely unearned** and need acceptance acts no worker may perform. **G5-5 gates
+  Task 015/015B only, not U1.**
+- **HARD STOP — no U1 code was written.** Of the U1 gate's four blockers, the
+  independent review and D-P0-3 are resolved by durable evidence
+  ([`5080722794`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080722794),
+  [`5080795232`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080795232)),
+  and the base is now bound — but **G5-4 remains genuinely unearned** and no act
+  opening the U1 gate exists. Both the acceptance and the merge record state plainly
+  that no U1 implementation is authorized. Writing U1 code here would have required
+  this session to check its own gates — the self-authorization CLAUDE.md §13 and
+  DEC-041's unchanged-gates list forbid. Recorded as a hard stop with evidence, not
+  a deferral.
+- **P3 carry-forward closed** (authorized by acceptance `5080795232` §3 for "the next
+  authorized documentation touch"): the "four/five docs deliverables" count corrected
+  and all five paths enumerated; `AR-083` and `A23` moved into ascending order
+  (content unchanged); finding 4 proven still-true at the bound base by the tree
+  identity above; **finding 5 resolved against source** — the shipped U0 layer uses
+  `danger` (31 occurrences, incl. `bg-danger`) and never `critical`, so the
+  **contract** §12.2 was the drifting document and now reads `danger`. The review had
+  left this to "the copy deck"; unresolved, an implementer reading the contract as
+  authoritative would have emitted a token the U0 layer does not define.
+- **Debt surfaced:** the MVP **PII-simplification** obligation is separate from #196,
+  is not part of SEC-2's definition of done, and is currently tracked by **no issue**.
+  It needs an owner.
+- **Not claimed:** no gate accepted or opened; no issue action; no Shopify
+  credential, request, or mutation; no browser/render, Odoo.sh runtime, live-Shopify,
+  UAT, or release-readiness evidence; no PERF-0 number restated as a guarantee.
+  "Delivered" remains suppressed. No accepted Wave 1–4/U0 code was changed — no
+  defect requiring one was found. No runtime campaign was run and none is fabricated;
+  per DEC-041 D7 a docs-only batch is verified by repository/diff/path/link/
+  consistency checks, and this does not weaken the runtime requirement for any later
+  code batch.
+- **Learning feedback loop.** (1) The D10 gap repeated a known pattern: the merge
+  record itself listed what remained but no surface was updated, so the *next*
+  session's first act had to be reconciliation rather than delivery — D10's
+  "immediately after merge" needs an owner named in the merge record, not just a
+  rule. (2) A "still unchecked" gate list is not actionable; re-deriving it per gate
+  turned an apparently-blocked wave into two specific control-room acts. (3) Deferring
+  a vocabulary conflict to a downstream artifact ("the copy deck will fix it") leaves
+  the authoritative document wrong in the interim; DEC-041 D1's ground-truth rule
+  resolved it in one grep.
+- **Next-session prompt:** see the gate-state file §5 ("What unblocks U1") — one
+  control-room instruction that dispositions G5-4, checks G5-1/G5-2/G5-3/G5-6/G5-8
+  against §4's evidence, rules on the G5-7 authority question, and states explicitly
+  whether the U1 gate is **OPEN** at base `87f1763a`. Until that exists, the correct
+  next worker action is **not** U1 implementation.
+
 ### Wave 5 U1 Gate A — final-backend re-anchor and bounded reconciliation (2026-07-25)
 
 - **Branch / PR:** `claude/wave-5-u1-gate-a`, draft PR

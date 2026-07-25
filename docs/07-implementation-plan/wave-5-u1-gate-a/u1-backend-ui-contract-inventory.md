@@ -565,16 +565,16 @@ never used to decide eligibility, classify blockers, or determine "review requir
 
 Labels/icons are **semantic placeholders** reconciled to the platform FontAwesome
 set (P9) at implementation (status model §9). Severity tokens reuse the U0 layer
-(calm/info/warning/critical/unknown).
+(calm/info/warning/danger/unknown).
 
 | Layer | Operator label family | Icon family (semantic) | Severity rule | Unknown value | Empty / unavailable |
 |---|---|---|---|---|---|
 | L0 Odoo delivery | Draft / Waiting / Ready / **Done** / Cancelled | `truck` / `check-circle` | calm→done; info→in-progress | n/a (fixed Odoo enum) | no picking → "—" |
 | A1 order roll-up | Not shipped / Partially shipped / Fully shipped / … (status model §2) | `truck-outline` / `truck-half` / `truck-check` | per §2 | `badge-unknown` / `help-circle` (§7) | no snapshot → no badge |
-| A4 fulfillment result | Shipped (confirmed) / Cancelled / Error / Failed | `check-circle` / `cancel` / `alert-circle` / `close-octagon` | calm / warning / critical (§4) | "Unknown: RAW", `schema_warning`, never success | no status → "—", `_is_success=false` |
-| A5 carrier milestone (tracking + delivered-inconsistency **only**) | tracking chips (carrier/number); **Delivered per carrier — Odoo delivery not validated** (delivered-inconsistency) | `truck-fast` / `package-check`; inconsistency → `alert-decagram` | tracking chips info/calm; **delivered-inconsistency → critical, pinned** (§8) | unknown milestone → §7 ("unknown milestone") | no `trackingInfo` → no chips; `delivered_inconsistency=false` → no inconsistency badge |
-| A7 display status (roll-up, display-only) | e.g. Marked as fulfilled / Submitted / Label printed / In transit / Delivered — **shown as "Shopify display status"**, never as a carrier event | `tag` / `information-outline` (distinct from A5 `truck-*`) | calm/info; **never critical by itself** | `badge-unknown` (§7) | no value → "—" |
-| C1 reconciliation | Observed / Review Case Open / Acknowledged / Applied / Superseded | `eye` / `hand` / `check` | review → warning/critical; applied → calm | n/a (fixed selection) | default `observed` |
+| A4 fulfillment result | Shipped (confirmed) / Cancelled / Error / Failed | `check-circle` / `cancel` / `alert-circle` / `close-octagon` | calm / warning / danger (§4) | "Unknown: RAW", `schema_warning`, never success | no status → "—", `_is_success=false` |
+| A5 carrier milestone (tracking + delivered-inconsistency **only**) | tracking chips (carrier/number); **Delivered per carrier — Odoo delivery not validated** (delivered-inconsistency) | `truck-fast` / `package-check`; inconsistency → `alert-decagram` | tracking chips info/calm; **delivered-inconsistency → danger, pinned** (§8) | unknown milestone → §7 ("unknown milestone") | no `trackingInfo` → no chips; `delivered_inconsistency=false` → no inconsistency badge |
+| A7 display status (roll-up, display-only) | e.g. Marked as fulfilled / Submitted / Label printed / In transit / Delivered — **shown as "Shopify display status"**, never as a carrier event | `tag` / `information-outline` (distinct from A5 `truck-*`) | calm/info; **never danger by itself** | `badge-unknown` (§7) | no value → "—" |
+| C1 reconciliation | Observed / Review Case Open / Acknowledged / Applied / Superseded | `eye` / `hand` / `check` | review → warning/danger; applied → calm | n/a (fixed selection) | default `observed` |
 | C2 review reason / error | the **21** review reasons / 19 error classes (operator labels via copy deck) | `tag` / `alert-*` | per reason severity | `unknown_status_value` review reason; `unknown_system_error` | no reason → not a review case |
 | C3 origin | Connector-Created / External — Merchant / External — App/Service / External — Unknown Origin | `link` / `store` / `apps` / `help` | neutral/info | `external_unknown` handles the unknown case | default `external_unknown` |
 | — unknown-value | Unknown status (raw value) | `help-circle` | warning | (this row **is** the unknown handler) | — |

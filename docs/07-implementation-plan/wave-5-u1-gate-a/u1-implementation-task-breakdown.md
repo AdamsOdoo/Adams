@@ -36,7 +36,7 @@ through S4/S5; S7/S8 last. **Odoo-19 data load order:** wizard/actions defined
 ## 4. Allowed / forbidden files (exact — carried into the locked prompt)
 
 **Allowed (NEW/edited)** — the view/wizard/security/test files below are under
-`addons/shopify_connector_fulfillment/`; the four `docs/…` deliverables at the end
+`addons/shopify_connector_fulfillment/`; the five `docs/…` deliverables at the end
 are **repo-root** paths (not under the addon):
 `views/shopify_connector_fulfillment_menus.xml`,
 `views/shopify_connector_store_settings_fulfillment_views.xml`,
@@ -57,7 +57,9 @@ transitively resolved),
 `tests/test_ui_tours.py`, `static/tests/**` (only if a tour bundle is needed),
 `docs/06-prompts/ui-u1-copy-deck.md`,
 `docs/05-qa/ui-u1-validation-results.md`,
-plus AR-log append + handoff + program-state top entry.
+`docs/05-qa/architecture-review-log.md` (append one AR row),
+`docs/01-research/research-handoff.md` (top entry),
+`docs/07-implementation-plan/mvp-program-state.md` (Wave 5/U1 row).
 
 **Forbidden:** any `models/**` business file (the mode-switch wizard is a NEW
 `wizards/**` TransientModel, not a `models/**` file, and `models/__init__.py` must

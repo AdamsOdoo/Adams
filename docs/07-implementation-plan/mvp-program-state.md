@@ -10,7 +10,7 @@
 
 | Item | Current state |
 | --- | --- |
-| Program integration | `mvp/program-integration@3a1afa43f8d07a7dae1799968273fa0ab8049490` is the live tip after accepted governance PR #202 (`8b2c19a`) and runtime-accepted Wave-4 backend PR #189 (`3a1afa43`). `sol/pre-wave-5-stabilization` branches from this exact SHA. |
+| Program integration | **`mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` is the live tip** (D10 closure, 2026-07-25), after pre-Wave-5 stabilization PR #203 (`2583081f`) and Wave 5 U1 Gate-A docs PR #194 (merge `87f1763a`, accepted head `80fbb523`). Earlier tips `3a1afa43` (PR #189/#202) and `2583081f` are historical. Exact-base CI: Actions run [`30177207908`](https://github.com/AdamsOdoo/Adams/actions/runs/30177207908) `success` on `87f1763a` — DEC-041 D8 **supporting** evidence only; Odoo.sh remains the Tier-1 authority. Full gate state: [`wave-5-completion-gate-state.md`](./wave-5-completion-gate-state.md). |
 | Wave 1 | Accepted, runtime-green, merged via PR #172 (`d18f9a9`); exact-head build `34986844`. |
 | Wave 2 | Accepted, runtime-green, merged via PR #176 (`22bfb9a`); runtime-tested `63607dd`, build `35100725`, 728/728 and 86/86 Wave-2 methods green. |
 | Wave 3 Stage 0 | Accepted, runtime-green, merged via PR #178 (`e48cfb1`); build `35145929`, 825/825. External process harness was explicitly infrastructure-deferred, not claimed executed. |
@@ -18,7 +18,7 @@
 | U0 | Accepted, runtime-verified, merged via PR #192 (`8818c77`); exact head `a13f672`, build `35308219`, U0/Test Connection 67/67, sale 194/194, inventory 247/247. Driven browser/visual evidence remains deferred to UAT/release readiness. |
 | Wave 4 Gate A | Accepted and merged via PR #188 (`01f072d`). |
 | Wave 4 Gate B | [PR #189](https://github.com/AdamsOdoo/Adams/pull/189) is backend-accepted and merged at `3a1afa43f8d07a7dae1799968273fa0ab8049490`. Runtime-tested implementation candidate `25639f17`, Odoo.sh build `35422036`, [runtime record 5074529652](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5074529652), and [independent acceptance 5077119326](https://github.com/AdamsOdoo/Adams/pull/189#issuecomment-5077119326) remain authoritative. The post-runtime head added only two accepted tracker files and no `addons/**` or test change. Live Shopify Gate D/CV-013 is deferred until the Wave-5 implementation candidate freezes; it remains open and unclaimed. |
-| Wave 5 | U1 Gate-A [PR #194](https://github.com/AdamsOdoo/Adams/pull/194) is **open/draft/unmerged**, **re-anchored 2026-07-25** from its frozen head `b38e687` onto the current integration tip `2583081f97c94428dfd10325589b1b891eea240b` via an ordinary merge commit (parents `b38e6874` + `2583081f`; no rebase, no force-push), plus exactly one bounded documentation reconciliation commit, per the binding dependency-freeze ruling [`5058829593`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5058829593). The pre-Wave-5 stabilization gate has closed (PR #203 merged; SEC-2 #196 closed), so the transfer condition is satisfied. Unsupported “Delivered” is **suppressed**: it is neither claimed, displayed nor offered by the U1 contract, and the two fulfillment/tracking prototypes now carry a binding suppression annotation marking their “Delivered” chips as illustrative-only. The reconciliation re-verified the whole U1 backend contract against the actual source at `2583081f` (delta table: `u1-backend-ui-contract-inventory.md` §0.1) — notably `review_reason` is now **21** values, and SEC-3 added `company_id` + `sec3_scope_quarantined` to every U1-visible model (acceptance A23). Scope held to exactly the same 24 `docs/**` paths; no `addons/**` change. **A fresh independent Gate-A review is still required; PR #194 is not accepted, not ready-marked, not merged; no Wave-5 implementation is authorized yet.** |
+| Wave 5 | U1 Gate-A [PR #194](https://github.com/AdamsOdoo/Adams/pull/194) is **CLOSED — MERGED** (2026-07-25T22:15:01Z) at accepted head `80fbb523`, merge commit **`87f1763a`**, under independent review [`5080722794`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080722794) (`INDEPENDENT U1 GATE-A ACCEPT`; no P0/P1/material P2; five P3 deferred), control-room acceptance [`5080795232`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080795232) and merge record [`5080798692`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080798692). Merged scope: 24 paths, all `docs/**`; no `addons/**`. Accepted **only as the U1 Gate-A documentation package**: **D-P0-3 is accepted for implementation**, OQ-4/OQ-5 resolved non-blocking, and unsupported “Delivered” remains **suppressed**. **G5-1…G5-9 remain unchecked; no U1 implementation is authorized, begun or claimed; the U1 implementation base was left unbound by the merge.** Per-gate evidence-derived state, the D10 closure record and the residual U1 blockers are in [`wave-5-completion-gate-state.md`](./wave-5-completion-gate-state.md). |
 | Release dependencies | Pre-Wave-5: warm-update fixtures #193/#157, inventory residue #198, SEC-2 #196, current-backend SEC-3 #197, external multiprocessing/lifecycle proof, minimal CI/full-suite, and pre-Wave-5 PERF-0 #199 baseline. Post-Wave-5 external package: Shopify provisioning #200, Gate D/CV-013 #185/#186, Wave-5 live scenarios, UI-delta SEC-3, performance comparison, UAT and product-owner release sign-off. |
 | Wave 6 / release | Not started; no UAT or release acceptance claim. |
 
@@ -234,8 +234,16 @@ Official Shopify documentation checks, schema/contract validation, automated tes
 
 ### Frozen until stabilization closes
 
-- PR #194 remains untouched and frozen.
-- No Wave-5 implementation branch or implementation PR is authorized.
+> **SUPERSEDED 2026-07-25 (D10 closure).** Stabilization closed with PR #203
+> (`2583081f`) and PR #194 has since been accepted and **merged** (`87f1763a`).
+> The first bullet below is historical. Current state:
+> [`wave-5-completion-gate-state.md`](./wave-5-completion-gate-state.md).
+
+- ~~PR #194 remains untouched and frozen.~~ **Merged 2026-07-25 at `87f1763a`.**
+- No Wave-5 implementation branch or implementation PR is authorized. **Still
+  current:** the U1 gate remains closed on G5-4 (PERF-1 packet not accepted) and
+  on the absence of an explicit control-room act opening the U1 gate. The
+  implementation base is now **bound to `87f1763a`** by product-owner instruction.
 - “Delivered” must not be exposed until a real backend seam is separately authorized, implemented, and independently proven.
 - No UAT or release-readiness claim is authorized.
 
@@ -279,10 +287,26 @@ If schedule slips, use these levers in order:
 
 ## 8. Next actions
 
-1. Open the single draft pre-Wave-5 stabilization PR from `sol/pre-wave-5-stabilization`.
-2. Execute the non-Shopify debt workstreams in the order recorded in §5, with exact-SHA runtime and independent acceptance.
-3. Keep #185/#186/#200 open and make no Shopify request or mutation.
-4. After stabilization merges, freeze the new integration SHA, transfer PR #194 path-by-path, suppress unsupported “Delivered”, and start one Wave-5 implementation PR.
+> **Refreshed 2026-07-25 (D10 closure).** Items 1, 2 and 4 of the previous list are
+> **done**: the stabilization PR opened, executed and merged (PR #203, `2583081f`),
+> and PR #194 was accepted and merged (`87f1763a`) with “Delivered” suppressed.
+
+1. **Control-room act — open or explicitly re-sequence the Wave 5 gates.** Per
+   [`wave-5-completion-gate-state.md`](./wave-5-completion-gate-state.md) §4, six of
+   the nine gates are substantively earned by merged, independently accepted
+   evidence and need only a check; **G5-4** (PERF-1 packet) and **G5-5** (export
+   PDs) are genuinely unearned and need acceptance acts no worker may perform.
+   G5-5 gates Task 015/015B only, not U1.
+2. **Decide the G5-7 authority question:** whether the exact-base Actions run
+   `30177207908` (`success` on `87f1763a`) satisfies "SEC-1 intact at the Wave 5
+   base", or an exact-SHA Odoo.sh run at `87f1763a` is required.
+3. **Then, and only then, authorize U1 implementation** at the bound base
+   `87f1763a`. The locked prompt is otherwise ready: its base is bound and its
+   backend contract is proven to hold at that base by `addons/` tree identity with
+   `2583081f`.
+4. Assign an owner to the **MVP PII-simplification** obligation, which is a
+   separate item from #196 and is currently tracked by no issue.
+5. Keep #185/#186/#197/#199/#200 open and make no Shopify request or mutation.
 
 
 ## 9. Wave-boundary calibration template

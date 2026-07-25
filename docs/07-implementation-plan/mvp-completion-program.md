@@ -54,11 +54,13 @@ The MVP still includes:
 
 Confirmed excluded from this MVP remain: payout reconciliation; advanced refunds/accounting automation; Shopify Markets; subscriptions; gift cards; POS; B2B; metafields; advanced analytics; app-store packaging; complex multi-company; broad multi-store orchestration.
 
-### D10 synchronized state — 2026-07-25
+### D10 synchronized state — 2026-07-25 (post-merge closure)
 
-- `mvp/program-integration@3a1afa43f8d07a7dae1799968273fa0ab8049490` contains accepted governance PR #202 and the backend-accepted Wave-4 PR #189.
-- Wave-4 runtime evidence remains tied to implementation candidate `25639f17be14b30a52a8453f0813aa0b764de310`, Odoo.sh build `35422036`; the later two-file reconciliation changed trackers only and no `addons/**` or test path.
-- Wave 5 has not started. `sol/pre-wave-5-stabilization` must close all inherited non-Shopify debt before PR #194 is transferred or U1 implementation begins.
+- **`mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` is the live tip.** It is the ordinary merge commit of Wave 5 U1 Gate-A [PR #194](https://github.com/AdamsOdoo/Adams/pull/194) (accepted head `80fbb523`) onto pre-Wave-5 stabilization [PR #203](https://github.com/AdamsOdoo/Adams/pull/203) (`2583081f`). Earlier tips `3a1afa43` (PR #202 + PR #189) and `2583081f` are historical.
+- PR #194 merged docs-only — 24 paths, every one under `docs/**`, zero `addons/**` — under independent review [`5080722794`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080722794), acceptance [`5080795232`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080795232) and merge record [`5080798692`](https://github.com/AdamsOdoo/Adams/pull/194#issuecomment-5080798692).
+- Wave-4 runtime evidence remains tied to implementation candidate `25639f17be14b30a52a8453f0813aa0b764de310`, Odoo.sh build `35422036`; the later reconciliations changed trackers and docs only, and no `addons/**` or test path. The `addons/` tree is byte-identical at `2583081f` and `87f1763a`.
+- Inherited non-Shopify stabilization debt closed through PR #203; SEC-2 #196 is closed. **Issues #197 (SEC-3) and #199 (PERF-0 thresholds) remain open.**
+- **Wave 5 implementation has not started and is not authorized.** U1 Gate-A planning is accepted and merged, but G5-1…G5-9 remain unchecked — G5-4 (PERF-1 packet) and G5-5 (export PDs) are genuinely unearned. Per-gate evidence-derived state and the residual U1 blockers: [`wave-5-completion-gate-state.md`](./wave-5-completion-gate-state.md).
 - Live Shopify Gate D/CV-013 and provisioning issues #185/#186/#200 are deferred until the Wave-5 implementation candidate is complete and frozen. They remain open and unclaimed; no external UAT or release-readiness claim exists.
 
 ## 4. Risk-tiered review model
