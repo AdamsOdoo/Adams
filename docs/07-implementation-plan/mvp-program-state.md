@@ -143,6 +143,24 @@ cover, SEC-3 classified the control-plane leak as neutral instead of closing it,
 and PERF-0 mislabelled execution time as lock wait. All findings are corrected on
 the same PR #203, with no rebase and no force-push.
 
+**Second correction round — 2026-07-25 (evidence integrity).** The control room
+reviewed `156a4a7` and returned three confirmed evidence-integrity gaps, all now
+corrected on the same PR #203 with no rebase and no force-push:
+
+| Gap | Correction |
+| --- | --- |
+| **Actions run 30153827606 was not exact-head evidence.** It succeeded (1504 fresh, 1504 warm, 18 non-standard) but its artifact recorded `connector_sha: 60ea6690…` — GitHub's synthetic PR *merge* commit, not head `156a4a74…`. Classified **EXECUTED — PASS ON SYNTHETIC PR MERGE REF; NOT EXACT-HEAD EVIDENCE**; its results are retained, not discarded, and not called failed. | The workflow checks out `github.event.pull_request.head.sha`; the runner verifies its checkout against the declared source head and **aborts** rather than publishing a mismatch; the artifact records tested checkout SHA, source head, base, event, worktree state, Odoo SHA, Python and PostgreSQL versions. |
+| **PERF-0 residue claims excluded business fixtures.** Partners, product templates, generated variants, sale orders and lines were created and never captured, deleted or verified. Two further layers surfaced on the first honest teardown: 350 mutation attempts and 7 jobs per scenario created by *production* paths, and 50 `product.value` valuation rows per scenario created as a side effect. | Every row tracked by exact id; rows above a pre-run per-table watermark adopted (a watermark cannot reach a pre-existing row); FK-safe child-before-parent teardown; absence re-verified from a new transaction; a whole-database `id > watermark` sweep that no future fixture can escape; **two full passes in the same database**, second starting from the identical baseline. |
+| **PERF-0 labels and contention overstated.** Three scenarios named `*_scan` performed a `search` and a `read`. The contention measurement blocked with raw SQL `FOR UPDATE`, a path the connector never takes. | Renamed `*_projection`; the real network-free cron admission paths added as separate scenarios; the **production** claim path (`_claim_for_dispatch` → `try_lock_for_update` → `FOR UPDATE SKIP LOCKED`) exercised against a held row, its **no-wait** behaviour reported as the production result; the raw blocking experiment retained and relabelled `database lock calibration`. |
+| **SEC-3 tests described more coverage than they performed**, and same-**store** agreement was unenforced on five relations. | One authoritative inventory drives every test; a completeness guard fails on any uncovered durable store-scoped model or undeclared connector relation; `shopify.connector.scope.mixin` adds ORM constraints for new rows and a non-guessing quarantine for historic ones. |
+
+**Still open after this round:** exact-SHA Odoo.sh runtime, a first exact-head
+green Actions run observed on the corrected head, and independent Tier-1 review.
+Issues #157, #193, #196, #197, #198 and #199 all remain open. #199 in particular
+stays open because the per-record reconciliation **handlers** perform Shopify
+reads and cannot be measured by any local harness; no fake transport was
+introduced to manufacture a number.
+
 ### Shopify-only deferred package
 
 The 2026-07-25 product-owner ruling defers only validation requiring a live Shopify store, credential, API request, or mutation until the Wave-5 implementation candidate is complete and frozen. Issues #185, #186, and #200 remain open. Gate D/CV-013, applicable Wave-5 live scenarios, external UAT, and release readiness are not waived or claimed.

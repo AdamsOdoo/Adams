@@ -274,6 +274,70 @@ bind a business record of its own company, enforced on create and on write, and
 under `sudo()`**. Verified directly:
 `test_sudo_does_not_let_an_interactive_caller_widen_company`.
 
+## 4.5 Relational closure — same-STORE agreement (2026-07-25 correction)
+
+Company equality is not sufficient for a row that points at another connector
+row, because **one Odoo company may own several Shopify stores**. Two stores in
+one company pass every company check while being two different shops. A record
+rule cannot express the requirement at all: a domain cannot compare two of a
+record's own fields, so there is no `('store_id', '=', 'job_id.store_id')` to
+write.
+
+`shopify.connector.scope.mixin` closes it in two parts:
+
+* **New and updated rows** — an `@api.constrains` per model, calling
+  `_sec3_check_parent_scope()`. A constraint, not a rule, because constraints
+  fire under `sudo()` and every connector write path uses `sudo()` somewhere.
+* **Historic rows** — an `init()`-time sweep that sets `sec3_scope_quarantined`,
+  which every fail-closed rule now excludes. It **never guesses**: re-homing the
+  row to its parent's store, or the parent to the row's, are both plausible and
+  both destructive. The ids are logged, the rows are hidden, nothing is moved.
+  `action_sec3_release_scope_quarantine` is the Administrator-gated remediation,
+  and it re-runs the check before clearing rather than trusting the caller.
+
+### Relation-by-relation result
+
+| Relation | Status before | Now |
+| --- | --- | --- |
+| `job.mutation_attempt_id` | already constrained | declared, so the historic sweep covers it too |
+| `job.superseded_by_job_id` | **unconstrained** | constrained + swept. *Found by the new completeness guard, not by reading the model* |
+| `job.log.job_id` | structurally closed | recorded — `store_id` is `related('job_id.store_id')`, so it cannot disagree |
+| `mutation.attempt.job_id` | structurally closed | recorded — same reason |
+| `product.variant.binding.product_template_binding_id` | **unconstrained** | constrained + swept |
+| `inventory.level.binding.product_variant_binding_id` | already constrained | declared, swept |
+| `inventory.level.binding.location_mapping_id` | already constrained | declared, swept |
+| `fulfillment.binding.order_binding_id` | already constrained | declared, swept |
+| `evidence.order_binding_id` | **unconstrained** | constrained + swept |
+| `evidence.fulfillment_binding_id` | **unconstrained** | constrained + swept |
+| `evidence.line.evidence_id` | structurally closed | recorded — `company_id` is related through this very field |
+| `evidence.line.sale_line_id` | **unconstrained** | constrained on the COMPANY axis (a sale order has no store); a historic mismatch quarantines the parent evidence, so the observation and its ledger stay hidden together |
+| `call.lease.job_id` | — | **not closable**: it is an `Integer`, not a `Many2one`, so there is no FK to check. Recorded as D-33 for the Wave-5 schema review |
+
+Two things are stated plainly rather than glossed:
+
+1. **Five relations were genuinely open** — variant→template binding,
+   evidence→order binding, evidence→fulfillment binding, evidence line→sale
+   line, and `job.superseded_by_job_id`. The rest were already closed, or
+   closed by construction. Claiming twelve new protections would overstate what
+   changed.
+2. **`order.binding.fulfillment_binding_id` does not exist.** An earlier draft
+   of this audit listed it. The relation runs the other way —
+   `fulfillment.binding.order_binding_id` — and was already constrained.
+
+### What the completeness guard enforces
+
+`TestSec3InventoryCompleteness` fails when:
+
+* a durable store-scoped model exists in the registry with no entry in the test
+  inventory (so a new model cannot be added without a fixture and both a
+  positive and a negative proof);
+* a covered model has no `company_id`, or its company rule is not global, or the
+  rule contains a `company_id = False` escape hatch;
+* a connector-to-connector `Many2one` exists that no `_sec3_parent_scope_relations`
+  declaration covers, and that is not on the recorded structurally-safe list;
+* the field that makes a "structurally safe" relation safe stops being a
+  `related` field.
+
 ## 5. `sudo()` seam classification — 177 call sites, re-audited against the store-company root
 
 Every `sudo()` in connector production code was re-examined against the question
