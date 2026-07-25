@@ -1,0 +1,122 @@
+# Minimal install-and-run-suites CI, authorised by DEC-041 D8.
+#
+# Deliberately thin. All real logic lives in tools/run_connector_suite.sh so the
+# exact same command runs on a laptop and here; CI that cannot be reproduced
+# locally is how CI and reality drift apart.
+#
+# Scope and limits, stated in the file so they cannot be quoted out of context:
+#   * NO Shopify credentials, secrets, requests, or mutations. This workflow
+#     declares no secrets and the suite script has no Shopify code path.
+#   * This is SUPPORTING evidence. Until equivalence is separately proven, the
+#     exact-SHA Odoo.sh run remains the Tier-1 acceptance authority (DEC-041 D8).
+#     A green run here is not wave acceptance and must never be recorded as one.
+#   * Both a fresh install and a warm `-u` update run, because issue #193 proved
+#     a green fresh install says nothing about the warm path.
+
+name: Connector test suite
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - Shopify-connector
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: connector-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    name: Odoo 19 install + full connector suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        # 16.x matches the Odoo.sh baseline recorded in issue #193.
+        image: postgres:16
+        env:
+          POSTGRES_USER: odoo
+          POSTGRES_PASSWORD: odoo
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: odoo
+      PGPASSWORD: odoo
+      ODOO_REF: '19.0'
+      ARTIFACT_DIR: ${{ github.workspace }}/ci-artifacts
+
+    steps:
+      - name: Check out the connector
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          # 3.12 is Odoo 19's Noble target; its requirements.txt splits its
+          # pin set on exactly this version.
+          python-version: '3.12'
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            libxml2-dev libxslt1-dev libsasl2-dev libjpeg-dev \
+            libpq-dev postgresql-client
+
+      - name: Cache the Odoo source checkout
+        uses: actions/cache@v4
+        with:
+          path: .odoo-src
+          key: odoo-src-${{ env.ODOO_REF }}
+
+      - name: Run the connector suite
+        run: |
+          chmod +x tools/run_connector_suite.sh
+          tools/run_connector_suite.sh
+
+      - name: Publish durable artifacts
+        # Always: a failing run is exactly when the logs are worth keeping.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connector-suite-${{ github.sha }}
+          path: |
+            ci-artifacts/*.log
+            ci-artifacts/summary.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Summarise into the job page
+        if: always()
+        run: |
+          {
+            echo '## Connector suite'
+            echo
+            echo "Connector SHA: \`${{ github.sha }}\`"
+            echo
+            if [ -f ci-artifacts/summary.json ]; then
+              echo '```json'
+              cat ci-artifacts/summary.json
+              echo '```'
+            else
+              echo '_No summary produced -- the suite failed before it could write one._'
+            fi
+            echo
+            echo '> Supporting evidence only. Exact-SHA Odoo.sh remains the Tier-1'
+            echo '> acceptance authority under DEC-041 D8. No Shopify operation occurs here.'
+          } >> "$GITHUB_STEP_SUMMARY"
