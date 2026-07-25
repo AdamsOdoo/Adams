@@ -12,27 +12,68 @@
             <field name="category_id" ref="module_category_shopify_connector"/>
         </record>
 
+        <!--
+            SEC-2 (issue #196) role layer, method Option M-A: purely ADDITIVE
+            `implied_ids`. Two customer-facing roles are exposed on the user
+            form; the four legacy capability groups stay exactly where they are
+            as server-side authorization primitives, keep their XML IDs, and are
+            never renamed. Every existing `has_group` check and ACL row keeps
+            working unchanged because Odoo 19 resolves group membership through
+            the transitive closure:
+            `res.users.all_group_ids = group_ids.all_implied_ids`
+            (odoo/odoo@19.0 30bde9ff, odoo/addons/base/models/res_users.py
+            L447-L449), and `res.groups.all_implied_ids` is "the group itself
+            with all its implied groups" (base/models/res_groups.py L71-L73).
+
+            Customer-facing (carry `privilege_id`, so the user form shows a
+            two-entry selector; Odoo 19 builds the selector from
+            `res.groups.privilege.group_ids`, base/models/res_groups.py
+            L343-L352, so a group WITHOUT a privilege is not offered there):
+
+              User          -> Operator, Reviewer  (=> Auditor transitively)
+              Administrator -> User                (=> everything)
+
+            Server-side primitives (no `privilege_id`, hidden from the form):
+            Auditor, Operator, Reviewer.
+        -->
+
         <record id="group_shopify_connector_auditor" model="res.groups">
             <field name="name">Auditor</field>
-            <field name="privilege_id" ref="privilege_shopify_connector"/>
+            <!-- SEC-2: hidden capability primitive. Explicit False is required:
+                 an update only writes fields present in the record, so omitting
+                 the field would leave the old privilege in place. -->
+            <field name="privilege_id" eval="False"/>
         </record>
 
         <record id="group_shopify_connector_operator" model="res.groups">
             <field name="name">Operator</field>
-            <field name="privilege_id" ref="privilege_shopify_connector"/>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('group_shopify_connector_auditor'))]"/>
         </record>
 
         <record id="group_shopify_connector_reviewer" model="res.groups">
             <field name="name">Reviewer</field>
-            <field name="privilege_id" ref="privilege_shopify_connector"/>
+            <field name="privilege_id" eval="False"/>
             <field name="implied_ids" eval="[(4, ref('group_shopify_connector_auditor'))]"/>
         </record>
 
+        <!-- SEC-2 Connector User: the NEW customer-facing role. It grants no
+             access of its own; every right arrives through the implied closure,
+             which is what keeps this change purely additive. -->
+        <record id="group_shopify_connector_user" model="res.groups">
+            <field name="name">User</field>
+            <field name="privilege_id" ref="privilege_shopify_connector"/>
+            <field name="implied_ids" eval="[(4, ref('group_shopify_connector_operator')), (4, ref('group_shopify_connector_reviewer'))]"/>
+        </record>
+
+        <!-- SEC-2 Connector Administrator: the EXISTING administrator group,
+             re-purposed as the second customer-facing role. XML ID unchanged.
+             Operator/Reviewer stay in `implied_ids` so the closure is identical
+             if the User group is ever removed from the chain. -->
         <record id="group_shopify_connector_admin" model="res.groups">
             <field name="name">Administrator</field>
             <field name="privilege_id" ref="privilege_shopify_connector"/>
-            <field name="implied_ids" eval="[(4, ref('group_shopify_connector_operator')), (4, ref('group_shopify_connector_reviewer'))]"/>
+            <field name="implied_ids" eval="[(4, ref('group_shopify_connector_user')), (4, ref('group_shopify_connector_operator')), (4, ref('group_shopify_connector_reviewer'))]"/>
         </record>
 
     </data>
