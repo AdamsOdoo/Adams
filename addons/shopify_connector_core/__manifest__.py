@@ -78,6 +78,10 @@ later, separately authorized tasks.
             'shopify_connector_core/static/src/xml/shopify_connector_dashboard.xml',
             'shopify_connector_core/static/src/js/shopify_connector_dashboard.js',
             'shopify_connector_core/static/src/js/tours/shopify_connector_u0_tour.js',
+            # U2 lives in core because the surfaces it walks belong to four
+            # different addons and a tour can only be registered once; core is
+            # the only module all four depend on.
+            'shopify_connector_core/static/src/js/tours/shopify_connector_u2_tour.js',
         ],
         'web.assets_unit_tests': [
             'shopify_connector_core/static/tests/shopify_connector_dashboard.test.js',

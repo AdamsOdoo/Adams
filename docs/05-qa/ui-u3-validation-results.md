@@ -67,18 +67,26 @@ the harness could not have produced a pass.
 
 ```
 odoo-bin ... --test-enable --test-tags /shopify_connector_product_export:TestU3ExportTours,/shopify_connector_core:TestUiTours
-0 failed, 0 error(s) of 4 tests
+0 failed, 0 error(s) of 5 tests
 ```
 
 | Tour | Covers |
 | --- | --- |
 | `shopify_connector_u0_nav_tour` | **Inherited, now passing.** Dashboard → Stores → Sync Center → Error & Review Center → Logs |
+| `shopify_connector_u2_nav_tour` | **New — U2 had no browser evidence at all.** Orders workspace → COD reconciliation → customer matching → product matching → variant matching → inventory workspace → first-push guard → location mapping |
 | `shopify_connector_u3_export_nav_tour` | All five U3 export surfaces render: Export Previews, Exported Media, Reconnect and Backfill, Export Settings, Export Diagnostics |
 | `shopify_connector_u3_export_review_tour` | Opens the Owl diff on a seeded preview and asserts the **refusal section** and the **enumerated tag removals** are on screen, and the confirm control is present for a reviewer |
 | `shopify_connector_u3_export_keyboard_tour` | The export action takes keyboard focus **and matches `:focus-visible`**, so a focus ring that exists only in the stylesheet fails |
 
 `[Fact]` The review tour deliberately **does not click confirm**. Confirming
 enqueues a real apply job, and a tour must not leave a queued mutation behind.
+
+`[Fact]` The U2 tour is **read-only by construction**: every step opens a menu
+or asserts that a list rendered. No step clicks a control that writes, enqueues
+a job or contacts Shopify, so it leaves no residue. It also found a real
+navigation fact that a server-side test would not have: **Customer Matching is
+parented to the *Catalog* branch, not Orders**, even though the menu is
+declared in the sale addon.
 
 ### 4.2 HOOT unit suite
 
@@ -146,6 +154,11 @@ the same user, state and expiry.
    to resolve the import.
 7. **No `ui-u2-copy-deck.md`.** The U2 surfaces carry their copy inline with
    no deck. A genuine gap in the U2 record; not closed here.
+8. **U2's browser evidence is navigational only.** The new U2 tour proves
+   every U2 surface renders and is reachable; it does **not** exercise the
+   U2 *action* controls (order review, COD reconcile, matching resolve),
+   because those write and a tour that leaves state behind is worse than no
+   tour. Those remain for the driven runtime campaign with seeded fixtures.
 
 ---
 

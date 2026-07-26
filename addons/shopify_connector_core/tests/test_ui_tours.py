@@ -23,3 +23,26 @@ class TestUiTours(HttpCase):
             groups='base.group_user,shopify_connector_core.group_shopify_connector_auditor',
         )
         self.start_tour('/odoo', 'shopify_connector_u0_nav_tour', login='u0_tour_auditor')
+
+    def test_u2_navigation_tour(self):
+        """The U2 domain surfaces, driven in a browser.
+
+        U2 shipped with server-side visibility and wiring tests and NO
+        driven-browser evidence, which its own acceptance matrix requires.
+        This walks orders, COD reconciliation, customer matching, product and
+        variant matching, the inventory workspace, the first-push guard and
+        location mapping.
+
+        It is read-only: every step opens a menu or asserts a list rendered.
+        No step clicks a control that writes, enqueues a job or contacts
+        Shopify, so it leaves no residue.
+        """
+        new_test_user(
+            self.env,
+            login='u2_tour_user',
+            password='u2_tour_user',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_user',
+        )
+        self.start_tour('/odoo', 'shopify_connector_u2_nav_tour',
+                        login='u2_tour_user')
