@@ -244,14 +244,47 @@ establishes that the environment is faithful rather than merely green.
 
 ### 8.1 Results at the frozen head
 
-*Filled in from `ci-artifacts/summary.json` at the final commit — see the PR
-push record for the exact SHA and the verbatim result lines.*
+`[Fact — EXECUTED at exactly `7554fe1445dae5fb9ae92692efc40bb38d40972e`,
+declared and VERIFIED (`source_head_verified: true`), worktree clean
+(`connector_worktree_dirty: false`), Odoo pin verified
+(`odoo_pin_verified: true`), `shopify_operations: "none"`.]`
 
-| Pass | Result |
+| Pass | Verbatim result line |
 | --- | --- |
-| Fresh install + standard | see summary |
-| Warm `-u` update + standard | see summary |
-| Non-standard tag suite | see summary |
+| Fresh install + standard | `0 failed, 0 error(s) of 1707 tests when loading database 'connector_fresh_17541'` |
+| Warm `-u` update + standard | `0 failed, 0 error(s) of 1707 tests when loading database 'connector_warm_17541'` |
+| Non-standard tag suite | `0 failed, 0 error(s) of 19 tests when loading database 'connector_nonstandard_17541'` |
+
+**Both standard passes matter and neither substitutes for the other** (issue
+#193): a fresh install can be green while `-u` fails, because a required column
+contributed by a module outside the connector's dependency closure already
+exists in PostgreSQL but is not yet in the registry at `at_install` time.
+
+**1707 vs the 1616 baseline: +91 tests.** 86 are the new module's own; the rest
+are the API-version enforcement additions in core (endpoint construction,
+pre-send refusal, missing header, and the shared-transport-helper guard
+assertion) plus the test-connection missing-header case. **Four accepted
+assertions were replaced rather than added**, so the delta is not a pure
+addition and §2.1 names each one.
+
+### 8.2 The runner's own guard caught an error in this session
+
+`[Fact]` The first attempt at this final run passed a **wrong** full SHA — an
+abbreviated hash expanded incorrectly — and `run_connector_suite.sh` **refused
+to run**:
+
+```
+FATAL: checked-out commit 7554fe1445dae5fb9ae92692efc40bb38d40972e is not the
+       intended source head 7554fe1c5e6ce5a3d0a5b0f52a3f0e39cd0a4e2f
+Refusing to run. ... every artifact this run produced would describe the wrong
+commit.
+```
+
+`[Inference]` Recorded because it is direct evidence that the guard works on a
+real mistake rather than only in principle. That check exists because Actions
+run `30153827606` published `connector_sha: 60ea6690…` for a PR whose head was
+`156a4a74…`; it has now also stopped a hand-run local campaign from publishing
+a summary naming a commit that does not exist.
 
 **Evidence class: DEC-041 D8 supporting evidence, NOT Odoo.sh acceptance.**
 Until equivalence is separately proven, the exact-SHA Odoo.sh run remains the

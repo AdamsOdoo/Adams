@@ -8,6 +8,19 @@
 > **Wave 5 is not complete.** Four of its seven stages are delivered. §6
 > states exactly what is not, and why, without dressing either reason as the
 > other.
+>
+> **Continuation, 2026-07-26 — this record is not the whole of Wave 5 any
+> more.** A subsequent batch on `claude/wave-5-completion-cont-e1hunz`
+> delivered Task 015, Task 015B, centralized fail-closed API-version
+> enforcement, and U3 **partially**, under the consolidated continuation ruling
+> of the same date. That ruling **supersedes** §6's `X-EXPORT-0` blocking
+> disposition: the export design no longer depends on the unresolved
+> `productSet` omitted-list boundary, so the boundary no longer gates
+> implementation. **Nothing below is rewritten** — its findings were correct on
+> their own evidence and at their own time. The continuation's own evidence is
+> [`task-015-015b-u3-validation-results.md`](task-015-015b-u3-validation-results.md),
+> and the source basis is
+> [`task-015-export-source-verification-2026-07-26-addendum.md`](task-015-export-source-verification-2026-07-26-addendum.md).
 
 ---
 
