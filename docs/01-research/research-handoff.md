@@ -1,3 +1,79 @@
+### Wave 5 U3 completion and candidate freeze (2026-07-26)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a` and the required starting head `9cfc013`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  The branch-recovery problem recorded in the previous entry is **closed**:
+  this session pushed directly to `fable/wave-5-completion`, and the recovery
+  source `claude/wave-5-completion-cont-e1hunz` was left untouched at
+  `9cfc013` as a read-only checkpoint.
+- **Authorization:** the 2026-07-26 product-owner instruction assigning this
+  session the Wave 5 completion-worker role. **Conflict flagged, not resolved
+  unilaterally:** CLAUDE.md's 2026-07-25 role-model supersession makes Claude
+  the *independent reviewer* "unless a dated product-owner instruction
+  explicitly assigns a separate Claude session another role". This session
+  read the instruction as exactly that assignment and proceeded as worker
+  only — it reviewed nothing of its own and accepted nothing.
+- **Delivered:** the adversarial review of the recovered Task 015/015B
+  implementation and its corrections · the U3 completion slice (S7 Owl diff
+  surface, S25/S26 reconnect/backfill, S31 diagnostics, copy deck, polish) ·
+  **executed** browser and HOOT evidence · records reconciliation.
+
+- **The two candidate defects worth carrying forward.**
+  1. **The blocking hold was not a hold.** `_handle_product_export_preview`
+     emptied `plan_steps` when a product tripped the option or variant
+     ceiling, then called the media planner and extended the same list. A
+     product whose shape the connector had already refused came back
+     `previewed` — not `blocked` — carrying an executable media step, and a
+     reviewer could confirm it. That is precisely the "safe half of a refused
+     payload" the code's own comment says must never be offered. The hold is
+     now the last word on the plan.
+  2. **`productUpdate` does alter list state**, and the record said otherwise
+     by omission. 2026-07: "Updating `tags` overwrites any existing tags that
+     were previously added to the product." The overwrite is deliberate and
+     kept — tags are Odoo-owned and `tagsAdd` would make the Odoo field a set
+     the connector can only ever grow — but a merchant tag disappearing behind
+     an unlabelled `from -> to` row is not disclosure. The removals are now
+     enumerated **by name** and rendered as an alert above everything else.
+
+- **The finding that outlives this wave `[Fact]`.** `websocket-client` was not
+  installed, so **every `HttpCase` browser test SKIPPED while the suite
+  reported `0 failed, 0 error(s)`.** A green run that proves nothing is the
+  most dangerous shape a result can take. Two merged tour/HOOT assets turned
+  out to be broken underneath it: **every tour in this repository timed out on
+  its first step** (Odoo 19 hides the `.o_app` tiles until the apps menu is
+  opened, so the U0 navigation tour could never have passed — now fixed and
+  passing), and **`shopify_connector_dashboard.test.js` has never executed**
+  and still fails to register (TD-009). Logged as **TD-010 (High)**: the
+  recommended fix is not just the dependency but making the canonical runner
+  **fail** when a browser test skips.
+
+- **NOT delivered, stated plainly:** no screenshot set, no measured contrast
+  ratio, no RTL or reduced-motion *visual* verification, no `ui-u2-copy-deck.md`,
+  and no repair of the U0 HOOT suite (TD-009). No Odoo.sh runtime, no live
+  Shopify operation of any kind, no independent review, no UAT.
+  `X-EXPORT-0` remains an **API-VERSION HARD STOP** — neither PASS nor FAIL —
+  and `M-EXP-1`..`M-EXP-20` remain outstanding.
+- **Evidence:** [`../05-qa/ui-u3-validation-results.md`](../05-qa/ui-u3-validation-results.md),
+  [`../07-implementation-plan/wave-5-completion-gate-state.md`](../07-implementation-plan/wave-5-completion-gate-state.md) §5e.1.
+- **Learning feedback loop.** The lesson is not "add a dependency". It is that
+  **a skipped test and a passing test are indistinguishable in a summary
+  line**, and this repository's evidence discipline had no guard against that
+  — while having strong guards against nearly everything else (frozen sudo
+  inventories, phase-contract tag checks, source-head verification). The gap
+  was in the one place the instrument measures itself. Every future browser-
+  evidence claim must quote the executed test count, not the failure count.
+- **Next session prompt.** *Independently review PR #204 at its frozen head
+  from scratch, per `docs/06-prompts/claude-mvp-wave-review-template.md`. Do
+  not reuse this session's reasoning. Read the exact base/head checkout, the
+  complete diff, the governing DECs and packets, the acceptance criteria, the
+  pinned Odoo 19 source, and the executed test output — and independently
+  re-verify the two candidate corrections above, the ownership matrix, and the
+  claim that no code path can delete merchant-owned state. Post the complete
+  report verbatim to the PR, stating the exact reviewed SHA. Do not
+  ready-mark, accept or merge.*
+
 ### Wave 5 completion continuation — Task 015, 015B, U3, API version (2026-07-26)
 
 - **Branch / PR:** `claude/wave-5-completion-cont-e1hunz`, continuing the work
