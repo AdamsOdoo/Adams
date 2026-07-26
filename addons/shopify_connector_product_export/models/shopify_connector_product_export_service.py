@@ -46,6 +46,29 @@ The complete-list workaround is also refused: echoing a full remote list
 back into a declarative input would make this module the author of state it
 cannot see (a metafield it never read, a collection added a second ago),
 which is the same defect wearing a different shape.
+
+The one list this module DOES replace, stated rather than omitted
+------------------------------------------------------------------
+
+The sentence above is about *merchant-owned* state, and reading it as
+"`productUpdate` cannot alter any list" would be wrong. `tags` is a list
+field, it is in the scalar allowlist, and 2026-07 is explicit: "Updating
+`tags` overwrites any existing tags that were previously added to the
+product. To add new tags without overwriting existing tags, use the
+`tagsAdd` mutation" (2026-07 reference, read 2026-07-26).
+
+That overwrite is deliberate and kept. Tags are declared Odoo-owned, and
+`tagsAdd` would reduce the Odoo field to a set the connector can only ever
+grow -- which is not ownership, and would leave an operator no way to remove
+a tag they had removed in Odoo. So confirming a tag change replaces the
+complete Shopify tag list, and a tag that exists only in Shopify is removed
+by it.
+
+What is NOT acceptable is that happening silently, so `diff.tag_replacement`
+enumerates the removals **by name** and the preview surface renders them as
+a first-class warning rather than an unlabelled `from -> to` row. This is
+the only place in the entire export where confirming a change removes
+something that exists on Shopify.
 """
 
 import hashlib
@@ -697,6 +720,20 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
 
         remote = read['product']
         scalar_changes = []
+        # The one Odoo-owned LIST. `tags` is a list field and 2026-07 is
+        # explicit about it: "Updating `tags` overwrites any existing tags
+        # that were previously added to the product. To add new tags without
+        # overwriting existing tags, use the `tagsAdd` mutation" (2026-07
+        # reference, read 2026-07-26). This connector deliberately keeps the
+        # overwrite -- DEC/PD-PX declares tags Odoo-owned, and `tagsAdd`
+        # would make the Odoo field a set of tags Odoo can only ever grow,
+        # which is not ownership. What must NOT happen is the overwrite going
+        # unstated: a merchant tag that exists only in Shopify disappears when
+        # a tag change is confirmed, and an unlabelled `from -> to` row does
+        # not say that. The removals are therefore enumerated by name.
+        removed_tags = sorted(
+            set(remote.get('tags') or []) - set(desired_scalars.get('tags') or [])
+        )
         for field_name, desired in sorted(desired_scalars.items()):
             current = remote.get(field_name)
             if field_name == 'tags':
@@ -784,12 +821,31 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                           ),
             })
 
+        tags_changing = any(
+            change['field'] == 'tags' for change in scalar_changes
+        )
         diff = {
             'scalars': scalar_changes,
             'variants_update': variant_plan['update'],
             'variants_create': variant_plan['create'],
             'remote_updated_at': read['updated_at'],
             'price_exported': include_price,
+            # The one Odoo-owned list replacement, said out loud. This is the
+            # single place in the whole export where confirming a change
+            # REMOVES something that exists on Shopify, so it is disclosed by
+            # name rather than left to be inferred from a `from -> to` row.
+            'tag_replacement': {
+                'applies': tags_changing,
+                'removed': removed_tags if tags_changing else [],
+                'resulting': sorted(desired_scalars.get('tags') or []),
+                'note': (
+                    'Confirming this export replaces the product\'s COMPLETE '
+                    'Shopify tag list with the Odoo list. Tags are '
+                    'Odoo-owned; any tag added in Shopify and absent from '
+                    'Odoo is removed. Nothing else in this export removes '
+                    'anything from Shopify.'
+                ),
+            },
             # Named explicitly so "not listed" can never be misread as
             # "not affected". These are the surfaces the connector does not
             # own and structurally cannot write.
@@ -1007,6 +1063,17 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'variants_update': [],
             'remote_updated_at': False,
             'price_exported': include_price,
+            # Present on both paths so the UI never has to branch on which
+            # one produced the diff. A product that does not exist yet has no
+            # tags to remove, so a create never removes one.
+            'tag_replacement': {
+                'applies': False,
+                'removed': [],
+                'resulting': sorted(desired_scalars.get('tags') or []),
+                'note': 'A new product is created with exactly the Odoo tag '
+                        'list. Nothing is removed, because nothing exists '
+                        'yet.',
+            },
             'untouched': {
                 'note': 'A newly created product is created DRAFT unless the '
                         'product says otherwise, and is never published as a '

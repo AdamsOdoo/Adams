@@ -6,3 +6,8 @@ from . import test_export_create_dedup
 from . import test_media_export_pipeline
 from . import test_export_sec3_and_permissions
 from . import test_export_source_guards
+# U3 operator surfaces: the read-only projection, then the browser tours that
+# drive the real client against it.
+from . import test_export_ui_projection
+from . import test_u3_export_tours
+from . import test_u3_hoot_suite

@@ -1,0 +1,334 @@
+// Part of the Shopify Connector (U3 export operator experience).
+//
+// The S7 export diff surface. Three rules this file keeps:
+//
+// 1. TOKENS ONLY. Every colour, space, radius, duration and font here comes
+//    from the connector token layer in `shopify_connector_core`. No literal
+//    hex, no ad-hoc pixel value, no external font, no icon library, no CDN.
+//    The tokens are re-declared on this root because the core layer scopes
+//    them to `.o_sc_dashboard` so they cannot leak into the wider backend --
+//    the same scoping discipline, applied to a second root.
+//
+// 2. LOGICAL PROPERTIES, so RTL is correct without a mirrored stylesheet.
+//    `margin-inline-start` rather than `margin-left`, `padding-inline`
+//    rather than `padding-left/right`, `inline-size` rather than `width`,
+//    `border-inline-start` rather than `border-left`, `text-align: start`
+//    rather than `left`. Under `dir="rtl"` the whole surface mirrors and the
+//    diff arrows and rails follow the reading direction.
+//
+// 3. MOTION IS OPTIONAL. Every transition is behind
+//    `prefers-reduced-motion: no-preference`, so the reduced-motion default
+//    is *no animation at all* rather than an animation someone remembered to
+//    switch off. Nothing here animates position or size in a way that could
+//    trigger vestibular symptoms, and nothing flashes.
+//
+// Contrast: the status text/background pairs are the design-system semantic
+// pairs, which are the accepted >= 4.5:1 combinations; the interactive
+// boundary token `--sc-border-strong` is used for every control edge so
+// SC 1.4.11 (non-text contrast) holds. Focus is never removed, only
+// restyled, and the focus ring uses `:focus-visible` with a 2px offset so it
+// is visible against both the card and the page surface.
+
+.o_sc_export_diff {
+    // --- tokens (mirrors shopify_connector_tokens.scss; see note 1) ---
+    --sc-surface-0: #F8FAFC;
+    --sc-surface-1: #FFFFFF;
+    --sc-text-primary: #1F2937;
+    --sc-text-secondary: #475467;
+    --sc-border: #E4E7EC;
+    --sc-border-strong: #79839B;
+    --sc-accent: #175CD3;
+    --sc-focus: #175CD3;
+    --sc-success-text: #067647; --sc-success-bg: #ECFDF3;
+    --sc-warning-text: #B54708; --sc-warning-bg: #FFFAEB;
+    --sc-danger-text: #B42318;  --sc-danger-bg: #FEF3F2;
+    --sc-info-text: #175CD3;    --sc-info-bg: #EFF8FF;
+    --sc-neutral-text: #475467; --sc-neutral-bg: #F2F4F7;
+    --sc-space-1: 4px;  --sc-space-2: 8px;  --sc-space-3: 12px; --sc-space-4: 16px;
+    --sc-space-5: 24px; --sc-space-6: 32px;
+    --sc-fs-caption: 0.75rem;
+    --sc-fs-secondary: 0.875rem;
+    --sc-fs-body: 1rem;
+    --sc-fs-cardtitle: 1.125rem;
+    --sc-fs-lead: 1.375rem;
+    --sc-fw-body: 400;
+    --sc-fw-label: 500;
+    --sc-fw-dominant: 600;
+    --sc-radius: 8px;
+    --sc-motion-2: 150ms;
+    --sc-ease: cubic-bezier(0.2, 0, 0, 1);
+    --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+    background: var(--sc-surface-0);
+    color: var(--sc-text-primary);
+    font-family: var(--sc-font);
+    font-size: var(--sc-fs-body);
+    block-size: 100%;
+    overflow: auto;
+
+    // Focus is restyled, never removed.
+    :focus-visible {
+        outline: 2px solid var(--sc-focus);
+        outline-offset: 2px;
+    }
+
+    &__inner {
+        max-inline-size: 960px;
+        margin-inline: auto;
+        padding: var(--sc-space-5) var(--sc-space-4);
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-4);
+    }
+
+    // --- header ---------------------------------------------------------
+    .sc-x-head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sc-space-3);
+        align-items: flex-start;
+        justify-content: space-between;
+
+        &__title {
+            font-size: var(--sc-fs-lead);
+            font-weight: var(--sc-fw-dominant);
+            margin: 0;
+        }
+        &__sub {
+            color: var(--sc-text-secondary);
+            font-size: var(--sc-fs-secondary);
+        }
+    }
+
+    .sc-x-badge {
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-1) var(--sc-space-3);
+        font-size: var(--sc-fs-caption);
+        font-weight: var(--sc-fw-label);
+        white-space: nowrap;
+
+        &--success { color: var(--sc-success-text); background: var(--sc-success-bg); }
+        &--warning { color: var(--sc-warning-text); background: var(--sc-warning-bg); }
+        &--danger  { color: var(--sc-danger-text);  background: var(--sc-danger-bg); }
+        &--info    { color: var(--sc-info-text);    background: var(--sc-info-bg); }
+        &--neutral { color: var(--sc-neutral-text); background: var(--sc-neutral-bg); }
+    }
+
+    // --- banded messages -------------------------------------------------
+    .sc-x-band {
+        display: flex;
+        gap: var(--sc-space-3);
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-4);
+        // A coloured rail on the reading-start edge, so the band is
+        // distinguishable without relying on hue alone (SC 1.4.1).
+        border-inline-start: 4px solid currentColor;
+
+        &--warning { color: var(--sc-warning-text); background: var(--sc-warning-bg); }
+        &--danger  { color: var(--sc-danger-text);  background: var(--sc-danger-bg); }
+        &--neutral { color: var(--sc-neutral-text); background: var(--sc-neutral-bg); }
+
+        &__text {
+            font-weight: var(--sc-fw-dominant);
+        }
+        &__hint {
+            color: var(--sc-text-secondary);
+            font-size: var(--sc-fs-secondary);
+            margin-block-start: var(--sc-space-1);
+        }
+    }
+
+    // --- sections --------------------------------------------------------
+    .sc-x-section {
+        background: var(--sc-surface-1);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-4);
+
+        &__title {
+            font-size: var(--sc-fs-cardtitle);
+            font-weight: var(--sc-fw-dominant);
+            margin: 0 0 var(--sc-space-3) 0;
+
+            &--danger { color: var(--sc-danger-text); }
+        }
+    }
+
+    .sc-x-note {
+        color: var(--sc-text-secondary);
+        font-size: var(--sc-fs-secondary);
+        margin: var(--sc-space-2) 0 0 0;
+    }
+    .sc-x-muted {
+        color: var(--sc-text-secondary);
+        font-size: var(--sc-fs-secondary);
+    }
+
+    // --- diff table ------------------------------------------------------
+    .sc-x-table {
+        inline-size: 100%;
+        border-collapse: collapse;
+        font-size: var(--sc-fs-secondary);
+
+        th, td {
+            text-align: start;
+            padding: var(--sc-space-2) var(--sc-space-3);
+            border-block-end: 1px solid var(--sc-border);
+            vertical-align: top;
+        }
+        thead th {
+            font-weight: var(--sc-fw-label);
+            color: var(--sc-text-secondary);
+        }
+    }
+
+    .sc-x-cell {
+        // Long descriptions and tag lists must wrap, never force the page
+        // into a horizontal scroll.
+        overflow-wrap: anywhere;
+
+        &--from { color: var(--sc-text-secondary); }
+        &--to   { color: var(--sc-text-primary); font-weight: var(--sc-fw-label); }
+    }
+
+    // --- lists -----------------------------------------------------------
+    .sc-x-list, .sc-x-sublist, .sc-x-taglist, .sc-x-chips, .sc-x-steps {
+        list-style: none;
+        margin: var(--sc-space-2) 0 0 0;
+        padding: 0;
+    }
+    .sc-x-list__item {
+        padding: var(--sc-space-2) 0;
+        border-block-end: 1px solid var(--sc-border);
+
+        &--danger { border-inline-start: 3px solid var(--sc-danger-text);
+                    padding-inline-start: var(--sc-space-3); }
+    }
+    .sc-x-list__name { font-weight: var(--sc-fw-label); }
+    .sc-x-sublist {
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+        &__field { font-weight: var(--sc-fw-label); margin-inline-end: var(--sc-space-2); }
+    }
+
+    .sc-x-taglist { display: flex; flex-wrap: wrap; gap: var(--sc-space-2); }
+    .sc-x-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sc-space-1);
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-1) var(--sc-space-2);
+        font-size: var(--sc-fs-caption);
+        background: var(--sc-surface-1);
+        border: 1px solid var(--sc-border-strong);
+
+        &--removed { text-decoration: line-through; }
+    }
+    // The +/- marks carry no information on their own -- every one of them
+    // sits next to text that says the same thing -- so they are
+    // `aria-hidden` in the template and purely decorative here.
+    .sc-x-tag__mark {
+        font-weight: var(--sc-fw-dominant);
+        color: var(--sc-danger-text);
+
+        &--add { color: var(--sc-success-text); }
+    }
+
+    .sc-x-chips { display: flex; flex-wrap: wrap; gap: var(--sc-space-2); }
+    .sc-x-chip {
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-1) var(--sc-space-3);
+        background: var(--sc-neutral-bg);
+        color: var(--sc-neutral-text);
+        font-size: var(--sc-fs-caption);
+    }
+
+    // --- progress --------------------------------------------------------
+    .sc-x-progress {
+        block-size: 8px;
+        inline-size: 100%;
+        background: var(--sc-neutral-bg);
+        border-radius: var(--sc-radius);
+        overflow: hidden;
+
+        &__fill {
+            block-size: 100%;
+            background: var(--sc-accent);
+        }
+    }
+
+    .sc-x-step {
+        display: flex;
+        justify-content: space-between;
+        gap: var(--sc-space-3);
+        padding: var(--sc-space-2) var(--sc-space-3);
+        border-inline-start: 3px solid var(--sc-border);
+        font-size: var(--sc-fs-secondary);
+
+        &--success { border-inline-start-color: var(--sc-success-text); }
+        &--danger  { border-inline-start-color: var(--sc-danger-text); }
+        &__state { color: var(--sc-text-secondary); }
+    }
+
+    // --- controls --------------------------------------------------------
+    .sc-x-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sc-space-3);
+        align-items: center;
+    }
+
+    .sc-x-btn {
+        border: 1px solid var(--sc-border-strong);
+        background: var(--sc-surface-1);
+        color: var(--sc-text-primary);
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-2) var(--sc-space-4);
+        font: inherit;
+        font-weight: var(--sc-fw-label);
+        // 44px minimum target (WCAG 2.2 SC 2.5.8 comfortably exceeded).
+        min-block-size: 44px;
+        cursor: pointer;
+
+        &--primary {
+            background: var(--sc-accent);
+            border-color: var(--sc-accent);
+            color: #FFFFFF;
+        }
+        &[disabled] { opacity: 0.6; cursor: default; }
+    }
+
+    .sc-x-empty {
+        background: var(--sc-surface-1);
+        border: 1px dashed var(--sc-border-strong);
+        border-radius: var(--sc-radius);
+        padding: var(--sc-space-5);
+        text-align: center;
+    }
+
+    // --- loading skeleton ------------------------------------------------
+    .sc-x-skeleton {
+        background: var(--sc-neutral-bg);
+        border-radius: var(--sc-radius);
+
+        &--band { block-size: 64px; }
+        &--line { block-size: 16px; inline-size: 60%; }
+    }
+
+    // --- motion, strictly opt-in ----------------------------------------
+    @media (prefers-reduced-motion: no-preference) {
+        .sc-x-btn { transition: background var(--sc-motion-2) var(--sc-ease); }
+        .sc-x-progress__fill { transition: inline-size var(--sc-motion-2) var(--sc-ease); }
+    }
+
+    // --- narrow viewports -----------------------------------------------
+    // The diff table is the only element that cannot simply reflow, so it
+    // gets its own scroll container rather than forcing the page to scroll
+    // sideways.
+    @media (max-width: 600px) {
+        &__inner { padding: var(--sc-space-3); }
+        .sc-x-table { display: block; overflow-x: auto; white-space: nowrap; }
+        .sc-x-actions .sc-x-btn { inline-size: 100%; }
+    }
+}

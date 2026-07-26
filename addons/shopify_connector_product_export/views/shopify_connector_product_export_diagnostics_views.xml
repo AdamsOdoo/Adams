@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U3 — DIAGNOSTICS (S31) and the RECONNECT / BACKFILL landing (S25/S26).
+
+        WHY THESE ARE ODOO-NATIVE AND NOT OWL. The U3 locked prompt assigns an
+        Owl surface to the export preview/diff (S7) because a diff carries
+        severity a list cannot express. Diagnostics does not: it is "show me
+        the connector evidence that currently needs attention, filtered". That
+        is precisely what an Odoo action with a search view already does, and
+        building a second Owl client action to render the same rows would add
+        a maintenance surface and a test surface for no operator benefit.
+
+        NO NEW BACKEND LOGIC. Every filter below is a domain over a field an
+        earlier wave already ships. Nothing here computes health; it selects
+        rows whose recorded state already says what it says.
+
+        NO CREDENTIALS, NO PII. The columns are identifiers, states, classes
+        and timestamps. `preconditions_snapshot`, `remote_mutation_intent` and
+        raw payloads are deliberately absent from every list below — a
+        diagnostics screen that shows a request body is a diagnostics screen
+        that shows whatever was in it.
+    -->
+
+    <!-- ============================================================== -->
+    <!-- S31 — export diagnostics: what needs a human, right now         -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_export_diagnostics_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.job.search.export.diagnostics</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="arch" type="xml">
+            <search string="Export Diagnostics">
+                <field name="store_id"/>
+                <field name="job_type"/>
+                <field name="shopify_target_gid"/>
+                <!--
+                    The three dimensions are kept apart. "Needs a decision",
+                    "will retry by itself" and "gave up" are three different
+                    asks of an operator, and a merged "unhealthy" filter would
+                    make the first invisible inside the third.
+                -->
+                <filter name="filter_needs_decision" string="Needs a decision"
+                        domain="[('state', '=', 'blocked_manual_review')]"/>
+                <filter name="filter_will_retry" string="Retrying by itself"
+                        domain="[('state', 'in', ['retry_waiting', 'failed_retryable'])]"/>
+                <filter name="filter_gave_up" string="Failed for good"
+                        domain="[('state', '=', 'failed_final')]"/>
+                <separator/>
+                <filter name="filter_reconciling" string="Awaiting reconciliation"
+                        domain="[('reconciliation_pending_until', '!=', False)]"/>
+                <filter name="filter_running_long" string="Still running"
+                        domain="[('state', '=', 'running')]"/>
+                <separator/>
+                <!--
+                    The unknown-enum warning the state model calls for: a job
+                    that carries no error class while sitting in a failure
+                    state is a schema/vocabulary gap, not a healthy row.
+                -->
+                <filter name="filter_unclassified" string="Unclassified failure"
+                        domain="[('state', 'in', ['failed_final', 'blocked_manual_review']),
+                                 ('error_class', '=', False)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_type" string="Job type"
+                            context="{'group_by': 'job_type'}"/>
+                    <filter name="group_error" string="Error class"
+                            context="{'group_by': 'error_class'}"/>
+                    <filter name="group_subreason" string="Review reason"
+                            context="{'group_by': 'manual_review_subreason'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_export_diagnostics_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.job.list.export.diagnostics</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="arch" type="xml">
+            <list string="Export Diagnostics" create="false" delete="false">
+                <field name="create_date" string="Queued"/>
+                <field name="job_type"/>
+                <field name="state"
+                       decoration-danger="state in ['failed_final', 'blocked_manual_review']"
+                       decoration-warning="state in ['retry_waiting', 'failed_retryable']"
+                       decoration-info="state in ['queued', 'running']"
+                       decoration-success="state == 'succeeded'"/>
+                <field name="error_class" optional="show"/>
+                <field name="manual_review_subreason" string="Review reason"
+                       optional="show"/>
+                <field name="retry_count" optional="show"/>
+                <field name="next_retry_at" optional="hide"/>
+                <field name="reconciliation_pending_until" string="Reconciling until"
+                       optional="hide"/>
+                <field name="shopify_target_gid" string="Shopify target"
+                       optional="hide"/>
+                <field name="store_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_export_diagnostics"
+            model="ir.actions.act_window">
+        <field name="name">Export Diagnostics</field>
+        <field name="res_model">shopify.connector.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_export_diagnostics_search"/>
+        <field name="domain">[('job_type', 'like', 'product_export_')]</field>
+        <field name="context">{'search_default_filter_needs_decision': 1}</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing needs your attention
+            </p>
+            <p>
+                No export job is blocked, retrying or failed. Clear the
+                <em>Needs a decision</em> filter to see the full export history
+                for this connector.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- S25 / S26 — reconnect and backfill: the open work a reconnect   -->
+    <!-- leaves behind, and the catch-up progress across it              -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_export_backfill_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.preview.search.backfill</field>
+        <field name="model">shopify.connector.product.export.preview</field>
+        <field name="arch" type="xml">
+            <search string="Reconnect and Backfill">
+                <field name="store_id"/>
+                <field name="product_template_id"/>
+                <!--
+                    "Caught up" is not a number this connector invents. A
+                    reconnect expires every open preview (PD-PX-7, implemented
+                    strictly), so the catch-up backlog is exactly the set of
+                    exported products whose most recent preview is expired or
+                    mid-flight. Those are the two filters below; the progress
+                    an operator reads is `applied` against that backlog, not a
+                    watermark timestamp the export domain does not keep.
+                -->
+                <filter name="filter_needs_repreview" string="Needs a fresh preview"
+                        domain="[('state', '=', 'expired')]"/>
+                <filter name="filter_in_flight" string="Catch-up in flight"
+                        domain="[('state', 'in', ['confirmed', 'applying'])]"/>
+                <filter name="filter_caught_up" string="Caught up"
+                        domain="[('state', '=', 'applied')]"/>
+                <separator/>
+                <filter name="filter_stalled" string="Stalled mid-apply"
+                        domain="[('state', '=', 'applying')]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_day" string="Previewed on"
+                            context="{'group_by': 'previewed_at:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_export_backfill"
+            model="ir.actions.act_window">
+        <field name="name">Reconnect and Backfill</field>
+        <field name="res_model">shopify.connector.product.export.preview</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_export_backfill_search"/>
+        <field name="context">{'search_default_filter_needs_repreview': 1,
+                               'search_default_group_store': 1}</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing to catch up on
+            </p>
+            <p>
+                Reconnecting a store expires every open export preview, so a
+                confirmation taken before the reconnect can never authorise a
+                write afterwards. Anything that still needs re-reviewing after
+                a reconnect appears here.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- The reconnect banner on the store form (S25)                    -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_store_form_export_banner"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.export.banner</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <!--
+                    Placed BEFORE the sheet so it reads as a banner rather
+                    than as one more field group, and gated on the recorded
+                    state rather than on a computed "is degraded" the model
+                    does not have. `role="alert"` so a screen reader announces
+                    it on arrival instead of only when it is reached in order.
+                -->
+                <div class="alert alert-warning" role="alert"
+                     invisible="api_health_state != 'degraded'"
+                     groups="shopify_connector_core.group_shopify_connector_user">
+                    <strong>This store's API health is degraded.</strong>
+                    Exports stay reviewable, but a confirmation taken now may
+                    be refused at apply time. Open
+                    <em>Export &gt; Reconnect and Backfill</em> to see what is
+                    waiting.
+                </div>
+                <div class="alert alert-info" role="alert"
+                     invisible="state == 'connected'"
+                     groups="shopify_connector_core.group_shopify_connector_user">
+                    <strong>This store is not connected.</strong>
+                    No export can run, and every open preview was expired when
+                    the connection dropped — a stale confirmation can never
+                    authorise a write. Reconnect, then re-preview.
+                </div>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U3 / S7 — the Owl export preview and diff surface.
+
+        A client action rather than a form view, because what a reviewer needs
+        to read here is not a record's fields: it is a *difference*, with a
+        removal section, a refusal section and an untouched section that each
+        carry their own severity. A `widget="json"` dump of the diff field
+        shows the same bytes and communicates none of that.
+
+        It reads exactly one read-only aggregate
+        (`shopify.connector.product.export.ui.get_export_preview_data`) and its
+        only write path is `action_confirm_export_preview` — the same
+        sanctioned server door the wizard uses, with the same server-side role,
+        state, expiry and plan checks. The screen is a face; the backend is the
+        authority.
+    -->
+
+    <!--
+        NO `group_ids` HERE, AND THAT IS NOT AN OVERSIGHT. `group_ids` exists
+        on `ir.actions.act_window` and `ir.actions.server` but NOT on
+        `ir.actions.client` (odoo/odoo@19.0 `ir_actions.py::IrActionsClient`,
+        verified against the pinned source) — declaring one is a hard
+        ParseError at install, not a silently ignored field.
+
+        Access is therefore enforced where it actually belongs and where a
+        client action cannot route around it:
+
+        * the Export menu branch and the button that opens this action both
+          carry `groups="…group_shopify_connector_user"`, which is VISIBILITY;
+        * `get_export_preview_data` raises `AccessError` for any caller
+          outside the connector groups, and reads the preview as the current
+          user so the ordinary ACL and the SEC-3 company record rules apply;
+        * `action_confirm_export_preview` re-checks Reviewer/Administrator
+          under a row lock, which is AUTHORIZATION.
+
+        A user who reached this tag by hand gets an AccessError from the
+        service, not a rendered screen.
+    -->
+    <record id="action_shopify_connector_export_diff" model="ir.actions.client">
+        <field name="name">Review Export</field>
+        <field name="tag">shopify_connector_export_diff</field>
+    </record>
+
+</odoo>

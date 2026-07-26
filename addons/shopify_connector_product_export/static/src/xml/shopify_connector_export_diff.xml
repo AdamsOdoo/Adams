@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+    Part of the Shopify Connector (U3 export operator experience).
+
+    Reading order is the safety order. A reviewer meets, in this sequence:
+      1. what state this preview is in,
+      2. what will be REMOVED (tags — the only removal an export performs),
+      3. what will be changed,
+      4. what images will be appended,
+      5. what the connector REFUSED to do,
+      6. what it never touches at all,
+      7. only then, the confirm control.
+
+    The refusals are above the confirm button rather than below it on purpose:
+    a refusal a reviewer scrolls past after confirming is a refusal that was
+    not disclosed.
+
+    `dir="auto"` on the root and logical properties in the stylesheet keep the
+    surface correct under RTL without a mirrored stylesheet.
+-->
+<templates xml:space="preserve">
+
+    <t t-name="shopify_connector_product_export.ExportDiff">
+        <div class="o_sc_export_diff" dir="auto">
+            <div class="o_sc_export_diff__inner">
+
+                <!-- LOADING -->
+                <t t-if="state.status === 'loading'">
+                    <div class="sc-x-skeleton sc-x-skeleton--band" aria-hidden="true"/>
+                    <div class="sc-x-skeleton sc-x-skeleton--line" aria-hidden="true"/>
+                    <p role="status">Loading this export preview…</p>
+                </t>
+
+                <!-- ERROR -->
+                <t t-elif="state.status === 'error'">
+                    <div class="sc-x-band sc-x-band--danger" role="alert">
+                        <div class="sc-x-band__body">
+                            <div class="sc-x-band__text">We couldn't load this export preview</div>
+                            <div class="sc-x-band__hint" t-esc="state.errorMessage"/>
+                        </div>
+                    </div>
+                    <button class="sc-x-btn" t-on-click="() => this.refresh()">Try again</button>
+                </t>
+
+                <!-- READY -->
+                <t t-else="">
+                    <t t-set="data" t-value="state.data"/>
+
+                    <!-- header: identity and state -->
+                    <div class="sc-x-head">
+                        <div>
+                            <h1 class="sc-x-head__title" t-esc="data.product_name"/>
+                            <div class="sc-x-head__sub">
+                                <span t-esc="data.store_name"/>
+                                <span aria-hidden="true"> · </span>
+                                <span t-if="data.export_path === 'create'">Creates a new Shopify product</span>
+                                <span t-else="">Updates the bound Shopify product</span>
+                            </div>
+                        </div>
+                        <span t-att-class="toneClass('sc-x-badge', data.state_tone)"
+                              t-esc="data.state_label"/>
+                    </div>
+
+                    <!-- expiry: a stale preview says so before anything else -->
+                    <div t-if="data.is_expired" class="sc-x-band sc-x-band--neutral" role="status">
+                        <div class="sc-x-band__body">
+                            <div class="sc-x-band__text">This preview is no longer current</div>
+                            <div class="sc-x-band__hint">
+                                It aged out, or the product changed on one side since it was
+                                taken. Run a fresh preview — a stale confirmation can never
+                                authorise a write.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. THE REMOVAL, first and loudest -->
+                    <div t-if="data.tag_replacement.removes"
+                         class="sc-x-band sc-x-band--warning" role="alert">
+                        <div class="sc-x-band__body">
+                            <div class="sc-x-band__text">
+                                Confirming removes <t t-esc="data.tag_replacement.removed.length"/>
+                                tag(s) from this product on Shopify
+                            </div>
+                            <div class="sc-x-band__hint" t-esc="data.tag_replacement.note"/>
+                            <ul class="sc-x-taglist" aria-label="Tags that will be removed">
+                                <t t-foreach="data.tag_replacement.removed" t-as="tag" t-key="tag">
+                                    <li class="sc-x-tag sc-x-tag--removed">
+                                        <span class="sc-x-tag__mark" aria-hidden="true">−</span>
+                                        <span t-esc="tag"/>
+                                    </li>
+                                </t>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- 3. what changes -->
+                    <t t-foreach="data.sections" t-as="section" t-key="section.key">
+                        <section class="sc-x-section" t-att-aria-label="section.title">
+                            <h2 class="sc-x-section__title" t-esc="section.title"/>
+
+                            <table t-if="section.rows" class="sc-x-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Field</th>
+                                        <th scope="col">On Shopify now</th>
+                                        <th scope="col">After this export</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="section.rows" t-as="row" t-key="row.field">
+                                        <tr>
+                                            <th scope="row" t-esc="row.field"/>
+                                            <td class="sc-x-cell sc-x-cell--from" t-esc="row['from']"/>
+                                            <td class="sc-x-cell sc-x-cell--to" t-esc="row.to"/>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <t t-if="section.variants">
+                                <ul class="sc-x-list">
+                                    <t t-foreach="section.variants" t-as="variant" t-key="variant.name">
+                                        <li class="sc-x-list__item">
+                                            <div class="sc-x-list__name" t-esc="variant.name"/>
+                                            <ul t-if="variant.changes" class="sc-x-sublist">
+                                                <t t-foreach="variant.changes" t-as="change" t-key="change.field">
+                                                    <li>
+                                                        <span class="sc-x-sublist__field" t-esc="change.field"/>
+                                                        <span class="sc-x-cell sc-x-cell--from" t-esc="change['from']"/>
+                                                        <span aria-hidden="true"> → </span>
+                                                        <span class="sc-x-cell sc-x-cell--to" t-esc="change.to"/>
+                                                    </li>
+                                                </t>
+                                            </ul>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </t>
+                        </section>
+                    </t>
+
+                    <!-- 4. media: append-only, said in the heading -->
+                    <section class="sc-x-section" aria-label="Images">
+                        <h2 class="sc-x-section__title">Images</h2>
+                        <t t-if="data.media.exported">
+                            <p class="sc-x-note" t-esc="data.media.reason"/>
+                            <ul class="sc-x-list">
+                                <t t-foreach="data.media.appends" t-as="append" t-key="append.filename">
+                                    <li class="sc-x-list__item">
+                                        <span class="sc-x-tag__mark sc-x-tag__mark--add" aria-hidden="true">+</span>
+                                        <span t-esc="append.filename"/>
+                                        <span class="sc-x-muted" t-if="append.resuming"> (resuming an earlier upload)</span>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+                        <p t-else="" class="sc-x-note" t-esc="data.media.reason"/>
+                    </section>
+
+                    <!-- 5. what the connector REFUSED -->
+                    <section t-if="data.refusals.length" class="sc-x-section"
+                             aria-label="Refused differences">
+                        <h2 class="sc-x-section__title sc-x-section__title--danger">
+                            Refused differences
+                        </h2>
+                        <p class="sc-x-note">
+                            These are differences this connector will <strong>not</strong> act on.
+                            They are not part of the plan below and cannot be confirmed. It never
+                            deletes a remote variant, product option, option value, collection
+                            membership, merchant metafield or image.
+                        </p>
+                        <ul class="sc-x-list">
+                            <t t-foreach="data.refusals" t-as="refusal" t-key="refusal_index">
+                                <li class="sc-x-list__item sc-x-list__item--danger">
+                                    <div class="sc-x-list__name" t-esc="refusal.label"/>
+                                    <div class="sc-x-muted" t-esc="refusal.detail"/>
+                                </li>
+                            </t>
+                        </ul>
+                    </section>
+
+                    <!-- 6. what is never touched -->
+                    <section t-if="data.untouched.items.length" class="sc-x-section"
+                             aria-label="Left untouched">
+                        <h2 class="sc-x-section__title">Left untouched</h2>
+                        <ul class="sc-x-chips">
+                            <t t-foreach="data.untouched.items" t-as="item" t-key="item.key">
+                                <li class="sc-x-chip">
+                                    <span t-esc="item.label"/>
+                                    <span class="sc-x-muted" t-if="item.present"> — present, untouched</span>
+                                    <span class="sc-x-muted" t-else=""> — none on this product</span>
+                                </li>
+                            </t>
+                        </ul>
+                        <p class="sc-x-note" t-esc="data.untouched.note"/>
+                    </section>
+
+                    <!-- the plan and its progress -->
+                    <section t-if="data.plan.total" class="sc-x-section" aria-label="Apply plan">
+                        <h2 class="sc-x-section__title">What will run, in order</h2>
+                        <div class="sc-x-progress"
+                             role="progressbar"
+                             aria-label="Export progress"
+                             t-att-aria-valuenow="data.plan.done"
+                             aria-valuemin="0"
+                             t-att-aria-valuemax="data.plan.total">
+                            <div class="sc-x-progress__fill"
+                                 t-attf-style="inline-size: {{ data.plan.percent }}%"/>
+                        </div>
+                        <p class="sc-x-note">
+                            <t t-esc="data.plan.done"/> of <t t-esc="data.plan.total"/> steps complete
+                        </p>
+                        <ol class="sc-x-steps">
+                            <t t-foreach="data.plan.steps" t-as="step" t-key="step.index">
+                                <li t-att-class="toneClass('sc-x-step', step.tone)">
+                                    <span class="sc-x-step__label" t-esc="step.label"/>
+                                    <span class="sc-x-step__state" t-esc="step.state"/>
+                                </li>
+                            </t>
+                        </ol>
+                    </section>
+
+                    <!-- nothing to do -->
+                    <div t-if="!hasAnythingToShow" class="sc-x-empty" role="status">
+                        <div class="sc-x-section__title">This product already matches Shopify</div>
+                        <p>There is nothing to export. That is a healthy result, not a problem.</p>
+                    </div>
+
+                    <!-- 7. the one door -->
+                    <div class="sc-x-actions">
+                        <button t-if="data.can_confirm"
+                                class="sc-x-btn sc-x-btn--primary"
+                                name="confirm_export"
+                                t-att-disabled="state.confirming ? 'disabled' : undefined"
+                                t-on-click="() => this.confirm()">
+                            <span t-if="state.confirming">Confirming…</span>
+                            <span t-else="">Confirm this export</span>
+                        </button>
+                        <p t-elif="data.state === 'previewed'" class="sc-x-note" role="status">
+                            Only a Shopify Connector Reviewer or Administrator can confirm an
+                            export, and only while the preview is still current.
+                        </p>
+                        <button class="sc-x-btn" t-on-click="() => this.refresh()">Refresh</button>
+                        <button class="sc-x-btn" t-on-click="() => this.openRecord()">
+                            Open the full record
+                        </button>
+                    </div>
+
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

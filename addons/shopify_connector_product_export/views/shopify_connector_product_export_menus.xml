@@ -35,9 +35,26 @@
               action="action_shopify_connector_product_media_binding"
               sequence="20"/>
 
+    <menuitem id="menu_shopify_connector_product_export_backfill"
+              name="Reconnect and Backfill"
+              parent="menu_shopify_connector_product_export"
+              action="action_shopify_connector_export_backfill"
+              sequence="25"/>
+
     <menuitem id="menu_shopify_connector_product_export_settings"
               name="Export Settings"
               parent="menu_shopify_connector_product_export"
               action="action_shopify_connector_store_settings_export"
               sequence="30"/>
+
+    <!--
+        Diagnostics sits last in the branch on purpose. It is where an
+        operator goes when something is wrong, not the first thing they meet
+        when nothing is.
+    -->
+    <menuitem id="menu_shopify_connector_product_export_diagnostics"
+              name="Export Diagnostics"
+              parent="menu_shopify_connector_product_export"
+              action="action_shopify_connector_export_diagnostics"
+              sequence="40"/>
 </odoo>

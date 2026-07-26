@@ -8,6 +8,7 @@
 // intended for the driven Odoo.sh runtime campaign with seeded fixtures.
 
 import { registry } from "@web/core/registry";
+import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 
@@ -17,6 +18,13 @@ const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
     url: "/odoo",
     steps: () => [
+        // INHERITED DEFECT, corrected 2026-07-26. The `.o_app` tiles live
+        // inside the apps-menu sidebar and do not exist in the DOM until it
+        // is opened (odoo/odoo@19.0 `web/static/src/webclient/navbar/
+        // navbar.xml`), so every tour here timed out on its FIRST step. The
+        // U0 navigation tour could therefore never have passed, which is why
+        // no repository record carries a green tour result.
+        stepUtils.showAppsMenuItem(),
         {
             trigger: `.o_app${menu("menu_shopify_connector_root")}`,
             content: "Open the Shopify Connector app.",
@@ -71,6 +79,13 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
 registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
     url: "/odoo",
     steps: () => [
+        // INHERITED DEFECT, corrected 2026-07-26. The `.o_app` tiles live
+        // inside the apps-menu sidebar and do not exist in the DOM until it
+        // is opened (odoo/odoo@19.0 `web/static/src/webclient/navbar/
+        // navbar.xml`), so every tour here timed out on its FIRST step. The
+        // U0 navigation tour could therefore never have passed, which is why
+        // no repository record carries a green tour result.
+        stepUtils.showAppsMenuItem(),
         {
             trigger: `.o_app${menu("menu_shopify_connector_root")}`,
             run: "click",
@@ -97,6 +112,13 @@ registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
 registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
     url: "/odoo",
     steps: () => [
+        // INHERITED DEFECT, corrected 2026-07-26. The `.o_app` tiles live
+        // inside the apps-menu sidebar and do not exist in the DOM until it
+        // is opened (odoo/odoo@19.0 `web/static/src/webclient/navbar/
+        // navbar.xml`), so every tour here timed out on its FIRST step. The
+        // U0 navigation tour could therefore never have passed, which is why
+        // no repository record carries a green tour result.
+        stepUtils.showAppsMenuItem(),
         {
             trigger: `.o_app${menu("menu_shopify_connector_root")}`,
             run: "click",
@@ -118,6 +140,13 @@ registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
 registry.category("web_tour.tours").add("shopify_connector_u0_admin_tour", {
     url: "/odoo",
     steps: () => [
+        // INHERITED DEFECT, corrected 2026-07-26. The `.o_app` tiles live
+        // inside the apps-menu sidebar and do not exist in the DOM until it
+        // is opened (odoo/odoo@19.0 `web/static/src/webclient/navbar/
+        // navbar.xml`), so every tour here timed out on its FIRST step. The
+        // U0 navigation tour could therefore never have passed, which is why
+        // no repository record carries a green tour result.
+        stepUtils.showAppsMenuItem(),
         {
             trigger: `.o_app${menu("menu_shopify_connector_root")}`,
             run: "click",

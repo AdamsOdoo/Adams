@@ -88,6 +88,12 @@ class TestExportSourceGuards(TransactionCase):
             'shopify_connector_product_export_seams.py': 1,
             'shopify_connector_product_media_binding.py': 0,
             'shopify_connector_product_export_wizards.py': 0,
+            # U3: the export preview projection reads as the CURRENT user on
+            # purpose, so the ordinary ACL and the SEC-3 company record rules
+            # apply to it. A budget above zero here would mean the read
+            # surface had acquired an elevation, which is exactly the thing
+            # this inventory exists to make impossible to add quietly.
+            'shopify_connector_product_export_ui.py': 0,
             '__init__.py': 0,
             '__manifest__.py': 0,
         }

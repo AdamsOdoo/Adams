@@ -102,9 +102,28 @@
                         or Administrator and refuses anyone else with an
                         AccessError and no side effect.
                     -->
-                    <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
-                            type="action" string="Review and Confirm"
+                    <!--
+                        U3 / S7: the Owl review surface is the primary route,
+                        because a difference with a removal section, a refusal
+                        section and an untouched section is not something a
+                        `widget="json"` dump communicates. It opens read-only
+                        and carries the same confirm action.
+                    -->
+                    <button name="%(action_shopify_connector_export_diff)d"
+                            type="action" string="Review Export"
                             class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            context="{'active_id': id}"/>
+                    <!--
+                        The wizard stays as the second route rather than being
+                        replaced. It is the surface that works with JavaScript
+                        assets unavailable, and removing a working confirmation
+                        path to make a nicer one the only one would be a
+                        downgrade for anyone who lands there.
+                    -->
+                    <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
+                            type="action" string="Confirm without the review screen"
+                            class="btn-secondary"
                             invisible="state != 'previewed'"
                             groups="shopify_connector_core.group_shopify_connector_user"
                             context="{'default_preview_id': id}"/>

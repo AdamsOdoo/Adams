@@ -10,7 +10,7 @@
 // responsive behaviour are CSS-only (media queries), covered by the SCSS + the
 // runtime walkthrough.
 
-import { expect, test, describe } from "@odoo/hoot";
+import { expect, test, describe, beforeEach } from "@odoo/hoot";
 import { queryAll, queryFirst, queryText } from "@odoo/hoot-dom";
 import { animationFrame } from "@odoo/hoot-mock";
 import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
@@ -49,9 +49,18 @@ function mockOrm(getData) {
 }
 
 let lastAction = null;
-mockService("action", { doAction: async (action) => { lastAction = action; } });
 
 describe("shopify connector dashboard", () => {
+    // INHERITED DEFECT, corrected 2026-07-26. `mockService` was called at
+    // MODULE scope, which mutates the services registry while HOOT is still
+    // registering this suite; HOOT rejects that with "error while registering
+    // suite" and the whole file never ran. Nothing executed this file before
+    // now (no runner existed), so the breakage was invisible.
+    beforeEach(() => {
+        lastAction = null;
+        mockService("action", { doAction: async (action) => { lastAction = action; } });
+    });
+
     test("healthy state renders the success band and an affirmative line", async () => {
         mockOrm(() => payload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });

@@ -66,12 +66,26 @@ before any retry, and no blind resend.
         'security/shopify_connector_product_export_company_rules.xml',
         'data/shopify_connector_product_export_cron.xml',
         # U3 operator UI. Wizard actions first (views reference them), then
+        # the Owl client action (the preview form's button targets it), then
         # the views, then the menus, so every action exists before it is
         # referenced.
         'views/shopify_connector_product_export_wizard_views.xml',
+        'views/shopify_connector_export_diff_views.xml',
         'views/shopify_connector_product_export_views.xml',
+        'views/shopify_connector_product_export_diagnostics_views.xml',
         'views/shopify_connector_product_export_menus.xml',
     ],
+    'assets': {
+        'web.assets_backend': [
+            'shopify_connector_product_export/static/src/scss/shopify_connector_export_diff.scss',
+            'shopify_connector_product_export/static/src/xml/shopify_connector_export_diff.xml',
+            'shopify_connector_product_export/static/src/js/shopify_connector_export_diff.js',
+            'shopify_connector_product_export/static/src/js/tours/shopify_connector_u3_export_tour.js',
+        ],
+        'web.assets_unit_tests': [
+            'shopify_connector_product_export/static/tests/shopify_connector_export_diff.test.js',
+        ],
+    },
     'installable': True,
     'application': False,
     'auto_install': False,
