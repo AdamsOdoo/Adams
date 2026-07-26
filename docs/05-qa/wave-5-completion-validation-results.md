@@ -175,11 +175,34 @@ fresh-install checkpoint pass exists to catch, and it caught it.
 | U2 focused (product, inventory, sale) | **0 failed, 0 errors of 33** |
 | Full connector suite — fresh / warm / non-standard | see §4.1 |
 
-### 4.1 Full-suite checkpoint
+### 4.1 Full-suite checkpoint — clean worktree, exact head
 
-Recorded in `ci-artifacts/` at the head this record describes, and restated in
-the PR body. Every intermediate failure named in §3 was corrected **before**
-the next stage, never deferred to the final runtime.
+`[Fact — machine-readable summary committed at
+[`evidence/wave-5-completion-2026-07-26/connector-suite-summary.json`](evidence/wave-5-completion-2026-07-26/connector-suite-summary.json);
+the container is ephemeral, so the artifact is committed to a durable path per
+DEC-041 D3 rather than left in gitignored `ci-artifacts/`.]`
+
+| Pass | Result |
+| --- | --- |
+| Fresh install + standard suite | **0 failed, 0 errors of 1616** |
+| Warm `-u` update + standard suite | **0 failed, 0 errors of 1616** |
+| Non-standard tag suite (concurrency proofs, benchmarks) | **0 failed, 0 errors of 19** |
+
+```
+tested_checkout_sha       19ba225dd7378baf7e80dac4678ac52ba3b65e33
+connector_worktree_dirty  false
+source_head_verified      true
+odoo_pin_verified         true
+shopify_operations        none
+```
+
+The non-standard count rose from 18 to 19: PERF-1's throughput benchmark is
+the nineteenth, and it is reachable only because the phase-contract guard
+refused to let a new `-standard` class exist without a tag in the runner
+(§3.4).
+
+Every intermediate failure named in §3 was corrected **before** the next
+stage, never deferred to the final runtime.
 
 ## 5. Not claimed
 
