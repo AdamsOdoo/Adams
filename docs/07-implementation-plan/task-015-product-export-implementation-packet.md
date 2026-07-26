@@ -338,3 +338,86 @@ gate closes on draft-open; no UI/webhook/media work.
    prompt's "ChatGPT opens the gate" language is superseded by the DEC-032
    control-room model — gate authority is product owner + Claude control
    room within the Wave 5 wave gate.
+
+---
+
+## 10. Addendum (2026-07-26) — mutation-split supersession
+
+> **Status: implemented under the control-room continuation ruling of
+> 2026-07-26. NOT an acceptance.** Appended; nothing above this line is
+> rewritten. Two of the D-015 closures are **superseded in part** by that
+> ruling, and the supersession is recorded here rather than by editing the
+> original closures, so a reviewer can see exactly what changed and why.
+
+### 10.1 What is superseded
+
+**D-015-2 is superseded on strategy only.** Its field allowlist is unchanged
+and remains binding. Its sentence "`productVariantsBulkUpdate`/`BulkCreate` are
+**not** used (single declarative `productSet` — one mutation shape, MBQ-23's
+strategy choice made: fewer non-idempotent surfaces)" **no longer holds.** The
+strategy is now a split:
+
+| Path | Mutation | Notes |
+| --- | --- | --- |
+| create (unbound only) | `productSet(synchronous: true, identifier: {customId})` | the only `productSet` in the module |
+| scalar update | `productUpdate(product:, identifier: {id})` | `identifier.id` is the preferred targeting form; `ProductSetInput.id` still exists but is deprecated |
+| mapped variants | `productVariantsBulkUpdate(allowPartialUpdates: false)` | atomic, never partial |
+| new variants | `productVariantsBulkCreate(strategy: PRESERVE_STANDALONE_VARIANT)` | `DEFAULT` deletes the standalone variant and is therefore unavailable |
+
+`[Inference]` MBQ-23's rationale — "fewer non-idempotent surfaces" — was sound
+and is outweighed. Four mutations that structurally *cannot* delete merchant
+state are safer than one that can, and each of the four runs under its own
+Layer 2 attempt with its own reconciliation read, so the count of surfaces
+costs bookkeeping rather than safety.
+
+**D-015-3 is superseded on mechanism, and its intent is strengthened.** The
+containment argument no longer rests on omitted-list preservation, because the
+update path no longer uses a declarative input: `ProductUpdateInput` has no
+`variants` and no `productOptions` field, and expresses collections as
+`collectionsToJoin`/`collectionsToLeave`. The connector therefore cannot delete
+those things however it is called.
+
+The "always the complete desired variant set" rule is **withdrawn and
+replaced** by its opposite: variants are written **individually, by bound GID**,
+and **nothing is ever deleted**. Every difference that would require a remote
+deletion — a bound variant missing remotely, a remote variant the connector
+does not own, an option structure that diverges — is enumerated in the preview
+as a refusal and routed to `destructive_write_guard_blocked`. Echoing a
+complete remote list back into a declarative input is **explicitly refused**,
+because it would make the connector the author of state it cannot see.
+
+**D-015-4's create path is unchanged and confirmed** (`customId` upsert,
+`metafieldDefinitionCreate` bootstrap with `capabilities.uniqueValues`, the SKU
+pre-search duplicate gate, synchronous-only). Two additions: the bootstrap is
+its own Layer 2 mutation domain gated on a settings marker, and the create path
+is closed unless preflight **and** reconciliation-by-`customId` establish that
+no Shopify product is bound to the Odoo source identity.
+
+**D-015-5/6/7/8 are unchanged.** Preview → confirm → apply remains the only
+mode, with the same expiry and changed-since-read gates.
+
+### 10.2 `X-EXPORT-0`
+
+Reclassified from a **blocking prerequisite** to **non-blocking research**. The
+earlier experiment produced no behavioural result — it ended in an API-VERSION
+HARD STOP with no mutation executed and no residue. Full record:
+[`../05-qa/task-015-export-source-verification-2026-07-26-addendum.md`](../05-qa/task-015-export-source-verification-2026-07-26-addendum.md)
+§3.
+
+### 10.3 Deviations from §8's locked prompt, named
+
+- **`shopify_export_vendor` / `shopify_export_product_type` /
+  `shopify_export_tags` are new connector-owned `product.template` fields.**
+  §2's allowlist names `vendor`, `productType` and `tags` as exported, but Odoo
+  has no field that means any of them, and inferring one (from a supplier
+  record, say) would export a guess about the merchant's catalog taxonomy. An
+  explicit, empty-by-default field exports nothing until somebody fills it in.
+- **The apply step chain is several job types, not one.** Layer 2 permits one
+  mutation attempt per job for its whole lifetime, so each mutation in the plan
+  is its own job with its own attempt and its own reconciliation read. The
+  confirmed plan lives on the preview record and advances only on a recorded,
+  resolved success.
+- **Options are never mutated on an existing product.** No 2026-07 option
+  mutation was source-verified as non-destructive, so an option divergence is
+  disclosed and refused rather than attempted. This narrows D-015-2's option
+  export to the create path.

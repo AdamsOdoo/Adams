@@ -93,10 +93,39 @@ order. Cleanup (§7) is verified against this baseline.
 Legend — **Expected** is the observable result; **Evidence** is what must be
 captured, sanitized, and attached to the run record.
 
-### 4.0 BLOCKING PREREQUISITE — `X-EXPORT-0` (added 2026-07-26)
+### 4.0 `X-EXPORT-0` — NON-BLOCKING RESEARCH (reclassified 2026-07-26)
 
-> **This case gates Task 015 implementation, not merely its validation.**
-> Run it before any export code is written or accepted. Source:
+> **Reclassification, 2026-07-26 (control-room continuation ruling).**
+> `X-EXPORT-0` **no longer gates Task 015 implementation.** It is retained as
+> **non-blocking research**, because the production export design no longer
+> depends on `productSet` preserving list fields that are omitted entirely.
+>
+> The dependency was removed rather than resolved. `productSet` is no longer
+> the update mutation: an existing product is updated through `productUpdate`
+> (whose input object has **no** `variants` and **no** `productOptions` field,
+> and whose collection handling is the additive/subtractive
+> `collectionsToJoin`/`collectionsToLeave`), `productVariantsBulkUpdate` with
+> `allowPartialUpdates: false`, and `productVariantsBulkCreate` with
+> `strategy: PRESERVE_STANDALONE_VARIANT`. `productSet` survives only on the
+> create path, where there is by definition no merchant state to destroy.
+> Full verification:
+> [`task-015-export-source-verification-2026-07-26-addendum.md`](task-015-export-source-verification-2026-07-26-addendum.md)
+> §2.
+>
+> **The earlier X-EXPORT-0 experiment produced no behavioural result.** It
+> ended in an API-VERSION HARD STOP: no Shopify mutation was executed, no
+> object and no residue existed, and the connector it was attempted against
+> exposed a pre-`2026-07` schema without proving one exact version. It is
+> neither a PASS nor a FAIL. Running it later is still worth doing — the
+> answer is useful to know — but nothing waits on it.
+>
+> **Version discriminators, recorded so the next attempt does not repeat the
+> mistake:** `grams` is **unreliable** (Shopify's changelog and the current
+> reference conflict). `BusinessEntity.legalEntityId` and `GiftCard.lineItem`
+> are valid positive `2026-07` markers. `ProductSetInput.id` still exists as
+> **deprecated**, and `identifier.id` is the preferred targeting form.
+>
+> Historical framing follows unchanged. Source:
 > [`task-015-export-source-verification-2026-07-26.md`](task-015-export-source-verification-2026-07-26.md)
 > §3 — the official documentation does **not** resolve whether a list field
 > that is omitted from a `productSet` input entirely is left alone or has all
@@ -109,12 +138,45 @@ captured, sanitized, and attached to the run record.
 | --- | --- | --- | --- | --- |
 | **X-EXPORT-0** | `productSet` omitted-list-field boundary | On a throwaway synthetic product: (1) add it to two collections, set one merchant-authored metafield, attach one image; (2) record the full state; (3) call `productSet` with an input that omits `collections`, `metafields` and media **entirely** (supplying only allowlisted scalar fields); (4) re-read the product. | **Record what actually happened — both outcomes are valid results of this experiment.** If the collections, metafield and image all survive, D-015-3's containment argument holds and Task 015 may proceed. If any of them is gone, the export design must change before any code is written: omission is not protection, and every list field must be supplied explicitly and completely. | Before/after full product read (sanitized), the exact request sent, the API version string returned by the store, and a one-line verdict naming which reading is true. |
 
-**Do not proceed past this case on either assumption.** A "probably fine"
-here is a decision to risk deleting a merchant's collections.
+**Do not proceed past this case on either assumption** — *if the design ever
+depends on it again*. A "probably fine" there would be a decision to risk
+deleting a merchant's collections. As of 2026-07-26 nothing depends on it.
 
-Re-confirm §2 of the source-verification record against the store's **pinned**
-API version at the same time: that record was verified against `latest`
-because the `2026-07` documentation URLs returned 503.
+The prior instruction to re-confirm §2 against the store's **pinned** API
+version is **discharged**: the `2026-07` documentation URLs returned HTTP 200
+on 2026-07-26 and every statement was re-verified against the pinned version.
+See the addendum §1.
+
+### 4.0a Export mutation cases — `M-EXP-*` (Task 015 / 015B)
+
+> Mutation cases. Each needs a named approver recorded before execution (§2.4),
+> and each asserts the store identity before acting.
+
+| # | Case | Expected | Evidence |
+| --- | --- | --- | --- |
+| M-EXP-1 | Confirm a preview for an unbound product, then apply | One product created; DRAFT; **unpublished**; bindings written for template and every variant | Product GID, binding rows, status |
+| M-EXP-2 | Replay the create job | **No** second product; the `customId` upsert or the reconciliation read converges on the first | Product count = 1, attempt ledger |
+| M-EXP-3 | Interrupt the create transport mid-flight | Reconciliation read by `customId` only; **never** a blind resend | Attempt state, reconcile job |
+| M-EXP-4 | Update a bound product's title/vendor/tags | `productUpdate` applied; **collections, merchant metafields and existing media unchanged** — verified by before/after read | Before/after full product read |
+| M-EXP-5 | Add a merchant collection + metafield + image in Shopify, then run an update | All three survive the update untouched | Before/after read |
+| M-EXP-6 | Update a mapped variant's price and SKU | `productVariantsBulkUpdate` applied atomically; `allowPartialUpdates` false | Variant read, request echo |
+| M-EXP-7 | Add a variant in Odoo, preview, confirm, apply | `productVariantsBulkCreate` with `PRESERVE_STANDALONE_VARIANT`; **no existing variant deleted** | Variant list before/after |
+| M-EXP-8 | Delete a variant in Shopify that a binding names | Blocked to manual review; **nothing written** | Job state, review case |
+| M-EXP-9 | Add a variant in Shopify the connector does not own, then apply | Survives untouched; disclosed in the preview as unowned | Before/after variant list |
+| M-EXP-10 | Change the option structure in Shopify, then preview | `remote_option_divergence` refused; no variant write planned | Preview record |
+| M-EXP-11 | Edit the product in Shopify between preview and apply | Apply refuses; preview expires; **nothing written** | Job state, preview state |
+| M-EXP-12 | Confirm, wait past the 24h expiry, then apply | Refused; fresh preview required | Preview state |
+| M-EXP-13 | Set `price_source_of_truth = shopify_authoritative`, then apply | Price fields **absent** from the request | Request echo |
+| M-EXP-14 | Media: append one image | `stagedUploadsCreate` → upload → `fileCreate` → poll to `READY` → `fileUpdate(referencesToAdd)`; **no association before READY** | Attempt ledger, `fileStatus` trace |
+| M-EXP-15 | Media: re-run with the same image | **No** second upload (checksum no-op) | Registry row count |
+| M-EXP-16 | Media: change the image and re-run | New image appended; **old File and association retained**, old row flagged `orphan_cleanup_candidate` | Product media list, registry |
+| M-EXP-17 | Media: a merchant-uploaded image on the same product | Survives every connector operation | Before/after media list |
+| M-EXP-18 | Media: force a `FAILED` `fileStatus` (bad file) | Manual review; **nothing associated** | Row status, job state |
+| M-EXP-19 | Point the connector at a store serving another API version | Every call fails closed with the configuration class; **no mutation** | Redacted log, job state |
+| M-EXP-20 | Confirm `fileUpdate(referencesToAdd:)` actually makes the File the product's media | Documented behaviour confirmed **or** the association path corrected | Product media list before/after |
+
+**M-EXP-20 is the one 015B behaviour this batch could not verify from
+documentation** and is called out rather than assumed.
 
 ### 4.1 Read / discovery (no mutation) — `D-*`
 

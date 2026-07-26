@@ -190,9 +190,9 @@ review or final acceptance**. That is exactly what this section does.
 | 2 | **PERF-1** | **DELIVERED, source-rebased.** Cron progress + time budget, configurable per-pass cap, pre-claim backpressure. The packet's claim-N rework was **not** performed because it was already merged in a stronger form — see §5c |
 | 3 | **U1 — fulfillment operator experience** | **DELIVERED** (previous batch, unchanged here) |
 | 4 | **U2 — orders, COD, catalog matching, inventory surfaces** | **DELIVERED** |
-| 5 | **Task 015 — controlled product export** | **NOT DELIVERED — HARD STOP, see §6a** |
-| 6 | **Task 015B — media export** | **NOT DELIVERED** — sequenced after 015 |
-| 7 | **U3 — reconnect/backfill, export UI, governance, diagnostics, polish** | **NOT DELIVERED** |
+| 5 | **Task 015 — controlled product export** | **DELIVERED, mutation-split** — see §5d. The HARD STOP of §6a is **lifted by the 2026-07-26 continuation ruling**, which removed the design's dependency on the unresolved `productSet` omitted-list boundary |
+| 6 | **Task 015B — media export** | **DELIVERED, append-only** — see §5d |
+| 7 | **U3 — export and non-export operator surfaces** | **PARTIALLY DELIVERED** — see §5e, which states exactly what is and is not in this batch |
 
 ## 5c. PERF-1 source rebase — what was corrected
 
@@ -209,6 +209,87 @@ was therefore not implemented as written; the packet now carries a §0 rebase
 section recording that, and the delivered scope is the part that genuinely did
 not exist. Full detail:
 [`../05-qa/task-perf1-validation-results.md`](../05-qa/task-perf1-validation-results.md).
+
+## 5d. Task 015 / 015B — the mutation split, and why the stop lifted
+
+`[Fact — implemented and locally validated in this branch; NOTHING accepted]`
+
+**The §6a hard stop was not overruled on schedule; the dependency it rested on
+was removed.** §6a's finding stands exactly as written: the official
+documentation does not say what `productSet` does with a list field omitted
+entirely, and building a destructive-write guard on a guess about *when Shopify
+deletes merchant data* is not acceptable. The 2026-07-26 continuation ruling
+directed that the production design must no longer depend on that proposition,
+and the 2026-07 reference — reachable this time, where it returned 503 before —
+shows how:
+
+| Path | Mutation | Why it cannot delete merchant state |
+| --- | --- | --- |
+| Create (unbound only) | `productSet(synchronous: true, identifier: {customId})` | A brand-new product has no merchant state. The `customId` upsert is what makes a replayed create converge on one product |
+| Scalar update | `productUpdate(product:, identifier: {id})` | `ProductUpdateInput` has **no `variants`** and **no `productOptions`** field at all, and expresses collections as additive/subtractive `collectionsToJoin`/`collectionsToLeave` |
+| Mapped variants | `productVariantsBulkUpdate(allowPartialUpdates: false)` | Operates only on the variant ids given; all-or-nothing |
+| New variants | `productVariantsBulkCreate(strategy: PRESERVE_STANDALONE_VARIANT)` | `DEFAULT` would delete the standalone "Default Title" variant, so it is not used |
+
+Full verification, including the corrected media-scope conclusion and the
+`X-EXPORT-0` record corrections:
+[`../05-qa/task-015-export-source-verification-2026-07-26-addendum.md`](../05-qa/task-015-export-source-verification-2026-07-26-addendum.md).
+
+**Nothing in the new module deletes a remote variant, product option, option
+value, collection membership, merchant metafield or media asset.** Every
+difference that would require one is enumerated in the preview as a refusal and
+routed to `destructive_write_guard_blocked`. The complete-list workaround is
+also refused: echoing a full remote list back into a declarative input would
+make the connector the author of state it cannot see.
+
+**015B is append-only, which is stronger than the packet's detach-only
+posture.** No `fileDelete`, no detach, no reorder. A superseded image's File
+and association are **retained** and the row is flagged
+`orphan_cleanup_candidate` for a later explicit capability that does not exist
+yet. The honest cost — a replaced image leaves the old one on the product until
+an operator removes it — is recorded rather than engineered around, because
+removing it safely needs a `File` reverse-reference query and 2026-07 exposes
+none.
+
+**One packet conclusion is corrected `[Fact]`:** least privilege for media is
+**`write_files` + `write_products`**, not `write_images` + `write_products`.
+`fileCreate` accepts `write_images`, but `fileUpdate` — the only 2026-07
+mutation that associates an **existing** File with a product, and therefore the
+only READY-gated association path — does not. `write_themes` is never
+requested and its presence is a readiness **failure**.
+
+## 5e. U3 — delivered scope and the residue, stated separately
+
+`[Fact]`
+
+**Delivered in this batch:** the export preview/diff surface (S7/S27) with the
+confirm flow wired to `action_confirm_export_preview`; the refused-differences
+and left-untouched sections rendered as first-class parts of the confirmation,
+not footnotes; the exported-media registry surface including the
+retained-orphan disclosure; the per-store export settings, ownership-direction
+and retention surface (S28/S29); the reconnect export block (PD-PX-7,
+implemented the strict way — reconnecting expires every open preview, so no
+pre-reconnect confirmation can authorise a post-reconnect write); the product
+form opt-in and its allowlist disclosure; and the Export menu branch under the
+one existing U0 root at a sequence held distinct by a test.
+
+**NOT delivered in this batch, and not claimed `[Fact]`:**
+
+- **No Owl component.** S7 is Odoo-native list/form/notebook, not the Owl
+  diff surface the master specification assigns to U3. The backend contract
+  and every guard are complete and tested; the Owl presentation layer is not
+  built.
+- **No `web_tour` tours and no HOOT tests** for the U3 surfaces. The packet
+  makes both an acceptance criterion for a UI phase. Server-side visibility
+  and wiring are tested; browser-driven evidence is absent.
+- **No screenshot set, no §13 accessibility checklist, no copy deck**
+  (`ui-u3-copy-deck.md` does not exist).
+- **No reconnect/backfill banner or watermark catch-up progress surface**
+  (S25/S26), **no diagnostics screen** (S31), and **no motion/reduced-motion,
+  keyboard-walkthrough or contrast pass**.
+
+The reason is capacity, not a dependency, and it is stated plainly rather than
+dressed as one. **U3 is therefore not complete**, and the acceptance criteria
+the packet sets for a UI phase are not met by this batch.
 
 ## 6. Re-derived Wave 5 completion scope and sequence
 

@@ -1,3 +1,83 @@
+### Wave 5 completion continuation — Task 015, 015B, U3, API version (2026-07-26)
+
+- **Branch / PR:** `claude/wave-5-completion-cont-e1hunz`, continuing the work
+  of draft [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the same
+  bound base `87f1763a` and the same starting head `60a80eff`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  **Branch note, flagged rather than resolved unilaterally:** the continuation
+  instruction named `fable/wave-5-completion` (PR #204's head), while this
+  session's harness contract designates `claude/wave-5-completion-cont-e1hunz`
+  as the only branch it may push to. Both refs were at exactly `60a80eff`, so
+  the lineage and the base are identical; the work is pushed to the designated
+  branch and the control room decides whether to retarget PR #204 or open a new
+  PR from this branch. `fable/wave-5-completion`, `mvp/program-integration` and
+  PR #204's ready state were not touched.
+- **Authorization:** the consolidated continuation ruling of 2026-07-26, which
+  **supersedes the earlier decision that `X-EXPORT-0` must block
+  implementation** and requires that the production export design no longer
+  depend on `productSet` preserving entirely-omitted list fields.
+- **Delivered:** centralized fail-closed API-version enforcement · Task 015
+  (split-mutation product export) · Task 015B (append-only media export) · SEC-3
+  over every new model/relation/ACL/rule · the `X-EXPORT-0` record correction ·
+  **U3 partially** (see below).
+- **The one architectural move worth carrying forward.** The stop was not
+  overruled; **the dependency was removed.** `ProductUpdateInput` has no
+  `variants` and no `productOptions` field and expresses collections as
+  `collectionsToJoin`/`collectionsToLeave`, so `productUpdate` *cannot* delete
+  merchant list state however it is called. The design stopped asking the
+  unanswered question instead of guessing the answer. `productSet` survives only
+  on the create path, where there is no merchant state to destroy, and a guard
+  asserts that on the operation string rather than trusting the call graph.
+- **NOT delivered, stated plainly:** **U3 is incomplete** — no Owl component,
+  no `web_tour` tours, no HOOT tests, no screenshot set, no accessibility
+  checklist, no copy deck, no S25/S26 banners, no S31 diagnostics, no polish
+  pass (TD-006). The reason is capacity, not a dependency. **No variant media
+  association** and **no media reordering** (015B narrowing, named). **No
+  option mutation on an existing product** — a divergence is refused (TD-007).
+- **Evidence:** [`../05-qa/task-015-015b-u3-validation-results.md`](../05-qa/task-015-015b-u3-validation-results.md),
+  [`../05-qa/task-015-export-source-verification-2026-07-26-addendum.md`](../05-qa/task-015-export-source-verification-2026-07-26-addendum.md).
+  Local Odoo 19 @ pinned `30bde9ff`, PostgreSQL 16.13. **The environment was
+  proven faithful before it was trusted**: the starting head reproduced
+  `0 failed, 0 error(s) of 1616 tests` on a fresh install, matching the number
+  PR #204 records for that SHA. **DEC-041 D8 supporting evidence — Odoo.sh
+  remains Tier-1 and has NOT been run. No Shopify store, credential, request,
+  mutation or webhook exists anywhere in this batch.**
+- **Learning feedback loop.** Five things this batch taught that generalise:
+  (1) **when a gate blocks on an unanswered question, try removing the
+  dependency before trying to answer it** — the export stop dissolved not by
+  resolving `productSet`'s omitted-list semantics but by reading the *other*
+  mutation's input object and finding it structurally incapable of the harm;
+  (2) **re-fetch a blocked source before inheriting its limitation** — the
+  `2026-07` documentation URLs returned 503 for the previous session and 200 for
+  this one, which cleared a limitation that record had correctly flagged as
+  unresolved; (3) **a repository's own guards are the best reviewers available
+  to an implementing session** — five standing guards rejected the first version
+  of this work, every rejection was correct, and one of them (the
+  mutation-literal guard) refused a plausible eight-way delegation until the
+  shared transport helper was *named* and separately asserted; (4) **extend a
+  guard by naming, never by pattern** — widening the accepted-split allowlist to
+  "every `_prepare_preconditions_*`" would have passed the suite and destroyed
+  the guard, so the ten pairs and the one shared helper are enumerated and the
+  freeze test still fails on any addition; (5) **a test that passes for the
+  wrong reason is worse than a failing one** — `AccessError` subclasses
+  `UserError`, so two confirmation-guard tests were green while only ever
+  exercising the permission check, and Odoo's `assertRaises` savepoint was
+  silently rolling back the very side effect a third test asserted.
+- **Next-session prompt.** The next gate is **not** more implementation:
+  1. one **exact-head Odoo.sh runtime campaign** at the frozen head (fresh
+     install + warm update + the non-standard tag suite), recorded verbatim;
+  2. then **independent Claude review at that exact SHA** — a separate
+     top-level session or a fresh subagent, adversarially re-verifying the
+     mutation split against the 2026-07 source, the guard extensions in
+     `test_mutation_source_guards.py` (they touch an accepted core guard and
+     deserve the most scrutiny in this batch), the four inverted API-version
+     assertions, and the SEC-3 matrix additions;
+  3. then a **separate closure session** to ready-mark or merge.
+  The U3 completion slice (Owl S7, tours, HOOT, screenshots, accessibility,
+  copy deck, S25/S26, S31, polish) is a distinct authorized batch, and
+  `M-EXP-1..20` in the live-validation package is the export campaign the moment
+  a store exists.
+
 ### Wave 5 completion batch — SEC-2 PII, PERF-1, U2 (2026-07-26)
 
 - **Branch / PR:** `fable/wave-5-completion`, draft [PR #204](https://github.com/AdamsOdoo/Adams/pull/204)

@@ -413,3 +413,67 @@ other work.
 >    [`wave-5-definition-of-ready.md`](wave-5-definition-of-ready.md).
 >
 > Re-acceptance of this packet rides the same Wave 5 G5-5 gate as Task 015.
+
+---
+
+## 11. Addendum (2026-07-26) — append-only supersession
+
+> **Status: implemented under the control-room continuation ruling of
+> 2026-07-26. NOT an acceptance.** Appended; nothing above is rewritten.
+
+### 11.1 Detach-only becomes append-only
+
+**D-015B-2 and D-015B-6 are superseded in the safe direction.** The packet's
+posture was detach-the-connector-owned-association-and-retain-the-File. The
+ruling requires **append-only**, which is strictly stronger: this module
+performs **no detach, no reorder and no `fileDelete`** on any path.
+
+When an Odoo image changes, the new image is uploaded and appended, and the
+superseded registry row is flagged `orphan_cleanup_candidate` while its File
+**and its association** are retained. The honest cost is that a replaced image
+leaves the old one on the product until an operator removes it in Shopify. That
+is recorded as a known limitation rather than engineered around, for the same
+reason the packet already gives: removing it safely needs a `File`
+reverse-reference query to prove exclusive use, and 2026-07 exposes none
+(re-verified against the pinned reference this session — the `File` interface is
+`alt`/`createdAt`/`fileErrors`/`fileStatus`/`id`/`preview`/`updatedAt`).
+
+The field is named `orphan_cleanup_candidate` rather than
+`detached_orphan_candidate`, because nothing is detached.
+
+### 11.2 The association mutation, and the scope correction
+
+**D-015B-4's READY gate is unchanged and is the binding constraint.** The
+packet's stated association mechanism — "product association via
+`productUpdate` media/files input" — **does not work with a READY gate**, and
+that is a source finding rather than a preference: `CreateMediaInput` has
+exactly three fields (`alt`, `mediaContentType`, `originalSource`) and **no
+`id`**, so `productUpdate(media:)` creates media from a source URL and cannot
+attach an existing `File`. There is nothing to poll before it, so
+association-before-`READY` would be unavoidable.
+
+The pipeline is therefore `stagedUploadsCreate` → plain HTTPS upload →
+`fileCreate` → poll `fileStatus` until `READY` → `fileUpdate(referencesToAdd:
+[productId])`, the one 2026-07 mutation that associates an existing File with a
+product. `productCreateMedia` is deprecated ("Use `productUpdate` or
+`productSet` instead") and `productUpdateMedia` is deprecated ("Use
+`fileUpdate` instead"), so `fileUpdate` is also Shopify's own designated
+current surface.
+
+**Consequently the least-privilege conclusion changes `[Fact]`:**
+`fileCreate` accepts `write_files`, `write_themes` **or** `write_images`, but
+`fileUpdate` accepts only `write_files` or `write_themes`. The minimal set that
+satisfies the READY gate is **`write_files` + `write_products`**;
+`write_themes` is never requested and its presence in a granted-scope snapshot
+is a readiness **failure**. This corrects the `write_images` + `write_products`
+conclusion recorded on 2026-07-26 before the association path was pinned down.
+
+### 11.3 Scope narrowing, named
+
+- **No variant media association in this batch.** `productVariantAppendMedia`
+  exists and is additive, but the batch delivers the product-level append only.
+  Per-variant image association is deferred **with a name**, not absorbed.
+- **No `productReorderMedia`.** Primary-image ordering is not controlled, so an
+  appended image lands wherever Shopify puts it. Stated rather than implied.
+- **`fileUpdate(referencesToAdd:)`'s effect is documented, not behaviourally
+  confirmed.** It is case `M-EXP-20` in the live-validation package.
