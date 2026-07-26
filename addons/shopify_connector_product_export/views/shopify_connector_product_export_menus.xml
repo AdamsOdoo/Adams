@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U3: the Export branch of the connector navigation, under the ONE
+        existing U0 root. No new root app menu — the operator keeps one
+        connector app.
+
+        Sequence 34 places Export between Catalog (32)/Inventory (33) and
+        Fulfillment (35), matching the master specification's relative order.
+        Top-level sequences are held distinct by a test, because a collision
+        makes rendered order depend on insertion id rather than on intent.
+
+        VISIBILITY vs AUTHORIZATION. The branch is gated on the SEC-2
+        customer-facing User role, which is a visibility control only. The
+        confirm control inside the screen carries the same role, and the
+        server refuses a caller who is not Reviewer or Administrator
+        regardless of what the screen offered.
+    -->
+
+    <menuitem id="menu_shopify_connector_product_export"
+              name="Export"
+              parent="shopify_connector_core.menu_shopify_connector_root"
+              sequence="34"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
+
+    <menuitem id="menu_shopify_connector_product_export_preview"
+              name="Export Previews"
+              parent="menu_shopify_connector_product_export"
+              action="action_shopify_connector_product_export_preview"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_connector_product_export_media"
+              name="Exported Media"
+              parent="menu_shopify_connector_product_export"
+              action="action_shopify_connector_product_media_binding"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_connector_product_export_settings"
+              name="Export Settings"
+              parent="menu_shopify_connector_product_export"
+              action="action_shopify_connector_store_settings_export"
+              sequence="30"/>
+</odoo>

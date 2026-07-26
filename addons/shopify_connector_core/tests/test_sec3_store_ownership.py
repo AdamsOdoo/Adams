@@ -105,6 +105,10 @@ SEC3_MODELS = (
     ('shopify.connector.fulfillment.binding', '_row_fulfillment_binding'),
     ('shopify.connector.fulfillment.inbound.evidence', '_row_evidence'),
     ('shopify.connector.fulfillment.inbound.evidence.line', '_row_evidence_line'),
+    # Task 015 / 015B (2026-07-26). Both are durable and store-scoped, so both
+    # are in the matrix rather than trusted to be safe by resemblance.
+    ('shopify.connector.product.export.preview', '_row_export_preview'),
+    ('shopify.connector.product.media.binding', '_row_export_media_binding'),
 )
 
 # Connector-to-connector relations that must agree on the STORE, and the models
@@ -120,6 +124,9 @@ SEC3_STORE_RELATIONS = (
     ('shopify.connector.fulfillment.binding', 'order_binding_id'),
     ('shopify.connector.fulfillment.inbound.evidence', 'order_binding_id'),
     ('shopify.connector.fulfillment.inbound.evidence', 'fulfillment_binding_id'),
+    ('shopify.connector.product.export.preview', 'product_template_binding_id'),
+    ('shopify.connector.product.media.binding', 'product_template_binding_id'),
+    ('shopify.connector.product.media.binding', 'product_variant_binding_id'),
 )
 
 # Relations whose scope disagreement is structurally impossible, because the
@@ -438,6 +445,48 @@ class Sec3Base(TransactionCase):
             'product_variant_id':
                 template_binding.product_template_id.product_variant_id.id,
             'product_template_binding_id': template_binding.id,
+        })
+
+    def _row_export_preview(self, store):
+        """A preview minted through the closed create surface.
+
+        `_create_preview` fails closed without its named context, so the
+        fixture satisfies the production guard instead of bypassing it.
+        """
+        Preview = self.env['shopify.connector.product.export.preview']
+        template_binding = self._build(
+            'shopify.connector.product.template.binding',
+            '_row_template_binding', store)
+        now = fields.Datetime.now()
+        return Preview._preview_surface('_create_preview').with_company(
+            store.company_id
+        ).create({
+            'store_id': store.id,
+            'product_template_id': template_binding.product_template_id.id,
+            'product_template_binding_id': template_binding.id,
+            'export_path': 'update',
+            'state': 'previewed',
+            'diff': {},
+            'apply_plan': {'steps': []},
+            'blocked_differences': {'items': []},
+            'previewed_at': now,
+            'expires_at': fields.Datetime.add(now, hours=1),
+        })
+
+    def _row_export_media_binding(self, store):
+        template_binding = self._build(
+            'shopify.connector.product.template.binding',
+            '_row_template_binding', store)
+        return self.env[
+            'shopify.connector.product.media.binding'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_template_binding_id': template_binding.id,
+            'media_role': 'primary',
+            'odoo_image_checksum': '%064d' % store.id,
+            'connector_filename': 'odoo-sec3-%s.png' % store.id,
+            'shopify_gid': self._gid('MediaImage', store),
+            'remote_status': 'staged',
         })
 
     def _row_location_mapping(self, store):

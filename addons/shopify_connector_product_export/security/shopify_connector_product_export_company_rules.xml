@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+        <!--
+            SEC-3 (issue #197) multi-company isolation, extended over the two
+            models this module adds.
+
+            Same ownership model as every other connector row: company is
+            rooted in the STORE via a stored related `company_id`, and TWO
+            global rules apply to each model because they close different
+            holes.
+
+              * the STORE rule — fail-closed on `company_id in company_ids`
+                with no NULL escape, plus the SEC-3 quarantine exclusion. A
+                row whose ownership cannot be proven is shown to nobody.
+              * the BUSINESS-RECORD rule — a preview names a
+                `product.template`, and a media row reaches its product only
+                through its parent bindings. Scoping on the store alone would
+                let a connector row act as a path to another company's
+                business record.
+
+            `noupdate="0"` is deliberate: a correction to a security rule has
+            to reach databases that already carry the old one on the next
+            module update.
+
+            Record rules constrain interactive access. Connector system code
+            runs `sudo()` and bypasses them by design; the write-side
+            authority is Odoo's native `_check_company` (opted into via
+            `_check_company_auto` + `check_company=True`) plus the
+            fail-closed checks in the export service.
+        -->
+
+        <record id="product_export_preview_store_company_rule" model="ir.rule">
+            <field name="name">Shopify Product Export Preview: owning store company</field>
+            <field name="model_id" ref="model_shopify_connector_product_export_preview"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
+        </record>
+
+        <record id="product_export_preview_business_company_rule" model="ir.rule">
+            <field name="name">Shopify Product Export Preview: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_product_export_preview"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('product_template_id.company_id', '=', False), ('product_template_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <record id="product_media_binding_store_company_rule" model="ir.rule">
+            <field name="name">Shopify Product Media Binding: owning store company</field>
+            <field name="model_id" ref="model_shopify_connector_product_media_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['&amp;', ('company_id', 'in', company_ids), ('sec3_scope_quarantined', '=', False)]</field>
+        </record>
+
+        <!--
+            The media row reaches company only through its template binding's
+            own product. Requiring that to be visible keeps the pre-existing
+            guarantee that a connector row is never a path to another
+            company's product record.
+        -->
+        <record id="product_media_binding_business_company_rule" model="ir.rule">
+            <field name="name">Shopify Product Media Binding: multi-company</field>
+            <field name="model_id" ref="model_shopify_connector_product_media_binding"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">['|', ('product_template_binding_id.product_template_id.company_id', '=', False), ('product_template_binding_id.product_template_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+    </data>
+</odoo>

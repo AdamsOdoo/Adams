@@ -1,0 +1,161 @@
+"""Shared fixtures for the product-export suite.
+
+No Shopify store, credential or request exists anywhere in this package. The
+transport is replaced at the `_send` seam so the REAL admission gate, the real
+Layer 2 attempt machinery and the real `_normalize_response` taxonomy all run
+exactly as they do in production — only the socket is absent.
+"""
+
+import json
+from unittest.mock import patch
+
+from odoo import fields
+from odoo.tests.common import TransactionCase
+
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    API_VERSION_RESPONSE_HEADER,
+    SHOPIFY_API_VERSION,
+)
+
+DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
+SHOP_DOMAIN = 'export-test.myshopify.com'
+PRODUCT_GID = 'gid://shopify/Product/111'
+VARIANT_GID = 'gid://shopify/ProductVariant/222'
+FILE_GID = 'gid://shopify/MediaImage/333'
+
+
+class FakeSendResponse:
+    """A `requests.Response` stand-in for the `_send` transport seam."""
+
+    def __init__(self, body, status_code=200, headers=None):
+        self._body = body
+        self.status_code = status_code
+        self.headers = headers if headers is not None else {
+            API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+        }
+        self.text = json.dumps(body) if body is not None else ''
+
+    def json(self):
+        return self._body
+
+
+class ExportCase(TransactionCase):
+    """Fixtures for a connected store with the export domain enabled."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Store = cls.env['shopify.connector.store']
+        cls.Service = cls.env['shopify.connector.product.export.service']
+        cls.Media = cls.env['shopify.connector.media.export.service']
+        cls.Preview = cls.env['shopify.connector.product.export.preview']
+        cls.TemplateBinding = cls.env[
+            'shopify.connector.product.template.binding'
+        ]
+        cls.VariantBinding = cls.env[
+            'shopify.connector.product.variant.binding'
+        ]
+        cls.MediaBinding = cls.env['shopify.connector.product.media.binding']
+
+        cls.store = cls.Store.sudo().create({
+            'name': 'Export Test Store',
+            'shop_domain': SHOP_DOMAIN,
+            'api_version': SHOPIFY_API_VERSION,
+        })
+        cls.store.sudo().write({'state': 'connected'})
+        cls.env['shopify.connector.store.credential'].sudo().create({
+            'store_id': cls.store.id,
+            'access_token': DUMMY_TOKEN,
+        })
+        cls.settings = cls.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': cls.store.id,
+            'product_export_domain_enabled': True,
+            'price_source_of_truth': 'odoo_authoritative',
+        })
+        cls.template = cls.env['product.template'].create({
+            'name': 'Exportable Widget',
+            'description_sale': '<p>A widget.</p>',
+            'list_price': 12.5,
+            'shopify_export_enabled': True,
+            'shopify_export_status': 'draft',
+            'shopify_export_vendor': 'Adams',
+            'shopify_export_product_type': 'Widgets',
+            'shopify_export_tags': 'alpha, beta',
+        })
+        cls.variant = cls.template.product_variant_ids[:1]
+        cls.variant.write({'default_code': 'WIDGET-1', 'barcode': '0001'})
+
+    def setUp(self):
+        super().setUp()
+        # `_admit` opens its gate/lease insert on an independent
+        # `registry.cursor()` side transaction. Registry test mode makes that a
+        # TestCursor sharing the single test connection, so the uncommitted
+        # fixtures and the committed lease are visible cross-cursor -- the
+        # sanctioned CORE-R2 mechanism the existing admission tests use.
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def bind_template(self, gid=PRODUCT_GID, variant_gid=VARIANT_GID):
+        binding = self.TemplateBinding.sudo().create({
+            'store_id': self.store.id,
+            'product_template_id': self.template.id,
+            'shopify_gid': gid,
+        })
+        if variant_gid:
+            self.VariantBinding.sudo().create({
+                'store_id': self.store.id,
+                'product_variant_id': self.variant.id,
+                'product_template_binding_id': binding.id,
+                'shopify_gid': variant_gid,
+            })
+        return binding
+
+    def make_job(self, job_type, res_model, res_id, gid=False):
+        return self.env['shopify.connector.job.enqueue'].enqueue(
+            self.store,
+            'manual_sync' if job_type != 'product_export_preview'
+            else 'export_preview_dry_run',
+            job_type,
+            payload_hash='test-%s-%s' % (job_type, res_id),
+            res_model=res_model,
+            res_id=res_id,
+            shopify_target_gid=gid,
+        )
+
+    def send_patch(self, responder):
+        """Patch the ONE transport method, nothing above it."""
+        Client = type(self.env['shopify.connector.api.client'])
+        return patch.object(Client, '_send', responder)
+
+    def make_preview(
+        self, export_path='update', steps=None, state='previewed',
+        binding=None, diff=None, blocked=None, remote_updated_at='2026-07-26T00:00:00Z',
+    ):
+        """Create a preview through the sanctioned surface.
+
+        Tests build previews directly rather than by running the preview
+        handler when the behaviour under test is downstream of it; the preview
+        handler has its own tests.
+        """
+        now = fields.Datetime.now()
+        values = {
+            'store_id': self.store.id,
+            'product_template_id': self.template.id,
+            'product_template_binding_id': binding.id if binding else False,
+            'export_path': export_path,
+            'state': state,
+            'diff': diff or {'scalars': [], 'untouched': {}},
+            'apply_plan': {'steps': steps or [], 'cursor': 0},
+            'blocked_differences': {'items': blocked or []},
+            'has_blocked_differences': bool(blocked),
+            'remote_product_gid': binding.shopify_gid if binding else False,
+            'remote_updated_at': remote_updated_at,
+            'source_write_date': self.Preview._source_write_date(self.template),
+            'previewed_at': now,
+            'expires_at': fields.Datetime.add(now, hours=24),
+        }
+        return self.Preview._preview_surface('_create_preview').create(values)

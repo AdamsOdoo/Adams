@@ -63,7 +63,103 @@ ACCEPTED_PREPARE_TRANSPORT_SPLIT = {
         'ShopifyConnectorInventoryService',
         '_prepare_preconditions_activate',
     ): '_transport_activate',
+    # Task 015 / 015B (2026-07-26 ruling). The export module splits its
+    # mutations across four product and three media domains; every one
+    # reaches transport ONLY through the single shared guarded helper
+    # named in SHARED_GUARDED_TRANSPORT below, which is stricter than
+    # eight separate copies of the same `execute_business` call.
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_product_export_service.py',
+        'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_binding_namespace',
+    ): '_transport_binding_namespace',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_product_export_service.py',
+        'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_create',
+    ): '_transport_create',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_product_export_service.py',
+        'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_update',
+    ): '_transport_update',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_product_export_service.py',
+        'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_variants_update',
+    ): '_transport_variants_update',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_product_export_service.py',
+        'ShopifyConnectorProductExportService',
+        '_prepare_preconditions_variants_create',
+    ): '_transport_variants_create',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_media_export_service.py',
+        'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_stage',
+    ): '_transport_media_stage',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_media_export_service.py',
+        'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_file_create',
+    ): '_transport_media_file_create',
+    (
+        'shopify_connector_product_export/models/'
+        'shopify_connector_media_export_service.py',
+        'ShopifyConnectorMediaExportService',
+        '_prepare_preconditions_media_associate',
+    ): '_transport_media_associate',
 }
+
+
+# The ONE shared guarded transport helper an accepted split may delegate to
+# instead of holding `execute_business(mutation_context=...)` itself. Naming it
+# here — rather than accepting any delegation — keeps the guard exact: a
+# `_transport_*` method satisfies the contract only by calling THIS method, and
+# this method is itself checked for the guarded call and for forbidden routes.
+SHARED_GUARDED_TRANSPORT = (
+    'shopify_connector_product_export/models/'
+    'shopify_connector_product_export_service.py',
+    'ShopifyConnectorProductExportService',
+    '_transport',
+)
+
+
+def _shared_guarded_transport_node(addon_root):
+    """Return the shared helper's AST node, or None when it is absent."""
+    file_suffix, class_name, method_name = SHARED_GUARDED_TRANSPORT
+    path = addon_root / file_suffix
+    if not path.exists():
+        return None
+    tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for member in node.body:
+                if (
+                    isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and member.name == method_name
+                ):
+                    return member
+    return None
+
+
+def _method_delegates_to_shared_transport(method_node):
+    """True when the method's only transport route is the shared helper."""
+    if method_node is None:
+        return False
+    return any(
+        isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Attribute)
+        and call.func.attr == SHARED_GUARDED_TRANSPORT[2]
+        for call in ast.walk(method_node)
+    )
 
 
 def _owning_class(node, parents):
@@ -140,7 +236,7 @@ def _single_paired_transport(owner_class, paired_name):
     return siblings[0]
 
 
-def _mutation_literal_violations(source, relative):
+def _mutation_literal_violations(source, relative, shared_transport=None):
     tree = ast.parse(source, filename=relative)
     parents = _parent_map(tree)
     violations = []
@@ -189,10 +285,21 @@ def _mutation_literal_violations(source, relative):
         )
         if paired_name is not None:
             transport = _single_paired_transport(owner_class, paired_name)
+            transport_is_guarded = transport is not None and (
+                _method_has_guarded_execute_business(transport)
+                or (
+                    # Delegation to the ONE shared guarded helper, which must
+                    # itself hold the guarded call and reach transport by no
+                    # other route.
+                    shared_transport is not None
+                    and _method_delegates_to_shared_transport(transport)
+                    and _method_has_guarded_execute_business(shared_transport)
+                    and not _method_has_forbidden_transport(shared_transport)
+                )
+            )
             if (
-                transport is not None
+                transport_is_guarded
                 and not _method_has_forbidden_transport(owner)
-                and _method_has_guarded_execute_business(transport)
                 and not _method_has_forbidden_transport(transport)
             ):
                 continue
@@ -428,17 +535,39 @@ class TestMutationSourceGuards(TransactionCase):
                         'shopify_connector_product_importer.py'
                     )
                     and func.attr == 'get'
+                ) or (
+                    # Task 015B: the staged-upload PUT/POST is a plain HTTPS
+                    # upload to the object-store target `stagedUploadsCreate`
+                    # returned. It is NOT a Shopify GraphQL call, changes no
+                    # Shopify resource, and writes to a write-once key, so it
+                    # cannot go through `execute_business` -- there is no
+                    # GraphQL operation to admit. Narrowed to one file, one
+                    # verb and one method so nothing else in that module can
+                    # reach raw HTTP.
+                    relative.endswith(
+                        'shopify_connector_product_export/models/'
+                        'shopify_connector_media_export_service.py'
+                    )
+                    and func.attr == 'post'
+                    and owner_name == '_handle_product_export_media_upload'
                 )
                 if not allowed:
                     violations.append((relative, node.lineno, func.attr))
         self.assertFalse(violations, violations)
 
     def test_mutation_literals_require_guarded_transport_or_selftest(self):
+        shared = _shared_guarded_transport_node(self._addon_root())
+        self.assertIsNotNone(
+            shared,
+            'the shared guarded transport helper named in '
+            'SHARED_GUARDED_TRANSPORT must exist, or the allowlist entries '
+            'that rely on it silently accept an unguarded delegation',
+        )
         violations = []
         for path in self._python_files():
             relative = str(path.relative_to(self._addon_root()))
             violations.extend(_mutation_literal_violations(
-                path.read_text(encoding='utf-8'), relative,
+                path.read_text(encoding='utf-8'), relative, shared,
             ))
         self.assertFalse(violations, violations)
 
@@ -470,10 +599,28 @@ class TestMutationSourceGuards(TransactionCase):
 
     # --- Accepted prepare/transport split: adversarial guard self-tests ---
 
-    def test_accepted_split_allowlist_is_exactly_the_two_inventory_pairs(self):
-        # The allowlist must stay exact and narrow: exactly the two real
-        # inventory pairs, nothing else. This fails if anyone widens it
-        # (e.g. to every `_prepare_preconditions_*`).
+    def test_accepted_split_allowlist_is_exactly_the_declared_pairs(self):
+        # The allowlist must stay EXACT and NARROW: every entry is named here
+        # explicitly, so widening it (e.g. to every `_prepare_preconditions_*`,
+        # or to a whole file) fails this test rather than passing quietly.
+        #
+        # Ten entries as of the 2026-07-26 export batch: the two original
+        # inventory pairs, plus the five product-export and three media-export
+        # pairs Task 015/015B added. Each export pair reaches transport only
+        # through the ONE shared guarded helper named in
+        # SHARED_GUARDED_TRANSPORT, whose existence and guardedness are
+        # asserted separately -- so the widening buys a shared audit point, not
+        # a weaker contract.
+        export_service = (
+            'shopify_connector_product_export/models/'
+            'shopify_connector_product_export_service.py'
+        )
+        export_class = 'ShopifyConnectorProductExportService'
+        media_service = (
+            'shopify_connector_product_export/models/'
+            'shopify_connector_media_export_service.py'
+        )
+        media_class = 'ShopifyConnectorMediaExportService'
         self.assertEqual(
             ACCEPTED_PREPARE_TRANSPORT_SPLIT,
             {
@@ -485,8 +632,57 @@ class TestMutationSourceGuards(TransactionCase):
                     _INV_SPLIT_FILE, _INV_SPLIT_CLASS,
                     '_prepare_preconditions_activate',
                 ): '_transport_activate',
+                (
+                    export_service, export_class,
+                    '_prepare_preconditions_binding_namespace',
+                ): '_transport_binding_namespace',
+                (
+                    export_service, export_class,
+                    '_prepare_preconditions_create',
+                ): '_transport_create',
+                (
+                    export_service, export_class,
+                    '_prepare_preconditions_update',
+                ): '_transport_update',
+                (
+                    export_service, export_class,
+                    '_prepare_preconditions_variants_update',
+                ): '_transport_variants_update',
+                (
+                    export_service, export_class,
+                    '_prepare_preconditions_variants_create',
+                ): '_transport_variants_create',
+                (
+                    media_service, media_class,
+                    '_prepare_preconditions_media_stage',
+                ): '_transport_media_stage',
+                (
+                    media_service, media_class,
+                    '_prepare_preconditions_media_file_create',
+                ): '_transport_media_file_create',
+                (
+                    media_service, media_class,
+                    '_prepare_preconditions_media_associate',
+                ): '_transport_media_associate',
             },
         )
+
+    def test_the_shared_guarded_transport_helper_is_genuinely_guarded(self):
+        """Guard against vacuity in the shared-helper allowance.
+
+        The eight export entries above are accepted only because ONE named
+        helper holds the guarded `execute_business(mutation_context=...)` call
+        and reaches transport by no other route. If that stopped being true,
+        every one of those entries would be accepting an unguarded delegation,
+        so it is asserted here directly rather than inferred.
+        """
+        shared = _shared_guarded_transport_node(self._addon_root())
+        self.assertIsNotNone(shared, 'the shared guarded helper must exist')
+        self.assertTrue(_method_has_guarded_execute_business(shared))
+        self.assertFalse(_method_has_forbidden_transport(shared))
+        # And a `_transport_*` method that does NOT delegate to it is still a
+        # violation -- the allowance is delegation-specific, not blanket.
+        self.assertFalse(_method_delegates_to_shared_transport(None))
 
     def test_accepted_split_real_inventory_service_passes(self):
         # The REAL production file: both accepted prepare/transport pairs

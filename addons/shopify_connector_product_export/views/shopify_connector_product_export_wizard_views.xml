@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U3 wizard surfaces. Defined before the views that reference them, so
+        every action exists by the time a button points at it.
+    -->
+
+    <record id="view_shopify_connector_product_export_request_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.request.wizard.form</field>
+        <field name="model">shopify.connector.product.export.request.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Preview Shopify Export">
+                <div class="alert alert-info" role="status">
+                    This reads the product from Shopify and computes a
+                    field-level difference. <strong>Nothing is written to
+                    Shopify by a preview.</strong>
+                </div>
+                <group>
+                    <field name="product_template_id"/>
+                    <field name="store_id"
+                           options="{'no_create': True, 'no_open': True}"/>
+                    <field name="export_enabled" readonly="1"/>
+                    <field name="export_status" readonly="1"/>
+                </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="export_enabled">
+                    This product is not enabled for Shopify export. Enable
+                    "Export to Shopify" on the product first.
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Run Preview" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_export_request_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Preview Shopify Export</field>
+        <field name="res_model">shopify.connector.product.export.request.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="binding_model_id" ref="product.model_product_template"/>
+        <field name="binding_view_types">form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+    </record>
+
+    <!--
+        The confirmation surface. It is deliberately verbose: the operator is
+        authorising a write to a live storefront, so the dialog shows what will
+        change, what the connector REFUSED to do, and what it is leaving
+        alone. Review-then-apply is rendered as the only mode — there is no
+        "apply without preview" affordance anywhere on this screen because
+        there is no such server path.
+    -->
+    <record id="view_shopify_connector_product_export_confirm_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.confirm.wizard.form</field>
+        <field name="model">shopify.connector.product.export.confirm.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Confirm Shopify Export">
+                <group>
+                    <field name="preview_id" readonly="1"/>
+                    <field name="product_template_id" readonly="1"/>
+                    <field name="export_path" readonly="1"/>
+                    <field name="state" readonly="1"/>
+                    <field name="has_blocked_differences" invisible="1"/>
+                </group>
+                <group string="What will change">
+                    <field name="changes_summary" nolabel="1" readonly="1"/>
+                </group>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not has_blocked_differences">
+                    <strong>Some differences were refused.</strong> They are
+                    listed below and are <em>not</em> part of what you are
+                    confirming. This connector never deletes a remote variant,
+                    option, collection, metafield or image.
+                </div>
+                <group string="What this connector refuses to do"
+                       invisible="not has_blocked_differences">
+                    <field name="blocked_summary" nolabel="1" readonly="1"/>
+                </group>
+                <group string="Left exactly as it is">
+                    <field name="untouched_summary" nolabel="1" readonly="1"/>
+                </group>
+                <group>
+                    <field name="acknowledged"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Confirm Export" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_export_confirm_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Confirm Shopify Export</field>
+        <field name="res_model">shopify.connector.product.export.confirm.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_reviewer'))]"/>
+    </record>
+
+</odoo>

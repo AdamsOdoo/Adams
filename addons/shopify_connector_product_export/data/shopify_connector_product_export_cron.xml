@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!--
+            The media READY poll (D-015B-4 step 2).
+
+            `noupdate="1"` so an administrator's cadence change survives every
+            module update: the interval is operational configuration, not
+            code, and a module update that silently reset it would undo a
+            deliberate operational decision.
+
+            The cron only ENQUEUES poll jobs; the jobs themselves run through
+            the ordinary dispatcher, so the poll inherits store-state gating,
+            the domain flag, replay policy and every log surface rather than
+            having its own privileged path. It stops enqueueing by itself once
+            no media row is in a pollable state.
+        -->
+        <record id="ir_cron_shopify_connector_media_export_poll" model="ir.cron">
+            <field name="name">Shopify Connector: product media export READY poll</field>
+            <field name="model_id" ref="model_shopify_connector_media_export_service"/>
+            <field name="state">code</field>
+            <field name="code">model.run_media_status_poll()</field>
+            <field name="interval_number">5</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

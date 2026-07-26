@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U3 export operator surfaces (premium UX master specification S7/S27),
+        plus the non-export U3 surfaces this module owns: the per-store export
+        settings/direction controls and the reconnect block.
+
+        WHAT THIS SURFACE IS. A face over the export models. Every button wires
+        to a sanctioned server action: `action_confirm_export_preview`,
+        `action_shopify_export_preview`,
+        `action_shopify_export_reconnect_reconciliation`,
+        `action_sec3_release_scope_quarantine`. No payload is built, no diff is
+        computed and no guard is evaluated here — the screen shows what the
+        service already recorded.
+
+        REVIEW-THEN-APPLY IS RENDERED AS THE ONLY MODE. There is no
+        apply-without-preview button, no auto-apply toggle and no bulk-confirm
+        affordance anywhere in this file, because no such server path exists.
+        An operator cannot be offered a shortcut that the backend would refuse.
+    -->
+
+    <!-- ============================================================== -->
+    <!-- S7 / S27 — export preview and diff                             -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_product_export_preview_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.preview.search</field>
+        <field name="model">shopify.connector.product.export.preview</field>
+        <field name="arch" type="xml">
+            <search string="Export Previews">
+                <field name="product_template_id"/>
+                <field name="store_id"/>
+                <field name="remote_product_gid"/>
+                <filter name="filter_awaiting_review" string="Awaiting Review"
+                        domain="[('state', '=', 'previewed')]"/>
+                <filter name="filter_in_progress" string="Applying"
+                        domain="[('state', 'in', ['confirmed', 'applying'])]"/>
+                <filter name="filter_blocked" string="Blocked"
+                        domain="[('state', '=', 'blocked')]"/>
+                <filter name="filter_has_refusals"
+                        string="Has Refused Differences"
+                        domain="[('has_blocked_differences', '=', True)]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_path" string="Path"
+                            context="{'group_by': 'export_path'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_export_preview_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.preview.list</field>
+        <field name="model">shopify.connector.product.export.preview</field>
+        <field name="arch" type="xml">
+            <list string="Export Previews" create="false" delete="false">
+                <field name="previewed_at"/>
+                <field name="product_template_id"/>
+                <field name="export_path"/>
+                <field name="store_id" optional="show"/>
+                <!--
+                    The state dimensions are NOT merged. "Blocked" describes
+                    the whole preview; "has refused differences" describes part
+                    of an otherwise-confirmable one. A single chip would have
+                    to pick a winner and would be wrong for one of them.
+                -->
+                <field name="state"
+                       decoration-warning="state == 'previewed'"
+                       decoration-danger="state == 'blocked'"
+                       decoration-success="state == 'applied'"
+                       decoration-muted="state == 'expired'"/>
+                <field name="has_blocked_differences" string="Refusals"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="expires_at" optional="show"/>
+                <field name="confirmed_uid" optional="show"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_export_preview_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.export.preview.form</field>
+        <field name="model">shopify.connector.product.export.preview</field>
+        <field name="arch" type="xml">
+            <form string="Export Preview" create="false" delete="false">
+                <header>
+                    <!--
+                        Visibility is gated on the customer-facing SEC-2 roles;
+                        AUTHORIZATION is the server's. `action_confirm` inside
+                        the wizard delegates to
+                        `action_confirm_export_preview`, which admits Reviewer
+                        or Administrator and refuses anyone else with an
+                        AccessError and no side effect.
+                    -->
+                    <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
+                            type="action" string="Review and Confirm"
+                            class="btn-primary"
+                            invisible="state != 'previewed'"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            context="{'default_preview_id': id}"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="previewed,confirmed,applying,applied"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="state != 'blocked'">
+                        This export cannot proceed as previewed. Every
+                        difference is listed below under
+                        <strong>Refused differences</strong>; resolve them in
+                        Shopify or in Odoo, then run a fresh preview.
+                    </div>
+                    <div class="alert alert-muted" role="status"
+                         invisible="state != 'expired'">
+                        This preview is no longer current — either it aged out
+                        or the product changed on one side. Run a fresh
+                        preview; a stale confirmation can never authorise a
+                        write.
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="product_template_id" readonly="1"/>
+                            <field name="store_id" readonly="1"/>
+                            <field name="export_path" readonly="1"/>
+                            <field name="product_template_binding_id"
+                                   readonly="1"
+                                   invisible="not product_template_binding_id"/>
+                            <field name="remote_product_gid" readonly="1"
+                                   invisible="not remote_product_gid"/>
+                        </group>
+                        <group string="Freshness">
+                            <field name="previewed_at" readonly="1"/>
+                            <field name="expires_at" readonly="1"/>
+                            <field name="remote_updated_at" readonly="1"
+                                   invisible="not remote_updated_at"/>
+                            <field name="source_write_date" readonly="1"/>
+                            <field name="confirmed_uid" readonly="1"
+                                   invisible="not confirmed_uid"/>
+                            <field name="confirmed_at" readonly="1"
+                                   invisible="not confirmed_at"/>
+                            <field name="applied_at" readonly="1"
+                                   invisible="not applied_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Difference" name="diff">
+                            <field name="diff" widget="json" readonly="1"/>
+                        </page>
+                        <page string="Refused differences" name="blocked"
+                              invisible="not has_blocked_differences">
+                            <div class="alert alert-warning" role="alert">
+                                These are differences this connector will
+                                <strong>not</strong> act on. It never deletes a
+                                remote variant, product option, option value,
+                                collection membership, merchant metafield or
+                                media asset.
+                            </div>
+                            <field name="blocked_differences" widget="json"
+                                   readonly="1" nolabel="1"/>
+                        </page>
+                        <page string="Apply plan" name="plan">
+                            <field name="apply_plan" widget="json"
+                                   readonly="1" nolabel="1"/>
+                        </page>
+                    </notebook>
+                    <field name="has_blocked_differences" invisible="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_export_preview"
+            model="ir.actions.act_window">
+        <field name="name">Export Previews</field>
+        <field name="res_model">shopify.connector.product.export.preview</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_awaiting_review': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No export preview yet
+            </p>
+            <p>
+                Enable "Export to Shopify" on a product, then use
+                <em>Preview Shopify Export</em> on its form. Nothing is ever
+                written to Shopify without a reviewed, confirmed preview.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- Media export registry — ownership evidence, append-only         -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_product_media_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.media.binding.search</field>
+        <field name="model">shopify.connector.product.media.binding</field>
+        <field name="arch" type="xml">
+            <search string="Exported Media">
+                <field name="connector_filename"/>
+                <field name="shopify_gid"/>
+                <field name="product_template_binding_id"/>
+                <field name="store_id"/>
+                <filter name="filter_in_flight" string="In Flight"
+                        domain="[('remote_status', 'in', ['staged', 'uploaded', 'processing', 'ready'])]"/>
+                <filter name="filter_failed" string="Failed"
+                        domain="[('remote_status', '=', 'failed')]"/>
+                <filter name="filter_orphan_candidates"
+                        string="Superseded — File Retained"
+                        domain="[('orphan_cleanup_candidate', '=', True)]"/>
+                <group>
+                    <filter name="group_status" string="Remote Status"
+                            context="{'group_by': 'remote_status'}"/>
+                    <filter name="group_role" string="Role"
+                            context="{'group_by': 'media_role'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_media_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.media.binding.list</field>
+        <field name="model">shopify.connector.product.media.binding</field>
+        <field name="arch" type="xml">
+            <list string="Exported Media" create="false" delete="false">
+                <field name="connector_filename"/>
+                <field name="media_role"/>
+                <field name="product_template_binding_id" optional="show"/>
+                <field name="product_variant_binding_id" optional="hide"/>
+                <field name="remote_status"
+                       decoration-warning="remote_status in ['staged', 'uploaded', 'processing']"
+                       decoration-danger="remote_status == 'failed'"
+                       decoration-success="remote_status == 'associated'"/>
+                <field name="orphan_cleanup_candidate" string="Superseded"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="exported_at" optional="show"/>
+                <field name="store_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_media_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.media.binding.form</field>
+        <field name="model">shopify.connector.product.media.binding</field>
+        <field name="arch" type="xml">
+            <form string="Exported Media" create="false" delete="false">
+                <sheet>
+                    <div class="alert alert-info" role="status"
+                         invisible="not orphan_cleanup_candidate">
+                        A newer image superseded this one. The remote File and
+                        its association are <strong>retained</strong>: Shopify
+                        exposes no query that could prove the File is unused
+                        elsewhere, so this connector never deletes it. Removing
+                        it is a deliberate manual step in Shopify.
+                    </div>
+                    <group>
+                        <group string="Identity">
+                            <field name="connector_filename" readonly="1"/>
+                            <field name="shopify_gid" string="File GID"
+                                   readonly="1"/>
+                            <field name="shopify_product_media_gid"
+                                   string="Product Media GID" readonly="1"/>
+                            <field name="odoo_image_checksum" readonly="1"/>
+                        </group>
+                        <group string="State">
+                            <field name="media_role" readonly="1"/>
+                            <field name="remote_status" readonly="1"/>
+                            <field name="orphan_cleanup_candidate" readonly="1"/>
+                            <field name="exported_at" readonly="1"/>
+                            <field name="last_verified_at" readonly="1"/>
+                            <field name="store_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Failure detail"
+                           invisible="not remote_failure_note">
+                        <field name="remote_failure_note" nolabel="1"
+                               readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_media_binding"
+            model="ir.actions.act_window">
+        <field name="name">Exported Media</field>
+        <field name="res_model">shopify.connector.product.media.binding</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- product.template — the per-product opt-in and export controls   -->
+    <!-- ============================================================== -->
+
+    <record id="view_product_template_form_shopify_export"
+            model="ir.ui.view">
+        <field name="name">product.template.form.shopify.export</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <!--
+                An INHERITED view may not carry `group_ids` on the record
+                (odoo/odoo@19.0 `ir_ui_view.py::_check_groups`), so the
+                restriction lives on the added element as a `groups`
+                attribute — which is also the finer-grained control: the rest
+                of the product form is untouched for everyone else.
+            -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Shopify Export" name="shopify_export"
+                       groups="shopify_connector_core.group_shopify_connector_user">
+                    <group>
+                        <field name="shopify_export_enabled"/>
+                        <field name="shopify_export_status"
+                               invisible="not shopify_export_enabled"/>
+                    </group>
+                    <group invisible="not shopify_export_enabled">
+                        <field name="shopify_export_vendor"/>
+                        <field name="shopify_export_product_type"/>
+                        <field name="shopify_export_tags"
+                               placeholder="tag-one, tag-two"/>
+                    </group>
+                    <div class="text-muted" colspan="2"
+                         invisible="not shopify_export_enabled">
+                        Only these fields, the product's options and its
+                        variants are ever exported. Collections, merchant
+                        metafields, existing media and publication state are
+                        never touched. Every change needs a reviewed,
+                        confirmed preview.
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- S28/S29 — the per-store export settings and the reconnect block -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_store_form_export"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.export</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="inside">
+                <group string="Product Export" name="shopify_product_export">
+                    <div class="text-muted" colspan="2">
+                        Reconnecting a store expires every open export preview,
+                        so a confirmation taken before the reconnect can never
+                        authorise a write afterwards. The next preview is a
+                        fresh read by construction.
+                    </div>
+                    <button name="action_shopify_export_reconnect_reconciliation"
+                            type="object" class="btn-secondary"
+                            string="Expire Open Export Previews"
+                            groups="shopify_connector_core.group_shopify_connector_user"
+                            confirm="Every open export preview for this store will be expired and must be reviewed again. Continue?"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_store_settings_form_export"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.form.export</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <form string="Export Settings">
+                <sheet>
+                    <group>
+                        <group string="Domain">
+                            <field name="store_id" readonly="1"/>
+                            <field name="product_export_domain_enabled"
+                                   groups="shopify_connector_core.group_shopify_connector_admin"/>
+                            <field name="product_export_binding_namespace_ready"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Ownership">
+                            <field name="price_source_of_truth"
+                                   groups="shopify_connector_core.group_shopify_connector_admin"/>
+                            <field name="media_source_of_truth"
+                                   groups="shopify_connector_core.group_shopify_connector_admin"/>
+                        </group>
+                    </group>
+                    <group string="Log and evidence retention">
+                        <field name="log_redaction_retention_days"
+                               groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    </group>
+                    <div class="text-muted">
+                        Prices are exported only when this store declares Odoo
+                        as the price source of truth; otherwise price fields
+                        are omitted from the payload entirely. Media export
+                        runs only under an explicit "Odoo" media direction —
+                        unset blocks it rather than choosing for you.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_store_settings_list_export"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.list.export</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="arch" type="xml">
+            <list string="Export Settings" create="false" delete="false">
+                <field name="store_id"/>
+                <field name="product_export_domain_enabled"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="product_export_binding_namespace_ready"
+                       widget="boolean_toggle" readonly="1"/>
+                <field name="price_source_of_truth"/>
+                <field name="media_source_of_truth"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_store_settings_export"
+            model="ir.actions.act_window">
+        <field name="name">Export Settings</field>
+        <field name="res_model">shopify.connector.store.settings</field>
+        <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+    </record>
+
+</odoo>

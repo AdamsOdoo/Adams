@@ -57,7 +57,7 @@
 
 set -euo pipefail
 
-MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -80,7 +80,7 @@ NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performanc
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"
