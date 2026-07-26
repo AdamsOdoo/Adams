@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 operator UI: the Inventory branch of the connector navigation.
+
+        Placement under the existing U0 root at sequence 33, between Catalog
+        (32) and Fulfillment (35), matching the master specification's
+        relative order. No new root app menu: the operator keeps one
+        connector app.
+
+        VISIBILITY vs AUTHORIZATION. The branch is gated on the SEC-2
+        customer-facing role, which is a visibility control only. Location
+        mapping is Administrator work per the role matrix, but the menu stays
+        visible to Users because the master specification gives Users READ on
+        it — the edit controls inside the screen carry the Administrator
+        group, and the server refuses a denied caller regardless.
+    -->
+
+    <menuitem id="menu_shopify_connector_inventory"
+              name="Inventory"
+              parent="shopify_connector_core.menu_shopify_connector_root"
+              sequence="33"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
+
+    <menuitem id="menu_shopify_connector_inventory_workspace"
+              name="Inventory Workspace"
+              parent="menu_shopify_connector_inventory"
+              action="action_shopify_connector_inventory_workspace"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_connector_inventory_first_push"
+              name="First-Push Guard"
+              parent="menu_shopify_connector_inventory"
+              action="action_shopify_connector_inventory_first_push"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_connector_location_mapping"
+              name="Location Mapping"
+              parent="menu_shopify_connector_inventory"
+              action="action_shopify_connector_location_mapping"
+              sequence="30"/>
+</odoo>

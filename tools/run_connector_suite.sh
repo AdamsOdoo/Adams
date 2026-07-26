@@ -69,7 +69,7 @@ EXTRA_MODULES="account,stock"
 # in sync with docs/05-qa/pre-wave-5-debt-discovery.md §3; the guard test
 # `test_phase_contract.py` fails if a `-standard` class exists that no tag here
 # selects, so the two cannot drift apart silently.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency"
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput"
 
 # Restrict the STANDARD passes to the connector modules.
 #

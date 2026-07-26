@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 operator UI — S8 customer matching / review (premium UX master
+        specification §3), hosted under the Catalog &amp; Matching branch.
+
+        PII POSTURE, EXPLICIT. Per SEC-2 and the roles document §3, both
+        customer-facing roles read the RAW operational snapshot their
+        permitted work requires. There is no masked-by-default column, no
+        unmask toggle, and no "reveal" affordance anywhere on this surface,
+        because none of those exist in the model any more. Access is governed
+        by ordinary ACLs, record rules and company boundaries; audit and log
+        redaction remain in force and are unaffected by what this view shows.
+
+        Rows whose snapshot was irreversibly masked by the pre-SEC-2 sweep are
+        flagged rather than hidden. The flag says the value is unrecoverable
+        and needs a re-import — it never substitutes a plausible-looking
+        replacement.
+    -->
+
+    <record id="view_shopify_connector_customer_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.customer.binding.search</field>
+        <field name="model">shopify.connector.customer.binding</field>
+        <field name="arch" type="xml">
+            <search string="Customers">
+                <field name="shopify_display_name"/>
+                <field name="shopify_email_snapshot"/>
+                <field name="partner_id"/>
+                <field name="shopify_gid"/>
+                <field name="store_id"/>
+                <filter name="filter_needs_attention"
+                        string="Needs Attention"
+                        domain="['|', '|',
+                                 ('status', '=', 'review'),
+                                 ('sec3_scope_quarantined', '=', True),
+                                 ('pii_snapshot_refresh_required', '=', True)]"/>
+                <separator/>
+                <filter name="filter_refresh_required"
+                        string="Snapshot Refresh Required"
+                        domain="[('pii_snapshot_refresh_required', '=', True)]"/>
+                <filter name="filter_review" string="In Review"
+                        domain="[('status', '=', 'review')]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_match_key" string="Matched By"
+                            context="{'group_by': 'match_key'}"/>
+                    <filter name="group_status" string="Binding Status"
+                            context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_customer_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.customer.binding.list</field>
+        <field name="model">shopify.connector.customer.binding</field>
+        <field name="arch" type="xml">
+            <list string="Customers" create="false" delete="false">
+                <field name="shopify_display_name"/>
+                <field name="partner_id"/>
+                <field name="shopify_email_snapshot" optional="show"/>
+                <field name="shopify_phone_snapshot" optional="hide"/>
+                <field name="match_key" optional="show"/>
+                <field name="status"
+                       decoration-warning="status == 'review'"
+                       decoration-muted="status == 'inactive'"/>
+                <field name="pii_snapshot_refresh_required"
+                       string="Refresh required" widget="boolean_toggle"
+                       readonly="1" optional="show"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="store_id" optional="hide"/>
+                <field name="shopify_last_imported_at" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_customer_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.customer.binding.form</field>
+        <field name="model">shopify.connector.customer.binding</field>
+        <field name="arch" type="xml">
+            <form string="Customer Binding" create="false" delete="false">
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This binding's company no longer agrees with its
+                        store's. No job will process it until an administrator
+                        releases it.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not pii_snapshot_refresh_required">
+                        <strong>Snapshot unavailable — re-import
+                        required.</strong>
+                        A previous retention sweep masked this customer's
+                        snapshot irreversibly. The original values cannot be
+                        recovered and are not reconstructed here. Re-import
+                        the customer from Shopify to restore them.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="status != 'review'">
+                        <strong>Waiting on a decision.</strong>
+                        This customer match was not conclusive. Review the
+                        evidence below before this binding is treated as
+                        authoritative.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="shopify_display_name" readonly="1"
+                                   placeholder="Unnamed Shopify customer"/></h1>
+                    </div>
+                    <group>
+                        <group string="Odoo">
+                            <field name="partner_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Shopify snapshot">
+                            <field name="shopify_email_snapshot" readonly="1"
+                                   string="Email"/>
+                            <field name="shopify_phone_snapshot" readonly="1"
+                                   string="Phone"/>
+                            <field name="shopify_gid" readonly="1"/>
+                            <field name="store_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Match evidence">
+                            <field name="status" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                            <field name="matched_by_uid" readonly="1"/>
+                            <field name="matched_at" readonly="1"/>
+                            <field name="shopify_last_imported_at"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Override history"
+                               invisible="not override_uid">
+                            <field name="override_uid" readonly="1"/>
+                            <field name="override_at" readonly="1"/>
+                            <field name="override_previous_candidate"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_customer_binding"
+            model="ir.actions.act_window">
+        <field name="name">Customer Matching</field>
+        <field name="res_model">shopify.connector.customer.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_customer_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Every customer is matched.
+            </p>
+            <p>
+                Customer bindings appear here after an order or customer
+                import. Nothing needs your decision right now.
+            </p>
+        </field>
+    </record>
+</odoo>

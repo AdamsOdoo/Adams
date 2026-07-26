@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.3.0',
+    'version': '19.0.2.4.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '
@@ -39,6 +39,12 @@ file.
         'security/ir.model.access.csv',
         'security/shopify_connector_sale_company_rules.xml',
         'data/shopify_connector_sale_cron.xml',
+        # U2 operator UI. Wizard actions first (the views reference them),
+        # then the views, then the menus.
+        'views/shopify_connector_sale_wizard_views.xml',
+        'views/shopify_connector_order_binding_views.xml',
+        'views/shopify_connector_customer_binding_views.xml',
+        'views/shopify_connector_sale_menus.xml',
     ],
     'installable': True,
     'application': False,

@@ -102,6 +102,12 @@ CORE_SUDO_SITES = [
     ('shopify_connector_mutation_attempt.py', '_surface', 'self', 1),
     ('shopify_connector_mutation_attempt.py',
      'action_resolve_mutation_attempt', 'job', 1),
+    # PERF-1: the drain's per-pass cap. System-parameter reads are
+    # admin-only in Odoo 19, so this read needs elevation. Read-only, and
+    # the value is clamped to [1,500] before it reaches the loop.
+    ('shopify_connector_job_dispatch.py',
+     '_resolve_drain_batch_size',
+     "self.env['ir.config_parameter']", 1),
     ('shopify_connector_pii_retention.py',
      '_attempt_evidence_retention_days',
      "self.env['ir.config_parameter']", 1),
@@ -198,6 +204,8 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_surface'): 'Closed attempt write surface.',
     ('shopify_connector_mutation_attempt.py',
      'action_resolve_mutation_attempt'): 'Resolved job consequence.',
+    ('shopify_connector_job_dispatch.py',
+     '_resolve_drain_batch_size'): 'Drain cap configuration.',
     ('shopify_connector_pii_retention.py',
      '_attempt_evidence_retention_days'): 'Retention configuration.',
     ('shopify_connector_pii_retention.py',

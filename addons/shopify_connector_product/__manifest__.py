@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.3.0',
+    'version': '19.0.2.4.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '
@@ -39,6 +39,10 @@ logic. No UI, wizard, webhook, or OAuth file.
         'security/ir.model.access.csv',
         'security/shopify_connector_product_company_rules.xml',
         'data/shopify_connector_attribute_lock.xml',
+        # U2 operator UI. Views before menus, so every action referenced by a
+        # menu already exists when the menu record is created.
+        'views/shopify_connector_product_binding_views.xml',
+        'views/shopify_connector_product_menus.xml',
     ],
     'installable': True,
     'application': False,

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 wizard form for the order operator surfaces. Loaded BEFORE the
+        views that reference its action.
+    -->
+
+    <record id="view_shopify_connector_manual_gateway_approval_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.manual.gateway.approval.wizard.form</field>
+        <field name="model">shopify.connector.manual.gateway.approval.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Approve manually-paid order" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-warning" role="alert">
+                    <strong>You are confirming payment was received.</strong>
+                    Shopify did not process this payment through a gateway, so
+                    the connector cannot verify it. Approving records your
+                    commercial judgement and queues a read-only evidence
+                    refresh — it does not create, capture or reconcile a
+                    payment in Odoo.
+                </div>
+                <group>
+                    <field name="binding_id" invisible="1"/>
+                    <group string="Order">
+                        <field name="shopify_order_name" readonly="1"/>
+                        <field name="shopify_order_total_amount" readonly="1"
+                               string="Order total"/>
+                        <field name="shopify_currency_code" readonly="1"
+                               string="Currency"/>
+                    </group>
+                    <group string="Payment evidence">
+                        <field name="manual_gateway_name" readonly="1"
+                               string="Gateway"/>
+                        <field name="manual_gateway_evidence_state"
+                               readonly="1" string="Evidence"/>
+                        <field name="shopify_financial_status_snapshot"
+                               readonly="1" string="Shopify financial status"/>
+                    </group>
+                </group>
+                <group>
+                    <field name="reason" nolabel="1" colspan="2"
+                           placeholder="Why is this order being approved?"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Approve" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_manual_gateway_approval_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Approve manually-paid order</field>
+        <field name="res_model">shopify.connector.manual.gateway.approval.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

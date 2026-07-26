@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 operator UI — S6 product matching, hosted under the S24 Mapping
+        Center branch (premium UX master specification §2.1/§3).
+
+        WHAT THIS SURFACE IS. A read-and-decide face over the ALREADY MERGED
+        product binding models. It adds no business logic: every button here
+        wires to a sanctioned server action that Wave 1 shipped and that
+        SEC-1 hardened. Matching itself (candidate scoring, duplicate
+        prevention, RA-006 "no name-only auto-match") lives entirely in the
+        importer service and is not re-implemented, re-scored, or second-
+        guessed in a view.
+
+        WHAT IT DELIBERATELY DOES NOT DO. It offers no "create as new"
+        affordance and no export action: creating a Shopify product is a
+        MUTATION and belongs to Task 015's preview → confirm → apply flow
+        (S27/S7, U3). Offering it here would put a mutation one click from a
+        list, which is precisely the shape the export operating model
+        forbids.
+    -->
+
+    <!-- ============================================================== -->
+    <!-- Product template bindings                                       -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_product_template_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.template.binding.search</field>
+        <field name="model">shopify.connector.product.template.binding</field>
+        <field name="arch" type="xml">
+            <search string="Product Bindings">
+                <field name="shopify_title"/>
+                <field name="shopify_gid"/>
+                <field name="product_template_id"/>
+                <field name="store_id"/>
+                <!--
+                    "Needs attention" is the S16/S23 lead-band contract applied
+                    to catalog: a binding is only interesting when it is under
+                    review or has been quarantined out of scope by SEC-3.
+                -->
+                <filter name="filter_needs_attention"
+                        string="Needs Attention"
+                        domain="['|', ('status', '=', 'review'), ('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_status_active" string="Active"
+                        domain="[('status', '=', 'active')]"/>
+                <filter name="filter_status_review" string="In Review"
+                        domain="[('status', '=', 'review')]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_imported_last_week" string="Imported This Week"
+                        domain="[('shopify_last_imported_at', '&gt;=', 'today -7d')]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_status" string="Binding Status"
+                            context="{'group_by': 'status'}"/>
+                    <filter name="group_match_key" string="Matched By"
+                            context="{'group_by': 'match_key'}"/>
+                    <filter name="group_shopify_status" string="Shopify Status"
+                            context="{'group_by': 'shopify_status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_template_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.template.binding.list</field>
+        <field name="model">shopify.connector.product.template.binding</field>
+        <field name="arch" type="xml">
+            <list string="Product Bindings" create="false" delete="false">
+                <field name="shopify_title"/>
+                <field name="product_template_id"/>
+                <field name="store_id" optional="show"/>
+                <field name="match_key" optional="show"/>
+                <field name="shopify_status" optional="show"/>
+                <field name="status"
+                       decoration-warning="status == 'review'"
+                       decoration-muted="status == 'inactive'"/>
+                <!--
+                    Text label, not colour alone (design system §12): the
+                    badge carries the word "Quarantined" as well as the
+                    danger family.
+                -->
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="shopify_last_imported_at" optional="hide"/>
+                <field name="shopify_gid" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_template_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.template.binding.form</field>
+        <field name="model">shopify.connector.product.template.binding</field>
+        <field name="arch" type="xml">
+            <form string="Product Binding" create="false" delete="false">
+                <sheet>
+                    <!--
+                        SEC-3 quarantine is the one condition that must be
+                        impossible to miss: the row is excluded from every
+                        ordinary read, so an operator who reached it needs the
+                        consequence in words, not a colour.
+                    -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This binding's company no longer agrees with its
+                        store's. It is hidden from ordinary reads and no job
+                        will process it until an administrator releases it.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="status != 'review'">
+                        <strong>Waiting on a decision.</strong>
+                        This product match was not conclusive. Review the
+                        evidence below before this binding is treated as
+                        authoritative.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="shopify_title" readonly="1"
+                                   placeholder="Untitled Shopify product"/></h1>
+                    </div>
+                    <group>
+                        <group string="Odoo">
+                            <field name="product_template_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Shopify">
+                            <field name="store_id" readonly="1"/>
+                            <field name="shopify_status" readonly="1"/>
+                            <field name="shopify_gid" readonly="1"/>
+                            <field name="shopify_updated_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Match Evidence">
+                            <field name="status" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                            <field name="matched_by_uid" readonly="1"/>
+                            <field name="matched_at" readonly="1"/>
+                        </group>
+                        <group string="Override History"
+                               invisible="not override_uid">
+                            <field name="override_uid" readonly="1"/>
+                            <field name="override_at" readonly="1"/>
+                            <field name="override_previous_candidate"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Media">
+                        <field name="shopify_primary_image_url" readonly="1"
+                               widget="url"/>
+                        <field name="shopify_image_checksum" readonly="1"/>
+                        <field name="shopify_last_imported_at" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_template_binding"
+            model="ir.actions.act_window">
+        <field name="name">Product Matching</field>
+        <field name="res_model">shopify.connector.product.template.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_product_template_binding_search"/>
+        <field name="context">{'search_default_filter_needs_attention': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Every product is matched.
+            </p>
+            <p>
+                Product bindings appear here after a catalog import. Nothing
+                needs your decision right now.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- Product variant bindings                                        -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_product_variant_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.variant.binding.search</field>
+        <field name="model">shopify.connector.product.variant.binding</field>
+        <field name="arch" type="xml">
+            <search string="Variant Bindings">
+                <field name="product_variant_id"/>
+                <field name="shopify_gid"/>
+                <field name="product_template_binding_id"/>
+                <field name="store_id"/>
+                <filter name="filter_needs_attention"
+                        string="Needs Attention"
+                        domain="['|', ('status', '=', 'review'), ('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <group>
+                    <filter name="group_template" string="Product"
+                            context="{'group_by': 'product_template_binding_id'}"/>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_status" string="Binding Status"
+                            context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_variant_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.variant.binding.list</field>
+        <field name="model">shopify.connector.product.variant.binding</field>
+        <field name="arch" type="xml">
+            <list string="Variant Bindings" create="false" delete="false">
+                <field name="product_variant_id"/>
+                <field name="product_template_binding_id" optional="show"/>
+                <field name="shopify_option_values" optional="show"/>
+                <field name="store_id" optional="hide"/>
+                <field name="match_key" optional="show"/>
+                <!--
+                    Price snapshots are shown as plain text, deliberately.
+                    They are a snapshot of what Shopify last reported, not an
+                    Odoo monetary value, and rendering them with a currency
+                    widget would imply the connector owns the price.
+                -->
+                <field name="shopify_price_snapshot" optional="show"/>
+                <field name="shopify_compare_at_price_snapshot"
+                       optional="hide"/>
+                <field name="status"
+                       decoration-warning="status == 'review'"
+                       decoration-muted="status == 'inactive'"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_variant_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.variant.binding.form</field>
+        <field name="model">shopify.connector.product.variant.binding</field>
+        <field name="arch" type="xml">
+            <form string="Variant Binding" create="false" delete="false">
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This binding's company no longer agrees with its
+                        store's. No job will process it until an administrator
+                        releases it.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="product_variant_id" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Odoo">
+                            <field name="product_template_binding_id"
+                                   readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Shopify">
+                            <field name="store_id" readonly="1"/>
+                            <field name="shopify_gid" readonly="1"/>
+                            <field name="shopify_option_values" readonly="1"/>
+                            <field name="shopify_last_imported_at"
+                                   readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Last Reported by Shopify">
+                            <field name="shopify_price_snapshot" readonly="1"/>
+                            <field name="shopify_compare_at_price_snapshot"
+                                   readonly="1"/>
+                            <field name="shopify_primary_image_url"
+                                   readonly="1" widget="url"/>
+                            <field name="shopify_image_checksum" readonly="1"/>
+                        </group>
+                        <group string="Match Evidence">
+                            <field name="status" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                            <field name="matched_by_uid" readonly="1"/>
+                            <field name="matched_at" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_variant_binding"
+            model="ir.actions.act_window">
+        <field name="name">Variant Matching</field>
+        <field name="res_model">shopify.connector.product.variant.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_product_variant_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Every variant is matched.
+            </p>
+            <p>
+                Variant bindings appear here once their product has been
+                imported and matched.
+            </p>
+        </field>
+    </record>
+</odoo>

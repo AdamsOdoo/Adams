@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 wizard forms for the inventory operator surfaces. Loaded BEFORE the
+        views that reference their actions, so every `%(...)d` reference
+        resolves at install time.
+
+        Both dialogs carry `role="dialog"` and `aria-modal="true"`: Odoo
+        renders them in a modal, and a screen reader needs the boundary
+        announced (design system §12).
+    -->
+
+    <record id="view_shopify_connector_location_push_toggle_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.push.toggle.wizard.form</field>
+        <field name="model">shopify.connector.location.push.toggle.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Change inventory push" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-info" role="status"
+                     invisible="not target_enabled">
+                    Inventory for <field name="location_name" readonly="1"
+                                         nolabel="1" class="oe_inline"/>
+                    will start pushing to Shopify on the next scheduled run.
+                </div>
+                <div class="alert alert-info" role="status"
+                     invisible="target_enabled">
+                    Inventory for <field name="location_name" readonly="1"
+                                         nolabel="1" class="oe_inline"/>
+                    will stop pushing. Quantities already on Shopify are left
+                    exactly as they are.
+                </div>
+                <group>
+                    <field name="mapping_id" invisible="1"/>
+                    <field name="odoo_location_id" readonly="1"/>
+                    <field name="currently_enabled" readonly="1"
+                           string="Currently enabled"/>
+                    <field name="target_enabled"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Confirm" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_location_push_toggle_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Change inventory push</field>
+        <field name="res_model">shopify.connector.location.push.toggle.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_shopify_connector_inventory_recheck_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.inventory.recheck.wizard.form</field>
+        <field name="model">shopify.connector.inventory.recheck.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Verify inventory now" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-info" role="status">
+                    This queues a read-only verification of what Shopify
+                    currently holds for this pair. It changes no quantity on
+                    either side.
+                </div>
+                <group>
+                    <field name="binding_id" invisible="1"/>
+                    <field name="variant_binding_id" readonly="1"/>
+                    <field name="location_mapping_id" readonly="1"/>
+                    <field name="pending_target_available" readonly="1"
+                           string="Odoo target"/>
+                    <field name="last_known_shopify_available" readonly="1"
+                           string="Shopify last known"/>
+                    <field name="reason"
+                           placeholder="Why is this being re-checked?"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Queue verification" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_inventory_recheck_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Verify inventory now</field>
+        <field name="res_model">shopify.connector.inventory.recheck.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

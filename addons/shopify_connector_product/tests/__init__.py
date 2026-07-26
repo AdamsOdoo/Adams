@@ -8,3 +8,4 @@ from . import test_product_price_import
 from . import test_product_media_import
 from . import test_product_refresh_and_stale
 from . import test_product_runtime_performance
+from . import test_ui_u2_product

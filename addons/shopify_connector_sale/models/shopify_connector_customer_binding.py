@@ -62,6 +62,11 @@ class ShopifyConnectorCustomerBinding(models.Model):
     pii_snapshot_refresh_required = fields.Boolean(
         string='Snapshot Refresh Required',
         compute='_compute_pii_snapshot_refresh_required',
+        # Searchable so the operator surface can filter to exactly the rows
+        # that need a re-import. Without this the flag is visible one record
+        # at a time, which is useless for remediating a sweep that may have
+        # touched thousands. The search seam is read-only and adds no state.
+        search='_search_pii_snapshot_refresh_required',
         help=(
             'This customer snapshot was irreversibly masked by the '
             'pre-SEC-2 retention sweep. The original values cannot be '
@@ -100,6 +105,26 @@ class ShopifyConnectorCustomerBinding(models.Model):
                 binding[field_name] == masked_sentinel
                 for field_name in binding._pii_snapshot_fields()
             )
+
+    def _search_pii_snapshot_refresh_required(self, operator, value):
+        """Translate the computed flag into a domain over the real columns.
+
+        Deliberately derived from `_pii_snapshot_fields()` rather than a
+        hardcoded list, so the search can never fall out of step with the
+        compute above or with a future snapshot field.
+        """
+        if operator not in ('=', '!='):
+            raise NotImplementedError(
+                'Only equality is supported on this flag.'
+            )
+        masked = [
+            (field_name, '=', LEGACY_MASKED_PII_VALUE)
+            for field_name in self._pii_snapshot_fields()
+        ]
+        # "any field is masked" -> an OR chain over the field terms.
+        any_masked = ['|'] * (len(masked) - 1) + masked
+        wants_masked = bool(value) == (operator == '=')
+        return any_masked if wants_masked else ['!'] + any_masked
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',

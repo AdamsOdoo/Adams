@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Inventory',
-    'version': '19.0.1.2.0',
+    'version': '19.0.1.3.0',
     'summary': (
         'Shopify inventory synchronization (Task 013): explicit location '
         'mapping, per-pair inventory-level bindings, first-push guard, and '
@@ -57,6 +57,11 @@ inventoryAdjustQuantities call anywhere in this module.
         'security/ir.model.access.csv',
         'security/shopify_connector_inventory_company_rules.xml',
         'data/shopify_connector_inventory_cron.xml',
+        # U2 operator UI. Wizard actions first (the views reference them),
+        # then the views, then the menus.
+        'views/shopify_connector_inventory_wizard_views.xml',
+        'views/shopify_connector_inventory_views.xml',
+        'views/shopify_connector_inventory_menus.xml',
     ],
     'installable': True,
     'application': False,

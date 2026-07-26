@@ -7,3 +7,4 @@ from . import test_inventory_location_cache_sync
 from . import test_inventory_concurrency
 # SEC-3 (issue #197) two-company isolation matrix.
 from . import test_sec3_company_isolation
+from . import test_ui_u2_inventory

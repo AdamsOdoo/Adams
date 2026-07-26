@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 operator UI — S10 location mapping, S11 first-push guard and
+        S19/S12 inventory workspace (premium UX master specification §3).
+
+        WHAT THIS SURFACE IS. A face over the merged inventory models. Every
+        button wires to a sanctioned server action that Wave 3 shipped:
+        `action_confirm_first_push`, `action_recheck_inventory_pair`,
+        `action_set_push_enabled`. No quantity is computed, compared or
+        decided here — the view shows what the service already recorded.
+
+        THE FIRST-PUSH GUARD IS NOT A ROUTINE SCREEN (RA-008). S11 is
+        deliberately a separate, differently-toned surface from the routine
+        S19 queue: pushing stock to a live storefront for the first time is a
+        one-way ceremony, and burying its confirmation among ordinary rows is
+        how blind first pushes happen. It is therefore its own action, its own
+        filter and its own consequence copy.
+    -->
+
+    <!-- ============================================================== -->
+    <!-- S10 — Location mapping                                          -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_location_mapping_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.mapping.search</field>
+        <field name="model">shopify.connector.location.mapping</field>
+        <field name="arch" type="xml">
+            <search string="Location Mapping">
+                <field name="shopify_location_name_snapshot"/>
+                <field name="odoo_location_id"/>
+                <field name="store_id"/>
+                <filter name="filter_push_disabled" string="Push Disabled"
+                        domain="[('push_enabled', '=', False)]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_status" string="Status"
+                            context="{'group_by': 'status'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_location_mapping_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.mapping.list</field>
+        <field name="model">shopify.connector.location.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Location Mapping" create="false" delete="false">
+                <field name="shopify_location_name_snapshot"/>
+                <field name="odoo_location_id"/>
+                <field name="store_id" optional="show"/>
+                <field name="push_enabled" widget="boolean_toggle"
+                       readonly="1"/>
+                <field name="status"
+                       decoration-warning="status == 'review'"
+                       decoration-muted="status == 'inactive'"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_location_mapping_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.mapping.form</field>
+        <field name="model">shopify.connector.location.mapping</field>
+        <field name="arch" type="xml">
+            <form string="Location Mapping" create="false" delete="false">
+                <header>
+                    <!--
+                        GROUP GATING IS DERIVED FROM THE SERVER, NOT FROM THE
+                        role matrix. `action_set_push_enabled` admits
+                        Operator OR Administrator (see the method's own
+                        guard), and the ACL gives Reviewer write on this
+                        model, so the button and the editable field carry
+                        exactly those groups. The premium UX master
+                        specification §2.4 lists this screen as
+                        "User: read, Administrator: act", which disagrees with
+                        the merged server guard; the view follows the SERVER,
+                        because a view that hides a permitted capability is a
+                        UI defect and a view that shows a denied one is worse.
+                        The discrepancy is recorded for the control room
+                        rather than resolved by silently changing either side.
+
+                        `action_set_push_enabled(enabled)` takes a REQUIRED
+                        argument, and an Odoo object button passes none, so
+                        the button opens a wizard that collects it and
+                        delegates. The server still owns what enabling a
+                        location means, and still audits it; the view never
+                        writes `push_enabled` itself.
+                    -->
+                    <button name="%(action_shopify_connector_location_push_toggle_wizard)d"
+                            type="action" string="Change Push"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_operator"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This mapping's company no longer agrees with its
+                        store's. Inventory for this location is paused until
+                        an administrator releases it.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="shopify_location_name_snapshot"
+                                   readonly="1"
+                                   placeholder="Unnamed Shopify location"/></h1>
+                    </div>
+                    <group>
+                        <group string="Mapping">
+                            <field name="odoo_location_id"
+                                   groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                            <field name="push_enabled" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Shopify">
+                            <field name="store_id" readonly="1"/>
+                            <field name="shopify_gid" readonly="1"/>
+                            <field name="status" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_location_mapping"
+            model="ir.actions.act_window">
+        <field name="name">Location Mapping</field>
+        <field name="res_model">shopify.connector.location.mapping</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_location_mapping_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No locations mapped yet.
+            </p>
+            <p>
+                A mapping is created when a Shopify location is paired with an
+                Odoo location. Until a pair exists, inventory for that Shopify
+                location stays paused.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- S19 / S12 — Inventory workspace, and S11 — first-push guard     -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_inventory_level_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.inventory.level.binding.search</field>
+        <field name="model">shopify.connector.inventory.level.binding</field>
+        <field name="arch" type="xml">
+            <search string="Inventory Levels">
+                <field name="product_variant_binding_id"/>
+                <field name="location_mapping_id"/>
+                <field name="store_id"/>
+                <field name="shopify_inventory_item_gid"/>
+                <filter name="filter_needs_attention"
+                        string="Needs Attention"
+                        domain="['|', '|',
+                                 ('first_push_state', '=', 'pending'),
+                                 ('status', '=', 'review'),
+                                 ('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_first_push_pending"
+                        string="First Push Pending"
+                        domain="[('first_push_state', '=', 'pending')]"/>
+                <filter name="filter_never_pushed" string="Never Pushed"
+                        domain="[('last_pushed_at', '=', False)]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <group>
+                    <filter name="group_location" string="Location"
+                            context="{'group_by': 'location_mapping_id'}"/>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_first_push" string="First-Push State"
+                            context="{'group_by': 'first_push_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_inventory_level_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.inventory.level.binding.list</field>
+        <field name="model">shopify.connector.inventory.level.binding</field>
+        <field name="arch" type="xml">
+            <list string="Inventory Levels" create="false" delete="false">
+                <field name="product_variant_binding_id"/>
+                <field name="location_mapping_id" optional="show"/>
+                <field name="pending_target_available" string="Odoo Target"/>
+                <field name="last_known_shopify_available"
+                       string="Shopify (last known)"/>
+                <field name="last_pushed_available" optional="hide"/>
+                <field name="last_pushed_at" optional="show"/>
+                <field name="first_push_state"
+                       decoration-warning="first_push_state == 'pending'"
+                       decoration-success="first_push_state == 'confirmed'"/>
+                <field name="status" optional="hide"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="store_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_inventory_level_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.inventory.level.binding.form</field>
+        <field name="model">shopify.connector.inventory.level.binding</field>
+        <field name="arch" type="xml">
+            <form string="Inventory Level" create="false" delete="false">
+                <header>
+                    <!--
+                        The first-push ceremony (RA-008). The confirm text
+                        names the consequence in words and is deliberately
+                        heavier than any routine action in this module.
+                    -->
+                    <button name="action_confirm_first_push" type="object"
+                            string="Confirm First Push" class="btn-primary"
+                            invisible="first_push_state != 'pending'"
+                            groups="shopify_connector_core.group_shopify_connector_reviewer"
+                            confirm="This is the FIRST stock push for this
+                                     product and location. Shopify's quantity
+                                     will be replaced by Odoo's. This cannot
+                                     be undone from here. Confirm?"/>
+                    <!--
+                        `action_recheck_inventory_pair(reason)` also takes a
+                        required argument; same wizard-and-delegate shape.
+                        The reason is mandatory because it lands on the
+                        verification job's audit trail.
+                    -->
+                    <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
+                            type="action" string="Verify Now"
+                            groups="shopify_connector_core.group_shopify_connector_operator"/>
+                    <field name="first_push_state" widget="statusbar"
+                           readonly="1"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This level's company no longer agrees with its store's.
+                        No push or verification job will process it until an
+                        administrator releases it.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="first_push_state != 'pending'">
+                        <strong>Waiting for a first-push confirmation.</strong>
+                        Nothing has been pushed for this product and location
+                        yet. Review the quantities below, then confirm.
+                    </div>
+                    <group>
+                        <group string="Pair">
+                            <field name="product_variant_binding_id"
+                                   readonly="1"/>
+                            <field name="location_mapping_id" readonly="1"/>
+                            <field name="store_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                        <group string="Quantities">
+                            <!--
+                                Three distinct quantities, never merged into
+                                one "delta" number: what Odoo wants pushed,
+                                what Shopify last reported, and what this
+                                connector last actually pushed. Collapsing
+                                them would hide whether a difference is drift
+                                or an unpushed change.
+                            -->
+                            <field name="pending_target_available"
+                                   string="Odoo target" readonly="1"/>
+                            <field name="last_known_shopify_available"
+                                   string="Shopify last known" readonly="1"/>
+                            <field name="last_pushed_available"
+                                   string="Last pushed by connector"
+                                   readonly="1"/>
+                            <field name="last_pushed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="First-Push Guard">
+                        <group>
+                            <field name="first_push_state" readonly="1"/>
+                            <field name="first_push_preview_qty" readonly="1"/>
+                        </group>
+                        <group invisible="not first_push_confirmed_by_uid">
+                            <field name="first_push_confirmed_by_uid"
+                                   readonly="1"/>
+                            <field name="first_push_confirmed_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Identity">
+                        <field name="shopify_inventory_item_gid" readonly="1"/>
+                        <field name="shopify_gid" readonly="1"/>
+                        <field name="status" readonly="1"/>
+                        <field name="match_key" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_inventory_workspace"
+            model="ir.actions.act_window">
+        <field name="name">Inventory Workspace</field>
+        <field name="res_model">shopify.connector.inventory.level.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_inventory_level_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No pending inventory changes.
+            </p>
+            <p>
+                Inventory levels appear here once products and locations are
+                mapped.
+            </p>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_inventory_first_push"
+            model="ir.actions.act_window">
+        <field name="name">First-Push Guard</field>
+        <field name="res_model">shopify.connector.inventory.level.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('first_push_state', '=', 'pending')]</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_inventory_level_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing is waiting for a first push.
+            </p>
+            <p>
+                The first stock push for each product and location needs an
+                explicit confirmation. Pairs waiting for one appear here.
+            </p>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        U2 operator UI — S16 orders workspace, S17 order review and S18 COD
+        reconciliation (premium UX master specification §3).
+
+        THE STATE DIMENSIONS ARE NEVER MERGED. The order binding carries five
+        genuinely independent state dimensions, and the master specification
+        is explicit that each gets its own badge:
+
+          * Shopify financial status  (what the shop says about payment)
+          * Shopify fulfilment status (what the shop says about shipping)
+          * cancellation              (shopify_cancelled_at / reason)
+          * connector binding status  (what THIS connector concluded)
+          * COD collection            (three further COD dimensions)
+
+        Rolling these into one "order state" chip is the single most tempting
+        simplification here and the most damaging: an order can be paid and
+        unshipped, shipped and unpaid, or cancelled after both. A merged badge
+        has to pick a winner, and whichever it picks is wrong for some
+        operator. So they render side by side, each labelled.
+
+        SNAPSHOT FIELDS ARE SHOWN AS TEXT. `shopify_order_total_amount`,
+        `shopify_financial_status_snapshot` and friends are Char on the
+        backend, deliberately: Shopify reports them as strings and the
+        connector does not own them. They are displayed as what they are —
+        a snapshot of what the shop last said — and never re-typed into
+        Monetary or Selection, which would assert an ownership the backend
+        refuses to claim.
+    -->
+
+    <!-- ============================================================== -->
+    <!-- S16 — Orders workspace                                          -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_order_binding_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.order.binding.search</field>
+        <field name="model">shopify.connector.order.binding</field>
+        <field name="arch" type="xml">
+            <search string="Orders">
+                <field name="shopify_order_name"/>
+                <field name="sale_order_id"/>
+                <field name="shopify_gid"/>
+                <field name="store_id"/>
+                <field name="manual_gateway_name"/>
+                <filter name="filter_needs_attention"
+                        string="Needs Attention"
+                        domain="['|', '|',
+                                 ('manual_gateway_approval_state', '=', 'pending'),
+                                 ('status', '=', 'review'),
+                                 ('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_manual_gateway_pending"
+                        string="Awaiting Payment Approval"
+                        domain="[('manual_gateway_approval_state', '=', 'pending')]"/>
+                <filter name="filter_cancelled" string="Cancelled on Shopify"
+                        domain="[('shopify_cancelled_at', '!=', False)]"/>
+                <separator/>
+                <filter name="filter_cod" string="Cash on Delivery"
+                        domain="[('is_cod', '=', True)]"/>
+                <separator/>
+                <filter name="filter_quarantined" string="Scope Quarantined"
+                        domain="[('sec3_scope_quarantined', '=', True)]"/>
+                <separator/>
+                <filter name="filter_recent" string="Created This Week"
+                        domain="[('shopify_created_at', '&gt;=', 'today -7d')]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_financial"
+                            string="Shopify Financial Status"
+                            context="{'group_by': 'shopify_financial_status_snapshot'}"/>
+                    <filter name="group_fulfillment"
+                            string="Shopify Fulfilment Status"
+                            context="{'group_by': 'shopify_fulfillment_status_snapshot'}"/>
+                    <filter name="group_status" string="Binding Status"
+                            context="{'group_by': 'status'}"/>
+                    <filter name="group_cod_collection"
+                            string="COD Collection State"
+                            context="{'group_by': 'cod_collection_state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_order_binding_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.order.binding.list</field>
+        <field name="model">shopify.connector.order.binding</field>
+        <field name="arch" type="xml">
+            <list string="Orders" create="false" delete="false">
+                <field name="shopify_order_name"/>
+                <field name="sale_order_id"/>
+                <!-- One column per independent dimension. See the file
+                     header: these are never merged. -->
+                <field name="shopify_financial_status_snapshot"
+                       string="Payment (Shopify)"/>
+                <field name="shopify_fulfillment_status_snapshot"
+                       string="Fulfilment (Shopify)"/>
+                <field name="status" string="Connector"
+                       decoration-warning="status == 'review'"
+                       decoration-muted="status == 'inactive'"/>
+                <field name="manual_gateway_approval_state"
+                       string="Payment approval" optional="show"
+                       decoration-warning="manual_gateway_approval_state == 'pending'"/>
+                <field name="is_cod" string="COD" optional="show"/>
+                <field name="shopify_order_total_amount" string="Total"
+                       optional="show"/>
+                <field name="shopify_currency_code" string="Currency"
+                       optional="hide"/>
+                <field name="shopify_created_at" optional="show"/>
+                <field name="shopify_cancelled_at" optional="hide"/>
+                <field name="sec3_scope_quarantined" string="Quarantined"
+                       widget="boolean_toggle" readonly="1" optional="show"/>
+                <field name="store_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- S17 — Order review (the form body of the same model)            -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_order_binding_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.order.binding.form</field>
+        <field name="model">shopify.connector.order.binding</field>
+        <field name="arch" type="xml">
+            <form string="Order Review" create="false" delete="false">
+                <header>
+                    <button name="%(action_shopify_connector_manual_gateway_approval_wizard)d"
+                            type="action" string="Approve Payment"
+                            class="btn-primary"
+                            invisible="manual_gateway_approval_state != 'pending'"
+                            groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not sec3_scope_quarantined">
+                        <strong>Excluded from synchronisation.</strong>
+                        This binding's company no longer agrees with its
+                        store's. No job will process this order until an
+                        administrator releases it.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="manual_gateway_approval_state != 'pending'">
+                        <strong>Needs a decision: payment was taken outside
+                        Shopify's gateway.</strong>
+                        The connector cannot verify this payment. Review the
+                        evidence below before approving.
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not shopify_cancelled_at">
+                        <strong>Cancelled on Shopify.</strong>
+                        <field name="shopify_cancel_reason" readonly="1"
+                               nolabel="1" class="oe_inline"/>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="shopify_order_name" readonly="1"
+                                   placeholder="Unnamed Shopify order"/></h1>
+                    </div>
+
+                    <!--
+                        The four state strips. Each group is one dimension,
+                        labelled with WHOSE view of the order it reports, so
+                        "Paid" is never mistaken for "the connector agrees it
+                        is paid".
+                    -->
+                    <group>
+                        <group string="What Shopify says">
+                            <field name="shopify_financial_status_snapshot"
+                                   readonly="1" string="Payment"/>
+                            <field name="shopify_previous_financial_status_snapshot"
+                                   readonly="1" string="Previously"
+                                   invisible="not shopify_previous_financial_status_snapshot"/>
+                            <field name="shopify_fulfillment_status_snapshot"
+                                   readonly="1" string="Fulfilment"/>
+                            <field name="shopify_cancelled_at" readonly="1"
+                                   string="Cancelled at"/>
+                            <field name="shopify_processed_at" readonly="1"/>
+                        </group>
+                        <group string="What this connector concluded">
+                            <field name="status" readonly="1"
+                                   string="Binding status"/>
+                            <field name="sale_order_id" readonly="1"/>
+                            <field name="customer_resolution" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                            <field name="store_id" readonly="1"/>
+                            <field name="company_id" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Financial Snapshot"
+                              name="financial_snapshot">
+                            <!--
+                                A breakdown, not a computed total. Every value
+                                is what Shopify reported; the connector adds
+                                no arithmetic of its own here, because a
+                                locally-computed total that disagreed with
+                                Shopify's would look like a connector bug
+                                rather than the upstream difference it is.
+                            -->
+                            <group>
+                                <group string="Reported by Shopify">
+                                    <field name="shopify_order_total_amount"
+                                           readonly="1" string="Total"/>
+                                    <field name="shopify_subtotal_amount"
+                                           readonly="1" string="Subtotal"/>
+                                    <field name="shopify_total_tax_amount"
+                                           readonly="1" string="Tax"/>
+                                    <field name="shopify_total_shipping_amount"
+                                           readonly="1" string="Shipping"/>
+                                    <field name="shopify_total_discounts_amount"
+                                           readonly="1" string="Discounts"/>
+                                    <field name="shopify_total_tip_amount"
+                                           readonly="1" string="Tip"/>
+                                </group>
+                                <group string="Currency and presentment">
+                                    <field name="shopify_currency_code"
+                                           readonly="1"/>
+                                    <field name="shopify_presentment_currency_code"
+                                           readonly="1"/>
+                                    <field name="shopify_order_total_presentment"
+                                           readonly="1"/>
+                                    <field name="shopify_taxes_included"
+                                           readonly="1"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Payment Approval"
+                              name="manual_gateway"
+                              invisible="not manual_gateway_name">
+                            <group>
+                                <group string="Gateway">
+                                    <field name="manual_gateway_name"
+                                           readonly="1"/>
+                                    <field name="manual_gateway_evidence_state"
+                                           readonly="1"/>
+                                    <field name="manual_gateway_approval_state"
+                                           readonly="1"/>
+                                </group>
+                                <group string="Decision"
+                                       invisible="not manual_gateway_approved_by_uid">
+                                    <field name="manual_gateway_approved_by_uid"
+                                           readonly="1"/>
+                                    <field name="manual_gateway_approved_at"
+                                           readonly="1"/>
+                                    <field name="manual_gateway_approved_shopify_updated_at"
+                                           readonly="1"
+                                           string="Shopify state at approval"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Cash on Delivery" name="cod"
+                              invisible="not is_cod">
+                            <group>
+                                <group string="The three COD dimensions">
+                                    <field name="cod_commercial_state"
+                                           readonly="1"/>
+                                    <field name="cod_fulfillment_state"
+                                           readonly="1"/>
+                                    <field name="cod_collection_state"
+                                           readonly="1"/>
+                                </group>
+                                <group string="Value ledger">
+                                    <field name="cod_order_value_amount"
+                                           readonly="1" string="Order value"/>
+                                    <field name="cod_fulfilled_value_amount"
+                                           readonly="1" string="Fulfilled"/>
+                                    <field name="cod_collected_value_amount"
+                                           readonly="1" string="Collected"/>
+                                    <field name="cod_refunded_value_amount"
+                                           readonly="1" string="Refunded"/>
+                                    <field name="cod_cancelled_value_amount"
+                                           readonly="1" string="Cancelled"/>
+                                </group>
+                            </group>
+                        </page>
+
+                        <page string="Identity and Freshness" name="identity">
+                            <group>
+                                <group string="Shopify identity">
+                                    <field name="shopify_gid" readonly="1"/>
+                                    <field name="shopify_legacy_resource_id"
+                                           readonly="1"/>
+                                    <field name="shopify_created_at"
+                                           readonly="1"/>
+                                    <field name="shopify_updated_at_snapshot"
+                                           readonly="1"/>
+                                </group>
+                                <group string="Connector freshness">
+                                    <field name="shopify_last_imported_at"
+                                           readonly="1"/>
+                                    <field name="shopify_last_evidence_refresh_at"
+                                           readonly="1"/>
+                                    <field name="financial_status_changed_at"
+                                           readonly="1"/>
+                                    <field name="financial_status_trigger_source"
+                                           readonly="1"/>
+                                </group>
+                            </group>
+                            <group string="Override history"
+                                   invisible="not override_uid">
+                                <field name="override_uid" readonly="1"/>
+                                <field name="override_at" readonly="1"/>
+                                <field name="override_previous_candidate"
+                                       readonly="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_order_workspace"
+            model="ir.actions.act_window">
+        <field name="name">Orders Workspace</field>
+        <field name="res_model">shopify.connector.order.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_order_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No orders imported yet.
+            </p>
+            <p>
+                Orders appear here within minutes of your first sync.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================== -->
+    <!-- S18 — COD reconciliation workspace                              -->
+    <!-- ============================================================== -->
+
+    <record id="view_shopify_connector_order_binding_cod_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.order.binding.cod.list</field>
+        <field name="model">shopify.connector.order.binding</field>
+        <field name="arch" type="xml">
+            <list string="COD Reconciliation" create="false" delete="false">
+                <field name="shopify_order_name"/>
+                <!-- Three badges, one per COD dimension. Same rule as the
+                     orders list: never merged into a single "COD state". -->
+                <field name="cod_commercial_state" string="Commercial"/>
+                <field name="cod_fulfillment_state" string="Fulfilment"/>
+                <field name="cod_collection_state" string="Collection"
+                       decoration-success="cod_collection_state == 'fully_collected'"
+                       decoration-warning="cod_collection_state == 'partially_collected'"
+                       decoration-danger="cod_collection_state == 'discrepancy'"/>
+                <field name="cod_order_value_amount" string="Due"/>
+                <field name="cod_collected_value_amount" string="Collected"/>
+                <field name="cod_refunded_value_amount" string="Refunded"
+                       optional="show"/>
+                <field name="cod_cancelled_value_amount" string="Cancelled"
+                       optional="hide"/>
+                <field name="shopify_currency_code" string="Currency"
+                       optional="show"/>
+                <field name="sale_order_id" optional="hide"/>
+                <field name="store_id" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_cod_reconciliation"
+            model="ir.actions.act_window">
+        <field name="name">COD Reconciliation</field>
+        <field name="res_model">shopify.connector.order.binding</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_cod', '=', True)]</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_order_binding_search"/>
+        <!--
+            Bound explicitly to the COD list so this workspace shows the
+            collection ledger rather than the general orders columns; the
+            form is the shared S17 review, whose COD page is already
+            conditional on `is_cod`.
+        -->
+        <field name="view_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'sequence': 10,
+                    'view_id': ref('view_shopify_connector_order_binding_cod_list')}),
+            (0, 0, {'view_mode': 'form', 'sequence': 20,
+                    'view_id': ref('view_shopify_connector_order_binding_form')}),
+        ]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No cash-on-delivery orders awaiting reconciliation.
+            </p>
+            <p>
+                COD orders appear here with their commercial, fulfilment and
+                collection states shown separately.
+            </p>
+        </field>
+    </record>
+</odoo>
