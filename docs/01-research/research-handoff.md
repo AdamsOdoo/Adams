@@ -1,3 +1,52 @@
+### Wave 5 completion batch — SEC-2 PII, PERF-1, U2 (2026-07-26)
+
+- **Branch / PR:** `fable/wave-5-completion`, draft [PR #204](https://github.com/AdamsOdoo/Adams/pull/204)
+  into `mvp/program-integration`, from the bound base `87f1763a`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+- **Authorization:** the control-room continuation ruling of 2026-07-26, which
+  opens G5-4/G5-5, accepts SEC-2 PII **Option 1** and the U2/U3 addendum, rules
+  G5-1/2/3/6/8 satisfied, and requires the PERF-1 and export packets to be
+  **source-rebased before any edit**.
+- **Delivered (4 of 7 stages):** SEC-2 PII simplification · PERF-1
+  (source-rebased) · U1 (previous batch, unchanged) · U2 orders/COD/catalog/
+  inventory operator surfaces.
+- **NOT delivered, two different reasons — stated separately on purpose:**
+  - **Task 015 / 015B export: an evidence-backed source-verification failure.**
+    Official documentation confirms most of the packets, and corrects 015B
+    (`fileCreate` accepts `write_images`, so `write_themes` must not be
+    requested). It does **not** resolve what `productSet` does with a list
+    field omitted *entirely* — which is exactly what D-015-3's containment
+    argument rests on. Under the strict reading a first export silently deletes
+    merchant collections, metafields and images. Resolving it needs one
+    dev-store experiment, now the blocking prerequisite `X-EXPORT-0`. **No
+    export code was written.** U3's export screens inherit the stop.
+  - **U3's non-export scope** (reconnect/backfill, settings/permissions/
+    retention, diagnostics, polish) is **not** blocked by that finding. It is
+    not built because this session reached the end of its working capacity
+    after U2.
+- **Evidence:** [`../05-qa/wave-5-completion-validation-results.md`](../05-qa/wave-5-completion-validation-results.md),
+  [`../05-qa/task-perf1-validation-results.md`](../05-qa/task-perf1-validation-results.md),
+  [`../05-qa/task-015-export-source-verification-2026-07-26.md`](../05-qa/task-015-export-source-verification-2026-07-26.md).
+  Local Odoo 19 @ pinned `30bde9ff`, PostgreSQL 16.14: SEC-2 60/60, PERF-1
+  61/61 + benchmark 1/1, U2 33/33, full suite in `ci-artifacts/`. **DEC-041 D8
+  supporting evidence — Odoo.sh remains Tier-1 and has NOT been run. No
+  driven-browser/tour/HOOT evidence exists for the U2 surfaces.**
+- **Learning feedback loop.** Four things this batch taught that generalise:
+  (1) **re-read the code before implementing a packet** — PERF-1's central
+  deliverable had already shipped in a stronger form, and following the packet
+  would have *removed* a hardened recovery model; (2) **a documentation gate
+  that fails is a result, not an obstacle** — the export stop is the most
+  valuable output here, and it only exists because verification ran before
+  coding rather than after; (3) **building a screen finds things reading a
+  model does not** — two views promised states their models forbid, and a third
+  hid a capability the server permits; (4) **fixtures that pass locally and
+  fail on a fresh database are the point of the fresh-install pass** — a stock
+  location parented to another company's `view` location proved it again.
+- **Next session:** exact-head Odoo.sh runtime, then independent Claude review
+  at that exact SHA by a session that is **not** this one, then a separate
+  closure session. Nothing here may be accepted, ready-marked or merged by the
+  session that wrote it.
+
 ### Wave 5 U1 implementation — fulfillment operator experience (2026-07-25)
 
 - **Branch / PR:** `fable/wave-5-completion`, draft [PR #204](https://github.com/AdamsOdoo/Adams/pull/204)

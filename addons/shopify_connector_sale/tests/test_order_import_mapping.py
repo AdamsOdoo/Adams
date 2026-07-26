@@ -364,10 +364,19 @@ class TestOrderImportMappingStatic(TransactionCase):
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
         )
+        # U2 added the four operator-UI data files. Recorded here in load
+        # order deliberately: the order is itself the contract -- the wizard
+        # actions must exist before the views that reference them, and the
+        # menus must come last so every action they point at is already
+        # created.
         self.assertEqual(manifest['data'], [
             'security/ir.model.access.csv',
             'security/shopify_connector_sale_company_rules.xml',
             'data/shopify_connector_sale_cron.xml',
+            'views/shopify_connector_sale_wizard_views.xml',
+            'views/shopify_connector_order_binding_views.xml',
+            'views/shopify_connector_customer_binding_views.xml',
+            'views/shopify_connector_sale_menus.xml',
         ])
 
     def test_job_types_have_lc1_ondelete_and_replay_policy(self):
