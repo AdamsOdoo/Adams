@@ -4,19 +4,33 @@ from odoo import fields
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import new_test_user, tagged
 
+from ..models.shopify_connector_media_export_service import (
+    JOB_TYPE_MEDIA_STAGE,
+)
 from ..models.shopify_connector_product_export_service import (
     JOB_TYPE_APPLY,
+    JOB_TYPE_PREVIEW,
     JOB_TYPE_UPDATE,
+    MAX_PRODUCT_OPTIONS,
 )
 from .common import ExportCase, FakeSendResponse, PRODUCT_GID
 
+# A real 1x1 PNG. `_decoded_image` base64-decodes and checksums the actual
+# bytes, so a placeholder string would be discarded before a media step could
+# ever be planned and the test would pass for the wrong reason.
+ONE_PIXEL_PNG = (
+    b'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDw'
+    b'AEhQGAhKmMIQAAAABJRU5ErkJggg=='
+)
 
-def _product_read_body(updated_at='2026-07-26T00:00:00Z', shop=None):
+
+def _product_read_body(updated_at='2026-07-26T00:00:00Z', shop=None,
+                       title='Exportable Widget'):
     return {'data': {
         'product': {
             'id': PRODUCT_GID,
             'handle': 'exportable-widget',
-            'title': 'Exportable Widget',
+            'title': title,
             'descriptionHtml': '<p>A widget.</p>',
             'vendor': 'Adams',
             'productType': 'Widgets',
@@ -265,6 +279,102 @@ class TestExportPreviewGuard(ExportCase):
             preview.unlink()
         with self.assertRaises(AccessError):
             preview.sudo().unlink()
+
+    # ------------------------------------------------------------------
+    # The blocking hold is the LAST word on the plan
+    # ------------------------------------------------------------------
+
+    def _give_the_template_too_many_options(self):
+        """One more attribute line than Shopify's documented option ceiling.
+
+        Each line carries a single value, so the variant count stays at one
+        and the only ceiling this trips is the option one.
+        """
+        Attribute = self.env['product.attribute']
+        Value = self.env['product.attribute.value']
+        Line = self.env['product.template.attribute.line']
+        for index in range(MAX_PRODUCT_OPTIONS + 1):
+            attribute = Attribute.create({
+                'name': 'Hold Axis %d' % index, 'create_variant': 'always',
+            })
+            value = Value.create({
+                'name': 'Only', 'attribute_id': attribute.id,
+            })
+            Line.create({
+                'product_tmpl_id': self.template.id,
+                'attribute_id': attribute.id,
+                'value_ids': [(6, 0, value.ids)],
+            })
+        self.template.invalidate_recordset()
+
+    def test_a_blocking_hold_also_withholds_the_media_plan(self):
+        """A refused product shape may not export "the safe half".
+
+        The hold used to run BEFORE the media planner, so it emptied the
+        product plan and the media planner then refilled it: a product whose
+        option shape had already been refused came back `previewed` with an
+        executable media step, and a reviewer could confirm it. The hold is
+        now the last word on the plan, and this test is the thing that keeps
+        it there -- it fails if the two are ever reordered again.
+        """
+        self.settings.sudo().write({'media_source_of_truth': 'odoo'})
+        self.template.sudo().write({'image_1920': ONE_PIXEL_PNG})
+        self._give_the_template_too_many_options()
+
+        job = self.make_job(
+            JOB_TYPE_PREVIEW, 'product.template', self.template.id,
+        )
+        job.sudo().write({'state': 'running'})
+        response = FakeSendResponse(_product_read_body(title='Renamed Remotely'))
+        with self.send_patch(
+            lambda self, store, body, token=None, mutation_context=None,
+            r=response: r
+        ):
+            preview = self.Service._handle_product_export_preview(job)
+        preview.invalidate_recordset()
+
+        kinds = {
+            item['kind']
+            for item in (preview.blocked_differences or {}).get('items') or []
+        }
+        self.assertIn('too_many_options', kinds)
+        # Not "no media step" by accident -- no step of ANY kind survives.
+        self.assertEqual((preview.apply_plan or {}).get('steps'), [])
+        self.assertNotIn(
+            JOB_TYPE_MEDIA_STAGE,
+            [step.get('step')
+             for step in (preview.apply_plan or {}).get('steps') or []],
+        )
+        # And the state says so, rather than looking confirmable.
+        self.assertEqual(preview.state, 'blocked')
+        # The media section must not still advertise appends it will not do.
+        self.assertFalse((preview.diff or {}).get('media', {}).get('exported'))
+        self.assertEqual(
+            (preview.diff or {}).get('media', {}).get('appends'), [],
+        )
+
+    def test_a_held_preview_cannot_be_confirmed(self):
+        """The end-to-end consequence, asserted through the real door."""
+        self.settings.sudo().write({'media_source_of_truth': 'odoo'})
+        self.template.sudo().write({'image_1920': ONE_PIXEL_PNG})
+        self._give_the_template_too_many_options()
+
+        job = self.make_job(
+            JOB_TYPE_PREVIEW, 'product.template', self.template.id,
+        )
+        job.sudo().write({'state': 'running'})
+        response = FakeSendResponse(_product_read_body(title='Renamed Remotely'))
+        with self.send_patch(
+            lambda self, store, body, token=None, mutation_context=None,
+            r=response: r
+        ):
+            preview = self.Service._handle_product_export_preview(job)
+        preview.invalidate_recordset()
+
+        with self.assertRaises(UserError) as catcher:
+            preview.with_user(self.reviewer).action_confirm_export_preview()
+        # `blocked` is refused by the state check, before the empty-plan one.
+        self.assertIn('previewed, unconfirmed', str(catcher.exception))
 
     def test_a_fresh_preview_expires_the_previous_one(self):
         first = self.make_preview(

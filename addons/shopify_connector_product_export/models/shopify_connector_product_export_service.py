@@ -581,20 +581,37 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             remote_updated_at = False
         blocked.extend(path_blocked)
 
-        # A blocking hold removes every executable step: an operator must
-        # never be able to confirm "the safe half" of a payload whose shape
-        # this connector already refused.
-        if any(
-            item['kind'] in ('too_many_options', 'too_many_variants')
-            for item in blocked
-        ):
-            plan_steps = []
-
         media_steps, media_diff = self.env[
             'shopify.connector.media.export.service'
         ]._preview_media(store, template, binding)
         diff['media'] = media_diff
         plan_steps.extend(media_steps)
+
+        # A blocking hold removes every executable step: an operator must
+        # never be able to confirm "the safe half" of a payload whose shape
+        # this connector already refused.
+        #
+        # This runs AFTER the media steps are collected, and that ordering is
+        # the whole point. Applied before them, the hold emptied the product
+        # plan and the media planner then refilled it, so a product whose
+        # option or variant shape had already been refused came back
+        # `previewed` with executable steps -- confirmable, and exporting the
+        # "safe half" the comment above says can never be offered. The hold
+        # has to be the last word on the plan, not a step in the middle of
+        # building it.
+        if any(
+            item['kind'] in ('too_many_options', 'too_many_variants')
+            for item in blocked
+        ):
+            plan_steps = []
+            diff['media'] = dict(
+                media_diff,
+                exported=False,
+                reason='Media is not exported while this product\'s option '
+                       'or variant shape is refused. Resolve the refusal '
+                       'and run a fresh preview.',
+                appends=[],
+            )
 
         preview = self._create_preview_record(
             store, template, binding, export_path, diff, plan_steps, blocked,
