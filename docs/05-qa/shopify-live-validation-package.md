@@ -93,6 +93,29 @@ order. Cleanup (§7) is verified against this baseline.
 Legend — **Expected** is the observable result; **Evidence** is what must be
 captured, sanitized, and attached to the run record.
 
+### 4.0 BLOCKING PREREQUISITE — `X-EXPORT-0` (added 2026-07-26)
+
+> **This case gates Task 015 implementation, not merely its validation.**
+> Run it before any export code is written or accepted. Source:
+> [`task-015-export-source-verification-2026-07-26.md`](task-015-export-source-verification-2026-07-26.md)
+> §3 — the official documentation does **not** resolve whether a list field
+> that is omitted from a `productSet` input entirely is left alone or has all
+> its remote entries deleted. Task 015's whole containment argument (that
+> `collections`, `metafields` and media are protected **by being omitted**)
+> depends on the answer. If the strict reading holds, a first export silently
+> destroys merchant data the connector never owned.
+
+| # | Case | Steps | Expected | Evidence |
+| --- | --- | --- | --- | --- |
+| **X-EXPORT-0** | `productSet` omitted-list-field boundary | On a throwaway synthetic product: (1) add it to two collections, set one merchant-authored metafield, attach one image; (2) record the full state; (3) call `productSet` with an input that omits `collections`, `metafields` and media **entirely** (supplying only allowlisted scalar fields); (4) re-read the product. | **Record what actually happened — both outcomes are valid results of this experiment.** If the collections, metafield and image all survive, D-015-3's containment argument holds and Task 015 may proceed. If any of them is gone, the export design must change before any code is written: omission is not protection, and every list field must be supplied explicitly and completely. | Before/after full product read (sanitized), the exact request sent, the API version string returned by the store, and a one-line verdict naming which reading is true. |
+
+**Do not proceed past this case on either assumption.** A "probably fine"
+here is a decision to risk deleting a merchant's collections.
+
+Re-confirm §2 of the source-verification record against the store's **pinned**
+API version at the same time: that record was verified against `latest`
+because the `2026-07` documentation URLs returned 503.
+
 ### 4.1 Read / discovery (no mutation) — `D-*`
 
 | # | Case | Expected | Evidence |

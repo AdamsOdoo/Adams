@@ -159,77 +159,118 @@ evidence satisfies G5-7 or orders an exact-SHA Odoo.sh run at `87f1763a`; and
 prompt is otherwise ready: its base is bound, and §3 proves its contract holds at
 that base.
 
-## 5a. U1 delivered in this branch — 2026-07-25
+## 5a. Control-room continuation ruling — 2026-07-26
 
-`[Fact — implemented and locally validated in this session; NOT accepted]`
+`[Fact — recorded from the product-owner/control-room instruction of 2026-07-26]`
 
-The product-owner instruction that bound the base to `87f1763a` also directed
-Wave 5 completion, which supersedes §5's hard stop. U1 was implemented per the
-locked contract.
+That instruction is itself the acceptance act §4 said was missing. It records:
 
-| Item | State |
+| Gate | Ruling |
 | --- | --- |
-| Scope | S1–S8: fulfillment menu branch, review workspace, binding/lineage, fulfillment job screen, operating-mode surface, mode-switch wizard, status/failure UX, tests |
-| Backend contract | Consumed unchanged; **no `models/**` file touched**, no schema change, no migration, no new durable model, no cron/controller/webhook/Owl surface |
-| Focused suite | **327/327 green** |
-| Full cross-wave suite | See [`../05-qa/ui-u1-validation-results.md`](../05-qa/ui-u1-validation-results.md) §2 |
-| Browser/render gate | **PRODUCED, not deferred** — 34 checks, 0 failed, 13 screenshots, both roles + outsider, desktop/390px/RTL |
-| Regression found and fixed | One real SEC-2 invariant violation (a direct ACL grant on the customer-facing role), fixed at `5e50aa1` with regression proof |
-| Declared deviations | Two, both recorded in the validation results §5 — a second wizard module, and the frozen test-file allowlist extension |
-| Known scope limit | Carrier tracking chips are not rendered; a parsed tracking read seam is a separate backend task (validation results §6) |
-| **Still required before U1 acceptance** | **Exact-SHA Odoo.sh runtime**; independent Claude review at the exact SHA; a separate closure session for any ready-mark/merge |
+| G5-1, G5-2, G5-3, G5-6, G5-8 | **Satisfied** by the merged and accepted evidence in §4 |
+| G5-7 | Supporting evidence **sufficient to continue implementation**; it does **not** grant Tier-1 acceptance. One exact-head Odoo.sh campaign remains mandatory after the final Wave 5 head is frozen |
+| G5-9 | Satisfied for U1; **owed per remaining stage** |
+| G5-4 | **OPEN.** PERF-1 objectives and the PB-19 provisional ≥ 600 jobs/hour target accepted, **subject to source rebase** |
+| G5-5 | **OPEN.** PD-PX-1..7 accepted as the binding export policy; Task 015/015B may proceed **after source alignment** |
+| SEC-2 PII | **Option 1 accepted and authorized** — controlled removal of business-record masking, mandatory log/audit redaction retained, already-masked data never reconstructed |
+| U2/U3 addendum | **Accepted for implementation** |
 
-**Gate bookkeeping is unchanged by this delivery.** G5-4 and G5-5 remain
-unearned control-room acts (§4); implementing U1 under a product-owner
-instruction does not check them, and this session checks none of them.
+The ruling also directs that the repository headers still reading
+"Proposed / Not accepted" are **not** a reason to stop, and that this tracker
+record the acceptance accurately **without claiming runtime, independent
+review or final acceptance**. That is exactly what this section does.
+
+## 5b. Wave 5 stage delivery — state at this head
+
+`[Fact — implemented and locally validated in this branch; NOTHING accepted]`
+
+| # | Stage | State |
+| --- | --- | --- |
+| 1 | **SEC-2 residual — PII simplification** | **DELIVERED.** Business-record masking removed (Option 1); log/audit redaction retained and renamed to what it governs; legacy-masked rows flagged for re-import, never reconstructed; migrations verified on real migrated data and proven idempotent |
+| 2 | **PERF-1** | **DELIVERED, source-rebased.** Cron progress + time budget, configurable per-pass cap, pre-claim backpressure. The packet's claim-N rework was **not** performed because it was already merged in a stronger form — see §5c |
+| 3 | **U1 — fulfillment operator experience** | **DELIVERED** (previous batch, unchanged here) |
+| 4 | **U2 — orders, COD, catalog matching, inventory surfaces** | **DELIVERED** |
+| 5 | **Task 015 — controlled product export** | **NOT DELIVERED — HARD STOP, see §6a** |
+| 6 | **Task 015B — media export** | **NOT DELIVERED** — sequenced after 015 |
+| 7 | **U3 — reconnect/backfill, export UI, governance, diagnostics, polish** | **NOT DELIVERED** |
+
+## 5c. PERF-1 source rebase — what was corrected
+
+`[Fact]` The PERF-1 packet described a dispatcher that claimed N jobs and
+looped over them in one uncommitted transaction. At the bound base,
+`run_drain()` already delegates to `_drain_one()`, which claims **one** job
+under `try_lock_for_update()`, dispatches it and **commits it on its own
+transaction**, with DEC-031 Layer 1 replay routing and Layer 2 mutation
+recovery around it.
+
+**Implementing D-PERF1-1 as written would have replaced a hardened,
+independently reviewed recovery model with a weaker description of it.** It
+was therefore not implemented as written; the packet now carries a §0 rebase
+section recording that, and the delivered scope is the part that genuinely did
+not exist. Full detail:
+[`../05-qa/task-perf1-validation-results.md`](../05-qa/task-perf1-validation-results.md).
 
 ## 6. Re-derived Wave 5 completion scope and sequence
 
-`[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record. Nothing
-invented.]`
+`[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.
+Nothing invented.]`
 
-Binding intra-wave sequence (DoR §3): **SEC-2 → PERF-1 → U1 → U2 → U3 → Task 015 →
-Task 015B.**
+Binding intra-wave sequence (DoR §3): **SEC-2 → PERF-1 → U1 → U2 → U3 →
+Task 015 → Task 015B.** The 2026-07-26 ruling re-orders the tail to
+SEC-2 → PERF-1 → U2 → 015 → 015B → U3, so the export backends land before
+the U3 screens that consume them.
 
-| Stage | Scope | State | Blocking gate |
-| --- | --- | --- | --- |
-| **SEC-2** | Two customer-facing roles over the internal capability groups | **DONE** — merged, #196 closed | — |
-| *(SEC-2 residual)* | MVP PII simplification — a **separate** obligation in `task-sec2-two-role-and-pii-simplification-packet.md`, explicitly **not** in #196 | **NOT STARTED, UNTRACKED BY ANY ISSUE** | G5-2 formal acceptance; needs an owner |
-| **PERF-1** | `_commit_progress()` drain-loop transaction model; ≥600 jobs/hour PB-19 budget | **NOT STARTED** | **G5-4** — packet not accepted |
-| **U1** | Fulfillment operator experience (S1–S8) | **IMPLEMENTED in this branch (§5a); NOT ACCEPTED** | Exact-SHA Odoo.sh runtime + independent review |
-| **U2** | Guided setup / readiness (acceptance-matrix row 4) | **NOT STARTED — see §6a** | U2 locked prompt in the UI phases packet is still **Proposed, not accepted** |
-| **U3** | Domain workspaces, mappings/config screens (rows 18, 19) | **NOT STARTED — see §6a** | U3 locked prompt still **Proposed, not accepted**; U2 first |
-| **Area 6 remainder** | Manual triggers + operator-visible cadence (rows 13, 14) | Backend merged; U0 already ships the Sync Center. Remaining operator surfaces **NOT STARTED** | Ships within U2/U3 |
-| **Task 015 / 015B** | Controlled product export + basic media export (row 6) | **NOT STARTED** | **G5-5** — export PDs not accepted |
+### 6a. HARD STOP — Task 015, 015B and U3 are not delivered
 
-**Inference:** U1 is the only Wave 5 stage whose planning package is complete,
-source-verified, independently reviewed, accepted and merged. It is the correct
-next implementation batch the moment §5's gate is opened. PERF-1 sits *before* U1
-in the binding sequence but is blocked by G5-4; if the control room does not accept
-the PERF-1 packet, it must explicitly re-sequence rather than let the wave stall —
-that choice is a control-room act, recorded here as an open decision.
+`[Fact — evidence-backed, not a scheduling deferral]`
 
-### 6a. What this branch does NOT deliver — stated plainly
+**Task 015's source-verification gate failed, and the failure is a real
+finding rather than a missing capability.** Before writing any export code,
+the official Shopify Admin GraphQL documentation was re-verified as the
+ruling requires. Full record:
+[`../05-qa/task-015-export-source-verification-2026-07-26.md`](../05-qa/task-015-export-source-verification-2026-07-26.md).
 
-`[Fact]` This branch delivers **U1 only**. **U2, U3, Task 015/015B controlled
-product/media export, and PERF-1 are NOT implemented here.** They are not
-deferred by this session's judgement — each is blocked on something a worker
-cannot supply:
+Most of the packets' assumptions were **confirmed** — `productSet`'s
+delete-on-omit rule for supplied lists, the `identifier.customId:
+UniqueMetafieldValueInput` upsert, the 2048-variant ceiling, synchronous
+mode, `write_products`, and — correcting 015B — that `fileCreate` accepts
+**`write_images`**, so least privilege is `write_images` + `write_products`
+and `write_themes` must not be requested.
 
-| Stage | Why it is not in this branch |
-| --- | --- |
-| **PERF-1** | **G5-4 unearned** — the PERF-1 packet is `Proposed … NOT accepted` and its §9 locked prompt is marked NOT usable. Its budgets (the `_commit_progress()` transaction model and the ≥600 jobs/hour PB-19 figure) are the acceptance bar; implementing against an unaccepted bar would be inventing product policy |
-| **Task 015 / 015B export** | **G5-5 unearned** — PD-PX-1..7 are not accepted and the Task 015/015B packets are not re-accepted. Export is a **mutation** domain: building it against unaccepted field-ownership, changed-since-read and destructive-list-guard contracts is exactly the class of work that must not proceed on inference |
-| **U2 / U3** | Their locked prompts in `ui-implementation-phases-packet.md` are still **Proposed — NOT accepted**, and that packet states its §6/§7 prompts are NOT usable. U1 had an independently reviewed, source-verified, accepted Gate-A packet; U2 and U3 do not |
+**One did not.** D-015-3's containment argument holds that `collections`,
+`metafields` and media are protected **by being omitted** from the
+`productSet` input. The documentation states that list fields delete "existing
+entries that aren't included in the mutation's input", and that omitted
+**non-list** fields stay unchanged — **it does not say what happens to a list
+field omitted entirely.** The packet itself flagged this as a dev-store
+empirical item, "never assumed".
 
-**This is a HARD STOP on those four stages, reported rather than worked
-around.** The honest position is that Wave 5 is **not complete**: one of its
-five stages is delivered. Proceeding on the rest would mean deriving product
-policy this session is not entitled to invent.
+If the strict reading is true, a first export silently deletes every
+collection membership, every merchant-authored metafield and every image on
+the exported product — merchant data the connector never owned and cannot
+restore. **Building a destructive-write guard on an unverified assumption
+about when Shopify deletes merchant data is exactly the class of work that
+must not proceed on inference.**
 
-**Wave 5 also does not close these `[Fact]`:** Gate D / CV-013 (#185), dev-store
-provisioning (#200), #186, SEC-3 (#197), PERF-0 release thresholds (#199), external
-UAT, and release readiness all remain **open and unclaimed**.
+Resolving it needs one dev-store experiment, now recorded as the **blocking
+prerequisite `X-EXPORT-0`** at the head of
+[`../05-qa/shopify-live-validation-package.md`](../05-qa/shopify-live-validation-package.md)
+§4.0. This session has no provisioned store and is forbidden from using one.
+
+**Task 015B** is sequenced after 015 and attaches media to products it
+creates, so it inherits the stop. **U3's export-flow screens (S27/S7)** have
+no `action_confirm_export_preview` to wire to, so they inherit it too.
+
+**U3's non-export scope** — reconnect/backfill (S25/S26),
+settings/permissions/retention (S28/S29/S30), diagnostics (S31) and the polish
+pass — is **not** blocked by that finding. It is **not delivered in this
+batch** for a different and entirely separate reason: the implementing session
+reached the end of its working capacity after U2. That is stated plainly
+rather than dressed as a dependency.
+
+**Wave 5 also does not close these `[Fact]`:** Gate D / CV-013 (#185),
+dev-store provisioning (#200), #186, SEC-3 (#197), PERF-0 release thresholds
+(#199), external UAT, and release readiness all remain **open and unclaimed**.
 
 ## 7. P3 carry-forward disposition — review `5080722794`
 

@@ -53,16 +53,26 @@ class TestUiU2Inventory(TransactionCase):
         # `odoo_location_id` is REQUIRED on the mapping, so an "unmapped"
         # mapping row cannot exist. The fixture reflects that rather than
         # working around it.
-        parent = cls.env['stock.location'].search(
-            [('usage', '=', 'view')], limit=1,
-        )
+        # The parent must belong to this company (or to none), or Odoo's
+        # `_check_company` refuses the create. Picking the first `view`
+        # location in the database is not safe: on a fresh install without
+        # demo data it can belong to another company, which is exactly how
+        # this fixture failed in CI while passing locally.
+        parent = cls.env['stock.location'].search([
+            ('usage', '=', 'view'),
+            ('company_id', 'in', (False, cls.env.company.id)),
+        ], limit=1)
         # (store, odoo_location) is unique too, so each probe needs its own
         # Odoo location.
+        base = {
+            'usage': 'internal',
+            'company_id': cls.env.company.id,
+        }
+        if parent:
+            base['location_id'] = parent.id
         cls.odoo_locations = cls.env['stock.location'].create([
-            {'name': 'U2 loc A', 'usage': 'internal',
-             'location_id': parent.id},
-            {'name': 'U2 loc B', 'usage': 'internal',
-             'location_id': parent.id},
+            dict(base, name='U2 loc A'),
+            dict(base, name='U2 loc B'),
         ])
         cls.odoo_location = cls.odoo_locations[0]
 
