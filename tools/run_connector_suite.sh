@@ -65,11 +65,24 @@ MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale
 EXTRA_MODULES="account,stock"
 
 # The complete set of connector test tags that carry `-standard`. Every entry
-# here is a test class that `--test-enable` alone will NOT run. Keep this list
+# here is a test class that `--test-enable` alone will NOT run.
+#
+# `shopify_connector_hoot` (added 2026-07-26) runs the connector's HOOT unit
+# suite in a real browser. It is `-standard` because it builds the full unit
+# asset bundle and boots Chrome, which is exactly this list's cost profile.
+#
+# WARNING, and it applies to every browser test this runner executes: an
+# `HttpCase` test SKIPS -- it does not fail -- when `websocket-client` is
+# absent from the venv or when no Chrome/Chromium is resolvable, and a skip
+# still reports `0 failed, 0 error(s)`. This script does NOT yet install
+# `websocket-client`, does NOT resolve a browser, and does NOT fail on a skip;
+# see TD-010. Until it does, a green run here is NOT evidence that any tour or
+# HOOT test executed. Set ODOO_BROWSER_BIN and install websocket-client before
+# quoting browser evidence from this runner. Keep this list
 # in sync with docs/05-qa/pre-wave-5-debt-discovery.md §3; the guard test
 # `test_phase_contract.py` fails if a `-standard` class exists that no tag here
 # selects, so the two cannot drift apart silently.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput"
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot"
 
 # Restrict the STANDARD passes to the connector modules.
 #
