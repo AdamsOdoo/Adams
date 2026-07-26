@@ -76,7 +76,7 @@ class TestExportDestructiveGuard(ExportCase):
             'selectedOptions': [],
         }
         plan = self.Service._diff_variants(
-            self.store, self.binding, self._remote(),
+            self.store, self.binding,
             [self._bound_remote_variant(), foreign],
             self.template.product_variant_ids, True,
         )
@@ -100,7 +100,7 @@ class TestExportDestructiveGuard(ExportCase):
         """Creating a replacement would duplicate; deleting the binding would
         erase evidence. Neither is available, so it is a review case."""
         plan = self.Service._diff_variants(
-            self.store, self.binding, self._remote(), [],
+            self.store, self.binding, [],
             self.template.product_variant_ids, True,
         )
         kinds = [item['kind'] for item in plan['blocked']]

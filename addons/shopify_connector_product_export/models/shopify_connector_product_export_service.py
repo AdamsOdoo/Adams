@@ -633,7 +633,13 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'product_template_id': template.id,
             'product_template_binding_id': binding.id if binding else False,
             'export_path': export_path,
-            'state': 'blocked' if not plan_steps else 'previewed',
+            # `blocked` means "this export cannot proceed as previewed", which
+            # is only true when something was actually refused. A preview with
+            # no steps and no refusals is simply a product that already matches
+            # Shopify: it stays `previewed`, and confirmation refuses it with
+            # "nothing that can be exported" rather than a red banner implying
+            # a problem that does not exist.
+            'state': 'blocked' if (blocked and not plan_steps) else 'previewed',
             'diff': diff,
             'apply_plan': {'steps': plan_steps, 'cursor': 0},
             'blocked_differences': {'items': blocked},
@@ -688,7 +694,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 })
 
         variant_plan = self._diff_variants(
-            store, binding, remote, read['variants'], variants, include_price,
+            store, binding, read['variants'], variants, include_price,
         )
         blocked.extend(variant_plan['blocked'])
 
@@ -800,7 +806,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
 
     @api.model
     def _diff_variants(
-        self, store, binding, remote, remote_variants, variants, include_price,
+        self, store, binding, remote_variants, variants, include_price,
     ):
         """Map Odoo variants onto remote variants strictly through bindings.
 
