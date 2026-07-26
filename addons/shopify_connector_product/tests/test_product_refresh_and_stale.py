@@ -2,6 +2,10 @@ import uuid
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    API_VERSION_RESPONSE_HEADER,
+    SHOPIFY_API_VERSION,
+)
 from odoo.tools import float_compare
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
@@ -25,7 +29,14 @@ class _FakeSendResponse:
     def __init__(self, body, status_code=200, headers=None):
         self._body = body
         self.status_code = status_code
-        self.headers = headers or {}
+        # The API-version ruling (2026-07-26) makes `_normalize_response`
+        # fail closed when the response carries no `X-Shopify-API-Version`
+        # header, so a fake transport response has to state the version it
+        # is pretending to have been served by -- exactly as a real one
+        # does. An explicit `headers` argument still overrides this.
+        self.headers = headers or {
+            API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+        }
         self.text = ''
 
     def json(self):

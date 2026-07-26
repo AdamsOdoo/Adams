@@ -54,6 +54,10 @@ import odoo.service.model as service_model
 from odoo.sql_db import db_connect
 from odoo.tests import tagged
 from odoo.tests.common import TransactionCase
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    API_VERSION_RESPONSE_HEADER,
+    SHOPIFY_API_VERSION,
+)
 from odoo.tools import email_normalize, mute_logger
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
@@ -101,7 +105,14 @@ class _RaceFakeResponse:
 
     def __init__(self, status_code, json_body=None, headers=None):
         self.status_code = status_code
-        self.headers = headers or {}
+        # The API-version ruling (2026-07-26) makes `_normalize_response`
+        # fail closed when the response carries no `X-Shopify-API-Version`
+        # header, so a fake transport response has to state the version it
+        # is pretending to have been served by -- exactly as a real one
+        # does. An explicit `headers` argument still overrides this.
+        self.headers = headers or {
+            API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+        }
         self._json_body = json_body
         self.text = json.dumps(json_body) if json_body is not None else ''
 

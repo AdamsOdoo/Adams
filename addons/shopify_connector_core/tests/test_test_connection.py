@@ -201,8 +201,16 @@ class TestTestConnection(TransactionCase):
                 self._get_credential().credential_state, credential_before
             )
 
-    # 25. Version fall-forward on an otherwise-passing run.
-    def test_version_fallforward_warns_but_still_passes(self):
+    # 25. Version fall-forward now FAILS the probe (2026-07-26 ruling).
+    #
+    # Formerly `test_version_fallforward_warns_but_still_passes`, which
+    # asserted `last_test_connection_result == 'pass'` with a `degraded`
+    # health state. "Verified, but against a schema we did not check" is the
+    # soft disposition the API-version ruling removes: a store served on
+    # another version is not a connection this connector can vouch for, so
+    # the probe fails with the configuration class and the store is not
+    # marked verified.
+    def test_version_fallforward_fails_the_probe(self):
         self._set_token()
         response = FakeResponse(
             200, json_body=_success_body(domain=self.store.shop_domain),
@@ -210,9 +218,22 @@ class TestTestConnection(TransactionCase):
         )
         self._run_test_connection(lambda self, store, body, token=None: response)
         self.store.invalidate_recordset()
-        self.assertEqual(self.store.last_test_connection_result, 'pass')
-        self.assertEqual(self.store.api_health_state, 'degraded')
-        self.assertTrue(self.store.api_health_reason)
+        self.assertEqual(self.store.last_test_connection_result, 'fail')
+        self.assertTrue(self.store.last_test_connection_reason)
+        job = self._latest_job()
+        self.assertEqual(job.error_class, 'odoo_validation_configuration')
+
+    # 25b. A response with no version header fails the probe for the same
+    # reason: there is no evidence the schema matched.
+    def test_missing_version_header_fails_the_probe(self):
+        self._set_token()
+        response = FakeResponse(
+            200, json_body=_success_body(domain=self.store.shop_domain),
+            headers={},
+        )
+        self._run_test_connection(lambda self, store, body, token=None: response)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.last_test_connection_result, 'fail')
 
     # 26. Idempotency -- the collision guard: two runs, two distinct nonces.
     def test_second_run_does_not_collide_on_idempotency_key(self):

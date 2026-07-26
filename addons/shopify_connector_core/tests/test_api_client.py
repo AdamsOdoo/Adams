@@ -10,11 +10,17 @@ from odoo.tests.common import TransactionCase, tagged
 
 from ..models import shopify_connector_api_client as client_module
 from ..models.shopify_connector_api_client import (
+    ERROR_API_VERSION,
     ERROR_AUTH,
     ERROR_TEMPORARY,
     ERROR_THROTTLE,
     ERROR_UNKNOWN,
     ShopifyClientError,
+)
+from ..tools.api_version import (
+    API_VERSION_RESPONSE_HEADER,
+    SHOPIFY_API_VERSION,
+    admin_graphql_endpoint,
 )
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
@@ -61,7 +67,14 @@ class FakeResponse:
         json_error=False,
     ):
         self.status_code = status_code
-        self.headers = headers or {}
+        # The API-version ruling (2026-07-26) makes `_normalize_response` fail
+        # closed on a response with no `X-Shopify-API-Version` header, so the
+        # default fixture states the version it is pretending to have been
+        # served by. Tests that exercise the version gate itself pass
+        # `headers` explicitly, including `{}` for the missing-header case.
+        self.headers = {
+            API_VERSION_RESPONSE_HEADER: SHOPIFY_API_VERSION,
+        } if headers is None else headers
         self._json_body = json_body
         self._json_error = json_error
         if text is not None:
@@ -148,6 +161,9 @@ class TestApiClient(TransactionCase):
     def test_success_fixture_returns_parsed_data(self):
         response = FakeResponse(200, json_body=_success_body())
         result = self._execute_with(lambda self, store, body: response)
+        # The served version is reported on every success and is always the
+        # verified constant: there is no fall-forward result shape any more.
+        self.assertEqual(result['served_version'], SHOPIFY_API_VERSION)
         self.assertNotIn('version_fallforward', result)
         self.assertEqual(result['data']['shop']['name'], 'Test Shop')
         self.assertEqual(
@@ -269,15 +285,79 @@ class TestApiClient(TransactionCase):
         )
         self.assertEqual(exc.error_class, ERROR_UNKNOWN)
 
-    # 15. X-Shopify-API-Version header mismatch -> version_fallforward, no exception.
-    def test_version_fallforward_no_exception(self):
+    # 15. X-Shopify-API-Version mismatch -> FAILS CLOSED (2026-07-26 ruling).
+    #
+    # This assertion is the inverse of what it was. The former
+    # `test_version_fallforward_no_exception` proved that a response Shopify
+    # served on a DIFFERENT API version was returned to the caller as a
+    # success carrying a `version_fallforward` marker. Under the 2026-07-26
+    # control-room ruling that is no longer acceptable: a mutation built
+    # against 2026-07 semantics and executed against another version's
+    # semantics must never be reported as applied, so the response is refused
+    # before any caller sees it.
+    def test_version_mismatch_fails_closed(self):
         response = FakeResponse(
             200, json_body=_success_body(),
-            headers={'X-Shopify-API-Version': '2026-10'},
+            headers={API_VERSION_RESPONSE_HEADER: '2026-10'},
         )
-        result = self._execute_with(lambda self, store, body: response)
-        self.assertTrue(result.get('version_fallforward'))
-        self.assertEqual(result.get('served_version'), '2026-10')
+        exc = self._raises_with(response)
+        self.assertEqual(exc.error_class, ERROR_API_VERSION)
+        # The served and expected versions may appear in the technical
+        # detail; a token, a header value or a credential never may.
+        self.assertIn('2026-10', exc.technical_detail)
+        self.assertNotIn(DUMMY_TOKEN, exc.technical_detail)
+        self.assertNotIn(DUMMY_TOKEN, str(exc))
+
+    # 15b. A response with NO version header is the same uncertainty without
+    # the evidence, and is refused for the same reason.
+    def test_missing_version_header_fails_closed(self):
+        exc = self._raises_with(
+            FakeResponse(200, json_body=_success_body(), headers={})
+        )
+        self.assertEqual(exc.error_class, ERROR_API_VERSION)
+        self.assertIn(SHOPIFY_API_VERSION, exc.technical_detail)
+        self.assertNotIn(DUMMY_TOKEN, exc.technical_detail)
+
+    # 15c. The endpoint is built from the centralized constant, so a store row
+    # can never redirect a verified request at an unverified schema.
+    def test_endpoint_uses_the_centralized_constant(self):
+        self.assertEqual(
+            admin_graphql_endpoint('example.myshopify.com'),
+            'https://example.myshopify.com/admin/api/%s/graphql.json' % (
+                SHOPIFY_API_VERSION,
+            ),
+        )
+        captured = {}
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            captured['url'] = url
+            captured['headers'] = headers
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.object(client_module.requests, 'post', fake_post):
+            self.Client.execute(self.store, 'query { shop { id } }')
+        self.assertEqual(
+            captured['url'],
+            'https://%s/admin/api/%s/graphql.json' % (
+                self.store.shop_domain, SHOPIFY_API_VERSION,
+            ),
+        )
+
+    # 15d. A store whose recorded version disagrees with the connector
+    # constant is refused BEFORE any request is sent.
+    def test_store_version_disagreement_refuses_before_send(self):
+        self.store.sudo().write({'api_version': '2025-01'})
+        sent = []
+
+        def fake_post(url, json=None, headers=None, timeout=None):
+            sent.append(url)
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.object(client_module.requests, 'post', fake_post):
+            with self.assertRaises(ShopifyClientError) as catcher:
+                self.Client.execute(self.store, 'query { shop { id } }')
+        self.assertEqual(catcher.exception.error_class, ERROR_API_VERSION)
+        self.assertFalse(sent, 'no request may be sent on a version mismatch')
 
     # 16. The five permission-scope-auth reasons are pairwise distinct.
     def test_five_permission_scope_auth_reasons_pairwise_distinct(self):

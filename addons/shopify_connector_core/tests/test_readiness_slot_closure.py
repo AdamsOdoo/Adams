@@ -322,7 +322,16 @@ class TestReadinessSlotClosure(TransactionCase):
 
     # 12. Fall-forward connection still sets api_health_state 'degraded'
     #     (the D-R1-5 change never touches this path).
-    def test_fallforward_success_still_sets_api_health_degraded(self):
+    def test_fallforward_now_fails_the_probe_instead_of_degrading(self):
+        """Inverted by the 2026-07-26 API-version ruling.
+
+        Formerly `test_fallforward_success_still_sets_api_health_degraded`,
+        which asserted `last_test_connection_result == 'pass'` with a
+        `degraded` health state. "Verified, but against a schema we did not
+        check" is exactly the soft disposition that ruling removes: a store
+        served on another API version is not a connection this connector can
+        vouch for, so the probe FAILS and the store is not marked verified.
+        """
         store = self._make_store('degraded-health')
         self._set_token(store)
         self._run_test_connection(
@@ -333,18 +342,27 @@ class TestReadinessSlotClosure(TransactionCase):
             ),
         )
         store.invalidate_recordset()
-        self.assertEqual(store.last_test_connection_result, 'pass')
-        self.assertEqual(store.api_health_state, 'degraded')
+        self.assertEqual(store.last_test_connection_result, 'fail')
+        self.assertTrue(store.last_test_connection_reason)
 
     # 12b. Recovery regression: a store that fell forward to `degraded`
     #      (with a populated reason) returns to `normal` on a subsequent
     #      non-fall-forward success, and the stale reason is cleared --
     #      both states reached through real test-connection behavior, no
     #      force-writes.
-    def test_degraded_recovers_to_normal_and_clears_reason(self):
+    def test_a_failed_probe_recovers_to_normal_and_clears_reason(self):
+        """Recovery regression, re-anchored on the post-ruling behaviour.
+
+        The `degraded` state is no longer reachable through a fall-forward
+        success (that path now fails closed), so the regression this test
+        exists for -- a stale `api_health_reason` surviving a later success --
+        is reproduced by reaching a failed probe first and then succeeding.
+        Both states are still reached through real test-connection behaviour,
+        with no force-writes.
+        """
         store = self._make_store('recovery')
         self._set_token(store)
-        # 1) fall-forward success -> degraded with a non-empty reason.
+        # 1) a version mismatch -> failed probe with a non-empty reason.
         self._run_test_connection(
             store,
             FakeResponse(
@@ -353,9 +371,9 @@ class TestReadinessSlotClosure(TransactionCase):
             ),
         )
         store.invalidate_recordset()
-        self.assertEqual(store.api_health_state, 'degraded')
-        self.assertTrue(store.api_health_reason)
-        # 2) subsequent non-fall-forward success -> normal, reason cleared.
+        self.assertEqual(store.last_test_connection_result, 'fail')
+        self.assertTrue(store.last_test_connection_reason)
+        # 2) subsequent correctly-versioned success -> normal, reason cleared.
         self._run_test_connection(
             store,
             FakeResponse(
@@ -494,7 +512,14 @@ class TestReadinessSlotClosure(TransactionCase):
         with open(path, 'r', encoding='utf-8') as source_file:
             content = source_file.read()
         self.assertEqual(content.count("'api_health_state': 'normal'"), 1)
-        self.assertIn("'api_health_state': 'degraded'", content)
+        # The 2026-07-26 API-version ruling removed the fall-forward branch
+        # that wrote `degraded` on an otherwise-successful probe: a served
+        # version that differs from the connector constant now fails closed in
+        # `_normalize_response` and never reaches the success path. The
+        # `degraded` VALUE remains in the selection and is still reachable
+        # through other health transitions; what no longer exists is a write
+        # of it next to a recorded verification.
+        self.assertNotIn("'api_health_state': 'degraded'", content)
         self.assertEqual(
             core_sudo_inventory_for_file('shopify_connector_store.py'),
             (

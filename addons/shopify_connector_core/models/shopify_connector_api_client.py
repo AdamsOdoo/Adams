@@ -10,6 +10,11 @@ import requests
 from odoo import api, fields, models
 from odoo.exceptions import UserError
 
+from ..tools.api_version import (
+    API_VERSION_RESPONSE_HEADER,
+    SHOPIFY_API_VERSION,
+    admin_graphql_endpoint,
+)
 from ..tools.redaction import redact
 from .shopify_connector_mutation_attempt import canonical_sha256
 
@@ -34,6 +39,12 @@ ERROR_TEMPORARY = 'shopify_temporary_server_network'
 ERROR_AUTH = 'shopify_permission_scope_auth'
 ERROR_THROTTLE = 'shopify_throttling_rate_limit'
 ERROR_UNKNOWN = 'unknown_system_error'
+# The API-version block. Classified as a configuration/API-compatibility
+# problem, which is exactly what it is: an operator fixes it (by correcting
+# the store's recorded version, or by the connector being upgraded to a
+# version Shopify still serves) and then retries. No 17th error class is
+# introduced -- this is the existing DEC-009 "manual fix then retry" class.
+ERROR_API_VERSION = 'odoo_validation_configuration'
 
 # The five mandatory, pairwise-distinct plain-language reasons for the
 # shopify_permission_scope_auth class (AR-027, F1 revision) -- a shared/
@@ -58,6 +69,13 @@ REASON_THROTTLED = 'Shopify is asking us to slow down — try again shortly.'
 REASON_UNKNOWN = (
     'Shopify returned a response we could not interpret — try again, '
     'and contact support if it persists.'
+)
+# Deliberately names no header value, no token and no domain: an
+# operator-facing reason has to be safe to paste into a support ticket.
+REASON_API_VERSION = (
+    'Shopify did not serve the Admin API version this connector is built '
+    'for, so the response was refused rather than acted on. This needs a '
+    'configuration or connector-version fix, not a retry.'
 )
 
 # CORE-R2 (AR-047; analysis §9.1) lifecycle-call purpose -> allowed store
@@ -152,10 +170,12 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         """Send one read-only GraphQL query and return its normalized data.
 
         Returns `{'data': <parsed data>, 'throttle_status': <dict or
-        None>}`, optionally with `version_fallforward`/`served_version`
-        keys on an API-version header mismatch (never raised as an
-        error). Raises `ShopifyClientError` on any transport or
-        GraphQL-level failure.
+        None>, 'served_version': <the verified version string>}`. Raises
+        `ShopifyClientError` on any transport or GraphQL-level failure,
+        **including** an API-version mismatch or a missing
+        `X-Shopify-API-Version` header: under the 2026-07-26 ruling a
+        response Shopify served on another version is refused rather than
+        returned with a fall-forward marker.
         """
         self._validate_graphql_operation(
             query, variables or {}, mutation_context=None,
@@ -801,9 +821,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             token = self.env[
                 'shopify.connector.store.credential'
             ]._get_access_token(store)
-        url = 'https://%s/admin/api/%s/graphql.json' % (
-            store.shop_domain, store.api_version,
-        )
+        # The endpoint's version comes from the centralized connector
+        # constant, never from the store row. A store whose recorded version
+        # disagrees is a configuration block raised BEFORE the request, not a
+        # request quietly addressed at a schema nothing here was verified
+        # against.
+        self._assert_configured_api_version(store)
+        url = admin_graphql_endpoint(store.shop_domain)
         headers = {
             'Content-Type': 'application/json',
             'X-Shopify-Access-Token': token,
@@ -814,6 +838,77 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             headers=headers,
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
         )
+
+    @api.model
+    def _assert_configured_api_version(self, store):
+        """Refuse to send at all when the store's recorded version disagrees.
+
+        Raised before the network call, so a misconfigured store never
+        reaches Shopify rather than being caught on the way back. The
+        recorded version is never *used* to build the endpoint — this check
+        exists so a disagreement is surfaced as the configuration problem it
+        is, instead of being silently overridden.
+        """
+        recorded = getattr(store, 'api_version', None)
+        if recorded and recorded != SHOPIFY_API_VERSION:
+            raise ShopifyClientError(
+                error_class=ERROR_API_VERSION,
+                reason=REASON_API_VERSION,
+                technical_detail=redact(
+                    'store api_version %s != connector %s' % (
+                        recorded, SHOPIFY_API_VERSION,
+                    )
+                ),
+                credential_invalid=False,
+            )
+        return True
+
+    @api.model
+    def _assert_served_api_version(self, response):
+        """Fail closed on the served version, before any success is reported.
+
+        Two failures, one disposition:
+
+        * a **mismatch** means Shopify executed the request against a schema
+          this connector was not verified against, so its response cannot be
+          interpreted safely — including a `userErrors: []` that would
+          otherwise read as success;
+        * a **missing header** is the same uncertainty with no evidence
+          either way, and a mutation path may not proceed on "probably the
+          right version".
+
+        Only the version strings appear in the diagnostic. No header, token
+        or credential value is ever included: `redact()` is applied on top of
+        a message that already contains none.
+        """
+        headers = getattr(response, 'headers', None) or {}
+        try:
+            served = headers.get(API_VERSION_RESPONSE_HEADER)
+        except Exception:
+            served = None
+        if not served:
+            raise ShopifyClientError(
+                error_class=ERROR_API_VERSION,
+                reason=REASON_API_VERSION,
+                technical_detail=redact(
+                    'no %s header on the response; expected %s' % (
+                        API_VERSION_RESPONSE_HEADER, SHOPIFY_API_VERSION,
+                    )
+                ),
+                credential_invalid=False,
+            )
+        if served != SHOPIFY_API_VERSION:
+            raise ShopifyClientError(
+                error_class=ERROR_API_VERSION,
+                reason=REASON_API_VERSION,
+                technical_detail=redact(
+                    'served api version %s != connector %s' % (
+                        served, SHOPIFY_API_VERSION,
+                    )
+                ),
+                credential_invalid=False,
+            )
+        return served
 
     def _safe_text(self, response):
         try:
@@ -937,17 +1032,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         if errors:
             raise self._error_from_graphql_errors(errors, response)
 
-        result = {
+        # The version gate runs AFTER the transport/GraphQL error taxonomy so
+        # a 401 or a THROTTLED response keeps its own accurate
+        # classification, and BEFORE any result is returned so no caller can
+        # act on a body served by an unverified schema.
+        served_version = self._assert_served_api_version(response)
+        return {
             'data': body.get('data'),
             'throttle_status': self._parse_throttle_status(body),
+            'served_version': served_version,
         }
-        served_version = None
-        headers = getattr(response, 'headers', None) or {}
-        try:
-            served_version = headers.get('X-Shopify-API-Version')
-        except Exception:
-            served_version = None
-        if served_version and served_version != store.api_version:
-            result['version_fallforward'] = True
-            result['served_version'] = served_version
-        return result
