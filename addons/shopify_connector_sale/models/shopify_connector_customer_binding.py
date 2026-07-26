@@ -1,5 +1,11 @@
 from odoo import api, fields, models
 
+# The sentinel the pre-SEC-2 retention sweep wrote over customer snapshots.
+# SEC-2 removed the code that writes it; this constant exists only so already
+# masked rows can be *recognised* and flagged for refresh (packet §E). It is
+# never written to a business record by any code path.
+LEGACY_MASKED_PII_VALUE = '***'
+
 
 class ShopifyConnectorCustomerBinding(models.Model):
     """Binds one Shopify Customer to one Odoo ``res.partner``.
@@ -40,32 +46,28 @@ class ShopifyConnectorCustomerBinding(models.Model):
     # never a second source of truth for matching; matching always reads
     # the live incoming payload against res.partner.email via
     # partner_id, never these snapshots -- MBQ-55 §7.1.D).
-    shopify_display_name = fields.Char(
-        readonly=True,
-        groups=(
-            'shopify_connector_core.group_shopify_connector_reviewer,'
-            'shopify_connector_core.group_shopify_connector_admin'
-        ),
-    )
-    shopify_email_snapshot = fields.Char(
-        readonly=True,
-        groups=(
-            'shopify_connector_core.group_shopify_connector_reviewer,'
-            'shopify_connector_core.group_shopify_connector_admin'
-        ),
-    )
-    shopify_phone_snapshot = fields.Char(
-        readonly=True,
-        groups=(
-            'shopify_connector_core.group_shopify_connector_reviewer,'
-            'shopify_connector_core.group_shopify_connector_admin'
-        ),
-    )
-    pii_snapshot_masked = fields.Char(
-        compute='_compute_pii_snapshot_masked',
-        compute_sudo=True,
-    )
+    # SEC-2 (packet §C): both customer-facing roles read the raw operational
+    # snapshot. The former field-level `groups=` restriction is removed --
+    # access is now governed by the ordinary ACL / record-rule / company
+    # checks alone, and there is no masked display variant of these fields.
+    shopify_display_name = fields.Char(readonly=True)
+    shopify_email_snapshot = fields.Char(readonly=True)
+    shopify_phone_snapshot = fields.Char(readonly=True)
     shopify_last_imported_at = fields.Datetime(readonly=True)
+    # SEC-2 §E: masking was irreversible, so rows masked before SEC-2 cannot
+    # be restored. They are marked as requiring refresh/re-import rather than
+    # reconstructed -- no original value is ever inferred from a masked
+    # string. Non-stored: it is a live read of the snapshot fields, so it can
+    # never disagree with them.
+    pii_snapshot_refresh_required = fields.Boolean(
+        string='Snapshot Refresh Required',
+        compute='_compute_pii_snapshot_refresh_required',
+        help=(
+            'This customer snapshot was irreversibly masked by the '
+            'pre-SEC-2 retention sweep. The original values cannot be '
+            'recovered; re-import the customer from Shopify to restore them.'
+        ),
+    )
 
     def _odoo_binding_field_name(self):
         return 'partner_id'
@@ -91,34 +93,13 @@ class ShopifyConnectorCustomerBinding(models.Model):
         'shopify_email_snapshot',
         'shopify_phone_snapshot',
     )
-    def _compute_pii_snapshot_masked(self):
+    def _compute_pii_snapshot_refresh_required(self):
+        masked_sentinel = LEGACY_MASKED_PII_VALUE
         for binding in self:
-            email = binding.shopify_email_snapshot or ''
-            phone = binding.shopify_phone_snapshot or ''
-            display_name = binding.shopify_display_name or ''
-            if email and email != '***':
-                local, separator, domain = email.partition('@')
-                host, dot, suffix = domain.rpartition('.')
-                if separator and host:
-                    binding.pii_snapshot_masked = '%s***@%s***%s%s' % (
-                        local[:1] or '*',
-                        host[:1] or '*',
-                        dot,
-                        suffix,
-                    )
-                else:
-                    binding.pii_snapshot_masked = '%s***' % (
-                        email[:1] or '*',
-                    )
-            elif phone and phone != '***':
-                digits = ''.join(char for char in phone if char.isdigit())
-                binding.pii_snapshot_masked = '***%s' % digits[-2:]
-            elif display_name and display_name != '***':
-                binding.pii_snapshot_masked = '%s***' % display_name[:1]
-            elif email or phone or display_name:
-                binding.pii_snapshot_masked = '***'
-            else:
-                binding.pii_snapshot_masked = False
+            binding.pii_snapshot_refresh_required = any(
+                binding[field_name] == masked_sentinel
+                for field_name in binding._pii_snapshot_fields()
+            )
 
     _store_shopify_gid_uniq = models.Constraint(
         'UNIQUE(store_id, shopify_gid)',

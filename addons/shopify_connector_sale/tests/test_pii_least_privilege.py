@@ -1,4 +1,5 @@
 import ast
+import json
 import os
 from datetime import timedelta
 from unittest.mock import patch
@@ -154,29 +155,82 @@ class TestPiiLeastPrivilege(TransactionCase):
         self.assertEqual(logs.actor_uid, actor)
         return logs
 
-    def test_pii_field_and_masked_visibility_for_all_roles(self):
+    def test_raw_pii_snapshot_readable_by_every_connector_role(self):
+        """SEC-2 packet section C: no masked surface, both roles read raw.
+
+        The pre-SEC-2 behaviour restricted the snapshot fields to
+        reviewer+admin at field level and offered everyone else a masked
+        display. Both halves are gone: the fields carry no `groups=`, so
+        every connector role reads the raw operational value, and there is no
+        masked variant to read instead.
+        """
         binding = self._binding(self._partner('PII visibility', self.company))
         raw_fields = [
             'shopify_display_name',
             'shopify_email_snapshot',
             'shopify_phone_snapshot',
         ]
-        for label in ('auditor', 'operator'):
-            view = binding.with_user(self.roles[label])
-            with self.assertRaises(AccessError, msg=label):
-                view.read(raw_fields)
-            masked = view.read(['pii_snapshot_masked'])[0][
-                'pii_snapshot_masked'
-            ]
-            self.assertTrue(masked)
-            self.assertNotIn('jane.sensitive@example.com', masked)
-            self.assertNotIn('+971501234567', masked)
-        for label in ('reviewer', 'admin'):
+        for label in self.roles:
             values = binding.with_user(self.roles[label]).read(raw_fields)[0]
             self.assertEqual(
                 values['shopify_email_snapshot'],
                 'jane.sensitive@example.com',
+                'raw snapshot must be readable by %s' % label,
             )
+            self.assertEqual(values['shopify_phone_snapshot'], '+971501234567')
+            self.assertEqual(values['shopify_display_name'], 'Jane Sensitive')
+        for field_name in raw_fields:
+            self.assertFalse(
+                self.Binding._fields[field_name].groups,
+                'SEC-2 removes the field-level group restriction from %s'
+                % field_name,
+            )
+
+    def test_masked_snapshot_field_is_gone(self):
+        """SEC-2 section H item 5: the masked field and its compute are gone."""
+        self.assertNotIn('pii_snapshot_masked', self.Binding._fields)
+        self.assertFalse(
+            hasattr(self.Binding, '_compute_pii_snapshot_masked'),
+        )
+
+    def test_outsider_without_connector_role_is_denied(self):
+        """SEC-2 section H item 3: raw read needs a connector role."""
+        outsider = self.env['res.users'].create({
+            'name': 'SEC-2 outsider',
+            'login': 'sec2_pii_outsider',
+            'company_id': self.company.id,
+            'company_ids': [(6, 0, [self.company.id])],
+            'group_ids': [(6, 0, [self.env.ref('base.group_user').id])],
+        })
+        binding = self._binding(
+            self._partner('Outsider probe', self.company),
+            gid='gid://shopify/Customer/OutsiderProbe',
+        )
+        with self.assertRaises(AccessError):
+            binding.with_user(outsider).read(['shopify_email_snapshot'])
+
+    def test_legacy_masked_rows_are_flagged_not_reconstructed(self):
+        """SEC-2 section E: irreversibly masked rows are marked, never guessed."""
+        clean = self._binding(
+            self._partner('Snapshot intact', self.company),
+            gid='gid://shopify/Customer/SnapshotIntact',
+        )
+        self.assertFalse(clean.pii_snapshot_refresh_required)
+
+        legacy = self._binding(
+            self._partner('Snapshot masked', self.company),
+            gid='gid://shopify/Customer/SnapshotMasked',
+        )
+        # Exactly what the pre-SEC-2 sweep left behind.
+        legacy.sudo().write({
+            'shopify_display_name': '***',
+            'shopify_email_snapshot': '***',
+            'shopify_phone_snapshot': '***',
+        })
+        legacy.invalidate_recordset()
+        self.assertTrue(legacy.pii_snapshot_refresh_required)
+        # The flag reports the loss; it never invents a replacement value.
+        self.assertEqual(legacy.shopify_email_snapshot, '***')
 
     def test_binding_identity_write_and_create_denied_for_all_roles(self):
         binding = self._binding(self._partner('Identity current', self.company))
@@ -359,91 +413,73 @@ class TestPiiLeastPrivilege(TransactionCase):
         self.assertFalse(binding.override_uid)
         self.assertEqual(self._audit_jobs(), before)
 
-    def test_manual_mask_role_audit_redaction_and_atomicity(self):
-        partner = self._partner('Mask partner', self.company)
-        binding = self._binding(partner)
-        before = self._audit_jobs()
-        for label in ('auditor', 'operator', 'reviewer'):
-            with self.assertRaises(AccessError):
-                self.Retention.with_user(
-                    self.roles[label]
-                ).action_mask_customer_pii(binding)
-        self.assertEqual(self._audit_jobs(), before)
+    def test_manual_mask_action_is_absent_for_every_role(self):
+        """SEC-2 section H item 6: the manual mask action no longer exists.
 
-        admin = self.roles['admin']
-        self.Retention.with_user(admin).action_mask_customer_pii(binding)
-        binding.invalidate_recordset()
-        self.assertEqual(binding.shopify_email_snapshot, '***')
-        self.assertEqual(binding.shopify_phone_snapshot, '***')
-        logs = self._assert_one_audit(before, admin)
-        self.assertIn('masked_field_count=3', logs.message)
-        self.assertNotIn('jane.sensitive@example.com', logs.message)
-        self.assertNotIn('+971501234567', logs.message)
-
-        rollback_binding = self._binding(
-            self._partner('Mask rollback', self.company),
-            gid='gid://shopify/Customer/MaskRollback',
+        Asserting absence on the model is stronger than asserting an
+        AccessError: an action that still exists but is merely denied to the
+        current role is exactly the dormant capability Option 1 rejects in
+        favour of Option 2.
+        """
+        self.assertFalse(
+            hasattr(self.Retention, 'action_mask_customer_pii'),
         )
-        before_rollback = self._audit_jobs()
-        with patch.object(
-            type(self.store),
-            '_create_lifecycle_audit_job',
-            side_effect=RuntimeError('synthetic audit failure'),
-        ):
-            with self.assertRaises(RuntimeError):
-                with self.env.cr.savepoint():
-                    self.Retention.with_user(
-                        admin
-                    ).action_mask_customer_pii(rollback_binding)
-        rollback_binding.invalidate_recordset()
-        self.assertEqual(
-            rollback_binding.shopify_email_snapshot,
-            'jane.sensitive@example.com',
+        self.assertFalse(
+            hasattr(self.Retention, '_binding_models_with_pii'),
         )
-        self.assertEqual(self._audit_jobs(), before_rollback)
 
-    def test_retention_one_summary_per_affected_store(self):
-        second_store = self.env['shopify.connector.store'].create({
-            'name': 'SEC-1 retention second store',
-            'shop_domain': 'sec1-retention-2.myshopify.com',
-            'api_version': '2026-07',
-        })
+    def test_sweep_redacts_logs_and_never_touches_a_business_record(self):
+        """SEC-2 section H item 7 + the retained-redaction half of TA-C5.
+
+        One sweep, two assertions that must both hold: aged log payloads are
+        redacted (redaction stays mandatory) and the binding snapshots are
+        returned byte-for-byte unchanged (masking is gone). Running both
+        against a single sweep is what proves the two behaviours were
+        separated rather than removed together.
+        """
         old = fields.Datetime.now() - timedelta(days=3)
-        first = self._binding(
-            self._partner('Retention first', self.company),
-            gid='gid://shopify/Customer/Retention1',
+        binding = self._binding(
+            self._partner('Sweep untouched', self.company),
+            gid='gid://shopify/Customer/SweepUntouched',
             create_date=old,
         )
-        second = self._binding(
-            self._partner('Retention second', self.company),
-            gid='gid://shopify/Customer/Retention2',
-            store=second_store,
-            create_date=old,
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': self.store.id,
+            'log_redaction_retention_days': 1,
+        })
+        job = self.store.sudo()._create_lifecycle_audit_job(
+            'SEC-2 redaction fixture carrier'
         )
-        for store in (self.store, second_store):
-            self.env['shopify.connector.store.settings'].sudo().create({
-                'store_id': store.id,
-                'pii_snapshot_retention_days': 1,
-            })
-        before_first = len(self._audit_jobs(self.store))
-        before_second = len(self._audit_jobs(second_store))
+        log = self.JobLog.sudo().create({
+            'job_id': job.id,
+            'event_type': 'note',
+            'message': 'aged payload fixture',
+            'payload_snapshot': json.dumps({
+                'email': 'jane.sensitive@example.com',
+                'nested': {'phone': '+971501234567', 'count': 2},
+            }),
+            'actor_uid': self.env.uid,
+            'occurred_at': old,
+        })
+
         self.Retention.run_sweep()
-        first.invalidate_recordset()
-        second.invalidate_recordset()
-        self.assertEqual(first.shopify_email_snapshot, '***')
-        self.assertEqual(second.shopify_email_snapshot, '***')
-        first_jobs = self._audit_jobs(self.store)
-        second_jobs = self._audit_jobs(second_store)
-        self.assertEqual(len(first_jobs), before_first + 1)
-        self.assertEqual(len(second_jobs), before_second + 1)
-        for job in (first_jobs[-1], second_jobs[-1]):
-            logs = self.JobLog.search([
-                ('job_id', '=', job.id),
-                ('event_type', '=', 'manual_action'),
-            ])
-            self.assertEqual(len(logs), 1)
-            self.assertNotIn('jane.sensitive@example.com', logs.message)
-            self.assertIn('masked_binding_count=1', logs.message)
+
+        binding.invalidate_recordset()
+        self.assertEqual(
+            binding.shopify_email_snapshot,
+            'jane.sensitive@example.com',
+            'the sweep must not mask a business record',
+        )
+        self.assertEqual(binding.shopify_phone_snapshot, '+971501234567')
+        self.assertEqual(binding.shopify_display_name, 'Jane Sensitive')
+        self.assertFalse(binding.pii_snapshot_refresh_required)
+
+        log.invalidate_recordset()
+        self.assertNotIn('jane.sensitive@example.com', log.payload_snapshot)
+        self.assertNotIn('+971501234567', log.payload_snapshot)
+        payload = json.loads(log.payload_snapshot)
+        self.assertEqual(payload['email'], '***')
+        self.assertEqual(payload['nested']['phone'], '***')
 
     def test_override_signature_has_no_model_or_company_argument(self):
         core_models = os.path.join(

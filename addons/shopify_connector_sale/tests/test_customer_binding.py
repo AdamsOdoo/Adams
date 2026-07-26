@@ -221,8 +221,11 @@ class TestCustomerBinding(TransactionCase):
             if field.store and name not in self.AUTOMATIC_FIELDS
         }
         self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+        # SEC-2 removed the masked display entirely. What remains is the
+        # non-stored refresh flag for rows the pre-SEC-2 sweep already masked.
+        self.assertNotIn('pii_snapshot_masked', self.CustomerBinding._fields)
         self.assertFalse(self.CustomerBinding._fields[
-            'pii_snapshot_masked'
+            'pii_snapshot_refresh_required'
         ].store)
 
     def test_complete_protected_surface_denies_create_alter_and_clear(self):

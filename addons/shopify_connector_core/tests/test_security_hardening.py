@@ -258,10 +258,10 @@ class TestSecurityHardening(TransactionCase):
         self.assertEqual(len(logs), 1)
         self.assertEqual(logs.actor_uid, admin)
 
-    def test_retention_masks_payload_and_one_summary_per_affected_store(self):
+    def test_retention_redacts_payload_and_one_summary_per_affected_store(self):
         self.env['shopify.connector.store.settings'].sudo().create({
             'store_id': self.store.id,
-            'pii_snapshot_retention_days': 1,
+            'log_redaction_retention_days': 1,
         })
         job = self._job('succeeded')
         old = fields.Datetime.now() - timedelta(days=2)
@@ -296,4 +296,4 @@ class TestSecurityHardening(TransactionCase):
         summary_logs = self._logs(summary, 'manual_action')
         self.assertEqual(len(summary_logs), 1)
         self.assertNotIn('raw@example.com', summary_logs.message)
-        self.assertIn('masked_payload_count=1', summary_logs.message)
+        self.assertIn('redacted_payload_count=1', summary_logs.message)

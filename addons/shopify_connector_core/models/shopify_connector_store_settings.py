@@ -48,12 +48,19 @@ class ShopifyConnectorStoreSettings(models.Model):
         ],
     )
     notification_default_enabled = fields.Boolean(default=False)
-    pii_snapshot_retention_days = fields.Integer(
+    # SEC-2: this was `pii_snapshot_retention_days`, which drove *both* the
+    # removed customer-binding masking and the retained log redaction. With
+    # masking gone (packet §D Option 1) the setting is renamed to what it
+    # actually still governs -- log/audit evidence redaction. No business
+    # record is ever rewritten on this schedule.
+    log_redaction_retention_days = fields.Integer(
         default=0,
         help=(
-            'Number of days to retain PII-bearing connector snapshots. '
-            'Zero retains snapshots indefinitely; 365 days is the recommended '
-            'MVP operating value.'
+            'Number of days to retain unredacted PII-bearing entries inside '
+            'stored connector log payloads. Zero retains log payloads '
+            'unredacted indefinitely; 365 days is the recommended MVP '
+            'operating value. This never alters a customer, order, or '
+            'binding record.'
         ),
     )
 
