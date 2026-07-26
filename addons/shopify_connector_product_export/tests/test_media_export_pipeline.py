@@ -343,8 +343,58 @@ class TestMediaExportPipeline(ExportCase):
 
     def test_staging_reconciliation_never_assumes_the_target_is_usable(self):
         class _Attempt:
+            store_id = self.store
             expected_store_identity = self.store.shop_domain
 
-        verdict = self.Media._reconcile_media_stage(_Attempt())
+        body = {'data': {
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+        response = FakeSendResponse(body)
+        with self.send_patch(
+            lambda self, store, body, token=None, mutation_context=None,
+            r=response: r
+        ):
+            verdict = self.Media._reconcile_media_stage(_Attempt())
         self.assertEqual(verdict['verdict'], 'not_applied')
         self.assertEqual(verdict['action'], 'block_manual_review')
+        # The identity is OBSERVED, not echoed back from the attempt.
+        self.assertEqual(
+            verdict['observed_store_identity'], self.store.shop_domain,
+        )
+
+    def test_staging_reconciliation_refuses_a_different_store(self):
+        class _Attempt:
+            store_id = self.store
+            expected_store_identity = self.store.shop_domain
+
+        body = {'data': {
+            'shop': {'myshopifyDomain': 'someone-else.myshopify.com'},
+        }}
+        response = FakeSendResponse(body)
+        with self.send_patch(
+            lambda self, store, body, token=None, mutation_context=None,
+            r=response: r
+        ):
+            verdict = self.Media._reconcile_media_stage(_Attempt())
+        self.assertEqual(verdict['error_class'], 'store_identity_mismatch')
+
+    def test_a_failed_media_link_blocks_the_plan_entry_it_belongs_to(self):
+        """The plan holds one entry per image; every link resolves that one.
+
+        Keying the advance on the calling job's own type would look right and
+        do nothing, because `media_upload`/`media_file_create`/
+        `media_associate` are not in the plan -- leaving a failed image's
+        entry pending forever.
+        """
+        preview = self._applying_preview()
+        row = self._media_row(remote_status='uploaded', shopify_gid=FILE_GID)
+        self.Media._advance_media(
+            row, JOB_TYPE_MEDIA_ASSOCIATE, None, completed=False,
+        )
+        self.env.flush_all()
+        preview.invalidate_recordset()
+        states = [
+            step['state']
+            for step in (preview.apply_plan or {}).get('steps') or []
+        ]
+        self.assertEqual(states, ['blocked'])

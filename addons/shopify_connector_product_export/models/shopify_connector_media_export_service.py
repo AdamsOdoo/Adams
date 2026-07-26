@@ -353,15 +353,26 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
 
     @api.model
     def _advance_media(self, row, from_step, next_step_type, completed=True):
-        """Advance the export plan and chain the next media step."""
+        """Advance the export plan and chain the next media step.
+
+        The plan holds ONE step per image — the `media_stage` entry the
+        preview created — and the four jobs after it are that step's internal
+        chain. So both the completion and the failure of any link resolve the
+        SAME plan entry: `_advance_plan` is keyed on `JOB_TYPE_MEDIA_STAGE`
+        regardless of which link called. Keying it on the calling job's own
+        type would look right and silently do nothing, because
+        `media_upload`/`media_file_create`/`media_associate` are not in the
+        plan — leaving a failed image's plan entry pending forever.
+        """
+        del from_step
         Service = self.env['shopify.connector.product.export.service']
         preview = self._preview_for_row(row)
         if not preview:
             return False
         if not completed:
-            return Service._advance_plan(preview, from_step, False)
+            return Service._advance_plan(preview, JOB_TYPE_MEDIA_STAGE, False)
         if next_step_type:
-            self.env['shopify.connector.product.export.service']._enqueue(
+            Service._enqueue(
                 preview.store_id, next_step_type, 'manual_sync',
                 row._name, row.id,
                 shopify_target_gid=preview.remote_product_gid or False,
@@ -370,7 +381,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 ),
             )
             return True
-        # The associate step is the last one: only then is the plan step
+        # The associate step is the last link: only then is the plan entry
         # that started this chain complete.
         return Service._advance_plan(preview, JOB_TYPE_MEDIA_STAGE, True)
 
@@ -487,15 +498,35 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
     def _reconcile_media_stage(self, attempt):
         """A staged upload target creates nothing in the store.
 
-        There is therefore no remote state to read back, and no way for a
-        lost acknowledgement to have changed the merchant's store. The safe
-        verdict is `not_applied` with a *new* staging attempt as the
-        consequence — never an assumption that the previous target is usable,
-        because staged targets expire and its parameters were never received.
+        There is no remote state to read back and no way for a lost
+        acknowledgement to have changed the merchant's store, so the verdict
+        is always `not_applied` — never an assumption that the previous
+        target is usable, because staged targets expire and this attempt
+        never received its parameters.
+
+        The identity read is still performed rather than assumed. Returning
+        `attempt.expected_store_identity` unread would report an identity
+        this method never observed, which is the one thing a reconciliation
+        verdict must not do: the whole point of the field is that the
+        dispatcher can compare what was SEEN against what was expected.
         """
+        client = self.env['shopify.connector.api.client']
+        result = client.execute(
+            attempt.store_id,
+            'query ProductExportMediaStageIdentity { '
+            'shop { myshopifyDomain } }',
+            {},
+        )
+        identity = (
+            ((result or {}).get('data') or {}).get('shop') or {}
+        ).get('myshopifyDomain')
+        if identity != attempt.expected_store_identity:
+            return self.env[
+                'shopify.connector.product.export.service'
+            ]._reconcile_identity_mismatch(identity)
         return {
             'verdict': 'not_applied',
-            'observed_store_identity': attempt.expected_store_identity,
+            'observed_store_identity': identity,
             'action': 'block_manual_review',
             'error_class': ERROR_CLASS_TEMPORARY,
             'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
