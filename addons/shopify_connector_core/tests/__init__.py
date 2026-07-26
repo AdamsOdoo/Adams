@@ -45,3 +45,5 @@ from . import test_phase_contract
 from . import test_sec3_store_ownership
 # SEC-2 (issue #196) customer-facing connector roles.
 from . import test_sec2_roles
+# PERF-1 core queue throughput calibration.
+from . import test_dispatch_throughput

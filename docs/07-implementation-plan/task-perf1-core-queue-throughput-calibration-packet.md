@@ -1,7 +1,74 @@
 # Task PERF-1 — Core Queue Throughput Calibration: Implementation-Ready Planning Packet
 
-> **Status: Proposed for ChatGPT review. NOT accepted. The locked
-> prompt in §9 is NOT usable.** Produced 2026-07-11 by the PR #148
+## 0. Status, acceptance, and 2026-07-26 source rebase — READ FIRST
+
+> **Status: ACCEPTED for implementation and IMPLEMENTED, subject to the
+> source-rebase corrections in this section. NOT runtime-accepted, NOT
+> independently reviewed, NOT merged.**
+>
+> **Acceptance `[Fact]`.** The control-room continuation ruling of
+> **2026-07-26** opens gate **G5-4** and accepts this packet's objectives and
+> the **PB-19 provisional target of ≥ 600 jobs/hour**, expressly subject to
+> the source rebase below. The §9 locked prompt's DO-NOT-USE preamble is
+> discharged by that ruling. **The §9 prompt is nonetheless superseded, not
+> merely unlocked** — it instructs a rework that must not be performed; see
+> §0.2.
+>
+> **The 2026-07-11 body below is preserved verbatim as the historical
+> planning record.** Where §1–§9 conflict with this section, **this section
+> governs.** The delivered result is recorded in
+> [`../05-qa/task-perf1-validation-results.md`](../05-qa/task-perf1-validation-results.md).
+
+### 0.1 What this packet got wrong about the code `[Fact — re-read at 87f1763a]`
+
+The packet's central premise — that `run_drain()` claims N rows and loops
+over them inside one uncommitted transaction, holding every lock for the
+whole pass — **stopped being true before this packet was ever executed.** At
+the bound base, `run_drain()` loops `_drain_one()`, which claims **one** job
+via `_claim_for_dispatch(1)`, dispatches it, and **commits it on its own
+transaction**, wrapped in DEC-031 Layer 1 replay-policy recovery and, for
+mutation job types, the Layer 2 C1/C2/NET/C3 protocol with three distinct
+recovery entry points.
+
+**Every invariant D-PERF1-1 and D-PERF1-3 set out to create already exists**:
+lock release between jobs, no double-claim, per-job atomicity, crash
+survival.
+
+### 0.2 Consequences — what must NOT be implemented `[Binding]`
+
+- **D-PERF1-1's rework is WITHDRAWN as a deliverable.** Implementing it as
+  written would replace the hardened, independently reviewed per-job recovery
+  model with a weaker description of it. The §9 locked prompt's
+  "rework run_drain() … claim ONE job at a time … dispatch it inside a
+  per-job savepoint" instruction is therefore **superseded and must not be
+  followed**; that machinery is already there and is not to be rewritten.
+- **What D-PERF1-1 still owns** is the part that genuinely did not exist:
+  `ir.cron._commit_progress()` **progress reporting and the cron time
+  budget**, and the **configurable per-pass cap** replacing the hardcoded
+  constant.
+- **D-PERF1-3's invariants become a PRESERVATION obligation, not a build
+  obligation** — they are asserted by the existing merged suites, which must
+  stay green, plus a source guard that the claim's lock + under-lock re-check
+  is unchanged.
+- **D-PERF1-2, D-PERF1-4 and D-PERF1-5 stand as written.**
+- **D-PERF1-5's latency profile is UNOBTAINABLE in this environment
+  `[Fact]`** — no Shopify store is provisioned and no credential exists, and
+  fabricating a dev-store latency is forbidden. A **declared synthetic**
+  profile is used and labelled as such everywhere it is reported. **PB-19
+  remains provisional and is NOT claimed as met**; the measurement that would
+  discharge it belongs to the provisioned-store campaign.
+- **§4's "`shopify_connector_job.py` is not edited" is relaxed by exactly one
+  declared deviation**: an optional `exclude_store_ids` argument narrowing
+  the claim's **candidate search only**, because D-PERF1-4 backpressure is
+  otherwise unimplementable and would livelock. The `try_lock_for_update()`
+  call and the under-lock re-check are unchanged and guarded. Offered for
+  the control room to ratify or reject.
+
+---
+
+> **Historical header, 2026-07-11 — superseded by §0 above. Preserved
+> verbatim; its "NOT accepted / NOT usable" wording no longer describes the
+> gate state.** Produced 2026-07-11 by the PR #148
 > revision session, implementing **re-review comment `4945129824`
 > item 5** (PB-19 has no gated implementation owner) and **final-
 > convergence comment `4947866018` item 1** (the packet's transaction/

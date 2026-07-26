@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.13.0',
+    'version': '19.0.1.14.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -52,6 +52,9 @@ later, separately authorized tasks.
         # Loaded after the ACLs, because a record rule refines an access
         # right that must already exist.
         'security/shopify_connector_company_rules.xml',
+        # PERF-1: the drain's per-pass cap parameter is seeded before the
+        # drain cron that consumes it.
+        'data/shopify_connector_config_params.xml',
         'data/shopify_connector_cron_drain.xml',
         'data/shopify_connector_cron_disconnect.xml',
         'data/shopify_connector_pii_retention_cron.xml',

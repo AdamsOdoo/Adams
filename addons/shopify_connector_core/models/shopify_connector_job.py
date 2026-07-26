@@ -527,7 +527,49 @@ class ShopifyConnectorJob(models.Model):
     # ------------------------------------------------------------------
 
     @api.model
-    def _claim_for_dispatch(self, limit):
+    def _claimable_domain(self, now=False, exclude_store_ids=()):
+        """The candidate domain a drain pass may claim from.
+
+        PERF-1 extracted this literal from `_claim_for_dispatch` so the
+        dispatcher can COUNT what remains with exactly the same predicate it
+        claims with -- `ir.cron._commit_progress(remaining=...)` reporting a
+        number derived from a second, hand-copied domain would drift from the
+        claim the moment either changed. The predicate itself is unchanged.
+
+        `exclude_store_ids` is the PERF-1 D-PERF1-4 backpressure lever: a
+        store under Shopify throttle pressure is dropped from the CANDIDATE
+        SEARCH for the rest of the pass, so its jobs are never locked and
+        never transitioned. It can only ever narrow the set -- backpressure
+        never raises the drain rate.
+        """
+        now = now or fields.Datetime.now()
+        domain = [
+            '&',
+            '|',
+            ('reconciliation_pending_until', '=', False),
+            ('reconciliation_pending_until', '<=', now),
+            '|',
+            ('state', '=', 'queued'),
+            '&', ('state', '=', 'retry_waiting'), ('next_retry_at', '<=', now),
+        ]
+        if exclude_store_ids:
+            domain = [
+                ('store_id', 'not in', list(exclude_store_ids)),
+            ] + domain
+        return domain
+
+    @api.model
+    def _claimable_count(self, exclude_store_ids=()):
+        """How many jobs a further pass could claim right now.
+
+        Read-only; takes no lock. Used only to report cron progress.
+        """
+        return self.search_count(
+            self._claimable_domain(exclude_store_ids=exclude_store_ids),
+        )
+
+    @api.model
+    def _claim_for_dispatch(self, limit, exclude_store_ids=()):
         """Claim up to `limit` claimable (`queued`, or due `retry_
         waiting`) jobs for one drain pass.
 
@@ -552,17 +594,19 @@ class ShopifyConnectorJob(models.Model):
         by any unit test in this repository -- see the Task 006C
         gate-opening proposal §4/§8 for the live-runtime validation this
         does not, and could not, perform.
+
+        PERF-1 note: only the CANDIDATE SEARCH gained the optional
+        `exclude_store_ids` narrowing above. The `try_lock_for_update()`
+        claim and the under-lock state re-check below are unchanged and are
+        held to that by a source guard
+        (`test_dispatch_throughput.py::test_claim_lock_and_recheck_unchanged`).
         """
         now = fields.Datetime.now()
-        candidates = self.search([
-            '&',
-            '|',
-            ('reconciliation_pending_until', '=', False),
-            ('reconciliation_pending_until', '<=', now),
-            '|',
-            ('state', '=', 'queued'),
-            '&', ('state', '=', 'retry_waiting'), ('next_retry_at', '<=', now),
-        ], limit=limit, order='id asc')
+        candidates = self.search(
+            self._claimable_domain(now, exclude_store_ids),
+            limit=limit,
+            order='id asc',
+        )
         if not candidates:
             return candidates
         locked = candidates.try_lock_for_update()

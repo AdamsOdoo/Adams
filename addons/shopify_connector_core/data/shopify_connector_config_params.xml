@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Task PERF-1 (D-PERF1-1/2). The drain loop's per-pass job cap:
+             how many claim -> dispatch -> commit cycles ONE invocation of
+             shopify.connector.job.dispatch.run_drain() runs before it yields
+             the cron worker.
+
+             Seeded at the merged default (20) so an upgraded database keeps
+             behaving exactly as before until an administrator deliberately
+             raises it. noupdate="1" so a later module upgrade never resets a
+             tuned value.
+
+             This is a CEILING, not a throughput figure. With per-job commit
+             the real limit is per-job handler latency and the cron time
+             budget ir.cron._commit_progress() reports — whichever binds
+             first. The second calibration lever is the drain cron's own
+             interval (data, not code); see
+             shopify_connector_cron_drain.xml.
+
+             Accepted range 1..500. A malformed or out-of-range value is
+             ignored with one logged warning and the default is used, so a
+             typo can neither stop the drain nor let one pass monopolise the
+             worker. -->
+        <record id="config_param_drain_batch_size" model="ir.config_parameter">
+            <field name="key">shopify_connector.drain_batch_size</field>
+            <field name="value">20</field>
+        </record>
+    </data>
+</odoo>

@@ -30,6 +30,27 @@ _logger = logging.getLogger(__name__)
 # tunable constant, never an inlined magic number.
 DISPATCH_BATCH_SIZE = 20
 
+# PERF-1 (D-PERF1-1/2). The per-pass job cap: how many
+# claim -> dispatch -> commit cycles ONE drain invocation runs before it
+# yields the cron worker. It is a ceiling, not a throughput figure --
+# actual throughput is bounded by per-job handler latency and by the cron
+# time budget `ir.cron._commit_progress()` reports, whichever binds first.
+# Cadence (the drain cron's interval) is the second lever and is admin
+# data, not code; see data/shopify_connector_cron_drain.xml.
+DRAIN_BATCH_SIZE_PARAM = 'shopify_connector.drain_batch_size'
+DRAIN_BATCH_SIZE_MIN = 1
+DRAIN_BATCH_SIZE_MAX = 500
+
+# PERF-1 (D-PERF1-4) backpressure. The two `shopify.connector.store`
+# `api_health_state` values that mean "this store has recently been refused
+# or slowed by Shopify". Reading them costs no Shopify call: the field is
+# durable local state maintained by the merged store lifecycle. A store in
+# one of these states is dropped from the claim CANDIDATE SEARCH for the
+# rest of the pass, so the drain self-limits under throttle pressure
+# instead of forcing 429s. This can only ever defer work -- there is no
+# path here that raises the rate.
+BACKPRESSURE_HEALTH_STATES = ('throttled', 'degraded')
+
 # Decision C (gate-opening proposal §6 / MBQ-16 implementation-planning
 # defaults, restated in DEC-009's own acceptance note as "implementation
 # planning defaults, not final production-tuned constants"). Named,
@@ -185,42 +206,143 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def run_drain(self, limit=DISPATCH_BATCH_SIZE):
-        """Claim and dispatch up to ``limit`` jobs -- the ``ir.cron`` target.
+    def _resolve_drain_batch_size(self):
+        """The per-pass job cap, from `ir.config_parameter`, clamped.
 
-        Each job is claimed, dispatched, and committed on its own per-job
-        transaction (see :meth:`_drain_one`). The dispatcher deliberately does
-        NOT wrap the handler in ``odoo.service.model.retrying``: that boundary
-        automatically RE-INVOKES the complete handler after a rollback, which
-        -- once a Shopify transport has already occurred -- risks a duplicate
-        request, and it re-drives the job by a bare id without ever
-        reacquiring the row-lock claim the rollback released. Instead a genuine
-        PostgreSQL serialization/deadlock/lock failure (SQLSTATE
-        40001/40P01/55P03) is caught at the per-job outer boundary, which rolls
-        back, resets the environment, REACQUIRES the exact job under a real
-        ``FOR UPDATE SKIP LOCKED`` row lock, revalidates its claimable state
-        under that lock, and -- only if the job is still safely owned and
-        claimable -- routes it ONCE through its declared DEC-031 Layer 1
-        (AR-048) replay policy WITHOUT the recovery call itself re-invoking
-        the handler: a ``local_only`` or ``remote_read_replay_safe`` job may
-        be scheduled for a later bounded ``concurrency_race_conflict`` retry,
-        while a ``remote_effect_not_replay_safe`` or undeclared job is routed
-        to manual review instead of any automatic retry. This routing is
-        policy-gated and makes no exactly-once claim. Per-job commit keeps one
-        racing (or failing) job from rolling back the work of jobs already
-        committed in the same drain (batch integrity); and because the claim is
-        only a transaction-scoped row lock, a rolled-back job is never
-        re-exposed by a bare re-browse -- after any rollback the job MUST be
-        re-locked before any dispatch or state transition
-        (:meth:`_recover_after_concurrency_conflict`).
+        Unset -> the merged default. Malformed or out of `[1, 500]` -> the
+        default plus one logged warning; a misconfigured parameter must never
+        silently disable the drain (0) or let one pass monopolise the cron
+        worker.
         """
-        for _slot in range(limit):
-            if not self._drain_one():
-                break
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            DRAIN_BATCH_SIZE_PARAM,
+        )
+        if raw in (False, None, ''):
+            return DISPATCH_BATCH_SIZE
+        try:
+            value = int(str(raw).strip())
+        except (TypeError, ValueError):
+            _logger.warning(
+                "Ignoring malformed %s=%r; using the default per-pass cap %d.",
+                DRAIN_BATCH_SIZE_PARAM, raw, DISPATCH_BATCH_SIZE,
+            )
+            return DISPATCH_BATCH_SIZE
+        if value < DRAIN_BATCH_SIZE_MIN or value > DRAIN_BATCH_SIZE_MAX:
+            _logger.warning(
+                "Ignoring out-of-range %s=%d (allowed %d..%d); using the "
+                "default per-pass cap %d.",
+                DRAIN_BATCH_SIZE_PARAM, value,
+                DRAIN_BATCH_SIZE_MIN, DRAIN_BATCH_SIZE_MAX,
+                DISPATCH_BATCH_SIZE,
+            )
+            return DISPATCH_BATCH_SIZE
+        return value
 
     @api.model
-    def _drain_one(self):
+    def _backpressured_store_ids(self):
+        """Stores to defer this pass, from durable local health state only.
+
+        No Shopify call, no credential read: `api_health_state` is written by
+        the merged store lifecycle when Shopify throttles or degrades a call.
+        Deliberately NOT `sudo()`: deferral only needs to cover stores whose
+        jobs this pass could actually claim, and the claim runs under the same
+        user. Elevating here would read across the SEC-3 store scope for no
+        gain -- the cron user is root, which already sees every store.
+
+        Returns a plain tuple so the caller can pass it straight into the
+        claim's candidate-search narrowing.
+        """
+        return tuple(self.env['shopify.connector.store'].search([
+            ('api_health_state', 'in', BACKPRESSURE_HEALTH_STATES),
+        ]).ids)
+
+    @api.model
+    def run_drain(self, limit=None):
+        """Claim and dispatch jobs until the pass cap or cron budget binds.
+
+        PERF-1 (D-PERF1-1/2/4) added three things to the merged loop, and
+        deliberately changed nothing else:
+
+        * **Cron progress + time budget.** After each committed job the pass
+          calls ``ir.cron._commit_progress(1, remaining=<claimable count>)``
+          -- the official Odoo 19 API, verified against
+          ``odoo/addons/base/models/ir_cron.py`` at the pinned 19.0 commit:
+          ``_commit_progress(processed=0, *, remaining=None,
+          deactivate=False) -> float``, returning the seconds of cron time
+          left. The pass returns as soon as that reaches zero, so a long
+          queue yields the worker instead of overrunning its slot, and the
+          operator sees real progress rather than a silent cron.
+        * **A configurable per-pass cap** (``drain_batch_size``), replacing
+          the hardcoded batch constant as the *default* rather than the only
+          value.
+        * **Pre-claim backpressure**: stores under Shopify throttle pressure
+          are excluded from the candidate search for the whole pass.
+
+        ``_commit_progress`` COMMITS on every path (including the
+        outside-a-cron path, where it commits and reports unlimited time), so
+        it is called only where ``_drain_one`` is itself allowed to commit --
+        i.e. never on the shared in-test cursor, whose ``commit`` is the test
+        runner's raising guard. The gate is
+        :meth:`_concurrency_retry_supported`, exactly the one ``_drain_one``
+        already uses for its own commit.
+
+        Per-job claim, dispatch, savepoint, commit, ownership, DEC-031
+        Layer 1 replay policy, Layer 2 mutation safety and concurrency
+        recovery are unchanged -- they already lived in :meth:`_drain_one`
+        and this method still delegates every one of them to it.
+
+        Returns the number of jobs dispatched in this pass.
+        """
+        cap = (
+            self._resolve_drain_batch_size() if limit is None
+            else limit
+        )
+        deferred_store_ids = self._backpressured_store_ids()
+        if deferred_store_ids:
+            _logger.info(
+                "Drain backpressure: deferring %d store(s) whose api_health_"
+                "state is one of %s for this pass.",
+                len(deferred_store_ids), ', '.join(BACKPRESSURE_HEALTH_STATES),
+            )
+        report_progress = self._concurrency_retry_supported()
+        Job = self.env['shopify.connector.job']
+        processed = 0
+        for _slot in range(cap):
+            if not self._drain_one(exclude_store_ids=deferred_store_ids):
+                break
+            processed += 1
+            if not report_progress:
+                continue
+            remaining = self.env['ir.cron']._commit_progress(
+                1,
+                remaining=Job._claimable_count(deferred_store_ids),
+            )
+            if remaining <= 0:
+                _logger.info(
+                    "Drain pass yielding after %d job(s): the cron time "
+                    "budget is exhausted.", processed,
+                )
+                break
+        return processed
+
+    @api.model
+    def _drain_one(self, exclude_store_ids=()):
         """Claim and dispatch a single job on its own per-job transaction.
+
+        The dispatcher deliberately does NOT wrap the handler in
+        ``odoo.service.model.retrying``: that boundary automatically
+        RE-INVOKES the complete handler after a rollback, which -- once a
+        Shopify transport has already occurred -- risks a duplicate request,
+        and it re-drives the job by a bare id without ever reacquiring the
+        row-lock claim the rollback released. A genuine PostgreSQL
+        serialization/deadlock/lock failure (SQLSTATE 40001/40P01/55P03) is
+        caught at the per-job outer boundary below instead. Per-job commit
+        keeps one racing (or failing) job from rolling back the work of jobs
+        already committed in the same drain (batch integrity).
+
+        ``exclude_store_ids`` (PERF-1 D-PERF1-4) narrows only the claim's
+        CANDIDATE SEARCH, so a backpressured store's jobs are never locked
+        and never transitioned by this pass.
 
         The claim (``shopify.connector.job._claim_for_dispatch``) is a
         transaction-scoped ``FOR UPDATE SKIP LOCKED`` row lock, NOT a durable
@@ -241,7 +363,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         succeeded, was refused, routed, recovered, or left to another worker),
         ``False`` when no claimable job remains so ``run_drain`` can stop early.
         """
-        claimed = self.env['shopify.connector.job']._claim_for_dispatch(1)
+        claimed = self.env['shopify.connector.job']._claim_for_dispatch(
+            1, exclude_store_ids=exclude_store_ids,
+        )
         if not claimed:
             return False
         job_id = claimed.id

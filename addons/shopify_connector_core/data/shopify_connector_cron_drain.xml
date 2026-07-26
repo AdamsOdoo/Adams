@@ -7,7 +7,26 @@
              are conservative implementation defaults pending live
              runtime validation, see docs/07-implementation-plan/
              task-006c-sync-engine-gate-opening-proposal.md §8. Data
-             only, no view, menu, or action accompanies this record. -->
+             only, no view, menu, or action accompanies this record.
+
+             Task PERF-1 (D-PERF1-2) — CADENCE IS A LEVER, AND IT IS DATA.
+             Throughput has two calibration levers and neither is a code
+             change:
+
+               1. this record's interval_number/interval_type (how often a
+                  pass starts), an ordinary admin-editable ir.cron field;
+               2. the per-pass job cap, ir.config_parameter
+                  shopify_connector.drain_batch_size (see
+                  shopify_connector_config_params.xml).
+
+             Their product is the CLAIM CEILING, not the achieved rate:
+             because run_drain() commits per job and stops when
+             ir.cron._commit_progress() reports the cron time budget spent,
+             a pass processes as many jobs as its slot and the per-job
+             handler latency allow, up to the cap. The 5-minute default
+             below is unchanged by PERF-1 deliberately — raising it is an
+             operator decision made against measured latency, not a default
+             this packet is entitled to pick for every store. -->
         <record id="ir_cron_shopify_connector_job_dispatch_drain" model="ir.cron">
             <field name="name">Shopify Connector: Job Dispatch Drain</field>
             <field name="model_id" ref="model_shopify_connector_job_dispatch"/>

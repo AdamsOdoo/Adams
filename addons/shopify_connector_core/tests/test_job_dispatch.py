@@ -677,6 +677,11 @@ class TestJobDispatch(TransactionCase):
              '_recover_pre_c2_failure', 'job'),
             ('shopify_connector_job_dispatch.py',
              '_recover_layer2_owner', 'job'),
+            # PERF-1: reading `ir.config_parameter` requires elevation in
+            # Odoo 19 (system-parameter access is admin-only). Read-only, and
+            # the value is clamped before use.
+            ('shopify_connector_job_dispatch.py',
+             '_resolve_drain_batch_size', "self.env['ir.config_parameter']"),
         ])
         actual = []
         for path in self._find_new_model_files():
