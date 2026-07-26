@@ -50,6 +50,14 @@ visible to a server-side view test.
 | 2 | `--` inside an XML comment in the Owl template made the entire `web.assets_web` bundle fail to build (`OwlError: Missing template "web.WebClient"`). | **Candidate** | Fixed. Only a browser could see this; the Python install parsed the file without complaint because static templates are not parsed at install. |
 | 3 | **Every tour in the repository timed out on its first step.** In Odoo 19 the `.o_app` tiles live inside the apps-menu sidebar and do not exist in the DOM until it is opened (`web/static/src/webclient/navbar/navbar.xml`). `shopify_connector_u0_nav_tour`, merged with U0, **could never have passed**. | **Inherited** | Fixed with the standard `stepUtils.showAppsMenuItem()` step. The U0 tour now passes — see §4. |
 | 4 | `shopify_connector_dashboard.test.js` has shipped since U0 and **nothing ever ran it**: no Python runner opened `/web/tests`. It is also broken — `mockService` at module scope, which HOOT rejects during suite registration. | **Inherited** | Module-scope `mockService` corrected. The suite still fails to register for a **further, unidentified reason**; see §5. |
+| 5 | **The canonical runner's warm and non-standard databases had no filestore.** `createdb -T` copies the database but not `<data_dir>/filestore/<dbname>/`, so the clone came up with a complete `ir_attachment` table pointing at files that were not there (76 MB in the template, 1.1 MB in the clone). Invisible to every test that does not read an attachment's bytes — and fatal to every browser test, because the web asset bundles **are** attachments: they failed to load, `odoo.isTourReady(...)` never became true, and all five tour tests failed in the warm pass while the fresh pass was green. | **Inherited (runner)** | Fixed. `clone_db()` now copies the filestore with the database. **The warm database was not reproducing a warm upgrade; it was reproducing a broken installation.** |
+
+`[Fact]` Finding #5 is the reason the first definitive exact-head run was
+discarded rather than reported: fresh passed **1728/1728** and warm failed
+**3 failed, 2 error(s) of 1728** — every failure a tour, none of them a
+product defect. Reporting that as a product result would have been wrong; so
+would tagging the tours out of the warm pass to make it green. The instrument
+was broken, and the instrument was fixed.
 
 `[Inference — high confidence, from #3 and #4 together]` No browser evidence
 for any connector UI surface has ever actually executed in this repository.

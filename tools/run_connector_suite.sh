@@ -231,6 +231,34 @@ EOF
 STANDARD_TAG_ARGS=(--test-tags "$STANDARD_TAGS")
 [[ -n "$TEST_TAGS" ]] && STANDARD_TAG_ARGS=(--test-tags "${STANDARD_TAGS},${TEST_TAGS}")
 
+# --- Database clone: the FILESTORE has to come with it -----------------------
+#
+# `createdb -T` copies the database and nothing else. Odoo keeps attachment
+# CONTENT on disk under `<data_dir>/filestore/<dbname>/`, and the copied
+# database's `ir_attachment` rows still name checksums that only exist in the
+# TEMPLATE's directory. The clone therefore comes up with a complete attachment
+# table pointing at files that are not there.
+#
+# For most tests that is invisible, which is why it survived this long: nothing
+# in the standard passes read an attachment's bytes. The moment a browser test
+# runs it is fatal -- the web asset bundles ARE attachments, so they fail to
+# load, `odoo.isTourReady(...)` never becomes true, and every tour fails with
+# "The ready code was always falsy" while the fresh pass is green. The warm
+# database was not reproducing a warm upgrade; it was reproducing a broken
+# installation.
+#
+# Real upgrades keep the filestore. So does this now.
+clone_db() {  # clone_db <template_db> <new_db>
+    local src="$1" dst="$2"
+    dropdb --if-exists "$dst" 2>/dev/null || true
+    createdb -T "$src" "$dst"
+    local store="${ARTIFACT_DIR}/odoo-data/filestore"
+    if [[ -d "${store}/${src}" ]]; then
+        rm -rf "${store}/${dst}"
+        cp -a "${store}/${src}" "${store}/${dst}"
+    fi
+}
+
 run_odoo() {  # run_odoo <db> <logfile> <args...>
     local db="$1" logfile="$2"; shift 2
     ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$CONF" -d "$db" \
@@ -279,8 +307,7 @@ if [[ $RUN_WARM -eq 1 ]]; then
     fi
     DB="connector_warm_$$"
     log "warm update + tests -> ${DB}"
-    dropdb --if-exists "$DB" 2>/dev/null || true
-    createdb -T "$TEMPLATE_DB" "$DB"
+    clone_db "$TEMPLATE_DB" "$DB"
     if run_odoo "$DB" "${ARTIFACT_DIR}/warm.log" -u "$MODULES" \
             --test-enable "${STANDARD_TAG_ARGS[@]}"; then
         WARM_STATUS="pass"
@@ -307,8 +334,7 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     fi
     DB="connector_nonstandard_$$"
     log "non-standard tag suite -> ${DB}"
-    dropdb --if-exists "$DB" 2>/dev/null || true
-    createdb -T "$TEMPLATE_DB" "$DB"
+    clone_db "$TEMPLATE_DB" "$DB"
     if run_odoo "$DB" "${ARTIFACT_DIR}/nonstandard.log" -u "$MODULES" \
             --test-enable --test-tags "$NONSTANDARD_TAGS"; then
         NONSTD_STATUS="pass"
