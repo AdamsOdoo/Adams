@@ -192,7 +192,7 @@ review or final acceptance**. That is exactly what this section does.
 | 4 | **U2 — orders, COD, catalog matching, inventory surfaces** | **DELIVERED** |
 | 5 | **Task 015 — controlled product export** | **DELIVERED, mutation-split** — see §5d. The HARD STOP of §6a is **lifted by the 2026-07-26 continuation ruling**, which removed the design's dependency on the unresolved `productSet` omitted-list boundary |
 | 6 | **Task 015B — media export** | **DELIVERED, append-only** — see §5d |
-| 7 | **U3 — export and non-export operator surfaces** | **PARTIALLY DELIVERED** — see §5e, which states exactly what is and is not in this batch |
+| 7 | **U3 — export and non-export operator surfaces** | **DELIVERED** (structural and behavioural criteria), with visual artifacts outstanding — see §5e and **§5e.1**, which state exactly what is and is not present |
 
 ## 5c. PERF-1 source rebase — what was corrected
 
@@ -272,24 +272,72 @@ pre-reconnect confirmation can authorise a post-reconnect write); the product
 form opt-in and its allowlist disclosure; and the Export menu branch under the
 one existing U0 root at a sequence held distinct by a test.
 
-**NOT delivered in this batch, and not claimed `[Fact]`:**
+**NOT delivered in the batch this section originally described `[Fact]`:**
+no Owl component, no `web_tour` tours, no HOOT tests, no screenshot set, no
+accessibility checklist, no copy deck, no reconnect/backfill surface (S25/S26),
+no diagnostics screen (S31), and no motion/keyboard/contrast pass. The reason
+was capacity, not a dependency, and it was stated plainly rather than dressed
+as one.
 
-- **No Owl component.** S7 is Odoo-native list/form/notebook, not the Owl
-  diff surface the master specification assigns to U3. The backend contract
-  and every guard are complete and tested; the Owl presentation layer is not
-  built.
-- **No `web_tour` tours and no HOOT tests** for the U3 surfaces. The packet
-  makes both an acceptance criterion for a UI phase. Server-side visibility
-  and wiring are tested; browser-driven evidence is absent.
-- **No screenshot set, no §13 accessibility checklist, no copy deck**
-  (`ui-u3-copy-deck.md` does not exist).
-- **No reconnect/backfill banner or watermark catch-up progress surface**
-  (S25/S26), **no diagnostics screen** (S31), and **no motion/reduced-motion,
-  keyboard-walkthrough or contrast pass**.
+### 5e.1 U3 completion — 2026-07-26
 
-The reason is capacity, not a dependency, and it is stated plainly rather than
-dressed as one. **U3 is therefore not complete**, and the acceptance criteria
-the packet sets for a UI phase are not met by this batch.
+`[Fact — implemented and locally executed in this branch; NOTHING accepted]`
+
+The residue above is now largely closed. Delivered since:
+
+- **The S7 Owl diff surface**, backed by a new read-only projection service
+  (`shopify.connector.product.export.ui`). The projection computes no guard
+  and no payload — an AST guard asserts it never writes, sudoes, commits or
+  enqueues, its sudo budget is pinned at **zero**, and it reads as the
+  current user so the ordinary ACL and the SEC-3 company rules apply. The
+  reading order is the safety order: state → what will be **removed** →
+  what changes → images → what the connector **refused** → what it never
+  touches → only then the confirm control.
+- **Reconnect/backfill (S25/S26)** and **export diagnostics (S31)**, both
+  Odoo-native rather than Owl. Diagnostics is "show me the rows that need
+  attention, filtered", which an action with a search view already does; a
+  second client action would add maintenance and test surface for no
+  operator benefit. Every filter is a domain over a field an earlier wave
+  shipped — no new backend logic — and no credential, payload or PII column
+  appears on any of them.
+- **`docs/06-prompts/ui-u3-copy-deck.md`** — the copy actually shipped, quoted
+  from the committed views, not copy proposed for a later implementation.
+- **Executed browser evidence**: three U3 `web_tour` tours and an 11-test
+  HOOT suite, run in a real Chromium. Full record:
+  [`../05-qa/ui-u3-validation-results.md`](../05-qa/ui-u3-validation-results.md).
+- **The polish pass, implemented structurally**: logical properties
+  throughout (RTL correct without a mirrored stylesheet), every transition
+  behind `prefers-reduced-motion: no-preference` so reduced motion is the
+  default rather than an afterthought, design-system token pairs only, and a
+  keyboard tour that asserts the focused control matches `:focus-visible` —
+  so a focus ring that exists only in the stylesheet fails the test.
+
+**Four defects were found by executing the surfaces**, three of them
+inherited from already-merged work:
+
+1. `ir.actions.client` has **no `group_ids`** in Odoo 19 — a hard
+   `ParseError` at install. **Candidate; fixed.**
+2. `--` inside an XML comment made the whole `web.assets_web` bundle fail to
+   build. Only a browser can see this. **Candidate; fixed.**
+3. **Every tour in this repository timed out on its first step.** In Odoo 19
+   the `.o_app` tiles do not exist in the DOM until the apps menu is opened,
+   so `shopify_connector_u0_nav_tour` — merged with U0 — **could never have
+   passed**. **Inherited; fixed**, and the U0 tour now passes.
+4. **`shopify_connector_dashboard.test.js` has never run** (no runner
+   existed) **and still fails to register**. **Inherited; partially fixed**
+   — logged as **TD-009**, and the U0 dashboard therefore still has no
+   executed unit evidence.
+
+**And one environment finding that invalidates prior reasoning about browser
+evidence `[Fact]`:** `websocket-client` was absent, so every `HttpCase`
+browser test **SKIPPED** while the suite reported `0 failed, 0 error(s)`. Any
+"full suite green" that included tour or HOOT tests may have executed none of
+them. Logged as **TD-010 (High)**.
+
+**Still not delivered, and not claimed:** no screenshot set, no measured
+contrast ratio, no RTL or reduced-motion *visual* verification, and no
+`ui-u2-copy-deck.md`. **U3's structural and behavioural acceptance criteria
+are met by this branch; its visual-artifact criteria are not.**
 
 ## 6. Re-derived Wave 5 completion scope and sequence
 

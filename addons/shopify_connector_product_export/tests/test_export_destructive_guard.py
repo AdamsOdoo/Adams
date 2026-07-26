@@ -10,7 +10,7 @@ from ..models.shopify_connector_product_export_service import (
     JOB_TYPE_VARIANTS_CREATE,
     JOB_TYPE_VARIANTS_UPDATE,
 )
-from .common import ExportCase, PRODUCT_GID, VARIANT_GID
+from .common import ExportCase, FakeSendResponse, PRODUCT_GID, VARIANT_GID
 
 
 @tagged('post_install', '-at_install')
@@ -245,3 +245,78 @@ class TestExportDestructiveGuard(ExportCase):
             'inventoryQuantities',
         ):
             self.assertIn(key, FORBIDDEN_UPDATE_KEYS)
+
+    # ------------------------------------------------------------------
+    # The ONE list this connector replaces, disclosed by name
+    # ------------------------------------------------------------------
+
+    def test_a_merchant_only_tag_is_enumerated_as_a_removal(self):
+        """`productUpdate` overwrites the tag list, and the diff must say so.
+
+        2026-07 is explicit: "Updating `tags` overwrites any existing tags
+        that were previously added to the product" (reference read
+        2026-07-26). The overwrite is deliberate -- tags are Odoo-owned -- but
+        a merchant tag disappearing behind an unlabelled `from -> to` row is
+        not disclosure, so the removals are enumerated.
+        """
+        self.template.sudo().write({'shopify_export_tags': 'alpha, beta'})
+        remote = self._remote()
+        remote['tags'] = ['alpha', 'beta', 'merchant-added']
+        read = self._read()
+        read['product'] = remote
+        diff, steps, blocked = self.Service._preview_update_path(
+            self.store, self.template, self.binding,
+            self.Service._desired_scalars(self.template),
+            self.Service._desired_options(self.template),
+            self.template.product_variant_ids, True, read,
+        )
+        replacement = diff['tag_replacement']
+        self.assertTrue(replacement['applies'])
+        self.assertEqual(replacement['removed'], ['merchant-added'])
+        self.assertEqual(replacement['resulting'], ['alpha', 'beta'])
+        self.assertIn('COMPLETE', replacement['note'])
+
+    def test_an_unchanged_tag_list_reports_no_replacement(self):
+        """No tag change, no claim that anything is being replaced."""
+        self.template.sudo().write({'shopify_export_tags': 'alpha, beta'})
+        read = self._read()
+        diff, steps, blocked = self.Service._preview_update_path(
+            self.store, self.template, self.binding,
+            self.Service._desired_scalars(self.template),
+            self.Service._desired_options(self.template),
+            self.template.product_variant_ids, True, read,
+        )
+        self.assertFalse(diff['tag_replacement']['applies'])
+        self.assertEqual(diff['tag_replacement']['removed'], [])
+
+    def test_the_create_path_never_reports_a_tag_removal(self):
+        """A product that does not exist yet has no tags to remove."""
+        self.assertFalse(
+            self.Service._desired_scalars(self.template).get('nonexistent'),
+        )
+        # The create-path diff is built by `_preview_create_path`; assert the
+        # shape it publishes rather than reaching into the handler. It runs
+        # two real preflight READS (custom-id reconciliation and the SKU
+        # gate), so the transport seam is patched -- the guards themselves
+        # still run exactly as they do in production.
+        job = self.make_job(
+            'product_export_preview', 'product.template', self.template.id,
+        )
+        job.sudo().write({'state': 'running'})
+        empty = FakeSendResponse({'data': {
+            'products': {'nodes': []},
+            'productVariants': {'nodes': []},
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }})
+        with self.send_patch(
+            lambda self, store, body, token=None, mutation_context=None,
+            r=empty: r
+        ):
+            diff, steps, blocked = self.Service._preview_create_path(
+                job, self.store, self.template,
+                self.Service._desired_scalars(self.template),
+                self.Service._desired_options(self.template),
+                self.env['product.product'], True,
+            )
+        self.assertFalse(diff['tag_replacement']['applies'])
+        self.assertEqual(diff['tag_replacement']['removed'], [])
