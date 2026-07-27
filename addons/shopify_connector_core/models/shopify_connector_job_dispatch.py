@@ -251,7 +251,18 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         Returns a plain tuple so the caller can pass it straight into the
         claim's candidate-search narrowing.
+
+        TD-014: before reading the states, every store deferred for rate
+        head-room is re-evaluated against the clock. Shopify's bucket
+        refills continuously, so a store deferred a while ago may already
+        have recovered -- and it cannot tell us itself, because a deferred
+        store makes no calls and therefore receives no new
+        `throttleStatus`. Without this the first deferral would be
+        permanent, which is a worse failure than the throttling it
+        avoids. No Shopify contact: the projection is arithmetic on the
+        last observation and the clock.
         """
+        self.env['shopify.connector.store']._recover_throttled_stores()
         return tuple(self.env['shopify.connector.store'].search([
             ('api_health_state', 'in', BACKPRESSURE_HEALTH_STATES),
         ]).ids)

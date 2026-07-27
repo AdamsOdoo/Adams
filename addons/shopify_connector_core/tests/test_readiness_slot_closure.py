@@ -511,7 +511,25 @@ class TestReadinessSlotClosure(TransactionCase):
         )
         with open(path, 'r', encoding='utf-8') as source_file:
             content = source_file.read()
-        self.assertEqual(content.count("'api_health_state': 'normal'"), 1)
+        # 1 -> 2 (TD-014, authorised deliberately). CORE-R1's write on a
+        # verified probe is still there and still singular. The second is
+        # the rate-backpressure RELEASE in
+        # `_apply_throttle_backpressure`: a store deferred for exhausted
+        # Shopify head-room has to be able to return to `normal` when the
+        # bucket refills, or PERF-1's lever becomes a one-way trip and the
+        # first deferral is permanent.
+        #
+        # The two writers do not overlap. CORE-R1's records a verified
+        # connection probe; this one only ever releases a deferral IT
+        # made, gated on `api_health_state == 'throttled'`, so it can
+        # neither manufacture a verification nor clear a `degraded` state
+        # set by anything else.
+        self.assertEqual(content.count("'api_health_state': 'normal'"), 2)
+        self.assertEqual(
+            content.count("'api_health_state': 'throttled'"), 1,
+            'Exactly one production writer may defer a store for rate '
+            'pressure (TD-014).',
+        )
         # The 2026-07-26 API-version ruling removed the fall-forward branch
         # that wrote `degraded` on an otherwise-successful probe: a served
         # version that differs from the connector constant now fails closed in
@@ -525,6 +543,21 @@ class TestReadinessSlotClosure(TransactionCase):
             (
                 ('shopify_connector_store.py', '_apply_probe_failure',
                  'job', 1, 'Probe failure transition.'),
+                # TD-014 (PERF-1 / D-PERF1-4): the rate-head-room lever.
+                # Every one of these writes only this store's own
+                # `api_throttle_*` numerics and the health state derived
+                # from them. `api_health_state`, `api_health_reason` and
+                # the four numerics are readonly protected fields, so the
+                # service that maintains them cannot write them
+                # unelevated. No credential, no request payload and no
+                # cross-store disclosure: the recovery sweep searches only
+                # stores the cron user can already see.
+                ('shopify_connector_store.py',
+                 '_apply_throttle_backpressure', 'self', 1,
+                 'Rate backpressure health write.'),
+                ('shopify_connector_store.py',
+                 '_apply_throttle_backpressure', 'self', 2,
+                 'Rate backpressure health write.'),
                 ('shopify_connector_store.py', '_audit_probe_superseded',
                  'job', 1, 'Probe supersession audit.'),
                 # SEC-3 (#197) ownership seams. Recorded here as well as in
@@ -541,6 +574,10 @@ class TestReadinessSlotClosure(TransactionCase):
                 ('shopify_connector_store.py',
                  '_create_lifecycle_audit_job', 'job', 1,
                  'Lifecycle audit carrier.'),
+                ('shopify_connector_store.py', '_record_throttle_status',
+                 'self', 1, 'Rate head-room observation write.'),
+                ('shopify_connector_store.py', '_recover_throttled_stores',
+                 'self', 1, 'Rate deferral recovery sweep.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'Job', 1, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',

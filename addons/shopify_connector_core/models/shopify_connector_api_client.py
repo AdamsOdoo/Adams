@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import uuid
@@ -17,6 +18,8 @@ from ..tools.api_version import (
 )
 from ..tools.redaction import redact
 from .shopify_connector_mutation_attempt import canonical_sha256
+
+_logger = logging.getLogger(__name__)
 
 # Adjustable planning defaults (not an official Shopify requirement).
 _CONNECT_TIMEOUT_SECONDS = 10
@@ -1037,8 +1040,27 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         # classification, and BEFORE any result is returned so no caller can
         # act on a body served by an unverified schema.
         served_version = self._assert_served_api_version(response)
+        throttle_status = self._parse_throttle_status(body)
+        # TD-014. The single choke point every successful Shopify response
+        # passes through, for every domain and both read and mutation
+        # paths, so this is where the rate signal becomes durable state.
+        # It was parsed here and returned to callers that ignored it,
+        # which is why PERF-1's backpressure lever could never fire: no
+        # production code had ever written `api_health_state='throttled'`.
+        #
+        # Recording is best-effort by construction. A store row that
+        # cannot be written must never turn a good Shopify response into
+        # a failure, so the result is returned regardless.
+        if throttle_status and store:
+            try:
+                store._record_throttle_status(throttle_status)
+            except Exception:  # noqa: BLE001 - see above
+                _logger.exception(
+                    'Could not record Shopify rate head-room for store %s; '
+                    'the response itself is unaffected.', store.id,
+                )
         return {
             'data': body.get('data'),
-            'throttle_status': self._parse_throttle_status(body),
+            'throttle_status': throttle_status,
             'served_version': served_version,
         }

@@ -19,6 +19,18 @@ from .shopify_connector_job_dispatch import (
 
 _logger = logging.getLogger(__name__)
 
+# TD-014 (PERF-1 / D-PERF1-4). Head-room thresholds as a fraction of the
+# store's own `maximumAvailable`, so they hold for any plan size rather
+# than encoding a bucket the connector does not control (MBQ-51 stays
+# untouched: no bucket size is hard-coded anywhere).
+#
+# Two thresholds rather than one, deliberately: with a single line the
+# state flaps across it, rewriting the store row and changing the next
+# pass's candidate set on every call. The gap is the hysteresis that lets
+# the bucket actually refill before work resumes.
+THROTTLE_DEFER_RATIO = 0.2
+THROTTLE_RECOVER_RATIO = 0.5
+
 # CORE-R2 Slice 2A: the disconnect controller's `timed_out` escalation snapshot
 # records at most this many outstanding holders (opaque lease_key + Integer
 # job_id only -- never a token/credential/payload) into the audited
@@ -93,6 +105,23 @@ class ShopifyConnectorStore(models.Model):
         readonly=True,
     )
     api_health_reason = fields.Char(readonly=True)
+    # TD-014 (PERF-1, D-PERF1-4). The minimum safe numeric state from
+    # Shopify's own `extensions.cost.throttleStatus`, which
+    # `_parse_throttle_status` has extracted from every response since
+    # PERF-1 shipped and which nothing consumed. Three numbers and a
+    # timestamp: no request payload, no header, no credential, nothing
+    # that could carry merchant data.
+    #
+    # Official reference: https://shopify.dev/docs/api/usage/limits
+    # (read 2026-07-27). The bucket refills continuously at
+    # `restoreRate` points per second up to `maximumAvailable`, which is
+    # what lets `_projected_throttle_available` below recompute head-room
+    # without issuing a call -- and that, in turn, is what stops a
+    # deferred store from starving.
+    api_throttle_available = fields.Float(readonly=True)
+    api_throttle_maximum = fields.Float(readonly=True)
+    api_throttle_restore_rate = fields.Float(readonly=True)
+    api_throttle_observed_at = fields.Datetime(readonly=True)
     webhook_ready = fields.Boolean(default=False, readonly=True)
     last_test_connection_result = fields.Selection(
         selection=[('pass', 'Pass'), ('fail', 'Fail')],
@@ -208,6 +237,169 @@ class ShopifyConnectorStore(models.Model):
                     'A Shopify store must belong to a company. Assign the '
                     'owning company before saving this store.'
                 )
+
+    # ------------------------------------------------------------------
+    # TD-014 (PERF-1 / D-PERF1-4): backpressure from real throttle data
+    # ------------------------------------------------------------------
+
+    def _record_throttle_status(self, throttle_status):
+        """Fold one response's `throttleStatus` into this store's health.
+
+        Called from the single client choke point, so every Shopify
+        response this connector receives contributes -- reads and
+        mutations alike, for every domain.
+
+        **Fail-safe on absent or malformed data.** Shopify omits
+        `extensions.cost` on some responses, and a partial or
+        non-numeric payload must never be read as "no head-room". When
+        the three values are not all usable numbers this returns without
+        touching anything, so throughput is preserved exactly as it was
+        before TD-014. Backpressure is only ever applied on evidence.
+
+        **Only ever defers work.** Nothing here raises a rate, shortens
+        a delay, or admits anything: the strongest effect available is
+        setting `api_health_state` to `throttled`, which the existing
+        `_backpressured_store_ids` lever already drops from the claim
+        candidate search for the rest of a pass.
+
+        **Isolated per store.** State lives on the store row, so one
+        merchant's exhausted bucket cannot defer another's work.
+        """
+        self.ensure_one()
+        values = self._normalized_throttle_values(throttle_status)
+        if not values:
+            return False
+        available, maximum, restore_rate = values
+        self.sudo().write({
+            'api_throttle_available': available,
+            'api_throttle_maximum': maximum,
+            'api_throttle_restore_rate': restore_rate,
+            'api_throttle_observed_at': fields.Datetime.now(),
+        })
+        self.invalidate_recordset()
+        return self._apply_throttle_backpressure()
+
+    @api.model
+    def _normalized_throttle_values(self, throttle_status):
+        """`(available, maximum, restore_rate)`, or False if unusable.
+
+        `maximumAvailable` must be positive because it is the divisor for
+        head-room; a zero or absent bucket size makes the ratio undefined
+        and is treated as no evidence rather than as zero head-room.
+        """
+        if not isinstance(throttle_status, dict):
+            return False
+        try:
+            available = float(throttle_status.get('currentlyAvailable'))
+            maximum = float(throttle_status.get('maximumAvailable'))
+            restore_rate = float(throttle_status.get('restoreRate') or 0.0)
+        except (TypeError, ValueError):
+            return False
+        if maximum <= 0 or available < 0 or restore_rate < 0:
+            return False
+        return min(available, maximum), maximum, restore_rate
+
+    def _projected_throttle_available(self, now=None):
+        """Head-room now, projecting the documented continuous refill.
+
+        This is what prevents the starvation the naive design has. A
+        store deferred for low head-room issues no calls, so it receives
+        no new `throttleStatus`, so a purely observation-driven state
+        could never recover -- the store would be deferred forever on the
+        strength of one bad moment.
+
+        Shopify's bucket refills continuously at `restoreRate` points per
+        second up to `maximumAvailable`, so the head-room a store would
+        have *right now* is arithmetic on the last observation and the
+        clock. No Shopify call, fully deterministic, and testable by
+        passing `now`.
+        """
+        self.ensure_one()
+        if not self.api_throttle_maximum or not self.api_throttle_observed_at:
+            return None
+        now = now or fields.Datetime.now()
+        elapsed = (now - self.api_throttle_observed_at).total_seconds()
+        if elapsed < 0:
+            elapsed = 0.0
+        return min(
+            self.api_throttle_maximum,
+            self.api_throttle_available
+            + (self.api_throttle_restore_rate * elapsed),
+        )
+
+    def _throttle_headroom_ratio(self, now=None):
+        """Projected head-room as a fraction of the bucket, or None."""
+        self.ensure_one()
+        projected = self._projected_throttle_available(now=now)
+        if projected is None or not self.api_throttle_maximum:
+            return None
+        return projected / self.api_throttle_maximum
+
+    def _apply_throttle_backpressure(self, now=None):
+        """Move `api_health_state` between `normal` and `throttled`.
+
+        Two thresholds, not one, on purpose. A single threshold makes the
+        state flap around it: every call that nudged head-room across the
+        line would rewrite the store row and change the next pass's
+        candidate set. Deferring below `THROTTLE_DEFER_RATIO` and only
+        recovering above the higher `THROTTLE_RECOVER_RATIO` gives the
+        bucket room to actually refill before work resumes.
+
+        `degraded` is left alone entirely. It means something else --
+        the store lifecycle sets it for API health problems that are not
+        rate pressure -- and this must not clear a degradation it did not
+        cause.
+        """
+        self.ensure_one()
+        ratio = self._throttle_headroom_ratio(now=now)
+        if ratio is None:
+            return False
+        if ratio < THROTTLE_DEFER_RATIO:
+            if self.api_health_state != 'throttled':
+                self.sudo().write({
+                    'api_health_state': 'throttled',
+                    'api_health_reason': (
+                        'Shopify API head-room is %.0f%% of this store\'s '
+                        'bucket; new work is deferred until it recovers.'
+                        % (ratio * 100)
+                    ),
+                })
+                _logger.info(
+                    'Store %d deferred on Shopify rate head-room %.2f.',
+                    self.id, ratio,
+                )
+            return True
+        if (
+            self.api_health_state == 'throttled'
+            and ratio >= THROTTLE_RECOVER_RATIO
+        ):
+            self.sudo().write({
+                'api_health_state': 'normal',
+                'api_health_reason': False,
+            })
+            _logger.info(
+                'Store %d resumed on Shopify rate head-room %.2f.',
+                self.id, ratio,
+            )
+        return False
+
+    @api.model
+    def _recover_throttled_stores(self, now=None):
+        """Re-evaluate every rate-deferred store against the clock.
+
+        The other half of the anti-starvation guarantee. A store deferred
+        by `_apply_throttle_backpressure` makes no calls, so nothing
+        would re-evaluate it from the response path. This runs at the
+        start of each drain pass and lets the projected refill lift the
+        deferral on its own, with no Shopify contact of any kind.
+        """
+        recovered = self.sudo().search([
+            ('api_health_state', '=', 'throttled'),
+            ('api_throttle_observed_at', '!=', False),
+        ])
+        for store in recovered:
+            store._apply_throttle_backpressure(now=now)
+        return recovered
 
     @api.model
     def _backfill_company(self):

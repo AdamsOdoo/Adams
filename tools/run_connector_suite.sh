@@ -103,6 +103,7 @@ REQUIRED_TOUR_TESTS="\
 TestUiTours.test_navigation_tour \
 TestUiTours.test_u2_navigation_tour \
 TestUiU2InventoryActionTours.test_first_push_confirm_tour \
+TestUiU2InventoryActionTours.test_first_push_reaches_confirmed_from_a_genuine_pending_pair \
 TestUiU2InventoryActionTours.test_first_push_pending_offers_no_control_tour \
 TestUiU2InventoryActionTours.test_first_push_denied_for_a_role_the_server_refuses \
 TestUiU2InventoryActionTours.test_push_toggle_tour \

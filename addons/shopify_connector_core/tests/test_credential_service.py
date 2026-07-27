@@ -130,6 +130,14 @@ CORE_SUDO_SITES = [
      '_positive_int_parameter', "self.env['ir.config_parameter']", 1),
     ('shopify_connector_stale_owner_sweep.py', 'run_sweep', 'job', 1),
     ('shopify_connector_store.py', '_apply_probe_failure', 'job', 1),
+    # TD-014 (PERF-1 / D-PERF1-4). Three elevations that write only
+    # this store's own rate-head-room state and its derived health
+    # state. No credential, no payload, no cross-store read: the
+    # recovery sweep searches stores the cron user already sees.
+    ('shopify_connector_store.py', '_apply_throttle_backpressure',
+     'self', 1),
+    ('shopify_connector_store.py', '_apply_throttle_backpressure',
+     'self', 2),
     ('shopify_connector_store.py', '_audit_probe_superseded', 'job', 1),
     # SEC-3 (#197) ownership seams. Both are deliberate and both are recorded
     # here because this guard is the audit: a new sudo() in core is a change to
@@ -141,6 +149,9 @@ CORE_SUDO_SITES = [
      'Job', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
      'job', 1),
+    ('shopify_connector_store.py', '_record_throttle_status', 'self', 1),
+    ('shopify_connector_store.py', '_recover_throttled_stores',
+     'self', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'Job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
@@ -228,6 +239,16 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_apply_probe_failure'): 'Probe failure transition.',
     ('shopify_connector_store.py',
      '_audit_probe_superseded'): 'Probe supersession audit.',
+    # TD-014: PERF-1's backpressure lever, finally given an input.
+    # `api_health_state`/`api_health_reason` and the four
+    # `api_throttle_*` numerics are all readonly protected fields, so
+    # the service that maintains them cannot write them unelevated.
+    ('shopify_connector_store.py',
+     '_record_throttle_status'): 'Rate head-room observation write.',
+    ('shopify_connector_store.py',
+     '_apply_throttle_backpressure'): 'Rate backpressure health write.',
+    ('shopify_connector_store.py',
+     '_recover_throttled_stores'): 'Rate deferral recovery sweep.',
     # Reads res.company to decide whether ownership is PROVABLE (exactly one
     # company) during install/update. Never writes a company it guessed.
     ('shopify_connector_store.py',
