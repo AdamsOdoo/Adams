@@ -290,6 +290,135 @@ OVERFLOW_JS = r"""
   // locale. Asserting on `documentElement` would be asserting against Odoo's
   // design, and would fail forever for a reason this repository cannot fix.
   const root = document.querySelector(".o_sc_dashboard, .o_sc_export_diff");
+
+  // TD-016. WHY THE DOCUMENT TOTAL IS NOT ENOUGH.
+  //
+  // The original instrument compared `documentElement.scrollWidth` against
+  // `innerWidth` and nothing else. That measures ONE thing: whether the page
+  // body scrolls sideways. It is a real rule (§10) and worth keeping, but it
+  // is structurally incapable of failing for a connector-owned defect,
+  // because every Odoo backend surface sits inside `.o_content`, which is
+  // `overflow: auto`. A connector panel 300px too wide is clipped or scrolled
+  // by that ancestor and contributes exactly nothing to the document total.
+  // So the check could only ever fail for something Odoo itself did.
+  //
+  // What actually needs measuring is each connector-owned surface against
+  // the box it is rendered into, plus whether any of its descendants are
+  // pushed outside the region a user can see or reach.
+  // Every connector-owned surface root, and the inner element each one
+  // actually lays its content out in. Both are measured: the root is what
+  // the ancestor clips, the inner is where the content that could overflow
+  // lives. `[class^="o_sc_"]` would be tempting but would also match future
+  // utility classes; this list is exact and
+  // `test_the_overflow_instrument_covers_every_connector_surface` fails if
+  // a new `o_sc_*` root appears without being added to it.
+  const SURFACE_SELECTOR = [
+    ".o_sc_dashboard", ".o_sc_dashboard__inner",
+    ".o_sc_export_diff", ".o_sc_export_diff__inner",
+  ].join(", ");
+
+  const box = (el) => {
+    const r = el.getBoundingClientRect();
+    return {top: r.top, right: r.right, bottom: r.bottom, left: r.left,
+            width: r.width, height: r.height};
+  };
+
+  // The nearest ancestor that CONSTRAINS this element horizontally, and
+  // what it does about the overflow. The distinction is the whole point:
+  //
+  //   `auto` / `scroll` — the overflow is REACHABLE. §10 names this as the
+  //       design system's answer to wide content ("wide content must scroll
+  //       inside its own `overflow-x: auto` container"), so a table row
+  //       extending past its own scroll container is the rule working, not
+  //       a defect.
+  //
+  //   `hidden` / `clip` — the overflow is GONE, silently, with no scrollbar
+  //       for anyone to notice. That is the defect this instrument exists
+  //       to find.
+  //
+  // Walked from the element itself, not from the surface root. Measuring a
+  // descendant against the SURFACE's clipper skips any scroll container
+  // between them and reports every legitimately-scrolling table as broken.
+  const constrainer = (el, stopAt) => {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (/auto|scroll/.test(cs.overflowX)) {
+        return {node: p, scrolls: true};
+      }
+      if (/hidden|clip/.test(cs.overflowX)) {
+        return {node: p, scrolls: false};
+      }
+      if (p === stopAt) break;
+    }
+    return null;
+  };
+
+  const name = (el) =>
+    (el.className ? String(el.className).split(/\s+/)[0] : "") || el.tagName;
+
+  const surfaces = [];
+  for (const el of document.querySelectorAll(SURFACE_SELECTOR)) {
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) continue;
+    const cs = getComputedStyle(el);
+    const scrollable = /auto|scroll/.test(cs.overflowX);
+    const self_overflow = el.scrollWidth - el.clientWidth;
+    const own = constrainer(el, null);
+
+    // Descendants clipped away by a `hidden`/`clip` ancestor. 1px of
+    // tolerance throughout: sub-pixel layout rounding is not clipping.
+    const escaped = [];
+    for (const child of el.querySelectorAll("*")) {
+      const cr = child.getBoundingClientRect();
+      if (cr.width <= 0 || cr.height <= 0) continue;
+      if (getComputedStyle(child).visibility === "hidden") continue;
+      const gate = constrainer(child, null);
+      if (!gate || gate.scrolls) continue;  // reachable by scrolling
+      const gateRect = gate.node.getBoundingClientRect();
+      const over_right = cr.right - gateRect.right;
+      const over_left = gateRect.left - cr.left;
+      if (over_right > 1 || over_left > 1) {
+        escaped.push({
+          tag: child.tagName.toLowerCase(),
+          cls: String(child.className || "").split(/\s+/)[0],
+          // A control the user cannot reach is worse than text they
+          // cannot read, so it is reported separately.
+          interactive: !!child.closest("button, a[href], input, select, textarea, [tabindex]"),
+          clipped_by: name(gate.node),
+          over_right: Math.round(over_right),
+          over_left: Math.round(over_left),
+        });
+      }
+      if (escaped.length >= 12) break;  // enough to diagnose; not a dump
+    }
+
+    const ownRect = own ? own.node.getBoundingClientRect() : null;
+    surfaces.push({
+      cls: name(el),
+      rect: box(el),
+      scroll_width: el.scrollWidth,
+      client_width: el.clientWidth,
+      // Overflow the surface itself declares it will handle. A table that
+      // scrolls inside its own container is the design system's ANSWER to
+      // wide content (§10), not a defect.
+      overflow_x: cs.overflowX,
+      self_overflow: self_overflow,
+      unhandled_self_overflow: (!scrollable && self_overflow > 1)
+        ? self_overflow : 0,
+      clipped_by: own ? name(own.node) : null,
+      clipped_silently: !!(own && !own.scrolls),
+      clip_rect: ownRect ? {left: ownRect.left, right: ownRect.right} : null,
+      // Horizontal displacement of the surface itself relative to a
+      // constrainer that does NOT scroll -- the RTL failure shape, where a
+      // mirrored layout pushes content off the opposite edge for good.
+      escapes_left: (own && !own.scrolls)
+        ? Math.round(Math.max(0, ownRect.left - r.left)) : 0,
+      escapes_right: (own && !own.scrolls)
+        ? Math.round(Math.max(0, r.right - ownRect.right)) : 0,
+      escaped_descendants: escaped,
+    });
+  }
+
   return JSON.stringify({
     doc_scroll_width: document.documentElement.scrollWidth,
     inner_width: window.innerWidth,
@@ -300,6 +429,7 @@ OVERFLOW_JS = r"""
       .map((s) => s.href).filter((h) => h && h.includes(".rtl.")).length,
     connector_root: root ? root.className.split(/\s+/)[0] : null,
     connector_direction: root ? getComputedStyle(root).direction : null,
+    surfaces: surfaces,
   });
 })()
 """
@@ -782,17 +912,181 @@ class TestUiVisualEvidence(HttpCase):
     # A + B. Desktop, tablet and mobile
     # ------------------------------------------------------------------
 
-    def test_responsive_screenshots_and_no_horizontal_overflow(self):
-        """Every U2/U3 surface, at all three widths, with no body scroll.
+    def _clipping_defects(self, name, width, metrics):
+        """Connector-owned clipping at one surface and width (TD-016).
 
-        The design system's rule is that the page body never scrolls
-        horizontally (§10); wide content is the table's problem, not the
-        document's. Measured from `document.documentElement.scrollWidth`
-        against `window.innerWidth`, which is the only definition that cannot
-        be satisfied by a stylesheet comment.
+        Two distinct defects, kept separate because they fail differently:
+
+        `unhandled_self_overflow` — the surface is wider than its own box
+        and has not declared `overflow-x: auto|scroll`. The design system's
+        answer to wide content is that the CONTENT scrolls inside its own
+        container (§10); a surface that overflows without offering that is
+        content the user simply cannot get to.
+
+        `escaped_descendants` — something inside the surface is rendered
+        outside the rectangle its clipping ancestor actually shows. This is
+        the case the document-total check could never see, because an
+        ancestor with `overflow: hidden` clips it silently and the page
+        never grows.
+        """
+        defects = []
+        for surface in metrics.get('surfaces') or []:
+            if surface['unhandled_self_overflow']:
+                defects.append({
+                    'kind': 'unhandled_self_overflow',
+                    'page': name, 'width': width, 'surface': surface['cls'],
+                    'scroll_width': surface['scroll_width'],
+                    'client_width': surface['client_width'],
+                    'overflow_x': surface['overflow_x'],
+                })
+            if surface['escapes_left'] > 1 or surface['escapes_right'] > 1:
+                defects.append({
+                    'kind': 'surface_displaced',
+                    'page': name, 'width': width, 'surface': surface['cls'],
+                    'clipped_by': surface['clipped_by'],
+                    'escapes_left': surface['escapes_left'],
+                    'escapes_right': surface['escapes_right'],
+                })
+            escaped = surface.get('escaped_descendants') or []
+            if escaped:
+                defects.append({
+                    'kind': 'clipped_content',
+                    'page': name, 'width': width, 'surface': surface['cls'],
+                    'clipped_by': surface['clipped_by'],
+                    'clipped_silently': surface['clipped_silently'],
+                    'interactive': [
+                        item for item in escaped if item['interactive']
+                    ],
+                    'escaped': escaped,
+                })
+        return defects
+
+    def test_the_overflow_instrument_covers_every_connector_surface(self):
+        """TD-016: a new surface cannot be added outside the measurement.
+
+        The instrument names its surfaces explicitly rather than matching a
+        prefix, which is precise but goes stale silently. This reads the
+        `o_sc_*` roots that actually exist in the shipped Owl templates and
+        stylesheets and fails if one of them is not measured — so the cost
+        of adding a surface is one line here, and the cost of forgetting is
+        a failing test rather than an unmeasured screen.
+        """
+        import re
+
+        addons = pathlib.Path(__file__).resolve().parents[2]
+        found = set()
+        for pattern in ('shopify_connector_*/static/src/**/*.xml',
+                        'shopify_connector_*/static/src/**/*.scss'):
+            for path in addons.glob(pattern):
+                found.update(re.findall(r'\bo_sc_[a-z0-9_]+', path.read_text()))
+        self.assertTrue(
+            found,
+            'no connector surface classes were discovered at all; this '
+            'guard is vacuous and the glob is wrong.',
+        )
+        unmeasured = sorted(
+            name for name in found if '.%s' % name not in OVERFLOW_JS
+        )
+        self.assertFalse(unmeasured, (
+            'these connector surface classes exist but the TD-016 overflow '
+            'instrument does not measure them, so clipping on them would go '
+            'unseen: %s' % unmeasured
+        ))
+
+    def test_the_overflow_instrument_can_actually_fail(self):
+        """TD-016's central assertion: this instrument is falsifiable.
+
+        The defect TD-016 records is not that a surface overflowed. It is
+        that the *check* could not have noticed if one had. The old
+        instrument compared `documentElement.scrollWidth` against
+        `innerWidth`, and every connector surface sits inside
+        `.o_action_manager`, which is `overflow: hidden` — so a connector
+        panel 400px too wide was clipped silently, the document never grew,
+        and the assertion passed. A green result meant nothing.
+
+        So this injects exactly that defect — an element far wider than its
+        surface, inside an ancestor that hides rather than scrolls — and
+        requires the instrument to report it. Without this, "no clipping
+        found" is indistinguishable from "no clipping findable".
+        """
+        seeded = self._seed()
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['mobile'])
+            name, path, wait, _criterion, after = (
+                self._reachable_surfaces(seeded)[0]
+            )
+            self._open(browser, path, wait, after)
+
+            clean = json.loads(self._eval(browser, OVERFLOW_JS))
+            self.assertFalse(
+                self._clipping_defects(name, WIDTHS['mobile'], clean),
+                'the control measurement must be clean before the injected '
+                'defect means anything',
+            )
+
+            injected = self._eval(browser, r"""
+(() => {
+  const host = document.querySelector(".o_sc_dashboard__inner, .o_sc_export_diff__inner");
+  if (!host) return "no connector surface on this page";
+  const el = document.createElement("div");
+  el.id = "sc-td016-probe";
+  // Far wider than any viewport under test, and positioned so it extends
+  // past the right edge of a surface whose ancestor HIDES the overflow.
+  el.style.cssText = "width:4000px;height:24px;background:#f00";
+  el.textContent = "TD-016 probe";
+  host.appendChild(el);
+  return "ok";
+})()
+""")
+            self.assertEqual(injected, 'ok', injected)
+
+            probed = json.loads(self._eval(browser, OVERFLOW_JS))
+            defects = self._clipping_defects(name, WIDTHS['mobile'], probed)
+            self.assertTrue(defects, (
+                'the instrument did not report a 4000px element inside a '
+                'surface whose ancestor hides overflow, so it cannot detect '
+                'connector-owned clipping and a green result from it proves '
+                'nothing (TD-016). Measured: %s'
+                % json.dumps(probed.get('surfaces'), indent=2)
+            ))
+            self.assertTrue(
+                any(entry['kind'] == 'clipped_content' for entry in defects),
+                'the injected element was clipped away, so it must be '
+                'reported as clipped content: %s' % json.dumps(defects)[:800],
+            )
+            # And the document total -- the ONLY thing the old instrument
+            # looked at -- is unchanged, which is precisely why it could
+            # never have caught this.
+            self.assertLessEqual(
+                probed['doc_scroll_width'], probed['inner_width'] + 1,
+                'this probe is only meaningful while the ancestor absorbs '
+                'the overflow; if the document itself grew, it is testing '
+                'the old check rather than the new one',
+            )
+
+    def test_responsive_screenshots_and_no_horizontal_overflow(self):
+        """Every U2/U3 surface, at all three widths, measured per surface.
+
+        Two rules, and TD-016 is about the second one having been absent.
+
+        The document rule (§10): the page body never scrolls horizontally.
+        Wide content is the table's problem, not the document's. Measured
+        from `documentElement.scrollWidth` against `innerWidth`.
+
+        The surface rule: no connector-owned surface may be wider than the
+        box it is rendered into without handling it, and nothing inside one
+        may be rendered outside the region the user can actually see. The
+        old instrument checked only the document total, and every Odoo
+        backend surface sits inside `.o_content`, which is `overflow: auto`
+        — so a connector panel 300px too wide was absorbed by that ancestor
+        and contributed nothing to the number being asserted. The check
+        could not fail for a connector-owned defect, which made a green
+        result evidence of nothing.
         """
         seeded = self._seed()
         overflows = []
+        clipping = []
+        per_surface = {}
         with self._browser() as browser:
             for label, width in WIDTHS.items():
                 self._viewport(browser, width)
@@ -801,17 +1095,48 @@ class TestUiVisualEvidence(HttpCase):
                     self._shoot(browser, '%s-%s-%dpx' % (name, label, width),
                                 criterion)
                     metrics = json.loads(self._eval(browser, OVERFLOW_JS))
+                    per_surface['%s@%dpx' % (name, width)] = {
+                        'doc_scroll_width': metrics['doc_scroll_width'],
+                        'inner_width': metrics['inner_width'],
+                        'surfaces': [
+                            {key: surface[key] for key in (
+                                'cls', 'scroll_width', 'client_width',
+                                'overflow_x', 'self_overflow',
+                                'unhandled_self_overflow', 'clipped_by',
+                                'clipped_silently', 'escapes_left',
+                                'escapes_right',
+                            )}
+                            for surface in metrics.get('surfaces') or []
+                        ],
+                    }
                     # 1px of tolerance: sub-pixel layout rounding is not a
                     # horizontal scrollbar.
                     if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
                         overflows.append({
-                            'surface': name, 'width': width, **metrics})
-        self._record('responsive', {'widths': WIDTHS, 'overflows': overflows},
-                     'DESIGN SYSTEM §10 responsive; §14 screenshot set')
+                            'surface': name, 'width': width,
+                            'doc_scroll_width': metrics['doc_scroll_width'],
+                            'inner_width': metrics['inner_width']})
+                    clipping.extend(
+                        self._clipping_defects(name, width, metrics)
+                    )
+        self._record('responsive',
+                     {'widths': WIDTHS, 'overflows': overflows,
+                      'clipping': clipping, 'measured': per_surface},
+                     'DESIGN SYSTEM §10 responsive; §14 screenshot set; '
+                     'TD-016 per-surface clipping')
+        self.assertTrue(
+            any(entry['surfaces'] for entry in per_surface.values()),
+            'no connector-owned surface was measured at any width, so this '
+            'instrument proved nothing (TD-016).',
+        )
         self.assertFalse(
             overflows,
             'these surfaces scroll the page horizontally, which the design '
             'system forbids:\n%s' % json.dumps(overflows, indent=2))
+        self.assertFalse(
+            clipping,
+            'these connector surfaces clip or hide their own content:\n%s'
+            % json.dumps(clipping, indent=2))
 
     # ------------------------------------------------------------------
     # C. RTL
@@ -835,18 +1160,31 @@ class TestUiVisualEvidence(HttpCase):
         self.env.flush_all()
 
         overflows, measured, connector_roots = [], {}, {}
+        clipping = []
         with self._browser() as browser:
-            self._viewport(browser, WIDTHS['desktop'])
-            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
-                self._open(browser, path, wait, after)
-                self._shoot(browser, '%s-rtl-1366px' % name,
-                            criterion + ' (RTL, SC 1.3.2 / §10)')
-                metrics = json.loads(self._eval(browser, OVERFLOW_JS))
-                measured[name] = metrics
-                if metrics['connector_direction']:
-                    connector_roots[name] = metrics['connector_direction']
-                if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
-                    overflows.append({'surface': name, **metrics})
+            # TD-016: RTL is measured at every required width, not only at
+            # desktop. A mirrored layout fails by pushing content off the
+            # OPPOSITE edge, and the narrow viewports are where it does it.
+            for label, width in WIDTHS.items():
+                self._viewport(browser, width)
+                for name, path, wait, criterion, after in (
+                    self._reachable_surfaces(seeded)
+                ):
+                    self._open(browser, path, wait, after)
+                    self._shoot(browser, '%s-rtl-%dpx' % (name, width),
+                                criterion + ' (RTL, SC 1.3.2 / §10)')
+                    metrics = json.loads(self._eval(browser, OVERFLOW_JS))
+                    measured['%s@%dpx' % (name, width)] = metrics
+                    if metrics['connector_direction']:
+                        connector_roots[name] = metrics['connector_direction']
+                    if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
+                        overflows.append({
+                            'surface': name, 'width': width,
+                            'doc_scroll_width': metrics['doc_scroll_width'],
+                            'inner_width': metrics['inner_width']})
+                    clipping.extend(
+                        self._clipping_defects(name, width, metrics)
+                    )
         self._record(
             'rtl',
             {'lang': lang.code,
@@ -855,8 +1193,11 @@ class TestUiVisualEvidence(HttpCase):
                      'stylesheets use logical properties, which resolve '
                      'against `direction`, so the meaningful measurement is '
                      'the connector surface root.',
-             'measured': measured, 'overflows': overflows},
-            'DESIGN SYSTEM §10 RTL smoke check (V-8)')
+             'widths': WIDTHS,
+             'measured': measured, 'overflows': overflows,
+             'clipping': clipping},
+            'DESIGN SYSTEM §10 RTL check at every required width (V-8); '
+            'TD-016 per-surface clipping')
 
         self.assertTrue(measured, 'no surface was measured')
         # Odoo really did switch to RTL: its own flipped bundles were served.
@@ -887,6 +1228,10 @@ class TestUiVisualEvidence(HttpCase):
             overflows,
             'these surfaces overflow horizontally in RTL:\n%s'
             % json.dumps(overflows, indent=2))
+        self.assertFalse(
+            clipping,
+            'these connector surfaces clip or displace their own content '
+            'when mirrored:\n%s' % json.dumps(clipping, indent=2))
 
     # ------------------------------------------------------------------
     # D. Reduced motion

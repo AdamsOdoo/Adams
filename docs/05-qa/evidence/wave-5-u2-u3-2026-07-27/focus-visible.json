@@ -309,7 +309,7 @@
       "height": 21,
       "index": 6,
       "indicator_contrast": 19.03,
-      "label": "shopify.connector.location.mapping,1",
+      "label": "shopify.connector.location.mapping,14",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "1px",
       "outline_style": "auto",
@@ -679,26 +679,6 @@
       "tab_index": 0,
       "tag": "button",
       "width": 22
-    },
-    {
-      "background_behind": "rgb(248, 249, 250)",
-      "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px",
-      "classes": "btn p-0 o-dropdown dropdown-toggle dropdown",
-      "focused": true,
-      "has_indicator": true,
-      "height": 23,
-      "index": 11,
-      "indicator_contrast": null,
-      "label": "",
-      "outline_color": "rgb(33, 37, 41)",
-      "outline_offset": "0px",
-      "outline_style": "none",
-      "outline_width_px": 0,
-      "selector": "[data-sc-focus-probe=\"11\"]",
-      "surface": "u3-export-settings",
-      "tab_index": -1,
-      "tag": "button",
-      "width": 20
     }
   ],
   "measured": [
@@ -1980,7 +1960,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "th",
-      "width": 346
+      "width": 348
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2000,7 +1980,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "th",
-      "width": 301
+      "width": 305
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2080,7 +2060,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "th",
-      "width": 140
+      "width": 136
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2100,7 +2080,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "th",
-      "width": 111
+      "width": 108
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2160,7 +2140,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "td",
-      "width": 346
+      "width": 348
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2171,7 +2151,7 @@
       "height": 40,
       "index": 19,
       "indicator_contrast": 18.05,
-      "label": "shopify.connector.location.mapping,1",
+      "label": "shopify.connector.location.mapping,14",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -2180,7 +2160,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "td",
-      "width": 301
+      "width": 305
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2260,7 +2240,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "td",
-      "width": 140
+      "width": 136
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2280,7 +2260,7 @@
       "surface": "u2-inventory-workspace",
       "tab_index": -1,
       "tag": "td",
-      "width": 111
+      "width": 108
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2460,7 +2440,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "th",
-      "width": 346
+      "width": 348
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2480,7 +2460,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "th",
-      "width": 301
+      "width": 305
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2560,7 +2540,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "th",
-      "width": 140
+      "width": 136
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2580,7 +2560,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "th",
-      "width": 111
+      "width": 108
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2640,7 +2620,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "td",
-      "width": 346
+      "width": 348
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2651,7 +2631,7 @@
       "height": 40,
       "index": 19,
       "indicator_contrast": 18.05,
-      "label": "shopify.connector.location.mapping,1",
+      "label": "shopify.connector.location.mapping,14",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -2660,7 +2640,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "td",
-      "width": 301
+      "width": 305
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2740,7 +2720,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "td",
-      "width": 140
+      "width": 136
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2760,7 +2740,7 @@
       "surface": "u2-first-push-guard-previewed",
       "tab_index": -1,
       "tag": "td",
-      "width": 111
+      "width": 108
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -2911,7 +2891,7 @@
       "height": 21,
       "index": 6,
       "indicator_contrast": 19.03,
-      "label": "shopify.connector.location.mapping,1",
+      "label": "shopify.connector.location.mapping,14",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "1px",
       "outline_style": "auto",
@@ -3300,7 +3280,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "th",
-      "width": 229
+      "width": 227
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3320,7 +3300,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "th",
-      "width": 121
+      "width": 122
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3340,7 +3320,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "th",
-      "width": 214
+      "width": 213
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3360,7 +3340,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "th",
-      "width": 109
+      "width": 110
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3380,7 +3360,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "th",
-      "width": 92
+      "width": 93
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3471,7 +3451,7 @@
       "height": 40,
       "index": 21,
       "indicator_contrast": 18.05,
-      "label": "Jul 27, 1:43 AM",
+      "label": "Jul 27, 12:51 PM",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -3500,7 +3480,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "td",
-      "width": 229
+      "width": 227
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3520,7 +3500,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "td",
-      "width": 121
+      "width": 122
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3540,7 +3520,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "td",
-      "width": 214
+      "width": 213
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3560,7 +3540,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "td",
-      "width": 109
+      "width": 110
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3580,7 +3560,7 @@
       "surface": "u3-export-previews",
       "tab_index": -1,
       "tag": "td",
-      "width": 92
+      "width": 93
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -3591,7 +3571,7 @@
       "height": 40,
       "index": 27,
       "indicator_contrast": 18.05,
-      "label": "Jul 28, 1:43 AM",
+      "label": "Jul 28, 12:51 PM",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -3711,7 +3691,7 @@
       "height": 794,
       "index": 3,
       "indicator_contrast": 18.05,
-      "label": "Connector FilenameMedia RoleProduct Temp",
+      "label": "No media has been exported yet.\n        ",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4671,7 +4651,7 @@
       "height": 794,
       "index": 5,
       "indicator_contrast": 18.05,
-      "label": "StoreCustomer notification confirmedLast",
+      "label": "StoreProduct Export Domain EnabledProduc",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4688,7 +4668,7 @@
       "classes": "o_list_record_selector o_list_controller align-middle pe-1 cursor-pointer",
       "focused": true,
       "has_indicator": true,
-      "height": 40,
+      "height": 38,
       "index": 6,
       "indicator_contrast": 18.05,
       "label": "",
@@ -4708,7 +4688,7 @@
       "classes": "align-middle o_column_sortable position-relative cursor-pointer opacity-trigger-hover w-print-auto",
       "focused": true,
       "has_indicator": true,
-      "height": 40,
+      "height": 38,
       "index": 8,
       "indicator_contrast": 18.05,
       "label": "Store",
@@ -4720,18 +4700,18 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "th",
-      "width": 994
+      "width": 200
     },
     {
       "background_behind": "rgb(248, 249, 250)",
       "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 9999px inset",
-      "classes": "align-middle o_column_sortable position-relative cursor-pointer opacity-trigger-hover w-print-auto",
+      "classes": "align-middle o_column_sortable position-relative cursor-pointer o_boolean_toggle_cell opacity-trigger-hover w-print-auto",
       "focused": true,
       "has_indicator": true,
-      "height": 40,
+      "height": 38,
       "index": 9,
       "indicator_contrast": 18.05,
-      "label": "Customer notification confirmed",
+      "label": "Product Export Domain Enabled",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4740,18 +4720,18 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "th",
-      "width": 109
+      "width": 295
     },
     {
       "background_behind": "rgb(248, 249, 250)",
       "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 9999px inset",
-      "classes": "align-middle o_column_sortable position-relative cursor-pointer opacity-trigger-hover w-print-auto",
+      "classes": "align-middle o_column_sortable position-relative cursor-pointer o_boolean_toggle_cell opacity-trigger-hover w-print-auto",
       "focused": true,
       "has_indicator": true,
-      "height": 40,
+      "height": 38,
       "index": 10,
       "indicator_contrast": 18.05,
-      "label": "Last reconciliation",
+      "label": "Product Export Binding Namespace Ready",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4760,27 +4740,47 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "th",
-      "width": 190
+      "width": 390
     },
     {
       "background_behind": "rgb(248, 249, 250)",
-      "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px",
-      "classes": "btn p-0 o-dropdown dropdown-toggle dropdown",
+      "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 9999px inset",
+      "classes": "align-middle o_column_sortable position-relative cursor-pointer opacity-trigger-hover w-print-auto",
       "focused": true,
       "has_indicator": true,
-      "height": 23,
+      "height": 38,
       "index": 11,
-      "indicator_contrast": null,
-      "label": "",
-      "outline_color": "rgb(33, 37, 41)",
+      "indicator_contrast": 18.05,
+      "label": "Price Source Of Truth",
+      "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
-      "outline_style": "none",
-      "outline_width_px": 0,
+      "outline_style": "auto",
+      "outline_width_px": 1,
       "selector": "[data-sc-focus-probe=\"11\"]",
       "surface": "u3-export-settings",
       "tab_index": -1,
-      "tag": "button",
-      "width": 20
+      "tag": "th",
+      "width": 202
+    },
+    {
+      "background_behind": "rgb(248, 249, 250)",
+      "box_shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 9999px inset",
+      "classes": "align-middle o_column_sortable position-relative cursor-pointer opacity-trigger-hover w-print-auto",
+      "focused": true,
+      "has_indicator": true,
+      "height": 38,
+      "index": 12,
+      "indicator_contrast": 18.05,
+      "label": "Media Source Of Truth",
+      "outline_color": "rgb(16, 16, 16)",
+      "outline_offset": "0px",
+      "outline_style": "auto",
+      "outline_width_px": 1,
+      "selector": "[data-sc-focus-probe=\"12\"]",
+      "surface": "u3-export-settings",
+      "tab_index": -1,
+      "tag": "th",
+      "width": 238
     },
     {
       "background_behind": "rgb(248, 249, 250)",
@@ -4789,14 +4789,14 @@
       "focused": true,
       "has_indicator": true,
       "height": 40,
-      "index": 12,
+      "index": 13,
       "indicator_contrast": 18.05,
       "label": "",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
       "outline_width_px": 1,
-      "selector": "[data-sc-focus-probe=\"12\"]",
+      "selector": "[data-sc-focus-probe=\"13\"]",
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "td",
@@ -4809,29 +4809,9 @@
       "focused": true,
       "has_indicator": true,
       "height": 40,
-      "index": 14,
-      "indicator_contrast": 18.05,
-      "label": "Visual evidence store",
-      "outline_color": "rgb(16, 16, 16)",
-      "outline_offset": "0px",
-      "outline_style": "auto",
-      "outline_width_px": 1,
-      "selector": "[data-sc-focus-probe=\"14\"]",
-      "surface": "u3-export-settings",
-      "tab_index": -1,
-      "tag": "td",
-      "width": 994
-    },
-    {
-      "background_behind": "rgb(248, 249, 250)",
-      "box_shadow": "rgba(0, 0, 0, 0.11) 0px 0px 0px 9999px inset",
-      "classes": "o_data_cell cursor-pointer o_field_cell o_readonly_modifier",
-      "focused": true,
-      "has_indicator": true,
-      "height": 40,
       "index": 15,
       "indicator_contrast": 18.05,
-      "label": "",
+      "label": "Visual evidence store",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4840,18 +4820,18 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "td",
-      "width": 109
+      "width": 200
     },
     {
       "background_behind": "rgb(248, 249, 250)",
       "box_shadow": "rgba(0, 0, 0, 0.11) 0px 0px 0px 9999px inset",
-      "classes": "o_data_cell cursor-pointer o_field_cell o_readonly_modifier",
+      "classes": "o_data_cell cursor-pointer o_field_cell o_boolean_toggle_cell o_readonly_modifier",
       "focused": true,
       "has_indicator": true,
       "height": 40,
       "index": 16,
       "indicator_contrast": 18.05,
-      "label": "",
+      "label": "\u200b",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4860,18 +4840,18 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "td",
-      "width": 190
+      "width": 295
     },
     {
       "background_behind": "rgb(248, 249, 250)",
       "box_shadow": "rgba(0, 0, 0, 0.11) 0px 0px 0px 9999px inset",
-      "classes": "w-print-0 p-print-0",
+      "classes": "o_data_cell cursor-pointer o_field_cell o_boolean_toggle_cell o_readonly_modifier",
       "focused": true,
       "has_indicator": true,
       "height": 40,
       "index": 17,
       "indicator_contrast": 18.05,
-      "label": "",
+      "label": "\u200b",
       "outline_color": "rgb(16, 16, 16)",
       "outline_offset": "0px",
       "outline_style": "auto",
@@ -4880,7 +4860,47 @@
       "surface": "u3-export-settings",
       "tab_index": -1,
       "tag": "td",
-      "width": 32
+      "width": 390
+    },
+    {
+      "background_behind": "rgb(248, 249, 250)",
+      "box_shadow": "rgba(0, 0, 0, 0.11) 0px 0px 0px 9999px inset",
+      "classes": "o_data_cell cursor-pointer o_field_cell o_readonly_modifier",
+      "focused": true,
+      "has_indicator": true,
+      "height": 40,
+      "index": 18,
+      "indicator_contrast": 18.05,
+      "label": "Odoo Authoritative",
+      "outline_color": "rgb(16, 16, 16)",
+      "outline_offset": "0px",
+      "outline_style": "auto",
+      "outline_width_px": 1,
+      "selector": "[data-sc-focus-probe=\"18\"]",
+      "surface": "u3-export-settings",
+      "tab_index": -1,
+      "tag": "td",
+      "width": 202
+    },
+    {
+      "background_behind": "rgb(248, 249, 250)",
+      "box_shadow": "rgba(0, 0, 0, 0.11) 0px 0px 0px 9999px inset",
+      "classes": "o_data_cell cursor-pointer o_field_cell o_readonly_modifier",
+      "focused": true,
+      "has_indicator": true,
+      "height": 40,
+      "index": 19,
+      "indicator_contrast": 18.05,
+      "label": "",
+      "outline_color": "rgb(16, 16, 16)",
+      "outline_offset": "0px",
+      "outline_style": "auto",
+      "outline_width_px": 1,
+      "selector": "[data-sc-focus-probe=\"19\"]",
+      "surface": "u3-export-settings",
+      "tab_index": -1,
+      "tag": "td",
+      "width": 238
     },
     {
       "background_behind": "rgb(248, 250, 252)",

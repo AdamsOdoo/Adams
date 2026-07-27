@@ -54,8 +54,8 @@ made and no credential exists.
 | `contrast.json` | every measured text and non-text pair: selector, sample, foreground, background, font size, required threshold, computed ratio, PASS/FAIL |
 | `focus-visible.json` | every focusable control with `:focus-visible` forced: outline style/width/colour/offset, box-shadow, background behind, measured indicator contrast, target size |
 | `reduced-motion.json` | whether the media query reached the page, and every element still carrying a non-trivial transition or animation |
-| `rtl.json` | per surface: `<html>`/`<body>`/connector-root computed `direction`, whether Odoo served its rtlcss bundles, whether `.o_rtl` was applied, and the overflow measurement |
-| `responsive.json` | the widths measured and any surface whose document scrolled horizontally |
+| `rtl.json` | per surface: `<html>`/`<body>`/connector-root computed `direction`, whether Odoo served its rtlcss bundles, whether `.o_rtl` was applied, and the full per-surface clipping measurement — **at all three widths**, not only desktop (TD-016) |
+| `responsive.json` | the widths measured, any surface whose document scrolled horizontally, and — new in TD-016 — a readable **per-surface** record for every connector surface at every width: `scroll_width`, `client_width`, declared `overflow-x`, unhandled self-overflow, the ancestor that constrains it, whether that ancestor hides or scrolls the overflow, and any descendant clipped away by it |
 | `manifest.json` | every artifact mapped to the acceptance criterion it evidences |
 
 **Surfaces captured (14):** U0 dashboard; U2 orders workspace, COD
@@ -65,7 +65,7 @@ exported media, reconnect/backfill, export diagnostics, export settings, and
 the **S7 export diff** carrying a refusal and an enumerated tag removal.
 
 **Variants per surface:** `desktop-1366px`, `tablet-768px`, `mobile-390px`,
-`rtl-1366px`, `reduced-motion-1366px`, `focus-1366px`.
+`rtl-1366px`, `rtl-768px`, `rtl-390px`, `reduced-motion-1366px`, `focus-1366px`.
 
 ---
 
@@ -74,7 +74,7 @@ the **S7 export diff** carrying a refusal and an enumerated tag removal.
 | Criterion | Artifact |
 | --- | --- |
 | DESIGN SYSTEM §10 responsive, §14 screenshot set (V-8) | `screenshots/*-{desktop,tablet,mobile}-*.png`, `responsive.json` |
-| DESIGN SYSTEM §10 RTL smoke check (V-8) | `screenshots/*-rtl-1366px.png`, `rtl.json` |
+| DESIGN SYSTEM §10 RTL smoke check (V-8) | `screenshots/*-rtl-{1366,768,390}px.png`, `rtl.json` |
 | DESIGN SYSTEM §8 reduced motion (V-7) · WCAG 2.2 **SC 2.3.3** | `screenshots/*-reduced-motion-1366px.png`, `reduced-motion.json` |
 | WCAG 2.2 **SC 2.4.7** Focus Visible (V-9) | `screenshots/*-focus-1366px.png`, `focus-visible.json` |
 | WCAG 2.2 **SC 1.4.3** Contrast (Minimum) (V-3) | `contrast.json` |
@@ -160,7 +160,50 @@ computes to 1e-6 s, which is not motion.
 
 `[Fact]` **RTL.** A real `ar_001` session. Odoo served both rtlcss bundles and
 applied its own `.o_rtl` class. Both connector Owl roots computed
-`direction: rtl`. **No surface overflows horizontally in RTL.**
+`direction: rtl`. **No surface overflows horizontally in RTL, and no
+connector surface clips or displaces its own content when mirrored — at
+1366, 768 and 390 CSS px.** RTL is now measured at every required width
+rather than at desktop alone (TD-016): a mirrored layout fails by pushing
+content off the *opposite* edge, and the narrow viewports are where it does
+it.
+
+### TD-016 — what the overflow measurement was, and what it is now
+
+`[Fact]` The previous instrument compared `document.documentElement.scrollWidth`
+against `window.innerWidth` and nothing else. That is a real rule (§10, the
+page body must not scroll sideways) but it was **structurally incapable of
+failing for a connector-owned defect**: every connector surface renders
+inside `.o_action_manager`, which is `overflow: hidden`, so a connector
+panel hundreds of pixels too wide is clipped silently, the document never
+grows, and the assertion passes. A green result from it was evidence of
+nothing.
+
+`[Fact]` The instrument now measures, per connector surface and per width:
+its own `scrollWidth` against `clientWidth`; whether it declares
+`overflow-x: auto|scroll` to handle that; the nearest ancestor that
+constrains it horizontally and whether that ancestor **scrolls** (the
+overflow is reachable — §10's sanctioned answer for wide content) or
+**hides** it (the overflow is gone); every descendant rendered outside a
+hiding ancestor's rectangle, flagged separately when it is interactive; and
+the surface's own horizontal displacement.
+
+`[Fact]` `test_the_overflow_instrument_can_actually_fail` injects a 4000px
+element into a connector surface and requires the instrument to report it,
+while asserting the document total stays unchanged — which is precisely why
+the old check could not have caught it. An instrument that has never been
+shown to fail is not evidence.
+
+`[Recommendation]` **TD-016 is classified as an evidence correction, not a
+production defect.** The corrected instrument was run at all three widths in
+both directions and reproduced **no** connector-owned clipping, so no
+production CSS was changed. The one candidate it initially reported — the
+export-diff table's rows extending past `.o_sc_export_diff__inner` at 390px
+— was traced to the measurement itself: descendants were being compared
+against the *surface's* constraining ancestor, which skipped
+`.sc-x-table`'s own `overflow-x: auto`. That container is the design
+system's prescribed treatment for wide content (§10), so content scrolling
+inside it is the rule working. The measurement was corrected to walk each
+descendant's own ancestors; the stylesheet was not touched.
 
 `[Fact]` **Responsive.** No surface scrolls the page horizontally at 1366, 768
 or 390 CSS px.

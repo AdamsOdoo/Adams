@@ -1,157 +1,814 @@
 {
+  "clipping": [],
   "lang": "ar_001",
   "measured": {
-    "u0-dashboard-healthy": {
-      "body_direction": "ltr",
+    "u0-dashboard-healthy@1366px": {
+      "body_direction": "rtl",
       "connector_direction": "rtl",
       "connector_root": "o_sc_dashboard",
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 1120,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 518.984375,
+            "height": 440.984375,
+            "left": 123,
+            "right": 1243,
+            "top": 78,
+            "width": 1120
+          },
+          "scroll_width": 1120,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
     },
-    "u2-cod-reconciliation-empty": {
-      "body_direction": "ltr",
+    "u0-dashboard-healthy@390px": {
+      "body_direction": "rtl",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 366,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 664.984375,
+            "height": 606.984375,
+            "left": 12,
+            "right": 378,
+            "top": 58,
+            "width": 366
+          },
+          "scroll_width": 366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u0-dashboard-healthy@768px": {
+      "body_direction": "rtl",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 676.984375,
+            "height": 614.984375,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u2-cod-reconciliation-empty@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-customer-matching-empty": {
-      "body_direction": "ltr",
+    "u2-cod-reconciliation-empty@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-cod-reconciliation-empty@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-first-push-form-awaiting-confirmation": {
-      "body_direction": "ltr",
+    "u2-customer-matching-empty@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-first-push-guard-previewed": {
-      "body_direction": "ltr",
+    "u2-first-push-form-awaiting-confirmation@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-inventory-workspace": {
-      "body_direction": "ltr",
+    "u2-first-push-guard-previewed@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-location-mapping-form": {
-      "body_direction": "ltr",
+    "u2-inventory-workspace@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-orders-workspace-empty": {
-      "body_direction": "ltr",
+    "u2-location-mapping-form@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u2-product-matching": {
-      "body_direction": "ltr",
+    "u2-orders-workspace-empty@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-product-matching@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u3-export-diagnostics": {
-      "body_direction": "ltr",
+    "u2-product-matching@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-product-matching@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u3-export-diff-refusal-and-tag-removal": {
-      "body_direction": "ltr",
+    "u3-export-diagnostics@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diff-refusal-and-tag-removal@1366px": {
+      "body_direction": "rtl",
       "connector_direction": "rtl",
       "connector_root": "o_sc_export_diff",
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 960,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1101.359375,
+            "height": 1055.359375,
+            "left": 203,
+            "right": 1163,
+            "top": 46,
+            "width": 960
+          },
+          "scroll_width": 960,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
     },
-    "u3-export-previews": {
-      "body_direction": "ltr",
+    "u3-export-diff-refusal-and-tag-removal@390px": {
+      "body_direction": "rtl",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1430.359375,
+            "height": 1384.359375,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u3-export-diff-refusal-and-tag-removal@768px": {
+      "body_direction": "rtl",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1159.359375,
+            "height": 1113.359375,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u3-export-previews@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u3-export-settings": {
-      "body_direction": "ltr",
+    "u3-export-previews@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-previews@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-settings@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u3-exported-media": {
-      "body_direction": "ltr",
+    "u3-export-settings@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-settings@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-exported-media@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
     },
-    "u3-reconnect-backfill": {
-      "body_direction": "ltr",
+    "u3-exported-media@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-exported-media@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@1366px": {
+      "body_direction": "rtl",
       "connector_direction": null,
       "connector_root": null,
       "direction": "ltr",
       "doc_scroll_width": 1366,
       "inner_width": 1366,
       "odoo_rtl_class": true,
-      "rtl_stylesheets": 2
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@390px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@768px": {
+      "body_direction": "rtl",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
     }
   },
   "note": "Odoo 19 backend sets no `dir` on <html>/<body>; its RTL mechanism is rtlcss bundle flipping. The connector stylesheets use logical properties, which resolve against `direction`, so the meaningful measurement is the connector surface root.",
-  "overflows": []
+  "overflows": [],
+  "widths": {
+    "desktop": 1366,
+    "mobile": 390,
+    "tablet": 768
+  }
 }

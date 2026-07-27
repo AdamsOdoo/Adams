@@ -1,4 +1,382 @@
 {
+  "clipping": [],
+  "measured": {
+    "u0-dashboard-healthy@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "scroll_width": 1366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 1120,
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 1120,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u0-dashboard-healthy@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 366,
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u0-dashboard-healthy@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 736,
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 736,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u2-cod-reconciliation-empty@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-cod-reconciliation-empty@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-cod-reconciliation-empty@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u2-product-matching@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u2-product-matching@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u2-product-matching@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u3-export-diff-refusal-and-tag-removal@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "scroll_width": 1366,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 960,
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 960,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u3-export-diff-refusal-and-tag-removal@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 390,
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 390,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u3-export-diff-refusal-and-tag-removal@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        },
+        {
+          "client_width": 768,
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "scroll_width": 768,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0
+        }
+      ]
+    },
+    "u3-export-previews@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u3-export-previews@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u3-export-previews@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u3-export-settings@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u3-export-settings@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u3-export-settings@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u3-exported-media@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u3-exported-media@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u3-exported-media@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@1366px": {
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@390px": {
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@768px": {
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "surfaces": []
+    }
+  },
   "overflows": [],
   "widths": {
     "desktop": 1366,
