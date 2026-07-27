@@ -217,7 +217,18 @@ class TestPhaseContract(TransactionCase):
                         continue
                     if not item.name.startswith('test_'):
                         continue
-                    if 'start_tour' in ast.unparse(item):
+                    # Match an actual CALL to `…start_tour(…)`, not the string
+                    # "start_tour" appearing anywhere in the method. This guard
+                    # names the identifier in its own body, so a substring
+                    # search finds itself and reports a test that drives no
+                    # tour as a missing tour -- which is exactly the kind of
+                    # false positive that gets a guard deleted.
+                    if any(
+                        isinstance(call.func, ast.Attribute)
+                        and call.func.attr == 'start_tour'
+                        for call in ast.walk(item)
+                        if isinstance(call, ast.Call)
+                    ):
                         actual.add('%s.%s' % (node.name, item.name))
 
         self.assertTrue(
