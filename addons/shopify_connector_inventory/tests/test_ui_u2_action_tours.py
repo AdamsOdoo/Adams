@@ -178,6 +178,74 @@ class TestUiU2InventoryActionTours(HttpCase):
         self.assertEqual(binding.first_push_confirmed_by_uid, self.reviewer)
         self.assertTrue(binding.first_push_confirmed_at)
 
+    def test_first_push_reaches_confirmed_from_a_genuine_pending_pair(self):
+        """TD-012: the whole ceremony, with nothing fabricated.
+
+        `test_first_push_confirm_tour` above starts from a row this test
+        file itself wrote as `previewed`. That is the habit that hid the
+        defect: `previewed` had no production writer reachable from
+        anywhere, so every test that granted itself the state passed while
+        an operator could never get there.
+
+        This one starts at the model's own default and reaches `confirmed`
+        through production surfaces only — the scheduled scan admits the
+        preview, the preview handler records the quantity, and a reviewer
+        presses the real button in a real browser. No `first_push_state`
+        is written by this test.
+        """
+        Service = self.env['shopify.connector.inventory.service']
+        # A store setting, not a state fabrication: the scheduled pass is
+        # opt-in per store and this class's fixture does not enable it.
+        self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', self.store.id)], limit=1,
+        ).sudo().write({'inventory_scheduled_sync_enabled': True})
+        binding = self.env[
+            'shopify.connector.inventory.level.binding'
+        ].sudo().create({
+            'store_id': self.store.id,
+            'product_variant_binding_id': self.variant_binding.id,
+            'location_mapping_id': self.mapping.id,
+            'shopify_inventory_item_gid': 'gid://shopify/InventoryItem/U2REACH',
+        })
+        self.assertEqual(binding.first_push_state, 'pending')
+
+        # The scheduled pass -- cron entry point, then its own job handler,
+        # exactly as production runs it.
+        for scan in Service.run_inventory_push_scan().filtered(
+            lambda j: j.store_id == self.store
+        ):
+            scan.sudo().write({'state': 'running'})
+            Service._handle_inventory_push_scan(scan)
+
+        preview = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'inventory_first_push_preview'),
+            ('res_id', '=', binding.id),
+        ])
+        self.assertEqual(
+            len(preview), 1,
+            'the scheduled pass did not admit the first-push preview',
+        )
+        preview.sudo().write({'state': 'running'})
+        Service._handle_inventory_first_push_preview(preview)
+        binding.invalidate_recordset()
+        self.assertEqual(
+            binding.first_push_state, 'previewed',
+            'the production preview job did not record the preview',
+        )
+        self.env.flush_all()
+
+        self.start_tour(self._url(GUARD_ACTION),
+                        'shopify_connector_u2_first_push_confirm_tour',
+                        login='u2act_reviewer')
+
+        binding.invalidate_recordset()
+        self.assertEqual(
+            binding.first_push_state, 'confirmed',
+            'the browser confirmation did not reach the server',
+        )
+        self.assertEqual(binding.first_push_confirmed_by_uid, self.reviewer)
+
     def test_first_push_pending_offers_no_control_tour(self):
         """A pair awaiting its preview offers no control the server refuses."""
         binding = self._level('gid://shopify/InventoryItem/U2PEND', 'pending')

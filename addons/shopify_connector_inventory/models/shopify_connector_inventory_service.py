@@ -932,6 +932,43 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         return binding.status in ('review', 'stale')
 
     @api.model
+    def _existing_pair_scope_job(self, store, pair_key):
+        """The non-terminal inventory job holding this pair's scope, if any.
+
+        Two things this has to get right, both of which the previous
+        inline version got wrong:
+
+        **The field it queries.** `operation_scope_key` is not the pair
+        key. It is the composite `store|res_model|res_id|target_gid`
+        built by core's `_compute_operation_scope_key`, and the pair key
+        is only its last segment. Comparing the two could never match, so
+        the fast-path coalesce never fired and — worse — the
+        re-verification after catching the constraint violation could
+        never confirm the collision either, turning a benign concurrent
+        admission into a raised error. The pair key IS `shopify_target_gid`
+        verbatim (`_create_inventory_job` passes it as such), so that is
+        what gets compared. `operation_scope_key != False` restricts the
+        match to non-terminal jobs, using exactly the guarantee the unique
+        constraint relies on: core clears the key on reaching a terminal
+        state or being superseded.
+
+        **When it reads.** `operation_scope_key` is a STORED COMPUTE, so a
+        sibling created earlier in this same transaction has no value for
+        it in PostgreSQL until the ORM flushes. Without the flush an
+        unflushed sibling is invisible here and the caller falls through
+        to the constraint. The constraint is still the atomic guard for
+        the cross-worker window, which no flush can close.
+        """
+        Job = self.env['shopify.connector.job']
+        Job.flush_model()
+        return Job.sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', 'in', INVENTORY_JOB_TYPES),
+            ('shopify_target_gid', '=', pair_key),
+            ('operation_scope_key', '!=', False),
+        ], limit=1)
+
+    @api.model
     def _try_enqueue_push_sync(self, store, binding, job_source, trigger_origin=False):
         """Admit one `inventory_push_sync` job for `binding`, or coalesce.
 
@@ -976,11 +1013,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             binding.location_mapping_id.shopify_gid,
         )
         def _existing_pair_job():
-            return self.env['shopify.connector.job'].sudo().search([
-                ('store_id', '=', store.id),
-                ('job_type', 'in', INVENTORY_JOB_TYPES),
-                ('operation_scope_key', '=', pair_key),
-            ], limit=1)
+            return self._existing_pair_scope_job(store, pair_key)
 
         # Fast-path coalesce: a non-terminal inventory job already holding
         # this pair's operation_scope_key means "already in progress" -- the
@@ -1640,8 +1673,34 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         enqueued_count = 0
         coalesced_count = 0
         unchanged_count = 0
+        previewed_count = 0
         for binding in bindings:
             target, _free_qty = self._refresh_pending_target(binding)
+            # TD-012. The shipped first-push form tells the operator, in
+            # the `pending` empty state, that "the preview runs on the next
+            # scheduled pass". Nothing made that true: the only writer of
+            # `previewed` is the `inventory_first_push_preview` handler,
+            # and its only admission surface had no production caller at
+            # all -- so a pair could never leave `pending`, the confirm
+            # control could never appear, and the entire first-push
+            # ceremony was unreachable outside a test that wrote the state
+            # itself.
+            #
+            # The preview is admitted INSTEAD OF a push_sync, not beside
+            # it, for two independent reasons. Semantically, an unconfirmed
+            # pair has nothing to push -- `inventory_push_sync` gates every
+            # mutation on `first_push_state='confirmed'` (D-013-4), so the
+            # push job it would admit could only ever decline. Mechanically,
+            # both job types share this pair's `operation_scope_key`, so
+            # admitting both would collide on the unique constraint and one
+            # would be swallowed as a coalesce -- silently, and not always
+            # the same one.
+            if binding.first_push_state == 'pending':
+                if self._admit_first_push_preview(binding):
+                    previewed_count += 1
+                else:
+                    coalesced_count += 1
+                continue
             # A Float `last_pushed_available` defaults to 0.0 -- that
             # alone never distinguishes "never successfully pushed" from
             # "successfully pushed a confirmed zero" (PR #182 comment
@@ -1665,9 +1724,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         job._log_transition(
             'state_change',
             'Inventory push scan for store %d: mapped=%d enqueued=%d '
-            'coalesced=%d unchanged=%d.' % (
+            'coalesced=%d unchanged=%d first_push_previews=%d.' % (
                 store.id, mapped, enqueued_count, coalesced_count,
-                unchanged_count,
+                unchanged_count, previewed_count,
             ),
             from_state='running', to_state='succeeded',
         )
@@ -1725,10 +1784,78 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 "Only a Shopify Connector Operator or Administrator may "
                 "enqueue a first-push preview."
             )
-        return self._create_inventory_job(
-            binding.store_id, 'export_preview_dry_run',
-            JOB_TYPE_FIRST_PUSH_PREVIEW, binding,
+        # Company isolation is asserted BEFORE the admission elevates, so
+        # an authorised Operator of company A can never admit a preview for
+        # company B's pair by holding the right group in the wrong company.
+        self._assert_first_push_company_access(binding)
+        return self._admit_first_push_preview(binding)
+
+    @api.model
+    def _assert_first_push_company_access(self, binding):
+        """The pair's company must be one the acting user actually has."""
+        company = binding.company_id
+        if company and company not in self.env.user.company_ids:
+            raise AccessError(
+                "This inventory pair belongs to another company. A "
+                "first-push preview may only be admitted from a company "
+                "you have access to."
+            )
+        return True
+
+    @api.model
+    def _admit_first_push_preview(self, binding):
+        """TD-012: the admission itself, shared by both trigger surfaces.
+
+        Split out from `_enqueue_first_push_preview` because there are two
+        callers with two different authorities and only one of them is a
+        user. A person pressing a control is role-gated and
+        company-checked; the scheduled pass is the system acting on its own
+        schedule and has no user to gate. Collapsing them would mean either
+        an unauthenticated user-facing admission or a scan that fails
+        whenever the dispatcher identity is not in a connector group --
+        both wrong, in opposite directions.
+
+        Never issues a Shopify mutation: the job type it admits is
+        `inventory_first_push_preview`, whose handler only computes and
+        stores a quantity, and whose `job_source` is the read-only
+        `export_preview_dry_run`.
+
+        Duplicate-safe on the same terms as `_try_enqueue_push_sync`: a
+        non-terminal inventory job already holding this pair's
+        `operation_scope_key` means "already in progress", and admitting
+        nothing loses nothing. The savepoint plus the constraint remain the
+        atomic guard for the TOCTOU window between the read and the create.
+        """
+        if self._binding_push_admission_blocked(binding):
+            return self.env['shopify.connector.job']
+        store = binding.store_id
+        pair_key = pair_scope_key(
+            store.id,
+            binding.shopify_inventory_item_gid,
+            binding.location_mapping_id.shopify_gid,
         )
+
+        def _existing_pair_job():
+            return self._existing_pair_scope_job(store, pair_key)
+
+        if _existing_pair_job():
+            return self.env['shopify.connector.job']
+        try:
+            with self.env.cr.savepoint():
+                return self._create_inventory_job(
+                    store, 'export_preview_dry_run',
+                    JOB_TYPE_FIRST_PUSH_PREVIEW, binding,
+                )
+        except (ValidationError, IntegrityError) as exc:
+            message = str(exc)
+            if (
+                OPERATION_SCOPE_CONSTRAINT_MESSAGE not in message
+                and OPERATION_SCOPE_CONSTRAINT_NAME not in message
+            ):
+                raise
+            if not _existing_pair_job():
+                raise
+            return self.env['shopify.connector.job']
 
     @api.model
     def _enqueue_location_sync(self, store):
