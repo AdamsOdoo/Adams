@@ -170,7 +170,37 @@ class TestExportSourceGuards(TransactionCase):
             #                                       in this module uses.
             # All four are reachable only from inside a claimed dispatch or
             # from the two already-gated entry points above.
-            'shopify_connector_export_reconnect.py': 15,
+            #
+            # 15 -> 20 (TD-015 operator resolution, 2026-07-27). Five more,
+            # all on connector-owned bookkeeping the caller must not be able
+            # to write directly, and every one of them behind the
+            # Administrator + record-access + company checks in
+            # `_assert_export_reconcile_ack_authority`:
+            #   `_export_reconcile_media_claim`     1 - reads this binding's
+            #                                       OWN media rows to build
+            #                                       the claim digest. Elevated
+            #                                       so a record rule cannot
+            #                                       silently shorten the claim
+            #                                       and make a partial digest
+            #                                       look like a match.
+            #   `_export_reconcile_clear_acknowledgement` 1 - the ack fields
+            #                                       are protected binding
+            #                                       fields; dropping a
+            #                                       superseded ack is exactly
+            #                                       what a non-su write is
+            #                                       refused for.
+            #   `action_shopify_export_acknowledge_checksum` 1 - writes those
+            #                                       same protected fields
+            #                                       AFTER authority, record
+            #                                       access, company and
+            #                                       eligibility have all been
+            #                                       established.
+            #   `_reassert_export_reconcile_acknowledgements` 2 - reads this
+            #                                       store's own outstanding
+            #                                       reviews and re-applies the
+            #                                       block on the store's own
+            #                                       readonly verdict fields.
+            'shopify_connector_export_reconnect.py': 20,
             # 0 -> 1 (TD-011 correction, 2026-07-27). The public resume
             # action reads its own store's company through `sudo()` to
             # compare it against the acting user's allowed companies. It is

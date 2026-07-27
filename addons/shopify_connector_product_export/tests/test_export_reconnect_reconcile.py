@@ -34,6 +34,7 @@ response taxonomy all run.
 
 import base64
 import contextlib
+import inspect
 import json
 import logging
 import uuid
@@ -884,9 +885,14 @@ class TestExportReconnectRemoteMedia(TestExportReconnectReconcile):
         them and get a clean result for free.
         """
         self._associated_media_row()
-        note = self.Reconcile._media_divergence(self.binding)
+        reason, note = self.Reconcile._media_divergence(self.binding)
         self.assertTrue(note)
         self.assertIn('unverified', note)
+        self.assertEqual(
+            reason, 'media_not_reread',
+            'The machine-readable reason must say the remote half did not '
+            'run, so nothing downstream can treat it as acknowledgeable.',
+        )
 
     def test_nothing_in_the_media_path_can_create_or_replace_media(self):
         """Requirement 6, on the source of the whole remote arm."""
@@ -1238,6 +1244,841 @@ class TestExportReconnectConvergence(TestExportReconnectReconcile):
             settle.index('_serialize_reconcile_settlement'),
             settle.index('_export_reconcile_scope'),
             'Serialization has to come BEFORE the sibling read it gates.',
+        )
+
+
+@tagged('post_install', '-at_install')
+class TestExportReconnectChecksumAcknowledgement(TestExportReconnectReconcile):
+    """TD-015 operator resolution: the one review that can be resolved.
+
+    The defect this closes
+    ----------------------
+    The preceding cycle routed every media-bearing binding to `review` --
+    correctly, because Shopify exposes no digest of a stored File's bytes and
+    PD-PX-7 requires media checksums to be verified. It then recorded, in the
+    code and in the PR, that "an operator must clear it before exports
+    resume".
+
+    No route existed that could clear it. The only public action re-RAN the
+    pass, which re-read the same product, re-derived the same unprovable
+    checksum and landed in the same review. `export_reconcile_state` was
+    displayed on no screen anywhere in the product. So a reconnected store
+    that had ever exported product media was blocked from exporting
+    permanently, by construction, and the operator had nothing to click.
+
+    A fail-closed design with no door is not fail-closed; it is an outage
+    with a good explanation.
+
+    What these tests hold
+    ---------------------
+    Exactly one review reason is resolvable, and it is resolvable only by a
+    Connector Administrator, only for the company that owns the store, only
+    against the exact evidence the pass recorded, only with an explicit
+    consequence-stating confirmation, and only without touching Shopify at
+    all. Every other finding -- missing, archived, detached, failed, foreign,
+    truncated, in-flight, variant-divergent -- stays blocked, and the tests
+    below drive each one through the real handler rather than asserting it
+    from a constructed state.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.Wizard = self.env['shopify.connector.export.checksum.ack.wizard']
+        self.connector_user = self.env['res.users'].sudo().create({
+            'name': 'Reconcile Connector User',
+            'login': 'reconcile_user_%d' % self.store.id,
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_user'
+                ).id,
+            ])],
+        })
+        self.admin_user.sudo().write({
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+            'group_ids': [(4, self.env.ref('base.group_user').id)],
+        })
+        self.other_company = self.env['res.company'].sudo().create({
+            'name': 'TD-015 other company',
+        })
+        # An ADMINISTRATOR of another company. The distinction matters: this
+        # user holds every connector right and is refused purely on ownership,
+        # which is the only way to observe the company axis rather than the
+        # role axis.
+        self.other_admin = self.env['res.users'].sudo().create({
+            'name': 'Other Company Admin',
+            'login': 'reconcile_other_admin_%d' % self.store.id,
+            'company_id': self.other_company.id,
+            'company_ids': [(6, 0, [self.other_company.id])],
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
+
+    # ------------------------------------------------------------------
+    # Fixtures
+    # ------------------------------------------------------------------
+
+    def _reach_checksum_review(self, file_gid=FILE_GID):
+        """Drive the REAL pass to the one acknowledgeable outcome.
+
+        Constructed state is deliberately not used here. The whole security
+        claim is that this reason is reachable only after store identity,
+        product identity, archive state, the variant set, File identity, File
+        status and response completeness have all been established -- and the
+        only way to assert that is to make the handler establish them.
+        """
+        self._associated_media_row(file_gid=file_gid)
+        self._reconnect()
+        self._run_pass(media=_media_body(file_gids=(file_gid,)))
+        self.binding.invalidate_recordset()
+        self.store.invalidate_recordset()
+        return self.binding
+
+    def _ack(self, user=None, confirmed=True, binding=None):
+        binding = binding if binding is not None else self.binding
+        record = binding.with_user(user) if user is not None else binding
+        return record.action_shopify_export_acknowledge_checksum(
+            confirmed=confirmed,
+        )
+
+    # ------------------------------------------------------------------
+    # 1. The gap itself
+    # ------------------------------------------------------------------
+
+    def test_a_media_bearing_binding_reaches_the_acknowledgeable_reason(self):
+        """The pass records a machine-readable reason, not only prose."""
+        self._reach_checksum_review()
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        self.assertEqual(
+            self.binding.export_reconcile_reason, 'checksum_unverifiable',
+        )
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+        with self.assertRaises(UserError):
+            self.store._assert_export_reconciliation_complete()
+
+    def test_re_running_the_pass_alone_can_never_clear_the_block(self):
+        """The defect, stated as a test.
+
+        Re-running was the ONLY public route that existed. It re-reads the
+        same product and re-derives the same unprovable checksum, so it can
+        never be the resolution -- which is exactly why a resolution route
+        had to exist.
+        """
+        self._reach_checksum_review()
+        for _attempt in range(3):
+            self.store.with_user(self.admin_user).\
+                action_shopify_export_reconnect_reconciliation()
+            self._run_pass(media=_media_body(file_gids=(FILE_GID,)))
+            self.store.invalidate_recordset()
+            self.assertEqual(
+                self.store.export_reconcile_state, 'review_required',
+                'Re-running the pass cannot resolve an unprovable checksum.',
+            )
+
+    def test_eligibility_is_decided_from_the_reason_not_from_the_note(self):
+        """Requirement 4: a copy edit must never be an authorization change."""
+        self._reach_checksum_review()
+        self.binding.sudo().write({
+            'export_reconcile_note': 'Completely rewritten operator copy.',
+        })
+        self.binding.invalidate_recordset()
+        self._ack(user=self.admin_user)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+
+    # ------------------------------------------------------------------
+    # 2. The route works, end to end, for the right person
+    # ------------------------------------------------------------------
+
+    def test_an_administrator_can_acknowledge_and_the_store_converges(self):
+        """Requirement 11, through the production method."""
+        self._reach_checksum_review()
+        self.assertTrue(self._ack(user=self.admin_user))
+        self.binding.invalidate_recordset()
+        self.store.invalidate_recordset()
+        self.assertTrue(self.binding.export_reconcile_ack_at)
+        self.assertEqual(
+            self.binding.export_reconcile_ack_uid, self.admin_user,
+            'The acknowledgement records the actor, not the elevated user.',
+        )
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+        self.assertTrue(self.store._assert_export_reconciliation_complete())
+        self.assertIn(
+            'not cryptographically proven', self.store.export_reconcile_note,
+            'A `complete` reached by acknowledgement must not read as a '
+            'complete reached by proof.',
+        )
+
+    def test_the_binding_stays_in_review_after_acknowledgement(self):
+        """The verdict is evidence and is never rewritten into a `verified`.
+
+        Converging the STORE is the operator's decision; converting the
+        BINDING's verdict to `verified` would be the connector claiming a
+        proof it does not have, in the one field a later audit would read.
+        """
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.binding.invalidate_recordset()
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        self.assertEqual(
+            self.binding.export_reconcile_reason, 'checksum_unverifiable',
+        )
+
+    def test_acknowledgement_is_idempotent(self):
+        """Requirement 9."""
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.binding.invalidate_recordset()
+        first_at = self.binding.export_reconcile_ack_at
+        self.assertTrue(self._ack(user=self.admin_user))
+        self.assertTrue(self._ack(user=self.admin_user))
+        self.binding.invalidate_recordset()
+        self.assertEqual(self.binding.export_reconcile_ack_at, first_at)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+
+    def test_acknowledgement_requires_the_explicit_confirmation(self):
+        """Requirement 7: consent is an act, not a default."""
+        self._reach_checksum_review()
+        with self.assertRaises(UserError):
+            self._ack(user=self.admin_user, confirmed=False)
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+
+    def test_the_wizard_is_the_reachable_route_and_delegates(self):
+        """The UI door is the same door, with the consequence copy attached."""
+        self._reach_checksum_review()
+        action = self.binding.with_user(self.admin_user).\
+            action_shopify_export_open_checksum_ack_wizard()
+        self.assertEqual(
+            action['res_model'],
+            'shopify.connector.export.checksum.ack.wizard',
+        )
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        with self.assertRaises(UserError):
+            wizard.action_confirm()
+        wizard.confirmed = True
+        self.assertIn('no digest', wizard.unprovable_summary)
+        self.assertIn(
+            'does not verify anything', wizard.consequence_summary.lower(),
+        )
+        wizard.action_confirm()
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+
+    def test_the_wizard_copy_states_all_four_required_things(self):
+        """Requirement 14, asserted on the copy an operator actually reads."""
+        self._reach_checksum_review()
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        self.assertIn('still attached', wizard.verified_summary)
+        self.assertIn('not archived', wizard.verified_summary)
+        self.assertIn('FAILED', wizard.verified_summary)
+        self.assertIn('no digest', wizard.unprovable_summary)
+        self.assertIn('CANNOT prove', wizard.unprovable_summary)
+        self.assertIn('accept', wizard.consequence_summary)
+        self.assertIn('no export runs', wizard.consequence_summary)
+
+    # ------------------------------------------------------------------
+    # 3. Authority and company (SEC-3 negative axes)
+    # ------------------------------------------------------------------
+
+    def test_a_connector_user_is_refused(self):
+        """Requirement 6. A Connector User implies Reviewer, so gating on
+        Reviewer would have admitted exactly the role this refuses."""
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self._ack(user=self.connector_user)
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+
+    def test_a_connector_user_cannot_open_the_wizard_either(self):
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self.binding.with_user(self.connector_user).\
+                action_shopify_export_open_checksum_ack_wizard()
+
+    def test_a_wrong_company_administrator_is_refused(self):
+        """The company axis, observed with the role axis held constant."""
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self._ack(user=self.other_admin)
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+
+    def test_a_foreign_record_id_supplied_directly_is_refused(self):
+        """The RPC shape: an id typed into a call, not a record navigated to.
+
+        `browse(id)` bypasses no ACL and proves nothing either -- which is
+        why the production method calls `check_access` rather than trusting
+        that the caller reached the record legitimately.
+        """
+        self._reach_checksum_review()
+        foreign = self.TemplateBinding.with_user(self.other_admin).browse(
+            self.binding.id,
+        )
+        with self.assertRaises(AccessError):
+            foreign.action_shopify_export_acknowledge_checksum(confirmed=True)
+        with self.assertRaises(AccessError):
+            foreign.action_shopify_export_open_checksum_ack_wizard()
+
+    def test_the_wizard_model_is_not_readable_by_a_connector_user(self):
+        """The confirmation artifact is Administrator-only at the ACL too."""
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self.Wizard.with_user(self.connector_user).create({
+                'binding_id': self.binding.id,
+            })
+
+    # ------------------------------------------------------------------
+    # 4. Everything else stays blocked
+    # ------------------------------------------------------------------
+
+    def _assert_not_acknowledgeable(self, expected_reason):
+        self.binding.invalidate_recordset()
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        self.assertEqual(
+            self.binding.export_reconcile_reason, expected_reason,
+        )
+        with self.assertRaises(UserError):
+            self._ack(user=self.admin_user)
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+        self.store.invalidate_recordset()
+        self.assertEqual(
+            self.store.export_reconcile_state, 'review_required',
+            'A non-eligible review must keep the export block.',
+        )
+
+    def test_a_missing_product_cannot_be_acknowledged(self):
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(body=_product_body(exists=False))
+        self._assert_not_acknowledgeable('product_missing')
+
+    def test_an_archived_product_cannot_be_acknowledged(self):
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(body=_product_body(status='ARCHIVED'))
+        self._assert_not_acknowledgeable('product_archived')
+
+    def test_a_variant_divergence_cannot_be_acknowledged(self):
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(body=_product_body(variant_gids=()))
+        self._assert_not_acknowledgeable('variant_divergence')
+
+    def test_a_failed_media_file_cannot_be_acknowledged(self):
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=(FILE_GID,), status='FAILED'),
+        )
+        self._assert_not_acknowledgeable('media_failed_status')
+
+    def test_a_detached_media_file_cannot_be_acknowledged(self):
+        """The File still exists under this connector's filename, but is no
+        longer on the product."""
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=()),
+            files=_files_body(file_gids=(FILE_GID,)),
+        )
+        self._assert_not_acknowledgeable('media_absent')
+
+    def test_a_vanished_media_file_cannot_be_acknowledged(self):
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=()), files=_files_body(file_gids=()),
+        )
+        self._assert_not_acknowledgeable('media_absent')
+
+    def test_an_ambiguous_media_identity_cannot_be_acknowledged(self):
+        """A File carrying this connector's filename under another id."""
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=()),
+            files=_files_body(file_gids=('gid://shopify/MediaImage/OTHER',)),
+        )
+        self._assert_not_acknowledgeable('media_absent')
+
+    def test_a_truncated_media_read_cannot_be_acknowledged(self):
+        """Inconclusive evidence is never acknowledgeable: the connector did
+        not see the whole list, so nothing about the missing part is known."""
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=('gid://shopify/MediaImage/OTHER',),
+                              has_next=True),
+        )
+        self._assert_not_acknowledgeable('media_read_truncated')
+
+    def test_an_in_flight_media_upload_cannot_be_acknowledged(self):
+        row = self._associated_media_row()
+        row.sudo().write({'remote_status': 'staged'})
+        self._reconnect()
+        self._run_pass()
+        self._assert_not_acknowledgeable('media_in_flight')
+
+    def test_a_media_row_with_no_file_identity_cannot_be_acknowledged(self):
+        row = self._associated_media_row()
+        row.sudo().write({'shopify_gid': 'pending:abc'})
+        self._reconnect()
+        self._run_pass()
+        self._assert_not_acknowledgeable('media_association_unrecorded')
+
+    def test_a_verified_binding_has_nothing_to_acknowledge(self):
+        self._reconnect()
+        self._run_pass()
+        self.binding.invalidate_recordset()
+        self.assertEqual(self.binding.export_reconcile_state, 'verified')
+        with self.assertRaises(UserError):
+            self._ack(user=self.admin_user)
+
+    def test_a_foreign_store_identity_leaves_nothing_to_acknowledge(self):
+        """A read that landed on another store records no verdict at all, so
+        there is no review an acknowledgement could attach to."""
+        self._associated_media_row()
+        self._reconnect()
+        job = self._reconcile_jobs().filtered(
+            lambda j: j.state not in TERMINAL_JOB_STATES
+        )[0]
+        job.sudo().write({'state': 'running'})
+        responder = self._responder(
+            body=_product_body(shop_domain='someone-else.myshopify.com'),
+        )
+        with self.send_patch(responder):
+            with self.assertRaises(JobHandlerError):
+                self.Reconcile._handle_product_export_reconnect_reconcile(job)
+        self.binding.invalidate_recordset()
+        self.assertEqual(self.binding.export_reconcile_state, 'pending')
+        with self.assertRaises(UserError):
+            self._ack(user=self.admin_user)
+
+    # ------------------------------------------------------------------
+    # 5. The acknowledgement is bound to its evidence, and expires with it
+    # ------------------------------------------------------------------
+
+    def test_a_later_reconnect_invalidates_the_acknowledgement(self):
+        """Requirement 8, first clause -- and the most important one."""
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+        self._reconnect()
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+        self.store.invalidate_recordset()
+        self.assertIn(
+            self.store.export_reconcile_state, RECONCILE_BLOCKING_STATES,
+        )
+
+    def test_a_changed_local_media_claim_invalidates_the_acknowledgement(self):
+        """Requirement 8: a re-uploaded image is a different claim.
+
+        The digest is over the identities AND the local checksum, so this
+        does not need a mutation hook anywhere -- the acknowledgement simply
+        stops matching what it accepted.
+        """
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+        row = self.MediaBinding.sudo().search([
+            ('product_template_binding_id', '=', self.binding.id),
+        ], limit=1)
+        row.sudo().write({'odoo_image_checksum': 'a' * 64})
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+        self.store.invalidate_recordset()
+        # Caught by hand rather than with `assertRaises`. Odoo's
+        # `TransactionCase.assertRaises` runs its block inside a savepoint and
+        # ROLLS BACK when the exception fires (`odoo/tests/common.py`), which
+        # would undo the very state change this test exists to observe.
+        refused = False
+        try:
+            self.store._assert_export_reconciliation_complete()
+        except UserError:
+            refused = True
+        self.assertTrue(refused, 'The export must be refused.')
+        self.store.invalidate_recordset()
+        self.assertEqual(
+            self.store.export_reconcile_state, 'review_required',
+            'An acknowledgement that stopped matching its evidence must '
+            're-apply the export block, not keep releasing it.',
+        )
+
+    def test_a_changed_file_identity_invalidates_the_acknowledgement(self):
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        row = self.MediaBinding.sudo().search([
+            ('product_template_binding_id', '=', self.binding.id),
+        ], limit=1)
+        row.sudo().write({'shopify_gid': 'gid://shopify/MediaImage/999'})
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+
+    def test_a_changed_product_identity_invalidates_the_acknowledgement(self):
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.binding.sudo().write({'shopify_gid': 'gid://shopify/Product/999'})
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+
+    def test_a_stale_generation_acknowledgement_is_refused(self):
+        """Requirement 8: the evidence describes a connection that is gone."""
+        self._reach_checksum_review()
+        self.store.sudo().write({
+            'export_reconcile_generation':
+                self.store.export_reconcile_generation + 1,
+        })
+        self.store.invalidate_recordset()
+        self.binding.invalidate_recordset()
+        with self.assertRaises(UserError):
+            self._ack(user=self.admin_user)
+
+    def test_a_new_verdict_drops_any_previous_acknowledgement(self):
+        """A pass that ran again is evidence nobody has accepted yet."""
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        self.binding.invalidate_recordset()
+        self.assertTrue(self.binding.export_reconcile_ack_at)
+        self.Reconcile._record_binding_verdict(
+            self.binding, 'review', 'A fresh, different finding.',
+            reason='media_absent',
+            generation=self.store.export_reconcile_generation,
+        )
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.export_reconcile_ack_at)
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+
+    # ------------------------------------------------------------------
+    # 6. Per-binding isolation and store convergence
+    # ------------------------------------------------------------------
+
+    def _second_media_binding(self):
+        template = self.env['product.template'].create({
+            'name': 'Second media widget',
+            'shopify_export_enabled': True,
+        })
+        binding = self.TemplateBinding.sudo().create({
+            'store_id': self.store.id,
+            'product_template_id': template.id,
+            'shopify_gid': 'gid://shopify/Product/SECOND',
+        })
+        checksum = image_checksum(base64.b64decode(PNG_1X1) + b'second')
+        self.MediaBinding.sudo().create({
+            'store_id': self.store.id,
+            'product_template_binding_id': binding.id,
+            'media_role': 'primary',
+            'odoo_image_checksum': checksum,
+            'connector_filename': self.Media._connector_filename(
+                template.id, checksum,
+            ),
+            'shopify_gid': 'gid://shopify/MediaImage/SECOND',
+            'remote_status': 'associated',
+        })
+        return binding
+
+    def test_acknowledging_one_binding_does_not_clear_another(self):
+        """Requirements 12 and 13, together."""
+        second = self._second_media_binding()
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(media=_media_body(
+            file_gids=(FILE_GID, 'gid://shopify/MediaImage/SECOND'),
+        ))
+        self.binding.invalidate_recordset()
+        second.invalidate_recordset()
+        self.assertEqual(
+            self.binding.export_reconcile_reason, 'checksum_unverifiable')
+        self.assertEqual(
+            second.export_reconcile_reason, 'checksum_unverifiable')
+
+        self._ack(user=self.admin_user)
+        second.invalidate_recordset()
+        self.store.invalidate_recordset()
+        self.assertFalse(
+            second.export_reconcile_ack_at,
+            'One binding\'s acknowledgement may never touch another\'s.',
+        )
+        self.assertEqual(
+            self.store.export_reconcile_state, 'review_required',
+            'An outstanding review keeps the block.',
+        )
+
+        self._ack(user=self.admin_user, binding=second)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+
+    def test_an_unresolved_non_eligible_binding_keeps_the_block(self):
+        """A store converges only when EVERY binding is verified or validly
+        acknowledged -- an acknowledgeable one next to a missing product
+        stays blocked."""
+        second = self._second_media_binding()
+        self._associated_media_row()
+        self._reconnect()
+        jobs = self._reconcile_jobs().filtered(
+            lambda j: j.state not in TERMINAL_JOB_STATES
+        )
+        for job in jobs:
+            gone = job.res_id == second.id
+            responder = self._responder(
+                body=_product_body(exists=False) if gone else _product_body(),
+                media=_media_body(file_gids=(FILE_GID,)),
+            )
+            with self.send_patch(responder):
+                job.sudo().write({'state': 'running'})
+                self.Reconcile._handle_product_export_reconnect_reconcile(job)
+        self.binding.invalidate_recordset()
+        second.invalidate_recordset()
+        self.assertEqual(second.export_reconcile_reason, 'product_missing')
+        self._ack(user=self.admin_user)
+        self.store.invalidate_recordset()
+        self.assertEqual(
+            self.store.export_reconcile_state, 'review_required',
+            'The one binding nobody can acknowledge still blocks the store.',
+        )
+        with self.assertRaises(UserError):
+            self.store._assert_export_reconciliation_complete()
+
+    def test_the_store_review_list_surfaces_exactly_the_open_reviews(self):
+        """The list the store form renders is the work, and it is bounded."""
+        self._reach_checksum_review()
+        self.store.invalidate_recordset()
+        self.assertEqual(
+            self.store.export_reconcile_review_binding_ids, self.binding,
+        )
+        source = inspect.getsource(
+            self.env['shopify.connector.store'].
+            _compute_export_reconcile_review_binding_ids.__func__
+        )
+        self.assertIn(
+            'limit=EXPORT_RECONCILE_REVIEW_LIMIT', source,
+            'The review list must be a bounded read.',
+        )
+
+    def test_the_review_list_is_company_isolated(self):
+        """A foreign administrator reads an EMPTY list, never a filtered one.
+
+        The compute runs as the calling user, so the SEC-3 binding rule
+        decides what it can contain. That is what makes the count safe too: a
+        list that is empty rather than shortened discloses nothing about how
+        many reviews another company has outstanding.
+        """
+        self._reach_checksum_review()
+        foreign_store = self.store.with_user(self.other_admin).with_context(
+            allowed_company_ids=self.other_company.ids,
+        )
+        self.assertFalse(
+            foreign_store.export_reconcile_review_binding_ids,
+            'Another company\'s outstanding reviews must not be reachable '
+            'through the store form projection.',
+        )
+        # The owning administrator, by contrast, sees it -- without which the
+        # assertion above could pass because the list is broken for everyone.
+        self.assertEqual(
+            self.store.with_user(self.admin_user)
+            .export_reconcile_review_binding_ids,
+            self.binding,
+        )
+        # And the binding row itself is unreachable, not merely unlisted.
+        foreign_binding = self.TemplateBinding.with_user(
+            self.other_admin,
+        ).with_context(
+            allowed_company_ids=self.other_company.ids,
+        ).browse(self.binding.id)
+        with self.assertRaises(AccessError):
+            foreign_binding.export_reconcile_reason
+
+    def test_the_review_list_is_not_cached_across_users(self):
+        """A defect this cycle found and fixed, kept as a regression.
+
+        Odoo caches a non-stored computed field ONCE PER RECORD for the whole
+        transaction unless the field declares the context it depends on
+        (`Environment.cache_key`). This list is produced by a search the
+        caller's record rules filter, so without `depends_context` the first
+        reader's result is handed to the second -- and the dangerous
+        direction is owner-first: the foreign administrator would then read
+        the OWNER's outstanding reviews out of the cache.
+
+        Asserted in BOTH orders, because a single order can pass by accident.
+        """
+        self._reach_checksum_review()
+        owner_view = self.store.with_user(self.admin_user)
+        foreign_view = self.store.with_user(self.other_admin).with_context(
+            allowed_company_ids=self.other_company.ids,
+        )
+        # Owner first, then foreign.
+        self.assertEqual(
+            owner_view.export_reconcile_review_binding_ids, self.binding)
+        self.assertFalse(
+            foreign_view.export_reconcile_review_binding_ids,
+            'The foreign administrator read the owner\'s list out of a '
+            'shared field cache.',
+        )
+        # Foreign first, then owner, on a fresh cache.
+        self.env.invalidate_all()
+        self.assertFalse(
+            foreign_view.export_reconcile_review_binding_ids)
+        self.assertEqual(
+            owner_view.export_reconcile_review_binding_ids, self.binding,
+            'The owner read the foreign administrator\'s empty list out of a '
+            'shared field cache.',
+        )
+
+    # ------------------------------------------------------------------
+    # 7. Nothing reaches Shopify, and nothing writes a protected field
+    # ------------------------------------------------------------------
+
+    def test_no_transport_occurs_during_an_acknowledgement(self):
+        """Requirement 10, observed rather than asserted from the source.
+
+        The transport seam is patched with a responder that FAILS the test if
+        it is reached at all, so a request of any kind -- read or mutation --
+        would be caught, not merely a mutation.
+        """
+        self._reach_checksum_review()
+
+        def refuse(_self, _store, request, token=None, mutation_context=None):
+            raise AssertionError(
+                'The acknowledgement route contacted Shopify: %r'
+                % ((request or {}).get('query') or '')[:120]
+            )
+
+        with self.send_patch(refuse):
+            self._ack(user=self.admin_user)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
+
+    def test_the_acknowledgement_route_contains_no_transport_or_mutation(self):
+        """Requirement 10, on the source of the route itself."""
+        source = ''.join(
+            inspect.getsource(func) for func in (
+                self.TemplateBinding.
+                action_shopify_export_acknowledge_checksum.__func__,
+                self.TemplateBinding.
+                _assert_export_reconcile_ack_eligible.__func__,
+                self.TemplateBinding.
+                _assert_export_reconcile_ack_authority.__func__,
+            )
+        )
+        for forbidden in (
+            '_send', '_read_remote_product', '_read_remote_product_media',
+            '_search_remote_files_by_filename', '_enqueue', '_admit',
+            'productUpdate', 'fileDelete', 'productCreateMedia',
+        ):
+            self.assertNotIn(
+                forbidden, source,
+                'The acknowledgement must not be able to reach Shopify or '
+                'admit a job; it names %s.' % forbidden,
+            )
+
+    def test_the_acknowledgement_fields_are_protected_from_direct_writes(self):
+        """Anti-spoof: the fields the validity check reads are exactly the
+        fields a caller must not be able to set."""
+        self._reach_checksum_review()
+        protected = self.TemplateBinding._protected_binding_fields()
+        for name in (
+            'export_reconcile_reason',
+            'export_reconcile_evidence_generation',
+            'export_reconcile_evidence_product_gid',
+            'export_reconcile_evidence_file_gids',
+            'export_reconcile_evidence_claim_digest',
+            'export_reconcile_ack_at',
+            'export_reconcile_ack_uid',
+            'export_reconcile_ack_reason',
+            'export_reconcile_ack_generation',
+            'export_reconcile_ack_product_gid',
+            'export_reconcile_ack_file_gids',
+            'export_reconcile_ack_claim_digest',
+            'export_reconcile_ack_verdict_at',
+        ):
+            self.assertIn(name, protected)
+        with self.assertRaises(AccessError):
+            self.binding.with_user(self.admin_user).write({
+                'export_reconcile_ack_at': fields.Datetime.now(),
+            })
+        with self.assertRaises(AccessError):
+            self.binding.with_user(self.admin_user).write({
+                'export_reconcile_reason': 'checksum_unverifiable',
+            })
+
+    def test_a_forged_acknowledgement_still_fails_validation(self):
+        """Defence in depth: even a superuser-forged ack that does not match
+        the evidence is not honoured.
+
+        `sudo()` bypasses the protected-field guard by design -- connector
+        system code needs it. So the validity check re-derives every bound
+        value instead of trusting the stored flag, and this is that claim.
+        """
+        self._reach_checksum_review()
+        self.binding.sudo().write({
+            'export_reconcile_ack_at': fields.Datetime.now(),
+            'export_reconcile_ack_uid': self.admin_user.id,
+            'export_reconcile_ack_reason': 'checksum_unverifiable',
+            'export_reconcile_ack_generation':
+                self.store.export_reconcile_generation,
+            'export_reconcile_ack_product_gid': self.binding.shopify_gid,
+            'export_reconcile_ack_file_gids': 'gid://shopify/MediaImage/FORGED',
+            'export_reconcile_ack_claim_digest': 'not-a-real-digest',
+            'export_reconcile_ack_verdict_at': self.binding.export_reconcile_at,
+        })
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding._export_reconcile_ack_is_valid())
+        self.store.sudo().write({'export_reconcile_state': 'review_required'})
+        self.store._settle_export_reconciliation(
+            generation=self.store.export_reconcile_generation,
+        )
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+
+    # ------------------------------------------------------------------
+    # 8. Audit
+    # ------------------------------------------------------------------
+
+    def test_the_acknowledgement_is_audited_with_the_actor(self):
+        """Requirement 7: who, when, and the governed consequence."""
+        before = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+        self._reach_checksum_review()
+        self._ack(user=self.admin_user)
+        audits = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ], order='id desc')
+        self.assertEqual(len(audits) - before, 1)
+        logs = self.env['shopify.connector.job.log'].sudo().search([
+            ('job_id', '=', audits[0].id),
+        ])
+        message = ' '.join(logs.mapped('message') or [])
+        self.assertIn('acknowledged', message)
+        self.assertIn('actor_uid=%d' % self.admin_user.id, message)
+        self.assertIn('NOT', message)
+        self.assertNotIn(DUMMY_TOKEN, message)
+        self.assertNotIn(
+            DUMMY_TOKEN,
+            ' '.join(str(v) for v in logs.mapped('payload_snapshot') if v),
         )
 
 

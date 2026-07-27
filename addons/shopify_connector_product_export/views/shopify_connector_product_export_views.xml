@@ -436,13 +436,88 @@
                         Reconnecting a store expires every open export preview,
                         so a confirmation taken before the reconnect can never
                         authorise a write afterwards. The next preview is a
-                        fresh read by construction.
+                        fresh read by construction. The reconciliation below
+                        then re-reads every previously exported product before
+                        exports resume.
                     </div>
+                    <!--
+                        The reconciliation verdict was previously stored and
+                        never shown. An operator whose exports were blocked had
+                        no surface anywhere in the product that named the
+                        block, let alone one that could resolve it. These three
+                        fields are that surface; the list beneath them is the
+                        work.
+                    -->
+                    <field name="export_reconcile_state"
+                           widget="badge"
+                           decoration-success="export_reconcile_state == 'complete'"
+                           decoration-danger="export_reconcile_state == 'review_required'"
+                           decoration-warning="export_reconcile_state in ('required', 'in_progress')"/>
+                    <field name="export_reconcile_at"
+                           invisible="export_reconcile_state == 'not_required'"/>
+                    <field name="export_reconcile_note"
+                           invisible="not export_reconcile_note"/>
                     <button name="action_shopify_export_reconnect_reconciliation"
                             type="object" class="btn-secondary"
-                            string="Expire Open Export Previews"
+                            string="Re-run Export Reconciliation"
                             groups="shopify_connector_core.group_shopify_connector_user"
-                            confirm="Every open export preview for this store will be expired and must be reviewed again. Continue?"/>
+                            confirm="Every open export preview for this store will be expired and must be reviewed again, and every previously exported product will be re-read from Shopify. Continue?"/>
+                </group>
+                <!--
+                    TD-015 — the review surface, and the ONE resolvable review.
+
+                    Rendered on the store form because the store is where
+                    PD-PX-7's reconciliation already lives. No second review
+                    centre, no extra menu, no parallel state machine: the same
+                    verdict, shown where the block is.
+
+                    The button is offered to Administrators only, and the
+                    server refuses anyone else regardless of what this
+                    attribute rendered — `groups=` hides a control, it does not
+                    authorise one.
+                -->
+                <group string="Bindings awaiting review"
+                       name="shopify_product_export_reconcile_review"
+                       invisible="not export_reconcile_review_binding_ids">
+                    <div class="text-muted" colspan="2">
+                        Each row is a previously exported product whose claims
+                        this connector could not fully re-verify after the
+                        reconnect. Only one finding can be acknowledged — an
+                        image association that was re-read on the expected
+                        Shopify product, with the expected File identity and a
+                        non-FAILED status, where the only thing left unproven
+                        is the byte checksum Shopify does not expose. Anything
+                        missing, archived, detached, failed, foreign, truncated
+                        or inconclusive must be resolved in Shopify.
+                    </div>
+                    <field name="export_reconcile_review_binding_ids"
+                           nolabel="1" colspan="2">
+                        <!--
+                            Every editing affordance is off at the LIST level
+                            rather than by marking the field readonly. A
+                            readonly x2many is not a reliable host for row
+                            buttons, and the acknowledgement control has to be
+                            clickable: an unreachable control is the exact
+                            defect this section exists to correct.
+                        -->
+                        <list create="false" delete="false" edit="false">
+                            <field name="shopify_gid"/>
+                            <field name="export_reconcile_reason"/>
+                            <field name="export_reconcile_note"/>
+                            <field name="export_reconcile_at"/>
+                            <field name="export_reconcile_ack_at"
+                                   string="Acknowledged"/>
+                            <field name="export_reconcile_ack_uid"
+                                   string="Acknowledged by"/>
+                            <button name="action_shopify_export_open_checksum_ack_wizard"
+                                    type="object"
+                                    icon="fa-check-square-o"
+                                    title="Acknowledge the unprovable media checksum"
+                                    string="Acknowledge"
+                                    groups="shopify_connector_core.group_shopify_connector_admin"
+                                    invisible="export_reconcile_reason != 'checksum_unverifiable' or export_reconcile_ack_at"/>
+                        </list>
+                    </field>
                 </group>
             </xpath>
         </field>

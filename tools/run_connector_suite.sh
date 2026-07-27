@@ -126,7 +126,8 @@ TestUiU2SaleActionTours.test_order_approval_denied_for_a_role_the_server_refuses
 TestU3ExportTours.test_export_navigation_tour \
 TestU3ExportTours.test_export_review_tour_discloses_before_it_offers \
 TestU3ExportTours.test_export_review_surface_is_keyboard_reachable \
-TestU3ExportTours.test_media_resume_tour_reaches_the_resume_from_the_browser"
+TestU3ExportTours.test_media_resume_tour_reaches_the_resume_from_the_browser \
+TestU3ExportTours.test_td015_checksum_acknowledgement_tour"
 
 # The HOOT suites, by the exact name `test_u3_hoot_suite.py` re-emits after it
 # has verified each one. Keep in step with EXPECTED_SUITES in that file.

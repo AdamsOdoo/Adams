@@ -49,8 +49,46 @@ Anything missing, archived or materially divergent goes to explicit
 review. Nothing is re-created, re-published or repaired: a reconciliation
 that silently fixed what it found would be indistinguishable from the
 export it is supposed to be gating.
+
+The one resolvable review, and why it needed a route
+----------------------------------------------------
+Failing closed is only half a design. The previous cycle routed every
+media-bearing binding to `review` and said "an operator must clear it
+before exports resume" — while no production route existed that could
+clear it. The only public action re-RAN the pass, which re-derived the
+same unprovable checksum and landed in the same review. A reconnected
+store that had ever exported product media was therefore blocked from
+exporting *permanently*, by construction, with no operator affordance
+anywhere in the product. A block nobody can lift is not a fail-closed
+design; it is an outage.
+
+So exactly one review reason is resolvable:
+`export_reconcile_reason == 'checksum_unverifiable'`, the outcome reached
+only after the remote read has established store identity, product
+identity, File identity, association with the expected product, a
+non-FAILED File status, no variant divergence and a complete,
+non-truncated response — where the single remaining unknown is the byte
+digest Shopify does not expose. Every other reason (missing, archived,
+detached, failed, foreign, mismatched, ambiguous, truncated,
+inconclusive, in-flight, variant-divergent) stays blocked and is not
+acknowledgeable at all.
+
+Eligibility is a stored, machine-readable Selection written by the pass
+itself — never a substring of the operator-facing note. Parsing a note
+would make a copy edit a security change.
+
+The acknowledgement is bound to the exact evidence it accepts: the
+connection generation, the binding, the remote product GID, the remote
+File GID set, and a digest of the local media claim. Any change to any of
+those — a later reconnect, a re-pointed product, a re-uploaded File, a
+new local checksum or filename, or simply a fresh pass reaching a
+different verdict — invalidates it automatically, because the ack is
+cleared on every new verdict AND re-validated field-by-field before it is
+allowed to count. See `_export_reconcile_ack_is_valid`.
 """
 
+import hashlib
+import json
 import logging
 
 from odoo import api, fields, models
@@ -88,6 +126,49 @@ BINDING_RECONCILE_SELECTION = [
     ('review', 'Review Required'),
 ]
 
+#: TD-015 operator resolution. The machine-readable outcome of one binding's
+#: pass. Eligibility for the narrow acknowledgement is decided from THIS field
+#: and never from `export_reconcile_note`, which is operator-facing prose a
+#: copy edit may legitimately change.
+#:
+#: Exactly one value is acknowledgeable — `checksum_unverifiable`. Every other
+#: review reason below describes evidence that is missing, contradictory,
+#: foreign, incomplete or inconclusive, and no operator judgement can turn any
+#: of them into proof.
+BINDING_RECONCILE_REASON_SELECTION = [
+    # Terminal-clean outcomes.
+    ('no_bound_product', 'No Shopify Product Is Bound'),
+    ('verified_no_media_claim', 'Verified — No Associated Media Claimed'),
+    # Blocked review reasons. None of these is acknowledgeable.
+    ('product_missing', 'Shopify Product Missing'),
+    ('product_archived', 'Shopify Product Archived'),
+    ('variant_divergence', 'Bound Variants Diverged'),
+    ('media_association_unrecorded', 'Media Association Has No File Identity'),
+    ('media_in_flight', 'Media Upload Was In Flight'),
+    ('media_local_checksum_missing', 'Local Media Checksum Missing'),
+    ('media_not_reread', 'Remote Media State Was Not Re-read'),
+    ('media_product_reread_failed', 'Product Could Not Be Re-read For Media'),
+    ('media_failed_status', 'Associated Media File Is FAILED'),
+    ('media_read_truncated', 'Remote Media List Was Truncated'),
+    ('media_absent', 'Associated Media File Is Detached, Gone Or Ambiguous'),
+    # The ONE acknowledgeable outcome.
+    (
+        'checksum_unverifiable',
+        'Association Re-verified — Byte Checksum Not Provable',
+    ),
+]
+
+#: The single review reason a Connector Administrator may acknowledge. Kept as
+#: a named constant so the eligibility test and the production guard cannot
+#: drift apart, and so a reviewer can grep one symbol to find every site that
+#: decides what is resolvable.
+ACKNOWLEDGEABLE_RECONCILE_REASON = 'checksum_unverifiable'
+
+#: Bound read for the store-form review list. The reconciliation surface shows
+#: the work an operator has to do, not an unbounded recordset: a store with
+#: thousands of diverged bindings must not turn its own form into a table scan.
+EXPORT_RECONCILE_REVIEW_LIMIT = 200
+
 
 class ShopifyConnectorStoreExportReconnect(models.Model):
     _inherit = 'shopify.connector.store'
@@ -117,6 +198,56 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
     # Its VALUE means nothing; the UPDATE does. See
     # `_serialize_reconcile_settlement` for why a counter and not a lock.
     export_reconcile_settle_seq = fields.Integer(readonly=True, default=0)
+
+    # TD-015 operator resolution. The store form is the reconciliation surface
+    # PD-PX-7 already owns, so the review work is surfaced THERE rather than in
+    # a second review centre with its own menu and its own state machine.
+    #
+    # Computed, non-stored and deliberately a Many2many: nothing is persisted,
+    # no column or relation table is created, and no inverse is added to a
+    # model this module does not own. It runs as the CALLING user, so the
+    # SEC-3 record rules on the binding decide what it can contain -- an
+    # administrator of another company reads an empty list rather than a
+    # filtered one they could infer a count from.
+    #
+    # `depends_context` is LOAD-BEARING, not tidiness. Odoo caches a
+    # non-stored computed field once per record, shared by every environment
+    # in the transaction, UNLESS the field declares the context it depends on
+    # (`odoo/orm/environments.py::Environment.cache_key` at the pinned
+    # 30bde9ff). This value is produced by a search that the CALLER'S record
+    # rules filter, so without the declaration the first reader's result is
+    # served to the next -- in either direction. A foreign administrator
+    # reading first would blank the owner's list, and, far worse, an owner
+    # reading first would hand their list to the foreign administrator.
+    # Keying the cache on `(uid, su)`, the active company and the company
+    # switcher selection is what makes the per-user filtering real.
+    export_reconcile_review_binding_ids = fields.Many2many(
+        comodel_name='shopify.connector.product.template.binding',
+        string='Export Bindings Awaiting Review',
+        compute='_compute_export_reconcile_review_binding_ids',
+        depends_context=('uid', 'company', 'allowed_company_ids'),
+        help='Bindings whose reconnect reconciliation reached a review '
+             'verdict for this store. Only an association re-verified without '
+             'a provable byte checksum can be acknowledged; everything else '
+             'must be resolved in Shopify or in the binding itself.',
+    )
+
+    @api.depends('export_reconcile_state', 'export_reconcile_generation')
+    def _compute_export_reconcile_review_binding_ids(self):
+        """Bounded, current-user read of this store's outstanding reviews."""
+        Binding = self.env['shopify.connector.product.template.binding']
+        for store in self:
+            if not store.id:
+                store.export_reconcile_review_binding_ids = Binding
+                continue
+            store.export_reconcile_review_binding_ids = Binding.search(
+                [
+                    ('store_id', '=', store.id),
+                    ('export_reconcile_state', '=', 'review'),
+                ],
+                order='id asc',
+                limit=EXPORT_RECONCILE_REVIEW_LIMIT,
+            )
 
     # ------------------------------------------------------------------
     # Requirement 1: invoked by the real reconnect lifecycle
@@ -161,7 +292,16 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
         bindings.sudo().write({
             'export_reconcile_state': 'pending',
             'export_reconcile_note': False,
+            # TD-015: re-arming the pass discards the previous verdict, its
+            # evidence AND any acknowledgement of it. An acknowledgement is
+            # only ever a statement about one completed read.
+            'export_reconcile_reason': False,
+            'export_reconcile_evidence_generation': 0,
+            'export_reconcile_evidence_product_gid': False,
+            'export_reconcile_evidence_file_gids': False,
+            'export_reconcile_evidence_claim_digest': False,
         })
+        bindings._export_reconcile_clear_acknowledgement()
         self.sudo().write({
             'export_reconcile_state': 'required',
             'export_reconcile_generation': self.connection_generation,
@@ -285,6 +425,20 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
     def _assert_export_reconciliation_complete(self):
         """Requirement 3: block new exports until a valid terminal result."""
         self.ensure_one()
+        if self.export_reconcile_state == 'complete':
+            # TD-015 operator resolution. A `complete` reached partly through
+            # acknowledgement is only as good as those acknowledgements are
+            # NOW. Re-deriving them here is what makes requirement 8's
+            # invalidation rules load-bearing rather than decorative: without
+            # it, an acknowledgement taken against one local media claim would
+            # keep releasing exports after that claim had changed.
+            #
+            # Bounded and cheap: after a `complete` settlement the only
+            # bindings still in `review` are the acknowledged ones, and the
+            # search is on the indexed `(store_id, export_reconcile_state)`
+            # pair. A store that settled with no acknowledgement at all reads
+            # an empty set and pays one indexed count.
+            self._reassert_export_reconcile_acknowledgements()
         if self.export_reconcile_state not in RECONCILE_BLOCKING_STATES:
             return True
         if self.export_reconcile_state == 'review_required':
@@ -292,13 +446,52 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
                 'Exports are blocked for this store: the reconnect '
                 'reconciliation found bindings whose Shopify products are '
                 'missing, archived or materially different from what this '
-                'connector recorded. Review them before exporting again.'
+                'connector recorded. Open the store, review each binding '
+                'under "Bindings awaiting review", and resolve it before '
+                'exporting again.'
             )
         raise UserError(
             'Exports are blocked for this store until the reconnect '
             'reconciliation has re-read every previously exported product. '
             'It runs on the job queue; retry once it has finished.'
         )
+
+    def _reassert_export_reconcile_acknowledgements(self):
+        """Re-open the block if an acknowledgement stopped being true.
+
+        Fail-closed and self-explaining: the store is moved back to
+        `review_required` with a note naming the count, so an operator meets
+        the reason rather than an unexplained refusal on their next export.
+        Nothing is acknowledged, cleared or repaired here -- the binding keeps
+        its stale acknowledgement fields, and the next reconciliation pass
+        overwrites them with fresh evidence.
+        """
+        self.ensure_one()
+        outstanding = self.env[
+            'shopify.connector.product.template.binding'
+        ].sudo().search([
+            ('store_id', '=', self.id),
+            ('export_reconcile_state', '=', 'review'),
+        ], limit=EXPORT_RECONCILE_REVIEW_LIMIT)
+        invalidated = outstanding.filtered(
+            lambda b: not b._export_reconcile_ack_is_valid()
+        )
+        if not invalidated:
+            return True
+        _logger.info(
+            'Store %d: %d acknowledged export binding(s) no longer match the '
+            'evidence they accepted; the export block is re-applied.',
+            self.id, len(invalidated),
+        )
+        self.sudo().write({
+            'export_reconcile_state': 'review_required',
+            'export_reconcile_note': (
+                '%d acknowledged binding(s) no longer match the evidence that '
+                'was accepted; review them again.' % len(invalidated)
+            ),
+        })
+        self.invalidate_recordset()
+        return False
 
     def _serialize_reconcile_settlement(self):
         """Serialize concurrent settlement attempts on the store row.
@@ -382,8 +575,25 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
         )
         if pending:
             return False
+        # TD-015 operator resolution, requirements 11 and 13. A binding in
+        # `review` still blocks -- UNLESS its review is the one narrow
+        # checksum-unverifiable outcome AND a Connector Administrator has
+        # acknowledged exactly that evidence, and that acknowledgement is
+        # still valid for the generation, the identities and the local claim
+        # it was taken against. `_export_reconcile_ack_is_valid` re-derives all
+        # of that here rather than trusting a stored flag, so an
+        # acknowledgement can never outlive the evidence it accepted.
         in_review = bindings.filtered(
-            lambda b: b.export_reconcile_state == 'review'
+            lambda b: (
+                b.export_reconcile_state == 'review'
+                and not b._export_reconcile_ack_is_valid()
+            )
+        )
+        acknowledged = bindings.filtered(
+            lambda b: (
+                b.export_reconcile_state == 'review'
+                and b._export_reconcile_ack_is_valid()
+            )
         )
         self.sudo().write({
             'export_reconcile_state': (
@@ -395,12 +605,34 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
             # reached by now. Stamping the live value let an old pass's
             # verdicts be recorded as proof about a newer connection.
             'export_reconcile_generation': generation,
-            'export_reconcile_note': (
-                '%d binding(s) need review before exports resume.'
-                % len(in_review)
-            ) if in_review else False,
+            'export_reconcile_note': self._settled_reconcile_note(
+                in_review, acknowledged,
+            ),
         })
         return True
+
+    @api.model
+    def _settled_reconcile_note(self, in_review, acknowledged):
+        """The store-level note, stating acknowledgements as what they are.
+
+        A `complete` reached partly through acknowledgement is NOT the same
+        claim as a `complete` reached entirely through remote proof, and the
+        record must not read as though it were. The note names the count and
+        the exact limit of what was accepted, so nothing downstream can quote
+        `complete` as evidence that byte correspondence was verified.
+        """
+        if in_review:
+            return (
+                '%d binding(s) need review before exports resume.'
+                % len(in_review)
+            )
+        if acknowledged:
+            return (
+                '%d media binding(s) were acknowledged: the association was '
+                're-verified on Shopify, but byte correspondence was not '
+                'cryptographically proven.' % len(acknowledged)
+            )
+        return False
 
     # ------------------------------------------------------------------
     # Requirements 2 and 13: the operator-facing re-run
@@ -452,6 +684,38 @@ class ShopifyConnectorTemplateBindingExportReconnect(models.Model):
     )
     export_reconcile_note = fields.Char(readonly=True)
     export_reconcile_at = fields.Datetime(readonly=True)
+    # TD-015 operator resolution. The machine-readable half of the verdict.
+    # `export_reconcile_note` stays the operator-facing sentence; THIS is what
+    # every guard, filter and eligibility test reads.
+    export_reconcile_reason = fields.Selection(
+        selection=BINDING_RECONCILE_REASON_SELECTION,
+        readonly=True,
+        index=True,
+    )
+    # The exact evidence the current verdict rests on, captured by the pass at
+    # the moment it reached that verdict. An acknowledgement is bound to these
+    # values, so "what was accepted" is a stored fact rather than a
+    # reconstruction.
+    export_reconcile_evidence_generation = fields.Integer(readonly=True)
+    export_reconcile_evidence_product_gid = fields.Char(readonly=True)
+    export_reconcile_evidence_file_gids = fields.Char(readonly=True)
+    export_reconcile_evidence_claim_digest = fields.Char(readonly=True)
+    # The acknowledgement itself: who, when, and against which evidence.
+    export_reconcile_ack_at = fields.Datetime(readonly=True)
+    export_reconcile_ack_uid = fields.Many2one(
+        comodel_name='res.users',
+        readonly=True,
+        ondelete='set null',
+    )
+    export_reconcile_ack_reason = fields.Selection(
+        selection=BINDING_RECONCILE_REASON_SELECTION,
+        readonly=True,
+    )
+    export_reconcile_ack_generation = fields.Integer(readonly=True)
+    export_reconcile_ack_product_gid = fields.Char(readonly=True)
+    export_reconcile_ack_file_gids = fields.Char(readonly=True)
+    export_reconcile_ack_claim_digest = fields.Char(readonly=True)
+    export_reconcile_ack_verdict_at = fields.Datetime(readonly=True)
 
     @api.model
     def _additional_protected_binding_fields(self):
@@ -459,15 +723,387 @@ class ShopifyConnectorTemplateBindingExportReconnect(models.Model):
 
         The binding mixin refuses to create a record while any stored
         field is unclassified, which is what forces this to be a decision
-        rather than an oversight. All three are verdict state written only
-        by the reconciliation pass; an operator who could edit them could
-        clear their own export block.
+        rather than an oversight. Every field below is verdict, evidence or
+        acknowledgement state written only by the reconciliation pass and the
+        one sanctioned acknowledgement action; an operator who could edit any
+        of them could clear their own export block by writing to a column.
+
+        That is not a theoretical concern for the acknowledgement fields in
+        particular: they are precisely the values `_export_reconcile_ack_is_
+        valid` consults, so a generic write to them would BE the override this
+        design exists to prevent.
         """
         return super()._additional_protected_binding_fields() | frozenset((
             'export_reconcile_state',
             'export_reconcile_note',
             'export_reconcile_at',
+            'export_reconcile_reason',
+            'export_reconcile_evidence_generation',
+            'export_reconcile_evidence_product_gid',
+            'export_reconcile_evidence_file_gids',
+            'export_reconcile_evidence_claim_digest',
+            'export_reconcile_ack_at',
+            'export_reconcile_ack_uid',
+            'export_reconcile_ack_reason',
+            'export_reconcile_ack_generation',
+            'export_reconcile_ack_product_gid',
+            'export_reconcile_ack_file_gids',
+            'export_reconcile_ack_claim_digest',
+            'export_reconcile_ack_verdict_at',
         ))
+
+    # ------------------------------------------------------------------
+    # TD-015: the local media claim this acknowledgement would accept
+    # ------------------------------------------------------------------
+
+    def _export_reconcile_media_claim(self):
+        """The connector's own claim about this binding's exported media.
+
+        A stable, ordered projection of exactly the facts an acknowledgement
+        accepts on trust: which File the connector believes it created, the
+        checksum of the Odoo image it created it from, the filename that
+        identity is carried under, and the role it plays. Sorted so the digest
+        depends on the claim and not on row order.
+        """
+        self.ensure_one()
+        rows = self.env[
+            'shopify.connector.product.media.binding'
+        ].sudo().search([
+            ('product_template_binding_id', '=', self.id),
+            ('remote_status', '=', 'associated'),
+        ])
+        return sorted(
+            [
+                row.shopify_gid or '',
+                row.odoo_image_checksum or '',
+                row.connector_filename or '',
+                row.media_role or '',
+            ]
+            for row in rows
+        )
+
+    def _export_reconcile_claim_digest(self):
+        """A digest of the product identity plus the local media claim.
+
+        Requirement 8. This is what makes "the local claim changed" a
+        DETECTABLE event rather than an assumption. A re-uploaded image
+        changes its checksum, a renamed file changes its filename, a
+        re-pointed binding changes its product GID -- and any of them changes
+        this digest, so the acknowledgement taken against the old claim stops
+        being valid without anybody having to remember to revoke it.
+        """
+        self.ensure_one()
+        payload = json.dumps(
+            {
+                'product_gid': self.shopify_gid or '',
+                'media': self._export_reconcile_media_claim(),
+            },
+            sort_keys=True, separators=(',', ':'),
+        )
+        return hashlib.sha256(payload.encode('utf-8')).hexdigest()
+
+    def _export_reconcile_evidence_file_gid_list(self):
+        """The remote File GIDs the pass re-read, as a stable string."""
+        self.ensure_one()
+        return ','.join(
+            sorted(entry[0] for entry in self._export_reconcile_media_claim())
+        )
+
+    # ------------------------------------------------------------------
+    # TD-015: is the recorded acknowledgement still true?
+    # ------------------------------------------------------------------
+
+    def _export_reconcile_ack_is_valid(self):
+        """Requirement 8, evaluated fresh every time it is consulted.
+
+        Deliberately NOT a stored boolean. A stored "acknowledged" flag is a
+        claim about the past that keeps being true after the thing it
+        described has changed; every invalidation would then have to be
+        remembered at every mutation site, and the one nobody remembered would
+        be the security hole. Re-deriving it costs one bounded read and cannot
+        be forgotten.
+
+        Every clause below is an invalidation rule from requirement 8:
+
+        * no acknowledgement recorded, or the binding is no longer in review
+          -- nothing to honour;
+        * the verdict is no longer the one acknowledgeable reason, or the
+          acknowledgement was taken for a different reason -- a new pass
+          reached a different, blocking conclusion;
+        * a later reconnect (or a later pass) has moved the store's
+          reconciliation generation past the one acknowledged;
+        * the verdict timestamp has moved -- the pass ran again and produced
+          fresh evidence, so this acknowledgement describes a superseded read
+          (this is what catches a new divergence, a newly truncated or
+          inconclusive read, and a File that has since gone missing, detached,
+          archived or FAILED);
+        * the bound Shopify product identity has changed;
+        * the remote File identity set has changed;
+        * the local media claim has changed.
+        """
+        self.ensure_one()
+        if not self.export_reconcile_ack_at:
+            return False
+        if self.export_reconcile_state != 'review':
+            return False
+        if self.export_reconcile_reason != ACKNOWLEDGEABLE_RECONCILE_REASON:
+            return False
+        if self.export_reconcile_ack_reason != ACKNOWLEDGEABLE_RECONCILE_REASON:
+            return False
+        store = self.store_id
+        if not store:
+            return False
+        if self.export_reconcile_ack_generation != (
+            store.export_reconcile_generation
+        ):
+            return False
+        if self.export_reconcile_ack_generation != (
+            self.export_reconcile_evidence_generation
+        ):
+            return False
+        if self.export_reconcile_ack_verdict_at != self.export_reconcile_at:
+            return False
+        if self.export_reconcile_ack_product_gid != (
+            self.export_reconcile_evidence_product_gid
+        ):
+            return False
+        if self.export_reconcile_ack_product_gid != (self.shopify_gid or False):
+            return False
+        if self.export_reconcile_ack_file_gids != (
+            self.export_reconcile_evidence_file_gids
+        ):
+            return False
+        if self.export_reconcile_ack_file_gids != (
+            self._export_reconcile_evidence_file_gid_list()
+        ):
+            return False
+        if self.export_reconcile_ack_claim_digest != (
+            self.export_reconcile_evidence_claim_digest
+        ):
+            return False
+        if self.export_reconcile_ack_claim_digest != (
+            self._export_reconcile_claim_digest()
+        ):
+            return False
+        return True
+
+    def _export_reconcile_clear_acknowledgement(self):
+        """Drop any acknowledgement. Called whenever a new verdict lands."""
+        return self.sudo().write({
+            'export_reconcile_ack_at': False,
+            'export_reconcile_ack_uid': False,
+            'export_reconcile_ack_reason': False,
+            'export_reconcile_ack_generation': 0,
+            'export_reconcile_ack_product_gid': False,
+            'export_reconcile_ack_file_gids': False,
+            'export_reconcile_ack_claim_digest': False,
+            'export_reconcile_ack_verdict_at': False,
+        })
+
+    # ------------------------------------------------------------------
+    # TD-015: the public operator resolution route
+    # ------------------------------------------------------------------
+
+    def _assert_export_reconcile_ack_authority(self):
+        """Authority and company access, BOTH before anything elevates.
+
+        Requirement 6, and the ordering is the point: everything the
+        acknowledgement writes runs under `sudo()` on protected binding
+        fields, so a denial that happened afterwards would be a denial after
+        the fact. UI visibility is not consulted here at all -- a `groups=`
+        attribute hides a button and refuses nothing.
+
+        Connector Administrator ONLY. Not Reviewer: under the accepted SEC-2
+        two-role model `group_shopify_connector_user` IMPLIES
+        `group_shopify_connector_reviewer`, so gating on Reviewer would admit
+        every ordinary Connector User. The obsolete four-role planning groups
+        are not revived here; the two customer-facing roles are the boundary.
+        """
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may acknowledge an '
+                'unprovable media checksum.'
+            )
+        store = self.store_id
+        if not store:
+            raise UserError('This binding has no Shopify store.')
+        # Record access as the CALLING user. `self` may have been browsed by a
+        # raw id straight off an RPC call, which bypasses no ACL but also
+        # proves nothing on its own -- `check_access` is what turns "an id the
+        # caller typed" into "a record the caller may read".
+        self.check_access('read')
+        if store.company_id and store.company_id not in self.env.companies:
+            raise AccessError(
+                'This Shopify store belongs to another company.'
+            )
+        return store
+
+    def action_shopify_export_open_checksum_ack_wizard(self):
+        """Open the consequence-stating confirmation for this binding.
+
+        A window action is not an authorization boundary, so this performs the
+        same Administrator and company checks the acknowledgement itself does.
+        Offering the dialog to someone the server would refuse is how an
+        operator learns to distrust the surface.
+        """
+        self.ensure_one()
+        self._assert_export_reconcile_ack_authority()
+        self._assert_export_reconcile_ack_eligible()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Acknowledge Unprovable Media Checksum',
+            'res_model': 'shopify.connector.export.checksum.ack.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_binding_id': self.id,
+                'active_model': self._name,
+                'active_id': self.id,
+            },
+        }
+
+    def _assert_export_reconcile_ack_eligible(self):
+        """Requirements 2 and 3: only the one narrow outcome, ever.
+
+        Every refusal below names a class of evidence that is missing,
+        contradictory, foreign, incomplete or inconclusive. An operator
+        judgement cannot convert any of them into the proof PD-PX-7 asks for,
+        so none of them is offered as a choice at all -- there is no "override
+        anyway", because a general-purpose override is precisely what turns a
+        fail-closed reconciliation into a formality.
+        """
+        self.ensure_one()
+        if self.export_reconcile_state != 'review':
+            raise UserError(
+                'This binding is not awaiting review, so there is nothing to '
+                'acknowledge.'
+            )
+        if self.export_reconcile_reason != ACKNOWLEDGEABLE_RECONCILE_REASON:
+            raise UserError(
+                'This review cannot be acknowledged. Only a media association '
+                'that was re-read on the expected Shopify product, with the '
+                'expected File identity and a non-FAILED status, and whose '
+                'ONLY remaining uncertainty is that Shopify exposes no digest '
+                'of the stored bytes, may be acknowledged. A missing, '
+                'archived, detached, failed, foreign, mismatched, truncated, '
+                'in-flight or otherwise inconclusive finding must be resolved '
+                'in Shopify or on the binding, not accepted.'
+            )
+        store = self.store_id
+        if self.export_reconcile_evidence_generation != (
+            store.export_reconcile_generation
+        ):
+            raise UserError(
+                'This review belongs to an earlier connection generation. '
+                'Re-run the reconnect reconciliation and review the fresh '
+                'result.'
+            )
+        if self.export_reconcile_evidence_product_gid != (
+            self.shopify_gid or False
+        ):
+            raise UserError(
+                'The Shopify product this binding names has changed since the '
+                'review was recorded. Re-run the reconnect reconciliation.'
+            )
+        if self.export_reconcile_evidence_file_gids != (
+            self._export_reconcile_evidence_file_gid_list()
+        ):
+            raise UserError(
+                'The Shopify File identities recorded by the review no longer '
+                'match this binding. Re-run the reconnect reconciliation.'
+            )
+        if self.export_reconcile_evidence_claim_digest != (
+            self._export_reconcile_claim_digest()
+        ):
+            raise UserError(
+                'This binding\'s local media has changed since the review was '
+                'recorded. Re-run the reconnect reconciliation.'
+            )
+        return True
+
+    def action_shopify_export_acknowledge_checksum(self, confirmed=False):
+        """Requirement 5: the operator resolution route, and its whole extent.
+
+        What this does: records that a named Connector Administrator accepted
+        ONE specific residual uncertainty -- that Shopify exposes no digest of
+        a stored File's bytes -- against ONE binding, ONE connection
+        generation, ONE remote product identity, ONE remote File identity set
+        and ONE local media claim, then re-settles the store.
+
+        What this does NOT do, and cannot: no Shopify request of any kind, no
+        mutation, no export, no upload, no detach, no delete, no re-create, no
+        job admission. There is no transport seam in this method, which
+        `test_the_acknowledgement_route_contains_no_transport` asserts against
+        the source rather than against this sentence.
+
+        Requirement 9: repeating a valid acknowledgement is a no-op that
+        succeeds. An operator who double-clicks, or a client that retries,
+        must not be told the state is wrong when it is exactly what they
+        asked for.
+        """
+        self.ensure_one()
+        store = self._assert_export_reconcile_ack_authority()
+        if not confirmed:
+            raise UserError(
+                'Acknowledging requires the explicit confirmation: Shopify '
+                'exposes no digest of the stored bytes, so byte '
+                'correspondence was NOT cryptographically verified.'
+            )
+        # Idempotency BEFORE eligibility re-derivation: an already-valid
+        # acknowledgement is the requested state, and re-running the full
+        # eligibility gate on it would only risk failing a request that has
+        # already succeeded.
+        if self._export_reconcile_ack_is_valid():
+            return True
+        self._assert_export_reconcile_ack_eligible()
+        now = fields.Datetime.now()
+        self.sudo().write({
+            'export_reconcile_ack_at': now,
+            'export_reconcile_ack_uid': self.env.uid,
+            'export_reconcile_ack_reason': ACKNOWLEDGEABLE_RECONCILE_REASON,
+            'export_reconcile_ack_generation':
+                self.export_reconcile_evidence_generation,
+            'export_reconcile_ack_product_gid':
+                self.export_reconcile_evidence_product_gid,
+            'export_reconcile_ack_file_gids':
+                self.export_reconcile_evidence_file_gids,
+            'export_reconcile_ack_claim_digest':
+                self.export_reconcile_evidence_claim_digest,
+            'export_reconcile_ack_verdict_at': self.export_reconcile_at,
+        })
+        # The existing audit mechanism -- one closed `core_manual_maintenance`
+        # job with its log row appended by the CALLING user, so actor
+        # attribution survives the elevated write above. No credential, no
+        # Shopify response and no payload is recorded: the governed
+        # consequence is the whole content.
+        store._create_lifecycle_audit_job(
+            'Export reconnect reconciliation: unprovable media checksum '
+            'acknowledged. binding_id=%d actor_uid=%d generation=%s '
+            'product_gid=%s file_gids=%s reason=%s. The association was '
+            're-read on the expected Shopify product with the expected File '
+            'identity and a non-FAILED status; byte correspondence was NOT '
+            'cryptographically verified; no Shopify product or media was '
+            'changed.' % (
+                self.id,
+                self.env.uid,
+                self.export_reconcile_ack_generation,
+                self.export_reconcile_ack_product_gid or '',
+                self.export_reconcile_ack_file_gids or '',
+                ACKNOWLEDGEABLE_RECONCILE_REASON,
+            )
+        )
+        # Requirements 11, 12 and 13. Re-settle THIS generation only: an
+        # acknowledgement that made this the last outstanding review converges
+        # the store to `complete`; one that did not leaves every other
+        # binding's review exactly where it was.
+        store.invalidate_recordset()
+        store._settle_export_reconciliation(
+            generation=store.export_reconcile_generation,
+        )
+        return True
 
 
 class ShopifyConnectorExportReconcileService(models.AbstractModel):
@@ -520,6 +1156,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         if not binding.shopify_gid:
             self._record_binding_verdict(
                 binding, 'verified', 'No Shopify product is bound.',
+                reason='no_bound_product', generation=store.connection_generation,
             )
             self._finish(job, store, 'nothing to verify')
             return
@@ -530,8 +1167,13 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         # resolved by writing to that store.
         self._assert_same_store(store, result.get('store_identity'))
 
-        verdict, note = self._verdict_for(binding, result, store=store, job=job)
-        self._record_binding_verdict(binding, verdict, note)
+        verdict, reason, note = self._verdict_for(
+            binding, result, store=store, job=job,
+        )
+        self._record_binding_verdict(
+            binding, verdict, note,
+            reason=reason, generation=store.connection_generation,
+        )
         self._finish(job, store, note)
 
     @api.model
@@ -564,9 +1206,15 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         archived product is present but not exportable-to in any sense the
         operator would expect. Then the two identity sets the connector
         holds claims about.
+
+        Returns `(verdict, reason, note)`. The reason is the machine-readable
+        half TD-015's acknowledgement eligibility is decided from; the note
+        stays the sentence an operator reads. Keeping them as separate return
+        values -- rather than deriving one from the other -- is what stops a
+        copy edit from becoming an authorization change.
         """
         if not result.get('exists'):
-            return 'review', (
+            return 'review', 'product_missing', (
                 'The Shopify product this binding names no longer exists. '
                 'It was not re-created; an operator must decide what should '
                 'happen to this binding.'
@@ -574,7 +1222,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         product = result.get('product') or {}
         status = (product.get('status') or '').upper()
         if status == 'ARCHIVED':
-            return 'review', (
+            return 'review', 'product_archived', (
                 'The Shopify product is archived. Exports to it are '
                 'withheld until an operator decides.'
             )
@@ -596,14 +1244,16 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         bound_variant_gids = set(bound_variants.mapped('shopify_gid'))
         missing = bound_variant_gids - remote_variant_gids
         if missing:
-            return 'review', (
+            return 'review', 'variant_divergence', (
                 '%d bound variant(s) are no longer present on the Shopify '
                 'product.' % len(missing)
             )
 
-        media_note = self._media_divergence(binding, store=store, job=job)
+        media_reason, media_note = self._media_divergence(
+            binding, store=store, job=job,
+        )
         if media_note:
-            return 'review', media_note
+            return 'review', media_reason, media_note
         # Deliberately precise about what "re-verified" covers. Existence,
         # archive state and the governed variant GID set were re-read from
         # Shopify. This branch is reached only when the binding claims no
@@ -611,7 +1261,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         # PD-PX-7 to require, and none is implied. A binding that DOES claim
         # an association cannot reach `verified` at all; see
         # `_checksum_unverifiable_divergence`.
-        return 'verified', (
+        return 'verified', 'verified_no_media_claim', (
             'Product and variants re-verified against Shopify. This binding '
             'claims no associated Shopify media.'
         )
@@ -662,8 +1312,8 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
           its LOCAL checksum is a separate, local contradiction and is
           caught below.
 
-        Returns a divergence note, or `False` only when this binding makes
-        no associated-media claim for PD-PX-7 to verify.
+        Returns `(reason, note)`. `(False, False)` -- and only that -- means
+        this binding makes no associated-media claim for PD-PX-7 to verify.
         """
         rows = self.env[
             'shopify.connector.product.media.binding'
@@ -680,7 +1330,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             )
         )
         if stranded:
-            return (
+            return 'media_association_unrecorded', (
                 '%d media row(s) claim an association with no durable '
                 'Shopify File identity.' % len(stranded)
             )
@@ -690,7 +1340,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             )
         )
         if interrupted:
-            return (
+            return 'media_in_flight', (
                 '%d media upload(s) were still in flight when the '
                 'connection dropped and their remote state is unknown.'
                 % len(interrupted)
@@ -699,7 +1349,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             lambda row: not row.odoo_image_checksum
         )
         if missing_checksum:
-            return (
+            return 'media_local_checksum_missing', (
                 '%d media row(s) have no checksum evidence.'
                 % len(missing_checksum)
             )
@@ -707,13 +1357,13 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             lambda row: row.remote_status == 'associated'
         )
         if not associated:
-            return False
+            return False, False
         if store is None or job is None:
             # Not reachable from the handler, which always passes both. A
             # caller that cannot supply the transport context cannot
             # perform the remote half, and must not be allowed to return
             # the `False` that means "re-verified".
-            return (
+            return 'media_not_reread', (
                 'Remote media state was not re-read, so this binding\'s '
                 'media claims are unverified.'
             )
@@ -731,7 +1381,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             # The existence check in `_verdict_for` ran against a separate
             # read. A product that disappeared between the two is still a
             # review, not a media finding.
-            return (
+            return 'media_product_reread_failed', (
                 'The Shopify product could not be re-read while verifying '
                 'its media.'
             )
@@ -746,7 +1396,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             ).upper() == 'FAILED'
         ]
         if failed:
-            return (
+            return 'media_failed_status', (
                 '%d associated media File(s) are in FAILED state on Shopify.'
                 % len(failed)
             )
@@ -755,12 +1405,20 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             # Every association was found, with a non-FAILED status, on the
             # expected product. That is as far as a remote read can get --
             # and it is short of what PD-PX-7 requires.
+            #
+            # TD-015: this is also the ONLY branch whose finding an operator
+            # may acknowledge, and it is reached only after store identity,
+            # product identity, archive state, the governed variant GID set,
+            # every File identity, every File status and the completeness of
+            # the response have all been established. The `truncated` case
+            # below cannot arrive here, because `absent` is empty exactly when
+            # every claimed File was seen.
             return self._checksum_unverifiable_divergence(rows)
         if read.get('truncated'):
             # Requirement 5: an unverifiable claim is never reported as
             # verified, and never as a divergence either. The connector
             # did not see the whole list, so "absent" is not established.
-            return (
+            return 'media_read_truncated', (
                 'This product carries more than %d media items, so %d '
                 'connector-owned association(s) could not be re-verified '
                 'from a single read.' % (REMOTE_MEDIA_PAGE_SIZE, len(absent))
@@ -793,15 +1451,24 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         Read-only, like everything else here: nothing is re-created,
         re-uploaded, detached or deleted. The consequence is a real one and
         is deliberate -- a reconnected store with exported media reaches
-        `review_required` rather than `complete`, and an operator must clear
-        it before exports resume.
+        `review_required` rather than `complete`.
+
+        TD-015 operator resolution: this is the one review a Connector
+        Administrator can actually resolve, through
+        `action_shopify_export_acknowledge_checksum`. It is resolvable
+        precisely because everything EXCEPT the byte digest was established
+        remotely, and the digest is not something a merchant can produce
+        either -- Shopify does not expose one. Acknowledging accepts that one
+        residual uncertainty, on the record, with the actor named. It is not
+        a verification and this module never calls it one.
         """
-        return (
+        return ACKNOWLEDGEABLE_RECONCILE_REASON, (
             '%d media association(s) were re-read on the product with the '
             'expected File identity and non-FAILED status, but Shopify '
             'exposes no digest of the stored bytes, so checksum '
             'correspondence could not be proven. Nothing was changed; an '
-            'operator decides.' % len(rows)
+            'administrator may acknowledge this specific uncertainty.'
+            % len(rows)
         )
 
     @api.model
@@ -847,7 +1514,7 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
                 '%d File(s) carry this connector\'s filename under a '
                 'different identity' % len(ambiguous)
             )
-        return (
+        return 'media_absent', (
             '%s. Nothing was re-created, re-uploaded or re-attached; an '
             'operator decides.' % '; '.join(parts)
         )
@@ -864,11 +1531,41 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         return True
 
     @api.model
-    def _record_binding_verdict(self, binding, verdict, note):
+    def _record_binding_verdict(
+        self, binding, verdict, note, reason=False, generation=0,
+    ):
+        """Write one binding's verdict, its evidence, and nothing else.
+
+        TD-015: the verdict now carries the exact evidence an acknowledgement
+        could later be bound to -- the connection generation the read covered,
+        the remote product identity, the remote File identity set, and a
+        digest of the local media claim. Capturing them HERE, at the moment
+        the evidence was actually observed, is what lets
+        `_export_reconcile_ack_is_valid` compare "what was accepted" against
+        "what is true now" instead of re-deriving both from the same source.
+
+        Any previous acknowledgement is dropped unconditionally. A new verdict
+        supersedes the read an acknowledgement was taken against, whether the
+        new verdict is better, worse or identical -- an acknowledgement that
+        survived a re-run would be an acknowledgement of evidence nobody
+        looked at.
+        """
+        binding._export_reconcile_clear_acknowledgement()
         binding.sudo().write({
             'export_reconcile_state': verdict,
             'export_reconcile_note': (note or '')[:255],
             'export_reconcile_at': fields.Datetime.now(),
+            'export_reconcile_reason': reason or False,
+            'export_reconcile_evidence_generation': generation or 0,
+            'export_reconcile_evidence_product_gid': (
+                binding.shopify_gid or False
+            ),
+            'export_reconcile_evidence_file_gids': (
+                binding._export_reconcile_evidence_file_gid_list()
+            ),
+            'export_reconcile_evidence_claim_digest': (
+                binding._export_reconcile_claim_digest()
+            ),
         })
         return binding
 

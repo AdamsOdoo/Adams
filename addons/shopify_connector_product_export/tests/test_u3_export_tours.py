@@ -314,3 +314,127 @@ class TestU3ExportTours(HttpCase):
             before + 1,
             'the resume must admit exactly one queued job',
         )
+
+    # ------------------------------------------------------------------
+    # TD-015: the operator resolution route, driven in a real browser
+    # ------------------------------------------------------------------
+
+    def _seed_checksum_review(self):
+        """A store blocked on the ONE acknowledgeable reconciliation review.
+
+        Seeded in Odoo rows only: no credential is read, no Shopify request is
+        made, and the verdict is written through the reconciliation service's
+        own recording method rather than by hand, so the evidence fields the
+        eligibility gate consults are produced by production code.
+        """
+        store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'TD-015 Tour Store',
+            'shop_domain': 'td015-tour.myshopify.com',
+            'api_version': SHOPIFY_API_VERSION,
+        })
+        store.sudo().write({'state': 'connected', 'connection_generation': 3})
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'product_export_domain_enabled': True,
+            'price_source_of_truth': 'odoo_authoritative',
+            'media_source_of_truth': 'odoo',
+        })
+        template = self.env['product.template'].sudo().create({
+            'name': 'TD-015 Tour Widget',
+            'shopify_export_enabled': True,
+        })
+        binding = self.env[
+            'shopify.connector.product.template.binding'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_template_id': template.id,
+            'shopify_gid': 'gid://shopify/Product/9015',
+        })
+        checksum = image_checksum(b'td-015-tour-image-bytes')
+        self.env['shopify.connector.product.media.binding'].sudo().create({
+            'store_id': store.id,
+            'product_template_binding_id': binding.id,
+            'media_role': 'primary',
+            'odoo_image_checksum': checksum,
+            'connector_filename': self.env[
+                'shopify.connector.media.export.service'
+            ]._connector_filename(template.id, checksum),
+            'shopify_gid': 'gid://shopify/MediaImage/9015',
+            'remote_status': 'associated',
+        })
+        # The store is armed exactly as a reconnect arms it, then the verdict
+        # is recorded by the production method, so the tour meets the same
+        # state a real pass produces.
+        store.sudo().write({
+            'export_reconcile_state': 'in_progress',
+            'export_reconcile_generation': store.connection_generation,
+        })
+        self.env['shopify.connector.export.reconcile.service'].\
+            _record_binding_verdict(
+                binding, 'review',
+                '1 media association(s) were re-read on the product with the '
+                'expected File identity and non-FAILED status, but Shopify '
+                'exposes no digest of the stored bytes.',
+                reason='checksum_unverifiable',
+                generation=store.connection_generation,
+            )
+        store._settle_export_reconciliation(
+            generation=store.connection_generation,
+        )
+        store.invalidate_recordset()
+        self.assertEqual(store.export_reconcile_state, 'review_required')
+        return store, binding
+
+    def test_td015_checksum_acknowledgement_tour(self):
+        """The operator resolution route exists and is reachable by clicking.
+
+        This is the browser half of the TD-015 correction. The server tests
+        prove the acknowledgement method is correct; only a browser can prove
+        an administrator can actually GET to it — which is the whole defect,
+        because the previous cycle shipped the block without the door.
+        """
+        user = self._connector_user(
+            'td015_tour_admin',
+            'shopify_connector_core.group_shopify_connector_admin',
+        )
+        store, binding = self._seed_checksum_review()
+        # Prove the store and its review row are readable by the tour user
+        # first: a tour that fails on visibility looks identical to one that
+        # fails on a missing control, and the two need different fixes.
+        self.assertEqual(
+            self.env['shopify.connector.store'].with_user(user).search(
+                [('id', '=', store.id)],
+            ),
+            store,
+        )
+        self.assertEqual(
+            store.with_user(user).export_reconcile_review_binding_ids, binding,
+        )
+        self.env.flush_all()
+
+        self.start_tour(
+            '/odoo', 'shopify_connector_u3_checksum_ack_tour',
+            login='td015_tour_admin',
+        )
+
+        binding.invalidate_recordset()
+        store.invalidate_recordset()
+        self.assertTrue(
+            binding.export_reconcile_ack_at,
+            'the browser click did not reach the acknowledgement service',
+        )
+        self.assertEqual(
+            binding.export_reconcile_ack_uid.login, 'td015_tour_admin',
+            'the acknowledgement must record the operator who made it',
+        )
+        self.assertEqual(
+            store.export_reconcile_state, 'complete',
+            'the acknowledgement must lift the export block it was taken for',
+        )
+        self.assertFalse(
+            self.env['shopify.connector.job'].sudo().search([
+                ('store_id', '=', store.id),
+                ('state', 'in', ('queued', 'running')),
+            ]),
+            'acknowledging must admit no job and start no export',
+        )

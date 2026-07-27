@@ -201,3 +201,136 @@ class ShopifyConnectorProductExportConfirmWizard(models.TransientModel):
                 'been exported.'
             )
         return self.preview_id.action_confirm_export_preview()
+
+
+class ShopifyConnectorExportChecksumAckWizard(models.TransientModel):
+    """TD-015: the consequence-stating confirmation for the one narrow ack.
+
+    Same display-and-delegate contract as the two wizards above, and for the
+    same reason: the authority lives in
+    `action_shopify_export_acknowledge_checksum` on the binding, which
+    performs the Administrator check, the record-access check, the company
+    check and the eligibility check itself. This wizard adds exactly one
+    thing the server cannot: the sentence the operator has to read before
+    they are allowed to accept anything.
+
+    That sentence is not decoration. The whole risk in this route is an
+    operator believing they verified something. So the copy states, in the
+    operator's own words, what Shopify DID confirm, what it cannot confirm,
+    what they are accepting, and what was NOT changed -- and the server
+    refuses the call unless the box beside it is ticked.
+    """
+
+    _name = 'shopify.connector.export.checksum.ack.wizard'
+    _description = 'Shopify Connector Unprovable Media Checksum Acknowledgement'
+
+    binding_id = fields.Many2one(
+        comodel_name='shopify.connector.product.template.binding',
+        required=True,
+        readonly=True,
+        ondelete='cascade',
+    )
+    store_id = fields.Many2one(
+        related='binding_id.store_id',
+        readonly=True,
+        string='Shopify Store',
+    )
+    product_gid = fields.Char(
+        related='binding_id.shopify_gid',
+        readonly=True,
+        string='Shopify Product',
+    )
+    reconcile_note = fields.Char(
+        related='binding_id.export_reconcile_note',
+        readonly=True,
+        string='What the reconciliation found',
+    )
+    verified_summary = fields.Text(
+        compute='_compute_summaries',
+        readonly=True,
+        string='What Shopify confirmed',
+    )
+    unprovable_summary = fields.Text(
+        compute='_compute_summaries',
+        readonly=True,
+        string='What Shopify cannot confirm',
+    )
+    consequence_summary = fields.Text(
+        compute='_compute_summaries',
+        readonly=True,
+        string='What acknowledging does',
+    )
+    confirmed = fields.Boolean(
+        string=(
+            'I accept that byte correspondence was NOT cryptographically '
+            'verified'
+        ),
+        help='Acknowledgement is an explicit act. Nothing is acknowledged '
+             'until this is ticked and confirmed.',
+    )
+
+    def default_get(self, fields_list):
+        result = super().default_get(fields_list)
+        if self.env.context.get(
+            'active_model'
+        ) == 'shopify.connector.product.template.binding':
+            active_id = self.env.context.get('active_id')
+            if active_id:
+                result['binding_id'] = active_id
+        return result
+
+    @api.depends('binding_id')
+    def _compute_summaries(self):
+        for wizard in self:
+            binding = wizard.binding_id
+            files = binding.export_reconcile_evidence_file_gids or ''
+            count = len([gid for gid in files.split(',') if gid])
+            wizard.verified_summary = (
+                'This reconnect re-read Shopify and confirmed:\n'
+                '• the connection is bound to the expected Shopify store '
+                '(%s);\n'
+                '• the expected product still exists and is not archived '
+                '(%s);\n'
+                '• every bound variant is still present on it;\n'
+                '• all %d image File(s) this connector created are still '
+                'attached to that product, under the identities it recorded;\n'
+                '• none of those Files is in a FAILED state;\n'
+                '• the response was complete — nothing was truncated or '
+                'left inconclusive.' % (
+                    binding.store_id.shop_domain or '',
+                    binding.shopify_gid or '',
+                    count,
+                )
+            )
+            wizard.unprovable_summary = (
+                'Shopify exposes no digest of a stored File\'s bytes. Its '
+                'MediaImage and MediaImageOriginalSource types return a file '
+                'size, a URL, a status and timestamps — and no checksum. So '
+                'the connector CANNOT prove that the bytes stored on Shopify '
+                'are the same bytes it uploaded from Odoo. That is the only '
+                'thing still unproven here, and no operator action can prove '
+                'it either.'
+            )
+            wizard.consequence_summary = (
+                'Acknowledging records that you, by name, accept THAT ONE '
+                'uncertainty for THIS binding, against this exact connection, '
+                'product and File identity, and this exact local image.\n\n'
+                'It does not verify anything. It contacts Shopify not at all: '
+                'no product, image or File is created, changed, uploaded, '
+                'detached or deleted, and no export runs.\n\n'
+                'It is withdrawn automatically if the store is reconnected '
+                'again, if the reconciliation runs again, or if any of the '
+                'identities or the local image change.'
+            )
+
+    def action_confirm(self):
+        self.ensure_one()
+        if not self.confirmed:
+            raise UserError(
+                'Tick the acknowledgement to record it. Nothing has been '
+                'acknowledged and nothing was changed on Shopify.'
+            )
+        self.binding_id.action_shopify_export_acknowledge_checksum(
+            confirmed=True,
+        )
+        return {'type': 'ir.actions.act_window_close'}

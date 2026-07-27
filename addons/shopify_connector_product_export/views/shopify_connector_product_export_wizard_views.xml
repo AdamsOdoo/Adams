@@ -113,4 +113,61 @@
                eval="[(4, ref('shopify_connector_core.group_shopify_connector_reviewer'))]"/>
     </record>
 
+    <!--
+        TD-015 — the one resolvable reconciliation review.
+
+        This dialog exists to make an operator read four things before they
+        can accept anything: what Shopify DID confirm, what Shopify cannot
+        confirm, what accepting means, and what was not changed. The tick box
+        is the explicit act; the server refuses the call without it, and
+        refuses it again for any binding whose review is not the narrow
+        checksum-unverifiable outcome.
+
+        There is no "acknowledge anyway", no reason free-text that could be
+        mistaken for evidence, and no bulk affordance — a per-binding judgement
+        taken one at a time is the whole point.
+    -->
+    <record id="view_shopify_connector_export_checksum_ack_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.export.checksum.ack.wizard.form</field>
+        <field name="model">shopify.connector.export.checksum.ack.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Acknowledge Unprovable Media Checksum">
+                <div class="alert alert-warning" role="alert">
+                    <strong>This is not a verification.</strong>
+                    You are recording that you accept one specific thing
+                    Shopify cannot prove. Nothing on Shopify is read or
+                    changed by this dialog.
+                </div>
+                <group>
+                    <field name="binding_id" readonly="1"/>
+                    <field name="store_id" readonly="1"/>
+                    <field name="product_gid" readonly="1"/>
+                </group>
+                <group string="What the reconciliation found">
+                    <field name="reconcile_note" nolabel="1" readonly="1"/>
+                </group>
+                <group string="What Shopify confirmed">
+                    <field name="verified_summary" nolabel="1" readonly="1"/>
+                </group>
+                <group string="What Shopify cannot confirm">
+                    <field name="unprovable_summary" nolabel="1" readonly="1"/>
+                </group>
+                <group string="What acknowledging does">
+                    <field name="consequence_summary" nolabel="1" readonly="1"/>
+                </group>
+                <group>
+                    <field name="confirmed"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Acknowledge" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
 </odoo>

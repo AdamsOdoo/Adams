@@ -292,3 +292,85 @@ registry.category("web_tour.tours").add("shopify_connector_u3_media_resume_tour"
         },
     ],
 });
+
+// --- 5. TD-015: the one resolvable reconciliation review, end to end. ---
+//
+// This tour is the answer to the question the previous cycle could not answer:
+// "where does an operator actually go to clear this?" It walks the route a
+// real administrator walks — Stores, the store form, the reconciliation
+// section, the review list, the acknowledgement dialog — and only a browser
+// can prove it exists. A server-side test proves the METHOD works; it cannot
+// prove there is a control anywhere that reaches it, and an unreachable
+// method is exactly the defect being corrected.
+//
+// It asserts the consequence copy is on screen BEFORE the confirmation is
+// possible, then confirms, then asserts the store reached "Reconciled". No
+// Shopify request occurs: the acknowledgement route has no transport in it.
+registry.category("web_tour.tours").add("shopify_connector_u3_checksum_ack_tour", {
+    url: "/odoo",
+    steps: () => [
+        stepUtils.showAppsMenuItem(),
+        {
+            trigger: `.o_app${coreMenu("menu_shopify_connector_root")}`,
+            content: "Open the Shopify Connector app.",
+            run: "click",
+        },
+        {
+            trigger: coreMenu("menu_shopify_connector_stores"),
+            content: "Stores — the store owns the reconciliation surface.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
+            content: "Open the reconnected store.",
+            run: "click",
+        },
+        {
+            // The verdict must be VISIBLE. Before this cycle it was stored
+            // and rendered nowhere, so an operator whose exports were blocked
+            // had no way to learn why.
+            trigger: ".o_form_view:contains('Review Required')",
+            content: "The store states that the reconciliation needs review.",
+        },
+        {
+            trigger: ".o_form_view button[name='action_shopify_export_open_checksum_ack_wizard']",
+            content: "The acknowledgement control is offered on the review row.",
+            run: "click",
+        },
+        {
+            // Four claims, on screen, before any confirmation is possible.
+            trigger: ".modal .o_form_view",
+            content: "The consequence dialog states what was and was not proven.",
+            run() {
+                const text = document.querySelector(".modal .o_form_view").innerText;
+                for (const required of [
+                    "still attached",
+                    "no digest",
+                    "does not verify anything",
+                    "no export runs",
+                ]) {
+                    if (!text.includes(required)) {
+                        throw new Error(
+                            "the acknowledgement dialog omitted a required " +
+                            "statement: " + required
+                        );
+                    }
+                }
+            },
+        },
+        {
+            trigger: ".modal .o_field_widget[name='confirmed'] input",
+            content: "Acknowledging is an explicit act.",
+            run: "click",
+        },
+        {
+            trigger: ".modal footer button:contains('Acknowledge')",
+            content: "Record the acknowledgement.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view:contains('Reconciled')",
+            content: "The store converged; exports are no longer blocked.",
+        },
+    ],
+});
