@@ -225,11 +225,31 @@ class TestProductTemplateBinding(TransactionCase):
     #: is exactly the claim being re-verified, and it is protected binding
     #: evidence: an operator who could write it could clear their own export
     #: block.
+    #: TD-015 operator resolution (2026-07-27) adds three groups of fields:
+    #: the machine-readable verdict reason, the evidence that verdict rests
+    #: on, and the acknowledgement plus exactly what it accepted. They are
+    #: protected for a sharper reason than the verdict was: they are precisely
+    #: the values `_export_reconcile_ack_is_valid` consults, so a caller who
+    #: could write one could manufacture a valid acknowledgement and lift
+    #: their own export block without any of the checks.
     OPTIONAL_MODULE_FIELDS = {
         'shopify_connector_product_export': frozenset((
             'export_reconcile_state',
             'export_reconcile_note',
             'export_reconcile_at',
+            'export_reconcile_reason',
+            'export_reconcile_evidence_generation',
+            'export_reconcile_evidence_product_gid',
+            'export_reconcile_evidence_file_gids',
+            'export_reconcile_evidence_claim_digest',
+            'export_reconcile_ack_at',
+            'export_reconcile_ack_uid',
+            'export_reconcile_ack_reason',
+            'export_reconcile_ack_generation',
+            'export_reconcile_ack_product_gid',
+            'export_reconcile_ack_file_gids',
+            'export_reconcile_ack_claim_digest',
+            'export_reconcile_ack_verdict_at',
         )),
     }
 
