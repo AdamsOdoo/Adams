@@ -438,7 +438,7 @@ design system defaults.
 - **Primary role:** User. **Data:** review cases: Shopify fulfillment evidence (lines, quantities, location, tracking), the deterministic picking-selection result, per-condition checklist outcome (Mode 2 exact-conditions), mismatch details (quantity/location/line).
 - **Primary action:** Validate proposal (Mode 1 explicit validation) / Apply (Mode 2 only when checklist fully passes). **Secondary:** correct linkage, acknowledge with reason, reject.
 - **Hierarchy:** one case at a time (focused deciding, like S6); checklist rendered as pass/fail rows — every failed condition in words.
-- **Status language:** reconciliation states (`observed`, `under_review`, `auto_matched`, `applied`, `acknowledged`, `rejected`, `superseded`) + fulfillment-result badges.
+- **Status language:** reconciliation states (`observed`, `review`, `acknowledged`, `applied`, `superseded`) + fulfillment-result badges. *(TD-003, corrected: these are the five real `RECONCILED_STATE_SELECTION` values. `under_review`, `auto_matched` and `rejected` were never selection values — the code uses `review`, has no automatic-match state, and records a rejected case as `acknowledged`. Authoritative mapping: [`connector-vocabulary-reconciliation.md`](../06-prompts/connector-vocabulary-reconciliation.md).)*
 - **States:** empty = "No external fulfillments awaiting review."; unknown-schema per §4.11 halts auto-apply and surfaces here.
 - **A11y:** checklist rows text+icon. **Performance:** case detail lazy-loads evidence payload. **Odoo links:** picking, SO. **Audit:** decision + evidence snapshot persisted; nothing auto-changes Odoo stock outside the checklist (D-014-8).
 
