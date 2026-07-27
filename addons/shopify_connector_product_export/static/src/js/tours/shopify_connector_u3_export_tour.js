@@ -230,3 +230,65 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_keyboard_to
         },
     ],
 });
+
+// --- 4. TD-011: the media-resume route works in a real browser. ---
+//
+// This exists because the TD-011 defect was, exactly, a capability that
+// passed 15 server-side tests and could not be reached by an operator. A
+// server test asserting the action method behaves correctly cannot catch a
+// button whose `name` does not resolve, a `groups` attribute that hides the
+// control from the role the server admits, an `invisible` expression that
+// hides it when it should show, or a notification that never renders. Those
+// are the failure modes that make a route unreachable, and they only exist
+// in a browser.
+//
+// The row it acts on is seeded in Odoo rows only and its export genuinely
+// stopped. Clicking Resume admits a QUEUED job; nothing is transported,
+// because the transport is a separate dispatch this tour does not run.
+registry.category("web_tour.tours").add("shopify_connector_u3_media_resume_tour", {
+    url: "/odoo",
+    steps: () => [
+        stepUtils.showAppsMenuItem(),
+        {
+            trigger: `.o_app${coreMenu("menu_shopify_connector_root")}`,
+            content: "Open the Shopify Connector app.",
+            run: "click",
+        },
+        {
+            trigger: menu("menu_shopify_connector_product_export"),
+            content: "Open the Export branch.",
+            run: "click",
+        },
+        {
+            trigger: menu("menu_shopify_connector_product_export_media"),
+            content: "Exported Media — the registry that owns this surface.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
+            content: "Open the stopped media row.",
+            run: "click",
+        },
+        {
+            // Targeted by the label an operator reads, for the same reason as
+            // REVIEW_BUTTON above: an XML `type="object"` button keeps its
+            // method name, but asserting the label is what proves the control
+            // an operator can find is the one that is wired.
+            trigger: ".o_form_view button:contains('Resume Export')",
+            content: "The resume control is offered to a role the server admits.",
+            run: "click",
+        },
+        {
+            trigger: ".o_notification",
+            content: "A resume produces an operator-visible result.",
+            run() {
+                const text = document.querySelector(".o_notification").innerText;
+                if (!/resumed/i.test(text)) {
+                    throw new Error(
+                        "the resume produced no operator-visible confirmation: " + text
+                    );
+                }
+            },
+        },
+    ],
+});
