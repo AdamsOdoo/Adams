@@ -12,3 +12,5 @@ from . import test_export_ui_projection
 from . import test_u3_export_tours
 from . import test_u3_hoot_suite
 from . import test_export_apply_handoff
+from . import test_export_search_encoding
+from . import test_export_action_view_binding

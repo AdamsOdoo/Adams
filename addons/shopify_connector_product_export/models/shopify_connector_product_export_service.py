@@ -90,6 +90,9 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attemp
 from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
 )
+from odoo.addons.shopify_connector_core.tools.search_syntax import (
+    search_term,
+)
 
 from .shopify_connector_product_export_preview import PREVIEW_VALIDITY_HOURS
 
@@ -460,7 +463,18 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'productVariants(first: 5, query: $query) { nodes { id sku '
             'product { id title } } } }'
         )
-        search = ' OR '.join('sku:%s' % sku for sku in sorted(skus))
+        # A SKU is `product.default_code` -- free text an operator types, and
+        # the only operator-controlled value this module puts into a search
+        # grammar. Unencoded, an ordinary space alone re-shapes the query
+        # (whitespace separates terms, with `AND` implied), and the mangled
+        # query matches nothing. This gate reads "no rows" as "no duplicate",
+        # so a mangled query does not fail -- it opens the gate and lets a
+        # blind create through, which is the outcome two governing documents
+        # promise can never happen. `search_value` quotes and escapes, and
+        # raises for anything it cannot faithfully encode.
+        search = ' OR '.join(
+            search_term('sku', sku) for sku in sorted(skus)
+        )
         with client.execute_business(
             job, store, query, {'query': search},
         ) as result:

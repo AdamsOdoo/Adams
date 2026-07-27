@@ -74,6 +74,9 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
 )
+from odoo.addons.shopify_connector_core.tools.search_syntax import (
+    search_term,
+)
 
 from .shopify_connector_product_export_service import (
     ERROR_CLASS_BINDING_CONFLICT,
@@ -729,7 +732,13 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
             '... on MediaImage { image { url } } } } '
             'shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'query': 'filename:%s' % filename})
+        # Connector-generated and deterministic today (`odoo-<id>-<checksum>`),
+        # so this is not a live defect -- it is the same missing encoding as
+        # the SKU gate, and it goes through the same helper so it cannot
+        # become one if the filename scheme ever admits a wider charset.
+        result = client.execute(
+            store, query, {'query': search_term('filename', filename)},
+        )
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:

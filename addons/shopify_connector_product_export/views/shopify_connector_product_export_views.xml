@@ -316,6 +316,32 @@
         <field name="name">Exported Media</field>
         <field name="res_model">shopify.connector.product.media.binding</field>
         <field name="view_mode">list,form</field>
+        <!--
+            Bound explicitly for the same reason as the export settings
+            action above: this model has one list and one form today, so
+            `default_view()` happens to resolve them, but "happens to" is
+            not a binding, and a second list view added by any module would
+            silently take this menu over.
+        -->
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_product_media_binding_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_product_media_binding_form')})]"/>
+        <field name="search_view_id"
+               ref="view_shopify_connector_product_media_binding_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No media has been exported yet.
+            </p>
+            <p>
+                An image appears here once an export has staged and
+                associated it with a Shopify product. This registry is
+                append-only: it records what was uploaded, and the connector
+                never deletes media from the merchant's store.
+            </p>
+        </field>
     </record>
 
     <!-- ============================================================== -->
@@ -446,13 +472,45 @@
         </field>
     </record>
 
+    <!--
+        `view_ids` is bound explicitly, exactly as the fulfillment settings
+        action binds its own. Without it this action carried no view
+        reference at all, so Odoo fell back to `default_view()`, which is
+        `_order = "priority,name,id"` on `ir.ui.view`. Every view on
+        `shopify.connector.store.settings` sits at the default priority 16,
+        so the tie broke on NAME, and
+        `shopify.connector.store.settings.fulfillment.list` sorts before
+        `shopify.connector.store.settings.list.export`. "Export Settings"
+        rendered the FULFILLMENT list, and the purpose-built export list
+        below was unreachable dead code. The form happened to resolve
+        correctly (`...form.export` sorts before `...fulfillment.form`),
+        which is precisely why a name-ordered accident is not something to
+        leave load-bearing.
+    -->
     <record id="action_shopify_connector_store_settings_export"
             model="ir.actions.act_window">
         <field name="name">Export Settings</field>
         <field name="res_model">shopify.connector.store.settings</field>
         <field name="view_mode">list,form</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_store_settings_list_export')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_store_settings_form_export')})]"/>
         <field name="group_ids"
                eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No store is configured yet.
+            </p>
+            <p>
+                Export settings appear here once a Shopify store exists.
+                Whether a store may export, and which side owns price and
+                media, are set per store by a Shopify Connector
+                Administrator.
+            </p>
+        </field>
     </record>
 
 </odoo>
