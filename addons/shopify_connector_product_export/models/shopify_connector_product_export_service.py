@@ -167,6 +167,15 @@ MAX_PRODUCT_OPTIONS = 3
 # synchronous `productSet` stays inside its safe envelope by construction.
 MAX_EXPORT_VARIANTS = 100
 
+# TD-015 media verification. Shopify's documented per-connection maximum for
+# `first:` is 250, so this is the largest page the API will serve and the
+# fewest round trips a whole-list read can take. Reaching it is reported as
+# truncation rather than paged: a reconciliation that cannot see the entire
+# media list must say so, because "this File is not in the list" and "this
+# File is not in the part of the list I fetched" are different findings and
+# only one of them is a divergence.
+REMOTE_MEDIA_PAGE_SIZE = 250
+
 # The connector-owned binding metafield. `namespace` is omitted from
 # `UniqueMetafieldValueInput` on purpose: the 2026-07 reference states
 # "If omitted, the app-reserved namespace will be used", which is exactly
@@ -423,6 +432,114 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'has_media': bool(
                 ((product.get('media') or {}).get('nodes')) or []
             ),
+        }
+
+    @api.model
+    def _read_remote_product_media(self, store, job, product_gid):
+        """Read the product's media connection. Read-only, verification only.
+
+        TD-015 correction. Reconnect reconciliation used to decide media
+        divergence from the LOCAL registry alone -- a row that said
+        `associated` and carried a File GID contributed to a `verified`
+        verdict even though nothing had looked at the remote store. That is
+        precisely the claim a reconnect invalidates.
+
+        Kept OUT of `_read_remote_product` on purpose. That read is shared
+        with the preview and the apply-time changed-since-read gate, where
+        `media(first: 1)` answers only "does this product have any media"
+        for the operator's untouched-surfaces summary. Widening it would
+        change the cost and the meaning of a read two other callers depend
+        on, to serve a third that runs on a different occasion.
+
+        The selection is the same one the module's own accepted
+        media-association reconciliation uses
+        (`_reconcile_media_associate`), not a new invention: a File this
+        connector created and attached via `fileUpdate`/`referencesToAdd`
+        appears as a node on `product.media` under that same `MediaImage`
+        GID, which is what makes GID presence a sound association proof.
+        `fileStatus` comes back with it so a File that has since gone
+        `FAILED` is not read as healthy.
+
+        Bounded at 250 nodes -- Shopify's per-connection maximum -- and
+        the truncation is reported rather than silently ignored, because a
+        connector that could not see the whole list must not conclude a
+        File is absent from it.
+        """
+        client = self.env['shopify.connector.api.client']
+        query = (
+            'query ProductExportMediaVerify($id: ID!) { '
+            'product(id: $id) { id '
+            'media(first: %d) { nodes { id mediaContentType '
+            '... on MediaImage { id fileStatus image { url } } } '
+            'pageInfo { hasNextPage } } } '
+            'shop { myshopifyDomain } }' % (REMOTE_MEDIA_PAGE_SIZE,)
+        )
+        with client.execute_business(
+            job, store, query, {'id': product_gid},
+        ) as result:
+            data = (result or {}).get('data')
+        if not isinstance(data, dict):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify product-media response (no data).',
+            )
+        store_identity = (data.get('shop') or {}).get('myshopifyDomain')
+        product = data.get('product')
+        if product is None:
+            return {
+                'store_identity': store_identity,
+                'exists': False,
+                'nodes': [],
+                'truncated': False,
+            }
+        if not isinstance(product, dict) or product.get('id') != product_gid:
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Shopify returned a different product identity than '
+                'requested for the media read.',
+            )
+        media = product.get('media') or {}
+        nodes = media.get('nodes')
+        if not isinstance(nodes, list):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify media collection in the product read.',
+            )
+        return {
+            'store_identity': store_identity,
+            'exists': True,
+            'nodes': [node for node in nodes if isinstance(node, dict)],
+            'truncated': bool((media.get('pageInfo') or {}).get('hasNextPage')),
+        }
+
+    @api.model
+    def _search_remote_files_by_filename(self, store, job, filename):
+        """Find Files carrying one connector-generated filename. Read-only.
+
+        The second half of the TD-015 media proof, and the reason the
+        connector generates deterministic filenames at all: it is the only
+        durable, connector-owned identity evidence the Files API exposes.
+        Same query the accepted `_reconcile_media_file_create` verification
+        read uses, through the same encoding helper, so a filename scheme
+        that ever admitted a wider charset cannot silently produce an
+        unquoted search term.
+        """
+        client = self.env['shopify.connector.api.client']
+        query = (
+            'query ProductExportMediaFindByFilename($query: String!) { '
+            'files(first: 5, query: $query) { nodes { id fileStatus } } '
+            'shop { myshopifyDomain } }'
+        )
+        with client.execute_business(
+            job, store, query, {'query': search_term('filename', filename)},
+        ) as result:
+            data = (result or {}).get('data') or {}
+        return {
+            'store_identity': (data.get('shop') or {}).get('myshopifyDomain'),
+            'nodes': [
+                node for node in ((data.get('files') or {}).get('nodes')) or []
+                if isinstance(node, dict)
+            ],
         }
 
     @api.model

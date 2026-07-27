@@ -150,7 +150,27 @@ class TestExportSourceGuards(TransactionCase):
             # only after core's own Administrator-gated `action_reconnect`
             # succeeded, and the manual re-run checks Reviewer/Administrator
             # authority AND company access before anything elevates.
-            'shopify_connector_export_reconnect.py': 11,
+            #
+            # 11 -> 15 (TD-015 correction, 2026-07-27). Four more, each on
+            # connector-owned bookkeeping and none adding a surface:
+            #   `_outstanding_reconcile_jobs`   1 - reads this store's own
+            #                                       reconcile jobs to find
+            #                                       what a second reconnect
+            #                                       would collide with.
+            #   `_retire_superseded_reconcile_jobs` 1 - cancels a job from a
+            #                                       superseded generation;
+            #                                       `state`/`cancel_reason`
+            #                                       are protected job fields
+            #                                       and unwritable without it.
+            #   `_serialize_reconcile_settlement`   1 - bumps the store's own
+            #                                       readonly settle sequence,
+            #                                       the serialization row.
+            #   `_supersede`                    1 - the same protected job
+            #                                       transition every handler
+            #                                       in this module uses.
+            # All four are reachable only from inside a claimed dispatch or
+            # from the two already-gated entry points above.
+            'shopify_connector_export_reconnect.py': 15,
             # 0 -> 1 (TD-011 correction, 2026-07-27). The public resume
             # action reads its own store's company through `sudo()` to
             # compare it against the acting user's allowed companies. It is
