@@ -205,22 +205,67 @@ class TestConnectorHootSuite(HttpCase):
     def test_tours_are_not_in_a_unit_test_bundle(self):
         """TD-009 regression guard, at the cause rather than the symptom.
 
-        A tour in `web.assets_backend` is transitively part of
-        `web.assets_unit_tests_setup`, lands in the HOOT module set, and fails
-        the whole set because `@web_tour/tour_utils` is filtered out of it.
-        That is what stopped the dashboard suite registering. Putting a tour
-        back into the backend bundle must fail here, not three waves later.
+        A tour in a bundle the HOOT module set is built from lands in that
+        set and fails the whole of it, because `@web_tour/tour_utils` is
+        filtered out while the tour importing it is not. That is what
+        stopped the dashboard suite registering.
+
+        Every bundle `web.assets_unit_tests_setup` draws from has to be
+        checked, not just `web.assets_backend`. At the pinned Odoo,
+        `addons/web/__manifest__.py` includes BOTH:
+
+            ('include', 'web.assets_backend'),
+            ('include', 'web.assets_backend_lazy'),
+
+        so a tour in `assets_backend_lazy` recreates TD-009 identically. The
+        earlier version of this guard matched only `'web.assets_backend'`
+        with a trailing quote, so `assets_backend_lazy` could never match it,
+        and `web.assets_unit_tests` itself was never inspected either.
+
+        The offender test is on CONTENT as well as path. `/tours/` alone
+        misses a tour that does not live in a `tours/` directory, and the
+        trigger is the `@web_tour` import, not the directory name.
         """
         addons = pathlib.Path(__file__).resolve().parents[2]
+        unsafe_bundles = (
+            'web.assets_backend',
+            'web.assets_backend_lazy',
+            'web.assets_unit_tests',
+            'web.assets_unit_tests_setup',
+        )
         offenders = []
         for manifest in sorted(addons.glob('shopify_connector_*/__manifest__.py')):
             text = manifest.read_text()
-            backend = re.search(
-                r"'web\.assets_backend'\s*:\s*\[(.*?)\]", text, re.S)
-            if backend and '/tours/' in backend.group(1):
-                offenders.append(str(manifest.relative_to(addons)))
+            for bundle in unsafe_bundles:
+                block = re.search(
+                    r"'%s'\s*:\s*\[(.*?)\n\s*\]" % re.escape(bundle),
+                    text, re.S,
+                )
+                if not block:
+                    continue
+                listed = block.group(1)
+                for entry in re.findall(r"'([^']+\.js)'", listed):
+                    if '/tours/' in entry or entry.endswith('_tour.js'):
+                        offenders.append(
+                            '%s -> %s: %s' % (
+                                manifest.parent.name, bundle, entry,
+                            )
+                        )
+                        continue
+                    # A tour is anything importing `@web_tour`, wherever it
+                    # sits. Resolve `<addon>/static/...` against the tree.
+                    parts = entry.split('/', 1)
+                    if len(parts) != 2:
+                        continue
+                    path = addons / parts[0] / parts[1]
+                    if path.is_file() and '@web_tour' in path.read_text():
+                        offenders.append(
+                            '%s -> %s: %s (imports @web_tour)' % (
+                                manifest.parent.name, bundle, entry,
+                            )
+                        )
         self.assertFalse(offenders, (
-            'These manifests put a tour in `web.assets_backend`, which puts it '
-            'in the HOOT module set and breaks unit-suite registration for the '
-            'whole addon (TD-009). Move it to `web.assets_tests`:\n  %s'
+            'These manifests put a tour in a bundle the HOOT module set is '
+            'built from, which breaks unit-suite registration for the whole '
+            'addon (TD-009). Move it to `web.assets_tests`:\n  %s'
             % '\n  '.join(offenders)))

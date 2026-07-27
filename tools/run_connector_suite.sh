@@ -261,17 +261,37 @@ evidence_fail() { EVIDENCE_ERRORS+=("$1"); log "EVIDENCE FAILURE: $1"; }
 
 # Any skip that is not the single sanctioned one fails the run.
 verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
-    local logfile="$1" label="$2" line identity
+    local logfile="$1" label="$2" occurrence identity
     # `OdooTestResult.addSkip` logs `skipped <Class>.<method> : <reason>`.
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
-        identity="$(sed -E 's/^.*skipped ([A-Za-z0-9_]+\.[A-Za-z0-9_]+) : .*$/\1/' <<<"$line")"
-        if [[ "$identity" == "$ALLOWED_SKIP_TEST" && "$line" == *"$ALLOWED_SKIP_REASON"* ]]; then
+    #
+    # Match per OCCURRENCE, not per LINE. The previous version extracted one
+    # identity per line with a greedy `^.*`, which binds to the LAST skip on
+    # the line, and tested the reason as a substring of the WHOLE line. Two
+    # skips on one line therefore checked the last one and silently swallowed
+    # the first:
+    #
+    #   ... skipped RealTest.test_x : Chrome not found; skipped \
+    #       TestMutationRecovery.test_real_process_death_harness : real \
+    #       process-death harness is opt-in outside Odoo.sh
+    #
+    # extracted the sanctioned identity, matched the sanctioned reason, and
+    # `continue`d -- hiding a real browser skip, which is exactly the failure
+    # TD-010 exists to prevent. `grep -o` emits every occurrence separately,
+    # so identity and reason are always read from the SAME skip.
+    #
+    # `Subtest` lines are matched too. `OdooTestResult.getDescription` renders
+    # a subtest as `Subtest <Class>.<method> (<params>) : <reason>`, which the
+    # old pattern did not match at all, so every subtest skip was invisible.
+    while IFS= read -r occurrence; do
+        [[ -z "$occurrence" ]] && continue
+        identity="$(sed -E 's/^skipped (Subtest )?([A-Za-z0-9_]+\.[A-Za-z0-9_]+).*$/\2/' <<<"$occurrence")"
+        if [[ "$identity" == "$ALLOWED_SKIP_TEST" \
+              && "$occurrence" == *"$ALLOWED_SKIP_REASON"* ]]; then
             log "${label}: sanctioned skip ${identity}"
             continue
         fi
-        evidence_fail "${label}: unexpected skipped test -> ${line#*skipped }"
-    done < <(grep -E 'skipped [A-Za-z0-9_]+\.[A-Za-z0-9_]+ : ' "$logfile" || true)
+        evidence_fail "${label}: unexpected skipped test -> ${occurrence#skipped }"
+    done < <(grep -oE 'skipped (Subtest )?[A-Za-z0-9_]+\.[A-Za-z0-9_]+[^:]* : [^;]*' "$logfile" || true)
 }
 
 # Every required tour test must have STARTED and the run must contain one
@@ -369,6 +389,28 @@ self_test() {
     EVIDENCE_ERRORS=()
     verify_no_unexpected_skips "$wrong_reason" self-test
     _expect 1 "the sanctioned test skipping for a DIFFERENT reason still fails"
+
+    # 2b. Two skips on ONE line: a real skip followed by the sanctioned one.
+    #     This is the shape that defeated the previous line-based check -- a
+    #     greedy match bound the identity to the LAST skip and tested the
+    #     reason against the whole line, so the real skip was swallowed and
+    #     the run stayed green with a browser test silently not executed.
+    local two_on_one="${tmp}/two_on_one.log"
+    printf 'INFO db mod: skipped TestConnectorHootSuite.test_u0_dashboard : Chrome executable not found; skipped %s : %s\n' \
+        "$ALLOWED_SKIP_TEST" "$ALLOWED_SKIP_REASON" > "$two_on_one"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$two_on_one" self-test
+    _expect 1 "a real skip sharing a line with the sanctioned one still fails"
+
+    # 2c. A subtest skip. `getDescription` renders these as
+    #     `Subtest <Class>.<method> (<params>) : <reason>`, which the previous
+    #     pattern did not match at all -- every subtest skip was invisible.
+    local subtest_skip="${tmp}/subtest_skip.log"
+    printf 'INFO db mod: skipped Subtest TestConnectorHootSuite.test_u0_dashboard (i=1) : Chrome executable not found\n' \
+        > "$subtest_skip"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$subtest_skip" self-test
+    _expect 1 "a skipped SUBTEST is not invisible to the skip check"
 
     # 3. A required tour that never ran must fail, even when the marker COUNT
     #    still adds up. This is the subtle case: identity is checked, not just
@@ -692,6 +734,20 @@ fi
 # never ran, which is the entire subject of TD-010. A run that cannot prove its
 # browser evidence executed is not a green run.
 BROWSER_EVIDENCE_STATUS="verified"
+# A mode that does not RUN the HOOT pass has not verified HOOT, and must not
+# say it has. `verify_hoot_evidence` is called only from the non-standard
+# pass, so `--fresh-only`, `--warm-only` and `--skip-nonstandard` previously
+# published `"browser_evidence": "verified"` alongside the full
+# `required_hoot_suites` list while executing zero HOOT suites and emitting
+# zero CONNECTOR-HOOT-EVIDENCE lines. `EVIDENCE_ERRORS` stayed empty, so the
+# fail-closed branch below never fired. That is not a failure -- the mode is
+# allowed to exclude the pass -- but reporting it as verified is.
+if (( ! RUN_NONSTANDARD )); then
+    BROWSER_EVIDENCE_STATUS="partial: tours verified, HOOT not executed"
+fi
+if (( ! RUN_FRESH || ! RUN_WARM )); then
+    BROWSER_EVIDENCE_STATUS="${BROWSER_EVIDENCE_STATUS}; single-pass mode"
+fi
 if (( ${#EVIDENCE_ERRORS[@]} )); then
     BROWSER_EVIDENCE_STATUS="FAILED"
     OVERALL=1
@@ -728,6 +784,7 @@ cat > "$SUMMARY" <<EOF
   "browser_evidence": "${BROWSER_EVIDENCE_STATUS}",
   "required_tour_tests": $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w | tr -d ' '),
   "required_hoot_suites": "${REQUIRED_HOOT_SUITES}",
+  "hoot_suites_executed": $( (( RUN_NONSTANDARD )) && echo true || echo false ),
   "allowed_skip": "${ALLOWED_SKIP_TEST}",
   "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
   "postgres_server_version": "$(psql -tAc 'show server_version;' postgres 2>/dev/null | head -1 | tr -d '[:space:]')",
