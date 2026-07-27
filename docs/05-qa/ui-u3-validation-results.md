@@ -134,6 +134,13 @@ the same user, state and expiry.
 
 ## 5. Not closed, stated plainly
 
+> **Superseded in part on 2026-07-27 by the consolidated U2/U3 evidence-closure
+> batch on this same branch.** Items 1-5, 7 and 8 are CLOSED; item 4's
+> underlying claim turned out to be **wrong** and is corrected in §5A. Items 6
+> and the Odoo.sh/review/UAT absences in §6 stand. The original wording is kept
+> verbatim below rather than rewritten, because a durable record should show
+> what was believed at the time.
+
 `[Fact]`
 
 1. **The U0 HOOT suite still fails to register.** `HootError: error while
@@ -167,6 +174,76 @@ the same user, state and expiry.
    U2 *action* controls (order review, COD reconcile, matching resolve),
    because those write and a tour that leaves state behind is worse than no
    tour. Those remain for the driven runtime campaign with seeded fixtures.
+
+---
+
+## 5A. Addendum (2026-07-27) — what the consolidated closure batch found
+
+`[Fact]` **Item 1 — the U0 HOOT registration failure is diagnosed and fixed,
+and it was never in the dashboard test.** The swallowed cause is:
+
+```
+Error while loading "@shopify_connector_core/js/tours/shopify_connector_u0_tour":
+TypeError: Cannot destructure property 'stepUtils' of 'require(...)' as it is undefined.
+```
+
+`web.assets_unit_tests_setup` does `('include', 'web.assets_backend')`, and
+HOOT builds a per-suite module set from the test file's addon plus that addon's
+**declared Odoo dependencies**, then starts every module in it
+(`web/static/tests/_framework/module_set.hoot.js::defineModuleSet`, read at the
+pin). `web_tour` is not a declared dependency of `shopify_connector_core`, so
+`@web_tour/tour_utils` was filtered out of the set while the tour importing it
+was not — the tour threw, the module set failed, and the suite that merely
+shared the bundle could not register. The three connector tours now live in
+`web.assets_tests`, Odoo's own home for `HttpCase` tours. **Both suites now
+execute: `shopify connector dashboard` 8/8 and `shopify connector export diff`
+11/11**, each verified for its success marker AND its exact executed count.
+
+`[Fact]` **Items 2, 3 and 5 are closed by measurement**, not by argument. See
+[`ui-u2-validation-results.md`](./ui-u2-validation-results.md) §5-§6 and
+[`evidence/wave-5-u2-u3-2026-07-27/`](./evidence/wave-5-u2-u3-2026-07-27/):
+89 screenshots at 1366/768/390 px plus RTL, reduced-motion and focus variants;
+185 measured contrast pairs with 0 connector-owned failures; the reduced-motion
+media query emulated and the computed durations read back.
+
+`[Fact — CORRECTION]` **Item 4's underlying claim was wrong.** RTL was *not*
+"implemented structurally and merely unverified" — it did not work at all.
+Measured under a genuine `ar_001` session with both rtlcss bundles served and
+Odoo's `.o_rtl` class applied, `<html>`, `<body>` and `.o_sc_export_diff` all
+computed `direction: ltr`. Odoo 19's backend RTL mechanism is **rtlcss**, which
+flips *physical* properties in the CSS bundle; the connector's stylesheets are
+written entirely in **logical** properties, which have nothing for rtlcss to
+flip and instead resolve against `direction` — and `direction` was never set.
+`dir="auto"` made it worse, not better: it resolves from the first strong
+character of the *content*, so an Arabic operator reading English operational
+data got `ltr`.
+
+Both connector Owl roots now bind `dir` to the user's locale direction, and
+`u3-export-diff-refusal-and-tag-removal-rtl-1366px.png` is the rendered proof
+that the S7 surface mirrors. **This is the clearest case in the batch for why
+rendered evidence was required: the structural implementation was real, and its
+effect was nil.**
+
+`[Fact]` **Item 7 — `ui-u2-copy-deck.md` now exists**
+([`../06-prompts/ui-u2-copy-deck.md`](../06-prompts/ui-u2-copy-deck.md)), as an
+evidence record of shipped copy.
+
+`[Fact]` **Item 8 — U2's action controls are now driven in a browser.** All
+four sanctioned controls, by an allowed role and by a refused role, with the
+resulting database state asserted, inside a rolled-back transaction and with no
+Shopify contact. Three UI/server disagreements were found by doing it — one of
+them P1: `Confirm First Push` was visible only in the state the server refuses,
+so the sanctioned confirmation was unreachable from the shipped UI. Full record:
+[`ui-u2-validation-results.md`](./ui-u2-validation-results.md) §3.
+
+`[Fact]` **Item 6 stands.** The HOOT suite still imports `mailModels` from
+`@mail/../tests/mail_test_helpers`, so the unit bundle remains coupled to
+`mail` being installed.
+
+`[Fact — record correction]` An earlier report of this branch's work stated
+that the session preceding this one added **six** commits. It added **seven**:
+`5d6f1f5`, `f21f7bb`, `947096f`, `a9e515f`, `940b890`, `a4a9805`, `e117a2e`.
+Recorded here rather than by editing the earlier sentence.
 
 ---
 
