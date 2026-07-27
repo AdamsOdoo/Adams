@@ -1262,8 +1262,45 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         if not next_step:
             preview._record_applied()
             return True
+        # TD-013, post-transport half. The step that just finished DID reach
+        # Shopify, so expiry says nothing about it and it keeps its recorded
+        # outcome. What expiry does forbid is spending that stale
+        # confirmation on the NEXT mutation, so the chain stops here instead
+        # of enqueueing a child whose own pre-C2 guard would block it one
+        # transaction later with a less informative trail.
+        if preview._is_expired():
+            self._block_plan_on_expiry(preview, next_step)
+            return False
         self._enqueue_step(preview, next_step)
         return True
+
+    @api.model
+    def _block_plan_on_expiry(self, preview, next_step):
+        """Stop an in-flight plan whose confirmation aged out mid-chain.
+
+        Every still-pending step is marked `blocked` — not `done` — so the
+        plan records that the export stopped part-applied rather than
+        completing, and the preview is expired with a reason naming the step
+        that was refused. Completed steps and their bindings are untouched:
+        they happened.
+        """
+        plan = dict(preview.apply_plan or {})
+        steps = [dict(step) for step in plan.get('steps') or []]
+        for step in steps:
+            if step.get('state') == 'pending':
+                step['state'] = 'blocked'
+        plan['steps'] = steps
+        preview._record_plan_progress(plan)
+        preview.invalidate_recordset()
+        preview._record_expiry(
+            'expired_before_step_%s' % next_step['step'],
+        )
+        _logger.warning(
+            'Export preview %d expired mid-plan; refused to enqueue step '
+            '%s. Steps already applied are retained.',
+            preview.id, next_step['step'],
+        )
+        return False
 
     @api.model
     def _preview_for_job(self, job):
@@ -1320,6 +1357,42 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             self._fail_closed_pre_c2(
                 ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
                 'This export was never confirmed by a reviewer.',
+            )
+        return self._assert_preview_unexpired_pre_c2(preview)
+
+    @api.model
+    def _assert_preview_unexpired_pre_c2(self, preview):
+        """TD-013: one expiry invariant, bound at every mutation boundary.
+
+        **A stale confirmation must never authorise a new Shopify mutation.**
+
+        The apply orchestrator checks expiry once, before it builds the plan.
+        That check cannot cover the rest of the export: a plan is a chain of
+        separate jobs, each with its own transaction, and between any two of
+        them the confirmation can age past `expires_at` or the operator can
+        edit the template the diff described. Checking once and mutating five
+        times afterwards is the same defect as not checking at all — it just
+        takes longer to reach a merchant's store.
+
+        Deliberately a **pre-C2** guard, and only ever called before the
+        request is built. `ExportPreC2FailClosedError` is the repository's
+        signal for "nothing was transported", so raising it here cannot be
+        confused with an ambiguous outcome: `_recover_pre_c2_failure` blocks
+        the job for manual review with this message attached, which is the
+        operator-facing reason. Nothing is written from inside the guard,
+        because core rolls the transaction back before applying the
+        disposition — a write here would be silently discarded.
+
+        For the post-transport boundary, where a mutation HAS already
+        happened and expiry proves nothing about it, see `_advance_plan`.
+        """
+        if preview._is_expired():
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
+                'The confirmation authorising this export is no longer '
+                'valid: it has passed its expiry or the Odoo product has '
+                'been edited since the operator reviewed the diff. Take a '
+                'fresh preview and confirm it again.',
             )
         return preview
 

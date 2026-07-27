@@ -418,6 +418,12 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 'No confirmed, in-progress export authorises this media '
                 'upload.',
             )
+        # TD-013. `_preview_for_row` proves a preview is `applying`; it does
+        # not prove the confirmation behind it is still valid. The media
+        # families resolve their preview by row rather than by job, so they
+        # never passed through `_assert_confirmed_preview_pre_c2` and were
+        # the three mutation families with no expiry re-check at all.
+        Service._assert_preview_unexpired_pre_c2(preview)
         settings = Service._settings(
             self.env['shopify.connector.store'].browse(
                 local_snapshot['store_id']
@@ -657,6 +663,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 'No confirmed, in-progress export authorises this file '
                 'creation.',
             )
+        Service._assert_preview_unexpired_pre_c2(preview)  # TD-013
         if row.remote_status != 'uploaded' or not row.staged_resource_url:
             Service._fail_closed_pre_c2(
                 ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
@@ -933,6 +940,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 'No confirmed, in-progress export authorises this media '
                 'association.',
             )
+        Service._assert_preview_unexpired_pre_c2(preview)  # TD-013
         # THE gate. Checked here, immediately before the request is built,
         # under the fresh pre-C2 read of local state that the poll wrote.
         if row.remote_status != 'ready':

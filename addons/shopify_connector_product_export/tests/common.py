@@ -133,7 +133,9 @@ class ExportCase(TransactionCase):
 
     def make_preview(
         self, export_path='update', steps=None, state='previewed',
-        binding=None, diff=None, blocked=None, remote_updated_at='2026-07-26T00:00:00Z',
+        binding=None, diff=None, blocked=None,
+        remote_updated_at='2026-07-26T00:00:00Z', expires_at=None,
+        source_write_date=None,
     ):
         """Create a preview through the sanctioned surface.
 
@@ -154,8 +156,30 @@ class ExportCase(TransactionCase):
             'has_blocked_differences': bool(blocked),
             'remote_product_gid': binding.shopify_gid if binding else False,
             'remote_updated_at': remote_updated_at,
-            'source_write_date': self.Preview._source_write_date(self.template),
+            # Overridable so a test can express "the product was edited
+            # after this preview was taken". It cannot be expressed by
+            # actually writing to the template mid-test: Odoo stamps
+            # `write_date` from `cr.now()`, which is the TRANSACTION's
+            # timestamp and is cached on the cursor for its whole life
+            # (`odoo/sql_db.py::BaseCursor.now`). Every write inside one
+            # `TransactionCase` therefore carries the identical
+            # `write_date`, and `_is_expired`'s strictly-greater comparison
+            # can never flip. In production each job is its own
+            # transaction, so the clock does advance -- the mechanism is
+            # sound; only this fixture has to reach it another way.
+            'source_write_date': (
+                source_write_date if source_write_date is not None
+                else self.Preview._source_write_date(self.template)
+            ),
             'previewed_at': now,
-            'expires_at': fields.Datetime.add(now, hours=24),
+            # `expires_at` is settable only here: `_create_preview` is the
+            # CREATE surface and expiry is deliberately not in
+            # `WRITE_SURFACES`, so nothing may move a preview's deadline
+            # after the fact -- not even a test. A TD-013 case that needs an
+            # already-stale confirmation therefore has to be BORN stale.
+            'expires_at': (
+                expires_at if expires_at is not None
+                else fields.Datetime.add(now, hours=24)
+            ),
         }
         return self.Preview._preview_surface('_create_preview').create(values)
