@@ -64,6 +64,7 @@ import logging
 import uuid
 
 import requests
+from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
 from odoo.exceptions import UserError, ValidationError
@@ -114,6 +115,18 @@ MEDIA_STEP_TYPES = MEDIA_MUTATION_DOMAINS + (
 _UPLOAD_CONNECT_TIMEOUT_SECONDS = 10
 _UPLOAD_READ_TIMEOUT_SECONDS = 60
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+# TD-011. The two forms core's `(store_id, idempotency_key)` constraint can
+# surface as: the friendly `models.Constraint` message, which Odoo
+# substitutes only at the HTTP boundary, and the raw index name, which is
+# what an inline savepoint flush actually raises. Both are matched, on the
+# same reasoning as the inventory module's pair-scope equivalents.
+IDEMPOTENCY_CONSTRAINT_MESSAGE = (
+    'A job with this idempotency key already exists for this store.'
+)
+IDEMPOTENCY_CONSTRAINT_NAME = (
+    'shopify_connector_job_store_idempotency_key_uniq'
+)
 
 STAGED_RESOURCE = 'PRODUCT_IMAGE'
 MEDIA_CONTENT_TYPE = 'IMAGE'
@@ -324,12 +337,190 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
     @api.model
     def _enqueue_media_step(self, preview, step):
         row = self._ensure_media_row(preview, step)
-        return self.env['shopify.connector.product.export.service']._enqueue(
-            preview.store_id, step['step'], 'manual_sync',
-            row._name, row.id,
-            shopify_target_gid=preview.remote_product_gid or False,
-            payload_hash='%s:%s' % (step['step'], row.odoo_image_checksum),
+        return self._admit_media_job(
+            preview.store_id, step['step'], row,
+            preview.remote_product_gid or False,
         )
+
+    @api.model
+    def _media_payload_hash(self, row, step_type):
+        """TD-011: the payload hash carries the row's resume ordinal.
+
+        Deterministic for a given (step, image, attempt), so re-dispatching
+        one admitted job replays under its original identity exactly as
+        before. Different across authorised resumes, so a second attempt
+        at an image that failed is a genuinely new job rather than a
+        permanent `(store_id, idempotency_key)` collision.
+        """
+        return '%s:%s:%d' % (
+            step_type, row.odoo_image_checksum, row.resume_attempt,
+        )
+
+    @api.model
+    def _admit_media_job(self, store, step_type, row, target_gid):
+        """Admit one media job, containing a duplicate collision.
+
+        TD-011 requirement: a duplicate admission must not take down work
+        that has nothing to do with it. Without the savepoint the `23505`
+        surfaces during the enclosing flush and poisons the whole
+        transaction, so a single already-admitted image ends the drain pass
+        for every other store in it.
+
+        Only the exact idempotency collision is swallowed, and only after
+        re-confirming that the job it collided with really exists. Every
+        other error -- store state, domain gating, company, illegal
+        transition, an unrelated constraint -- propagates unchanged.
+        """
+        Service = self.env['shopify.connector.product.export.service']
+        payload_hash = self._media_payload_hash(row, step_type)
+
+        def _existing():
+            Job = self.env['shopify.connector.job']
+            Job.flush_model()
+            return Job.sudo().search([
+                ('store_id', '=', store.id),
+                ('job_type', '=', step_type),
+                ('res_model', '=', row._name),
+                ('res_id', '=', row.id),
+                ('payload_hash', '=', payload_hash),
+            ], limit=1)
+
+        existing = _existing()
+        if existing:
+            return existing
+        try:
+            with self.env.cr.savepoint():
+                return Service._enqueue(
+                    store, step_type, 'manual_sync', row._name, row.id,
+                    shopify_target_gid=target_gid,
+                    payload_hash=payload_hash,
+                )
+        except (ValidationError, IntegrityError) as exc:
+            message = str(exc)
+            if (
+                IDEMPOTENCY_CONSTRAINT_MESSAGE not in message
+                and IDEMPOTENCY_CONSTRAINT_NAME not in message
+            ):
+                raise
+            collided = _existing()
+            if not collided:
+                raise
+            _logger.info(
+                'Media step %s for row %d is already admitted under this '
+                'attempt identity; coalescing rather than failing the pass.',
+                step_type, row.id,
+            )
+            return collided
+
+    # ------------------------------------------------------------------
+    # TD-011: authorised resume of a media export that stopped
+    # ------------------------------------------------------------------
+
+    #: Where a resume re-enters the chain, per the row's own remote status.
+    #: `staged` restarts at the staging call because a staged target
+    #: expires; `uploaded` already has one and needs the File created;
+    #: `processing`/`ready` have a File and need the poll or the
+    #: association.
+    RESUME_ENTRY_STEP = {
+        'staged': JOB_TYPE_MEDIA_STAGE,
+        'uploaded': JOB_TYPE_MEDIA_FILE_CREATE,
+        'processing': JOB_TYPE_MEDIA_POLL,
+        'ready': JOB_TYPE_MEDIA_ASSOCIATE,
+        'failed': JOB_TYPE_MEDIA_STAGE,
+    }
+
+    @api.model
+    def _media_resume_blocker(self, row):
+        """Why this row may not be resumed, or `False` if it may be.
+
+        The order matters. Association is checked first because it is the
+        one irreversible outcome: this pipeline is append-only, so a
+        resume that re-ran the association would add a second reference
+        to the same File and there is no detach to undo it.
+
+        Ambiguity is checked next. A resume is a new mutation, and a new
+        mutation may not be admitted while the previous attempt's outcome
+        is unknown -- that is how one uncertain call becomes two real
+        ones. An unresolved `uncertain` attempt already has its own
+        reconciliation and manual-review boundary; the resume waits for
+        it rather than racing it.
+        """
+        if row.remote_status == 'associated':
+            return (
+                'This image is already associated with the product. The '
+                'media pipeline is append-only, so resuming would add a '
+                'second reference to the same File.'
+            )
+        # A `shopify.connector.mutation.attempt` carries no res_model/res_id
+        # of its own -- it belongs to a JOB. So the row's own jobs are the
+        # route to its attempts.
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', row.store_id.id),
+            ('res_model', '=', row._name),
+            ('res_id', '=', row.id),
+        ])
+        if not jobs:
+            return False
+        attempt = self.env['shopify.connector.mutation.attempt'].sudo().search(
+            [('job_id', 'in', jobs.ids)], order='id desc', limit=1,
+        )
+        if (
+            attempt
+            and attempt.observed_outcome in ('pending', 'uncertain')
+            and not attempt.resolution_disposition
+        ):
+            return (
+                'The previous attempt for this image has no established '
+                'outcome yet. It must be reconciled before another mutation '
+                'may be admitted.'
+            )
+        return False
+
+    @api.model
+    def _resume_media_export(self, row):
+        """Admit a fresh attempt at an image whose export stopped.
+
+        Returns the admitted job, or an empty recordset when the row is
+        not resumable -- in which case `resume_blocked_reason` carries the
+        operator-facing explanation.
+
+        The resume gets its OWN durable attempt identity by incrementing
+        `resume_attempt`, which the payload hash includes. Nothing about
+        the previous attempt is rewritten: its job keeps its
+        `idempotency_key`, its logs, its mutation attempts, and the row
+        keeps its checksum, its filename and whatever remote GID it had
+        reached. A resume adds history; it never edits it.
+        """
+        row.ensure_one()
+        preview = self._preview_for_row(row)
+        if not preview:
+            row.sudo().write({
+                'resume_blocked_reason':
+                    'No confirmed, in-progress export authorises a resume '
+                    'of this image.',
+            })
+            return self.env['shopify.connector.job']
+        blocker = self._media_resume_blocker(row)
+        if blocker:
+            row.sudo().write({'resume_blocked_reason': blocker})
+            return self.env['shopify.connector.job']
+        step_type = self.RESUME_ENTRY_STEP.get(
+            row.remote_status, JOB_TYPE_MEDIA_STAGE,
+        )
+        row.sudo().write({
+            'resume_attempt': row.resume_attempt + 1,
+            'resume_blocked_reason': False,
+        })
+        row.invalidate_recordset()
+        job = self._admit_media_job(
+            preview.store_id, step_type, row,
+            preview.remote_product_gid or False,
+        )
+        _logger.info(
+            'Media export resumed for row %d at step %s (attempt %d).',
+            row.id, step_type, row.resume_attempt,
+        )
+        return job
 
     @api.model
     def _row_for_job(self, job):
@@ -375,13 +566,9 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         if not completed:
             return Service._advance_plan(preview, JOB_TYPE_MEDIA_STAGE, False)
         if next_step_type:
-            Service._enqueue(
-                preview.store_id, next_step_type, 'manual_sync',
-                row._name, row.id,
-                shopify_target_gid=preview.remote_product_gid or False,
-                payload_hash='%s:%s' % (
-                    next_step_type, row.odoo_image_checksum,
-                ),
+            self._admit_media_job(
+                preview.store_id, next_step_type, row,
+                preview.remote_product_gid or False,
             )
             return True
         # The associate step is the last link: only then is the plan entry

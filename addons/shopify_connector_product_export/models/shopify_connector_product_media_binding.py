@@ -107,6 +107,35 @@ class ShopifyConnectorProductMediaBinding(models.Model):
     )
     exported_at = fields.Datetime(readonly=True)
     last_verified_at = fields.Datetime(readonly=True)
+    # TD-011. The durable identity of the CURRENT attempt at exporting this
+    # image, and the only thing that distinguishes "the substrate is
+    # re-dispatching the job I already admitted" from "an operator has
+    # authorised a fresh attempt after the last one failed".
+    #
+    # Core derives `idempotency_key` from `payload_hash` and never clears
+    # it -- unlike `operation_scope_key`, it survives the job reaching a
+    # terminal state, which is exactly what makes it a durable replay
+    # guard. The media steps built their `payload_hash` from
+    # `<step>:<checksum>` alone, so every attempt at the same image
+    # produced the identical key forever. The first failure was therefore
+    # permanent: a second attempt collided on
+    # `(store_id, idempotency_key)`, the row could not be unlinked (it is
+    # ownership evidence), and the checksum index refused a replacement
+    # row. Including this ordinal in the hash gives each authorised resume
+    # its own key while leaving replay of a single admitted job perfectly
+    # deterministic -- and without weakening the constraint for anything
+    # else in the system.
+    resume_attempt = fields.Integer(
+        default=0,
+        readonly=True,
+        help='Incremented once per authorised resume of this image export. '
+             'Part of the job payload hash, so each resume gets its own '
+             'durable idempotency identity while a re-dispatch of the same '
+             'job keeps its original one.',
+    )
+    # Set when a resume is refused because the previous attempt's outcome
+    # could not be established. Retained as the operator-facing reason.
+    resume_blocked_reason = fields.Char(readonly=True)
 
     def _odoo_binding_field_name(self):
         # This binding's Odoo-side identity is its parent template/variant
@@ -131,6 +160,8 @@ class ShopifyConnectorProductMediaBinding(models.Model):
             'orphan_cleanup_candidate',
             'exported_at',
             'last_verified_at',
+            'resume_attempt',
+            'resume_blocked_reason',
         ))
 
     # `shopify_gid` is the mixin's required File GID. It cannot be known

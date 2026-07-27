@@ -96,7 +96,26 @@ class TestExportSourceGuards(TransactionCase):
             # and company access were established upstream at enqueue
             # (`enqueue_preview` / `action_confirm_export_preview`).
             'shopify_connector_product_export_service.py': 21,
-            'shopify_connector_media_export_service.py': 20,
+            # 20 -> 26 (TD-011, authorised deliberately). Six elevations,
+            # each reviewed:
+            #   `_admit_media_job`      1 - reads the connector's own job
+            #                               table to coalesce a duplicate
+            #                               admission.
+            #   `_media_resume_blocker` 2 - reads this row's jobs and their
+            #                               mutation attempts to establish
+            #                               whether the previous outcome is
+            #                               still ambiguous.
+            #   `_resume_media_export`  3 - writes `resume_attempt` and
+            #                               `resume_blocked_reason` on the
+            #                               media row, both of which are
+            #                               protected binding fields and so
+            #                               are unwritable without it.
+            # All six touch connector-owned rows only, expose no new
+            # operator-facing surface, and add no user-reachable authority:
+            # a resume is admitted by the same service that already admits
+            # every other media step, under the preview whose authorisation
+            # was established upstream at confirmation.
+            'shopify_connector_media_export_service.py': 26,
             'shopify_connector_product_export_preview.py': 2,
             'shopify_connector_product_export_seams.py': 1,
             'shopify_connector_product_media_binding.py': 0,
