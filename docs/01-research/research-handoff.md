@@ -1,3 +1,93 @@
+### PR #204 final Wave 5 correction cycle (2026-07-27)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `2b704b9c756a2cdce5bae87363b1656d379852b9`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  Nine commits, all fast-forward. No rebase, amend, squash, force-push or
+  history rewrite; the recovery checkpoints are untouched.
+- **Authorization:** the 2026-07-27 product-owner instruction
+  "PR #204 FINAL WAVE 5 CORRECTION, VALIDATION AND UAT-READINESS CYCLE",
+  which assigns this session the correction-worker role and directs it to
+  continue through the complete cycle without another intermediate
+  control-room handoff. **The same standing conflict is flagged again and
+  again not resolved unilaterally:** CLAUDE.md's 2026-07-25 supersession makes
+  Claude the independent reviewer "unless a dated product-owner instruction
+  explicitly assigns a separate Claude session another role". This session
+  read the instruction as that assignment and acted as worker only. A second
+  conflict is recorded for the same reason as the previous entry: the harness
+  designated branch `claude/pr-204-scope-correction-yuqdwl`, while the
+  instruction names `fable/wave-5-completion` as the only authorized push
+  target and forbids creating another branch or PR. The instruction was
+  followed, because it names the branch, the PR and the exact head.
+- **Delivered — the eight mandatory corrections, one commit each:**
+  - **TD-013** expiry re-checked at every mutation boundary. All 8 mutation
+    families reach the guard, including the 3 media families that resolved
+    their preview by row and so had never passed through the assertion at
+    all. Pre-transport fails closed; post-transport blocks the chain without
+    retroactively denying a mutation that already reached Shopify.
+  - **TD-012** the first-push ceremony made reachable. The scheduled pass
+    admits the preview — the trigger the shipped `pending` empty state
+    already promised — instead of a `push_sync` that could only decline and
+    would collide on the pair's scope key. Also fixed the duplicate-prevention
+    query that compared `operation_scope_key` against the pair key and so
+    could never match.
+  - **TD-011** media resume. A `resume_attempt` ordinal in the payload hash
+    separates replay of an admitted job from an authorised new attempt,
+    without weakening `(store_id, idempotency_key)` anywhere or rewriting any
+    audit identity. Duplicate admission is contained so a `23505` can no
+    longer end the drain pass for unrelated stores.
+  - **TD-014** PERF-1 backpressure on the real signal. The accepted
+    D-PERF1-4 lever is used as specified; what was missing was its input.
+    Hysteresis stops the state flapping, and the documented continuous refill
+    lets a deferred store recover with no Shopify call — without which the
+    first deferral would have been permanent.
+  - **TD-015** the PD-PX-7 reconnect reconciliation pass, triggered by the
+    reconnect lifecycle rather than a button, read-only by construction.
+  - **TD-016** an overflow instrument that can actually fail. Classified as an
+    **evidence** correction: no connector-owned clipping was reproduced, so no
+    production CSS changed.
+  - **TD-008** API-version write hardening — default plus `@api.constrains`,
+    column kept, no migration.
+  - **TD-003** one authoritative code→label vocabulary reconciliation, and
+    the two residual stale locations corrected.
+- **Deliberately NOT resolved, and recorded as limitations rather than
+  disguised:** TD-004 (append-only media replacement), TD-005 (`write_files`
+  trade-off), TD-007 (fail-closed refusal on divergent remote options). Each
+  carries an operator-visible consequence written into the register for UAT.
+  TD-002 is unchanged and owned by PR #189.
+- **Two things this session got wrong and corrected mid-cycle**, recorded
+  because the pattern is more useful than the individual fixes:
+  1. A session-local focused-test helper did not export `ODOO_BROWSER_BIN`, so
+     every `HttpCase` **skipped** with "Chrome executable not found" while the
+     run reported green. Two claims were made on that basis and both were
+     withdrawn and re-verified with a real browser. This is TD-010's exact
+     failure shape reappearing in a throwaway script; the canonical runner
+     already refuses to run without a browser, and the helper now resolves one
+     the same way.
+  2. The first version of the TD-016 instrument measured descendants against
+     the *surface's* clipping ancestor, which skipped any scroll container in
+     between and reported a legitimately-scrolling table as a defect. Fixed by
+     walking each descendant's own ancestors. The stylesheet was not touched —
+     the measurement was wrong, not the CSS.
+- **Learning feedback loop.** The recurring lesson across both cycles is that
+  a green result is only evidence if the instrument could have failed. Three
+  separate defects this cycle were of that shape: a check that could not fail
+  (TD-016), a suite that skipped while reporting success (the browser helper),
+  and a coalesce query that could never match (TD-012). Each was found by
+  asking "what would this look like if it were broken?" rather than by reading
+  the result. The corrections all ship with a test that fails without them, and
+  three ship with a structural guard that fails if the defect returns.
+- **Not claimed:** no independent review of the corrected head, no Odoo.sh
+  runtime, no live-Shopify contact of any kind, no UAT, no acceptance,
+  ready-marking or merge. `M-EXP-1 … M-EXP-20` all remain outstanding;
+  `X-EXPORT-0` is neither PASS nor FAIL.
+- **Next recommended session:** a **fresh bounded independent delta review**
+  of the exact corrected head — a separate top-level Claude session or a fresh
+  subagent, never this one. If it passes: exact-head Odoo.sh validation, then
+  controlled live-Shopify validation and UAT.
+
 ### Wave 5 U2/U3 evidence-closure correction (2026-07-27)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

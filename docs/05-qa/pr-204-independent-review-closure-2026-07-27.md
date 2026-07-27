@@ -10,6 +10,8 @@
 | --- | --- |
 | Branch | `fable/wave-5-completion` |
 | Starting head (reviewed SHA) | `9cb7e38a736f04d38684219092fb90c839b45e27` |
+| Recovery checkpoint after the first correction cycle | `2b704b9c756a2cdce5bae87363b1656d379852b9` |
+| Corrected head this record describes | see PR #204 — the final cycle added 9 commits, fast-forward from `2b704b9`, with no amend, rebase, squash or force-push |
 | Bound base | `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` (verified ancestor) |
 | Review artifact | `Pasted text(94).txt`, SHA-256 `e071f34150c8b715e70c3df1a88e4ab0334b19b252136a598961c7cce2b30ae5` (authoritative digest per the 2026-07-27 continuation ruling; the digest named in the original correction prompt did not match any normalization of the file and was corrected by ruling) |
 | Authoritative content | from the heading `PR #204 — Final Independent Review` to end of file |
@@ -40,6 +42,14 @@ claimed or implied anywhere below.
 | **C** | Evidence or governance defect — a false record, not necessarily a broken product |
 | **D** | Live-Shopify validation item — not settleable without an authorized store experiment |
 | **E** | Refuted, downgraded, non-material, or out of accepted MVP scope |
+| **F** | Accepted or scheduled limitation — a real constraint, retained by decision, not a defect left unfixed |
+
+**Every finding below carries exactly one final disposition.** The
+2026-07-27 correction cycle removed the one hybrid this record previously
+carried (`E→ open`), which said both "refuted" and "still open" and was
+therefore neither. A finding is corrected, refuted, an evidence-only
+correction, a live-Shopify item, an accepted/scheduled limitation, or out of
+MVP scope — one of those, and it says which.
 
 ## 3. The P0 — Category B, diagnosed, reclassified A, corrected
 
@@ -112,7 +122,7 @@ material P2 · 5 evidence-only · 5 non-material P2 · 7 refuted/downgraded.**
 | Contrast: connector-owned AA failures | **E** | The final review's own correction stands: 24 connector-owned pairs, **0 failing**; 5 of the 6 disputed rows are `readonly` statusbar buttons Odoo renders `disabled` (WCAG 2.2 exempts inactive components), the 6th is Bootstrap's own `.btn-secondary` border. "0 connector-owned AA failures" is correct. No production change. |
 | Scope-quarantine banner unreachable | **E** | The SEC-3 rule filters those rows out of every non-superuser read — stricter than the banner and correct. Explicitly listed as not-to-be-resurrected. |
 | `_advance_plan` shares the P0's shape | **E** | Refuted by source: `_apply_validated_consequence` writes the predecessor terminal **before** calling `apply_consequence`, so the successor's key is free. Incidental rather than declared, but real. No change. |
-| Overflow instrument unfalsifiable | **E→ open** | `overflow: hidden` on `.o_action_manager` is unconditional at the pin, so a connector surface cannot fail the document-level check; all 15 surfaces recorded exactly `1366 == 1366`. **The instrument is weak, but no connector-owned clipping was demonstrated.** Recorded as outstanding evidence debt below rather than corrected by redesign. |
+
 
 ### Live-Shopify items — Category D, unchanged
 
@@ -124,39 +134,80 @@ is test-pinned to do so; whether Shopify then resolves the app-reserved
 namespace, and whether changing it would strand existing remote identity
 data, cannot be settled from documentation alone.
 
-## 5. Confirmed but NOT corrected in this session
+## 5. The six findings left open on 2026-07-27 — all now corrected
 
-These were investigated, their factual premises **confirmed**, and they are
-**left open**. They are recorded here so no reader mistakes this record for
-a clean bill of health.
+The 2026-07-27 correction cycle recorded six findings as confirmed but not
+corrected. **All six were corrected in the 2026-07-27 final cycle.** They are
+kept here with their original diagnosis, because the diagnosis is what the
+correction had to answer.
 
-| # | Finding | Cat | Evidence | Why not corrected |
+| # | Finding | Cat | Disposition | Correction commit | Regression test |
+| --- | --- | --- | --- | --- | --- |
+| P1 | **Media retry is structurally impossible.** `_enqueue_media_step` overrides the enqueue nonce with a deterministic `'%s:%s' % (step, checksum)`, feeding `idempotency_key`, which — unlike `operation_scope_key` — is **never cleared on a terminal state**. `_ensure_media_row` reuses the row, so a legitimate resume reproduces every key component. | **A** | **Corrected.** A `resume_attempt` ordinal on the media row feeds the payload hash: re-dispatching an admitted job replays under its original identity, an authorised resume gets its own. Uniqueness is not weakened anywhere and no audit identity is rewritten. A resume is refused on an already-associated image and while the previous attempt's outcome is unresolved. Duplicate admission is contained in a savepoint so a `23505` can no longer end the drain pass. | `ad66530` | `test_media_resume.py` (15) |
+| P1 | **First-push confirmation is unreachable.** `_enqueue_first_push_preview` has **zero production callers**; the only writer of `first_push_state='previewed'` is its handler. No button, cron, RPC or wizard reaches it. The shipped UI text promises a scheduled trigger that does not exist. | **A** | **Corrected.** The scheduled push scan now admits the preview for every push-enabled pair still `pending` — the trigger the UI already promised — instead of a `push_sync`, which an unconfirmed pair could only decline and which shares the pair's scope key. Role matrix and company isolation preserved; the duplicate-prevention query that could never match is fixed. | `c341280` | `test_inventory_first_push_reachability.py` (14) + a production-only U2 tour |
+| P1 | **Preview expiry is never re-checked at any mutation boundary.** `_assert_confirmed_preview_pre_c2` checks `state`/`confirmed_uid`/`confirmed_at` and never calls `_is_expired()`. No mutation family re-checks. The create and update paths re-derive their payload from the **live** template while gating on an older confirmation. | **A** | **Corrected.** All 8 mutation families now reach the expiry guard, including the 3 media families that had never passed through the assertion at all. Pre-transport it fails closed with an operator-facing reason; post-transport `_advance_plan` keeps the completed step and blocks the rest, because expiry may not retroactively deny a mutation that already reached Shopify. | `02b14bc` | `test_export_mutation_expiry.py` (13) |
+| P1 | **PERF-1 backpressure can never fire.** One production writer of `api_health_state`, writing `'normal'`; `'throttled'` has never been written by production code in any commit. The packet specified **throttle head-room** with linear back-off; `throttleStatus` is parsed on every response and has **zero consumers**. | **A** | **Corrected, using the accepted mechanism rather than a substitute.** The parsed `throttleStatus` becomes durable store state at the client's single response choke point and drives the existing D-PERF1-4 lever. Two thresholds give hysteresis; the documented continuous refill lets a deferred store recover with no Shopify call, which is what stops the first deferral being permanent. Absent or malformed data changes nothing. | `f1c1470` | `test_throttle_backpressure.py` (16) |
+| P1 | **PD-PX-7 reconnect reconciliation does not exist.** Zero `action_reconnect` references in the export module. A manual "Expire Open Export Previews" button shipped; the spec requires an automatic pass re-reading every exported binding by GID, verifying variant GID sets and media checksums, blocking exports until it completes. | **A** | **Corrected.** The pass is triggered by the reconnect lifecycle itself (via `connection_generation`, which core bumps only on success), re-reads each bound product by GID, verifies existence, archive state, the variant GID set and connector-owned media identity, routes anything missing/archived/divergent to explicit review, and blocks exports until a terminal verdict. Read-only by construction — there is no mutation path in the handler, asserted structurally. | `091d3e7` | `test_export_reconnect_reconcile.py` (23) |
+| P2 | **Overflow instrument cannot fail for connector surfaces.** It compares `documentElement.scrollWidth` against `innerWidth`, but every connector surface renders inside `.o_action_manager`, which is `overflow: hidden` at the pin. All 15 surfaces recorded exactly `1366 == 1366` and no per-surface measurement was stored. | **C** | **Corrected as an EVIDENCE correction.** The instrument now measures per surface and per width, distinguishing an ancestor that *scrolls* the overflow (reachable — §10's sanctioned treatment) from one that *hides* it (gone), and reports clipped descendants with interactive ones flagged. RTL is measured at all three widths. A probe test injects a 4000px element and requires the instrument to report it while the document total is unchanged. **No connector-owned clipping was reproduced, so no production CSS was changed** — the disposition is an evidence correction, not a product defect. | `01ddc1a` | `test_ui_visual_evidence.py` (probe + coverage guard) |
+| — | **Systemic:** three governing specifications silently replaced, each in a document asserting the spec was delivered or unchanged (`$app:binding` → omitted; throttle head-room → `api_health_state`; PD-PX-7 pass → expire-previews) | **C** | **Two of the three are now genuinely implemented as specified** (throttle head-room, `f1c1470`; the PD-PX-7 pass, `091d3e7`), so the substitution no longer exists to record. The third, `$app:binding`, is a **Category D** live-Shopify item and is unchanged — see §4. | — | — |
+
+## 5a. Findings corrected in this cycle that the review raised separately
+
+| Finding | Cat | Disposition | Commit | Regression test |
 | --- | --- | --- | --- | --- |
-| P1 | **Media retry is structurally impossible.** `_enqueue_media_step` overrides the enqueue nonce with a deterministic `'%s:%s' % (step, checksum)`, feeding `idempotency_key`, which — unlike `operation_scope_key` — is **never cleared on a terminal state**. `_ensure_media_row` reuses the row, so a legitimate resume reproduces every key component. | **A** | source, confirmed | Requires a resume-vs-retry design decision (new attempt identity without weakening uniqueness or deleting audit history). Re-introduces the shape TD-001 already catalogued. Not a mechanical fix. |
-| P1 | **First-push confirmation is unreachable.** `_enqueue_first_push_preview` has **zero production callers**; the only writer of `first_push_state='previewed'` is its handler. No button, cron, RPC or wizard reaches it. The shipped UI text promises a scheduled trigger that does not exist. | **A** | source, confirmed | Needs a sanctioned production path (§8.3) preserving the role matrix, company isolation and server-side admission. Must not be solved by weakening the guard. |
-| P1 | **Preview expiry is never re-checked at any mutation boundary.** `_assert_confirmed_preview_pre_c2` checks `state`/`confirmed_uid`/`confirmed_at` and never calls `_is_expired()`. No mutation family re-checks. The create and update paths re-derive their payload from the **live** template while gating on an older confirmation. | **A** | source, confirmed | Touches every mutation family (§8.4). Needs time-crossing tests per family. |
-| P1 | **PERF-1 backpressure can never fire.** One production writer of `api_health_state`, writing `'normal'`; `'throttled'` has never been written by production code in any commit. This PR adds the reader (`de257b2`) and deletes the last `'degraded'` writer (`48ab97c`). The packet specified **throttle head-room** with linear back-off; `throttleStatus` is parsed on every response (`api_client.py:928-940`) and has **zero consumers**. | **A** | source, confirmed | Needs the accepted mechanism rebuilt on real throttle data, or an explicit evidence-backed deviation (§8.5). |
-| P1 | **PD-PX-7 reconnect reconciliation does not exist.** Zero `action_reconnect` references in the export module. A manual "Expire Open Export Previews" button shipped; the spec requires an automatic pass re-reading every exported binding by GID, verifying variant GID sets and media checksums, blocking exports until it completes. | **A** | source, confirmed | Substantial new subsystem (§8.6). |
-| P2 | Overflow instrument cannot fail for connector surfaces | **C** | source + artifacts | Needs a measurement that survives an ancestor clip (§9.10). |
-| — | **Systemic:** three governing specifications silently replaced, each in a document asserting the spec was delivered or unchanged (`$app:binding` → omitted; throttle head-room → `api_health_state`; PD-PX-7 pass → expire-previews) | **C** | source, confirmed | The three substitutions are recorded here; the deviation notices belong with their corrections. |
+| Store `api_version` is writable and non-authoritative | **A** | **Corrected.** The column stays and no migration is performed; a default supplies the constant and an `@api.constrains` refuses a divergent row on create, write, `sudo()`, RPC and import alike. | `f7986b5` | `test_api_version_binding.py` (12) |
+| Product-doc vocabulary diverges from the shipped selections | **C** | **Corrected as a bounded evidence/vocabulary reconciliation.** One authoritative code→label mapping covering all 21 review reasons and the role/group distinction; the two residual stale locations corrected. Not a product-document rewrite. | `b99df8d` | `test_vocabulary_reconciliation.py` (7) |
+
+## 5b. Accepted and scheduled limitations — Category F, retained by decision
+
+These are **not** defects left unfixed, and they are **not** resolved. They
+are constraints kept deliberately, each with a limitation an operator can
+meet and which therefore belongs in UAT.
+
+| # | Limitation | Retained because | What an operator will see |
+| --- | --- | --- | --- |
+| TD-004 | Media replacement is append-only; no `fileDelete`, no automatic detach or orphan cleanup | Removing an association safely needs proof the `File` is not used elsewhere, and the 2026-07 `File` interface exposes no reverse-reference connection. Auto-deleting a File a merchant may have reused is a worse failure than an extra image | Replacing a product image leaves the older media association in place, so the product accumulates one entry per image version until an operator removes the old ones by hand in Shopify |
+| TD-005 | Media export requires `write_files` | `fileUpdate` is the only 2026-07 mutation that associates an existing File with a product, and therefore the only path that honours D-015B-4's READY gate; it accepts `write_files` or `write_themes` and not `write_images`. `write_themes` is never requested. The READY gate was not abandoned to claim the narrower scope | Nothing directly, but the app holds write access to every file in the store rather than only product images — an accepted MVP trade-off pending release-readiness review |
+| TD-007 | Divergent existing remote option structures are refused, never restructured | No 2026-07 option mutation was source-verified as non-destructive; each either removes values or reshapes the variant matrix | A merchant who renames an option or changes an option value in Shopify puts that product into a state where the connector exports nothing for it until somebody reconciles the structure by hand. The refusal is clear rather than a silent partial export, but the product is stuck |
+
+## 5c. Separately owned — not this PR's to close
+
+| # | Item | Owner |
+| --- | --- | --- |
+| TD-002 | Readiness scope-naming | **Wave 4 / PR #189.** Unchanged by this cycle and deliberately not duplicated or transplanted here merely to change its register status |
 
 ## 6. Status of this head
 
-The four correction commits are real corrections with passing local tests.
-They do **not** constitute a completed correction cycle:
+Every finding in the authoritative final review now carries exactly one
+disposition, and every confirmed in-scope defect has been corrected with a
+binding regression test. What that does **and does not** mean:
 
-- **5 P1s remain open** (media retry, first-push reachability, mutation-time
-  expiry, PERF-1 backpressure, PD-PX-7 reconnect) — all with confirmed
-  factual premises.
-- **No definitive exact-head validation has been run** against a head
-  carrying these corrections, and none should be run until the remaining P1s
-  are resolved, because §16 requires the definitive run to be the last thing
-  that touches the head.
-- **PR #204 remains draft, unaccepted, unapproved and unmerged.**
+**Corrected and locally verified.** The P0, the four P1s and four P2s of the
+first cycle, plus TD-011 through TD-016, TD-003 and TD-008 in the final
+cycle. Each correction has regression tests that fail without it, and the
+adjacent module suites pass.
 
-The corrected head is **not** an external-validation candidate. It is a
-better recovery checkpoint than `9cb7e38`, and the next authorized session
-should continue from it rather than restart.
+**Retained by decision, not resolved.** TD-004, TD-005 and TD-007 remain open
+limitations with operator-visible consequences (§5b). TD-002 is unchanged and
+belongs to PR #189 (§5c). **This head does not have zero technical debt, and
+this record does not claim it does.**
+
+**Not established at this head:**
+
+| Evidence class | State |
+| --- | --- |
+| Independent review of the corrected head | **Not performed** |
+| Odoo.sh runtime validation at the exact head | **Not performed** |
+| Live-Shopify validation — `M-EXP-1 … M-EXP-20` | **All outstanding.** `X-EXPORT-0` is neither PASS nor FAIL |
+| UAT | **Not begun** |
+
+**PR #204 remains draft, unaccepted, unapproved and unmerged.**
+
+The recommended next gate is a **fresh bounded independent delta review** of
+the corrected head, then exact-head Odoo.sh validation if that passes, then
+controlled live-Shopify validation and UAT if Odoo.sh passes. Nothing in this
+record is an acceptance, and the session that produced it may not perform the
+review.
 
 ## 7. What survived scrutiny
 

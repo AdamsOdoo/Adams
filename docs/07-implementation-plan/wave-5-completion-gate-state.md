@@ -401,6 +401,50 @@ is a genuinely narrower class. **U3's visual-artifact criteria are met locally
 and are NOT met at §14's stated bar.** No Odoo.sh runtime, no independent
 review, no UAT, no acceptance.
 
+### 5e.3 PR #204 correction cycles — 2026-07-27
+
+> **Status: implementing-session record. NOT an acceptance, NOT a review, NOT
+> a runtime or UAT claim.**
+
+Two correction cycles ran on `fable/wave-5-completion` on 2026-07-27, both
+fast-forward, with no amend, rebase, squash or force-push at any point.
+
+**First cycle** (head `9cb7e38` → `2b704b9`, 6 commits). Confirmed the P0 by
+execution and fixed it; corrected the SKU query encoding, the Export Settings
+view binding, the false RTL root cause, three stale tracker surfaces and four
+runner/guard integrity defects. Ended with **six confirmed findings recorded
+and not corrected**, registered TD-011 … TD-016.
+
+**Final cycle** (head `2b704b9` → the head recorded in PR #204, 9 commits).
+All six are now corrected, together with TD-003 and TD-008:
+
+| Item | Disposition |
+| --- | --- |
+| TD-011 media retry/resume | Corrected — resume ordinal in the payload hash; uniqueness not weakened, no audit identity rewritten; duplicate admission contained |
+| TD-012 first-push reachability | Corrected — the scheduled pass admits the preview, which is the trigger the shipped UI already promised |
+| TD-013 mutation-time expiry | Corrected — all 8 mutation families; pre-transport fails closed, post-transport blocks the chain without denying what already happened |
+| TD-014 PERF-1 backpressure | Corrected — the accepted D-PERF1-4 mechanism, driven by the real `throttleStatus` it had always parsed and never consumed |
+| TD-015 PD-PX-7 reconnect | Corrected — the specified pass, triggered by the reconnect lifecycle, read-only by construction |
+| TD-016 overflow instrument | Corrected as an **evidence** correction — no connector-owned clipping was reproduced, so no production CSS changed |
+| TD-003 vocabulary | Corrected — one authoritative code→label reconciliation; the two residual stale locations fixed |
+| TD-008 API-version writes | Corrected — default plus `@api.constrains`; column kept, no migration |
+
+**Retained deliberately, and NOT resolved:** TD-004 (append-only media
+replacement), TD-005 (`write_files` least-privilege trade-off), TD-007
+(fail-closed refusal on divergent remote option structures). Each carries an
+operator-visible limitation recorded for UAT in the technical-debt register.
+**TD-002 is unchanged and owned by PR #189.**
+
+**What this does not establish.** No independent review of the corrected
+head, no Odoo.sh runtime, no live-Shopify evidence of any kind, no UAT.
+`M-EXP-1 … M-EXP-20` all remain outstanding and `X-EXPORT-0` remains neither
+PASS nor FAIL. G5-1 … G5-9 are unaffected by this record. PR #204 remains
+draft, unaccepted, unapproved and unmerged, and the recommended next gate is
+a fresh bounded independent delta review.
+
+Full per-finding disposition:
+[`pr-204-independent-review-closure-2026-07-27.md`](../05-qa/pr-204-independent-review-closure-2026-07-27.md).
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.
