@@ -274,7 +274,36 @@
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
             <form string="Exported Media" create="false" delete="false">
+                <header>
+                    <!--
+                        TD-011. The one production route to the resume
+                        service. Offered only where the server would admit
+                        it: an `associated` row is refused (the pipeline is
+                        append-only, so a second association cannot be
+                        undone), so showing the control there would teach
+                        operators that this button sometimes lies. The
+                        `groups` attribute is convenience only: the real
+                        authority check lives in
+                        `action_shopify_resume_media_export`, which is what
+                        an RPC call reaches.
+                    -->
+                    <button name="action_shopify_resume_media_export"
+                            type="object"
+                            string="Resume Export"
+                            class="btn-primary"
+                            invisible="remote_status == 'associated'"
+                            groups="shopify_connector_core.group_shopify_connector_operator,shopify_connector_core.group_shopify_connector_admin"
+                            help="Admit a fresh attempt at exporting this
+                                  image. Nothing is sent to Shopify now: the
+                                  attempt runs on the job queue."/>
+                </header>
                 <sheet>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not resume_blocked_reason">
+                        <strong>This export was not resumed.</strong>
+                        <field name="resume_blocked_reason" readonly="1"
+                               nolabel="1" class="d-inline"/>
+                    </div>
                     <div class="alert alert-info" role="status"
                          invisible="not orphan_cleanup_candidate">
                         A newer image superseded this one. The remote File and
@@ -295,6 +324,8 @@
                         <group string="State">
                             <field name="media_role" readonly="1"/>
                             <field name="remote_status" readonly="1"/>
+                            <field name="resume_attempt" readonly="1"
+                                   string="Resume Attempts"/>
                             <field name="orphan_cleanup_candidate" readonly="1"/>
                             <field name="exported_at" readonly="1"/>
                             <field name="last_verified_at" readonly="1"/>

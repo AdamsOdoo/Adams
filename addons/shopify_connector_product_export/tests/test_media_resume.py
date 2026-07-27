@@ -37,6 +37,8 @@ import base64
 import uuid
 from unittest.mock import patch
 
+from odoo import fields
+from odoo.exceptions import AccessError
 from odoo.tests.common import tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attempt import (
@@ -504,3 +506,334 @@ class TestMediaResume(ExportCase):
             'resume ordinal, so a failed attempt could never be resumed '
             '(TD-011): %s' % offenders
         ))
+
+
+@tagged('post_install', '-at_install')
+class TestMediaResumeProductionRoute(ExportCase):
+    """TD-011 correction: the resume is reachable by an operator.
+
+    The first TD-011 implementation shipped `_resume_media_export` and no
+    production caller. Its every visible caller was a test, which means the
+    repository described a capability an operator could not use: a
+    leading-underscore service helper is not an RPC surface, is not a
+    button, is not a cron, and is not reachable from any menu.
+
+    These tests exercise `action_shopify_resume_media_export` -- the public
+    action on the exported-media registry, wired to the button on its form
+    -- because that is the route a real click takes. The helper-level tests
+    above stay as focused unit coverage of the ordinal mechanism; they are
+    explicitly NOT the proof that the route exists.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.binding = self.bind_template()
+        self.settings.sudo().write({'media_source_of_truth': 'odoo'})
+        self.template.write({'image_1920': PNG_1X1})
+        self.checksum = image_checksum(base64.b64decode(PNG_1X1))
+        self.Job = self.env['shopify.connector.job']
+        self.operator = self._user_in('group_shopify_connector_operator')
+        self.auditor = self._user_in('group_shopify_connector_auditor')
+
+    # ------------------------------------------------------------------
+    # Fixtures
+    # ------------------------------------------------------------------
+
+    def _user_in(self, group):
+        return self.env['res.users'].sudo().create({
+            'name': 'TD-011 %s' % group,
+            'login': 'td011_%s_%d' % (group, self.store.id),
+            'group_ids': [(6, 0, [
+                self.env.ref('shopify_connector_core.%s' % group).id,
+            ])],
+        })
+
+    def _applying_preview(self):
+        preview = self.make_preview(
+            export_path='update', binding=self.binding, state='applying',
+            steps=[{'step': JOB_TYPE_MEDIA_STAGE, 'state': 'pending',
+                    'role': 'primary', 'checksum': self.checksum,
+                    'odoo_variant_id': False}],
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        return preview
+
+    def _stopped_row(self):
+        """A media row whose export genuinely stopped, built the real way."""
+        preview = self._applying_preview()
+        job = self.Media._enqueue_media_step(
+            preview, {'step': JOB_TYPE_MEDIA_STAGE, 'role': 'primary',
+                      'checksum': self.checksum, 'odoo_variant_id': False},
+        )
+        job.sudo().write({'state': 'failed_final'})
+        self.env.flush_all()
+        return self.MediaBinding.browse(job.res_id), job
+
+    def _as(self, user, row):
+        """The row as that user would hold it -- no elevation anywhere."""
+        return row.with_user(user)
+
+    def _jobs_for(self, row):
+        return self.Job.sudo().search([
+            ('store_id', '=', self.store.id),
+            ('res_model', '=', row._name),
+            ('res_id', '=', row.id),
+        ])
+
+    # ------------------------------------------------------------------
+    # 1. The route exists and admits the right job
+    # ------------------------------------------------------------------
+
+    def test_the_action_is_public_and_not_an_underscore_helper(self):
+        """An RPC/UI action may not be a private method.
+
+        Asserted rather than assumed: Odoo refuses to call a
+        leading-underscore method from a button or over RPC, so shipping
+        one as the "route" would be shipping no route at all.
+        """
+        name = 'action_shopify_resume_media_export'
+        self.assertFalse(name.startswith('_'))
+        self.assertTrue(callable(getattr(self.MediaBinding, name)))
+
+    def test_the_form_button_names_this_action(self):
+        """The button an operator actually presses reaches this method.
+
+        Reads the installed view record, not the source file, so a view
+        that failed to load or an `arch` a later inherit rewrote would fail
+        here rather than pass on the strength of the XML on disk.
+        """
+        view = self.env.ref(
+            'shopify_connector_product_export.'
+            'view_shopify_connector_product_media_binding_form'
+        )
+        self.assertIn('action_shopify_resume_media_export', view.arch_db)
+        action = self.env.ref(
+            'shopify_connector_product_export.'
+            'action_shopify_connector_product_media_binding'
+        )
+        self.assertEqual(action.res_model, self.MediaBinding._name)
+        menu = self.env.ref(
+            'shopify_connector_product_export.'
+            'menu_shopify_connector_product_export_media'
+        )
+        self.assertEqual(
+            menu.action.id, action.id,
+            'The resume has to live on the registry surface that is already '
+            'on the menu, not behind a second parallel menu.',
+        )
+
+    def test_an_authorised_operator_admits_the_resume_through_the_action(self):
+        row, first = self._stopped_row()
+        result = self._as(self.operator, row).\
+            action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(row.resume_attempt, 1)
+        admitted = self._jobs_for(row) - first
+        self.assertEqual(len(admitted), 1)
+        self.assertEqual(admitted.job_type, JOB_TYPE_MEDIA_STAGE)
+        self.assertNotEqual(admitted.idempotency_key, first.idempotency_key)
+        self.assertEqual(result['params']['type'], 'success')
+        self.assertIn(str(admitted.id), result['params']['message'])
+
+    def test_the_route_reaches_the_service_the_helper_tests_exercise(self):
+        """The two must not drift into separate implementations."""
+        import inspect
+
+        source = inspect.getsource(
+            type(self.MediaBinding).action_shopify_resume_media_export
+        )
+        self.assertIn('_resume_media_export', source)
+
+    # ------------------------------------------------------------------
+    # 2. What the route refuses
+    # ------------------------------------------------------------------
+
+    def test_an_unauthorised_role_is_refused(self):
+        """An Auditor may read the registry and may not admit a mutation."""
+        row, _first = self._stopped_row()
+        with self.assertRaises(AccessError):
+            self._as(self.auditor, row).action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(
+            row.resume_attempt, 0,
+            'A refused role must not consume an attempt identity.',
+        )
+
+    def test_another_companys_store_is_refused(self):
+        row, _first = self._stopped_row()
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'TD-011 Other Company',
+        })
+        stranger = self.env['res.users'].sudo().create({
+            'name': 'TD-011 other-company operator',
+            'login': 'td011_other_company_%d' % self.store.id,
+            'company_id': other_company.id,
+            'company_ids': [(6, 0, [other_company.id])],
+            'group_ids': [(6, 0, [
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
+                ).id,
+            ])],
+        })
+        with self.assertRaises(AccessError):
+            self._as(stranger, row).action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(row.resume_attempt, 0)
+
+    def test_an_already_associated_row_is_refused_through_the_action(self):
+        """Append-only: a second association cannot be undone."""
+        row, first = self._stopped_row()
+        row.sudo().write({
+            'shopify_gid': FILE_GID, 'remote_status': 'associated',
+        })
+        self.env.flush_all()
+        result = self._as(self.operator, row).\
+            action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(result['params']['type'], 'danger')
+        self.assertIn('already associated', result['params']['message'])
+        self.assertEqual(row.resume_attempt, 0)
+        self.assertEqual(
+            self._jobs_for(row), first,
+            'No job may be admitted for an already-associated image.',
+        )
+
+    def test_an_unresolved_previous_outcome_is_refused_through_the_action(self):
+        """A new mutation may not be admitted over an unknown outcome."""
+        row, job = self._resume_with_uncertain_attempt()
+        result = self._as(self.operator, row).\
+            action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(result['params']['type'], 'danger')
+        self.assertIn('reconciled', result['params']['message'])
+        self.assertEqual(row.resume_attempt, 0)
+        self.assertEqual(self._jobs_for(row), job)
+
+    def _resume_with_uncertain_attempt(self):
+        """A row whose last attempt has no established outcome.
+
+        Built through the real Layer 2 C2 surface -- the same fixture the
+        helper-level tests use, deliberately shared rather than
+        reconstructed, because an attempt written column-by-column is not a
+        state production can reach.
+        """
+        preview = self._applying_preview()
+        job = self.Media._enqueue_media_step(
+            preview, {'step': JOB_TYPE_MEDIA_STAGE, 'role': 'primary',
+                      'checksum': self.checksum, 'odoo_variant_id': False},
+        )
+        row = self.MediaBinding.browse(job.res_id)
+        token = uuid.uuid4().hex
+        job.sudo().write({'state': 'running', 'current_attempt_token': token})
+        self.env.flush_all()
+        attempt = self.env[
+            'shopify.connector.mutation.attempt'
+        ].with_context(**{
+            C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+        })._create_attempt_intent({
+            'job_id': job.id,
+            'attempt_token': token,
+            'mutation_domain': job.job_type,
+            'expected_connection_generation':
+                job.store_id.connection_generation,
+            'expected_store_identity': job.store_id.shop_domain,
+            'remote_mutation_intent': {'job_id': job.id},
+            'preconditions_snapshot': {},
+            'shopify_idempotency_key': uuid.uuid4().hex,
+        })
+        attempt._record_direct_outcome('uncertain')
+        job.sudo().write({
+            'state': 'blocked_manual_review',
+            'manual_review_subreason': 'idempotency_contract_violation',
+        })
+        self.env.flush_all()
+        return row, job
+
+    def test_a_row_with_no_authorising_export_is_refused(self):
+        row = self.MediaBinding.sudo().create({
+            'store_id': self.store.id,
+            'product_template_binding_id': self.binding.id,
+            'media_role': 'primary',
+            'odoo_image_checksum': self.checksum,
+            'connector_filename': self.Media._connector_filename(
+                self.template.id, self.checksum,
+            ),
+            'shopify_gid': 'pending:orphan-%s' % self.checksum[:8],
+            'remote_status': 'failed',
+        })
+        result = self._as(self.operator, row).\
+            action_shopify_resume_media_export()
+        self.assertEqual(result['params']['type'], 'danger')
+        self.assertIn('authorises', result['params']['message'])
+
+    # ------------------------------------------------------------------
+    # 3. A repeated click admits nothing further
+    # ------------------------------------------------------------------
+
+    def test_a_repeated_click_coalesces_without_a_second_admission(self):
+        """The impatient-double-click case, and it is not hypothetical.
+
+        Each press used to increment the ordinal, which produced a DIFFERENT
+        payload hash, which meant `_admit_media_job`'s collision handling
+        could not catch it -- by construction, the two attempts do not
+        collide. Two live jobs for one image, and both would upload.
+        """
+        row, first = self._stopped_row()
+        acting = self._as(self.operator, row)
+        acting.action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        after_first = row.resume_attempt
+        jobs_after_first = self._jobs_for(row)
+
+        result = acting.action_shopify_resume_media_export()
+        row.invalidate_recordset()
+
+        self.assertEqual(
+            row.resume_attempt, after_first,
+            'The ordinal is consumed only when an attempt is actually '
+            'admitted, never by a button press that admitted nothing.',
+        )
+        self.assertEqual(
+            self._jobs_for(row), jobs_after_first,
+            'A second click must not admit a second live job for one image.',
+        )
+        self.assertEqual(result['params']['type'], 'warning')
+        self.assertIn('already queued', result['params']['message'])
+
+    def test_a_resume_is_admitted_again_once_the_previous_one_stopped(self):
+        """The coalesce is not a wall: it holds only while work is live."""
+        row, _first = self._stopped_row()
+        acting = self._as(self.operator, row)
+        acting.action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        outstanding = self.Media._outstanding_media_job(row)
+        self.assertTrue(outstanding)
+        outstanding.sudo().write({'state': 'failed_final'})
+        self.env.flush_all()
+
+        acting.action_shopify_resume_media_export()
+        row.invalidate_recordset()
+        self.assertEqual(row.resume_attempt, 2)
+
+    # ------------------------------------------------------------------
+    # 4. Nothing is transported by the route itself
+    # ------------------------------------------------------------------
+
+    def test_the_action_issues_no_shopify_request(self):
+        """Admission is bookkeeping; the transport is a separate job."""
+        row, _first = self._stopped_row()
+        Client = type(self.env['shopify.connector.api.client'])
+        with patch.object(Client, '_send') as sent:
+            self._as(self.operator, row).action_shopify_resume_media_export()
+        sent.assert_not_called()
+
+    def test_the_admitted_job_is_queued_not_running(self):
+        """The route hands work to the dispatcher; it does not run it."""
+        row, first = self._stopped_row()
+        self._as(self.operator, row).action_shopify_resume_media_export()
+        admitted = self._jobs_for(row) - first
+        self.assertEqual(admitted.state, 'queued')
+        self.assertFalse(admitted.started_at)

@@ -115,7 +115,18 @@ class TestExportSourceGuards(TransactionCase):
             # a resume is admitted by the same service that already admits
             # every other media step, under the preview whose authorisation
             # was established upstream at confirmation.
-            'shopify_connector_media_export_service.py': 26,
+            #
+            # 26 -> 28 (TD-011 correction, 2026-07-27). Two more:
+            #   `_outstanding_media_job` 1 - reads this row's own jobs to
+            #                                find one still queued, so a
+            #                                repeated resume coalesces
+            #                                instead of admitting a second
+            #                                live attempt at one image.
+            #   `_resume_media_export`   1 - clears `resume_blocked_reason`
+            #                                on the coalesce path; same
+            #                                protected field, same reason as
+            #                                the three above.
+            'shopify_connector_media_export_service.py': 28,
             'shopify_connector_product_export_preview.py': 2,
             # TD-015 moved the PD-PX-7 stub out of the seams file into
             # `shopify_connector_export_reconnect.py`, where the pass now
@@ -140,7 +151,18 @@ class TestExportSourceGuards(TransactionCase):
             # succeeded, and the manual re-run checks Reviewer/Administrator
             # authority AND company access before anything elevates.
             'shopify_connector_export_reconnect.py': 11,
-            'shopify_connector_product_media_binding.py': 0,
+            # 0 -> 1 (TD-011 correction, 2026-07-27). The public resume
+            # action reads its own store's company through `sudo()` to
+            # compare it against the acting user's allowed companies. It is
+            # a read of one field on the store this row already belongs to,
+            # and it happens AFTER the role check and AFTER
+            # `check_access('read')` has re-run the model ACL and both
+            # company record rules for the acting user on this row. Nothing
+            # is written under it, and the elevation exists so the company
+            # comparison itself cannot be defeated by a record rule that
+            # would hide the store and turn "wrong company" into "no
+            # company".
+            'shopify_connector_product_media_binding.py': 1,
             'shopify_connector_product_export_wizards.py': 0,
             # U3: the export preview projection reads as the CURRENT user on
             # purpose, so the ordinary ACL and the SEC-3 company record rules

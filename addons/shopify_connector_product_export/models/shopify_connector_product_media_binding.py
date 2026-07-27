@@ -191,6 +191,126 @@ class ShopifyConnectorProductMediaBinding(models.Model):
         )
 
     # ------------------------------------------------------------------
+    # TD-011: the production route to the resume service
+    # ------------------------------------------------------------------
+
+    def action_shopify_resume_media_export(self):
+        """Resume a stopped image export. The operator-facing entrance.
+
+        TD-011 shipped `_resume_media_export` with no production caller: a
+        leading-underscore service helper reachable only from tests, which
+        makes it a capability the repository *describes* and an operator
+        cannot use. This is that capability's one door -- a public action
+        on the registry that already owns this surface, wired to the button
+        on its form.
+
+        Authority is derived from the repository's own accepted matrix, not
+        chosen here. `action_manual_retry` admits **Operator or
+        Administrator** for every retry state except
+        `blocked_manual_review`, and `enqueue_preview` -- the other place
+        work is admitted into the export pipeline -- admits the same two.
+        A resume is a retry that admits work, so it takes that pair.
+        `blocked_manual_review` is not reachable through this door at all:
+        an unresolved mutation outcome is refused below, and its
+        resolution stays on the Reviewer's `action_resolve_mutation_attempt`
+        surface where it already lives.
+
+        Both checks that bound the elevation run BEFORE it, in the order
+        that matters:
+
+        1. **Role.** Checked first so an unauthorised user learns nothing
+           about whether the row exists.
+        2. **Record access + company.** `check_access('read')` re-runs the
+           model ACL *and* the two company record rules for THIS user on
+           THIS row, which is what keeps SEC-3 store scoping intact -- the
+           service that runs next is entirely `sudo()`, so this is the last
+           point at which the acting user's own access is consulted.
+
+           `read`, not `write`, and deliberately: the Operator's ACL row on
+           this model is `1,0,0,0` and every column here is a protected
+           binding field no role may write directly. Demanding `write`
+           would refuse the exact role the accepted matrix admits, and
+           granting it would broaden an ACL to satisfy a check rather
+           than a need. This follows core's own pattern -- an Operator
+           has read-only ACL on `shopify.connector.job` and still invokes
+           `action_manual_retry`, whose writes go through `sudo()` after
+           the role gate.
+
+        No Shopify traffic occurs here. The resume ADMITS a job; the
+        dispatcher runs it later, on its own transaction, through the same
+        transport every other media step uses.
+        """
+        self.ensure_one()
+        if not (
+            self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_operator'
+            )
+            or self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            )
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Operator or Administrator may '
+                'resume a media export.'
+            )
+        # Deliberately the un-elevated recordset: `self` here is browsed as
+        # the acting user, so this is a real ACL/record-rule evaluation and
+        # not a formality performed on a sudo() recordset.
+        self.check_access('read')
+        store = self.store_id.sudo()
+        if store.company_id and store.company_id not in self.env.user.company_ids:
+            raise AccessError(
+                'This Shopify store belongs to another company.'
+            )
+
+        Media = self.env['shopify.connector.media.export.service']
+        outstanding = Media._outstanding_media_job(self)
+        before = self.resume_attempt
+        job = Media._resume_media_export(self)
+        self.invalidate_recordset()
+        if not job:
+            # The service has recorded the reason durably on the row. A
+            # raise would roll that write back, so the refusal is reported
+            # as a sticky notification instead -- the operator sees it now
+            # AND the registry keeps it.
+            return self._resume_notification(
+                'danger',
+                'Media export not resumed',
+                self.resume_blocked_reason or (
+                    'This image export cannot be resumed.'
+                ),
+            )
+        if outstanding and job == outstanding:
+            return self._resume_notification(
+                'warning',
+                'Already in progress',
+                'This image export is already queued as job %d (attempt %d). '
+                'Nothing further was admitted.' % (job.id, before),
+            )
+        return self._resume_notification(
+            'success',
+            'Media export resumed',
+            'Attempt %d admitted as job %d, starting at step "%s". It runs '
+            'on the job queue; no Shopify call has been made yet.' % (
+                self.resume_attempt, job.id, job.job_type,
+            ),
+        )
+
+    def _resume_notification(self, tone, title, message):
+        """One operator-visible result, success or refusal alike."""
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'type': tone,
+                'title': title,
+                'message': message,
+                'sticky': tone != 'success',
+                'next': {'type': 'ir.actions.act_window_close'},
+            },
+        }
+
+    # ------------------------------------------------------------------
     # SEC-3 (#197): same-store consistency with BOTH connector parents.
     # ------------------------------------------------------------------
 

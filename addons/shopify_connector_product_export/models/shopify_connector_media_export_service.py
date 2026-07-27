@@ -128,6 +128,14 @@ IDEMPOTENCY_CONSTRAINT_NAME = (
     'shopify_connector_job_store_idempotency_key_uniq'
 )
 
+# TD-011 correction. The job states that still reach a dispatcher without
+# anybody doing anything: a job in one of these will run (or retry) on its
+# own, so a second resume request while one is outstanding must COALESCE on
+# it rather than admit a parallel attempt at the same image. The remaining
+# non-terminal states (`failed_retryable`, `blocked_manual_review`) require a
+# deliberate operator act to move, which is exactly what a resume is.
+MEDIA_JOB_OUTSTANDING_STATES = ('draft', 'queued', 'running', 'retry_waiting')
+
 STAGED_RESOURCE = 'PRODUCT_IMAGE'
 MEDIA_CONTENT_TYPE = 'IMAGE'
 # `fileCreate` requires a content type; the Odoo image pipeline normalises to
@@ -477,12 +485,34 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         return False
 
     @api.model
+    def _outstanding_media_job(self, row):
+        """The job for this row that is still going to run by itself.
+
+        TD-011 correction. Without this, two resume requests in a row --
+        an impatient double-click, or an operator returning to a screen
+        that still shows the failure -- each incremented `resume_attempt`,
+        each produced a DIFFERENT payload hash, and each therefore
+        admitted its own job. `_admit_media_job`'s collision handling
+        cannot catch that: the two attempts are, by construction, not
+        colliding. Two live jobs for one image is exactly the duplicate
+        admission the resume ordinal exists to make safe.
+        """
+        return self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', row.store_id.id),
+            ('res_model', '=', row._name),
+            ('res_id', '=', row.id),
+            ('state', 'in', MEDIA_JOB_OUTSTANDING_STATES),
+        ], order='id desc', limit=1)
+
+    @api.model
     def _resume_media_export(self, row):
         """Admit a fresh attempt at an image whose export stopped.
 
         Returns the admitted job, or an empty recordset when the row is
         not resumable -- in which case `resume_blocked_reason` carries the
-        operator-facing explanation.
+        operator-facing explanation. When a previous attempt is still
+        outstanding, returns THAT job unchanged: a resume coalesces on
+        work already queued instead of racing it.
 
         The resume gets its OWN durable attempt identity by incrementing
         `resume_attempt`, which the payload hash includes. Nothing about
@@ -490,6 +520,11 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         `idempotency_key`, its logs, its mutation attempts, and the row
         keeps its checksum, its filename and whatever remote GID it had
         reached. A resume adds history; it never edits it.
+
+        The ordinal is consumed ONLY when a new attempt is actually
+        admitted. A refused resume and a coalesced one both leave it
+        exactly where it was, so the attempt identities stay a faithful
+        count of real attempts rather than of button presses.
         """
         row.ensure_one()
         preview = self._preview_for_row(row)
@@ -504,6 +539,14 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         if blocker:
             row.sudo().write({'resume_blocked_reason': blocker})
             return self.env['shopify.connector.job']
+        outstanding = self._outstanding_media_job(row)
+        if outstanding:
+            row.sudo().write({'resume_blocked_reason': False})
+            _logger.info(
+                'Media export resume for row %d coalesced on job %d, which '
+                'is still outstanding.', row.id, outstanding.id,
+            )
+            return outstanding
         step_type = self.RESUME_ENTRY_STEP.get(
             row.remote_status, JOB_TYPE_MEDIA_STAGE,
         )
