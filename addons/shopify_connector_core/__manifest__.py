@@ -66,15 +66,22 @@ later, separately authorized tasks.
         'views/shopify_connector_dashboard_views.xml',
         'views/shopify_connector_ui_wizard_views.xml',
         'views/shopify_connector_store_views.xml',
-        # S1: the setup client action, its Configuration menu, and the
-        # re-run button on the store form. After the store views it
-        # inherits, and after the dashboard action its Save & Exit returns
-        # to.
-        'views/shopify_connector_setup_views.xml',
         'views/shopify_connector_job_log_views.xml',
         'views/shopify_connector_job_views.xml',
         'views/shopify_connector_mutation_attempt_views.xml',
         'views/shopify_connector_menus.xml',
+        # S1 LOADS LAST, and the ordering is load-bearing rather than tidy.
+        #
+        # This file needs BOTH `view_shopify_connector_store_form` (which it
+        # inherits, from the store views) and `menu_shopify_connector_root`
+        # (which its Configuration branch hangs off, from the menus file). It
+        # was originally placed beside the store views, where the menu ref did
+        # not yet exist -- invisible on a warm `-u` update of a database that
+        # already had the menu, and a hard `ParseError` on a FRESH install.
+        # The fresh-install pass in `tools/run_connector_suite.sh` is what
+        # caught it, which is exactly the failure family that pass exists for
+        # (issue #193: fresh and warm are not interchangeable).
+        'views/shopify_connector_setup_views.xml',
     ],
     'assets': {
         'web.assets_backend': [
