@@ -56,11 +56,49 @@ stay `Implemented — pending external validation`; none moves to
 | **TD-011** | The resume service had **no production caller** — every visible caller was a test. The row read "a stopped media export can be resumed"; an operator could not resume one. The 15 tests all called the private helper directly | A public `action_shopify_resume_media_export` on the exported-media registry, wired to a button on the form the existing menu opens. Operator/Administrator, `check_access('read')` and a company check before any elevation. The resume ordinal is consumed only on real admission, and a repeated click coalesces instead of admitting a second live attempt at one image. **13** regressions through the public action, plus a browser tour that presses the control on the real surface and asserts the queued job afterwards |
 | **TD-013** | Correctly implemented, **insufficiently evidenced**. All 13 tests called `_prepare_preconditions_*`/`_advance_plan` directly, which is unit coverage of the guard and not proof it is bound into the route a real mutation job takes | One `-standard` class drives `run_drain()` on a genuine pooled connection through the real claim, `_drain_mutation_one` and the registered `prepare_preconditions`, asserting zero calls at the transport choke point, the accepted fail-closed state, and no child mutation job. A companion control lets an unexpired confirmation through, so the refusal cannot pass on a dead route |
 | **TD-014** | Throttle pressure was evaluated **once per pass, before the claim loop**. A store reporting 2% head-room on its first job could still have four more claimed by that same pass — the precise burst backpressure exists to prevent. The 16 tests pulled the lever themselves and never asked whether mid-pass state changed later claims | The deferred set is re-read before every claim and **unioned**, so pressure binds the rest of the pass while unrelated stores keep draining; the mid-pass read does not re-project recovery, so a pass can only accumulate. 3 regressions through `run_drain()` driving a real-shaped `throttleStatus` through the production response choke point, with no forced 429 |
-| **TD-015** | Two distinct gaps. (a) Media divergence was decided from **local rows alone** — an `associated` row with a File GID and a checksum produced `verified` with nothing having read Shopify, which is exactly the claim a reconnect invalidates. (b) Store settlement was neither atomic nor generation-scoped: two final jobs could each see the other as pending and both decline, leaving every binding terminal and the store permanently `in_progress`; and the verdict was stamped with `connection_generation` as read at settle time rather than the epoch it covered | (a) A read-only re-read of the product's media connection, plus a Files-by-connector-filename read for any association missing from it — the same proofs the module's own accepted mutation reconciliations use. **Checksum correspondence cannot be proven remotely and PD-PX-7 requires it, so a binding that claims an associated media File routes to `review` and its store settles `review_required`** — corrected 2026-07-27 after a search of the accepted Task 015/015B decisions found no accepted authorization for the narrower identity-and-association proof (every such statement was written inside this same unmerged cycle, `4a9ec8f`). A binding claiming no associated media still reaches `verified`. Truncation beyond one page routes to review, never to a proven absence. (b) Settlement serializes on the store row via an unconditional sequence bump flushed before the sibling read, so a concurrent settlement raises `40001` and is re-driven under the pass's already-declared replay policy; each job settles its own epoch; stale-generation jobs are retired at enqueue and refuse themselves at dispatch; a repeated reconnect coalesces or replaces instead of failing on `UNIQUE(store_id, operation_scope_key)`. **27** regressions (9 media + 2 checksum-disposition + 12 single-transaction convergence + 4 genuine cross-transaction), plus 3 rewritten parent-class media tests. **Evidence correction, 2026-07-27:** the 12 convergence tests are single-transaction and never were a cross-transaction proof, though this register previously implied otherwise; the mechanism is now proven by `TestExportReconnectSettlementRace` on two genuine `db_connect` connections, with an observed SQLSTATE `40001`, the dispatcher's real no-replay re-drive to `complete`/`review_required`, and a sensitivity case that strands the store when the serialization boundary is removed |
+| **TD-015** | Two distinct gaps. (a) Media divergence was decided from **local rows alone** — an `associated` row with a File GID and a checksum produced `verified` with nothing having read Shopify, which is exactly the claim a reconnect invalidates. (b) Store settlement was neither atomic nor generation-scoped: two final jobs could each see the other as pending and both decline, leaving every binding terminal and the store permanently `in_progress`; and the verdict was stamped with `connection_generation` as read at settle time rather than the epoch it covered | (a) A read-only re-read of the product's media connection, plus a Files-by-connector-filename read for any association missing from it — the same proofs the module's own accepted mutation reconciliations use. **Checksum correspondence cannot be proven remotely and PD-PX-7 requires it, so a binding that claims an associated media File routes to `review` and its store settles `review_required`** — corrected 2026-07-27 after a search of the accepted Task 015/015B decisions found no accepted authorization for the narrower identity-and-association proof (every such statement was written inside this same unmerged cycle, `4a9ec8f`). A binding claiming no associated media still reaches `verified`. Truncation beyond one page routes to review, never to a proven absence. **Correction, 2026-07-27 (operator resolution).** The
+statement that "an operator must clear it before exports resume" was written
+before any route existed that could clear it: the only public action re-RAN the
+pass, which re-read the same product, re-derived the same unprovable checksum
+and landed in the same review, and `export_reconcile_state` was rendered on no
+screen. A reconnected store that had ever exported product media was therefore
+blocked from exporting permanently, by construction. That is now a real route.
+Exactly one review reason is resolvable — the stored, machine-readable
+`export_reconcile_reason == 'checksum_unverifiable'`, reached only after store
+identity, product identity, archive state, the governed variant set, every File
+identity, every File status and response completeness have all been established
+remotely, leaving the byte digest Shopify does not expose as the single unknown.
+Every other reason — missing, archived, detached, failed, foreign, mismatched,
+truncated, in-flight, variant-divergent, inconclusive — is **not**
+acknowledgeable and stays blocked; there is no general-purpose override.
+Acknowledgement is Connector Administrator only (not Reviewer, which the
+Connector User role implies), checks record access and company consistency
+before anything elevates, requires an explicit consequence-stating
+confirmation, makes no Shopify request of any kind, and is bound to the
+connection generation, the binding, the remote product GID, the remote File GID
+set and a digest of the local media claim — re-derived on every read, so a
+later reconnect, a fresh pass, a re-pointed product, a re-uploaded File or a
+changed local checksum withdraws it automatically. **Acknowledgement is not
+verification and this register does not call it one:** byte correspondence was
+never proven remotely, and the audit record and the operator dialog both say
+so. The store note for a `complete` reached this way names the acknowledgement
+count and its exact limit. 42 regressions plus a browser tour that walks the
+whole route. (b) Settlement serializes on the store row via an unconditional sequence bump flushed before the sibling read, so a concurrent settlement raises `40001` and is re-driven under the pass's already-declared replay policy; each job settles its own epoch; stale-generation jobs are retired at enqueue and refuse themselves at dispatch; a repeated reconnect coalesces or replaces instead of failing on `UNIQUE(store_id, operation_scope_key)`. **27** regressions (9 media + 2 checksum-disposition + 12 single-transaction convergence + 4 genuine cross-transaction), plus 3 rewritten parent-class media tests. **Evidence correction, 2026-07-27:** the 12 convergence tests are single-transaction and never were a cross-transaction proof, though this register previously implied otherwise; the mechanism is now proven by `TestExportReconnectSettlementRace` on two genuine `db_connect` connections, with an observed SQLSTATE `40001`, the dispatcher's real no-replay re-drive to `complete`/`review_required`, and a sensitivity case that strands the store when the serialization boundary is removed |
 
 **Not reopened:** TD-012 and TD-016. **Still retained by decision and NOT
-resolved:** TD-004, TD-005, TD-007. **TD-002 remains owned by PR #189** and
-was not touched, duplicated or transplanted.
+resolved:** TD-004, TD-005, TD-007.
+
+**TD-002 `[Corrected 2026-07-27]`.** Its backend implementation is **accepted
+and merged through [PR #189](https://github.com/AdamsOdoo/Adams/pull/189)**
+(merge `3a1afa43f8d07a7dae1799968273fa0ab8049490`, merged PR head
+`e12145ce8bb88c099208f025d3cbb656bf0393ca`, runtime-tested candidate
+`25639f17be14b30a52a8453f0813aa0b764de310`). Describing it as "owned by PR
+#189" was accurate while that PR was an open draft and is not accurate now: a
+merged pull request owns nothing outstanding. What **does** remain open, and is
+not claimed by any Wave 5 work, is TD-002's deferred external evidence —
+live-Shopify validation, Gate D, [CV-013 #185](https://github.com/AdamsOdoo/Adams/issues/185),
+external UAT and final release evidence. It was not touched, duplicated or
+transplanted by this branch.
 
 Each new regression was shown to **fail when its production correction is
 reverted**; the TD-011 button is additionally load-bearing, because removing
@@ -78,8 +116,10 @@ re-affirmed TD-004, TD-005 and TD-007 as retained limitations rather than
 resolving them. Read the individual rows for the detail; the summary a
 reader needs is this:
 
-**The connector does NOT have zero technical debt.** TD-002 is unchanged and
-owned by its separate Wave 4/PR #189 path. TD-004, TD-005 and TD-007 remain
+**The connector does NOT have zero technical debt.** `[Corrected 2026-07-27]`
+TD-002's backend implementation is accepted and merged through PR #189; its
+deferred live-Shopify, Gate D, CV-013, external UAT and release evidence
+remain open and are not claimed here. TD-004, TD-005 and TD-007 remain
 open by decision, and two of them (TD-004, TD-007) carry limitations an
 operator will meet in ordinary use and which belong in UAT.
 

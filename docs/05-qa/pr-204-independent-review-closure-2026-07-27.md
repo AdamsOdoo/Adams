@@ -426,8 +426,124 @@ recorded here rather than silently reconciled.
 `[Fact]` No Odoo.sh runtime, no independent review of the corrected head, no
 live-Shopify contact of any kind, no UAT, no acceptance, ready-marking or
 merge. TD-004, TD-005 and TD-007 remain retained limitations and are **not**
-resolved. TD-002 remains owned by PR #189. `M-EXP-1 … M-EXP-20` remain
-outstanding and `X-EXPORT-0` remains neither PASS nor FAIL. **This session
+resolved. `[Corrected 2026-07-27]` TD-002's backend implementation is accepted
+and merged through PR #189; its deferred live-Shopify/Gate D/CV-013/UAT
+evidence remains open. `M-EXP-1 … M-EXP-20` remain outstanding and
+`X-EXPORT-0` remains neither PASS nor FAIL. **This session implemented the
+corrections above and has not reviewed, accepted or approved its own work.**
+
+## 6c. Implementation-freeze cycle — 2026-07-27
+
+> `[Fact]` Implementing-session record. Not an acceptance, not a review, not a
+> runtime or UAT claim.
+
+### What §6b left unresolved, stated plainly
+
+§6b corrected the checksum disposition to fail closed and wrote, in the code
+and in the PR body, that "an operator must clear it before exports resume".
+`[Fact]` **No route existed that could clear it.** The only public action,
+`action_shopify_export_reconnect_reconciliation`, re-RAN the pass: it re-read
+the same product, re-derived the same unprovable checksum and recorded the same
+`review`. `export_reconcile_state` was displayed on no screen in the product —
+not on the store form, not in the Export branch, nowhere. The binding verdict
+fields are protected, so no direct write could clear them either.
+
+`[Inference, from the source above]` A reconnected store that had ever exported
+product media was therefore blocked from exporting **permanently, by
+construction**, and the operator had nothing to click. Failing closed with no
+door is not a fail-closed design; it is an outage with a good explanation.
+
+### Correction A — one resolvable review, and only one
+
+`[Fact]` Eligibility is a stored `Selection`, `export_reconcile_reason`, not a
+substring of the operator-facing note. Parsing a note would make a copy edit a
+security change.
+
+`[Fact]` `checksum_unverifiable` is reached only from the branch where the
+remote read has established: the connector is bound to the expected Shopify
+store; the expected product exists and is not archived; every bound variant is
+still present; every claimed File GID was found on that product; none is
+`FAILED`; and the response was complete rather than truncated. The single
+remaining unknown is the byte digest, which the 2026-07 `MediaImage` /
+`MediaImageOriginalSource` interface does not expose at all.
+
+`[Fact]` Every other reason — `product_missing`, `product_archived`,
+`variant_divergence`, `media_association_unrecorded`, `media_in_flight`,
+`media_local_checksum_missing`, `media_not_reread`,
+`media_product_reread_failed`, `media_failed_status`, `media_read_truncated`,
+`media_absent` — is refused by `_assert_export_reconcile_ack_eligible`. There
+is no general-purpose override anywhere in the route.
+
+`[Fact]` Authority is `group_shopify_connector_admin` only. Not Reviewer:
+under the accepted SEC-2 model `group_shopify_connector_user` implies
+`group_shopify_connector_reviewer`, so a Reviewer gate would admit every
+ordinary Connector User. Record access (`check_access('read')`) and company
+consistency (`store.company_id in env.companies`) are both checked before
+anything elevates.
+
+`[Fact]` The acknowledgement is bound to the connection generation, the
+binding, the remote product GID, the remote File GID set and a SHA-256 digest
+of the local media claim, and `_export_reconcile_ack_is_valid` re-derives every
+one of those on each read rather than trusting a stored flag. A later
+reconnect, a fresh pass, a re-pointed product, a re-uploaded File, a renamed
+file or a changed local checksum withdraws it automatically. The store's own
+export assertion re-checks outstanding acknowledgements and re-applies the
+block if one stopped matching, which is what makes those rules load-bearing.
+
+`[Fact]` No Shopify request of any kind occurs on the route — proved by a
+transport stand-in that fails the test if it is reached at all, and by an AST
+guard over the route's source.
+
+`[Fact]` **Acknowledgement is not verification.** Byte correspondence was not
+cryptographically proven; the operator dialog, the audit record and the store
+note all say so, and the store note for a `complete` reached this way names
+the acknowledgement count and its exact limit.
+
+`[Fact]` 42 regressions plus `TestU3ExportTours.test_td015_checksum_acknowledgement_tour`,
+which walks Stores → the store → the review row → the dialog → confirmed →
+`complete` in a real browser.
+
+### Correction B — S1, the 11-step guided setup wizard
+
+`[Fact]` All 11 accepted steps exist in the accepted order. Administrator only
+on every entry point including the read. Three entry routes, all driven in a
+browser. The credential is write-only end to end and `credential_present` is a
+boolean. Activation starts no synchronisation, enqueues no job and makes no
+Shopify request. 52 server regressions, 9 HOOT tests, 4 tours, and the surface
+is added to the existing rendered-evidence instrument so its contrast, focus
+visibility, reduced motion, RTL and 390/768/1366 behaviour are measured.
+
+### Correction C — SEC-3 delta
+
+`[Fact]` The complete surface delta is inventoried in
+[`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
+§8. `[Fact]` **Issue #197 remains open.** This is implementation coverage;
+#197's independent Tier-1 security review and exact-SHA runtime evidence do
+not exist for this head and are not claimed.
+
+### Three defects found while doing the above
+
+`[Fact]` 1. The store-form review list is a non-stored computed field whose
+contents the caller's record rules filter, and Odoo caches such a field once
+per record for the whole transaction unless it declares its context
+dependency. Without `depends_context` the first reader's result is served to
+the second — including owner-first, which would hand one company's outstanding
+reviews to another company's administrator.
+
+`[Fact]` 2. The readiness check read `web.base.url` unelevated; system
+parameters are `base.group_system` in Odoo 19, so the whole readiness run
+raised `AccessError` for a Connector Administrator who is not an Odoo system
+administrator — reachable in production through `action_reconnect`.
+
+`[Fact]` 3. The suite runner's fail-closed self-test hand-listed a copy of its
+own HOOT inventory, which went stale the moment a third suite was added.
+
+### Still not claimed by this cycle
+
+`[Fact]` No Odoo.sh runtime, no independent review of this head, no
+live-Shopify contact of any kind, no UAT, no acceptance, ready-marking or
+merge. TD-004, TD-005 and TD-007 remain retained. `M-EXP-1 … M-EXP-20` remain
+outstanding; `X-EXPORT-0` remains neither PASS nor FAIL. **This session
 implemented the corrections above and has not reviewed, accepted or approved
 its own work.**
 

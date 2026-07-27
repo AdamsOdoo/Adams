@@ -1,3 +1,80 @@
+### PR #204 implementation-freeze cycle (2026-07-27)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `98334c7aa878910090e0e964c8e20ab60333bad9`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  All commits fast-forward; no rebase, amend, squash or force-push.
+- **Authorization:** the 2026-07-27 control-room instruction "PR #204 FINAL
+  IMPLEMENTATION FREEZE CYCLE", which assigns this session a bounded
+  implementation-worker role and reserves review, acceptance, ready-marking
+  and merge to the control room. **The same standing branch conflict is
+  flagged again and again not resolved unilaterally:** the harness designated
+  `claude/pr-204-freeze-cycle-8tks3v` while the instruction authorises pushing
+  **only** `fable/wave-5-completion`. The instruction was followed and only
+  `fable/wave-5-completion` was pushed — the identity invariant (local head =
+  remote head = PR head) is unsatisfiable on any other branch, and pushing a
+  mirror is the deviation the previous instruction explicitly forbade.
+- **Correction A — TD-015 had no operator route, and this session confirmed
+  that before building one.** The pre-edit audit traced every writer of
+  `export_reconcile_state`, every public action on the store, binding and
+  review surfaces, and every view referencing the reconciliation. Result: the
+  only public action re-RAN the pass, which re-derives the same unprovable
+  checksum and lands in the same review; the verdict fields are protected
+  binding fields so no direct write could clear them; and
+  `export_reconcile_state` was rendered on **no screen anywhere in the
+  product**. A reconnected store that had ever exported product media was
+  blocked from exporting permanently, by construction. The control-room
+  finding stands. Exactly one review reason is now resolvable —
+  `checksum_unverifiable`, a stored machine-readable Selection, never a
+  substring of the operator note — Administrator only, company- and
+  record-checked before any elevation, explicitly confirmed, bound to the
+  generation/binding/product GID/File GID set/local claim digest, re-derived
+  on every read, and with no Shopify request on the route at all.
+  **Acknowledgement is not verification, and nothing in this repository says
+  it is.**
+- **Correction B — S1 exists.** The 11 accepted steps, in the accepted order,
+  behind one bounded Owl client action and one `AbstractModel` service that
+  owns no business rule. Administrator only on every entry point including the
+  read. Three entry routes. The credential is write-only end to end.
+  Activation starts no synchronisation and makes no Shopify request.
+- **Correction C — SEC-3 delta inventoried**, with a local two-company /
+  two-role negative matrix over every introduced surface.
+  [`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
+  §8. **Issue #197 remains open** and is not described as accepted.
+- **Correction D — present-tense trackers reconciled** for S1, U1, Product
+  Export, U3, SEC-2, SEC-3, CI and TD-002, against the source rather than
+  against previous prose. Historical records were left historical.
+- **Three defects found while doing the above, and fixed:** a cross-company
+  field-cache leak on the new store-form review list (a non-stored computed
+  field whose contents record rules filter is cached once per record for the
+  whole transaction unless it declares `depends_context`); an unelevated
+  `ir.config_parameter` read that made the whole readiness run raise
+  `AccessError` for a Connector Administrator who is not an Odoo system
+  administrator, reachable through `action_reconnect`; and a suite-runner
+  self-test that hand-listed a copy of its own HOOT inventory and went stale
+  when a third suite was added.
+- **Evidence class:** source inspection, local automated tests, local rendered
+  browser evidence, and a sensitivity proof for each new regression.
+  **No Odoo.sh runtime. No independent review of this head. No live-Shopify
+  contact of any kind. No UAT. No acceptance, ready-mark or merge.**
+- **Learning feedback loop.** The lesson this cycle records is narrow and
+  general: *a guard is not finished until the route out of it exists.* The
+  preceding cycle made the checksum disposition fail closed — correctly, and
+  on good evidence — and wrote that an operator must clear the review. Nobody
+  checked whether an operator could. The check that would have caught it is
+  cheap and belongs in the review template: for every new blocking state, name
+  the exact production call chain and the exact browser route that leaves it,
+  and if either is absent the state is an outage rather than a guard. It is
+  the same shape as the TD-011 finding (a service method with no production
+  caller) one level up: the mechanism was right and the *route* was never
+  asked about.
+- **Next authorized step belongs to the control room:** freeze the exact SHA,
+  then independent delta and security review, then Odoo.sh exact-head
+  validation, then controlled live-Shopify validation, then UAT, then the
+  release decision. No further exploratory implementation cycle is authorized.
+
 ### PR #204 TD-015 evidence-closure correction (2026-07-27)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

@@ -497,8 +497,10 @@ originally about:
 | TD-013 | **No redesign.** One new `-standard` class drives `run_drain()` on a genuine pooled connection through the real claim, the `_is_mutation_job_type` branch, `_drain_mutation_one` and the registered `prepare_preconditions`, asserting the transport choke point receives **zero** calls, the accepted fail-closed disposition, and no child mutation job | **3** regressions, one of which proves the route is live by letting an unexpired confirmation reach the transport — so the refusal test cannot pass on a dead route |
 
 **Unchanged by this cycle.** TD-004, TD-005 and TD-007 remain retained
-limitations and are **not** resolved. TD-002 remains owned by PR #189 and was
-not touched. TD-012 and TD-016 were not reopened.
+limitations and are **not** resolved. `[Corrected 2026-07-27]` TD-002's
+backend implementation is accepted and merged through PR #189 and was not
+touched by this branch; its deferred live-Shopify/Gate D/CV-013/UAT evidence
+remains open. TD-012 and TD-016 were not reopened.
 
 **Evidence classes this cycle carries:** source inspection, local automated
 tests, and the sensitivity proof that each new regression fails when the
@@ -506,6 +508,89 @@ corresponding production correction is reverted. **It carries no independent
 review, no Odoo.sh runtime, no live-Shopify contact of any kind, and no UAT.**
 The implementation worker has not reviewed, accepted or approved its own
 corrections, and may not.
+
+### 5e.5 PR #204 implementation-freeze cycle — 2026-07-27
+
+> **Status: implementing-session record. NOT an acceptance, NOT a review, NOT
+> a runtime or UAT claim. This session did not review its own work.**
+
+A fifth cycle ran from head `98334c7a`, fast-forward, with no amend, rebase,
+squash or force-push. It closes the last four confirmed implementation
+obligations on this PR.
+
+**A. TD-015 — the checksum review had no door.** The preceding cycle routed
+every media-bearing binding to `review`, correctly, and recorded that "an
+operator must clear it before exports resume". No route existed that could.
+The only public action re-RAN the pass, which re-derived the same unprovable
+checksum and landed in the same review; `export_reconcile_state` was rendered
+on no screen anywhere in the product. A reconnected store that had ever
+exported product media was blocked from exporting **permanently, by
+construction**. Exactly one review reason is now resolvable — the stored,
+machine-readable `checksum_unverifiable`, reached only after store identity,
+product identity, archive state, the governed variant set, every File
+identity, every File status and response completeness are established
+remotely. Every other reason stays blocked; there is no general-purpose
+override. Administrator only, record-access and company checks before any
+elevation, explicit consequence-stating confirmation, no Shopify request of
+any kind, and bound to the generation, binding, product GID, File GID set and
+a digest of the local media claim — re-derived on every read, so any change
+withdraws it. **Acknowledgement is not verification and this record does not
+call it one.**
+
+**B. S1 — the 11-step guided setup wizard.** Recorded as not implemented, and
+it was: `shopify.connector.store` carries `create="false"` on both its list
+and its form, so there was no route to create a store at all outside a data
+import or a `sudo()` call. One bounded Owl client action and one
+`AbstractModel` service, owning no business rule — every step delegates to the
+service that already owns the decision, and every durable choice is written to
+the field that already owns it. Administrator only on every entry point
+including the read. All three accepted entry routes exist and are driven in a
+browser.
+
+**C. SEC-3 integration.** This cycle's complete surface delta — 2 models, 17
+stored fields, 1 computed relation, 20 public methods, 14 elevated seams — is
+inventoried in [`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
+§8, with a local two-company/two-role negative matrix over every one.
+**Issue #197 remains OPEN.** This is implementation coverage; #197's own
+gates — full-surface inventory, independent Tier-1 security review, exact-SHA
+runtime evidence — are unmet at this head and are not claimed.
+
+**D. Present-tense tracker reconciliation.** S1, U1, Product Export, U3,
+SEC-2, SEC-3, CI and TD-002 were re-read against the source and corrected only
+where the present-tense claim was demonstrably stale. Historical records were
+left as historical records; no old test or validation record was rewritten to
+imply it covered later commits.
+
+**Three defects found while doing the above, and fixed here.**
+
+1. `export_reconcile_review_binding_ids` is a non-stored computed field whose
+   contents the caller's record rules filter, and Odoo caches such a field
+   **once per record for the whole transaction** unless it declares its
+   context dependency. Without `depends_context` the first reader's result is
+   served to the second — including owner-first, which would hand one
+   company's outstanding reviews to another company's administrator. Fixed and
+   asserted in both orders.
+2. The readiness check read `web.base.url` unelevated. System parameters are
+   `base.group_system` in Odoo 19, so the whole readiness run raised
+   `AccessError` for any Connector Administrator who is not also an Odoo
+   system administrator — reachable in production through `action_reconnect`
+   before S1 existed.
+3. The suite runner's fail-closed self-test hand-listed a copy of its own HOOT
+   inventory, which went stale the moment a third suite was added. It is
+   generated from the inventory now.
+
+**Retained and NOT resolved:** TD-004, TD-005, TD-007. `[Corrected
+2026-07-27]` **TD-002's backend implementation is accepted and merged through
+PR #189** (merge `3a1afa43`); its deferred live-Shopify, Gate D, CV-013,
+external UAT and release evidence remain open and are not claimed by this
+cycle. Describing TD-002 as "owned by PR #189" is corrected above: a merged
+pull request owns nothing outstanding.
+
+**Evidence classes this cycle carries:** source inspection, local automated
+tests, local rendered browser evidence, and the sensitivity proof for each new
+regression. **It carries no independent review, no Odoo.sh runtime, no
+live-Shopify contact of any kind, and no UAT.** The implementation worker has
+not reviewed, accepted or approved its own corrections, and may not.
 
 ## 6. Re-derived Wave 5 completion scope and sequence
 
