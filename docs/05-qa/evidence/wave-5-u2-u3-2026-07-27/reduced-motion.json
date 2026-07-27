@@ -1,0 +1,135 @@
+{
+  "media_query_matched": {
+    "u0-dashboard-healthy": true,
+    "u2-cod-reconciliation-empty": true,
+    "u2-customer-matching-empty": true,
+    "u2-first-push-form-awaiting-confirmation": true,
+    "u2-first-push-guard-previewed": true,
+    "u2-inventory-workspace": true,
+    "u2-location-mapping-form": true,
+    "u2-orders-workspace-empty": true,
+    "u2-product-matching": true,
+    "u3-export-diagnostics": true,
+    "u3-export-diff-refusal-and-tag-removal": true,
+    "u3-export-previews": true,
+    "u3-export-settings": true,
+    "u3-exported-media": true,
+    "u3-reconnect-backfill": true
+  },
+  "still_moving": [
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-orders-workspace-empty",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-cod-reconciliation-empty",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-customer-matching-empty",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0.25,
+      "selector": "div.o_searchview_facet.position-relative.d-inline-flex",
+      "surface": "u2-product-matching",
+      "transition_s": 0
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-product-matching",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-inventory-workspace",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u2-first-push-guard-previewed",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.btn.btn-secondary.dropdown-toggle",
+      "surface": "u2-first-push-form-awaiting-confirmation",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.btn.btn-secondary.dropdown-toggle",
+      "surface": "u2-first-push-form-awaiting-confirmation",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.btn.btn-secondary.dropdown-toggle",
+      "surface": "u2-first-push-form-awaiting-confirmation",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0.25,
+      "selector": "div.o_searchview_facet.position-relative.d-inline-flex",
+      "surface": "u3-export-previews",
+      "transition_s": 0
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u3-export-previews",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u3-exported-media",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0.25,
+      "selector": "div.o_searchview_facet.position-relative.d-inline-flex",
+      "surface": "u3-reconnect-backfill",
+      "transition_s": 0
+    },
+    {
+      "animation_s": 0.25,
+      "selector": "div.o_searchview_facet.position-relative.d-inline-flex",
+      "surface": "u3-reconnect-backfill",
+      "transition_s": 0
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u3-reconnect-backfill",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0.25,
+      "selector": "div.o_searchview_facet.position-relative.d-inline-flex",
+      "surface": "u3-export-diagnostics",
+      "transition_s": 0
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u3-export-diagnostics",
+      "transition_s": 0.2
+    },
+    {
+      "animation_s": 0,
+      "selector": "button.o_searchview_dropdown_toggler.d-print-none.btn",
+      "surface": "u3-export-settings",
+      "transition_s": 0.2
+    }
+  ]
+}

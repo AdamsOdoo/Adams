@@ -1,0 +1,157 @@
+{
+  "lang": "ar_001",
+  "measured": {
+    "u0-dashboard-healthy": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-cod-reconciliation-empty": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-customer-matching-empty": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-first-push-form-awaiting-confirmation": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-first-push-guard-previewed": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-inventory-workspace": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-location-mapping-form": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-orders-workspace-empty": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u2-product-matching": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-export-diagnostics": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-export-diff-refusal-and-tag-removal": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-export-previews": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-export-settings": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-exported-media": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    },
+    "u3-reconnect-backfill": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2
+    }
+  },
+  "note": "Odoo 19 backend sets no `dir` on <html>/<body>; its RTL mechanism is rtlcss bundle flipping. The connector stylesheets use logical properties, which resolve against `direction`, so the meaningful measurement is the connector surface root.",
+  "overflows": []
+}

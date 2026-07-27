@@ -1,0 +1,467 @@
+[
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-focus-1366px.png",
+    "bytes": 46324,
+    "criterion": "U2 S9 orders; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-focus-1366px.png",
+    "bytes": 52794,
+    "criterion": "U2 COD ledger; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-focus-1366px.png",
+    "bytes": 52575,
+    "criterion": "U2 S6 customer matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-focus-1366px.png",
+    "bytes": 52203,
+    "criterion": "U2 S8 product matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-focus-1366px.png",
+    "bytes": 43224,
+    "criterion": "U2 S19 inventory workspace (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-focus-1366px.png",
+    "bytes": 42289,
+    "criterion": "U2 S11 first-push guard; warning state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-focus-1366px.png",
+    "bytes": 94957,
+    "criterion": "U2 S11 form; warning state + action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-focus-1366px.png",
+    "bytes": 57320,
+    "criterion": "U2 S10 location mapping; action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-focus-1366px.png",
+    "bytes": 44526,
+    "criterion": "U3 S7 export review queue (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-focus-1366px.png",
+    "bytes": 32635,
+    "criterion": "U3 media registry (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-focus-1366px.png",
+    "bytes": 63882,
+    "criterion": "U3 S25/S26 reconnect and backfill (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-focus-1366px.png",
+    "bytes": 55424,
+    "criterion": "U3 S31 export diagnostics (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-focus-1366px.png",
+    "bytes": 32085,
+    "criterion": "U3 export settings/ownership/retention (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-focus-1366px.png",
+    "bytes": 91124,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "focus-visible.json",
+    "criterion": "WCAG 2.2 SC 2.4.7 Focus Visible; SC 2.5.8 Target Size"
+  },
+  {
+    "artifact": "contrast.json",
+    "criterion": "WCAG 2.2 SC 1.4.3 / SC 1.4.11"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-reduced-motion-1366px.png",
+    "bytes": 51257,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-reduced-motion-1366px.png",
+    "bytes": 45991,
+    "criterion": "U2 S9 orders; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-reduced-motion-1366px.png",
+    "bytes": 52656,
+    "criterion": "U2 COD ledger; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-reduced-motion-1366px.png",
+    "bytes": 52617,
+    "criterion": "U2 S6 customer matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-reduced-motion-1366px.png",
+    "bytes": 52250,
+    "criterion": "U2 S8 product matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-reduced-motion-1366px.png",
+    "bytes": 43105,
+    "criterion": "U2 S19 inventory workspace (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-reduced-motion-1366px.png",
+    "bytes": 42179,
+    "criterion": "U2 S11 first-push guard; warning state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-reduced-motion-1366px.png",
+    "bytes": 95102,
+    "criterion": "U2 S11 form; warning state + action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-reduced-motion-1366px.png",
+    "bytes": 57479,
+    "criterion": "U2 S10 location mapping; action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-reduced-motion-1366px.png",
+    "bytes": 45562,
+    "criterion": "U3 S7 export review queue (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-reduced-motion-1366px.png",
+    "bytes": 32301,
+    "criterion": "U3 media registry (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-reduced-motion-1366px.png",
+    "bytes": 64165,
+    "criterion": "U3 S25/S26 reconnect and backfill (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-reduced-motion-1366px.png",
+    "bytes": 55658,
+    "criterion": "U3 S31 export diagnostics (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-reduced-motion-1366px.png",
+    "bytes": 31917,
+    "criterion": "U3 export settings/ownership/retention (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-reduced-motion-1366px.png",
+    "bytes": 104577,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "reduced-motion.json",
+    "criterion": "DESIGN SYSTEM \u00a78 reduced motion (V-7); WCAG 2.2 SC 2.3.3"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-desktop-1366px.png",
+    "bytes": 51257,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-desktop-1366px.png",
+    "bytes": 45982,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-desktop-1366px.png",
+    "bytes": 52656,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-desktop-1366px.png",
+    "bytes": 52619,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-desktop-1366px.png",
+    "bytes": 52318,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-desktop-1366px.png",
+    "bytes": 42954,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-desktop-1366px.png",
+    "bytes": 42037,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-desktop-1366px.png",
+    "bytes": 94868,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-desktop-1366px.png",
+    "bytes": 57406,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-desktop-1366px.png",
+    "bytes": 45347,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-desktop-1366px.png",
+    "bytes": 32301,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-desktop-1366px.png",
+    "bytes": 64034,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-desktop-1366px.png",
+    "bytes": 55523,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-desktop-1366px.png",
+    "bytes": 31916,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-desktop-1366px.png",
+    "bytes": 104577,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-tablet-768px.png",
+    "bytes": 46356,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-tablet-768px.png",
+    "bytes": 37503,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-tablet-768px.png",
+    "bytes": 43748,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-tablet-768px.png",
+    "bytes": 44769,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-tablet-768px.png",
+    "bytes": 44139,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-tablet-768px.png",
+    "bytes": 30112,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-tablet-768px.png",
+    "bytes": 29163,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-tablet-768px.png",
+    "bytes": 84086,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-tablet-768px.png",
+    "bytes": 48884,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-tablet-768px.png",
+    "bytes": 32791,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-tablet-768px.png",
+    "bytes": 24051,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-tablet-768px.png",
+    "bytes": 53876,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-tablet-768px.png",
+    "bytes": 46545,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-tablet-768px.png",
+    "bytes": 25041,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-tablet-768px.png",
+    "bytes": 96882,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-mobile-390px.png",
+    "bytes": 38094,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-mobile-390px.png",
+    "bytes": 26628,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-mobile-390px.png",
+    "bytes": 33176,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-mobile-390px.png",
+    "bytes": 30601,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-mobile-390px.png",
+    "bytes": 28808,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-mobile-390px.png",
+    "bytes": 17298,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-mobile-390px.png",
+    "bytes": 16216,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-mobile-390px.png",
+    "bytes": 47598,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-mobile-390px.png",
+    "bytes": 36985,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-mobile-390px.png",
+    "bytes": 15591,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-mobile-390px.png",
+    "bytes": 12556,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-mobile-390px.png",
+    "bytes": 35576,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-mobile-390px.png",
+    "bytes": 31574,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-mobile-390px.png",
+    "bytes": 14017,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-mobile-390px.png",
+    "bytes": 69853,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "responsive.json",
+    "criterion": "DESIGN SYSTEM \u00a710 responsive; \u00a714 screenshot set"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-1366px.png",
+    "bytes": 52334,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-1366px.png",
+    "bytes": 45500,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-1366px.png",
+    "bytes": 52082,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-1366px.png",
+    "bytes": 52113,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-1366px.png",
+    "bytes": 51724,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-1366px.png",
+    "bytes": 42391,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-1366px.png",
+    "bytes": 41480,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-1366px.png",
+    "bytes": 95500,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-1366px.png",
+    "bytes": 57441,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-1366px.png",
+    "bytes": 44994,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-1366px.png",
+    "bytes": 31788,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-1366px.png",
+    "bytes": 63438,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-1366px.png",
+    "bytes": 55092,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-1366px.png",
+    "bytes": 31369,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-1366px.png",
+    "bytes": 103057,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "rtl.json",
+    "criterion": "DESIGN SYSTEM \u00a710 RTL smoke check (V-8)"
+  }
+]

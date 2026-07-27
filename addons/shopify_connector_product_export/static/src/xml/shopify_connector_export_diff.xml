@@ -21,7 +21,7 @@
 <templates xml:space="preserve">
 
     <t t-name="shopify_connector_product_export.ExportDiff">
-        <div class="o_sc_export_diff" dir="auto">
+        <div class="o_sc_export_diff" t-att-dir="direction">
             <div class="o_sc_export_diff__inner">
 
                 <!-- LOADING -->

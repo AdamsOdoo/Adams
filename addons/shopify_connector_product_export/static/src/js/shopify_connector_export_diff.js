@@ -27,6 +27,20 @@ import { Component, useState, onWillStart } from "@odoo/owl";
 import { registry } from "@web/core/registry";
 import { useService } from "@web/core/utils/hooks";
 import { _t } from "@web/core/l10n/translation";
+import { localization } from "@web/core/l10n/localization";
+
+// `localization` is a Proxy that THROWS for any parameter not yet loaded
+// (`web/static/src/core/l10n/localization.js`), so reading it before the
+// localization service has resolved would stop this component mounting. A
+// surface must never fail to render over a locale parameter, and "ltr" is the
+// documented default.
+function localeDirection() {
+    try {
+        return localization.direction || "ltr";
+    } catch {
+        return "ltr";
+    }
+}
 
 export class ShopifyConnectorExportDiff extends Component {
     static template = "shopify_connector_product_export.ExportDiff";
@@ -35,6 +49,23 @@ export class ShopifyConnectorExportDiff extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
+        // RTL: bind the reading direction to the USER'S LOCALE, not to the
+        // content. `dir="auto"` resolves from the first strong character of
+        // what is on screen, so an Arabic operator reading English
+        // operational data got `ltr` and every logical property in the
+        // stylesheet resolved LTR-ward.
+        //
+        // This matters here and nowhere else in Odoo. Odoo 19's BACKEND does
+        // not set `dir` on `<html>` or `<body>` at all -- measured under
+        // `ar_001` with both rtlcss bundles served and `.o_rtl` present:
+        // `documentElement` and `body` both compute `direction: ltr`. Its RTL
+        // mechanism is rtlcss, which flips PHYSICAL properties in the CSS
+        // bundle. That works for Odoo's own stylesheets and does nothing for
+        // this one, because this stylesheet is written entirely in LOGICAL
+        // properties -- which resolve against `direction`, and `direction` was
+        // never set. Reading the SCSS suggested RTL was handled; rendering it
+        // proved it was not.
+        this.direction = localeDirection();
         this.state = useState({
             status: "loading", // "loading" | "ready" | "error"
             data: null,

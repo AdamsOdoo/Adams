@@ -3,7 +3,7 @@
 <templates xml:space="preserve">
 
     <t t-name="shopify_connector_core.Dashboard">
-        <div class="o_sc_dashboard" dir="auto">
+        <div class="o_sc_dashboard" t-att-dir="direction">
             <div class="o_sc_dashboard__inner">
 
                 <!-- ============ LOADING ============ -->

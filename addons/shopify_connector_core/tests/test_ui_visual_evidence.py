@@ -1,0 +1,1059 @@
+"""Rendered visual and accessibility evidence for the U2 and U3 surfaces.
+
+WHAT THIS IS FOR. The design system makes five things acceptance criteria
+rather than aspirations (§12-§14): a recorded contrast table, a keyboard and
+visible-focus walkthrough, a reduced-motion check, responsive behaviour at the
+named widths, and an RTL smoke check. Wave 5 shipped with all five implemented
+*structurally* -- semantic token pairs, logical properties, every transition
+behind `prefers-reduced-motion: no-preference` -- and none of them MEASURED.
+Reading a stylesheet is not the same as rendering it, and the difference is
+exactly where these defects hide.
+
+So this file renders. It drives the real surfaces in a real Chromium through
+the DevTools protocol and produces artifacts a reader can check:
+
+  * full-page screenshots at 1366 / 768 / 390 CSS px;
+  * the same surfaces under `prefers-reduced-motion: reduce`, with the
+    resulting COMPUTED transition and animation durations read back;
+  * the same surfaces in a real RTL locale, with the computed `direction` read
+    back and the horizontal-overflow check re-run;
+  * every actionable control focused, with `:focus-visible` FORCED through
+    `CSS.forcePseudoState` so the indicator the stylesheet defines is the one
+    measured;
+  * a contrast table computed from rendered colours -- resolving transparent
+    backgrounds up the ancestor chain and compositing alpha -- against the
+    WCAG 2.2 thresholds.
+
+WHY CDP AND NOT A TOUR. A tour asserts DOM structure. It cannot set a
+viewport, cannot emulate a media feature, cannot force a pseudo-class, and
+cannot take a picture. `:focus-visible` in particular cannot be asserted from a
+tour at all: in headless Chromium a script-focused `<button>` never matches it,
+because the pseudo-class tracks the last real input modality and a tour has
+none. `CSS.forcePseudoState` removes the heuristic from the question entirely.
+
+WHERE THE ARTIFACTS GO, AND WHY NOT INTO THE REPOSITORY BY DEFAULT.
+`SC_EVIDENCE_DIR` chooses the output directory; without it, artifacts go to a
+temporary directory and are discarded. That default is deliberate and load
+bearing: the canonical runner records `connector_worktree_dirty`, and a test
+that rewrote committed PNGs on every run would dirty the worktree and destroy
+the exact-SHA property of the definitive run. Evidence is captured in a
+dedicated run with `SC_EVIDENCE_DIR` pointed at
+`docs/05-qa/evidence/wave-5-u2-u3-2026-07-27/`, committed, and thereafter this
+test proves the same properties on every run without touching them.
+
+THE ASSERTIONS RUN EITHER WAY. Contrast, reduced motion, focus visibility and
+horizontal overflow are asserted whether or not artifacts are being written, so
+this is a real test and not a capture script wearing a test's clothes.
+
+NO SHOPIFY. No credential, no request, no mutation. The fixtures are Odoo rows.
+"""
+
+import base64
+import contextlib
+import json
+import logging
+import os
+import pathlib
+import tempfile
+import time
+
+from odoo import fields
+from odoo.tests import tagged
+from odoo.tests.common import HttpCase, new_test_user
+from odoo.tests.common import ChromeBrowser
+
+_logger = logging.getLogger(__name__)
+
+#: The widths the design system names (§10, §14) plus the phone width the
+#: correction packet requires.
+WIDTHS = {'desktop': 1366, 'tablet': 768, 'mobile': 390}
+
+#: WCAG 2.2 thresholds. SC 1.4.3 for text, SC 1.4.11 for components.
+CONTRAST_TEXT = 4.5
+CONTRAST_LARGE_TEXT = 3.0
+CONTRAST_NON_TEXT = 3.0
+
+# --- In-page instruments -----------------------------------------------------
+# Colour maths runs in the page because that is the only place the RENDERED
+# values exist. Everything below returns JSON to Python, which does the
+# asserting.
+
+CONTRAST_JS = r"""
+(() => {
+  const parse = (c) => {
+    const m = c && c.match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+  };
+  // Composite a possibly-transparent colour over its ancestors, then over
+  // white -- the page's own base. A ratio computed against `rgba(0,0,0,0)`
+  // is meaningless, and that is the usual way a contrast table lies.
+  const effectiveBg = (el) => {
+    let node = el, acc = null;
+    while (node && node.nodeType === 1) {
+      const c = parse(getComputedStyle(node).backgroundColor);
+      if (c && c.a > 0) {
+        acc = acc === null ? c : over(acc, c);
+        if (acc.a >= 0.999) return acc;
+      }
+      node = node.parentElement;
+    }
+    const white = { r: 255, g: 255, b: 255, a: 1 };
+    return acc === null ? white : over(acc, white);
+  };
+  const over = (fg, bg) => ({
+    r: fg.r * fg.a + bg.r * (1 - fg.a),
+    g: fg.g * fg.a + bg.g * (1 - fg.a),
+    b: fg.b * fg.a + bg.b * (1 - fg.a),
+    a: 1,
+  });
+  const lum = (c) => {
+    const ch = [c.r, c.g, c.b].map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  };
+  const ratio = (a, b) => {
+    const l1 = lum(a), l2 = lum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+  const fmt = (c) =>
+    "#" + [c.r, c.g, c.b].map((v) =>
+      Math.round(v).toString(16).padStart(2, "0")).join("");
+
+  const visible = (el) => {
+    const s = getComputedStyle(el);
+    if (s.visibility === "hidden" || s.display === "none" || s.opacity === "0")
+      return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+
+  const results = [];
+  const seen = new Set();
+  // Only the connector's own surfaces. Measuring the whole Odoo chrome would
+  // report defects this repository neither owns nor can fix.
+  const roots = document.querySelectorAll(
+    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view, .modal-content"
+  );
+  for (const root of roots) {
+    for (const el of root.querySelectorAll("*")) {
+      if (!visible(el)) continue;
+      const text = Array.from(el.childNodes)
+        .filter((n) => n.nodeType === 3)
+        .map((n) => n.textContent.trim())
+        .join(" ")
+        .trim();
+      if (!text) continue;
+      const s = getComputedStyle(el);
+      const fg = parse(s.color);
+      if (!fg) continue;
+      const bg = effectiveBg(el);
+      const px = parseFloat(s.fontSize);
+      const bold = parseInt(s.fontWeight, 10) >= 700;
+      // SC 1.4.3 "large text": >= 18.66px bold, or >= 24px.
+      const large = px >= 24 || (bold && px >= 18.66);
+      const key = [el.className, s.color, fmt(bg), px, large].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        kind: "text",
+        selector: el.tagName.toLowerCase() +
+          (typeof el.className === "string" && el.className
+            ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".")
+            : ""),
+        sample: text.slice(0, 60),
+        foreground: fmt(over(fg, bg)),
+        background: fmt(bg),
+        font_px: Math.round(px * 100) / 100,
+        bold,
+        large,
+        required: large ? 3.0 : 4.5,
+        ratio: Math.round(ratio(over(fg, bg), bg) * 100) / 100,
+      });
+    }
+    // SC 1.4.11: the BOUNDARY of an actionable control against what is
+    // behind it. A control whose edge cannot be seen is not perceivable.
+    for (const el of root.querySelectorAll(
+      "button, .btn, input, select, textarea, a.o_form_uri"
+    )) {
+      if (!visible(el)) continue;
+      const s = getComputedStyle(el);
+      const width = parseFloat(s.borderTopWidth) || 0;
+      const own = parse(s.backgroundColor);
+      const behind = effectiveBg(el.parentElement || el);
+      let fgColor, what;
+      if (width > 0) {
+        fgColor = over(parse(s.borderTopColor), behind);
+        what = "border";
+      } else if (own && own.a > 0.05) {
+        fgColor = over(own, behind);
+        what = "fill";
+      } else {
+        continue;  // no boundary drawn: nothing to measure
+      }
+      const key = ["nt", el.className, what].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        kind: "non_text",
+        selector: el.tagName.toLowerCase() +
+          (typeof el.className === "string" && el.className
+            ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".")
+            : ""),
+        sample: what,
+        foreground: fmt(fgColor),
+        background: fmt(behind),
+        font_px: null,
+        bold: false,
+        large: false,
+        required: 3.0,
+        ratio: Math.round(ratio(fgColor, behind) * 100) / 100,
+      });
+    }
+  }
+  return JSON.stringify(results);
+})()
+"""
+
+MOTION_JS = r"""
+(() => {
+  const out = [];
+  const roots = document.querySelectorAll(
+    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view"
+  );
+  for (const root of roots) {
+    for (const el of [root, ...root.querySelectorAll("*")]) {
+      const s = getComputedStyle(el);
+      const dur = (v) => (v || "0s").split(",")
+        .map((x) => parseFloat(x) * (x.includes("ms") ? 0.001 : 1))
+        .reduce((a, b) => Math.max(a, b || 0), 0);
+      const t = dur(s.transitionDuration), a = dur(s.animationDuration);
+      // NOT `> 0`. The conventional reduced-motion override -- Odoo's own
+      // included -- is `0.001ms !important` rather than `0s`, so that
+      // `transitionend` still fires and JS waiting on it does not hang.
+      // That computes to 1e-6s, which is not motion by any definition; the
+      // threshold is 10ms, an order of magnitude below the design system's
+      // shortest sanctioned duration (100ms).
+      if (t > 0.01 || a > 0.01) {
+        out.push({
+          selector: el.tagName.toLowerCase() +
+            (typeof el.className === "string" && el.className
+              ? "." + el.className.trim().split(/\s+/).slice(0, 3).join(".")
+              : ""),
+          transition_s: t,
+          animation_s: a,
+        });
+      }
+    }
+  }
+  return JSON.stringify({
+    reduced_motion_matches:
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    moving: out,
+  });
+})()
+"""
+
+#: The S7 Owl diff is a client action opened by the preview form's
+#: "Review Export" button. `:contains()` is a hoot-dom extension and not valid
+#: CSS, so the button is found by its text the ordinary way.
+REVIEW_EXPORT_JS = r"""
+(() => {
+  const btn = Array.from(document.querySelectorAll(".o_form_view button"))
+    .find((b) => b.textContent.trim().includes("Review Export"));
+  if (!btn) {
+    throw new Error("no 'Review Export' control on the preview form");
+  }
+  btn.click();
+  return true;
+})()
+"""
+
+OVERFLOW_JS = r"""
+(() => {
+  // WHERE "DIRECTION" HAS TO BE READ, AND WHY NOT ON <html>.
+  //
+  // Odoo 19's BACKEND never sets `dir` on `<html>` or `<body>`. Measured under
+  // a real `ar_001` session with both rtlcss bundles served and `.o_rtl`
+  // present on the main components container: `documentElement` and `body`
+  // both compute `direction: ltr`. Odoo's backend RTL mechanism is rtlcss --
+  // it flips PHYSICAL properties inside the CSS bundle -- and it does not need
+  // `direction` to do that.
+  //
+  // The connector's own stylesheets are written entirely in LOGICAL
+  // properties, which have nothing for rtlcss to flip and instead resolve
+  // against `direction`. So the meaningful measurement is the direction of the
+  // CONNECTOR SURFACE ROOT, which the components now bind to the user's
+  // locale. Asserting on `documentElement` would be asserting against Odoo's
+  // design, and would fail forever for a reason this repository cannot fix.
+  const root = document.querySelector(".o_sc_dashboard, .o_sc_export_diff");
+  return JSON.stringify({
+    doc_scroll_width: document.documentElement.scrollWidth,
+    inner_width: window.innerWidth,
+    direction: getComputedStyle(document.documentElement).direction,
+    body_direction: getComputedStyle(document.body).direction,
+    odoo_rtl_class: !!document.querySelector(".o_rtl"),
+    rtl_stylesheets: Array.from(document.styleSheets)
+      .map((s) => s.href).filter((h) => h && h.includes(".rtl.")).length,
+    connector_root: root ? root.className.split(/\s+/)[0] : null,
+    connector_direction: root ? getComputedStyle(root).direction : null,
+  });
+})()
+"""
+
+FOCUSABLES_JS = r"""
+(() => {
+  const out = [];
+  const roots = document.querySelectorAll(
+    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view, .modal-content"
+  );
+  for (const root of roots) {
+    for (const el of root.querySelectorAll(
+      "button:not([disabled]), a[href], input:not([disabled]), " +
+      "select:not([disabled]), textarea:not([disabled]), [tabindex]"
+    )) {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) continue;
+      if (getComputedStyle(el).visibility === "hidden") continue;
+      if (!el.id) {
+        el.setAttribute("data-sc-focus-probe", out.length);
+      }
+      out.push({
+        index: out.length,
+        selector: `[data-sc-focus-probe="${out.length}"]`,
+        classes: typeof el.className === "string" ? el.className : "",
+        tag: el.tagName.toLowerCase(),
+        label: (el.getAttribute("aria-label") || el.textContent || "")
+          .trim().slice(0, 40),
+        tab_index: el.tabIndex,
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      });
+    }
+  }
+  return JSON.stringify(out);
+})()
+"""
+
+
+def _focus_indicator_js(selector):
+    return r"""
+(() => {
+  const el = document.querySelector(%s);
+  if (!el) return JSON.stringify({error: "gone"});
+  el.focus();
+  const s = getComputedStyle(el);
+  const parse = (c) => {
+    const m = c && c.match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const p = m[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    return {r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1};
+  };
+  const lum = (c) => {
+    const ch = [c.r, c.g, c.b].map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126*ch[0] + 0.7152*ch[1] + 0.0722*ch[2];
+  };
+  const bgOf = (node) => {
+    while (node && node.nodeType === 1) {
+      const c = parse(getComputedStyle(node).backgroundColor);
+      if (c && c.a > 0.9) return c;
+      node = node.parentElement;
+    }
+    return {r: 255, g: 255, b: 255, a: 1};
+  };
+  const outlineW = parseFloat(s.outlineWidth) || 0;
+  const outlineC = parse(s.outlineColor);
+  const bg = bgOf(el.parentElement || el);
+  const ratio = (a, b) => {
+    const l1 = lum(a), l2 = lum(b);
+    return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05);
+  };
+  return JSON.stringify({
+    focused: document.activeElement === el,
+    outline_style: s.outlineStyle,
+    outline_width_px: outlineW,
+    outline_color: s.outlineColor,
+    outline_offset: s.outlineOffset,
+    box_shadow: s.boxShadow,
+    background_behind: `rgb(${Math.round(bg.r)}, ${Math.round(bg.g)}, ${Math.round(bg.b)})`,
+    indicator_contrast:
+      outlineW > 0 && outlineC && outlineC.a > 0
+        ? Math.round(ratio(outlineC, bg) * 100) / 100
+        : null,
+    has_indicator:
+      (outlineW > 0 && s.outlineStyle !== "none") ||
+      (s.boxShadow && s.boxShadow !== "none"),
+  });
+})()
+""" % json.dumps(selector)
+
+
+@tagged('post_install', '-at_install', '-standard', 'shopify_connector_visual')
+class TestUiVisualEvidence(HttpCase):
+
+    # ------------------------------------------------------------------
+    # Harness
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.evidence_dir = os.environ.get('SC_EVIDENCE_DIR')
+        if cls.evidence_dir:
+            cls._out = pathlib.Path(cls.evidence_dir)
+            cls._persist = True
+        else:
+            cls._tmp = tempfile.TemporaryDirectory(suffix='_sc_evidence')
+            cls.addClassCleanup(cls._tmp.cleanup)
+            cls._out = pathlib.Path(cls._tmp.name)
+            cls._persist = False
+        (cls._out / 'screenshots').mkdir(parents=True, exist_ok=True)
+        cls.manifest = []
+        cls.user = new_test_user(
+            cls.env, login='sc_visual', password='sc_visual',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_user',
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.manifest:
+            (cls._out / 'manifest.json').write_text(
+                json.dumps(cls.manifest, indent=2, sort_keys=True))
+            _logger.info(
+                'CONNECTOR-VISUAL-EVIDENCE artifacts=%d dir=%s persisted=%s',
+                len(cls.manifest), cls._out, cls._persist)
+        super().tearDownClass()
+
+    @contextlib.contextmanager
+    def _browser(self, login='sc_visual'):
+        browser = ChromeBrowser(self, headless=True)
+        with self.allow_requests(browser=browser), contextlib.ExitStack() as stack:
+            stack.callback(self._wait_remaining_requests)
+            stack.enter_context(browser.cleanup)
+            self.authenticate(login, login, browser=browser)
+            self.cr.flush()
+            self.cr.clear()
+            yield browser
+
+    def _eval(self, browser, expression):
+        # `_websocket_request` returns the CDP RESULT PAYLOAD, not the whole
+        # message (see `ChromeBrowser.take_screenshot`, which reads
+        # `f.result()['data']` directly). So for `Runtime.evaluate` the shape
+        # is {'result': {'type', 'value'}, 'exceptionDetails': ...} -- one
+        # level shallower than the raw protocol message.
+        res = browser._websocket_request('Runtime.evaluate', params={
+            'expression': expression,
+            'returnByValue': True,
+            'awaitPromise': True,
+        })
+        if res.get('exceptionDetails'):
+            self.fail('in-page evaluation failed: %s'
+                      % json.dumps(res['exceptionDetails'])[:2000])
+        return res.get('result', {}).get('value')
+
+    def _viewport(self, browser, width, height=900):
+        browser._websocket_request('Emulation.setDeviceMetricsOverride', params={
+            'width': width, 'height': height,
+            'deviceScaleFactor': 1, 'mobile': width <= 480,
+        })
+
+    def _emulate_reduced_motion(self, browser, reduce_motion):
+        browser._websocket_request('Emulation.setEmulatedMedia', params={
+            'features': [{
+                'name': 'prefers-reduced-motion',
+                'value': 'reduce' if reduce_motion else 'no-preference',
+            }],
+        })
+
+    def _open(self, browser, path, wait_for='.o_list_view, .o_form_view, '
+                                            '.o_sc_dashboard, .o_sc_export_diff',
+              after=None):
+        from odoo.tests.common import HOST  # noqa: PLC0415
+        url = 'http://%s:%s%s' % (HOST, odoo_http_port(), path)
+        browser.navigate_to(url, wait_stop=True)
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            found = self._eval(
+                browser, 'document.querySelector(%s) !== null'
+                         % json.dumps(wait_for))
+            if found:
+                # Let Owl finish its first paint before measuring.
+                self._eval(browser, 'new Promise(r => requestAnimationFrame('
+                                    '() => requestAnimationFrame(r)))')
+                if after:
+                    action_js, action_wait = after
+                    self._eval(browser, action_js)
+                    if not self._wait_for_selector(browser, action_wait):
+                        self.fail('surface %r never reached %r after its '
+                                  'post-open action' % (path, action_wait))
+                return True
+            time.sleep(0.25)
+        self.fail('surface %r never rendered %r' % (path, wait_for))
+
+    def _wait_for_selector(self, browser, selector, timeout=30):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if self._eval(browser, 'document.querySelector(%s) !== null'
+                                   % json.dumps(selector)):
+                self._eval(browser, 'new Promise(r => requestAnimationFrame('
+                                    '() => requestAnimationFrame(r)))')
+                return True
+            time.sleep(0.25)
+        return False
+
+    def _shoot(self, browser, name, criterion):
+        data = browser._websocket_request('Page.captureScreenshot', params={
+            'format': 'png', 'captureBeyondViewport': True,
+        })
+        png = data.get('data')
+        self.assertTrue(png, 'no screenshot data for %s' % name)
+        raw = base64.b64decode(png)
+        path = self._out / 'screenshots' / ('%s.png' % name)
+        path.write_bytes(raw)
+        type(self).manifest.append({
+            'artifact': 'screenshots/%s.png' % name,
+            'bytes': len(raw),
+            'criterion': criterion,
+        })
+        return path
+
+    def _record(self, name, payload, criterion):
+        path = self._out / ('%s.json' % name)
+        path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        type(self).manifest.append({
+            'artifact': '%s.json' % name,
+            'criterion': criterion,
+        })
+
+    # ------------------------------------------------------------------
+    # Fixtures: the states each surface must be photographed in
+    # ------------------------------------------------------------------
+
+    def _seed(self):
+        """One store with U2 and U3 rows in their non-empty states."""
+        store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Visual evidence store',
+            'shop_domain': 'visual-evidence.myshopify.com',
+            'api_version': '2026-07',
+        })
+        store.sudo().write({'state': 'connected'})
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'inventory_domain_enabled': True,
+        })
+        warehouse = self.env['stock.warehouse'].search(
+            [('company_id', '=', self.env.company.id)], limit=1)
+        location = self.env['stock.location'].sudo().create({
+            'name': 'Visual evidence location',
+            'usage': 'internal',
+            'location_id': warehouse.view_location_id.id,
+        })
+        mapping = self.env['shopify.connector.location.mapping'].sudo().create({
+            'store_id': store.id,
+            'shopify_gid': 'gid://shopify/Location/VIS',
+            'odoo_location_id': location.id,
+            'match_key': 'manual',
+            'shopify_location_name_snapshot': 'Visual warehouse',
+        })
+        template = self.env['product.template'].sudo().create({
+            'name': 'Visual evidence widget'})
+        tbinding = self.env[
+            'shopify.connector.product.template.binding'].sudo().create({
+                'store_id': store.id,
+                'shopify_gid': 'gid://shopify/Product/VIS',
+                'product_template_id': template.id,
+            })
+        vbinding = self.env[
+            'shopify.connector.product.variant.binding'].sudo().create({
+                'store_id': store.id,
+                'shopify_gid': 'gid://shopify/ProductVariant/VIS',
+                'product_variant_id': template.product_variant_id.id,
+                'product_template_binding_id': tbinding.id,
+            })
+        level = self.env[
+            'shopify.connector.inventory.level.binding'].sudo().create({
+                'store_id': store.id,
+                'product_variant_binding_id': vbinding.id,
+                'location_mapping_id': mapping.id,
+                'shopify_inventory_item_gid': 'gid://shopify/InventoryItem/VIS',
+                'first_push_state': 'previewed',
+                'first_push_preview_qty': 12.0,
+                'pending_target_available': 12.0,
+            })
+        preview = self._seed_export_preview(store, template, tbinding)
+        self.env.flush_all()
+        return {
+            'store': store, 'mapping': mapping, 'level': level,
+            'template_binding': tbinding, 'variant_binding': vbinding,
+            'preview': preview,
+        }
+
+    def _seed_export_preview(self, store, template, binding):
+        """One export preview carrying a REFUSAL and a TAG REMOVAL.
+
+        Those two are the whole reason the S7 diff exists: the refusals must
+        sit above the confirm control, and the tag removals must be
+        enumerated by name. A screenshot of an empty diff would prove neither,
+        so the fixture puts both on screen.
+
+        Returns `None` when `shopify_connector_product_export` is not
+        installed -- the same condition `_reachable_surfaces` already handles
+        for every export action. The canonical runner installs it always, and
+        `test_the_export_diff_surface_is_reachable_when_export_is_installed`
+        fails if it is installed and this surface is nonetheless dropped, so
+        the diff cannot go missing quietly.
+
+        Odoo rows only -- no store credential is used, no Shopify request is
+        made, and nothing is enqueued.
+        """
+        if 'shopify.connector.product.export.preview' not in self.env:
+            _logger.info('visual evidence: product_export not installed; the '
+                         'S7 diff surface is not captured in this build')
+            return None
+        self.env['shopify.connector.store.settings'].sudo().search([
+            ('store_id', '=', store.id)]).write({
+                'product_export_domain_enabled': True,
+                'price_source_of_truth': 'odoo_authoritative',
+            })
+        template.sudo().write({
+            'shopify_export_enabled': True,
+            'shopify_export_tags': 'keep-me',
+        })
+        now = fields.Datetime.now()
+        Preview = self.env['shopify.connector.product.export.preview']
+        return Preview._preview_surface('_create_preview').create({
+            'store_id': store.id,
+            'product_template_id': template.id,
+            'product_template_binding_id': binding.id,
+            'export_path': 'update',
+            'state': 'previewed',
+            'diff': {
+                'scalars': [{'field': 'tags',
+                             'from': ['keep-me', 'merchant-added'],
+                             'to': ['keep-me']}],
+                'tag_replacement': {
+                    'applies': True,
+                    'removed': ['merchant-added'],
+                    'resulting': ['keep-me'],
+                    'note': "Confirming this export replaces the product's "
+                            'COMPLETE Shopify tag list with the Odoo list.',
+                },
+                'untouched': {'collections': True, 'metafields': False,
+                              'existing_media': True,
+                              'note': 'Never included in this export.'},
+                'media': {'exported': False, 'reason': 'Media export is off.',
+                          'appends': []},
+            },
+            'apply_plan': {'steps': [{'step': 'product_export_update',
+                                      'state': 'pending',
+                                      'fields': ['tags']}], 'cursor': 0},
+            'blocked_differences': {'items': [{
+                'kind': 'unowned_remote_variant',
+                'detail': 'A Shopify variant is not bound to any Odoo '
+                          'variant. It is left exactly as it is.',
+            }]},
+            'has_blocked_differences': True,
+            'remote_product_gid': binding.shopify_gid,
+            'remote_updated_at': '2026-07-26T00:00:00Z',
+            'source_write_date': Preview._source_write_date(template),
+            'previewed_at': now,
+            'expires_at': fields.Datetime.add(now, hours=24),
+        })
+
+    #: (name, path, wait-for selector, criterion[, after_js]) for every
+    #: captured surface. `after_js` runs once the page has rendered, for the
+    #: one surface that is reached by pressing a control rather than by URL.
+    def _surfaces(self, seeded):
+        act = '/odoo/action-%s'
+        return [
+            ('u0-dashboard-healthy',
+             act % 'shopify_connector_core.action_shopify_connector_dashboard',
+             '.o_sc_dashboard', 'DESIGN SYSTEM §9 dashboard hierarchy'),
+            ('u2-orders-workspace-empty',
+             act % 'shopify_connector_sale.action_shopify_connector_order_workspace',
+             '.o_list_view, .o_view_nocontent', 'U2 S9 orders; §11 empty state'),
+            ('u2-cod-reconciliation-empty',
+             act % 'shopify_connector_sale.action_shopify_connector_cod_reconciliation',
+             '.o_list_view, .o_view_nocontent', 'U2 COD ledger; §11 empty state'),
+            ('u2-customer-matching-empty',
+             act % 'shopify_connector_sale.action_shopify_connector_customer_binding',
+             '.o_list_view, .o_view_nocontent', 'U2 S6 customer matching'),
+            ('u2-product-matching',
+             act % 'shopify_connector_product.action_shopify_connector_product_template_binding',
+             '.o_list_view, .o_view_nocontent', 'U2 S8 product matching'),
+            ('u2-inventory-workspace',
+             act % 'shopify_connector_inventory.action_shopify_connector_inventory_workspace',
+             '.o_list_view', 'U2 S19 inventory workspace'),
+            ('u2-first-push-guard-previewed',
+             act % 'shopify_connector_inventory.action_shopify_connector_inventory_first_push',
+             '.o_list_view', 'U2 S11 first-push guard; warning state'),
+            ('u2-first-push-form-awaiting-confirmation',
+             (act % 'shopify_connector_inventory.action_shopify_connector_inventory_first_push')
+             + '/%d' % seeded['level'].id,
+             '.o_form_view', 'U2 S11 form; warning state + action control'),
+            ('u2-location-mapping-form',
+             (act % 'shopify_connector_inventory.action_shopify_connector_location_mapping')
+             + '/%d' % seeded['mapping'].id,
+             '.o_form_view', 'U2 S10 location mapping; action control'),
+            ('u3-export-previews',
+             act % 'shopify_connector_product_export.action_shopify_connector_product_export_preview',
+             '.o_list_view, .o_view_nocontent', 'U3 S7 export review queue'),
+            ('u3-exported-media',
+             act % 'shopify_connector_product_export.action_shopify_connector_product_media_binding',
+             '.o_list_view, .o_view_nocontent', 'U3 media registry'),
+            ('u3-reconnect-backfill',
+             act % 'shopify_connector_product_export.action_shopify_connector_export_backfill',
+             '.o_list_view, .o_form_view, .o_view_nocontent',
+             'U3 S25/S26 reconnect and backfill'),
+            ('u3-export-diagnostics',
+             act % 'shopify_connector_product_export.action_shopify_connector_export_diagnostics',
+             '.o_list_view, .o_form_view, .o_view_nocontent',
+             'U3 S31 export diagnostics'),
+            ('u3-export-settings',
+             act % 'shopify_connector_product_export.action_shopify_connector_store_settings_export',
+             '.o_list_view, .o_form_view, .o_view_nocontent',
+             'U3 export settings/ownership/retention'),
+            # The S7 Owl diff. It is the safety-critical U3 surface -- the one
+            # that discloses the refusals and enumerates the tag removals
+            # above the confirm control -- and it is the only connector
+            # surface with its own stylesheet besides the dashboard, so it is
+            # the one that most needs a measured contrast and RTL result.
+            # It is not reachable by URL: it is a client action opened by the
+            # preview form's "Review Export" button, so the button is pressed.
+        ] + ([
+            ('u3-export-diff-refusal-and-tag-removal',
+             (act % 'shopify_connector_product_export.'
+                    'action_shopify_connector_product_export_preview')
+             + '/%d' % seeded['preview'].id,
+             '.o_form_view',
+             'U3 S7 export diff: refusal disclosure + enumerated tag removals',
+             (REVIEW_EXPORT_JS, '.o_sc_export_diff')),
+        ] if seeded.get('preview') else [])
+
+    def _reachable_surfaces(self, seeded):
+        """Only the surfaces whose action actually exists in this build."""
+        out = []
+        for entry in self._surfaces(seeded):
+            name, path, wait, criterion = entry[:4]
+            after = entry[4] if len(entry) > 4 else None
+            xmlid = path.split('/odoo/action-')[1].split('/')[0]
+            if self.env.ref(xmlid, raise_if_not_found=False):
+                out.append((name, path, wait, criterion, after))
+            else:
+                _logger.info(
+                    'visual evidence: skipping %s -- action %s not present '
+                    'in this build', name, xmlid)
+        self.assertGreaterEqual(
+            len(out), 8,
+            'only %d U2/U3 surfaces resolved; the evidence set would be too '
+            'thin to be meaningful' % len(out))
+        return out
+
+    def test_the_export_diff_surface_is_reachable_when_export_is_installed(self):
+        """The S7 diff must not drop out of the evidence set quietly.
+
+        It is the only U3 surface whose refusal disclosure and enumerated tag
+        removals can be photographed, and it is reached by pressing a control
+        rather than by URL -- which is exactly the kind of surface that goes
+        missing from a capture set without anyone noticing.
+        """
+        if 'shopify.connector.product.export.preview' not in self.env:
+            self.skipTest('shopify_connector_product_export is not installed')
+        seeded = self._seed()
+        self.assertTrue(
+            seeded.get('preview'),
+            'product_export is installed but no export preview was seeded, so '
+            'the S7 diff would not be captured',
+        )
+        names = [entry[0] for entry in self._reachable_surfaces(seeded)]
+        self.assertIn(
+            'u3-export-diff-refusal-and-tag-removal', names,
+            'the S7 export diff is not in the captured surface set',
+        )
+
+    # ------------------------------------------------------------------
+    # A + B. Desktop, tablet and mobile
+    # ------------------------------------------------------------------
+
+    def test_responsive_screenshots_and_no_horizontal_overflow(self):
+        """Every U2/U3 surface, at all three widths, with no body scroll.
+
+        The design system's rule is that the page body never scrolls
+        horizontally (§10); wide content is the table's problem, not the
+        document's. Measured from `document.documentElement.scrollWidth`
+        against `window.innerWidth`, which is the only definition that cannot
+        be satisfied by a stylesheet comment.
+        """
+        seeded = self._seed()
+        overflows = []
+        with self._browser() as browser:
+            for label, width in WIDTHS.items():
+                self._viewport(browser, width)
+                for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                    self._open(browser, path, wait, after)
+                    self._shoot(browser, '%s-%s-%dpx' % (name, label, width),
+                                criterion)
+                    metrics = json.loads(self._eval(browser, OVERFLOW_JS))
+                    # 1px of tolerance: sub-pixel layout rounding is not a
+                    # horizontal scrollbar.
+                    if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
+                        overflows.append({
+                            'surface': name, 'width': width, **metrics})
+        self._record('responsive', {'widths': WIDTHS, 'overflows': overflows},
+                     'DESIGN SYSTEM §10 responsive; §14 screenshot set')
+        self.assertFalse(
+            overflows,
+            'these surfaces scroll the page horizontally, which the design '
+            'system forbids:\n%s' % json.dumps(overflows, indent=2))
+
+    # ------------------------------------------------------------------
+    # C. RTL
+    # ------------------------------------------------------------------
+
+    def test_rtl_renders_mirrored_without_overflow(self):
+        """A real RTL locale, rendered -- not logical CSS properties, read.
+
+        The stylesheets use logical properties throughout, which is the right
+        implementation. This proves the result: `direction: rtl` actually
+        reaches the document, and the surfaces still fit.
+        """
+        seeded = self._seed()
+        lang = self.env['res.lang'].sudo()._activate_lang('ar_001') \
+            or self.env['res.lang'].sudo()._activate_lang('ar_SY')
+        self.assertTrue(
+            lang, 'no Arabic locale is available in this build, so the RTL '
+                  'check cannot be performed; do not record it as passed')
+        self.assertEqual(lang.direction, 'rtl')
+        self.user.sudo().write({'lang': lang.code})
+        self.env.flush_all()
+
+        overflows, measured, connector_roots = [], {}, {}
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                self._open(browser, path, wait, after)
+                self._shoot(browser, '%s-rtl-1366px' % name,
+                            criterion + ' (RTL, SC 1.3.2 / §10)')
+                metrics = json.loads(self._eval(browser, OVERFLOW_JS))
+                measured[name] = metrics
+                if metrics['connector_direction']:
+                    connector_roots[name] = metrics['connector_direction']
+                if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
+                    overflows.append({'surface': name, **metrics})
+        self._record(
+            'rtl',
+            {'lang': lang.code,
+             'note': 'Odoo 19 backend sets no `dir` on <html>/<body>; its RTL '
+                     'mechanism is rtlcss bundle flipping. The connector '
+                     'stylesheets use logical properties, which resolve '
+                     'against `direction`, so the meaningful measurement is '
+                     'the connector surface root.',
+             'measured': measured, 'overflows': overflows},
+            'DESIGN SYSTEM §10 RTL smoke check (V-8)')
+
+        self.assertTrue(measured, 'no surface was measured')
+        # Odoo really did switch to RTL: its own flipped bundles were served.
+        self.assertTrue(
+            any(m['rtl_stylesheets'] for m in measured.values()),
+            'Odoo served no rtlcss bundle, so the session was not actually in '
+            'an RTL locale and this measured nothing',
+        )
+        self.assertTrue(
+            any(m['odoo_rtl_class'] for m in measured.values()),
+            'Odoo did not apply its own `.o_rtl` class, so the locale did not '
+            'reach the web client',
+        )
+        # And the connector's own Owl surfaces mirror, which is the part this
+        # repository owns and the part logical properties depend on.
+        self.assertTrue(
+            connector_roots,
+            'no connector Owl surface was reached, so the one direction this '
+            'repository controls was never measured',
+        )
+        wrong = {k: v for k, v in connector_roots.items() if v != 'rtl'}
+        self.assertFalse(
+            wrong,
+            'these connector surface roots did not resolve right-to-left, so '
+            'every logical property in their stylesheet resolved LTR-ward: %s'
+            % wrong)
+        self.assertFalse(
+            overflows,
+            'these surfaces overflow horizontally in RTL:\n%s'
+            % json.dumps(overflows, indent=2))
+
+    # ------------------------------------------------------------------
+    # D. Reduced motion
+    # ------------------------------------------------------------------
+
+    def test_reduced_motion_removes_every_transition(self):
+        """Rendered under the media query, not read out of the stylesheet.
+
+        Every connector transition is written behind
+        `prefers-reduced-motion: no-preference`, so the reduced-motion default
+        should be no animation at all. This emulates the media feature and
+        reads the COMPUTED durations back: a rule that was written correctly
+        but never applied is indistinguishable from one that was not written,
+        until something renders it.
+        """
+        seeded = self._seed()
+        moving, matched = [], {}
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+            self._emulate_reduced_motion(browser, True)
+            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                self._open(browser, path, wait, after)
+                payload = json.loads(self._eval(browser, MOTION_JS))
+                matched[name] = payload['reduced_motion_matches']
+                for entry in payload['moving']:
+                    moving.append({'surface': name, **entry})
+                self._shoot(browser, '%s-reduced-motion-1366px' % name,
+                            criterion + ' (prefers-reduced-motion: reduce; '
+                                        'SC 2.3.3)')
+        self._record('reduced-motion',
+                     {'media_query_matched': matched, 'still_moving': moving},
+                     'DESIGN SYSTEM §8 reduced motion (V-7); WCAG 2.2 SC 2.3.3')
+
+        self.assertTrue(all(matched.values()),
+                        'the reduced-motion media query did not reach the '
+                        'page, so this measured nothing: %s' % matched)
+        # Connector-owned elements only. Upstream Odoo chrome is not this
+        # repository's to fix, and failing on it would make the check useless.
+        ours = [m for m in moving
+                if 'sc-' in m['selector'] or 'o_sc_' in m['selector']]
+        self.assertFalse(
+            ours,
+            'these connector elements still animate under '
+            'prefers-reduced-motion: reduce:\n%s' % json.dumps(ours, indent=2))
+
+    # ------------------------------------------------------------------
+    # E. Keyboard and visible focus
+    # ------------------------------------------------------------------
+
+    def test_every_actionable_control_shows_a_visible_focus_indicator(self):
+        """`:focus-visible` FORCED, then the rendered indicator measured.
+
+        A tour cannot assert this: in headless Chromium a script-focused
+        button never matches `:focus-visible`, because the pseudo-class tracks
+        real input modality. `CSS.forcePseudoState` takes the heuristic out of
+        the question, so what is measured is the indicator the STYLESHEET
+        defines, which is the thing under test.
+        """
+        seeded = self._seed()
+        without, small, results = [], [], []
+        with self._browser() as browser:
+            browser._websocket_request('DOM.enable')
+            browser._websocket_request('CSS.enable')
+            self._viewport(browser, WIDTHS['desktop'])
+            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                self._open(browser, path, wait, after)
+                controls = json.loads(self._eval(browser, FOCUSABLES_JS))
+                for control in controls:
+                    node = browser._websocket_request(
+                        'DOM.getDocument', params={'depth': 0})
+                    root_id = node['root']['nodeId']
+                    found = browser._websocket_request(
+                        'DOM.querySelector',
+                        params={'nodeId': root_id,
+                                'selector': control['selector']})
+                    node_id = found.get('nodeId')
+                    if not node_id:
+                        continue
+                    browser._websocket_request(
+                        'CSS.forcePseudoState',
+                        params={'nodeId': node_id,
+                                'forcedPseudoClasses': ['focus', 'focus-visible']})
+                    measured = json.loads(self._eval(
+                        browser, _focus_indicator_js(control['selector'])))
+                    browser._websocket_request(
+                        'CSS.forcePseudoState',
+                        params={'nodeId': node_id, 'forcedPseudoClasses': []})
+                    if measured.get('error'):
+                        continue
+                    entry = {'surface': name, **control, **measured}
+                    results.append(entry)
+                    if not measured['has_indicator']:
+                        without.append(entry)
+                    # SC 2.5.8 target size, checked while we are here.
+                    if control['width'] < 24 or control['height'] < 24:
+                        small.append(entry)
+                if controls:
+                    self._shoot(browser, '%s-focus-1366px' % name,
+                                criterion + ' (focus visible; SC 2.4.7)')
+        self._record('focus-visible',
+                     {'measured': results, 'without_indicator': without,
+                      'below_24px_target': small},
+                     'WCAG 2.2 SC 2.4.7 Focus Visible; SC 2.5.8 Target Size')
+
+        self.assertTrue(results, 'no focusable control was measured at all')
+        # Filter on the element's REAL classes, not on `selector`: the probe
+        # attribute is itself named `data-sc-focus-probe`, so matching "sc-"
+        # against the selector matched every control on the page, including
+        # Odoo's own search input.
+        ours = [e for e in without
+                if 'sc-' in e.get('classes', '') or 'o_sc_' in e.get('classes', '')]
+        self.assertFalse(
+            ours,
+            'these connector controls render no focus indicator when focused '
+            '(SC 2.4.7):\n%s' % json.dumps(ours, indent=2)[:4000])
+
+    # ------------------------------------------------------------------
+    # F. Contrast
+    # ------------------------------------------------------------------
+
+    def test_measured_contrast_meets_wcag_22_aa(self):
+        """Ratios computed from RENDERED colour, against the AA thresholds.
+
+        SC 1.4.3 Contrast (Minimum): >= 4.5:1 ordinary text, >= 3:1 large
+        text. SC 1.4.11 Non-text Contrast: >= 3:1 for the boundary of a
+        meaningful UI component.
+
+        Backgrounds are resolved up the ancestor chain and alpha-composited
+        before the ratio is taken. A table computed against `rgba(0,0,0,0)` is
+        the usual way this measurement lies, and it always lies optimistically.
+        """
+        seeded = self._seed()
+        rows, failures = [], []
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                self._open(browser, path, wait, after)
+                for entry in json.loads(self._eval(browser, CONTRAST_JS)):
+                    entry['surface'] = name
+                    entry['pass'] = entry['ratio'] >= entry['required']
+                    rows.append(entry)
+                    if not entry['pass']:
+                        failures.append(entry)
+        self._record(
+            'contrast',
+            {'thresholds': {'text': CONTRAST_TEXT,
+                            'large_text': CONTRAST_LARGE_TEXT,
+                            'non_text': CONTRAST_NON_TEXT},
+             'criteria': ['WCAG 2.2 SC 1.4.3 Contrast (Minimum)',
+                          'WCAG 2.2 SC 1.4.11 Non-text Contrast'],
+             'method': 'rendered getComputedStyle colours, background '
+                       'resolved up the ancestor chain and alpha-composited; '
+                       'relative luminance per WCAG 2.2 definition',
+             'measured': rows, 'failures': failures},
+            'WCAG 2.2 SC 1.4.3 / SC 1.4.11')
+
+        self.assertTrue(rows, 'no contrast pair was measured at all')
+        # Connector-owned selectors only: the Odoo chrome around the surface
+        # is not this repository's to restyle.
+        ours = [f for f in failures
+                if 'sc-' in f['selector'] or 'o_sc_' in f['selector']]
+        self.assertFalse(
+            ours,
+            'these connector pairs are below their WCAG 2.2 AA threshold:\n%s'
+            % json.dumps(ours, indent=2)[:4000])
+
+
+def odoo_http_port():
+    from odoo.tools import config  # noqa: PLC0415
+    return config['http_port']
