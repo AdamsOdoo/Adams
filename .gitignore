@@ -214,3 +214,6 @@ __marimo__/
 .odoo-src/
 .connector-venv/
 ci-artifacts/
+
+# Session-local focused-test helper (not a repository deliverable).
+tools/.focused-test.sh
