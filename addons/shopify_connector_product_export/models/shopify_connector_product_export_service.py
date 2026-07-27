@@ -1157,7 +1157,43 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 {'state': 'applying'}
             )
             preview.invalidate_recordset()
-        self._enqueue_step(preview, next_step)
+        # The parent apply job and the child step it hands off to share
+        # `store_id`, `res_model`, `res_id` and `shopify_target_gid` -- and
+        # `operation_scope_key` is computed from exactly those four, with
+        # `job_type` deliberately excluded. The two keys are therefore
+        # byte-identical. This handler runs with the parent still `running`
+        # (the dispatcher terminalises only AFTER it returns), so the parent
+        # still holds the key, and creating the child violated
+        # `_store_operation_scope_key_uniq` -- the hand-off could not complete
+        # at all. Terminalise the parent and flush the key away first, which
+        # is the same terminalize-then-`flush_recordset` the inventory
+        # service already uses for its own hand-off. `_invoke_handler`'s
+        # `if job.state != 'running': return` sees the terminal state and
+        # leaves it alone, so the parent is never double-transitioned. The
+        # whole handler is inside the dispatcher's per-job transaction, so a
+        # failure in `_enqueue_step` rolls this write back with it.
+        # Terminalisation and the child's creation are ONE unit of work. A
+        # savepoint, because the two must not come apart in either direction:
+        # a parent recorded `succeeded` with no step behind it would read as a
+        # completed apply that silently exported nothing, and -- since
+        # `succeeded -> retry_waiting` is an illegal transition -- the
+        # dispatcher's own failure routing would then raise over the top of
+        # the real error and hide it. On rollback the parent is `running`
+        # again, which is exactly the state `_route_failure` expects.
+        from_state = job.state
+        with self.env.cr.savepoint():
+            job.sudo().write({
+                'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+            })
+            job.flush_recordset(['state', 'operation_scope_key'])
+            self._enqueue_step(preview, next_step)
+        job._log_transition(
+            'state_change',
+            'Export apply admitted; handed off to step %s.' % (
+                next_step['step'],
+            ),
+            from_state=from_state, to_state='succeeded',
+        )
         self.env['shopify.connector.job.log']._system_append(
             job, 'attempt',
             'Export apply admitted; step %s enqueued.' % (next_step['step'],),

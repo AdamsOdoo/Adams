@@ -82,7 +82,20 @@ class TestExportSourceGuards(TransactionCase):
         count is per file so a diff shows exactly where a new one appeared.
         """
         expected = {
-            'shopify_connector_product_export_service.py': 20,
+            # 20 -> 21 (2026-07-27): the apply handler now terminalises its
+            # own job before handing off to the first step, because the
+            # parent and the child compute a byte-identical
+            # `operation_scope_key` and the parent has to release it first.
+            # The elevation is the same one the dispatcher applies to the
+            # same field on the same record one frame later
+            # (`_invoke_handler`'s own `job.sudo().write({'state':
+            # 'succeeded'})`), on a job the dispatcher has already claimed
+            # and admitted -- it is a state write on connector-owned
+            # bookkeeping, reachable only from inside a claimed dispatch,
+            # and it exposes no new operator-facing surface. Authorisation
+            # and company access were established upstream at enqueue
+            # (`enqueue_preview` / `action_confirm_export_preview`).
+            'shopify_connector_product_export_service.py': 21,
             'shopify_connector_media_export_service.py': 20,
             'shopify_connector_product_export_preview.py': 2,
             'shopify_connector_product_export_seams.py': 1,
