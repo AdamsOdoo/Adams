@@ -226,8 +226,8 @@ claim, not only what was fixed.
 | **TD-011** | `_resume_media_export` had **no production caller** — every visible caller was a test. §6 recorded the capability as delivered; an operator could not reach it. All 15 tests called the private helper | Public `action_shopify_resume_media_export` on the exported-media registry, wired to a button on the form the existing menu opens. Operator/Administrator derived from the accepted matrix (`action_manual_retry`'s non-blocked branch, `enqueue_preview`), `check_access('read')` and a company check before any elevation. The ordinal is consumed only on real admission; a repeated click coalesces on the outstanding job | **13** through the public action, plus a browser tour on the real surface (required tours 15 -> 16) |
 | **TD-013** | Correctly implemented; **insufficiently evidenced**. All 13 tests called `_prepare_preconditions_*`/`_advance_plan` directly — unit coverage of the guard, not proof it is bound into the dispatch route | **No redesign.** One `-standard` class drives `run_drain()` on a genuine pooled connection through the real claim, `_drain_mutation_one` and the registered `prepare_preconditions`; zero calls at the transport choke point, the accepted fail-closed state, no child mutation job | **3**, one of which is a live-confirmation control so the refusal cannot pass on a dead route |
 | **TD-014** | Throttle pressure was evaluated **once per pass, before the claim loop**. A store reporting 2% head-room on its first job could still have four more claimed by that pass. The 16 tests pulled the lever themselves | The deferred set is re-read before every claim and **unioned**; the mid-pass read does not re-project recovery, so a pass can only accumulate deferrals and recovery stays a next-pass event | **3** through `run_drain()`, driving a real-shaped `throttleStatus` through the production response choke point. No forced 429 |
-| **TD-015 (media)** | Divergence was decided from **local rows alone**. An `associated` row with a File GID and a checksum produced `verified` with nothing having read Shopify — precisely the claim a reconnect invalidates | Read-only re-read of the product's media connection, plus Files-by-connector-filename for any association absent from it. **Checksum correspondence is not claimed** — the 2026-07 `File` interface exposes no digest, and the `verified` note says so. Truncation routes to review, never to a proven absence | **9**, plus 3 rewritten parent-class media tests |
-| **TD-015 (convergence)** | Store settlement was neither atomic nor generation-scoped. Two final jobs could each see the other as pending and both decline, leaving every binding terminal and the store permanently `in_progress` with no job left to settle it; and the verdict was stamped with `connection_generation` as read at settle time rather than the epoch it covered | Settlement serializes on the store row via an unconditional sequence bump flushed before the sibling read — under REPEATABLE READ a concurrent settlement raises `40001` and is re-driven under the pass's declared `remote_read_replay_safe` policy. Each job settles its own epoch; stale-generation jobs are retired at enqueue and refuse themselves at dispatch; a repeated reconnect coalesces or replaces safely | **12** |
+| **TD-015 (media)** | Divergence was decided from **local rows alone**. An `associated` row with a File GID and a checksum produced `verified` with nothing having read Shopify — precisely the claim a reconnect invalidates | Read-only re-read of the product's media connection, plus Files-by-connector-filename for any association absent from it. **Checksum correspondence cannot be proven remotely, so a binding that claims an association can no longer reach `verified` at all** — it routes to `review` with the exact reason (corrected 2026-07-27, §6b). Truncation routes to review, never to a proven absence | **9**, plus 3 rewritten parent-class media tests and **2** added by the §6b checksum correction |
+| **TD-015 (convergence)** | Store settlement was neither atomic nor generation-scoped. Two final jobs could each see the other as pending and both decline, leaving every binding terminal and the store permanently `in_progress` with no job left to settle it; and the verdict was stamped with `connection_generation` as read at settle time rather than the epoch it covered | Settlement serializes on the store row via an unconditional sequence bump flushed before the sibling read — under REPEATABLE READ a concurrent settlement raises `40001` and is re-driven under the pass's declared `remote_read_replay_safe` policy. Each job settles its own epoch; stale-generation jobs are retired at enqueue and refuse themselves at dispatch; a repeated reconnect coalesces or replaces safely | **12** single-transaction, plus **4** genuine cross-transaction (§6b) |
 
 ### The API limitation this cycle recorded rather than worked around
 
@@ -243,13 +243,14 @@ does and does not establish:
 | It is associated with the expected product | **Yes** — the GID appears on that product's `media` connection, the same evidence the module's accepted `_reconcile_media_associate` already relies on |
 | Its `fileStatus` is not `FAILED` | **Yes** |
 | A connector-owned filename identifies it | **Yes**, via `files(query: "filename:…")` |
-| The uploaded bytes still match `odoo_image_checksum` | **No — not claimed anywhere.** No API surface exposes it |
+| The uploaded bytes still match `odoo_image_checksum` | **No — and PD-PX-7 requires it, so the binding routes to `review`.** No API surface exposes a digest; see §6b |
 | The File is used only by this product | **No** — no reverse-reference connection exists; this is the same limitation that makes the pipeline append-only (TD-004) |
 
 A binding whose media claims cannot be established — including one on a
-product with more media than a single page can carry — goes to
-operator-visible `review_required`. It is never reported as `verified`, and
-never as a proven absence.
+product with more media than a single page can carry, **and including one
+whose checksum simply cannot be compared** — goes to operator-visible
+`review_required`. It is never reported as `verified`, and never as a proven
+absence.
 
 ### Sensitivity of the new evidence
 
@@ -261,9 +262,15 @@ button names a method that must exist and must be public.
 
 **Recorded rather than hidden:** two single-transaction convergence tests do
 *not* fail under the revert. In one shared transaction each job's write is
-already visible to the next, so those two cover ordering and the
-terminal-set invariant; the generation and serialization tests are what prove
-the concurrency mechanism.
+already visible to the next, so those two cover ordering and the terminal-set
+invariant.
+
+**Corrected 2026-07-27 (§6b).** The sentence that followed here claimed "the
+generation and serialization tests are what prove the concurrency mechanism".
+That was wrong. Those tests ran in the single shared `TransactionCase` cursor,
+where a transaction cannot raise a serialization failure against itself, so
+they proved the *decision* and not the *mechanism*. The cross-transaction
+proof now exists and is described in §6b.
 
 ### Unchanged by this cycle
 
@@ -272,6 +279,157 @@ resolved. TD-002 remains owned by PR #189, untouched and not transplanted.
 TD-012 and TD-016 were not reopened. **No independent review of this head, no
 Odoo.sh runtime, no live-Shopify contact of any kind, and no UAT.** PR #204
 remains draft, unaccepted, unapproved and unmerged.
+
+## 6b. Evidence-closure correction — 2026-07-27 (control-room directed)
+
+`[Fact]` This section is a **correction of §6a's own evidence claims**, made
+by a separate bounded implementation session under a dated control-room
+instruction. It is not an acceptance, and this session is not an independent
+reviewer of it.
+
+### What §6a claimed that was not true
+
+`[Fact]` The TD-015 convergence correction was recorded as proving a
+cross-transaction settlement race. The committed regression file contained
+**no** `db_connect`, no second cursor or environment, no subprocess or
+multiprocess harness, and no test that could produce a PostgreSQL
+serialization conflict. Every convergence test ran in the single shared
+`TransactionCase` cursor, in which one transaction cannot conflict with
+itself. The class docstring stated that "the cross-transaction proof uses two
+genuine pooled connections"; it did not.
+
+`[Inference]` Those tests were, and remain, real coverage — of ordering, the
+terminal-set invariant and generation binding. They were never coverage of the
+serialization mechanism, and describing them as such made a `40001`-dependent
+correction look proven when the instrument could not have observed a `40001`
+at all. This is the same defect §6a was itself convened to fix, one level up:
+a correction verified against the mechanism it introduced rather than against
+the condition it claims to survive.
+
+### Correction A — the genuine cross-transaction proof
+
+`[Fact]` `TestExportReconnectSettlementRace` (4 tests, tag
+`shopify_connector_export_reconcile_race`, registered in
+`tools/run_connector_suite.sh`) drives **two genuine independent `db_connect`
+connections**, each with its own Odoo environment and both bounded by
+transaction-local `statement_timeout` (20 s) and `lock_timeout` (10 s). No
+threads share a cursor; there are no threads at all, and no sleep is used as a
+concurrency mechanism — the interleaving is stepped from inside the transport
+seam, so worker A is provably mid-handler and provably uncommitted when worker
+B runs.
+
+| Step | What happens |
+| --- | --- |
+| 1 | Worker A runs the production `run_drain(1)` on its own pooled connection, claims the lower-id reconcile job, and reaches `_send` |
+| 2 | Inside that `_send`, worker B opens a second independent connection and runs the production handler for the **other** final reconcile job — same store, same generation — bumps the settlement sequence, reads its siblings, sees A's binding still `pending`, correctly **declines to settle**, and commits |
+| 3 | A records and flushes its own verdict, then reaches `_serialize_reconcile_settlement`: an `UPDATE` of a row B committed to after A's snapshot |
+| 4 | PostgreSQL raises a genuine **SQLSTATE 40001** on that exact `UPDATE` of `export_reconcile_settle_seq` |
+| 5 | The real `_drain_one` catches it, rolls back, re-locks the job and routes it once through its declared `remote_read_replay_safe` policy to `retry_waiting` / `concurrency_race_conflict`. The handler is **not** replayed |
+| 6 | The retry is made due and the **production dispatcher re-drives the job on a fresh connection and a fresh snapshot**, where B's verdict is visible. It settles, and the store converges |
+
+`[Fact]` Observed outcomes, both proven on a third independent connection
+reading committed state:
+
+* **Scenario 1** — both verdicts `verified`, final store state **`complete`**,
+  settled generation equal to the enqueued generation.
+* **Scenario 2** — one verdict `review`, final store state
+  **`review_required`**, and `_assert_export_reconciliation_complete()` still
+  refuses exports.
+
+`[Fact]` The conflict is asserted from the dispatcher's own log line, not
+inferred: `Job <id> hit a PostgreSQL concurrency failure (SQLSTATE 40001)
+after dispatch; rolling back and reacquiring the job under a fresh row lock
+before any routing -- the handler is not replayed.`
+
+### Correction A — sensitivity, with the boundary removed
+
+`[Fact]` `test_without_the_serialization_boundary_the_store_is_stranded`
+re-runs the identical fixture and identical interleaving with
+`_serialize_reconcile_settlement` replaced by a no-op, and asserts the defect
+returns: **no conflict is raised**, both jobs commit `succeeded`, every
+binding is terminal, `export_reconcile_settle_seq` stays `0`, and the store is
+left permanently **`in_progress`** with no job able to settle it. The
+production implementation is asserted to be back in place afterwards. The only
+difference between the passing and stranding runs is the sequence bump, which
+is what makes the bump load-bearing rather than decorative.
+
+### A production fact the proof had to establish first
+
+`[Fact]` `_drain_one` claims via `_claim_for_dispatch(1)`: a whole-table search
+`order='id asc', limit=1` followed by `try_lock_for_update()`, which is
+`FOR UPDATE SKIP LOCKED` at the pinned Odoo 19 commit
+(`odoo/orm/models.py`, verified this session). A concurrent worker whose single
+candidate is already locked therefore **locks nothing and dispatches nothing**
+— it does not leapfrog to the next job. This is asserted by
+`test_a_second_worker_cannot_claim_past_a_locked_job`, and it is why worker B
+drives the production handler in its own genuine transaction rather than a
+second `run_drain`. It also narrows how the original stranding is reached in
+production: the concurrent writer pair is a dispatching job against another
+transaction that writes the same store row, not two jobs claimed by one drain.
+
+### Correction B — the checksum disposition, corrected to fail closed
+
+`[Fact]` PD-PX-7 requires the pass to verify "exists / variant GID set /
+**media checksums**" (Task 015 packet §9.5, verbatim). The implementation can
+remotely establish File existence, product association, `fileStatus` and
+connector filename. It cannot establish checksum correspondence.
+
+`[Fact]` A search of the accepted Task 015 / 015B decisions, packets, rulings
+and implementation records found **no accepted decision authorising the
+narrower proof**. Every statement that "checksum correspondence is not
+claimed" and that a binding may still reach `verified` was written in commit
+`4a9ec8f` — inside this same unmerged correction cycle — in this record, the
+technical-debt register, the gate-state record and the handoff. A cycle cannot
+authorise itself, so disposition **B** of the control-room instruction
+applies.
+
+`[Fact]` Verified against current official Shopify Admin GraphQL schema
+documentation this session: `MediaImage` exposes `alt`, `createdAt`,
+`fileErrors`, `fileStatus`, `id`, `image`, `mediaContentType`, `mediaErrors`,
+`mediaWarnings`, `mimeType`, `originalSource`, `preview`, `status`,
+`translations`, `updatedAt`; `MediaImageOriginalSource` exposes `fileSize` and
+`url`. There is **no digest of the stored bytes** anywhere — `fileSize` is a
+length, which two different images can share. No live store was contacted.
+
+`[Decision — implemented, pending review]` A binding claiming an associated
+media File now routes to **`review`**, and its store settles
+**`review_required`**, with an operator-facing note naming both halves: the
+association *was* re-read with the expected File identity and a non-FAILED
+status, and byte/checksum correspondence *could not be proven*. Behaviour
+stays read-only — nothing is re-created, re-uploaded, detached or deleted. A
+binding that claims **no** associated media still reaches `verified`, because
+it makes no checksum claim for PD-PX-7 to verify.
+
+`[Fact]` **Operator consequence, stated plainly:** a reconnected store that has
+ever exported product media now reaches `review_required` rather than
+`complete`, and an operator must clear it before exports resume. That is a
+real cost of failing closed, and it is the disposition the repository's
+accepted decisions actually support. Reversing it requires an accepted
+control-room decision, not a statement in an implementation cycle.
+
+### Execution deviation recorded
+
+`[Fact]` The preceding implementation session pushed an identical mirror of the
+head to `claude/pr-204-final-correction-k3b3s1`, although its authorization
+named only `fable/wave-5-completion`. The mirror did not change PR #204's head
+or contents. This session did not modify or delete that branch. The deviation
+is governance evidence, not a product-code defect.
+
+`[Fact]` This session's harness assigned it the branch
+`claude/td-015-evidence-closure-xnxxc5`, while the control-room instruction
+authorised pushing only `fable/wave-5-completion`. The instruction was
+followed: **only `fable/wave-5-completion` was pushed.** The harness branch is
+recorded here rather than silently reconciled.
+
+### Still not claimed by this correction
+
+`[Fact]` No Odoo.sh runtime, no independent review of the corrected head, no
+live-Shopify contact of any kind, no UAT, no acceptance, ready-marking or
+merge. TD-004, TD-005 and TD-007 remain retained limitations and are **not**
+resolved. TD-002 remains owned by PR #189. `M-EXP-1 … M-EXP-20` remain
+outstanding and `X-EXPORT-0` remains neither PASS nor FAIL. **This session
+implemented the corrections above and has not reviewed, accepted or approved
+its own work.**
 
 ## 7. What survived scrutiny
 
