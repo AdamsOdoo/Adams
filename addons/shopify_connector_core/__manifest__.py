@@ -66,6 +66,11 @@ later, separately authorized tasks.
         'views/shopify_connector_dashboard_views.xml',
         'views/shopify_connector_ui_wizard_views.xml',
         'views/shopify_connector_store_views.xml',
+        # S1: the setup client action, its Configuration menu, and the
+        # re-run button on the store form. After the store views it
+        # inherits, and after the dashboard action its Save & Exit returns
+        # to.
+        'views/shopify_connector_setup_views.xml',
         'views/shopify_connector_job_log_views.xml',
         'views/shopify_connector_job_views.xml',
         'views/shopify_connector_mutation_attempt_views.xml',
@@ -77,6 +82,12 @@ later, separately authorized tasks.
             'shopify_connector_core/static/src/scss/shopify_connector_dashboard.scss',
             'shopify_connector_core/static/src/xml/shopify_connector_dashboard.xml',
             'shopify_connector_core/static/src/js/shopify_connector_dashboard.js',
+            # S1 guided setup. Same bundle, same token layer, same
+            # component vocabulary — it is a second surface in one app, not
+            # a second app.
+            'shopify_connector_core/static/src/scss/shopify_connector_setup_wizard.scss',
+            'shopify_connector_core/static/src/xml/shopify_connector_setup_wizard.xml',
+            'shopify_connector_core/static/src/js/shopify_connector_setup_wizard.js',
         ],
         # TOURS BELONG HERE, NOT IN `web.assets_backend` (TD-009).
         #
@@ -108,9 +119,13 @@ later, separately authorized tasks.
             # the only module all four depend on.
             'shopify_connector_core/static/src/js/tours/shopify_connector_u2_tour.js',
             'shopify_connector_core/static/src/js/tours/shopify_connector_u2_action_tour.js',
+            # S1 guided setup: the 11-step traversal, the three entry routes
+            # and the keyboard walkthrough.
+            'shopify_connector_core/static/src/js/tours/shopify_connector_s1_setup_tour.js',
         ],
         'web.assets_unit_tests': [
             'shopify_connector_core/static/tests/shopify_connector_dashboard.test.js',
+            'shopify_connector_core/static/tests/shopify_connector_setup_wizard.test.js',
         ],
     },
     'installable': True,

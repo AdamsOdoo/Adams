@@ -64,6 +64,42 @@ class ShopifyConnectorStoreSettings(models.Model):
         ),
     )
 
+    # ------------------------------------------------------------------
+    # S1: the guided setup wizard's durable progress
+    # ------------------------------------------------------------------
+    #
+    # The wizard keeps NO state of its own. Every durable business choice it
+    # collects already has an owning field on this record or on the store, and
+    # writing them anywhere else would create a second source of truth that
+    # the settings form could silently disagree with.
+    #
+    # What is genuinely new is the *progress*: which step was last completed,
+    # and who finished or re-ran setup. That belongs here for the same reason
+    # the flags do -- it is per-store configuration, it inherits the store's
+    # company through the related field above, and it is therefore covered by
+    # the SEC-3 record rules already on this model. Browser storage is never
+    # the source of truth: a resume that lived in localStorage would resume
+    # differently on a different machine, and would tell a second
+    # administrator nothing about what the first one had already done.
+    setup_wizard_step = fields.Integer(
+        default=1,
+        readonly=True,
+        help='The furthest setup-wizard step this store has completed. '
+             'Written only by the setup service.',
+    )
+    setup_completed_at = fields.Datetime(readonly=True)
+    setup_completed_uid = fields.Many2one(
+        comodel_name='res.users',
+        readonly=True,
+        ondelete='set null',
+    )
+    setup_last_rerun_at = fields.Datetime(readonly=True)
+    setup_last_rerun_uid = fields.Many2one(
+        comodel_name='res.users',
+        readonly=True,
+        ondelete='set null',
+    )
+
     _store_id_uniq = models.Constraint(
         'UNIQUE(store_id)',
         'Only one settings record is allowed per store.',

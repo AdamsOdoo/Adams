@@ -63,6 +63,8 @@ HOOT_SUCCESS = "[HOOT] Test suite succeeded"
 EXPECTED_SUITES = {
     'shopify connector dashboard': 8,
     'shopify connector export diff': 11,
+    # S1 (2026-07-27): the guided setup client action.
+    'shopify connector setup wizard': 9,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
@@ -71,6 +73,8 @@ EXPECTED_SUITES = {
 EXPECTED_FILES = {
     'shopify_connector_dashboard.test.js': 'shopify connector dashboard',
     'shopify_connector_export_diff.test.js': 'shopify connector export diff',
+    'shopify_connector_setup_wizard.test.js':
+        'shopify connector setup wizard',
 }
 
 #: `[HOOT] "<suite path>" ended (passed: <n> / time: <ms> ms)`
@@ -164,6 +168,16 @@ class TestConnectorHootSuite(HttpCase):
         """The S7 export-diff Owl component's unit suite."""
         self._run_suite('shopify connector export diff',
                         EXPECTED_SUITES['shopify connector export diff'])
+
+    def test_s1_setup_wizard_hoot_suite_passes(self):
+        """The S1 guided-setup Owl component's unit suite.
+
+        Lives in this runner rather than in core for the same reason the
+        dashboard suite does: one place runs every connector HOOT suite, so a
+        suite cannot be added and left unexecuted.
+        """
+        self._run_suite('shopify connector setup wizard',
+                        EXPECTED_SUITES['shopify connector setup wizard'])
 
     def test_every_hoot_file_is_executed(self):
         """No connector HOOT file may exist that this runner does not run.

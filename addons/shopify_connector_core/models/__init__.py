@@ -27,3 +27,7 @@ from . import shopify_connector_readiness_check
 from . import shopify_connector_ui_dashboard
 from . import shopify_connector_job_cancel_wizard
 from . import shopify_connector_mutation_resolution_wizard
+# S1 guided setup. Imported after the readiness registry it delegates to and
+# after the store/settings models it writes through -- it owns no table and no
+# business rule of its own.
+from . import shopify_connector_setup_wizard

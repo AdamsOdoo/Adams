@@ -127,11 +127,15 @@ TestU3ExportTours.test_export_navigation_tour \
 TestU3ExportTours.test_export_review_tour_discloses_before_it_offers \
 TestU3ExportTours.test_export_review_surface_is_keyboard_reachable \
 TestU3ExportTours.test_media_resume_tour_reaches_the_resume_from_the_browser \
-TestU3ExportTours.test_td015_checksum_acknowledgement_tour"
+TestU3ExportTours.test_td015_checksum_acknowledgement_tour \
+TestUiSetupTours.test_setup_wizard_traverses_all_eleven_steps \
+TestUiSetupTours.test_the_dashboard_empty_state_opens_setup \
+TestUiSetupTours.test_setup_resumes_at_the_step_it_was_left_on \
+TestUiSetupTours.test_setup_is_operable_by_keyboard_alone"
 
 # The HOOT suites, by the exact name `test_u3_hoot_suite.py` re-emits after it
 # has verified each one. Keep in step with EXPECTED_SUITES in that file.
-REQUIRED_HOOT_SUITES="shopify connector dashboard|shopify connector export diff"
+REQUIRED_HOOT_SUITES="shopify connector dashboard|shopify connector export diff|shopify connector setup wizard"
 
 # THE ONE SANCTIONED SKIP. Bound to an exact test identity and an exact reason,
 # deliberately: a general "one skip is allowed" rule would let ANY test skip,
@@ -376,8 +380,21 @@ self_test() {
         printf 'INFO db mod: Starting %s ...\n' "$t" >> "$good"
         printf 'INFO db mod.browser: tour succeeded\n' >> "$good"
     done
-    printf 'INFO db mod: CONNECTOR-HOOT-EVIDENCE suite="shopify connector dashboard" passed=8 marker=ok\n' >> "$good"
-    printf 'INFO db mod: CONNECTOR-HOOT-EVIDENCE suite="shopify connector export diff" passed=11 marker=ok\n' >> "$good"
+    # Generated FROM `REQUIRED_HOOT_SUITES` rather than hand-listed beside it.
+    # A hand-written copy of the inventory is exactly what went stale the first
+    # time a third suite was added, and a self-test that fails because its own
+    # fixture is out of date teaches operators to edit the number rather than
+    # read the failure.
+    local hoot_suite
+    while IFS= read -r hoot_suite; do
+        [[ -z "$hoot_suite" ]] && continue
+        printf 'INFO db mod: CONNECTOR-HOOT-EVIDENCE suite="%s" passed=1 marker=ok\n' \
+            "$hoot_suite" >> "$good"
+    # `printf '%s\n'` and not `printf '%s'`: without the trailing newline the
+    # final field has no line terminator, `read` returns non-zero for it, and
+    # the loop body silently skips the LAST suite -- which is precisely the
+    # suite a newly added one would be.
+    done < <(printf '%s\n' "$REQUIRED_HOOT_SUITES" | tr '|' '\n')
     printf 'INFO db mod: skipped %s : %s\n' "$ALLOWED_SKIP_TEST" "$ALLOWED_SKIP_REASON" >> "$good"
 
     EVIDENCE_ERRORS=()
@@ -456,7 +473,9 @@ self_test() {
 
     # 5. A missing HOOT suite must fail.
     local no_hoot="${tmp}/no_hoot.log"
-    grep -v 'shopify connector dashboard' "$good" > "$no_hoot"
+    local first_hoot_suite
+    first_hoot_suite="$(printf '%s\n' "$REQUIRED_HOOT_SUITES" | cut -d'|' -f1)"
+    grep -v "suite=\"${first_hoot_suite}\"" "$good" > "$no_hoot"
     EVIDENCE_ERRORS=()
     verify_hoot_evidence "$no_hoot" self-test
     _expect 1 "a HOOT suite with no verified evidence line fails"
@@ -466,8 +485,10 @@ self_test() {
     EVIDENCE_ERRORS=()
     verify_tour_evidence "${tmp}/empty.log" self-test
     verify_hoot_evidence "${tmp}/empty.log" self-test
-    local want=$(( $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w) + 1 + 2 ))
-    _expect "$want" "an empty log fails for every required tour and both suites"
+    local hoot_count
+    hoot_count="$(printf '%s\n' "$REQUIRED_HOOT_SUITES" | tr '|' '\n' | grep -c .)"
+    local want=$(( $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w) + 1 + hoot_count ))
+    _expect "$want" "an empty log fails for every required tour and every HOOT suite"
 
     # 7. An unresolvable browser must abort the RUN, not warn. Checked in a
     #    subshell so the exit does not end the self-test.

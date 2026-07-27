@@ -478,7 +478,16 @@ class TestReadinessSlotClosure(TransactionCase):
 
     def test_source_level_sec1_sudo_inventory_in_readiness(self):
         """SEC-1 adds protected job create/final-write elevation to
-        run_for_store; CORE-R1 retains the one cron-read elevation."""
+        run_for_store; CORE-R1 retains the one cron-read elevation; S1 adds
+        the system-parameter read (2026-07-27).
+
+        The `web.base.url` read needs elevation for the same reason the cron
+        read does: system parameters are `base.group_system` in Odoo 19 and
+        readiness runs as the invoking connector administrator, who is not
+        necessarily an Odoo system administrator. Without it the check raised
+        AccessError and failed the whole run -- reachable in production
+        through `action_reconnect` before the guided setup existed.
+        """
         self.assertEqual(
             core_sudo_inventory_for_file(
                 'shopify_connector_readiness_check.py'
@@ -488,6 +497,11 @@ class TestReadinessSlotClosure(TransactionCase):
                     'shopify_connector_readiness_check.py',
                     '_drain_cron_active_state', 'cron', 1,
                     'Read cron configuration.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
+                    '_web_base_url', "self.env['ir.config_parameter']", 1,
+                    'Read public base-URL configuration.',
                 ),
                 (
                     'shopify_connector_readiness_check.py',

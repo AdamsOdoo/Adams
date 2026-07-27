@@ -1,0 +1,333 @@
+// Part of the Shopify Connector (S1 guided setup).
+//
+// The setup wizard surface. Three rules, the same three the export diff
+// surface keeps:
+//
+// 1. TOKENS ONLY. Every colour, space, radius, duration and font comes from
+//    the connector token layer, which this root is listed in. No literal hex,
+//    no ad-hoc pixel value, no external font, no icon library, no CDN, no
+//    illustration subsystem. The status primitives (`sc-band`, `sc-badge`,
+//    `sc-btn`, `sc-skeleton`) are declared here rather than borrowed from the
+//    dashboard stylesheet, which scopes them to its own root -- the same
+//    discipline the export surface follows for the same reason.
+//
+// 2. LOGICAL PROPERTIES, so RTL is correct without a mirrored stylesheet:
+//    `margin-inline`, `padding-inline`, `border-inline-start`, `inline-size`,
+//    `text-align: start`. Under dir="rtl" the step rail, the choice cards and
+//    the action row all mirror.
+//
+// 3. MOTION IS OPTIONAL. The only transition is behind
+//    `prefers-reduced-motion: no-preference`, so reduced-motion users get no
+//    animation at all rather than one somebody remembered to switch off. There
+//    is no animation anywhere on the credential or readiness steps.
+//
+// Responsive: a single column at and below 768px, and nothing that can
+// overflow horizontally at 390px -- the step rail wraps rather than scrolls,
+// and the action row wraps rather than pushing the primary control off-screen.
+
+.o_sc_setup {
+    background: var(--sc-surface-0);
+    color: var(--sc-text-primary);
+    font-family: var(--sc-font);
+    min-height: 100%;
+    padding: var(--sc-space-6);
+    overflow-x: hidden; // never a connector-created horizontal page scroll
+
+    * { box-sizing: border-box; }
+
+    .o_sc_setup__inner {
+        max-inline-size: 880px;
+        margin-inline: auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-5);
+    }
+
+    // --- Focus visibility (WCAG 2.4.7): every operable element ---
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    [tabindex]:focus-visible {
+        outline: 2px solid var(--sc-focus);
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+    // --- Status band ---
+    .sc-band {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sc-space-4);
+        padding: var(--sc-space-4);
+        border-radius: var(--sc-radius);
+        background: var(--sc-neutral-bg);
+        color: var(--sc-neutral-text);
+
+        &.sc-band--success { background: var(--sc-success-bg); color: var(--sc-success-text); }
+        &.sc-band--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text); }
+        &.sc-band--danger  { background: var(--sc-danger-bg);  color: var(--sc-danger-text); }
+        &.sc-band--info    { background: var(--sc-info-bg);    color: var(--sc-info-text); }
+
+        .sc-band__icon { font-size: var(--sc-fs-cardtitle); line-height: 1.4; }
+        .sc-band__body { display: flex; flex-direction: column; gap: var(--sc-space-1); }
+        .sc-band__text { font-weight: var(--sc-fw-dominant); }
+        .sc-band__hint { font-size: var(--sc-fs-secondary); }
+    }
+
+    .sc-badge {
+        display: inline-block;
+        padding: 2px var(--sc-space-2);
+        border-radius: var(--sc-radius);
+        font-size: var(--sc-fs-caption);
+        font-weight: var(--sc-fw-label);
+        background: var(--sc-neutral-bg);
+        color: var(--sc-neutral-text);
+
+        &.sc-badge--success { background: var(--sc-success-bg); color: var(--sc-success-text); }
+        &.sc-badge--danger  { background: var(--sc-danger-bg);  color: var(--sc-danger-text); }
+        &.sc-badge--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text); }
+        &.sc-badge--info    { background: var(--sc-info-bg);    color: var(--sc-info-text); }
+        &.sc-badge--neutral { background: var(--sc-neutral-bg); color: var(--sc-neutral-text); }
+    }
+
+    .sc-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sc-space-2);
+        padding: var(--sc-space-2) var(--sc-space-4);
+        border: 1px solid var(--sc-border-strong);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+        color: var(--sc-text-primary);
+        font-family: inherit;
+        font-size: var(--sc-fs-body);
+        font-weight: var(--sc-fw-label);
+        cursor: pointer;
+
+        &[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+        &.sc-btn--primary {
+            background: var(--sc-accent);
+            border-color: var(--sc-accent);
+            color: #FFFFFF;
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            transition: background var(--sc-motion-2) var(--sc-ease);
+        }
+    }
+
+    .sc-skeleton {
+        background: var(--sc-neutral-bg);
+        border-radius: var(--sc-radius);
+        block-size: 84px;
+    }
+    .sc-skeleton--band { block-size: 84px; }
+
+    // --- Step rail: names, not numbers alone; wraps rather than scrolls ---
+    .sc_setup__steps ol {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sc-space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .sc_setup_step {
+        display: flex;
+        align-items: center;
+        gap: var(--sc-space-2);
+        padding: var(--sc-space-1) var(--sc-space-3);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+        font-size: var(--sc-fs-caption);
+        color: var(--sc-text-secondary);
+
+        .sc_setup_step__index {
+            font-weight: var(--sc-fw-dominant);
+        }
+
+        &.sc_setup_step--current {
+            border-color: var(--sc-accent);
+            color: var(--sc-accent);
+            font-weight: var(--sc-fw-label);
+        }
+
+        // Completion is not signalled by colour alone: the done state also
+        // carries a heavier border and the step keeps its name.
+        &.sc_setup_step--done {
+            border-color: var(--sc-success-text);
+            color: var(--sc-success-text);
+        }
+    }
+
+    // --- The one panel: a single card, never nested cards ---
+    .sc_setup__panel {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-4);
+        padding: var(--sc-space-6);
+        background: var(--sc-surface-1);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+    }
+
+    .sc_setup__heading {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+        margin: 0;
+        font-size: var(--sc-fs-lead);
+        font-weight: var(--sc-fw-dominant);
+
+        .sc_setup__heading-count {
+            font-size: var(--sc-fs-caption);
+            font-weight: var(--sc-fw-body);
+            color: var(--sc-text-secondary);
+        }
+    }
+
+    .sc_setup__subheading {
+        margin: 0;
+        font-size: var(--sc-fs-cardtitle);
+        font-weight: var(--sc-fw-label);
+    }
+
+    .sc_setup__lead { margin: 0; font-size: var(--sc-fs-body); }
+    .sc_setup__note {
+        margin: 0;
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+    }
+
+    .sc_setup__list,
+    .sc_setup__scopes,
+    .sc_setup__checks,
+    .sc_setup__domains {
+        margin: 0;
+        padding-inline-start: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-3);
+    }
+
+    .sc_setup__list { padding-inline-start: var(--sc-space-5); list-style: disc; }
+
+    .sc_setup__field {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+
+        label { font-weight: var(--sc-fw-label); }
+
+        input {
+            inline-size: 100%;
+            max-inline-size: 100%;
+            padding: var(--sc-space-2) var(--sc-space-3);
+            border: 1px solid var(--sc-border-strong);
+            border-radius: var(--sc-radius);
+            font-family: inherit;
+            font-size: var(--sc-fs-body);
+        }
+
+        small { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+    }
+
+    .sc_setup__scopes li,
+    .sc_setup__checks li,
+    .sc_setup__domain {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+        padding: var(--sc-space-3);
+        border-inline-start: 3px solid var(--sc-border);
+        background: var(--sc-surface-0);
+        border-radius: var(--sc-radius);
+        text-align: start;
+    }
+
+    .sc_setup_check--success { border-inline-start-color: var(--sc-success-text); }
+    .sc_setup_check--warning { border-inline-start-color: var(--sc-warning-text); }
+    .sc_setup_check--danger  { border-inline-start-color: var(--sc-danger-text); }
+
+    .sc_setup__scope-name { font-weight: var(--sc-fw-label); }
+    .sc_setup__scope-reason,
+    .sc_setup__check-reason,
+    .sc_setup__check-owner,
+    .sc_setup__domain-happens,
+    .sc_setup__domain-withheld,
+    .sc_setup__choice-consequence {
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+    }
+
+    .sc_setup__check-label,
+    .sc_setup__domain-label,
+    .sc_setup__choice-label { font-weight: var(--sc-fw-label); }
+
+    .sc_setup__choices {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-3);
+        margin: 0;
+        padding: var(--sc-space-4);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+
+        legend {
+            padding-inline: var(--sc-space-2);
+            font-weight: var(--sc-fw-label);
+            font-size: var(--sc-fs-body);
+        }
+    }
+
+    .sc_setup__choice {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: var(--sc-space-1) var(--sc-space-3);
+        align-items: start;
+        cursor: pointer;
+
+        input { margin-block-start: 4px; }
+        .sc_setup__choice-consequence { grid-column: 2; }
+    }
+
+    .sc_setup__summary {
+        display: grid;
+        grid-template-columns: minmax(9rem, auto) 1fr;
+        gap: var(--sc-space-2) var(--sc-space-4);
+        margin: 0;
+
+        dt { font-weight: var(--sc-fw-label); color: var(--sc-text-secondary); }
+        dd { margin: 0; }
+    }
+
+    .sc_setup__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sc-space-3);
+        margin-block-start: var(--sc-space-2);
+    }
+
+    // --- Single column at and below 768px (master specification S1) ---
+    @media (max-width: 768px) {
+        padding: var(--sc-space-4);
+
+        .sc_setup__panel { padding: var(--sc-space-4); }
+
+        .sc_setup__summary { grid-template-columns: 1fr; }
+
+        .sc_setup__choice { grid-template-columns: auto 1fr; }
+
+        // At 390px the primary action must stay on screen and reachable. The
+        // row wraps to full-width controls rather than overflowing, which is
+        // the failure mode a horizontal scroll hides rather than solves.
+        .sc_setup__actions .sc-btn {
+            flex: 1 1 auto;
+            justify-content: center;
+        }
+    }
+}

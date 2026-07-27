@@ -51,6 +51,16 @@
                                 <li>Run a test connection and a readiness check.</li>
                                 <li>Activate the store — syncing and this dashboard come to life.</li>
                             </ol>
+                            <!-- S1 entry route 1 of 3. The guided setup walks
+                                 these three lines rather than leaving an
+                                 operator to find the pieces. -->
+                            <div t-if="data.setup_available" class="sc-empty__action">
+                                <button class="sc-btn sc_dashboard_setup"
+                                        t-on-click="() => this.openSetup()">
+                                    <i class="fa fa-magic" aria-hidden="true"/>
+                                    <span>Set up your store</span>
+                                </button>
+                            </div>
                         </div>
                     </t>
 

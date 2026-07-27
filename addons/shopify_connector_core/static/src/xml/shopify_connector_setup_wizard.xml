@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+    Part of the Shopify Connector (S1 guided setup).
+
+    One decision per step. Every status carries text, never colour alone. Every
+    control is a real focusable element with a visible focus ring, and the step
+    heading is focusable so focus can land on it after each advance.
+
+    No decoration on the credential or readiness steps: those are the two
+    moments an operator most needs to read carefully, and an animation there
+    would be a distraction dressed as delight.
+-->
+<templates xml:space="preserve">
+
+    <t t-name="shopify_connector_core.SetupWizard">
+        <div class="o_sc_setup" t-att-dir="direction">
+            <div class="o_sc_setup__inner">
+
+                <!-- ============ LOADING ============ -->
+                <t t-if="state.status === 'loading'">
+                    <div class="sc-skeleton sc-skeleton--band" aria-hidden="true"/>
+                    <p role="status">Loading setup…</p>
+                </t>
+
+                <!-- ============ ERROR ============ -->
+                <t t-elif="state.status === 'error'">
+                    <div class="sc-band sc-band--danger" role="alert">
+                        <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                        <div class="sc-band__body">
+                            <div class="sc-band__text">Setup could not be loaded</div>
+                            <div class="sc-band__hint" t-esc="state.errorMessage"/>
+                        </div>
+                    </div>
+                </t>
+
+                <!-- ============ READY ============ -->
+                <t t-else="">
+
+                    <!-- Step indicator: plain step names, never numbers alone. -->
+                    <nav class="sc_setup__steps" aria-label="Setup steps">
+                        <ol>
+                            <t t-foreach="steps" t-as="step" t-key="step.key">
+                                <li t-att-class="stepClass(step)"
+                                    t-att-aria-current="step.index === state.step ? 'step' : false">
+                                    <span class="sc_setup_step__index" t-esc="step.index"/>
+                                    <span class="sc_setup_step__label" t-esc="step.label"/>
+                                </li>
+                            </t>
+                        </ol>
+                    </nav>
+
+                    <section class="sc_setup__panel" aria-live="polite">
+                        <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
+                            <span class="sc_setup__heading-count">
+                                Step <t t-esc="state.step"/> of <t t-esc="state.data.step_count"/>
+                            </span>
+                            <span t-esc="currentStep.label"/>
+                        </h1>
+
+                        <!-- A refusal the server made. Never swallowed, never
+                             turned into a silent no-op. -->
+                        <div t-if="state.errorMessage"
+                             class="sc-band sc-band--danger sc_setup__error"
+                             role="alert" id="sc_setup_error">
+                            <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text" t-esc="state.errorMessage"/>
+                            </div>
+                        </div>
+
+                        <!-- ===== 1. Welcome / prerequisites ===== -->
+                        <t t-if="state.step === 1">
+                            <p class="sc_setup__lead">
+                                This connects one Shopify store to this Odoo database. It
+                                takes about ten minutes, and <strong>nothing synchronises
+                                and nothing is written to Shopify until you finish and
+                                say so</strong>.
+                            </p>
+                            <h2 class="sc_setup__subheading">What you'll need</h2>
+                            <ul class="sc_setup__list">
+                                <li>Admin access to your Shopify store, so you can create a custom app and copy its Admin API access token.</li>
+                                <li>About ten minutes. You can stop at any point and pick up where you left off.</li>
+                            </ul>
+                            <div class="sc-band sc-band--info" role="note">
+                                <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">This connector needs Odoo.sh or on-premise hosting</div>
+                                    <div class="sc-band__hint">
+                                        Odoo Online (SaaS) cannot run it, because the connector
+                                        needs background workers and outbound calls that Odoo
+                                        Online does not provide. Better to know now than at the
+                                        last step.
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <!-- ===== 2. Store identity ===== -->
+                        <t t-if="state.step === 2">
+                            <p class="sc_setup__lead">
+                                Name this store so you recognise it later, and point it at
+                                the right Shopify shop.
+                            </p>
+                            <div class="sc_setup__field">
+                                <label for="sc_setup_name">Store name</label>
+                                <input id="sc_setup_name" type="text" class="o_input"
+                                       t-model="state.form.name"
+                                       aria-describedby="sc_setup_name_help"/>
+                                <small id="sc_setup_name_help">
+                                    Anything you'll recognise — "Main storefront", "EU shop".
+                                </small>
+                            </div>
+                            <div class="sc_setup__field">
+                                <label for="sc_setup_domain">Shopify domain</label>
+                                <input id="sc_setup_domain" type="text" class="o_input"
+                                       t-model="state.form.shopDomain"
+                                       placeholder="acme-supplies.myshopify.com"
+                                       aria-describedby="sc_setup_domain_help"/>
+                                <small id="sc_setup_domain_help">
+                                    Your store's permanent address, ending in .myshopify.com.
+                                    Find it in Shopify under Settings → Domains. We confirm it
+                                    against Shopify at the readiness step — we don't take it on
+                                    trust here.
+                                </small>
+                            </div>
+                            <p class="sc_setup__note">
+                                One Shopify store per setup. Connecting a second shop means a
+                                second store here.
+                            </p>
+                        </t>
+
+                        <!-- ===== 3. Credential entry ===== -->
+                        <t t-if="state.step === 3">
+                            <p class="sc_setup__lead">
+                                In Shopify, create a custom app and copy its
+                                <strong>Admin API access token</strong>. Paste it once here.
+                            </p>
+                            <div class="sc_setup__field">
+                                <label for="sc_setup_token">Admin API access token</label>
+                                <input id="sc_setup_token" type="password"
+                                       class="o_input sc_setup_token"
+                                       autocomplete="off" spellcheck="false"
+                                       aria-describedby="sc_setup_token_help"/>
+                                <small id="sc_setup_token_help">
+                                    Stored behind administrator-only access and never shown
+                                    again — not here, not in the store form, not in a log. If
+                                    you lose it, create a new one in Shopify and paste that.
+                                </small>
+                            </div>
+                            <p t-if="store.credential_present" class="sc_setup__note" role="status">
+                                A credential is already on record for this store. Pasting a new
+                                one replaces it, and the connection has to be tested again.
+                            </p>
+                            <div class="sc-band sc-band--info" role="note">
+                                <i class="fa fa-lock sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">This token is write-only</div>
+                                    <div class="sc-band__hint">
+                                        It is protected by access control, not by encryption at
+                                        rest. Anyone with database access can read it, so treat
+                                        database backups as containing it.
+                                    </div>
+                                </div>
+                            </div>
+                        </t>
+
+                        <!-- ===== 4. Scope presentation ===== -->
+                        <t t-if="state.step === 4">
+                            <p class="sc_setup__lead">
+                                These are the permissions the connector needs, and why. You
+                                grant them in Shopify when you create the custom app —
+                                <strong>this screen does not grant anything</strong>. We
+                                verify them at the readiness step.
+                            </p>
+                            <ul class="sc_setup__scopes">
+                                <t t-foreach="state.data.scopes" t-as="scope" t-key="scope.scope">
+                                    <li>
+                                        <span class="sc_setup__scope-name" t-esc="scope.scope"/>
+                                        <span class="sc_setup__scope-reason" t-esc="scope.reason"/>
+                                        <span t-if="scope.granted" class="sc-badge sc-badge--success">Granted</span>
+                                        <span t-else="" class="sc-badge sc-badge--neutral">Not confirmed yet</span>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <!-- ===== 5. Test connection ===== -->
+                        <t t-if="state.step === 5">
+                            <p class="sc_setup__lead">
+                                This makes one read-only call to Shopify to prove the token
+                                works. Nothing is created, changed or deleted.
+                            </p>
+                            <div t-if="store.test_connection_result === 'pass'"
+                                 class="sc-band sc-band--success" role="status">
+                                <i class="fa fa-check-circle sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">The connection works</div>
+                                    <div class="sc-band__hint">Shopify accepted the credential.</div>
+                                </div>
+                            </div>
+                            <div t-elif="store.test_connection_result === 'fail'"
+                                 class="sc-band sc-band--danger" role="alert">
+                                <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">The connection did not work</div>
+                                    <div class="sc-band__hint" t-esc="store.test_connection_reason"/>
+                                    <div class="sc-band__hint">
+                                        Go back one step and paste the token again, or check the
+                                        shop domain.
+                                    </div>
+                                </div>
+                            </div>
+                            <p t-else="" class="sc_setup__note" role="status">
+                                Not tested yet.
+                            </p>
+                            <div>
+                                <button class="sc-btn sc_setup_run_test"
+                                        t-att-disabled="state.busy"
+                                        t-on-click="() => this.runTestConnection()">
+                                    <span t-if="store.test_connection_result">Test again</span>
+                                    <span t-else="">Test connection</span>
+                                </button>
+                            </div>
+                        </t>
+
+                        <!-- ===== 6. Readiness checks ===== -->
+                        <t t-if="state.step === 6">
+                            <p class="sc_setup__lead">
+                                Everything known to break a first sync, checked before you
+                                start. Each result says what it means, who fixes it, and
+                                whether it blocks activation.
+                            </p>
+                            <t t-if="readiness.ran">
+                                <ul class="sc_setup__checks">
+                                    <t t-foreach="readiness.checks" t-as="check" t-key="check.code">
+                                        <li t-att-class="checkClass(check)">
+                                            <span class="sc_setup__check-label" t-esc="check.label"/>
+                                            <!-- Text, not colour alone. -->
+                                            <span class="sc-badge" t-att-class="'sc-badge--' + check.tone">
+                                                <t t-if="check.result === 'pass'">Passed</t>
+                                                <t t-elif="check.tier === 'essential'">Must be fixed</t>
+                                                <t t-else="">Worth checking</t>
+                                            </span>
+                                            <span class="sc_setup__check-reason" t-esc="check.reason"/>
+                                            <span class="sc_setup__check-owner">
+                                                Who fixes this: <t t-esc="check.owner"/>
+                                            </span>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </t>
+                            <p t-else="" class="sc_setup__note" role="status">
+                                Not run yet.
+                            </p>
+                            <div>
+                                <button class="sc-btn sc_setup_run_readiness"
+                                        t-att-disabled="state.busy"
+                                        t-on-click="() => this.runReadiness()">
+                                    <span t-if="readiness.ran">Re-run readiness</span>
+                                    <span t-else="">Run readiness checks</span>
+                                </button>
+                            </div>
+                        </t>
+
+                        <!-- ===== 7. Sync direction per domain ===== -->
+                        <t t-if="state.step === 7">
+                            <p class="sc_setup__lead">
+                                Choose what this connector does. Enabling nothing is a valid
+                                choice — a connected store that syncs nothing yet is fine.
+                            </p>
+                            <ul class="sc_setup__domains">
+                                <t t-foreach="state.data.domains" t-as="domain" t-key="domain.key">
+                                    <li class="sc_setup__domain">
+                                        <label>
+                                            <input type="checkbox"
+                                                   t-att-id="'sc_setup_domain_' + domain.key"
+                                                   t-att-checked="isDomainEnabled(domain.key)"
+                                                   t-on-change="() => this.toggleDomain(domain.key)"/>
+                                            <span class="sc_setup__domain-label" t-esc="domain.label"/>
+                                            <span class="sc-badge sc-badge--neutral" t-esc="domain.direction"/>
+                                        </label>
+                                        <span class="sc_setup__domain-happens" t-esc="domain.happens"/>
+                                        <span t-if="isDomainEnabled(domain.key)"
+                                              class="sc_setup__domain-withheld" t-esc="domain.withheld"/>
+                                    </li>
+                                </t>
+                            </ul>
+                        </t>
+
+                        <!-- ===== 8. Source of truth ===== -->
+                        <t t-if="state.step === 8">
+                            <p class="sc_setup__lead">
+                                Two decisions with real consequences, and no default. Both
+                                are required.
+                            </p>
+                            <fieldset class="sc_setup__choices">
+                                <legend>Which system is the source for your catalog?</legend>
+                                <t t-foreach="state.data.matching_choices" t-as="choice" t-key="choice.value">
+                                    <label class="sc_setup__choice">
+                                        <input type="radio" name="sc_setup_matching"
+                                               t-att-value="choice.value"
+                                               t-att-checked="state.form.matching === choice.value"
+                                               t-on-change="() => this.state.form.matching = choice.value"/>
+                                        <span class="sc_setup__choice-label" t-esc="choice.label"/>
+                                        <span class="sc_setup__choice-consequence" t-esc="choice.consequence"/>
+                                    </label>
+                                </t>
+                            </fieldset>
+                            <fieldset class="sc_setup__choices">
+                                <legend>Which system is the price authority?</legend>
+                                <t t-foreach="state.data.price_choices" t-as="choice" t-key="choice.value">
+                                    <label class="sc_setup__choice">
+                                        <input type="radio" name="sc_setup_price"
+                                               t-att-value="choice.value"
+                                               t-att-checked="state.form.price === choice.value"
+                                               t-on-change="() => this.state.form.price = choice.value"/>
+                                        <span class="sc_setup__choice-label" t-esc="choice.label"/>
+                                        <span class="sc_setup__choice-consequence" t-esc="choice.consequence"/>
+                                    </label>
+                                </t>
+                            </fieldset>
+                            <p class="sc_setup__note">
+                                Leaving the price authority with Shopify means prices are never
+                                exported. That block is stated here so it is never a surprise
+                                later.
+                            </p>
+                        </t>
+
+                        <!-- ===== 9. Notification default ===== -->
+                        <t t-if="state.step === 9">
+                            <p class="sc_setup__lead">
+                                Right now, <strong>customers will not be emailed</strong> when
+                                a delivery is fulfilled. You can change this any time in Store
+                                Settings.
+                            </p>
+                            <label class="sc_setup__choice">
+                                <input type="checkbox" id="sc_setup_notify"
+                                       t-model="state.form.notification"/>
+                                <span class="sc_setup__choice-label">
+                                    Let Shopify email my customers about fulfillments
+                                </span>
+                            </label>
+                            <div t-if="state.form.notification" class="sc-band sc-band--warning" role="alert">
+                                <i class="fa fa-envelope sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">Shopify will email your customers</div>
+                                    <div class="sc-band__hint">
+                                        Every delivery you validate in Odoo will send a Shopify
+                                        shipping notification to that order's customer.
+                                    </div>
+                                    <label class="sc_setup__choice">
+                                        <input type="checkbox" id="sc_setup_notify_confirm"
+                                               t-model="state.form.notificationConfirmed"/>
+                                        <span class="sc_setup__choice-label">
+                                            I understand, and I want customers emailed
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        </t>
+
+                        <!-- ===== 10. Inventory first-push scheduling ===== -->
+                        <t t-if="state.step === 10">
+                            <t t-if="isDomainEnabled('inventory')">
+                                <p class="sc_setup__lead">
+                                    <strong>Nothing is written to Shopify until you review and
+                                    confirm the stock preview.</strong> This step only picks
+                                    when the connector starts looking.
+                                </p>
+                                <label class="sc_setup__choice">
+                                    <input type="radio" name="sc_setup_push"
+                                           t-att-checked="state.form.schedulePush"
+                                           t-on-change="() => this.state.form.schedulePush = true"/>
+                                    <span class="sc_setup__choice-label">Schedule stock scanning now</span>
+                                    <span class="sc_setup__choice-consequence">
+                                        The connector starts preparing a first-push preview for
+                                        you to review.
+                                    </span>
+                                </label>
+                                <label class="sc_setup__choice">
+                                    <input type="radio" name="sc_setup_push"
+                                           t-att-checked="!state.form.schedulePush"
+                                           t-on-change="() => this.state.form.schedulePush = false"/>
+                                    <span class="sc_setup__choice-label">Do it later</span>
+                                    <span class="sc_setup__choice-consequence">
+                                        A first-class choice. The dashboard keeps it visible
+                                        without nagging.
+                                    </span>
+                                </label>
+                            </t>
+                            <t t-else="">
+                                <p class="sc_setup__lead" role="status">
+                                    Inventory syncing is not enabled for this store, so there is
+                                    no first stock push to schedule. You can enable it later in
+                                    Store Settings, and this step will be waiting.
+                                </p>
+                            </t>
+                        </t>
+
+                        <!-- ===== 11. Review and activate ===== -->
+                        <t t-if="state.step === 11">
+                            <p class="sc_setup__lead">
+                                Here is what this connector will do. You can change any of it
+                                later in Store Settings.
+                            </p>
+                            <dl class="sc_setup__summary">
+                                <dt>Store</dt>
+                                <dd><t t-esc="store.name"/> — <t t-esc="store.shop_domain"/></dd>
+                                <dt>What syncs</dt>
+                                <dd>
+                                    <t t-if="summary.domains.length" t-esc="summary.domains.join(', ')"/>
+                                    <t t-else="">Nothing yet — the store is connected and idle.</t>
+                                </dd>
+                                <dt>Catalog source</dt>
+                                <dd><t t-esc="summary.matching or 'Not chosen'"/></dd>
+                                <dt>Price authority</dt>
+                                <dd><t t-esc="summary.price or 'Not chosen'"/></dd>
+                                <dt>Customer notifications</dt>
+                                <dd t-esc="summary.notification"/>
+                                <dt>First stock push</dt>
+                                <dd t-esc="summary.first_push"/>
+                                <dt>Readiness</dt>
+                                <dd>
+                                    <t t-if="!readiness.ran">Not run yet</t>
+                                    <t t-elif="readiness.blocking.length">
+                                        Blocked: <t t-esc="readiness.blocking.length"/> essential
+                                        check(s) still failing
+                                    </t>
+                                    <t t-else="">All essential checks passed</t>
+                                </dd>
+                            </dl>
+                            <div t-if="readiness.blocking.length" class="sc-band sc-band--danger" role="alert">
+                                <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">These must be fixed before activating</div>
+                                    <ul>
+                                        <t t-foreach="readiness.blocking" t-as="check" t-key="check.code">
+                                            <li><t t-esc="check.label"/> — <t t-esc="check.reason"/></li>
+                                        </t>
+                                    </ul>
+                                </div>
+                            </div>
+                            <p class="sc_setup__note">
+                                Activating does not start a sync. Nothing is written to Shopify.
+                                The dashboard shows you the next explicit action.
+                            </p>
+                        </t>
+
+                        <!-- ===== Actions ===== -->
+                        <div class="sc_setup__actions">
+                            <button class="sc-btn" t-att-disabled="isFirstStep or state.busy"
+                                    t-on-click="() => this.back()">
+                                <span>Back</span>
+                            </button>
+                            <button class="sc-btn sc-btn--primary sc_setup_continue"
+                                    t-att-disabled="state.busy"
+                                    t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
+                                    t-on-click="() => this.continueStep()">
+                                <span t-if="isLastStep">Activate</span>
+                                <span t-else="">Continue</span>
+                            </button>
+                            <button t-if="store.id" class="sc-btn sc_setup_exit"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.saveAndExit()">
+                                <span>Save &amp; Exit</span>
+                            </button>
+                            <button t-if="store.id and store.setup_completed_at"
+                                    class="sc-btn sc_setup_rerun"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.rerun()">
+                                <span>Start again</span>
+                            </button>
+                        </div>
+                        <p t-if="store.setup_completed_at" class="sc_setup__note" role="status">
+                            Setup was completed by <t t-esc="store.setup_completed_by"/>. Re-running
+                            it changes nothing until you save a step.
+                        </p>
+                    </section>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

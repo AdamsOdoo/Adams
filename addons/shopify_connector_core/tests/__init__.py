@@ -52,3 +52,7 @@ from . import test_suite_runner_fails_closed
 from . import test_throttle_backpressure
 from . import test_api_version_binding
 from . import test_vocabulary_reconciliation
+# S1 guided setup wizard: the server side of the 11-step flow, and the
+# browser traversal that proves it is reachable at all.
+from . import test_setup_wizard
+from . import test_ui_setup_tours

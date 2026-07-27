@@ -116,8 +116,49 @@ CORE_SUDO_SITES = [
     ('shopify_connector_pii_retention.py', 'run_sweep', 'JobLog', 1),
     ('shopify_connector_readiness_check.py',
      '_drain_cron_active_state', 'cron', 1),
+    # S1 (2026-07-27). System-parameter reads are `base.group_system` in
+    # Odoo 19, and readiness runs as the invoking connector administrator --
+    # who is not necessarily an Odoo system administrator. Without this the
+    # check raised AccessError and took the whole readiness run with it, which
+    # `action_reconnect` could already reach in production.
+    ('shopify_connector_readiness_check.py',
+     '_web_base_url', "self.env['ir.config_parameter']", 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'Job', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'job', 1),
+    # ------------------------------------------------------------------
+    # S1 guided setup (2026-07-27).
+    #
+    # Every elevation below runs AFTER `_resolve_store` has established the
+    # Connector Administrator role, record access as the calling user, and
+    # company consistency against `env.companies`. None of them can cross a
+    # company boundary: `company_id` on both the settings row and every job
+    # row is a stored related field through `store_id`, so a row's company is
+    # its store's company by construction rather than by assignment.
+    #
+    # They exist because Odoo's merged ACL grants no connector group `create`
+    # on `shopify.connector.store` or `shopify.connector.store.settings`, and
+    # no `write` on the readonly progress columns -- deliberately, since all
+    # three are structure rather than data. Setup is the one flow that has to
+    # create them.
+    ('shopify_connector_setup_wizard.py', '_settings_for', 'Settings', 1),
+    ('shopify_connector_setup_wizard.py', '_settings_for', 'Settings', 2),
+    ('shopify_connector_setup_wizard.py', '_record_progress', 'settings', 1),
+    ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
+     "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
+     "self.env['shopify.connector.job.log']", 1),
+    ('shopify_connector_setup_wizard.py', 'save_store_identity',
+     "self.env['shopify.connector.store']", 1),
+    ('shopify_connector_setup_wizard.py', 'save_store_identity',
+     "self.env['shopify.connector.store']", 2),
+    ('shopify_connector_setup_wizard.py', 'save_directions', 'settings', 1),
+    ('shopify_connector_setup_wizard.py', 'save_source_of_truth',
+     'settings', 1),
+    ('shopify_connector_setup_wizard.py', 'save_notification', 'settings', 1),
+    ('shopify_connector_setup_wizard.py', 'save_first_push_schedule',
+     'settings', 1),
+    ('shopify_connector_setup_wizard.py', 'activate', 'settings', 1),
+    ('shopify_connector_setup_wizard.py', 'restart_setup', 'settings', 1),
     # SEC-3 (#197) scope-mixin seams. The upgrade sweep must see rows that the
     # fail-closed rules hide from every ordinary reader -- including, by
     # design, rows it is about to quarantine. The release action re-runs the
@@ -224,7 +265,29 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
     ('shopify_connector_readiness_check.py',
      '_drain_cron_active_state'): 'Read cron configuration.',
     ('shopify_connector_readiness_check.py',
+     '_web_base_url'): 'Read public base-URL configuration.',
+    ('shopify_connector_readiness_check.py',
      'run_for_store'): 'Readiness audit job lifecycle.',
+    ('shopify_connector_setup_wizard.py',
+     '_settings_for'): 'S1 store-settings row create.',
+    ('shopify_connector_setup_wizard.py',
+     '_record_progress'): 'S1 resume-point write.',
+    ('shopify_connector_setup_wizard.py',
+     '_last_readiness_checks'): 'S1 per-check readiness evidence read.',
+    ('shopify_connector_setup_wizard.py',
+     'save_store_identity'): 'S1 store row create.',
+    ('shopify_connector_setup_wizard.py',
+     'save_directions'): 'S1 domain enablement write.',
+    ('shopify_connector_setup_wizard.py',
+     'save_source_of_truth'): 'S1 source-of-truth write.',
+    ('shopify_connector_setup_wizard.py',
+     'save_notification'): 'S1 notification default write.',
+    ('shopify_connector_setup_wizard.py',
+     'save_first_push_schedule'): 'S1 first-push scheduling write.',
+    ('shopify_connector_setup_wizard.py',
+     'activate'): 'S1 completion stamp.',
+    ('shopify_connector_setup_wizard.py',
+     'restart_setup'): 'S1 re-run stamp.',
     ('shopify_connector_scope_mixin.py',
      '_sec3_quarantine_scope_mismatches'):
         'SEC-3 historic scope sweep over fail-closed rows.',

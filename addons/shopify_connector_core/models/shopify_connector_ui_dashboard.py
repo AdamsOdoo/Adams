@@ -92,6 +92,15 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             'cadence': self._cadence_line(activity),
             'sparkline': sparkline,
             'stores': stores,
+            # S1 entry route 1 of 3: the first-run empty state offers setup.
+            # A flag rather than an action payload, and gated on the same
+            # Administrator group the setup service enforces server-side --
+            # the dashboard is visible to every connector role, and offering
+            # a control the setup service would refuse is how a surface
+            # teaches operators to distrust it.
+            'setup_available': self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
             'refresh_interval_seconds': 30,
             'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
         }

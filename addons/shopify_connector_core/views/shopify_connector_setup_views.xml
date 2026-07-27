@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        S1 guided setup: the client action and its Configuration entry.
+
+        ONE client action, inside the normal Odoo web client. No new root app
+        menu, no parallel settings workflow and no second store-management
+        system: setup writes to the same store and settings records the Store
+        form shows, so what an operator does here and what they see there can
+        never disagree.
+
+        `groups` on the menu is VISIBILITY. The server re-checks the Connector
+        Administrator role, record access and company consistency on every
+        entry point of `shopify.connector.setup.wizard`, including the read, so
+        hiding the menu is convenience rather than security.
+
+        `ir.actions.client` carries no `group_ids` field in Odoo 19 (only
+        `ir.actions.act_window` does), so a client action cannot be
+        group-restricted at all. That is precisely why the enforcement lives on
+        every server method rather than on the action: a client action's tag is
+        reachable by URL to anyone who knows it, and the only thing standing
+        between that and a store's setup is the check inside
+        `_assert_setup_admin` / `_resolve_store`.
+    -->
+
+    <record id="action_shopify_connector_setup_wizard" model="ir.actions.client">
+        <field name="name">Setup Wizard</field>
+        <field name="tag">shopify_connector_setup_wizard</field>
+    </record>
+
+    <!--
+        Entry route 2 of 3: Configuration -> Setup Wizard.
+
+        Configuration is a new branch under the existing connector root rather
+        than a new app. It is Administrator-gated in full, because everything
+        that will ever live under it is an administrator's job.
+    -->
+    <menuitem id="menu_shopify_connector_configuration"
+              name="Configuration"
+              parent="menu_shopify_connector_root"
+              sequence="90"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
+
+    <menuitem id="menu_shopify_connector_setup_wizard"
+              name="Setup Wizard"
+              parent="menu_shopify_connector_configuration"
+              action="action_shopify_connector_setup_wizard"
+              sequence="10"/>
+
+    <!--
+        Entry route 3 of 3: re-run setup from the store record.
+
+        Placed in the store form header beside the lifecycle controls, because
+        that is where an administrator already goes to change how a store
+        behaves. It re-runs the guided flow; it does not reset a single stored
+        choice, which is why it carries no destructive confirmation - there is
+        nothing to warn about until the operator saves a step.
+    -->
+    <record id="view_shopify_connector_store_form_setup" model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.setup</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id" ref="view_shopify_connector_store_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_shopify_rerun_setup" type="object"
+                        string="Re-run Setup"
+                        groups="shopify_connector_core.group_shopify_connector_admin"
+                        help="Walk through the guided setup again for this store. Nothing changes until you save a step."/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

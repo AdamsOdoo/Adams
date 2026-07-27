@@ -136,7 +136,7 @@ CONTRAST_JS = r"""
   // Only the connector's own surfaces. Measuring the whole Odoo chrome would
   // report defects this repository neither owns nor can fix.
   const roots = document.querySelectorAll(
-    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view, .modal-content"
+    ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup, .o_form_view, .o_list_view, .modal-content"
   );
   for (const root of roots) {
     for (const el of root.querySelectorAll("*")) {
@@ -222,7 +222,7 @@ MOTION_JS = r"""
 (() => {
   const out = [];
   const roots = document.querySelectorAll(
-    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view"
+    ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup, .o_form_view, .o_list_view"
   );
   for (const root of roots) {
     for (const el of [root, ...root.querySelectorAll("*")]) {
@@ -289,7 +289,9 @@ OVERFLOW_JS = r"""
   // CONNECTOR SURFACE ROOT, which the components now bind to the user's
   // locale. Asserting on `documentElement` would be asserting against Odoo's
   // design, and would fail forever for a reason this repository cannot fix.
-  const root = document.querySelector(".o_sc_dashboard, .o_sc_export_diff");
+  const root = document.querySelector(
+    ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup"
+  );
 
   // TD-016. WHY THE DOCUMENT TOTAL IS NOT ENOUGH.
   //
@@ -315,6 +317,10 @@ OVERFLOW_JS = r"""
   const SURFACE_SELECTOR = [
     ".o_sc_dashboard", ".o_sc_dashboard__inner",
     ".o_sc_export_diff", ".o_sc_export_diff__inner",
+    // S1 (2026-07-27): the guided setup surface. Its non-root elements use
+    // the `sc_` prefix precisely so this list stays the inventory of
+    // MEASURED ROOTS rather than a list of every class in the connector.
+    ".o_sc_setup", ".o_sc_setup__inner",
   ].join(", ");
 
   const box = (el) => {
@@ -438,7 +444,7 @@ FOCUSABLES_JS = r"""
 (() => {
   const out = [];
   const roots = document.querySelectorAll(
-    ".o_sc_dashboard, .o_sc_export_diff, .o_form_view, .o_list_view, .modal-content"
+    ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup, .o_form_view, .o_list_view, .modal-content"
   );
   for (const root of roots) {
     for (const el of root.querySelectorAll(
@@ -806,6 +812,16 @@ class TestUiVisualEvidence(HttpCase):
             ('u0-dashboard-healthy',
              act % 'shopify_connector_core.action_shopify_connector_dashboard',
              '.o_sc_dashboard', 'DESIGN SYSTEM §9 dashboard hierarchy'),
+            # S1 (2026-07-27). The guided setup is the connector's THIRD
+            # stylesheet-bearing Owl surface and the first screen a new
+            # operator ever sees, so it belongs in the measured set rather
+            # than in the structurally-implemented-and-never-rendered
+            # category this whole file exists to close. It is reachable by
+            # URL and opens on step 1, which is the step with the most copy
+            # and therefore the most contrast pairs.
+            ('s1-setup-wizard-welcome',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup', 'S1 guided setup; §12 a11y gates, §14 responsive'),
             ('u2-orders-workspace-empty',
              act % 'shopify_connector_sale.action_shopify_connector_order_workspace',
              '.o_list_view, .o_view_nocontent', 'U2 S9 orders; §11 empty state'),
@@ -1026,7 +1042,9 @@ class TestUiVisualEvidence(HttpCase):
 
             injected = self._eval(browser, r"""
 (() => {
-  const host = document.querySelector(".o_sc_dashboard__inner, .o_sc_export_diff__inner");
+  const host = document.querySelector(
+    ".o_sc_dashboard__inner, .o_sc_export_diff__inner, .o_sc_setup__inner"
+  );
   if (!host) return "no connector surface on this page";
   const el = document.createElement("div");
   el.id = "sc-td016-probe";

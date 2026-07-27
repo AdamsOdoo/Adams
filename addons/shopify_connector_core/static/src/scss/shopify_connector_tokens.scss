@@ -7,7 +7,15 @@
 // library. Tokens are scoped to the dashboard root so they never leak into the
 // wider Odoo backend.
 
-.o_sc_dashboard {
+// S1 (2026-07-27): the setup wizard is a SECOND core-owned root and is added
+// to this selector rather than given its own copy of the token block. The
+// export module re-declares the layer on its own root because it lives in a
+// different addon and cannot rely on this file's load order; a root in THIS
+// addon has no such problem, and a duplicated token list is a list that
+// drifts. The scoping discipline is unchanged: tokens still reach only
+// connector roots, never the wider Odoo backend.
+.o_sc_dashboard,
+.o_sc_setup {
     // --- Surfaces (design-system §5) ---
     --sc-surface-0: #F8FAFC; // page background
     --sc-surface-1: #FFFFFF; // card

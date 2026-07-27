@@ -154,6 +154,15 @@ export class ShopifyConnectorDashboard extends Component {
         });
     }
 
+    // S1 entry route 1 of 3. Opens the guided setup client action; the setup
+    // service refuses a non-Administrator on the server regardless, so this
+    // is navigation rather than authorization.
+    openSetup() {
+        this.action.doAction(
+            "shopify_connector_core.action_shopify_connector_setup_wizard"
+        );
+    }
+
     // --- presentation helpers (class strings only; no state derivation) ---
     bandClass(severity) {
         return "sc-band sc-band--" + (severity || "neutral");

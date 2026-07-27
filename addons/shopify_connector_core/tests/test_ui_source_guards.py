@@ -113,18 +113,36 @@ class TestUiSourceGuards(TransactionCase):
 
     # ------------------------------------------------------------------ #
     def test_single_owl_surface(self):
-        """Exactly one client action is registered, in exactly one JS file."""
-        js = self._read('static', 'src', 'js', 'shopify_connector_dashboard.js')
-        self.assertEqual(
-            js.count('registry.category("actions").add('), 1,
-            "U0 must register exactly one Owl client action (the dashboard).",
-        )
-        # No second dashboard/client-action component file exists.
+        """One client action per accepted Owl surface, and no more.
+
+        U0 accepted exactly one: the dashboard. S1 (2026-07-27) adds the
+        second and last core-owned one, the guided setup wizard -- an accepted
+        MVP screen in its own right (premium UX master specification §3 "S1 --
+        Setup wizard"; DEC-012 §1). The guard is kept as an exact inventory
+        rather than relaxed to a count, so a THIRD surface still has to be a
+        decision somebody makes on purpose.
+        """
+        expected_actions = {
+            'shopify_connector_dashboard.js': 'shopify_connector_dashboard',
+            'shopify_connector_setup_wizard.js':
+                'shopify_connector_setup_wizard',
+        }
+        for filename, tag in expected_actions.items():
+            js = self._read('static', 'src', 'js', filename)
+            self.assertEqual(
+                js.count('registry.category("actions").add('), 1,
+                "%s must register exactly one Owl client action." % filename,
+            )
+            self.assertIn(
+                '"%s"' % tag, js,
+                "%s must register the accepted client-action tag." % filename,
+            )
         js_dir = os.path.join(self.addon_root, 'static', 'src', 'js')
         top_level_js = [f for f in os.listdir(js_dir) if f.endswith('.js')]
         self.assertEqual(
-            sorted(top_level_js), ['shopify_connector_dashboard.js'],
-            "Only the dashboard JS may live at static/src/js top level.",
+            sorted(top_level_js), sorted(expected_actions),
+            "Only the accepted Owl surfaces may live at static/src/js top "
+            "level.",
         )
 
     def test_no_controller_or_webhook_or_oauth(self):
@@ -276,6 +294,11 @@ class TestUiSourceGuards(TransactionCase):
             'shopify_connector_job_log_views.xml',
             'shopify_connector_mutation_attempt_views.xml',
             'shopify_connector_ui_wizard_views.xml',
+            # S1 (2026-07-27): the guided setup client action, its
+            # Configuration menu and the re-run button on the store form. An
+            # accepted MVP screen, so it joins the allowlist rather than
+            # dissolving it.
+            'shopify_connector_setup_views.xml',
         }
         present = {f for f in os.listdir(views_dir) if f.endswith('.xml')}
         self.assertEqual(
@@ -283,7 +306,11 @@ class TestUiSourceGuards(TransactionCase):
             "Only the U0-allowlisted view files may exist; found %s" % (present - allowed_views),
         )
         forbidden_tokens = ('fulfillment', 'setup_wizard', 'matching', 'mapping', 'export_preview')
-        for f in present:
+        # The setup views file IS the setup wizard, so the token check runs
+        # over every other file -- the guard exists to stop out-of-scope UI
+        # leaking into the U0 files, not to forbid an accepted screen from
+        # naming itself.
+        for f in present - {'shopify_connector_setup_views.xml'}:
             text = open(os.path.join(views_dir, f), encoding='utf-8').read().lower()
             for token in forbidden_tokens:
                 self.assertNotIn(

@@ -120,7 +120,12 @@ trusting the value passed in, and **refuses to re-home a store that already has
 an owner**. Fresh install, warm update, uninstall and reinstall all remain safe
 because the field is additive and the backfill is idempotent.
 
-## 3. Complete model classification — 35 models, none unclassified
+## 3. Complete model classification — 37 models, none unclassified
+
+> **2026-07-27 delta.** Two models were added by the TD-015 operator-resolution
+> and S1 guided-setup batch. Both are classified below and both are recorded in
+> §8, which states this cycle's complete surface delta. The count moved from 35
+> to 37; nothing was reclassified.
 
 ### 3.1 STORE-OWNED — company derived from `store_id.company_id` (17)
 
@@ -187,12 +192,15 @@ This is the only place in the connector where "company-neutral" survives
 examination. Everywhere else the previous revision used it, it meant
 "we did not model ownership".
 
-### 3.4 TRANSIENT wizards (2)
+### 3.4 TRANSIENT wizards (5)
 
 | Model | Classification |
 | --- | --- |
 | `shopify.connector.job.cancel.wizard` | operator/admin ACL; acts on a job the user could already reach — and *reaching* a job is now company-scoped |
 | `shopify.connector.mutation.resolution.wizard` | **admin-only ACL**; acts on an attempt the user could already reach, likewise company-scoped |
+| `shopify.connector.product.export.request.wizard` | operator/admin ACL; resolves a `product.template` and a store the caller can already read |
+| `shopify.connector.product.export.confirm.wizard` | reviewer/admin ACL; resolves a preview the caller can already read |
+| `shopify.connector.export.checksum.ack.wizard` (**2026-07-27**) | **admin-only ACL**; resolves a `shopify.connector.product.template.binding` the caller can already read, and delegates entirely to `action_shopify_export_acknowledge_checksum`, which re-checks the Administrator role, record access and company consistency itself |
 
 **Inference.** A transient wizard stores no durable cross-company data, and both
 resolve their target through a model that is now company-scoped, so neither can
@@ -204,7 +212,9 @@ rule; the scoping happens one level down, which is where the durable data lives.
 `api.client`, `binding.mixin`, `customer.importer`, `fulfillment.service`,
 `inventory.service`, `job.dispatch`, `job.enqueue`, `order.importer`,
 `order.scan`, `pii.retention`, `product.importer`, `readiness.check`,
-`stale.owner.sweep`, `ui.dashboard`.
+`stale.owner.sweep`, `ui.dashboard`, `product.export.ui`,
+`export.reconcile.service`, `media.export.service`,
+`product.export.service`, `setup.wizard` (**2026-07-27**).
 
 **Fact.** An abstract model has no table and no rows, so it cannot hold or leak a
 record. Record rules do not apply. Their isolation obligation is discharged by
@@ -401,3 +411,132 @@ statement about the schema, never about the requirement. When an isolation audit
 concludes that a class of records is neutral, the burden is to show that reading
 them reveals nothing about another tenant — not that the model happens to lack a
 company column.
+
+
+---
+
+## 8. 2026-07-27 delta — TD-015 operator resolution and S1 guided setup
+
+This section is the exact surface this batch introduced or changed. It is
+written as an inventory rather than a narrative so a reviewer can check it
+item by item, and so a later batch cannot add a surface without the diff to
+this table being visible.
+
+**Status.** This is **implementation coverage**, not acceptance. Issue #197
+remains open: it requires an independent Tier-1 security review and exact-SHA
+runtime evidence before external UAT or release-candidate qualification, and
+neither exists for this head. Nothing below claims otherwise.
+
+### 8.1 New models
+
+| Model | Kind | Durable? | Company path | Isolation |
+| --- | --- | --- | --- | --- |
+| `shopify.connector.setup.wizard` | AbstractModel | no table | n/a | No rows to leak. Every entry point checks the Administrator role, then `check_access('read')` on the store as the CALLING user, then `store.company_id in env.companies` — in that order, before any elevation. |
+| `shopify.connector.export.checksum.ack.wizard` | TransientModel | per-session only | via `binding_id` | Admin-only ACL row. Owns no business rule; the authority is the binding method it calls, which repeats all three checks. |
+
+Neither is a durable store-scoped model, so
+`test_no_durable_store_scoped_model_escapes_this_matrix` correctly does not
+require a row builder for either.
+
+### 8.2 New stored fields
+
+| Model | Field | Kind | Company path | Notes |
+| --- | --- | --- | --- | --- |
+| `shopify.connector.store.settings` | `setup_wizard_step` | Integer | inherited (stored related `company_id`) | Resume point. Written only by the setup service. |
+| `shopify.connector.store.settings` | `setup_completed_at` / `setup_completed_uid` | Datetime / M2o `res.users` | inherited | Who finished setup, and when. |
+| `shopify.connector.store.settings` | `setup_last_rerun_at` / `setup_last_rerun_uid` | Datetime / M2o `res.users` | inherited | Who re-ran it, and when. |
+| `…product.template.binding` | `export_reconcile_reason` | Selection | mixin `store_id.company_id` | The machine-readable verdict. Protected binding field. |
+| `…product.template.binding` | `export_reconcile_evidence_generation` / `_product_gid` / `_file_gids` / `_claim_digest` | Integer / Char ×3 | mixin | The evidence a verdict rests on. Protected. |
+| `…product.template.binding` | `export_reconcile_ack_at` / `_uid` / `_reason` / `_generation` / `_product_gid` / `_file_gids` / `_claim_digest` / `_verdict_at` | Datetime, M2o `res.users`, Selection, Integer, Char ×3, Datetime | mixin | The acknowledgement and exactly what it accepted. All protected. |
+
+Every binding field above is registered in
+`_additional_protected_binding_fields`, so a generic non-superuser
+`create()`/`write()` on any of them raises `AccessError`. That is not
+cosmetic: they are precisely the values `_export_reconcile_ack_is_valid`
+consults, so a writable one would BE the override the design forbids.
+
+### 8.3 New relationships
+
+| Owner | Field | Target | Stored? | Consistency |
+| --- | --- | --- | --- | --- |
+| `shopify.connector.store` | `export_reconcile_review_binding_ids` | `…product.template.binding` | **no** (computed Many2many) | Creates no column and no relation table. Computed by a store-scoped, `limit`-ed search that runs as the CALLING user, so the SEC-3 binding rules filter it. `depends_context=('uid', 'company', 'allowed_company_ids')` keys the field cache per user and per company selection — without it Odoo caches a non-stored computed field once per record for the whole transaction and the first reader's result is served to the second, in either direction. |
+| `shopify.connector.store.settings` | `setup_completed_uid`, `setup_last_rerun_uid` | `res.users` | yes | Not connector-to-connector, so the same-store scope mixin does not apply; `res.users` is not a store-scoped model. |
+| `…product.template.binding` | `export_reconcile_ack_uid` | `res.users` | yes | Same. |
+
+No new connector-to-connector Many2one exists, so
+`test_no_undeclared_connector_relation_exists` needs no new declaration —
+and would fail if one were added silently.
+
+### 8.4 New public / RPC-callable methods
+
+| Method | Model | Authority | Company check |
+| --- | --- | --- | --- |
+| `get_setup_state` | setup service | Administrator | per resolved store |
+| `save_store_identity` | setup service | Administrator | creates only into `env.company`, refused unless the caller belongs to it |
+| `save_credential` | setup service | Administrator | per resolved store |
+| `acknowledge_scopes`, `run_test_connection`, `run_readiness` | setup service | Administrator | per resolved store |
+| `save_directions`, `save_source_of_truth`, `save_notification`, `save_first_push_schedule` | setup service | Administrator | per resolved store |
+| `activate`, `save_and_exit`, `restart_setup`, `action_open_setup_wizard` | setup service | Administrator | per resolved store |
+| `action_shopify_rerun_setup` | `shopify.connector.store` | Administrator (inside `restart_setup`) | per resolved store |
+| `action_shopify_export_acknowledge_checksum` | template binding | **Administrator only** | `check_access('read')` + `store.company_id in env.companies` |
+| `action_shopify_export_open_checksum_ack_wizard` | template binding | **Administrator only** | same, before the dialog opens |
+| `action_confirm` | ack wizard | delegates | delegates |
+
+### 8.5 New client payloads and UI routes
+
+| Surface | Route | Payload discipline |
+| --- | --- | --- |
+| S1 client action `shopify_connector_setup_wizard` | Dashboard empty state · Configuration → Setup Wizard · store form "Re-run Setup" | One bounded read (`get_setup_state`). Carries `credential_present` as a boolean and **never** a token, fragment or length. Store list is a `limit=20` search as the caller. |
+| TD-015 review list + acknowledgement | store form → *Bindings awaiting review* → *Acknowledge* → dialog | Bounded (`limit=200`) current-user search; the dialog reads only fields on a binding the caller can already read. |
+
+`ir.actions.client` carries no `group_ids` in Odoo 19, so the setup action
+cannot be group-restricted at all — which is exactly why every server method
+enforces the role itself.
+
+### 8.6 New elevated (`sudo()`) seams
+
+Recorded in the exact-inventory guards
+(`test_credential_service.py::CORE_SUDO_SITES`,
+`test_readiness_slot_closure.py`, and the per-file budget in
+`test_export_source_guards.py`), which fail on an unlisted addition.
+
+| Seam | Why elevation is necessary | Checks before it |
+| --- | --- | --- |
+| `setup.wizard._settings_for` ×2 | no connector group holds `create` on `store.settings` | role, record access, company |
+| `setup.wizard._record_progress` | resume point is a readonly column | as above |
+| `setup.wizard._last_readiness_checks` ×2 | reads one job + one log row for the already-authorised store | as above |
+| `setup.wizard.save_store_identity` ×2 | no connector group holds `create` on `shopify.connector.store` | role; company taken from `env.company` and refused unless the caller belongs to it |
+| `setup.wizard.save_directions` / `save_source_of_truth` / `save_notification` / `save_first_push_schedule` / `activate` / `restart_setup` | settings write ACL is Administrator-only but `create` is not, and the progress columns are readonly | role, record access, company |
+| `readiness.check._web_base_url` | system parameters are `base.group_system`; readiness runs as the connector administrator | called only from the readiness registry, which its callers gate |
+| `export_reconnect._export_reconcile_media_claim` | reads the binding's own media rows so a record rule cannot silently shorten the claim and make a partial digest match | role, record access, company |
+| `export_reconnect._export_reconcile_clear_acknowledgement` | ack fields are protected binding fields | as above, or a pass writing a fresh verdict |
+| `export_reconnect.action_shopify_export_acknowledge_checksum` | writes those protected fields | role, record access, company, eligibility |
+| `export_reconnect._reassert_export_reconcile_acknowledgements` ×2 | reads the store's own outstanding reviews and re-applies the block on readonly verdict fields | reached only from the store's own export assertion |
+
+Actor attribution survives every one of them: the audit row is written through
+`store._create_lifecycle_audit_job`, whose `job.log` append runs in the
+CALLING user's environment, and `export_reconcile_ack_uid` / `setup_completed_uid`
+store `env.uid` rather than the superuser.
+
+### 8.7 Install, upgrade and historic records
+
+* Every new stored field is additive with a safe default (`0`, `False`), so a
+  warm `-u` update of a database that already holds stores and bindings needs
+  no migration and none is added.
+* `setup_wizard_step` defaults to `1`, so an existing store reads as
+  "setup not yet walked" rather than as complete — the fail-safe direction.
+* An existing store's settings row is reused rather than replaced;
+  `_settings_for` creates one only when none exists.
+* No new stored relation exists, so the SEC-3 historic quarantine sweep has
+  nothing new to scan and no existing row's scope changes.
+* Uninstall behaviour is unchanged: no new model is depended on by another
+  module, and the two new models own no data that outlives a session
+  (transient) or a request (abstract).
+
+### 8.8 What this delta does NOT claim
+
+* SEC-3 is **not** accepted, and **#197 stays open**.
+* No Tier-1 independent security review of this head exists.
+* No exact-SHA Odoo.sh runtime evidence exists for this head.
+* The local two-company/two-role negative matrix is green, and local green is
+  supporting evidence, not acceptance.

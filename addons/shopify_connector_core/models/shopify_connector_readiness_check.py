@@ -310,10 +310,34 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         )
 
     @api.model
+    def _web_base_url(self):
+        """Read `web.base.url`, elevated, for exactly the reason the cron read
+        below is elevated.
+
+        System-parameter reads are `base.group_system` in Odoo 19
+        (`ir_config_parameter.get_param` calls `check_access('read')`, and
+        base grants that model to system administrators only). Readiness runs
+        as the INVOKING connector administrator, who is not necessarily an
+        Odoo system administrator -- so without this the check raised
+        `AccessError` and took the whole readiness run down with it.
+
+        That was reachable in production before S1 existed:
+        `action_reconnect` runs `run_for_store` as the connector administrator
+        who clicked it. The guided setup's readiness step reaches it too, and
+        found it.
+
+        Narrow, read-only, one named parameter, and isolated in its own helper
+        rather than inlined -- the same shape and the same reason as
+        `_drain_cron_active_state`, whose AST guard forbids `.sudo()` inside
+        any `_check_*` method.
+        """
+        return self.env['ir.config_parameter'].sudo().get_param('web.base.url')
+
+    @api.model
     def _check_web_base_url(self, store):
         """Reads `ir.config_parameter` only -- no external network call."""
         code = 'web_base_url'
-        base_url = self.env['ir.config_parameter'].get_param('web.base.url')
+        base_url = self._web_base_url()
         if not base_url:
             return self._check_result(
                 code, self.ESSENTIAL, self.RESULT_FAIL,
