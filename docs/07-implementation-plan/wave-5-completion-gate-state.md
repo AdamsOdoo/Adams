@@ -445,6 +445,68 @@ a fresh bounded independent delta review.
 Full per-finding disposition:
 [`pr-204-independent-review-closure-2026-07-27.md`](../05-qa/pr-204-independent-review-closure-2026-07-27.md).
 
+### 5e.4 PR #204 consolidated final correction — 2026-07-27
+
+> **Status: implementing-session record. NOT an acceptance, NOT a review, NOT
+> a runtime or UAT claim. This session did not review its own work.**
+
+A **third** cycle ran from head `cb9f0ad`, again fast-forward, with no amend,
+rebase, squash or force-push. It exists because §5e.3's own claims were
+**not sufficient**, and the honest statement of why matters more than the
+list of fixes.
+
+**Why the previous cycle's completion claim was insufficient.** Four of the
+six §5e.3 corrections were verified against the mechanism they introduced
+rather than against the route an operator or a worker actually takes. That
+is a real distinction, and it is the same distinction the TD-011 finding was
+originally about:
+
+- **TD-011** shipped `_resume_media_export` with **no production caller**.
+  Its every visible caller was a test. §5e.3 recorded "a stopped media
+  export can be resumed" and 15 passing tests — all of which called the
+  private service helper directly. A capability reachable only from a test
+  is not a capability, and the previous record did not distinguish the two.
+- **TD-014** evaluated throttle pressure **once per drain pass, before the
+  claim loop**. So pressure a job reported during a pass could not affect
+  that pass: a store could come back with 2% head-room on its first job and
+  have four more claimed behind it. The 16 tests exercised the lever by
+  pulling it themselves; none asked whether state written during a pass
+  changed the claims still to come.
+- **TD-015** decided media divergence from the **local registry alone**. A
+  row saying `associated`, carrying a File GID and a checksum, produced a
+  `verified` verdict with nothing having read Shopify. That is precisely the
+  claim a reconnect invalidates. Separately, store-level settlement was
+  neither atomic nor generation-scoped: two final jobs could each observe
+  the other as pending and both decline to settle, leaving every binding
+  terminal and the store permanently `in_progress` with no job left to
+  notice — and a verdict was stamped with `connection_generation` as read at
+  settle time rather than the epoch it covered.
+- **TD-013** was correctly implemented and **insufficiently evidenced**. Its
+  13 tests called `_prepare_preconditions_*` and `_advance_plan` directly.
+  That is legitimate unit coverage and it is not proof that the guard is
+  bound into the dispatch path a real mutation job takes.
+
+**Corrections in this cycle:**
+
+| Item | Correction | Evidence |
+| --- | --- | --- |
+| TD-011 | A public `action_shopify_resume_media_export` on the exported-media registry, wired to a button on the form the menu already opens. Operator/Administrator per the accepted matrix (`action_manual_retry`'s non-blocked branch and `enqueue_preview`), with `check_access('read')` and a company check before any elevation. The resume ordinal is now consumed **only when an attempt is actually admitted**, and a repeated click coalesces on the outstanding job instead of admitting a second live attempt at one image | 16 regressions through the public action, incl. unauthorised role, wrong company, already-associated, unresolved outcome, repeated click, and zero transport |
+| TD-014 | The deferred-store set is re-read before **every** claim and **unioned**, so pressure observed mid-pass binds the rest of that pass while unrelated stores keep draining. The mid-pass read deliberately does not re-project recovery, so a pass can only accumulate deferrals; recovery stays a next-pass event on the documented restore-rate projection | 3 regressions through `run_drain()`, driving a real-shaped `throttleStatus` through the production `_normalize_response` choke point. No forced 429 |
+| TD-015 (media) | Reconciliation now re-reads the product's media connection and, for any association it cannot find there, the store's Files by connector filename — both read-only, both the same proofs the module's own accepted mutation reconciliations already rely on. **Checksum correspondence is not claimed**: the 2026-07 `File` interface exposes no digest, the limitation is recorded, and the `verified` note says so. Truncation beyond one page routes to review rather than being reported as a proven absence | 9 regressions, incl. complete-local-evidence-with-missing-remote, detached vs deleted, divergent identity, `FAILED` status, unverifiable-by-truncation, foreign media left alone, and every request asserted to be a query |
+| TD-015 (convergence) | Settlement serializes on the store row via an unconditional sequence bump, flushed before the sibling read — under Odoo's REPEATABLE READ that makes a concurrent settlement raise `40001`, which the dispatcher re-drives under the pass's already-declared `remote_read_replay_safe` policy. Each job settles **its own** connection epoch, stale-generation jobs are retired at enqueue and refuse themselves at dispatch, and a repeated reconnect coalesces or replaces safely instead of failing on `UNIQUE(store_id, operation_scope_key)` | 11 regressions, incl. both job orderings, old-generation refusal, repeated reconnect, same-generation coalesce, and fail-closed transport |
+| TD-013 | **No redesign.** One new `-standard` class drives `run_drain()` on a genuine pooled connection through the real claim, the `_is_mutation_job_type` branch, `_drain_mutation_one` and the registered `prepare_preconditions`, asserting the transport choke point receives **zero** calls, the accepted fail-closed disposition, and no child mutation job | 3 regressions, one of which proves the route is live by letting an unexpired confirmation reach the transport — so the refusal test cannot pass on a dead route |
+
+**Unchanged by this cycle.** TD-004, TD-005 and TD-007 remain retained
+limitations and are **not** resolved. TD-002 remains owned by PR #189 and was
+not touched. TD-012 and TD-016 were not reopened.
+
+**Evidence classes this cycle carries:** source inspection, local automated
+tests, and the sensitivity proof that each new regression fails when the
+corresponding production correction is reverted. **It carries no independent
+review, no Odoo.sh runtime, no live-Shopify contact of any kind, and no UAT.**
+The implementation worker has not reviewed, accepted or approved its own
+corrections, and may not.
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.

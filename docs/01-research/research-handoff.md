@@ -1,3 +1,118 @@
+### PR #204 consolidated final correction (2026-07-27)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `cb9f0adb81c6a9e586f698a2db32842fce34979e`, comparison baseline
+  `2b704b9c756a2cdce5bae87363b1656d379852b9`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  All commits fast-forward. No rebase, amend, squash, force-push or history
+  rewrite; the recovery checkpoints are untouched.
+- **Authorization:** the 2026-07-27 product-owner instruction
+  "PR #204 CONSOLIDATED FINAL CORRECTION", which assigns this session the
+  implementation-worker role for five bounded findings and explicitly reserves
+  review, acceptance, ready-marking and merge to the control room.
+  **Two standing conflicts are flagged again and again not resolved
+  unilaterally.** (1) CLAUDE.md's 2026-07-25 supersession makes Claude the
+  independent reviewer "unless a dated product-owner instruction explicitly
+  assigns a separate Claude session another role"; this session read the
+  instruction as that assignment and acted as worker only. (2) The harness
+  designated branch was `claude/pr-204-final-correction-k3b3s1`, while the
+  instruction names `fable/wave-5-completion` as the only authorized push
+  target. The instruction was followed, because it names the branch, the PR
+  and the exact head, and because the task's own identity invariant — local
+  head = remote head = PR head — is unsatisfiable on any other branch. The
+  same commits were also pushed to the harness branch so the two do not
+  diverge.
+- **Why this cycle exists, stated plainly.** The previous cycle's completion
+  claims were **not sufficient** for four of its six rows, and the shortfall
+  had one shape: each was verified against the mechanism it introduced rather
+  than against the route a worker or an operator actually takes. That is the
+  same distinction the original TD-011 finding was about, which is what makes
+  it worth recording as a pattern rather than as five fixes.
+- **Delivered:**
+  - **TD-011 — a production route.** `_resume_media_export` had no production
+    caller; every visible caller was a test. A public
+    `action_shopify_resume_media_export` now sits on the exported-media
+    registry, wired to a button on the form the existing menu already opens.
+    Authority is *derived* from the repository's accepted matrix rather than
+    chosen — Operator/Administrator, matching `action_manual_retry`'s
+    non-blocked branch and `enqueue_preview` — with `check_access('read')` and
+    a company check before any elevation. Two behavioural corrections came
+    with it: the resume ordinal is consumed **only** when an attempt is
+    actually admitted, and a repeated click coalesces on the outstanding job
+    instead of admitting a second live attempt at one image (which
+    `_admit_media_job`'s collision handling cannot catch, because two
+    different ordinals do not collide by construction).
+  - **TD-014 — same-pass backpressure.** The deferred set was computed once,
+    before the claim loop, so pressure a job reported during a pass could not
+    bind that pass. It is now re-read before every claim and **unioned**: a
+    store that loses head-room stays deferred for the rest of the pass, other
+    stores keep draining, and the mid-pass read deliberately does not
+    re-project recovery so a pass can only accumulate deferrals.
+  - **TD-015 — remote media evidence.** Divergence was decided from local
+    rows alone. It now re-reads the product's media connection and, for any
+    association absent from it, the store's Files by connector filename —
+    both read-only, both the same proofs the module's own accepted mutation
+    reconciliations already rely on. **Checksum correspondence is not
+    claimed:** the 2026-07 `File` interface exposes no digest, the limitation
+    is recorded, and the `verified` note says so instead of implying both were
+    checked. Truncation beyond one page routes to review rather than being
+    reported as a proven absence.
+  - **TD-015 — convergent settlement.** Two final jobs could each observe the
+    other as pending and both decline to settle, leaving every binding
+    terminal and the store permanently `in_progress` with no job left to
+    notice. Settlement now serializes on the store row via an unconditional
+    sequence bump, flushed before the sibling read: under Odoo's REPEATABLE
+    READ a concurrent settlement raises `40001`, which the dispatcher
+    re-drives under the pass's already-declared `remote_read_replay_safe`
+    policy. Each job settles **its own** connection epoch; stale-generation
+    jobs are retired at enqueue and refuse themselves at dispatch; a repeated
+    reconnect coalesces or replaces instead of failing on
+    `UNIQUE(store_id, operation_scope_key)`.
+  - **TD-013 — evidence only, no redesign.** One `-standard` class drives
+    `run_drain()` on a genuine pooled connection through the real claim, the
+    `_is_mutation_job_type` branch, `_drain_mutation_one` and the registered
+    `prepare_preconditions`, asserting the transport choke point receives zero
+    calls, the accepted fail-closed disposition, and no child mutation job.
+- **Deliberately NOT resolved:** TD-004, TD-005, TD-007 remain retained
+  limitations. TD-002 is unchanged and owned by PR #189. TD-012 and TD-016
+  were not reopened.
+- **Learning feedback loop.** The lesson from the previous cycle — a green
+  result is only evidence if the instrument could have failed — generalises,
+  and this cycle is what the generalisation looks like. Three of the four
+  shortfalls were **not wrong code**; they were correct code verified at the
+  wrong altitude. A test that calls the private helper proves the helper
+  works and says nothing about whether anything calls it. A test that pulls
+  the lever proves the lever moves and says nothing about whether the loop
+  pulls it. A test that reads the local row proves the row is read and says
+  nothing about the remote object the row is a claim about. The durable
+  practice this yields: **for every guard, name the production entry point a
+  real actor reaches it through, and put at least one regression there** —
+  and where that entry point is a UI control, assert the installed view, not
+  the file on disk. Two mechanical findings reinforce it: removing the TD-011
+  action makes Odoo's own view validator refuse to install the module, which
+  is a stronger binding than any assertion this session could write; and the
+  TD-013 proof ships with a companion control that lets an *unexpired*
+  confirmation reach the transport, so the refusal test cannot pass on a dead
+  route.
+- **Sensitivity, proven not asserted.** With the five production corrections
+  reverted, the affected suites report **37 failed + 5 errors of 224**; with
+  them in place, **0 failed, 0 errors of 224**. Two single-transaction
+  convergence tests do **not** fail under the revert, and that is recorded
+  rather than hidden: in one shared transaction each job's write is already
+  visible to the next, so those two cover ordering and the terminal-set
+  invariant, while the generation and serialization tests are what prove the
+  concurrency mechanism.
+- **Not claimed:** no independent review of this head, no Odoo.sh runtime, no
+  live-Shopify contact of any kind, no UAT, no acceptance, ready-marking or
+  merge. `M-EXP-1 … M-EXP-20` all remain outstanding; `X-EXPORT-0` is neither
+  PASS nor FAIL.
+- **Next recommended session:** a **fresh bounded independent delta review**
+  of the exact final head — a separate top-level Claude session or a fresh
+  subagent, never this one. If it passes: exact-head Odoo.sh validation, then
+  controlled live-Shopify validation and UAT.
+
 ### PR #204 final Wave 5 correction cycle (2026-07-27)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

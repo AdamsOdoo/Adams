@@ -209,6 +209,70 @@ controlled live-Shopify validation and UAT if Odoo.sh passes. Nothing in this
 record is an acceptance, and the session that produced it may not perform the
 review.
 
+## 6a. Consolidated final correction — 2026-07-27
+
+> **Not an acceptance. Not a review.** The implementation worker has not
+> reviewed, accepted or approved its own corrections, and may not.
+
+§6 above claimed every confirmed in-scope defect was corrected with a binding
+regression test. **For four rows that claim was not sufficient**, and the
+shortfall had a single shape worth naming: each correction was verified
+against the mechanism it introduced rather than against the route a worker or
+an operator actually takes. This section records what was wrong with the
+claim, not only what was fixed.
+
+| Row | The insufficiency | Correction | Regressions |
+| --- | --- | --- | --- |
+| **TD-011** | `_resume_media_export` had **no production caller** — every visible caller was a test. §6 recorded the capability as delivered; an operator could not reach it. All 15 tests called the private helper | Public `action_shopify_resume_media_export` on the exported-media registry, wired to a button on the form the existing menu opens. Operator/Administrator derived from the accepted matrix (`action_manual_retry`'s non-blocked branch, `enqueue_preview`), `check_access('read')` and a company check before any elevation. The ordinal is consumed only on real admission; a repeated click coalesces on the outstanding job | 16 through the public action |
+| **TD-013** | Correctly implemented; **insufficiently evidenced**. All 13 tests called `_prepare_preconditions_*`/`_advance_plan` directly — unit coverage of the guard, not proof it is bound into the dispatch route | **No redesign.** One `-standard` class drives `run_drain()` on a genuine pooled connection through the real claim, `_drain_mutation_one` and the registered `prepare_preconditions`; zero calls at the transport choke point, the accepted fail-closed state, no child mutation job | 3, one of which is a live-confirmation control so the refusal cannot pass on a dead route |
+| **TD-014** | Throttle pressure was evaluated **once per pass, before the claim loop**. A store reporting 2% head-room on its first job could still have four more claimed by that pass. The 16 tests pulled the lever themselves | The deferred set is re-read before every claim and **unioned**; the mid-pass read does not re-project recovery, so a pass can only accumulate deferrals and recovery stays a next-pass event | 3 through `run_drain()`, driving a real-shaped `throttleStatus` through the production response choke point. No forced 429 |
+| **TD-015 (media)** | Divergence was decided from **local rows alone**. An `associated` row with a File GID and a checksum produced `verified` with nothing having read Shopify — precisely the claim a reconnect invalidates | Read-only re-read of the product's media connection, plus Files-by-connector-filename for any association absent from it. **Checksum correspondence is not claimed** — the 2026-07 `File` interface exposes no digest, and the `verified` note says so. Truncation routes to review, never to a proven absence | 9 |
+| **TD-015 (convergence)** | Store settlement was neither atomic nor generation-scoped. Two final jobs could each see the other as pending and both decline, leaving every binding terminal and the store permanently `in_progress` with no job left to settle it; and the verdict was stamped with `connection_generation` as read at settle time rather than the epoch it covered | Settlement serializes on the store row via an unconditional sequence bump flushed before the sibling read — under REPEATABLE READ a concurrent settlement raises `40001` and is re-driven under the pass's declared `remote_read_replay_safe` policy. Each job settles its own epoch; stale-generation jobs are retired at enqueue and refuse themselves at dispatch; a repeated reconnect coalesces or replaces safely | 11 |
+
+### The API limitation this cycle recorded rather than worked around
+
+Shopify's 2026-07 `File` interface exposes `alt`, `createdAt`, `fileErrors`,
+`fileStatus`, `id`, `preview` and `updatedAt` — and **no digest of the stored
+bytes**. So a stored `odoo_image_checksum` **cannot be remotely
+re-verified**, by this connector or any other. What reconciliation therefore
+does and does not establish:
+
+| Claim | Remotely re-verified? |
+| --- | --- |
+| The File exists under the GID this connector recorded | **Yes** |
+| It is associated with the expected product | **Yes** — the GID appears on that product's `media` connection, the same evidence the module's accepted `_reconcile_media_associate` already relies on |
+| Its `fileStatus` is not `FAILED` | **Yes** |
+| A connector-owned filename identifies it | **Yes**, via `files(query: "filename:…")` |
+| The uploaded bytes still match `odoo_image_checksum` | **No — not claimed anywhere.** No API surface exposes it |
+| The File is used only by this product | **No** — no reverse-reference connection exists; this is the same limitation that makes the pipeline append-only (TD-004) |
+
+A binding whose media claims cannot be established — including one on a
+product with more media than a single page can carry — goes to
+operator-visible `review_required`. It is never reported as `verified`, and
+never as a proven absence.
+
+### Sensitivity of the new evidence
+
+With the five production corrections reverted, the affected suites report
+**37 failed + 5 errors of 224 tests**; with them in place, **0 failed, 0
+errors of 224**. Removing the TD-011 action entirely is a stronger binding
+still: Odoo's own view validator refuses to install the module, because the
+button names a method that must exist and must be public.
+
+**Recorded rather than hidden:** two single-transaction convergence tests do
+*not* fail under the revert. In one shared transaction each job's write is
+already visible to the next, so those two cover ordering and the
+terminal-set invariant; the generation and serialization tests are what prove
+the concurrency mechanism.
+
+### Unchanged by this cycle
+
+TD-004, TD-005 and TD-007 remain retained limitations and are **not**
+resolved. TD-002 remains owned by PR #189, untouched and not transplanted.
+TD-012 and TD-016 were not reopened. **No independent review of this head, no
+Odoo.sh runtime, no live-Shopify contact of any kind, and no UAT.** PR #204
+remains draft, unaccepted, unapproved and unmerged.
+
 ## 7. What survived scrutiny
 
 Recorded because a closure record that lists only defects misrepresents the
