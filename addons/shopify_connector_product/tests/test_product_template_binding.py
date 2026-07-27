@@ -214,17 +214,47 @@ class TestProductTemplateBinding(TransactionCase):
             ]),
         )
 
+    #: Fields another installed module contributes to this binding, and the
+    #: module that owns each. The guard below stays EXACT rather than being
+    #: loosened to a subset check: an unclassified stored field is precisely
+    #: what it exists to catch, and a tolerant assertion would stop catching
+    #: it. What it must not do is assume this module is the only contributor.
+    #:
+    #: `shopify_connector_product_export` adds the PD-PX-7 reconnect
+    #: reconciliation verdict (TD-015). It is per-binding because a binding
+    #: is exactly the claim being re-verified, and it is protected binding
+    #: evidence: an operator who could write it could clear their own export
+    #: block.
+    OPTIONAL_MODULE_FIELDS = {
+        'shopify_connector_product_export': frozenset((
+            'export_reconcile_state',
+            'export_reconcile_note',
+            'export_reconcile_at',
+        )),
+    }
+
+    def _expected_protected_fields(self):
+        """The exact set for the modules actually installed here."""
+        expected = set(self.EXPECTED_PROTECTED_FIELDS)
+        installed = self.env['ir.module.module'].sudo().search([
+            ('name', 'in', list(self.OPTIONAL_MODULE_FIELDS)),
+            ('state', '=', 'installed'),
+        ]).mapped('name')
+        for name in installed:
+            expected |= self.OPTIONAL_MODULE_FIELDS[name]
+        return frozenset(expected)
+
     def test_exact_stored_field_classification_and_protected_set(self):
+        expected = self._expected_protected_fields()
         self.assertEqual(
-            self.TemplateBinding._protected_binding_fields(),
-            self.EXPECTED_PROTECTED_FIELDS,
+            self.TemplateBinding._protected_binding_fields(), expected,
         )
         stored_fields = {
             name
             for name, field in self.TemplateBinding._fields.items()
             if field.store and name not in self.AUTOMATIC_FIELDS
         }
-        self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+        self.assertEqual(stored_fields, expected)
 
     def test_future_stored_field_omission_fails_closed(self):
         binding = self.TemplateBinding.sudo().create({
