@@ -18,3 +18,4 @@ from . import test_order_scan_triggers
 # SEC-3 (issue #197) two-company isolation matrix.
 from . import test_sec3_company_isolation
 from . import test_ui_u2_sale
+from . import test_ui_u2_action_tours

@@ -168,13 +168,19 @@
                 <filter name="filter_needs_attention"
                         string="Needs Attention"
                         domain="['|', '|',
-                                 ('first_push_state', '=', 'pending'),
+                                 ('first_push_state', 'in',
+                                  ['pending', 'previewed']),
                                  ('status', '=', 'review'),
                                  ('sec3_scope_quarantined', '=', True)]"/>
                 <separator/>
                 <filter name="filter_first_push_pending"
                         string="First Push Pending"
                         domain="[('first_push_state', '=', 'pending')]"/>
+                <!-- The rows a reviewer can actually act on: previewed, so
+                     the confirm control is on screen. -->
+                <filter name="filter_first_push_awaiting_confirmation"
+                        string="Awaiting First-Push Confirmation"
+                        domain="[('first_push_state', '=', 'previewed')]"/>
                 <filter name="filter_never_pushed" string="Never Pushed"
                         domain="[('last_pushed_at', '=', False)]"/>
                 <separator/>
@@ -228,9 +234,29 @@
                         names the consequence in words and is deliberately
                         heavier than any routine action in this module.
                     -->
+                    <!--
+                        VISIBLE IN `previewed`, NOT `pending`. The state
+                        machine is pending -> previewed (the preview job
+                        records the quantity, service
+                        `_handle_inventory_first_push_preview`) -> confirmed
+                        (this button). `action_confirm_first_push` refuses
+                        anything that is not `previewed`:
+                        "A first push can only be confirmed after its preview
+                        has run."
+
+                        This originally read `!= 'pending'`, which showed the
+                        button in exactly the state the server refuses and hid
+                        it in the one state the server accepts — so the only
+                        click the shipped UI allowed could never succeed, and
+                        the sanctioned confirmation was unreachable. Found by
+                        driving the control in a browser; a server-side test
+                        that writes `first_push_state='previewed'` itself
+                        cannot see it. Keep this predicate identical to the
+                        server guard.
+                    -->
                     <button name="action_confirm_first_push" type="object"
                             string="Confirm First Push" class="btn-primary"
-                            invisible="first_push_state != 'pending'"
+                            invisible="first_push_state != 'previewed'"
                             groups="shopify_connector_core.group_shopify_connector_reviewer"
                             confirm="This is the FIRST stock push for this
                                      product and location. Shopify's quantity
@@ -241,10 +267,17 @@
                         required argument; same wizard-and-delegate shape.
                         The reason is mandatory because it lands on the
                         verification job's audit trail.
+
+                        REVIEWER, not operator. The service guard is
+                        "Only a Shopify Connector Reviewer or Administrator
+                        may release a blocked inventory pair"; gating the
+                        button on Operator showed a control to a role the
+                        server refuses, which the packet's §3 rule names as a
+                        test failure — UI and ACL must agree.
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
-                            groups="shopify_connector_core.group_shopify_connector_operator"/>
+                            groups="shopify_connector_core.group_shopify_connector_reviewer"/>
                     <field name="first_push_state" widget="statusbar"
                            readonly="1"/>
                 </header>
@@ -256,8 +289,23 @@
                         No push or verification job will process it until an
                         administrator releases it.
                     </div>
+                    <!--
+                        Two waiting states, two different sentences, because
+                        they need two different things from the reader. In
+                        `pending` there is nothing to review yet and no
+                        control to press; in `previewed` there is a quantity
+                        on screen and a decision to make.
+                    -->
                     <div class="alert alert-warning" role="alert"
                          invisible="first_push_state != 'pending'">
+                        <strong>Waiting for a first-push preview.</strong>
+                        Nothing has been pushed for this product and location
+                        yet, and the quantity to send has not been computed.
+                        The preview runs on the next scheduled pass; the
+                        confirmation control appears once it has.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="first_push_state != 'previewed'">
                         <strong>Waiting for a first-push confirmation.</strong>
                         Nothing has been pushed for this product and location
                         yet. Review the quantities below, then confirm.
@@ -334,7 +382,14 @@
         <field name="name">First-Push Guard</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
-        <field name="domain">[('first_push_state', '=', 'pending')]</field>
+        <!--
+            BOTH waiting states. Scoping this queue to `pending` alone meant
+            the guard listed only rows whose confirm control is not yet
+            available and hid every row actually awaiting a decision, so a
+            reviewer working the queue could never reach the confirmation.
+        -->
+        <field name="domain">[('first_push_state', 'in',
+                              ['pending', 'previewed'])]</field>
         <field name="search_view_id"
                ref="view_shopify_connector_inventory_level_binding_search"/>
         <field name="help" type="html">
