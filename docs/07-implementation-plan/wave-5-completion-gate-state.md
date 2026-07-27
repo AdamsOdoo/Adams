@@ -339,6 +339,61 @@ contrast ratio, no RTL or reduced-motion *visual* verification, and no
 `ui-u2-copy-deck.md`. **U3's structural and behavioural acceptance criteria
 are met by this branch; its visual-artifact criteria are not.**
 
+### 5e.2 U2/U3 evidence closure — 2026-07-27
+
+`[Fact — implemented and locally executed in this branch; NOTHING accepted]`
+
+The four gaps §5e.1 left open are closed, and closing them found more.
+
+**TD-009 is resolved, and the diagnosis moved the blame.** The U0 HOOT suite's
+registration failure was never in the dashboard test: HOOT builds a per-suite
+module set from the test file's addon plus that addon's *declared* Odoo
+dependencies and starts every module in it, `web_tour` is not a declared
+dependency of `shopify_connector_core`, and so a tour importing
+`@web_tour/tour_utils` threw and took the whole module set — and the suite
+sharing its bundle — down with it. The three connector tours moved to
+`web.assets_tests`, Odoo's own home for `HttpCase` tours. **Both HOOT suites
+now execute: dashboard 8/8, export diff 11/11.**
+
+**TD-010 is resolved at the instrument, not at the dependency.** The runner
+installs `websocket-client` on every run, resolves and *boots* the browser
+before running anything, and FAILS on an unexpected skip, a required tour that
+did not start, a short marker count or a missing HOOT evidence line. The skip
+allowance is bound to one exact test identity and its exact reason.
+`--self-test` proves each check rejects what it must, and a suite test runs it.
+
+**U2's action controls now have browser evidence, and it found a P1.**
+`Confirm First Push` was visible only in the state
+`action_confirm_first_push` refuses and hidden in the state it accepts, and
+the First-Push Guard queue listed only the unusable state — **the sanctioned
+first-push confirmation was unreachable from the shipped UI.** Two further
+UI/ACL disagreements (`Verify Now`, `Change Push`) are corrected. Two more
+findings are recorded rather than fixed: the scope-quarantine banner can never
+render, because the SEC-3 rule filters those rows out of every ordinary read
+(stricter than the banner, and correct); and five list views decorate on a
+`status` value that does not exist.
+
+**The visual and accessibility criteria are now MEASURED**, and the
+measurement overturned a claim. RTL was not "implemented structurally and
+merely unverified" — it did not work. Odoo 19's backend never establishes
+`direction: rtl` (its mechanism is rtlcss bundle-flipping), the connector
+stylesheets are written entirely in logical properties which resolve against
+`direction`, and `dir="auto"` resolved from the English content. Both
+connector Owl roots now bind `dir` to the user's locale, with rendered proof.
+
+**Delivered:** `docs/06-prompts/ui-u2-copy-deck.md`,
+`docs/05-qa/ui-u2-validation-results.md`, and
+`docs/05-qa/evidence/wave-5-u2-u3-2026-07-27/` — 89 screenshots at 1366/768/390
+px plus RTL, reduced-motion and focused-control variants; 185 measured contrast
+pairs with **0 connector-owned failures**; focus indicators measured with
+`:focus-visible` forced.
+
+**What this does NOT deliver.** The design system §14 asks for the screenshot
+set *from the Odoo.sh runtime*. This package is **local** rendered evidence and
+is a genuinely narrower class. **U3's visual-artifact criteria are met locally
+and are NOT met at §14's stated bar.** No Odoo.sh runtime, no independent
+review, no UAT, no acceptance.
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.

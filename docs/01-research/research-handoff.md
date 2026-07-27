@@ -1,3 +1,77 @@
+### Wave 5 U2/U3 evidence-closure correction (2026-07-27)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head `e117a2e`.
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  The recovery checkpoint `claude/wave-5-completion-cont-e1hunz@9cfc013` and
+  both protected checkpoints (`acd8c469`, `22bfb9a0`) are untouched. No
+  rebase, amend, squash, force-push or history rewrite.
+- **Authorization:** the 2026-07-27 product-owner instruction assigning this
+  session the PR #204 correction-worker role. **Same conflict as the previous
+  entry, flagged again and again not resolved unilaterally:** CLAUDE.md's
+  2026-07-25 supersession makes Claude the independent reviewer "unless a
+  dated product-owner instruction explicitly assigns a separate Claude
+  session another role". This session read the instruction as that
+  assignment and acted as worker only. **A second conflict is also recorded:**
+  the session harness designated branch `claude/pr-204-u2-u3-evidence-rfqzxv`
+  while the task instruction requires pushing to `fable/wave-5-completion` and
+  forbids creating another branch or PR. The instruction was followed, because
+  it names the branch, the PR and the exact head, and because the harness
+  branch would leave PR #204's head un-advanced and make the refreeze
+  impossible. Raised in the session reply rather than decided silently.
+- **Delivered — one consolidated correction batch, five commits:**
+  - **TD-009 resolved.** The U0 HOOT registration failure is diagnosed: HOOT
+    builds a per-suite module set from the test file's addon plus its
+    *declared* Odoo dependencies and starts every module in it; `web_tour` is
+    not declared by `shopify_connector_core`, so a tour importing
+    `@web_tour/tour_utils` threw and failed the whole set — taking down a
+    suite that merely shared the bundle. Tours moved to `web.assets_tests`.
+    Both suites now execute: dashboard 8/8, export diff 11/11.
+  - **TD-010 resolved.** The canonical runner now installs `websocket-client`
+    every run, resolves *and boots* the browser, and FAILS on an unexpected
+    skip, a required tour that did not start, a short marker count or a
+    missing HOOT evidence line. The skip allowance is bound to one exact test
+    identity and reason. `--self-test` proves each check rejects what it must,
+    and a suite test runs it.
+  - **U2 action-control browser evidence**, for all four sanctioned controls,
+    by an allowed role and a refused role. It found a **P1**: `Confirm First
+    Push` was visible only in the state the server refuses — the sanctioned
+    confirmation was unreachable from the shipped UI — plus two UI/ACL
+    disagreements, both corrected.
+  - **Measured visual and accessibility evidence** (89 screenshots, 185
+    contrast pairs, focus indicators with `:focus-visible` forced, reduced
+    motion emulated, a real RTL locale). **It overturned a claim:** RTL never
+    worked. Odoo 19's backend does not set `direction: rtl`, the connector
+    stylesheets are all logical properties, and `dir="auto"` resolved from
+    English content. Fixed at both connector Owl roots.
+  - **Records:** `ui-u2-copy-deck.md` and `ui-u2-validation-results.md` (both
+    required by the U2 packet, neither previously existing), the U3 record
+    corrected by addendum, TD-006/009/010 reconciled, gate state §5e.2.
+- **Learning feedback loop.** The lesson is one sentence: *a structural
+  implementation and a working implementation are different claims, and only
+  rendering distinguishes them.* Three of this batch's findings — the RTL
+  failure, the unreachable first-push control, and the HOOT suite blamed on
+  the wrong file — were all invisible to every test that did not drive a
+  browser, and two of them had already been reported as "implemented" or
+  "partially fixed". The corresponding process rule is the one TD-010 now
+  enforces mechanically: **a run that cannot prove its browser evidence
+  executed is not evidence**, and the instrument, not the reader, must be the
+  thing that refuses.
+- **Not claimed:** no Odoo.sh runtime, no live-Shopify evidence
+  (`M-EXP-1`..`M-EXP-20` outstanding; `X-EXPORT-0` still an API-version hard
+  stop that is neither PASS nor FAIL), no independent review, no UAT, no
+  acceptance of any Wave 5 gate. The design system §14 screenshot set is
+  specified *from the Odoo.sh runtime*; this package is **local** and is a
+  narrower class.
+- **Next session prompt:** independent Claude review of PR #204 at its exact
+  frozen head, from scratch, per
+  `docs/06-prompts/claude-mvp-wave-review-template.md` — reading the exact
+  base/head checkout, the complete diff, the governing DECs and packets, the
+  automated-test output and the committed evidence package, and adversarially
+  re-verifying rather than summarizing. That review must not be performed by
+  this session or any session that implemented this work.
+
 ### Wave 5 U3 completion and candidate freeze (2026-07-26)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft
