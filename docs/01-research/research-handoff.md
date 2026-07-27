@@ -96,6 +96,19 @@
   TD-013 proof ships with a companion control that lets an *unexpired*
   confirmation reach the transport, so the refusal test cannot pass on a dead
   route.
+- **One count error this session found in its own records, and how.** The
+  first version of these records and of the PR body said TD-011 shipped 16
+  regressions and TD-015 convergence 11. The real numbers are **13** and
+  **12**, measured by parsing the test classes and cross-checking against the
+  `Starting <Class>.<method>` lines the definitive run emitted. It is the same
+  defect the previous cycle had to fix in its own final commit ("Correct the
+  TD-012 regression-test count: 13, not 14"), which is the point: a
+  hand-counted number in a governance record is a claim like any other and has
+  to be measured. Corrected before the definitive run was treated as
+  definitive, so the frozen head carries the accurate counts.
+  Exact per-item counts: TD-011 **13** + 1 browser tour; TD-014 **3**;
+  TD-015 media **9** (plus 3 rewritten parent-class tests); TD-015
+  convergence **12**; TD-013 **3**.
 - **Sensitivity, proven not asserted.** With the five production corrections
   reverted, the affected suites report **37 failed + 5 errors of 224**; with
   them in place, **0 failed, 0 errors of 224**. Two single-transaction
