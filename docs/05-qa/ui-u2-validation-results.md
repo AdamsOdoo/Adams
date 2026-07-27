@@ -158,10 +158,33 @@ surfaces through the DevTools protocol. Artifacts:
 | Focus visible | `CSS.forcePseudoState('focus-visible')`; computed outline/box-shadow + measured contrast | Every connector control renders an indicator |
 | Contrast | rendered `getComputedStyle` colours, backgrounds resolved up the ancestor chain and alpha-composited | See §6 |
 
-`[Fact — P2 finding, and the reason the RTL claim had to change]` **Odoo 19's
-backend never establishes `direction: rtl`.** Measured under a genuine
-`ar_001` session with both rtlcss bundles served and Odoo's own `.o_rtl` class
-present on the main components container:
+`[Correction — 2026-07-27. The statement previously recorded here as a
+[Fact] was false, and is withdrawn.]`
+
+**What was recorded:** "Odoo 19's backend never establishes `direction: rtl`
+… `direction` was never set."
+
+**Why it is false.** Odoo 19 *does* set `direction`, three times, in
+`addons/web/static/src/webclient/webclient_layout.scss` at the pinned
+`30bde9ff` — lines 22 (`.o_action_manager`), 73 (`.o_content`) and 84
+(`.o_content > .o_view_controller`) — and Odoo's own comment on two of them
+says why:
+
+```scss
+direction: ltr; //Define direction attribute here so when rtlcss preprocessor run, it converts it to rtl
+```
+
+**What actually happened.** `rtlcss` was **absent from the measuring
+environment**. `AssetsBundle.run_rtlcss` (`odoo/addons/base/models/
+assetsbundle.py`) returns the stylesheet *unflipped* when the binary cannot
+be executed, while the `.rtl.` bundle URL is minted from the user's locale
+alone and is served either way. So the measurement recorded a real
+observation of a **broken toolchain**, and attributed it to Odoo's design.
+`rtl_stylesheets: 2` proved the locale was RTL, not that anything had been
+flipped.
+
+The observations in the block below are what was measured; the conclusion
+drawn from them was wrong.
 
 ```
 html   dir attribute : null
@@ -170,10 +193,12 @@ body   computed      : ltr
 .o_sc_dashboard       : dir="auto" → computed ltr
 ```
 
-Odoo's backend RTL mechanism is **rtlcss**, which flips *physical* properties
-inside the CSS bundle. That works for Odoo's own stylesheets and does nothing
-for the connector's, because the connector's are written entirely in **logical**
-properties — which resolve against `direction`, and `direction` was never set.
+**What survives the correction.** Two narrower statements are still true and
+are the real basis for the `dir` binding that shipped: Odoo sets no `dir`
+*attribute* on `<html>`/`<body>` (it sets the CSS `direction` property on
+inner containers instead), and `dir="auto"` is the wrong tool regardless —
+it resolves from the first strong character of the *content*, so an Arabic
+operator reading English
 `dir="auto"` made it worse rather than better: it resolves from the first
 strong character of the *content*, so an Arabic operator reading English
 operational data got `ltr`.

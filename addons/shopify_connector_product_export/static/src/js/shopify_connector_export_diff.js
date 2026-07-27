@@ -55,16 +55,22 @@ export class ShopifyConnectorExportDiff extends Component {
         // operational data got `ltr` and every logical property in the
         // stylesheet resolved LTR-ward.
         //
-        // This matters here and nowhere else in Odoo. Odoo 19's BACKEND does
-        // not set `dir` on `<html>` or `<body>` at all -- measured under
-        // `ar_001` with both rtlcss bundles served and `.o_rtl` present:
-        // `documentElement` and `body` both compute `direction: ltr`. Its RTL
-        // mechanism is rtlcss, which flips PHYSICAL properties in the CSS
-        // bundle. That works for Odoo's own stylesheets and does nothing for
-        // this one, because this stylesheet is written entirely in LOGICAL
-        // properties -- which resolve against `direction`, and `direction` was
-        // never set. Reading the SCSS suggested RTL was handled; rendering it
-        // proved it was not.
+        // Odoo 19's backend sets no `dir` ATTRIBUTE on `<html>` or `<body>`.
+        // It sets the CSS `direction` PROPERTY instead, on inner containers
+        // (`webclient_layout.scss` lines 22/73/84 at the pinned 30bde9ff),
+        // expressly so rtlcss can flip it -- Odoo's own comment there says
+        // so. Binding `dir` on this root is therefore belt-and-braces rather
+        // than a substitute for Odoo's mechanism: it makes this component's
+        // logical properties resolve correctly from the user's locale
+        // without depending on the asset pipeline having produced a flipped
+        // bundle.
+        //
+        // A correction to what this comment previously said: it claimed
+        // `direction` "was never set" by Odoo. That was measured in an
+        // environment where the `rtlcss` binary was MISSING, in which case
+        // `AssetsBundle.run_rtlcss` returns the stylesheet unflipped while
+        // the `.rtl.` URL is still served from the locale alone. The LTR
+        // render was real; the conclusion about Odoo was not.
         this.direction = localeDirection();
         this.state = useState({
             status: "loading", // "loading" | "ready" | "error"

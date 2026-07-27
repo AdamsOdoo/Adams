@@ -155,7 +155,7 @@ measured** — no fake transport was introduced.
 
 `[Fact]` Real Chromium against a real Odoo 19 HTTP server rendering the real U1
 screens on a seeded database. Harness output:
-`ci-artifacts/u1-browser-evidence.json`. **34 checks, 0 failed, 13 screenshots.**
+`ci-artifacts/u1-browser-evidence.json`. **34 checks, 0 failed, 13 screenshots** — `[Corrected 2026-07-27]` of which the RTL check is **withdrawn** (see §3.2): 33 checks stand, 1 is unproven, and 12 of the 13 screenshots are distinct captures. The producing harness is not committed anywhere in this repository, so none of these figures is independently reproducible.
 
 The U1 locked prompt forbids auto-deferring this class. **No browser class is
 recorded as deferred, and none is recorded as passed without execution.**
@@ -175,7 +175,7 @@ recorded as deferred, and none is recorded as passed without execution.**
 | 09 | `09-admin-settings-form.png` | Administrator | Settings form with the switch button |
 | 10 | `10-admin-mode-switch-dialog.png` | Administrator | Mode-switch confirmation dialog |
 | 11 | `11-admin-review-workspace.png` | Administrator | Review workspace |
-| 12 | `12-admin-review-rtl.png` | Administrator | Same screen rendered RTL |
+| 12 | `12-admin-review-rtl.png` | Administrator | **`[Corrected 2026-07-27 — NOT RTL EVIDENCE]`** This file is **byte-identical** to row 11 (`sha256 fdb4ea74…`, 70,410 bytes both). It is a second capture of the LTR screen, not an RTL render, and it was graded PASS. It proves nothing about RTL. |
 | 13 | `13-outsider-permission-denied.png` | No connector group | Refusal |
 
 ### 3.2 What the browser run proved
@@ -194,7 +194,7 @@ recorded as deferred, and none is recorded as passed without execution.**
 | Empty state | Does not assert "there are none"; carries the withheld-records caveat | PASS |
 | Wizard | Dialog opens with `role="dialog"`; consequences are static; counts are labelled "indicative … not a complete count" | PASS |
 | Responsive | 390 px: `scrollWidth == clientWidth` (390) — no horizontal page overflow | PASS |
-| RTL | `dir="rtl"`: `scrollWidth == clientWidth` (1440) — no horizontal overflow | PASS |
+| RTL | `dir="rtl"`: `scrollWidth == clientWidth` (1440) — no horizontal overflow | **`[Corrected 2026-07-27]` WITHDRAWN — not PASS, not FAIL.** The overflow number was measured, but the screenshot offered as its evidence is byte-identical to the LTR capture, so nothing here establishes that an RTL render was ever produced. The harness that made these files is committed nowhere in this repository, so the measurement cannot be re-run or audited. **U1 has no valid RTL evidence.** |
 | A11y | `role="dialog"` on the modal, `role="status"` on alert regions, an `h1` per screen, severity carried by **words** (state and reason columns) not colour alone | PASS |
 
 ### 3.3 Browser classes NOT executed — stated honestly

@@ -375,11 +375,18 @@ render, because the SEC-3 rule filters those rows out of every ordinary read
 
 **The visual and accessibility criteria are now MEASURED**, and the
 measurement overturned a claim. RTL was not "implemented structurally and
-merely unverified" — it did not work. Odoo 19's backend never establishes
-`direction: rtl` (its mechanism is rtlcss bundle-flipping), the connector
-stylesheets are written entirely in logical properties which resolve against
-`direction`, and `dir="auto"` resolved from the English content. Both
-connector Owl roots now bind `dir` to the user's locale, with rendered proof.
+merely unverified" — it did not render RTL.
+
+`[Corrected 2026-07-27]` The root cause recorded here previously — "Odoo 19's
+backend never establishes `direction: rtl`" — was **false and is withdrawn**.
+Odoo sets `direction` in `webclient_layout.scss` (lines 22, 73, 84 at the
+pinned `30bde9ff`) expressly so rtlcss can flip it. **`rtlcss` was absent
+from the measuring environment**, and `run_rtlcss` returns the bundle
+unflipped in that case while the `.rtl.` URL is still served. The LTR render
+was real; the explanation was not. `dir="auto"` was independently wrong: it
+resolves from the content, so an Arabic operator reading English data got
+`ltr`. Both connector Owl roots bind `dir` to the user's locale, which is
+correct on its own terms and is retained.
 
 **Delivered:** `docs/06-prompts/ui-u2-copy-deck.md`,
 `docs/05-qa/ui-u2-validation-results.md`, and
@@ -406,7 +413,21 @@ the U3 screens that consume them.
 
 ### 6a. HARD STOP — Task 015, 015B and U3 are not delivered
 
-`[Fact — evidence-backed, not a scheduling deferral]`
+> **`[SUPERSEDED — historical. Corrected 2026-07-27.]`** This section is
+> retained as the record of a real gate failure and the reasoning at the
+> time. **It is no longer current state, and its `[Fact]` label below must
+> not be read as a present-tense claim.** Task 015, Task 015B and U3 are all
+> delivered at this branch's head — see **§5d** and the delivery rows at
+> §193–§195 of this same file, which contradicted this section until this
+> correction. Two specifics that are now false as written: the stop rested
+> on `productSet`'s omitted-list-field semantics, and the continuation
+> ruling **withdrew `productSet` as the update mutation** so the design no
+> longer depends on them; and §6a states that U3's screens have "no
+> `action_confirm_export_preview` to wire to", when that method exists at
+> `models/shopify_connector_product_export_preview.py` and is exercised by
+> four tests. Nothing below has been rewritten.
+
+`[Fact as recorded on 2026-07-25 — superseded, see the banner above]`
 
 **Task 015's source-verification gate failed, and the failure is a real
 finding rather than a missing capability.** Before writing any export code,

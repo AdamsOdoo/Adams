@@ -13,6 +13,7 @@ environment is torn down).
 | PostgreSQL / Python | 16.13 / 3.12.3 |
 | Browser | Chromium 141.0.7390.37 (Playwright) |
 | Result | **34 checks, 0 failed, 13 screenshots** |
+| `[Corrected 2026-07-27]` | The **RTL check is withdrawn**. `12-admin-review-rtl.png` is byte-identical to `11-admin-review-workspace.png` (`sha256 fdb4ea74…`), so it is a second LTR capture, not an RTL render, and it was graded PASS. 33 checks stand; 12 of 13 screenshots are distinct. The harness that produced this set is **committed nowhere in this repository**, so none of it can be re-run or audited. |
 | Shopify | **none** — no credential, request, mutation or webhook |
 
 ## Files

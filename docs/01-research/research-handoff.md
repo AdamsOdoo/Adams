@@ -41,10 +41,14 @@
     disagreements, both corrected.
   - **Measured visual and accessibility evidence** (89 screenshots, 185
     contrast pairs, focus indicators with `:focus-visible` forced, reduced
-    motion emulated, a real RTL locale). **It overturned a claim:** RTL never
-    worked. Odoo 19's backend does not set `direction: rtl`, the connector
-    stylesheets are all logical properties, and `dir="auto"` resolved from
-    English content. Fixed at both connector Owl roots.
+    motion emulated, a real RTL locale). **It overturned a claim:** the
+    surfaces did not render RTL. `[Corrected 2026-07-27]` The cause recorded
+    at the time — "Odoo 19's backend does not set `direction: rtl`" — was
+    **false**. Odoo sets `direction` in `webclient_layout.scss` so rtlcss can
+    flip it; **`rtlcss` was missing from the measuring environment**, and
+    Odoo returns the bundle unflipped in that case while still serving the
+    `.rtl.` URL. `dir="auto"` was separately wrong (it resolves from the
+    content). Both connector Owl roots bind `dir` to the user's locale.
   - **Records:** `ui-u2-copy-deck.md` and `ui-u2-validation-results.md` (both
     required by the U2 packet, neither previously existing), the U3 record
     corrected by addendum, TD-006/009/010 reconciled, gate state §5e.2.

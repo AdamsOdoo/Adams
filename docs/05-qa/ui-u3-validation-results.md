@@ -206,14 +206,22 @@ execute: `shopify connector dashboard` 8/8 and `shopify connector export diff`
 185 measured contrast pairs with 0 connector-owned failures; the reduced-motion
 media query emulated and the computed durations read back.
 
-`[Fact — CORRECTION]` **Item 4's underlying claim was wrong.** RTL was *not*
-"implemented structurally and merely unverified" — it did not work at all.
-Measured under a genuine `ar_001` session with both rtlcss bundles served and
-Odoo's `.o_rtl` class applied, `<html>`, `<body>` and `.o_sc_export_diff` all
-computed `direction: ltr`. Odoo 19's backend RTL mechanism is **rtlcss**, which
-flips *physical* properties in the CSS bundle; the connector's stylesheets are
-written entirely in **logical** properties, which have nothing for rtlcss to
-flip and instead resolve against `direction` — and `direction` was never set.
+`[Correction — 2026-07-27, superseding the [Fact — CORRECTION] previously
+recorded here.]` The measurement below is real; the root cause recorded
+alongside it was false and is withdrawn.
+
+**Measured:** under an `ar_001` session, `<html>`, `<body>` and
+`.o_sc_export_diff` all computed `direction: ltr`.
+
+**Recorded cause (false):** "Odoo 19's backend RTL mechanism is rtlcss …
+`direction` was never set."
+
+**Actual cause:** `rtlcss` was **not installed in the measuring
+environment**. Odoo 19 sets `direction` in `webclient_layout.scss` (lines
+22, 73, 84 at the pinned `30bde9ff`) precisely so rtlcss can flip it, and
+`run_rtlcss` returns the bundle unflipped when the binary is missing while
+still serving it under the `.rtl.` URL. The environment produced a
+genuinely LTR render and the conclusion misattributed it to Odoo.
 `dir="auto"` made it worse, not better: it resolves from the first strong
 character of the *content*, so an Arabic operator reading English operational
 data got `ltr`.
