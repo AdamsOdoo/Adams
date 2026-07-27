@@ -46,6 +46,7 @@ dict; the numbers are the same three the parser already returned.
 
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
@@ -57,6 +58,25 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_store import (
     THROTTLE_DEFER_RATIO,
     THROTTLE_RECOVER_RATIO,
 )
+
+
+class FakeThrottleResponse:
+    """A `requests.Response` stand-in for `_normalize_response`.
+
+    Deliberately minimal: `_normalize_response` reads `json()` and, on the
+    error paths only, the status/text. A richer fake would let a test pass
+    for reasons the production path does not have.
+    """
+
+    status_code = 200
+
+    def __init__(self, body):
+        self._body = body
+        self.headers = {}
+        self.text = ''
+
+    def json(self):
+        return self._body
 
 
 @tagged('post_install', '-at_install')
@@ -182,6 +202,160 @@ class TestThrottleBackpressure(TransactionCase):
         self.assertNotEqual(self.other_store.api_health_state, 'throttled')
         self.assertEqual(
             self.Dispatch._backpressured_store_ids(), (self.store.id,),
+        )
+
+    # ------------------------------------------------------------------
+    # 2b. Same-pass backpressure: pressure THIS pass observed binds THIS
+    #     pass. The correction to the first TD-014 implementation.
+    # ------------------------------------------------------------------
+
+    def _low_headroom_body(self, available):
+        """A real-shaped GraphQL body carrying `extensions.cost`.
+
+        The three field names are Shopify's own
+        (https://shopify.dev/docs/api/usage/limits, read 2026-07-27) and
+        this goes through `_normalize_response` -- the production choke
+        point -- not through `_record_throttle_status` directly. That is
+        the whole point of these two tests: the previous TD-014 regressions
+        proved the *lever* worked by pulling it themselves.
+        """
+        return {
+            'data': {'shop': {'myshopifyDomain': 'irrelevant'}},
+            'extensions': {'cost': {'throttleStatus': {
+                'maximumAvailable': 2000.0,
+                'currentlyAvailable': available,
+                'restoreRate': 100.0,
+            }}},
+        }
+
+    def _drain_with_throttle_on(self, throttled_store, available=40.0):
+        """Run ONE `run_drain()` in which the first job for `throttled_store`
+        comes back reporting near-exhausted head-room.
+
+        The handler is replaced -- not the transport -- because
+        `core_dispatch_selftest` deliberately issues no Shopify call at all,
+        so there is no request for a patched `_send` to answer. What is
+        under test is not the transport: it is whether state written
+        DURING a pass changes the claims still to come in that pass. So the
+        handler feeds a real-shaped response through the real
+        `_normalize_response`, which is the only production route from a
+        response to `api_health_state`.
+        """
+        Dispatch = type(self.Dispatch)
+        Client = type(self.env['shopify.connector.api.client'])
+        original = Dispatch._handle_core_dispatch_selftest
+        seen = []
+
+        def handler(dispatch_self, job):
+            seen.append(job.store_id.id)
+            if job.store_id.id == throttled_store.id and len(seen) == 1:
+                response = FakeThrottleResponse(
+                    self._low_headroom_body(available)
+                )
+                dispatch_self.env[
+                    'shopify.connector.api.client'
+                ]._normalize_response(job.store_id, response)
+            return original(dispatch_self, job)
+
+        with patch.object(Client, '_assert_served_api_version',
+                          lambda _self, _response: '2026-07'), \
+                patch.object(Dispatch, '_handle_core_dispatch_selftest',
+                             handler):
+            processed = self.Dispatch.run_drain()
+        return processed, seen
+
+    def test_pressure_observed_mid_pass_defers_that_store_in_the_same_pass(self):
+        """The TD-014 correction, at the production seam.
+
+        The first implementation computed the deferred set ONCE, before the
+        claim loop. So a store could report 2% head-room on the first job
+        of a pass and have four more of its jobs claimed by the same pass
+        -- the exact burst backpressure exists to prevent, and a defect no
+        amount of testing the lever in isolation would surface.
+
+        No forced 429 anywhere: the deferral comes from proactive
+        `throttleStatus` head-room, which is what the official
+        documentation says applications should use.
+        """
+        self._queue(4)
+        self._queue(1, store=self.other_store)
+        self.Param.sudo().set_param(
+            dispatch_module.DRAIN_BATCH_SIZE_PARAM, '50',
+        )
+        processed, seen = self._drain_with_throttle_on(self.store)
+
+        self.assertEqual(
+            seen[0], self.store.id,
+            'The pressure-reporting store must go first, or this proves '
+            'nothing about what follows it.',
+        )
+        self.assertEqual(
+            seen.count(self.store.id), 1,
+            'Store A reported near-zero head-room on its FIRST job of this '
+            'pass. No further job for store A may be claimed by the SAME '
+            'pass -- this is the assertion the original TD-014 '
+            'implementation could not pass.',
+        )
+        self.assertIn(
+            self.other_store.id, seen,
+            'Per-store isolation: one store losing head-room must not stop '
+            'an unrelated store\'s work in the same pass.',
+        )
+        self.assertEqual(processed, 2)
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.api_health_state, 'throttled')
+
+    def test_the_deferred_set_can_only_grow_during_a_pass(self):
+        """Once deferred, deferred for the rest of the pass.
+
+        The union is not an implementation detail. Re-reading the set
+        without accumulating would let the mid-pass recovery projection
+        lift a deferral the same pass had just applied, and the pass would
+        oscillate against a bucket it is supposed to be leaving alone.
+        Recovery is a NEXT-pass event, and the read the loop uses is the
+        one that does not project.
+        """
+        self.store._record_throttle_status(self._throttle(100.0))
+        self.store.invalidate_recordset()
+        # Aged far enough that the projection WOULD clear the deferral.
+        self.store.sudo().write({
+            'api_throttle_observed_at': fields.Datetime.subtract(
+                fields.Datetime.now(), seconds=60,
+            ),
+        })
+        self.store.invalidate_recordset()
+        self.assertIn(
+            self.store.id, self.Dispatch._backpressured_store_ids_now(),
+            'The mid-pass read must report the store\'s CURRENT durable '
+            'state without projecting recovery onto it.',
+        )
+        self.assertNotIn(
+            self.store.id, self.Dispatch._backpressured_store_ids(),
+            'The pass-boundary read still applies the documented restore-'
+            'rate projection, so recovery keeps working across passes.',
+        )
+
+    def test_a_later_pass_admits_the_recovered_store_again(self):
+        """Requirement: deferral is temporary, and recovery needs no 429."""
+        self._queue(2)
+        self.Param.sudo().set_param(
+            dispatch_module.DRAIN_BATCH_SIZE_PARAM, '50',
+        )
+        processed, seen = self._drain_with_throttle_on(self.store)
+        self.assertEqual(processed, 1, 'The pass self-limited to one job.')
+
+        # Time passes. `restoreRate` refills the bucket; nothing is asked
+        # of Shopify to find that out.
+        self.store.sudo().write({
+            'api_throttle_observed_at': fields.Datetime.subtract(
+                fields.Datetime.now(), seconds=60,
+            ),
+        })
+        self.store.invalidate_recordset()
+        self.assertEqual(
+            self.Dispatch.run_drain(), 1,
+            'The remaining job must run on a later pass once the projected '
+            'refill clears the accepted recovery threshold.',
         )
 
     # ------------------------------------------------------------------

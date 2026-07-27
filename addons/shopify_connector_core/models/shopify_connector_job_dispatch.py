@@ -263,6 +263,24 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         last observation and the clock.
         """
         self.env['shopify.connector.store']._recover_throttled_stores()
+        return self._backpressured_store_ids_now()
+
+    @api.model
+    def _backpressured_store_ids_now(self):
+        """The same read WITHOUT the recovery projection.
+
+        TD-014 correction. `_backpressured_store_ids` is the START-OF-PASS
+        entry point: it first lets the clock lift stale deferrals, then
+        reads the states. That recovery step belongs to the pass boundary
+        and must not run again mid-pass, because a deferral this pass
+        observed has to hold for the rest of it -- re-projecting inside the
+        loop could lift a store the same pass had just deferred and let it
+        be claimed again.
+
+        This read-only variant is what the loop calls before each
+        subsequent claim, so the pass can only ever ACCUMULATE deferrals.
+        Recovery happens on the next pass, exactly as documented.
+        """
         return tuple(self.env['shopify.connector.store'].search([
             ('api_health_state', 'in', BACKPRESSURE_HEALTH_STATES),
         ]).ids)
@@ -286,8 +304,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         * **A configurable per-pass cap** (``drain_batch_size``), replacing
           the hardcoded batch constant as the *default* rather than the only
           value.
-        * **Pre-claim backpressure**: stores under Shopify throttle pressure
-          are excluded from the candidate search for the whole pass.
+        * **Per-claim backpressure**: stores under Shopify throttle pressure
+          are excluded from the candidate search, re-evaluated before EVERY
+          claim and accumulated across the pass (TD-014 correction below).
 
         ``_commit_progress`` COMMITS on every path (including the
         outside-a-cron path, where it commits and reports unlimited time), so
@@ -308,25 +327,56 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             self._resolve_drain_batch_size() if limit is None
             else limit
         )
-        deferred_store_ids = self._backpressured_store_ids()
-        if deferred_store_ids:
+        deferred = set(self._backpressured_store_ids())
+        if deferred:
             _logger.info(
                 "Drain backpressure: deferring %d store(s) whose api_health_"
                 "state is one of %s for this pass.",
-                len(deferred_store_ids), ', '.join(BACKPRESSURE_HEALTH_STATES),
+                len(deferred), ', '.join(BACKPRESSURE_HEALTH_STATES),
             )
         report_progress = self._concurrency_retry_supported()
         Job = self.env['shopify.connector.job']
         processed = 0
         for _slot in range(cap):
-            if not self._drain_one(exclude_store_ids=deferred_store_ids):
+            # TD-014 correction. The deferred set used to be computed ONCE,
+            # here, before the loop -- so throttle pressure a job in THIS
+            # pass observed could not affect this pass. The first job for a
+            # store could come back reporting 3% head-room and the next
+            # slot would still claim that store's next job, which is the
+            # precise moment backpressure exists to prevent.
+            #
+            # It is now re-read before every claim and UNIONED, never
+            # replaced. Two properties follow from the union, and both are
+            # required:
+            #
+            #   * once a store is deferred it stays deferred for the rest of
+            #     the pass, so the pass cannot oscillate; and
+            #   * a store never leaves the set mid-pass, so recovery is a
+            #     next-pass event driven by the documented restore-rate
+            #     projection, unchanged.
+            #
+            # Per-store isolation is untouched: only the observed store's id
+            # enters the set, so unrelated stores keep draining. Still no
+            # Shopify call -- this reads durable local state the response
+            # choke point wrote.
+            if _slot:
+                newly = set(self._backpressured_store_ids_now()) - deferred
+                if newly:
+                    _logger.info(
+                        "Drain backpressure: %d store(s) lost Shopify rate "
+                        "head-room during this pass and are deferred for the "
+                        "rest of it.", len(newly),
+                    )
+                    deferred |= newly
+            exclude = tuple(sorted(deferred))
+            if not self._drain_one(exclude_store_ids=exclude):
                 break
             processed += 1
             if not report_progress:
                 continue
             remaining = self.env['ir.cron']._commit_progress(
                 1,
-                remaining=Job._claimable_count(deferred_store_ids),
+                remaining=Job._claimable_count(exclude),
             )
             if remaining <= 0:
                 _logger.info(
