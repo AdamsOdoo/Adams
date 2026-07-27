@@ -85,7 +85,12 @@ EXTRA_MODULES="account,stock"
 # Keep this list in sync with docs/05-qa/pre-wave-5-debt-discovery.md §3; the
 # guard test `test_phase_contract.py` fails if a `-standard` class exists that
 # no tag here selects, so the two cannot drift apart silently.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual"
+# `shopify_connector_export_mutation_route` (added 2026-07-27) drives the real
+# Layer 2 mutation route through `run_drain()` to prove TD-013's expiry guard is
+# bound into the production dispatch path and not merely into a helper. It is
+# `-standard` because that route commits between C1 and C2 by design and so
+# needs a genuine pooled connection, which the shared in-test cursor is not.
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route"
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #

@@ -33,8 +33,16 @@ Both expiry directions are covered, because `_is_expired` has two:
 reviewed the diff. The second is the one an operator actually hits.
 """
 
-from odoo import fields
-from odoo.tests.common import tagged
+import uuid
+from unittest.mock import patch
+
+from odoo import SUPERUSER_ID, api, fields
+from odoo.sql_db import db_connect
+from odoo.tests.common import TransactionCase, tagged
+
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
 
 from ..models.shopify_connector_media_export_service import (
     JOB_TYPE_MEDIA_ASSOCIATE,
@@ -524,4 +532,366 @@ class TestExportMutationExpiry(ExportCase):
             'expiry guard; found %s. If a family was legitimately added or '
             'removed, update this count in the same commit.'
             % sorted(set(bound)),
+        )
+
+
+# Non-standard: this class needs a GENUINE pooled connection with real commit
+# boundaries, because the Layer 2 mutation route it exercises commits between
+# C1 and C2 by design (`_drain_mutation_one`) and refuses outright on a shared
+# in-test cursor: "Layer 2 mutation dispatch requires an owned cursor with real
+# commit boundaries". It is bounded (statement_timeout + lock_timeout), creates
+# its own store, and cleans up after itself. The suite runner runs it by tag.
+@tagged('post_install', '-at_install', '-standard',
+        'shopify_connector_export_mutation_route')
+class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
+    """TD-013 through the REAL dispatcher, not through its helpers.
+
+    Why this class exists
+    ---------------------
+    The TD-013 regressions above call `_prepare_preconditions_*` and
+    `_advance_plan` directly. That is legitimate unit coverage of the guard
+    and it is NOT proof that the guard is bound into the route a real job
+    takes. A guard can be present in a method no production dispatch ever
+    reaches -- which is the exact failure mode TD-011 turned out to have,
+    on the same PR.
+
+    So this drives `run_drain()`: the production claim, the
+    `_is_mutation_job_type` branch, `_drain_mutation_one`, `prepare_local`,
+    `prepare_preconditions` (where the TD-013 assertion lives),
+    `_recover_pre_c2_failure`, and the fail-closed disposition. The
+    transport is patched at `_send` -- the single choke point -- and
+    asserted to receive nothing.
+
+    Zero Shopify contact: `_send` is replaced by a function that fails the
+    test if it is ever called, so a regression that let the request through
+    surfaces as a failure rather than as an outbound connection.
+    """
+
+    STATEMENT_TIMEOUT_MS = 10000
+    LOCK_TIMEOUT_MS = 8000
+
+    def _open_bounded(self):
+        """A genuine pooled cursor with both transaction-local PG limits.
+
+        Same shape as the core module's genuine-connection lifecycle tests:
+        a real connection so `commit()` is real, and bounded so a lock this
+        test cannot acquire fails fast instead of hanging the suite.
+        """
+        cr = db_connect(self.env.cr.dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _fixtures(self, env, suffix, stale=True):
+        """A store, an applying+confirmed preview, and one mutation job.
+
+        The preview is valid at admission and stale at its mutation
+        boundary, which is the scenario TD-013 is about: `expires_at` is
+        absent from the preview's write surfaces on purpose, so the fixture
+        sets the deadline at birth rather than reaching around the guard.
+        """
+        store = env['shopify.connector.store'].create({
+            'name': 'TD-013 route store %s' % suffix,
+            'shop_domain': 'td013-route-%s.myshopify.com' % suffix,
+            'api_version': SHOPIFY_API_VERSION,
+            'state': 'connected',
+        })
+        # A credential, because `execute_business` refuses a connected store
+        # with no usable token BEFORE `_send` -- so without one, the
+        # live-confirmation control below could never reach the transport and
+        # would "prove" the guard for the wrong reason. Set before the job is
+        # enqueued, so the job captures the store's settled
+        # `connection_generation`.
+        env['shopify.connector.store.credential'].create({
+            'store_id': store.id,
+            'access_token': 'shpat_DUMMYDUMMYDUMMY0000000000000000',
+        })
+        store.write({'state': 'connected'})
+        env['shopify.connector.store.settings'].create({
+            'store_id': store.id,
+            'product_export_domain_enabled': True,
+            'price_source_of_truth': 'odoo_authoritative',
+        })
+        template = env['product.template'].create({
+            'name': 'TD-013 route widget %s' % suffix,
+            'shopify_export_enabled': True,
+        })
+        binding = env['shopify.connector.product.template.binding'].create({
+            'store_id': store.id,
+            'product_template_id': template.id,
+            'shopify_gid': 'gid://shopify/Product/TD013ROUTE%s' % suffix,
+        })
+        now = fields.Datetime.now()
+        # Through the CREATE surface, like production. The preview model
+        # refuses a bare `create()`, and `expires_at` is deliberately absent
+        # from `WRITE_SURFACES`, so a stale confirmation has to be BORN
+        # stale rather than aged by reaching around the guard.
+        Preview = env[
+            'shopify.connector.product.export.preview'
+        ]._preview_surface('_create_preview')
+        preview = Preview.create({
+            'store_id': store.id,
+            'product_template_id': template.id,
+            'product_template_binding_id': binding.id,
+            'export_path': 'update',
+            'state': 'applying',
+            'diff': {'scalars': [], 'untouched': {}},
+            'apply_plan': {
+                'steps': [{'step': JOB_TYPE_UPDATE, 'state': 'pending',
+                           'fields': ['title']}],
+                'cursor': 0,
+            },
+            'blocked_differences': {'items': []},
+            'has_blocked_differences': False,
+            'remote_product_gid': binding.shopify_gid,
+            'remote_updated_at': '2026-07-26T00:00:00Z',
+            'previewed_at': now,
+            'source_write_date': Preview._source_write_date(template),
+            'expires_at': (
+                fields.Datetime.subtract(now, hours=1) if stale
+                else fields.Datetime.add(now, hours=1)
+            ),
+        })
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': env.uid,
+            'confirmed_at': now,
+        })
+        job = env['shopify.connector.job.enqueue'].enqueue(
+            store, 'manual_sync', JOB_TYPE_UPDATE,
+            payload_hash=uuid.uuid4().hex,
+            res_model=preview._name, res_id=preview.id,
+            shopify_target_gid=binding.shopify_gid,
+        )
+        return store, preview, job
+
+    def _drain_once(self, stale=True):
+        """Run the production drain for exactly one mutation job.
+
+        Returns `(job_state, error_class, subreason, send_calls,
+        child_job_count)` read back on a THIRD connection, so what is
+        asserted is what actually committed rather than what a cache held.
+        """
+        suffix = uuid.uuid4().hex[:8]
+        Client = type(self.env['shopify.connector.api.client'])
+        sent = []
+
+        def refuse_send(_self, _store, request, token=None,
+                        mutation_context=None):
+            sent.append(request)
+            raise AssertionError(
+                'The transport choke point was reached. A stale confirmation '
+                'must never authorise a Shopify mutation.'
+            )
+
+        cr = self._open_bounded()
+        job_id = store_id = None
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            store, _preview, job = self._fixtures(env, suffix, stale=stale)
+            job_id, store_id = job.id, store.id
+            env.flush_all()
+            cr.commit()
+            with patch.object(Client, '_send', refuse_send):
+                env['shopify.connector.job.dispatch'].run_drain(1)
+            cr.commit()
+        finally:
+            try:
+                cr.rollback()
+            finally:
+                cr.close()
+
+        observer = self._open_bounded()
+        try:
+            oenv = api.Environment(observer, SUPERUSER_ID, {})
+            job = oenv['shopify.connector.job'].browse(job_id)
+            # "Mutation job" is whatever the dispatcher itself would route
+            # down the Layer 2 path, read from the live registry rather than
+            # from a list in this file that could drift from it.
+            mutation_types = list(
+                oenv['shopify.connector.job.dispatch']
+                ._get_reconciliation_strategies()
+            )
+            children = oenv['shopify.connector.job'].search_count([
+                ('store_id', '=', store_id),
+                ('job_type', 'in', mutation_types),
+                ('id', '!=', job_id),
+            ])
+            result = (
+                job.state, job.error_class, job.manual_review_subreason,
+                list(sent), children,
+            )
+        finally:
+            try:
+                observer.rollback()
+            finally:
+                observer.close()
+        self._cleanup(store_id)
+        return result
+
+    def _cleanup(self, store_id):
+        """Remove this test's committed rows on its own connection.
+
+        Committed fixtures are not rolled back by `TransactionCase`, so they
+        would otherwise leak into the rest of the run. Job logs are
+        append-only and jobs cannot be unlinked through the ORM, so the
+        teardown is raw SQL scoped to this one store id.
+
+        The order is dictated by real foreign keys, and one of them points
+        BOTH ways: a job names its mutation attempt (`mutation_attempt_id`)
+        and an attempt names its job. The reference from the job side is
+        nulled first, which is what breaks the cycle -- deleting either
+        table first without that raises `ForeignKeyViolation`.
+        """
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                'UPDATE shopify_connector_job SET mutation_attempt_id = NULL '
+                'WHERE store_id = %s',
+                (store_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_job_log WHERE job_id IN '
+                '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
+                (store_id,),
+            )
+            for table in (
+                'shopify_connector_mutation_attempt',
+                'shopify_connector_call_lease',
+                'shopify_connector_job',
+                'shopify_connector_product_export_preview',
+                'shopify_connector_product_media_binding',
+                'shopify_connector_product_variant_binding',
+                'shopify_connector_product_template_binding',
+                'shopify_connector_store_settings',
+                'shopify_connector_store_credential',
+            ):
+                # The table names are a fixed literal tuple in this file, so
+                # the only interpolated value is the parameterised store id.
+                cr.execute(
+                    'DELETE FROM ' + table + ' WHERE store_id = %s',
+                    (store_id,),
+                )
+            cr.execute(
+                'DELETE FROM shopify_connector_store WHERE id = %s',
+                (store_id,),
+            )
+            cr.commit()
+        finally:
+            cr.close()
+
+    # ------------------------------------------------------------------
+    # The binding proof
+    # ------------------------------------------------------------------
+
+    def test_a_stale_confirmation_is_refused_by_the_real_mutation_route(self):
+        """Requirements 1-6 of the TD-013 evidence correction, in one run."""
+        state, error_class, subreason, sent, children = self._drain_once()
+
+        self.assertEqual(
+            sent, [],
+            'Requirement 4: the transport choke point must receive zero '
+            'calls. Anything here means a stale confirmation reached '
+            'Shopify.',
+        )
+        self.assertEqual(
+            state, 'blocked_manual_review',
+            'Requirement 5: the accepted fail-closed disposition for a '
+            'pre-C2 refusal is a job held for manual review.',
+        )
+        self.assertEqual(error_class, 'destructive_write_guard_blocked')
+        self.assertEqual(subreason, 'destructive_write_guard_blocked')
+        self.assertEqual(
+            children, 0,
+            'Requirement 6: a refused mutation must not admit the next step '
+            'of the plan.',
+        )
+
+    def test_the_same_route_admits_a_live_confirmation(self):
+        """The guard is sensitive to expiry, not to the route itself.
+
+        Without this the test above would pass equally well if the route
+        were broken for every mutation, which would prove nothing about
+        TD-013. Here the confirmation is live, so the run gets PAST the
+        expiry assertion and reaches the transport -- which this class
+        still refuses, so the job fails rather than mutating. What matters
+        is that `_send` WAS reached: the difference between the two tests
+        is expiry and nothing else.
+        """
+        state, _error_class, _subreason, sent, _children = self._drain_once(
+            stale=False,
+        )
+        self.assertTrue(
+            sent,
+            'A live confirmation must be allowed through to the transport, '
+            'or the previous test proves only that the route is dead.',
+        )
+        self.assertNotEqual(state, 'succeeded')
+
+    def test_the_guard_is_reached_from_the_production_dispatch_path(self):
+        """The call chain, asserted so it cannot be quietly re-plumbed.
+
+        `_drain_one` routes a mutation job to `_drain_mutation_one`, which
+        invokes the registered `prepare_preconditions` -- and the export
+        module registers `_prepare_preconditions_update` there. Each link
+        is checked, because the run above would still pass if a future edit
+        moved the assertion somewhere the drain no longer calls.
+        """
+        import inspect
+
+        from odoo.addons.shopify_connector_core.models import (
+            shopify_connector_job_dispatch as dispatch_module,
+        )
+
+        drain_one = inspect.getsource(
+            dispatch_module.ShopifyConnectorJobDispatch._drain_one
+        )
+        self.assertIn('_is_mutation_job_type', drain_one)
+        self.assertIn('_drain_mutation_one', drain_one)
+        mutation = inspect.getsource(
+            dispatch_module.ShopifyConnectorJobDispatch._drain_mutation_one
+        )
+        self.assertIn("strategy['prepare_preconditions']", mutation)
+
+        strategies = self.env[
+            'shopify.connector.job.dispatch'
+        ]._get_reconciliation_strategies()
+        self.assertEqual(
+            strategies[JOB_TYPE_UPDATE]['prepare_preconditions'].__name__,
+            '_prepare_preconditions_update',
+        )
+        # Two hops, both asserted, because the guard sits behind the
+        # confirmation assertion rather than being called directly by each
+        # family -- which is the design, and is why every family reaches it.
+        Service = self.env['shopify.connector.product.export.service']
+        for job_type in (
+            JOB_TYPE_CREATE, JOB_TYPE_UPDATE, JOB_TYPE_VARIANTS_CREATE,
+            JOB_TYPE_VARIANTS_UPDATE, JOB_TYPE_BINDING_NAMESPACE,
+            JOB_TYPE_MEDIA_STAGE, JOB_TYPE_MEDIA_FILE_CREATE,
+            JOB_TYPE_MEDIA_ASSOCIATE,
+        ):
+            with self.subTest(family=job_type):
+                source = inspect.getsource(
+                    strategies[job_type]['prepare_preconditions']
+                )
+                self.assertTrue(
+                    '_assert_preview_unexpired_pre_c2' in source
+                    or '_assert_confirmed_preview_pre_c2' in source,
+                    'This mutation family does not reach the TD-013 expiry '
+                    'guard from the dispatcher.',
+                )
+        self.assertIn(
+            '_assert_preview_unexpired_pre_c2',
+            inspect.getsource(
+                type(Service)._assert_confirmed_preview_pre_c2
+            ),
+            'The confirmation assertion is what carries every family into '
+            'the expiry guard; if it stops calling it, all 8 families lose '
+            'the check at once.',
         )
