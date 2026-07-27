@@ -440,24 +440,77 @@ class TestExportReconnectReconcile(ExportCase):
         self.assertEqual(self.binding.export_reconcile_state, 'review')
         self.assertIn('in flight', self.binding.export_reconcile_note)
 
-    def test_a_remotely_confirmed_media_row_is_not_a_divergence(self):
-        """The only shape of `verified` media there now is.
+    def test_a_remotely_confirmed_media_row_still_cannot_reach_verified(self):
+        """The checksum disposition, on the best case the platform allows.
 
-        Before the TD-015 correction this test passed on the strength of
-        the LOCAL row alone -- the responder returned a product body for
-        every call and nothing looked at Shopify's media at all. It now
-        requires the remote read to actually name this File on this
-        product, which is why `media=` has to be supplied.
+        Everything a remote read CAN establish is established here: the
+        File GID is on the product, its `fileStatus` is not `FAILED`, the
+        store identity matches. PD-PX-7 requires "exists / variant GID set
+        / media checksums", and the third one cannot be answered -- so this
+        is `review`, not `verified`.
+
+        The previous cycle returned `verified` here and recorded the
+        checksum as a retained limitation. That substitutes a narrower
+        proof for the accepted one, and the only documents authorising the
+        substitution were written in that same unmerged cycle. Fail closed
+        until an accepted decision says otherwise.
         """
         self._associated_media_row(salt=b'\x02')
         self._reconnect()
         self._run_pass(media=_media_body(file_gids=(FILE_GID,)))
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        note = self.binding.export_reconcile_note
+        self.assertIn('expected File identity', note)
+        self.assertIn('checksum correspondence could not be proven', note)
+        self.assertNotIn(
+            'no longer exist', note,
+            'An unprovable checksum is not a proven absence.',
+        )
+        self.assertEqual(
+            self.store.export_reconcile_state, 'review_required',
+            'The export block stays in place until an operator clears it.',
+        )
+        with self.assertRaises(UserError):
+            self.Service.with_user(self.admin_user).enqueue_preview(
+                self.template, self.store,
+            )
+
+    def test_the_checksum_verdict_names_both_halves_precisely(self):
+        """The operator is told what WAS established, not only what was not.
+
+        A refusal that says only "could not verify" is indistinguishable
+        from a transport failure, and an operator would go looking for a
+        missing File that is in fact present and correctly associated.
+        """
+        self._associated_media_row(salt=b'\x03')
+        self._reconnect()
+        self._run_pass(media=_media_body(file_gids=(FILE_GID,)))
+        note = self.binding.export_reconcile_note
+        self.assertIn('were re-read on the product', note)
+        self.assertIn('non-FAILED status', note)
+        self.assertIn('no digest of the stored bytes', note)
+        self.assertIn('Nothing was changed', note)
+        self.assertLessEqual(
+            len(note), 255,
+            'The note is stored in a Char truncated at 255; a reason that '
+            'loses its own explanation is not a reason.',
+        )
+
+    def test_a_binding_with_no_media_claim_still_reaches_verified(self):
+        """The disposition is scoped to bindings that CLAIM an association.
+
+        Blocking every reconnected store, including ones that never
+        exported an image, would be a different and much broader change
+        than the one the evidence supports.
+        """
+        self._reconnect()
+        self._run_pass()
         self.assertEqual(self.binding.export_reconcile_state, 'verified')
         self.assertIn(
-            'not remotely verifiable', self.binding.export_reconcile_note,
-            'A verdict that re-verified associations but could not compare '
-            'checksums must say so rather than imply it checked both.',
+            'claims no associated Shopify media',
+            self.binding.export_reconcile_note,
         )
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
 
     def test_a_different_store_identity_is_refused_outright(self):
         """The scenario PD-PX-7 exists for, and the one write that must not
@@ -677,7 +730,12 @@ class TestExportReconnectRemoteMedia(TestExportReconnectReconcile):
     What is provable and what is not is stated in `_media_divergence`'s
     docstring and asserted here: existence, product association and
     `fileStatus` are re-read; the stored image checksum is not, because the
-    2026-07 `File` interface exposes no digest of the bytes it holds.
+    2026-07 `MediaImage` exposes no digest of the bytes it holds.
+
+    And because PD-PX-7 requires the checksum comparison by name, "cannot
+    prove it" resolves to `review`, not to `verified` with a footnote. A
+    binding that claims an association can no longer reach `verified` at
+    all -- only one that claims none can.
     """
 
     def test_complete_local_evidence_does_not_survive_missing_remote_media(self):
@@ -764,17 +822,24 @@ class TestExportReconnectRemoteMedia(TestExportReconnectReconcile):
         )
 
     def test_a_foreign_media_item_on_the_product_is_left_alone(self):
-        """Merchant-owned media is neither claimed nor touched."""
+        """Merchant-owned media is neither claimed nor touched.
+
+        The verdict is `review` because of the unprovable checksum, not
+        because of the merchant's image -- which is exactly what the note
+        has to show, or the operator would go hunting for a divergence
+        that does not exist. This connector makes no exclusivity claim it
+        could verify.
+        """
         self._associated_media_row()
         self._reconnect()
         self._run_pass(media=_media_body(file_gids=(
             FILE_GID, 'gid://shopify/MediaImage/MERCHANT-OWNED',
         )))
-        self.assertEqual(
-            self.binding.export_reconcile_state, 'verified',
-            'Extra merchant media is not a divergence: this connector makes '
-            'no exclusivity claim it could verify.',
-        )
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        note = self.binding.export_reconcile_note
+        self.assertIn('checksum correspondence could not be proven', note)
+        self.assertNotIn('MERCHANT-OWNED', note)
+        self.assertNotIn('no longer associated', note)
 
     def test_the_media_read_lands_on_a_different_store_and_is_refused(self):
         """A media read that observed somebody else's store settles nothing."""

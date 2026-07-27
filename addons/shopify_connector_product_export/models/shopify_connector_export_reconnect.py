@@ -37,6 +37,14 @@ three things the connector actually owns claims about:
 * the governed variant GID set still matches the bindings,
 * the media rows this connector created still name Files it can see.
 
+PD-PX-7 also names *media checksums*, and Shopify exposes no digest of a
+stored File's bytes, so that third check cannot be satisfied remotely.
+A binding claiming an associated media File therefore reaches `review`
+with the exact reason rather than `verified` — fail-closed, because no
+accepted decision authorises substituting identity-and-association
+evidence for the checksum comparison the specification requires. See
+`_checksum_unverifiable_divergence`.
+
 Anything missing, archived or materially divergent goes to explicit
 review. Nothing is re-created, re-published or repaired: a reconciliation
 that silently fixed what it found would be indistinguishable from the
@@ -597,14 +605,15 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
         if media_note:
             return 'review', media_note
         # Deliberately precise about what "re-verified" covers. Existence,
-        # archive state, the governed variant GID set, File existence,
-        # `fileStatus` and the product association were all re-read from
-        # Shopify. The stored image checksum was NOT: the 2026-07 API
-        # exposes no digest of the bytes it holds, so nothing here can
-        # compare them and this note does not say it did.
+        # archive state and the governed variant GID set were re-read from
+        # Shopify. This branch is reached only when the binding claims no
+        # associated Shopify media -- so there is no media checksum for
+        # PD-PX-7 to require, and none is implied. A binding that DOES claim
+        # an association cannot reach `verified` at all; see
+        # `_checksum_unverifiable_divergence`.
         return 'verified', (
-            'Product, variants and media associations re-verified against '
-            'Shopify. Image checksums are not remotely verifiable.'
+            'Product and variants re-verified against Shopify. This binding '
+            'claims no associated Shopify media.'
         )
 
     @api.model
@@ -639,18 +648,22 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
           `files(query: "filename:...")` read, for a row whose File GID
           is absent from the product so the connector can distinguish
           "detached" from "gone".
-        * **Checksum correspondence -- NOT PROVABLE, and not claimed.**
-          The 2026-07 `File` interface exposes `alt`, `createdAt`,
-          `fileErrors`, `fileStatus`, `id`, `preview` and `updatedAt`, and
-          no digest of the stored bytes. Nothing here re-verifies
-          `odoo_image_checksum` against Shopify, and no verdict this
-          method returns says it did. A row missing its local checksum is
-          still a local contradiction and still goes to review; that is a
-          statement about the connector's own evidence, not about the
-          remote bytes.
+        * **Checksum correspondence -- NOT PROVABLE, so NOT `verified`.**
+          The 2026-07 `MediaImage`/`File` interface exposes `alt`,
+          `createdAt`, `fileErrors`, `fileStatus`, `id`, `mimeType`,
+          `originalSource`, `preview` and `updatedAt`, and no digest of the
+          stored bytes (`originalSource.fileSize` is a length, not a
+          digest). PD-PX-7 requires the pass to verify *media checksums*
+          before exports resume, and no repository decision has ever
+          authorised substituting identity-and-association evidence for
+          that. So a binding whose association this pass re-read but whose
+          checksum it cannot prove is routed to review with the exact
+          reason -- see `_checksum_unverifiable_divergence`. A row missing
+          its LOCAL checksum is a separate, local contradiction and is
+          caught below.
 
-        Returns a divergence note, or `False` when every claim this
-        connector makes about the remote media was re-verified.
+        Returns a divergence note, or `False` only when this binding makes
+        no associated-media claim for PD-PX-7 to verify.
         """
         rows = self.env[
             'shopify.connector.product.media.binding'
@@ -739,7 +752,10 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
             )
         absent = [row for row in rows if row.shopify_gid not in remote_by_gid]
         if not absent:
-            return False
+            # Every association was found, with a non-FAILED status, on the
+            # expected product. That is as far as a remote read can get --
+            # and it is short of what PD-PX-7 requires.
+            return self._checksum_unverifiable_divergence(rows)
         if read.get('truncated'):
             # Requirement 5: an unverifiable claim is never reported as
             # verified, and never as a divergence either. The connector
@@ -750,6 +766,43 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
                 'from a single read.' % (REMOTE_MEDIA_PAGE_SIZE, len(absent))
             )
         return self._absent_media_divergence(store, job, absent)
+
+    @api.model
+    def _checksum_unverifiable_divergence(self, rows):
+        """PD-PX-7's third check, when the platform cannot answer it.
+
+        The requirement is verbatim: the pass verifies "exists / variant GID
+        set / **media checksums**" before exports resume. The first two are
+        remotely provable and are proved. The third is not: the 2026-07
+        Admin GraphQL `MediaImage` exposes `alt`, `createdAt`, `fileErrors`,
+        `fileStatus`, `id`, `image`, `mediaContentType`, `mediaErrors`,
+        `mediaWarnings`, `mimeType`, `originalSource`, `preview`, `status`,
+        `translations` and `updatedAt`, and none of them is a digest of the
+        stored bytes -- `originalSource.fileSize` is a length, which two
+        different images can share.
+
+        Two dispositions were available, and this is the one the repository
+        actually authorises. Reporting `verified` on identity-and-association
+        evidence alone would substitute a narrower proof for the one the
+        accepted specification names, and **no accepted decision authorises
+        that substitution**: every statement to that effect was written in
+        this same unmerged correction cycle, which cannot authorise itself.
+        So the pass fails closed -- the operator is told exactly what was
+        established and exactly what was not, and decides.
+
+        Read-only, like everything else here: nothing is re-created,
+        re-uploaded, detached or deleted. The consequence is a real one and
+        is deliberate -- a reconnected store with exported media reaches
+        `review_required` rather than `complete`, and an operator must clear
+        it before exports resume.
+        """
+        return (
+            '%d media association(s) were re-read on the product with the '
+            'expected File identity and non-FAILED status, but Shopify '
+            'exposes no digest of the stored bytes, so checksum '
+            'correspondence could not be proven. Nothing was changed; an '
+            'operator decides.' % len(rows)
+        )
 
     @api.model
     def _absent_media_divergence(self, store, job, rows):
