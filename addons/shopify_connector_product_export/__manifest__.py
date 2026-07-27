@@ -80,6 +80,12 @@ before any retry, and no blind resend.
             'shopify_connector_product_export/static/src/scss/shopify_connector_export_diff.scss',
             'shopify_connector_product_export/static/src/xml/shopify_connector_export_diff.xml',
             'shopify_connector_product_export/static/src/js/shopify_connector_export_diff.js',
+        ],
+        # See the TD-009 note in `shopify_connector_core/__manifest__.py`: a
+        # tour in `web.assets_backend` lands in the HOOT module set and breaks
+        # suite registration for its whole addon. Tours live in
+        # `web.assets_tests`, which only the test-mode backend loads.
+        'web.assets_tests': [
             'shopify_connector_product_export/static/src/js/tours/shopify_connector_u3_export_tour.js',
         ],
         'web.assets_unit_tests': [

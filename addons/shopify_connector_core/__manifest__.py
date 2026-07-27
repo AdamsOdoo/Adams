@@ -77,11 +77,37 @@ later, separately authorized tasks.
             'shopify_connector_core/static/src/scss/shopify_connector_dashboard.scss',
             'shopify_connector_core/static/src/xml/shopify_connector_dashboard.xml',
             'shopify_connector_core/static/src/js/shopify_connector_dashboard.js',
+        ],
+        # TOURS BELONG HERE, NOT IN `web.assets_backend` (TD-009).
+        #
+        # `web.assets_unit_tests_setup` does `('include', 'web.assets_backend')`,
+        # so anything in the backend bundle is also a candidate module for a
+        # HOOT run. HOOT then builds a per-suite MODULE SET from the test
+        # file's addon plus that addon's declared Odoo dependencies
+        # (`web/static/tests/_framework/module_set.hoot.js::defineModuleSet`)
+        # and STARTS EVERY MODULE IN IT. `web_tour` is not a declared
+        # dependency of this addon, so `@web_tour/tour_utils` is filtered OUT
+        # of the set -- and a tour that imports `stepUtils` from it therefore
+        # threw `Cannot destructure property 'stepUtils' of 'require(...)' as
+        # it is undefined`, which failed the whole module set and produced
+        # `HootError: error while registering suite
+        # "shopify_connector_dashboard"`. That is the entire residual cause of
+        # TD-009: the dashboard suite was never broken, a file sharing its
+        # bundle was.
+        #
+        # `web.assets_tests` is Odoo's own home for HttpCase tours (see
+        # `account`, `crm`, `calendar` ... at the pin). It is loaded into the
+        # backend only when `test_mode_enabled` or `'tests' in debug`
+        # (`web/views/webclient_templates.xml::conditional_assets_tests`), which
+        # is exactly when `start_tour` runs, and it is in NO unit-test bundle,
+        # so a tour can never again break a HOOT suite.
+        'web.assets_tests': [
             'shopify_connector_core/static/src/js/tours/shopify_connector_u0_tour.js',
             # U2 lives in core because the surfaces it walks belong to four
             # different addons and a tour can only be registered once; core is
             # the only module all four depend on.
             'shopify_connector_core/static/src/js/tours/shopify_connector_u2_tour.js',
+            'shopify_connector_core/static/src/js/tours/shopify_connector_u2_action_tour.js',
         ],
         'web.assets_unit_tests': [
             'shopify_connector_core/static/tests/shopify_connector_dashboard.test.js',
