@@ -12,6 +12,9 @@ import time
 
 from odoo import fields
 from odoo.tests.common import TransactionCase, new_test_user, tagged
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
 
 
 @tagged('post_install', '-at_install', 'shopify_connector_u0')
@@ -39,7 +42,7 @@ class TestUiPerformance(TransactionCase):
         cls._seq += 1
         return cls.Store.create({'name': 'P%d' % cls._seq,
                                  'shop_domain': 'u0-perf-%d.myshopify.com' % cls._seq,
-                                 'api_version': '2025-01', 'state': 'connected',
+                                 'api_version': SHOPIFY_API_VERSION, 'state': 'connected',
                                  'credential_present': True})
 
     def _seed_jobs(self, n, state='succeeded'):

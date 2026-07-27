@@ -10,6 +10,9 @@ import re
 
 from odoo import fields
 from odoo.exceptions import AccessError
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
 from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 EMAIL_RE = re.compile(r'[^@\s]+@[^@\s]+\.[^@\s]+')
@@ -45,7 +48,7 @@ class TestUiDashboard(TransactionCase):
         vals = {
             'name': 'U0 Store %d' % cls._seq,
             'shop_domain': 'u0-store-%d.myshopify.com' % cls._seq,
-            'api_version': '2025-01',
+            'api_version': SHOPIFY_API_VERSION,
             'state': state,
             'credential_present': True,
         }

@@ -97,7 +97,19 @@ class TestFulfillmentReadiness(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_api_version_fails_when_outside_accepted_set(self):
-        self.store.write({'api_version': '2025-01'})
+        # TD-008 made a divergent `api_version` unreachable through the
+        # ORM: `_check_api_version_is_the_connector_constant` refuses it on
+        # create, write, `sudo()`, RPC and import alike. The readiness
+        # check's behaviour on such a row still matters -- a database
+        # upgraded from before that constraint can contain one -- so the
+        # row is planted in SQL, the way `TestSec3HistoricRows` plants a
+        # company-less store. Nothing about what this test asserts has
+        # changed; only how the state it asserts on is reached.
+        self.env.cr.execute(
+            'UPDATE shopify_connector_store SET api_version = %s '
+            'WHERE id = %s', ('2025-01', self.store.id),
+        )
+        self.store.invalidate_recordset()
         result = self.Check._check_fulfillment_api_version(self.store)
         self.assertEqual(result['tier'], self.Check.ESSENTIAL)
         self.assertEqual(result['result'], self.Check.RESULT_FAIL)

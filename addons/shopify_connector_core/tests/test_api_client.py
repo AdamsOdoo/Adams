@@ -346,7 +346,27 @@ class TestApiClient(TransactionCase):
     # 15d. A store whose recorded version disagrees with the connector
     # constant is refused BEFORE any request is sent.
     def test_store_version_disagreement_refuses_before_send(self):
-        self.store.sudo().write({'api_version': '2025-01'})
+        """Defence in depth, kept after TD-008 closed the ORM route.
+
+        TD-008 makes a divergent `api_version` unreachable through the
+        ORM: `_check_api_version_is_the_connector_constant` refuses it on
+        create, write, `sudo()`, RPC and import alike. That is the primary
+        fix, and it is what makes this state a HISTORIC row rather than a
+        reachable one.
+
+        The client's own pre-send check still matters and is still
+        asserted, because a database upgraded from before that constraint
+        can contain exactly such a row. Planted in SQL for the same reason
+        `TestSec3HistoricRows` plants a company-less store: the ORM
+        (correctly) refuses to create the shape being tested, and refusing
+        to test it would mean the deeper guard is never exercised.
+        """
+        self.env.cr.execute(
+            'UPDATE shopify_connector_store SET api_version = %s '
+            'WHERE id = %s', ('2025-01', self.store.id),
+        )
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.api_version, '2025-01')
         sent = []
 
         def fake_post(url, json=None, headers=None, timeout=None):

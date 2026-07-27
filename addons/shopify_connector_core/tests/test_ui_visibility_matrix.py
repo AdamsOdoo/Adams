@@ -17,6 +17,9 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
 
 
 @tagged('post_install', '-at_install', 'shopify_connector_u0')
@@ -42,7 +45,7 @@ class TestUiVisibilityMatrix(TransactionCase):
     def _make_store(cls, state='connected', **extra):
         cls._seq += 1
         vals = {'name': 'S%d' % cls._seq, 'shop_domain': 'u0-vis-%d.myshopify.com' % cls._seq,
-                'api_version': '2025-01', 'state': state, 'credential_present': True}
+                'api_version': SHOPIFY_API_VERSION, 'state': state, 'credential_present': True}
         vals.update(extra)
         return cls.Store.create(vals)
 

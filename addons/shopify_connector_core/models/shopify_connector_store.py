@@ -6,6 +6,7 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
 from ..tools.redaction import redact
+from ..tools.api_version import SHOPIFY_API_VERSION
 from .shopify_connector_api_client import (
     ERROR_AUTH,
     LIFECYCLE_PURPOSE_STATES,
@@ -95,7 +96,21 @@ class ShopifyConnectorStore(models.Model):
         default='setup_incomplete',
         readonly=True,
     )
-    api_version = fields.Char(required=True)
+    # TD-008. The value is still stored -- the column is not removed and no
+    # schema migration is performed -- but it is no longer a value anyone
+    # may CHOOSE. `SHOPIFY_API_VERSION` remains the single authority: the
+    # endpoint is built from the constant, never from this column, and
+    # `_check_api_version_is_the_connector_constant` below refuses any row
+    # that disagrees with it.
+    #
+    # The default is what makes ordinary store creation correct without
+    # anybody passing anything, and the constraint is what makes the
+    # RPC/import/superuser paths safe -- the form was already
+    # `readonly="1"`, which is a client-side courtesy and not a boundary.
+    api_version = fields.Char(
+        required=True,
+        default=lambda self: SHOPIFY_API_VERSION,
+    )
     api_health_state = fields.Selection(
         selection=[
             ('normal', 'Normal'),
@@ -217,6 +232,45 @@ class ShopifyConnectorStore(models.Model):
         'UNIQUE(shop_domain)',
         'A store already exists for this Shopify shop domain.',
     )
+
+    @api.constrains('api_version')
+    def _check_api_version_is_the_connector_constant(self):
+        """TD-008: the stored version may only ever be the constant.
+
+        `api_version` was a plain writable `Char`. The form marked it
+        `readonly="1"`, which stops a person typing in it and stops nothing
+        else: an RPC call, a data import, a server action or any `sudo()`
+        write could set it to anything, and the field would then sit on
+        the store looking authoritative while every request went to the
+        version in `SHOPIFY_API_VERSION` regardless. The stored value
+        could not change WHERE requests went -- it could only lie about
+        it, which is worse than a value that does nothing.
+
+        `@api.constrains` is the right guard here rather than a
+        `models.Constraint`, because the acceptable value is a Python
+        constant rather than a database-expressible one, and because it
+        fires on every ORM path including `sudo()`, `load()` and RPC --
+        the three the readonly attribute does not cover.
+
+        Existing rows that already hold the constant are unaffected: they
+        satisfy this. A row that does not is a genuine configuration
+        defect and is refused rather than silently tolerated.
+        """
+        for store in self:
+            if store.api_version and store.api_version != SHOPIFY_API_VERSION:
+                raise ValidationError(
+                    'This connector speaks Shopify Admin API %s, and that '
+                    'version is a verified property of its code -- every '
+                    'query and mutation in it was checked field-by-field '
+                    'against that schema. It cannot be reconfigured per '
+                    'store, so %r was refused. Requests are sent to %s '
+                    'whatever this field says; a store row claiming a '
+                    'different version would only misreport where they '
+                    'go.' % (
+                        SHOPIFY_API_VERSION, store.api_version,
+                        SHOPIFY_API_VERSION,
+                    )
+                )
 
     @api.constrains('company_id')
     def _check_company_assigned(self):
