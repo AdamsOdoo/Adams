@@ -90,7 +90,13 @@ EXTRA_MODULES="account,stock"
 # bound into the production dispatch path and not merely into a helper. It is
 # `-standard` because that route commits between C1 and C2 by design and so
 # needs a genuine pooled connection, which the shared in-test cursor is not.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route"
+# `shopify_connector_export_reconcile_race` (added 2026-07-27) is the TD-015
+# cross-transaction settlement proof: two genuine independent connections, a
+# real SQLSTATE 40001, the dispatcher's bounded re-drive, and a sensitivity
+# case that strands the store with the serialization boundary removed. It is
+# `-standard` for the same reason and a stronger one -- a serialization
+# failure cannot occur on a single shared connection at all.
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race"
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #

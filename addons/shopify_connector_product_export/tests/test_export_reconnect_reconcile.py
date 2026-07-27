@@ -33,11 +33,23 @@ response taxonomy all run.
 """
 
 import base64
+import contextlib
 import json
+import logging
+import uuid
 from unittest.mock import patch
 
+import psycopg2
+import psycopg2.errorcodes
+
+from odoo import SUPERUSER_ID, api, fields
 from odoo.exceptions import AccessError, UserError
-from odoo.tests.common import tagged
+from odoo.sql_db import db_connect
+from odoo.tests.common import TransactionCase, tagged
+
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
     TERMINAL_JOB_STATES,
@@ -52,6 +64,7 @@ from ..models.shopify_connector_export_reconnect import (
 )
 from ..models.shopify_connector_media_export_service import image_checksum
 from .common import (
+    DUMMY_TOKEN,
     ExportCase,
     FakeSendResponse,
     FILE_GID,
@@ -918,9 +931,18 @@ class TestExportReconnectConvergence(TestExportReconnectReconcile):
     could record itself as proof about a newer connection and release its
     block.
 
-    The cross-transaction proof uses two genuine pooled connections. No
-    shared Odoo ORM cursor is driven from two threads, and there is no
-    sleep: the interleaving is stepped explicitly.
+    What this class does and does NOT prove
+    ---------------------------------------
+    Every test below runs in the single shared `TransactionCase` cursor.
+    They cover ordering, the terminal-set invariant, generation binding and
+    the mechanism's own shape -- and they are **not** a cross-transaction
+    proof, because one transaction cannot produce a serialization conflict
+    with itself. An earlier version of this docstring claimed they used
+    "two genuine pooled connections"; they never did.
+
+    The genuine cross-transaction proof is
+    `TestExportReconnectSettlementRace` at the foot of this file, on two
+    independent `db_connect` connections through the production dispatcher.
     """
 
     def _second_binding(self):
@@ -1217,3 +1239,759 @@ class TestExportReconnectConvergence(TestExportReconnectReconcile):
             settle.index('_export_reconcile_scope'),
             'Serialization has to come BEFORE the sibling read it gates.',
         )
+
+
+#: The dispatcher logs the SQLSTATE it observed before recovering. That line is
+#: the only place the exact PostgreSQL error code surfaces as evidence, so the
+#: race proofs below read it rather than asserting the recovery happened "for
+#: some reason".
+DISPATCH_LOGGER = (
+    'odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch'
+)
+
+
+# Non-standard, and for one reason: the boundary under test IS a PostgreSQL
+# serialization failure, and a serialization failure cannot occur on the single
+# shared in-test connection -- one transaction does not conflict with itself.
+# This class therefore needs GENUINE independent pooled connections with real
+# commit boundaries. It is bounded (statement_timeout + lock_timeout), creates
+# its own store, cleans up its committed fixtures and asserts zero residue. The
+# suite runner runs it by tag.
+@tagged('post_install', '-at_install', '-standard',
+        'shopify_connector_export_reconcile_race')
+class TestExportReconnectSettlementRace(TransactionCase):
+    """TD-015 settlement, proved ACROSS transactions instead of within one.
+
+    What was missing, and why it mattered
+    -------------------------------------
+    `TestExportReconnectConvergence` covers ordering, the terminal-set
+    invariant and generation binding -- all of it inside the single shared
+    `TransactionCase` cursor, where each job's write is already visible to
+    the next. That is real coverage of the *decision*, and it is no
+    coverage at all of the *mechanism*: the correction's entire claim is
+    that a concurrent settlement raises `40001` and is re-driven, and a
+    transaction cannot raise `40001` against itself. The previous cycle's
+    records nevertheless said the proof used "two genuine pooled
+    connections". It did not. This class is that proof.
+
+    The interleaving, and why it is deterministic
+    ---------------------------------------------
+    No threads, no sleeps, no barrier -- the race is *stepped* by the
+    transport seam, so it runs identically every time:
+
+    1. **Worker A** runs the production `run_drain(1)` on its own pooled
+       connection. It claims the lower-id reconcile job, starts it, and
+       reaches `_send` for its product read.
+    2. **Inside that `_send`**, worker B opens a second, independent pooled
+       connection and runs the production handler for the *other* reconcile
+       job -- same store, same generation -- to completion, and commits. B
+       bumps the store's settlement sequence, reads its siblings, sees A's
+       binding still `pending` (A has committed nothing), and correctly
+       declines to settle. The store is still `in_progress`.
+    3. A's `_send` returns. A records its own verdict, flushes it, and
+       reaches `_serialize_reconcile_settlement` -- an `UPDATE` of a store
+       row that B committed an `UPDATE` to *after A's snapshot was taken*.
+       Under REPEATABLE READ that is a genuine SQLSTATE `40001`.
+    4. The real `_drain_one` catches it, rolls back, re-locks the job, and
+       routes it once through its declared `remote_read_replay_safe` policy
+       to a bounded `concurrency_race_conflict` retry. The handler is never
+       replayed.
+    5. The retry is made due and the **production dispatcher re-drives the
+       job on a fresh connection and a fresh snapshot**, where B's verdict
+       is now visible. It settles, and the store converges.
+
+    Step 3 is the whole point, and `test_without_the_serialization_
+    boundary_the_store_is_stranded` proves it by removing exactly that one
+    thing and running the identical interleaving: with no conflict, A reads
+    its siblings from its own stale snapshot, sees B's binding still
+    `pending`, declines as well -- and both jobs commit `succeeded`, every
+    binding terminal, the store permanently `in_progress`. The old defect,
+    reproduced on demand.
+
+    Why B runs the handler rather than a second `run_drain`
+    -------------------------------------------------------
+    It cannot run a second `run_drain`, and that is a property of the
+    production claim rather than a shortcut here. `_drain_one` claims via
+    `_claim_for_dispatch(1)`, which searches `order='id asc', limit=1` and
+    then `try_lock_for_update()` -- `FOR UPDATE SKIP LOCKED` at the pinned
+    Odoo 19 commit. A second worker facing a locked lowest-id candidate
+    locks nothing and claims nothing. That is asserted directly by
+    `test_a_second_worker_cannot_claim_past_a_locked_job`, and it is why B
+    drives the production handler inside its own genuine transaction while
+    A -- the side that must observe the conflict and recover -- runs the
+    complete production dispatcher.
+
+    Zero Shopify contact: `_send` is replaced, so the real client, the real
+    admission and the real response taxonomy all run and only the socket is
+    absent.
+    """
+
+    STATEMENT_TIMEOUT_MS = 20000
+    LOCK_TIMEOUT_MS = 10000
+
+    # ------------------------------------------------------------------
+    # Genuine-connection plumbing
+    # ------------------------------------------------------------------
+
+    def _open_bounded(self):
+        """A real pooled cursor carrying both transaction-local PG limits.
+
+        Bounded so this test fails closed. Without them a proof about lock
+        conflicts is one deadlock away from hanging the whole suite, which
+        reports as neither pass nor fail.
+        """
+        cr = db_connect(self.env.cr.dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _backend_pid(self, cr):
+        cr.execute('SELECT pg_backend_pid()')
+        return cr.fetchone()[0]
+
+    def _real_registry_cursor(self):
+        """`registry.cursor()` handing out bounded real pooled cursors.
+
+        Production opens its admission/lease side transaction on
+        `registry.cursor()`. In test mode that is a `TestCursor` sharing the
+        single test connection -- which would quietly re-join the two
+        workers this class exists to keep apart.
+        """
+        return lambda *args, **kwargs: self._open_bounded()
+
+    @contextlib.contextmanager
+    def _capture_dispatch_log(self):
+        """Collect the dispatcher's records without requiring any.
+
+        `assertLogs` fails when nothing is logged, and the sensitivity case
+        below asserts precisely that nothing was -- so it cannot be used
+        here. The handler class is local rather than module-level because
+        `test_export_source_guards.py::test_every_test_class_declares_its_
+        phase` walks every top-level class in this directory and requires a
+        phase declaration; a logging helper is not a test class and must not
+        pretend to be one to satisfy the guard.
+        """
+        records = []
+
+        class _Capture(logging.Handler):
+            def emit(self, record):
+                records.append(record)
+
+        handler = _Capture(level=logging.INFO)
+        logger = logging.getLogger(DISPATCH_LOGGER)
+        logger.addHandler(handler)
+        previous = logger.level
+        logger.setLevel(logging.INFO)
+        try:
+            yield records
+        finally:
+            logger.removeHandler(handler)
+            logger.setLevel(previous)
+
+    # ------------------------------------------------------------------
+    # Fixtures
+    # ------------------------------------------------------------------
+
+    def _commit_fixture(self):
+        """A connected store with TWO exported bindings and one live pass.
+
+        Committed on its own connection, because both workers below must be
+        able to see it from transactions this one does not own.
+        """
+        suffix = uuid.uuid4().hex[:8]
+        cr = self._open_bounded()
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            shop_domain = 'td015-race-%s.myshopify.com' % suffix
+            store = env['shopify.connector.store'].create({
+                'name': 'TD-015 race store %s' % suffix,
+                'shop_domain': shop_domain,
+                'api_version': SHOPIFY_API_VERSION,
+                'state': 'connected',
+            })
+            # `execute_business` refuses a connected store with no usable
+            # token before `_send`, so without a credential neither worker
+            # would reach the settlement boundary at all.
+            env['shopify.connector.store.credential'].create({
+                'store_id': store.id,
+                'access_token': DUMMY_TOKEN,
+            })
+            store.write({'state': 'connected'})
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id,
+                'product_export_domain_enabled': True,
+                'price_source_of_truth': 'odoo_authoritative',
+            })
+            template_ids, binding_ids, gids = [], [], {}
+            for index in (1, 2):
+                template = env['product.template'].create({
+                    'name': 'TD-015 race widget %s-%d' % (suffix, index),
+                    'shopify_export_enabled': True,
+                })
+                gid = 'gid://shopify/Product/TD015RACE%s%d' % (suffix, index)
+                binding = env[
+                    'shopify.connector.product.template.binding'
+                ].create({
+                    'store_id': store.id,
+                    'product_template_id': template.id,
+                    'shopify_gid': gid,
+                })
+                template_ids.append(template.id)
+                binding_ids.append(binding.id)
+                gids[binding.id] = gid
+            # The real reconnect entry point: it expires open previews,
+            # marks every exported binding `pending`, blocks exports and
+            # enqueues one job per binding at the store's current epoch.
+            store._require_export_reconnect_reconciliation()
+            env.flush_all()
+            jobs = env['shopify.connector.job'].search([
+                ('store_id', '=', store.id),
+                ('job_type', '=', JOB_TYPE_RECONNECT_RECONCILE),
+            ], order='id asc')
+            self.assertEqual(
+                len(jobs), 2,
+                'The race needs exactly two final reconciliation jobs for '
+                'one store and one generation.',
+            )
+            fixture = {
+                'store_id': store.id,
+                'shop_domain': shop_domain,
+                'generation': store.connection_generation,
+                # A claims the LOWEST id -- `_claim_for_dispatch` searches
+                # `order='id asc', limit=1` -- so B must take the other one.
+                'job_a_id': jobs[0].id,
+                'job_b_id': jobs[1].id,
+                'binding_a_id': jobs[0].res_id,
+                'binding_b_id': jobs[1].res_id,
+                'gid_a': gids[jobs[0].res_id],
+                'gid_b': gids[jobs[1].res_id],
+                'template_ids': template_ids,
+            }
+            self.assertEqual(
+                store.export_reconcile_state, 'in_progress',
+                'Exports must be blocked before the race starts, or the '
+                'convergence assertions prove nothing.',
+            )
+            cr.commit()
+            # Registered the moment the rows are durable, so a failure in
+            # the precondition below still tears the fixture down.
+            self.addCleanup(self._cleanup_and_assert_no_residue, fixture)
+            self._assert_no_competing_claimable(cr, fixture)
+            cr.rollback()
+        finally:
+            cr.close()
+        return fixture
+
+    def _assert_no_competing_claimable(self, cr, fixture):
+        """No foreign job may sit ahead of ours in the claim order.
+
+        `_claim_for_dispatch` searches the WHOLE job table `order='id asc',
+        limit=1`. A committed, claimable job belonging to some other test
+        with a lower id would be the one `run_drain` picks, and this class's
+        race would silently never happen. Every genuine-connection harness
+        in this repository cleans up its committed jobs for exactly this
+        reason, so this is a fail-closed precondition rather than an
+        expected outcome -- if it ever fires, a harness leaked rows.
+        """
+        cr.execute(
+            "SELECT id, store_id, state FROM shopify_connector_job "
+            "WHERE id < %s AND store_id != %s AND ("
+            "  state = 'queued' OR ("
+            "    state = 'retry_waiting' AND next_retry_at <= now()))"
+            " ORDER BY id LIMIT 5",
+            (fixture['job_a_id'], fixture['store_id']),
+        )
+        competing = cr.fetchall()
+        self.assertEqual(
+            competing, [],
+            'Another test left claimable jobs committed ahead of this '
+            'fixture, so run_drain would claim one of them instead of the '
+            'race job: %r' % (competing,),
+        )
+
+    def _cleanup_and_assert_no_residue(self, fixture):
+        """Remove this test's COMMITTED rows, then prove they are gone.
+
+        `TransactionCase` rolls back its own cursor; it cannot roll back
+        what these workers committed on connections it does not own. Job
+        logs are append-only and jobs cannot be unlinked through the ORM,
+        so the teardown is raw SQL scoped to this one store id, in
+        foreign-key order.
+        """
+        store_id = fixture['store_id']
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                'UPDATE shopify_connector_job SET mutation_attempt_id = NULL '
+                'WHERE store_id = %s', (store_id,),
+            )
+            cr.execute(
+                'DELETE FROM shopify_connector_job_log WHERE job_id IN '
+                '(SELECT id FROM shopify_connector_job WHERE store_id = %s)',
+                (store_id,),
+            )
+            for table in (
+                'shopify_connector_mutation_attempt',
+                'shopify_connector_call_lease',
+                'shopify_connector_job',
+                'shopify_connector_product_export_preview',
+                'shopify_connector_product_media_binding',
+                'shopify_connector_product_variant_binding',
+                'shopify_connector_product_template_binding',
+                'shopify_connector_store_settings',
+                'shopify_connector_store_credential',
+            ):
+                # Fixed literal tuple in this file; the only interpolated
+                # value is the parameterised store id.
+                cr.execute(
+                    'DELETE FROM ' + table + ' WHERE store_id = %s',
+                    (store_id,),
+                )
+            cr.execute(
+                'DELETE FROM shopify_connector_store WHERE id = %s',
+                (store_id,),
+            )
+            cr.commit()
+        finally:
+            cr.close()
+
+        # The templates go through the ORM, so anything that legitimately
+        # references them refuses loudly rather than leaving a dangling row.
+        drop = self._open_bounded()
+        try:
+            env = api.Environment(drop, SUPERUSER_ID, {})
+            env['product.template'].browse(fixture['template_ids']).unlink()
+            drop.commit()
+        finally:
+            drop.close()
+
+        check = self._open_bounded()
+        try:
+            residue = {}
+            for table in (
+                'shopify_connector_job',
+                'shopify_connector_call_lease',
+                'shopify_connector_product_template_binding',
+                'shopify_connector_product_media_binding',
+                'shopify_connector_store_credential',
+                'shopify_connector_store_settings',
+            ):
+                check.execute(
+                    'SELECT count(*) FROM ' + table + ' WHERE store_id = %s',
+                    (store_id,),
+                )
+                residue[table] = check.fetchone()[0]
+            check.execute(
+                'SELECT count(*) FROM shopify_connector_store WHERE id = %s',
+                (store_id,),
+            )
+            residue['shopify_connector_store'] = check.fetchone()[0]
+            check.execute(
+                'SELECT count(*) FROM product_template WHERE id IN %s',
+                (tuple(fixture['template_ids']),),
+            )
+            residue['product_template'] = check.fetchone()[0]
+            check.rollback()
+        finally:
+            check.close()
+        self.assertEqual(
+            set(residue.values()), {0},
+            'The race left committed test residue behind: %r' % residue,
+        )
+
+    # ------------------------------------------------------------------
+    # The stepped interleaving
+    # ------------------------------------------------------------------
+
+    def _responder(self, fixture, trace, missing_gid=None, run_sibling=True):
+        """One transport stand-in that also STEPS the race.
+
+        The sibling transaction is launched from inside worker A's first
+        `_send`, which is what makes the interleaving deterministic without
+        a sleep, a thread or a barrier: A is provably mid-handler and
+        provably has not committed when B runs.
+        """
+        def responder(_self, _store, request, token=None,
+                      mutation_context=None):
+            query = (request or {}).get('query') or ''
+            requested = ((request or {}).get('variables') or {}).get('id')
+            trace.setdefault('queries', []).append(query.split('(')[0].strip())
+            if run_sibling and not trace.get('sibling_ran'):
+                trace['sibling_ran'] = True
+                self._run_sibling(fixture, responder, trace)
+            body = _product_body(
+                exists=(requested != missing_gid),
+                variant_gids=(),
+                shop_domain=fixture['shop_domain'],
+            )
+            if body['data']['product'] is not None:
+                body['data']['product']['id'] = requested
+            return FakeSendResponse(body)
+        return responder
+
+    def _run_sibling(self, fixture, responder, trace):
+        """Worker B: the OTHER final job, in its own genuine transaction."""
+        cr = self._open_bounded()
+        try:
+            trace['sibling_pid'] = self._backend_pid(cr)
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(fixture['job_b_id'])
+            job.write({'state': 'running'})
+            env[
+                'shopify.connector.export.reconcile.service'
+            ]._handle_product_export_reconnect_reconcile(job)
+            env.flush_all()
+            # Committed BEFORE worker A reaches its own settlement boundary.
+            # This commit is the concurrent update A's snapshot cannot see.
+            cr.commit()
+            trace['sibling_settled_state'] = env[
+                'shopify.connector.store'
+            ].browse(fixture['store_id']).export_reconcile_state
+        finally:
+            cr.close()
+
+    def _drain_once(self, fixture, trace, missing_gid=None, bypass=False,
+                    run_sibling=True):
+        """Worker A: the complete production dispatcher on a real connection."""
+        ClientCls = type(self.env['shopify.connector.api.client'])
+        StoreCls = type(self.env['shopify.connector.store'])
+        responder = self._responder(
+            fixture, trace, missing_gid=missing_gid, run_sibling=run_sibling,
+        )
+        cr = self._open_bounded()
+        try:
+            trace['drain_pid'] = self._backend_pid(cr)
+            cr.execute('SHOW transaction_isolation')
+            self.assertEqual(
+                cr.fetchone()[0], 'repeatable read',
+                'The drain cursor must run at the production isolation level '
+                '-- 40001 is a REPEATABLE READ phenomenon.',
+            )
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(patch.object(
+                    self.registry, 'cursor', self._real_registry_cursor(),
+                ))
+                stack.enter_context(patch.object(
+                    ClientCls, '_send', responder,
+                ))
+                if bypass:
+                    # The sensitivity lever, and ONLY this. Everything else
+                    # -- the verdict write, the flush, the sibling read, the
+                    # decision -- stays exactly as production runs it.
+                    stack.enter_context(patch.object(
+                        StoreCls, '_serialize_reconcile_settlement',
+                        lambda store_self: True,
+                    ))
+                records = stack.enter_context(self._capture_dispatch_log())
+                env['shopify.connector.job.dispatch'].run_drain(1)
+                trace['log'] = [
+                    record.getMessage() for record in records
+                ]
+            cr.commit()
+        finally:
+            cr.close()
+        return trace
+
+    def _observe(self, fixture):
+        """Read the COMMITTED state on a third, independent connection."""
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                'SELECT export_reconcile_state, export_reconcile_generation, '
+                'export_reconcile_settle_seq FROM shopify_connector_store '
+                'WHERE id = %s', (fixture['store_id'],),
+            )
+            state, generation, settle_seq = cr.fetchone()
+            cr.execute(
+                'SELECT id, export_reconcile_state FROM '
+                'shopify_connector_product_template_binding '
+                'WHERE store_id = %s', (fixture['store_id'],),
+            )
+            bindings = dict(cr.fetchall())
+            cr.execute(
+                'SELECT id, state, error_class FROM shopify_connector_job '
+                'WHERE store_id = %s', (fixture['store_id'],),
+            )
+            jobs = {row[0]: (row[1], row[2]) for row in cr.fetchall()}
+            cr.rollback()
+        finally:
+            cr.close()
+        return {
+            'state': state, 'generation': generation,
+            'settle_seq': settle_seq, 'bindings': bindings, 'jobs': jobs,
+        }
+
+    def _make_retry_due(self, fixture):
+        """Advance the bounded retry's clock -- nothing else.
+
+        The dispatcher's own claim predicate (`retry_waiting` AND
+        `next_retry_at <= now`) is left to decide whether the job is
+        claimable; this only removes the wall-clock wait.
+        """
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                'SELECT state FROM shopify_connector_job WHERE id = %s',
+                (fixture['job_a_id'],),
+            )
+            self.assertEqual(
+                cr.fetchone()[0], 'retry_waiting',
+                'The conflicted job must be sitting in a bounded retry for '
+                'the dispatcher to re-drive it.',
+            )
+            cr.execute(
+                "UPDATE shopify_connector_job SET next_retry_at = "
+                "now() - interval '1 minute' WHERE id = %s",
+                (fixture['job_a_id'],),
+            )
+            cr.commit()
+            self._assert_no_competing_claimable(cr, fixture)
+            cr.rollback()
+        finally:
+            cr.close()
+
+    def _assert_genuine_conflict(self, trace, observed, job_a_id):
+        """The conflict itself, asserted rather than inferred."""
+        self.assertNotEqual(
+            trace['drain_pid'], trace['sibling_pid'],
+            'The two transactions must run on distinct PostgreSQL backends.',
+        )
+        self.assertEqual(
+            trace.get('sibling_settled_state'), 'in_progress',
+            'Worker B must correctly DECLINE to settle: it cannot see A\'s '
+            'verdict, so it is not the last job. This is the exact race '
+            'shape that used to strand the store.',
+        )
+        conflict = [
+            message for message in trace['log']
+            if 'PostgreSQL concurrency failure' in message
+        ]
+        self.assertTrue(
+            conflict,
+            'The dispatcher never reported a concurrency failure, so no '
+            'serialization boundary was reached. Log: %r' % trace['log'],
+        )
+        self.assertIn(
+            'SQLSTATE %s' % psycopg2.errorcodes.SERIALIZATION_FAILURE,
+            conflict[0],
+            'The conflict must be a genuine 40001 (serialization failure), '
+            'not a lock timeout or an injected exception: %r' % conflict,
+        )
+        state, error_class = observed['jobs'][job_a_id]
+        self.assertEqual(
+            state, 'retry_waiting',
+            'A `remote_read_replay_safe` job that lost a serialization race '
+            'must remain safely retryable.',
+        )
+        self.assertEqual(error_class, 'concurrency_race_conflict')
+
+    # ------------------------------------------------------------------
+    # Scenario 1 -- both verdicts verified, the store converges to complete
+    # ------------------------------------------------------------------
+
+    def test_the_conflicting_settlement_converges_to_complete(self):
+        fixture = self._commit_fixture()
+        trace = self._drain_once(fixture, {})
+
+        mid = self._observe(fixture)
+        self._assert_genuine_conflict(trace, mid, fixture['job_a_id'])
+        self.assertEqual(
+            mid['state'], 'in_progress',
+            'Neither transaction settled: B was not last, and A aborted. '
+            'This is precisely the moment the old implementation stopped '
+            'at -- with no job left to notice.',
+        )
+        self.assertEqual(
+            mid['bindings'][fixture['binding_b_id']], 'verified',
+            'B\'s verdict committed and survived A\'s rollback.',
+        )
+        self.assertEqual(
+            mid['bindings'][fixture['binding_a_id']], 'pending',
+            'A\'s verdict was rolled back with its aborted transaction.',
+        )
+
+        # The real dispatcher re-drives the job on a fresh snapshot.
+        self._make_retry_due(fixture)
+        self._drain_once(fixture, {'sibling_ran': True}, run_sibling=False)
+
+        final = self._observe(fixture)
+        self.assertEqual(
+            final['state'], 'complete',
+            'The re-driven job sees the sibling verdict its aborted '
+            'predecessor could not, and settles.',
+        )
+        self.assertEqual(final['generation'], fixture['generation'])
+        self.assertEqual(
+            set(final['bindings'].values()), {'verified'},
+        )
+        self.assertGreaterEqual(
+            final['settle_seq'], 2,
+            'Every settle attempt writes the serialization row, including '
+            'the one that declined and the one that aborted.',
+        )
+        self.assertEqual(
+            final['jobs'][fixture['job_a_id']][0], 'succeeded',
+        )
+
+    # ------------------------------------------------------------------
+    # Scenario 2 -- one review verdict, the store converges to review_required
+    # ------------------------------------------------------------------
+
+    def test_the_conflicting_settlement_converges_to_review_required(self):
+        fixture = self._commit_fixture()
+        # B's product is gone from Shopify, so B's verdict is `review`.
+        trace = self._drain_once(fixture, {}, missing_gid=fixture['gid_b'])
+
+        mid = self._observe(fixture)
+        self._assert_genuine_conflict(trace, mid, fixture['job_a_id'])
+        self.assertEqual(mid['state'], 'in_progress')
+        self.assertEqual(
+            mid['bindings'][fixture['binding_b_id']], 'review',
+        )
+
+        self._make_retry_due(fixture)
+        self._drain_once(
+            fixture, {'sibling_ran': True}, missing_gid=fixture['gid_b'],
+            run_sibling=False,
+        )
+
+        final = self._observe(fixture)
+        self.assertEqual(
+            final['state'], 'review_required',
+            'A review verdict from the transaction that WON the race must '
+            'survive the loser\'s rollback and bind the settled outcome.',
+        )
+        self.assertEqual(final['generation'], fixture['generation'])
+        self.assertEqual(
+            final['bindings'][fixture['binding_a_id']], 'verified',
+        )
+        self.assertEqual(
+            final['bindings'][fixture['binding_b_id']], 'review',
+        )
+
+        # And the block is still on, which is the operator-visible half.
+        cr = self._open_bounded()
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].browse(fixture['store_id'])
+            with self.assertRaises(UserError) as caught:
+                store._assert_export_reconciliation_complete()
+            self.assertIn(
+                'missing, archived or materially different',
+                str(caught.exception),
+            )
+            cr.rollback()
+        finally:
+            cr.close()
+
+    # ------------------------------------------------------------------
+    # Sensitivity -- remove the boundary, get the defect back
+    # ------------------------------------------------------------------
+
+    def test_without_the_serialization_boundary_the_store_is_stranded(self):
+        """The proof that the boundary is load-bearing.
+
+        Identical fixture, identical interleaving, identical everything --
+        except `_serialize_reconcile_settlement` is a no-op. With no
+        conflicting write there is no conflict, so worker A reads its
+        siblings from its own snapshot, cannot see B's committed verdict,
+        declines exactly as B did, and commits.
+
+        The result is the original TD-015 defect, on demand: every binding
+        terminal, both jobs `succeeded`, the store permanently
+        `in_progress`, and no job left that could ever settle it.
+        """
+        fixture = self._commit_fixture()
+        trace = self._drain_once(fixture, {}, bypass=True)
+
+        self.assertNotEqual(trace['drain_pid'], trace['sibling_pid'])
+        self.assertEqual(
+            [
+                message for message in trace['log']
+                if 'PostgreSQL concurrency failure' in message
+            ], [],
+            'With the boundary removed there must be NO conflict -- that is '
+            'the whole point, and it is why the store strands.',
+        )
+
+        stranded = self._observe(fixture)
+        self.assertEqual(
+            set(stranded['bindings'].values()), {'verified'},
+            'Every binding reached a terminal verdict.',
+        )
+        self.assertEqual(
+            {state for state, _error in stranded['jobs'].values()},
+            {'succeeded'},
+            'Both jobs finished successfully and neither is coming back.',
+        )
+        self.assertEqual(
+            stranded['state'], 'in_progress',
+            'THE DEFECT: every binding is terminal and the store is still '
+            'blocked, with no job left to notice. If this assertion ever '
+            'fails, the regression above has stopped proving anything.',
+        )
+        self.assertEqual(
+            stranded['settle_seq'], 0,
+            'The bypass really did remove the serialization write.',
+        )
+
+        # And the production implementation is back in place afterwards --
+        # the bypass is a context manager, and this is what proves it exited.
+        Store = self.env['shopify.connector.store']
+        self.assertEqual(
+            type(Store)._serialize_reconcile_settlement.__name__,
+            '_serialize_reconcile_settlement',
+            'The sensitivity lever must never outlive the test that pulled '
+            'it.',
+        )
+
+    # ------------------------------------------------------------------
+    # The production fact that shapes the interleaving above
+    # ------------------------------------------------------------------
+
+    def test_a_second_worker_cannot_claim_past_a_locked_job(self):
+        """Why worker B drives the handler rather than a second drain.
+
+        `_drain_one` claims with `_claim_for_dispatch(1)`: search
+        `order='id asc', limit=1`, then `try_lock_for_update()`, which is
+        `FOR UPDATE SKIP LOCKED` at the pinned Odoo 19 commit. A concurrent
+        worker whose single candidate is already locked therefore locks
+        nothing and dispatches nothing -- it does not leapfrog to the next
+        job.
+
+        Asserted here rather than asserted in prose, because the shape of
+        the race proof above depends on it being true.
+        """
+        fixture = self._commit_fixture()
+        holder = self._open_bounded()
+        try:
+            henv = api.Environment(holder, SUPERUSER_ID, {})
+            locked = henv['shopify.connector.job'].browse(
+                fixture['job_a_id'],
+            ).try_lock_for_update()
+            self.assertTrue(locked, 'worker A must hold the lower-id job')
+
+            other = self._open_bounded()
+            try:
+                oenv = api.Environment(other, SUPERUSER_ID, {})
+                claimed = oenv['shopify.connector.job']._claim_for_dispatch(1)
+                self.assertFalse(
+                    claimed,
+                    'A second worker claimed %r while the lowest-id '
+                    'candidate was locked; the interleaving in this class '
+                    'is built on it claiming nothing.' % claimed,
+                )
+                other.rollback()
+            finally:
+                other.close()
+            holder.rollback()
+        finally:
+            holder.close()
