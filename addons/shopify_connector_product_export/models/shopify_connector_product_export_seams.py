@@ -14,6 +14,9 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
 
+from .shopify_connector_export_reconnect import (
+    JOB_TYPE_RECONNECT_RECONCILE,
+)
 from .shopify_connector_media_export_service import (
     JOB_TYPE_MEDIA_ASSOCIATE,
     JOB_TYPE_MEDIA_FILE_CREATE,
@@ -47,6 +50,7 @@ EXPORT_JOB_TYPES = (
     JOB_TYPE_MEDIA_POLL,
     JOB_TYPE_MEDIA_ASSOCIATE,
     JOB_TYPE_MUTATION_RECONCILE,
+    JOB_TYPE_RECONNECT_RECONCILE,
 )
 
 JOB_TYPE_LABELS = {
@@ -63,6 +67,7 @@ JOB_TYPE_LABELS = {
     JOB_TYPE_MEDIA_POLL: 'Product Export Media Poll',
     JOB_TYPE_MEDIA_ASSOCIATE: 'Product Export Media Associate',
     JOB_TYPE_MUTATION_RECONCILE: 'Product Export Mutation Reconciliation',
+    JOB_TYPE_RECONNECT_RECONCILE: 'Product Export Reconnect Reconciliation',
 }
 
 # The scopes this domain genuinely needs, and no more.
@@ -306,6 +311,9 @@ class ShopifyConnectorJobDispatchProductExport(models.AbstractModel):
                 Service._handle_product_export_mutation_reconcile,
             JOB_TYPE_MEDIA_UPLOAD: Media._handle_product_export_media_upload,
             JOB_TYPE_MEDIA_POLL: Media._handle_product_export_media_poll,
+            JOB_TYPE_RECONNECT_RECONCILE: self.env[
+                'shopify.connector.export.reconcile.service'
+            ]._handle_product_export_reconnect_reconcile,
         })
         return handlers
 
@@ -318,6 +326,11 @@ class ShopifyConnectorJobDispatchProductExport(models.AbstractModel):
             JOB_TYPE_MUTATION_RECONCILE:
                 REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             JOB_TYPE_MEDIA_POLL: REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
+            # PD-PX-7 (TD-015). The pass issues one narrow product READ
+            # and writes only local verdicts, so replaying it converges
+            # rather than repeating a remote effect.
+            JOB_TYPE_RECONNECT_RECONCILE:
+                REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             # The staged upload writes to a write-once object-store key with
             # the same bytes, so a replay converges rather than duplicating.
             # Every genuine Shopify mutation below is NOT replay-safe.
@@ -402,38 +415,12 @@ class ShopifyConnectorJobDispatchProductExport(models.AbstractModel):
 
 # ======================================================================
 # Seam 6: shopify.connector.store — the reconnect export block (PD-PX-7).
+#
+# TD-015 moved this to `shopify_connector_export_reconnect.py`, where the
+# pass PD-PX-7 actually specifies now lives. What stood here expired every
+# open preview on demand and called that the reconciliation. Expiring the
+# previews is necessary — a confirmation taken before a reconnect must not
+# authorise a mutation after it — but it re-read nothing, so a store could
+# be reconnected to a different Shopify store, or after products had been
+# deleted, and resume exporting against bindings it had never verified.
 # ======================================================================
-class ShopifyConnectorStoreProductExport(models.Model):
-    _inherit = 'shopify.connector.store'
-
-    def action_shopify_export_reconnect_reconciliation(self):
-        """Queue a fresh preview for every exported binding after reconnect.
-
-        PD-PX-7 says exports stay blocked for a reconnected store until a
-        reconciliation pass has re-read every previously exported binding.
-        This module implements that block the strict way: reconnecting
-        **expires every open preview**, so no confirmation taken before the
-        reconnect can authorise a mutation afterwards. The re-read itself is
-        the next preview, which is a fresh read by construction.
-        """
-        self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
-        ):
-            raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may run '
-                'the export reconnect reconciliation.'
-            )
-        Preview = self.env['shopify.connector.product.export.preview']
-        open_previews = Preview.sudo().search([
-            ('store_id', '=', self.id),
-            ('state', 'in', ('previewed', 'confirmed', 'applying')),
-        ])
-        for preview in open_previews:
-            preview._record_expiry('store_reconnected')
-        return len(open_previews)

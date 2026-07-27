@@ -520,6 +520,13 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 'request a product-export preview.'
             )
         self._require_export_enabled(store)
+        # PD-PX-7 (TD-015). Requirement 3: no new export may be admitted for
+        # a reconnected store until the reconciliation pass has re-read
+        # every previously exported binding. Checked here because
+        # `enqueue_preview` is the operator-facing entrance to the whole
+        # export flow -- blocking it blocks the apply and every mutation
+        # downstream of it, without needing a second gate at each.
+        store._assert_export_reconciliation_complete()
         if not template.shopify_export_enabled:
             raise UserError(
                 'This product is not enabled for Shopify export. Enable it '
@@ -537,6 +544,12 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
 
     @api.model
     def _enqueue_apply(self, preview):
+        # The second gate after all, because a preview confirmed BEFORE a
+        # reconnect could otherwise still be applied afterwards. The
+        # reconnect expires open previews, so this is defence in depth
+        # rather than the primary block -- but an apply is where the
+        # mutations start, and it is the wrong place to rely on one guard.
+        preview.store_id._assert_export_reconciliation_complete()
         return self._enqueue(
             preview.store_id, JOB_TYPE_APPLY, 'manual_sync',
             preview._name, preview.id,

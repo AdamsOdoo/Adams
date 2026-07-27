@@ -117,7 +117,29 @@ class TestExportSourceGuards(TransactionCase):
             # was established upstream at confirmation.
             'shopify_connector_media_export_service.py': 26,
             'shopify_connector_product_export_preview.py': 2,
-            'shopify_connector_product_export_seams.py': 1,
+            # TD-015 moved the PD-PX-7 stub out of the seams file into
+            # `shopify_connector_export_reconnect.py`, where the pass now
+            # lives, so this file's one elevation went with it.
+            'shopify_connector_product_export_seams.py': 0,
+            # PD-PX-7 (TD-015). Eleven elevations, all on connector-owned
+            # rows and none reachable by an unauthorised user:
+            #   store state           4 - `export_reconcile_*` are readonly
+            #                             protected fields on the store.
+            #   binding scope + state 4 - reads every exported binding and
+            #                             records its verdict; the verdict
+            #                             is protected binding evidence, so
+            #                             an operator who could write it
+            #                             could clear their own block.
+            #   variant + media reads 2 - the identity sets the verdict
+            #                             compares against.
+            #   job terminalisation   1 - the same protected-transition
+            #                             elevation every handler in this
+            #                             module already uses.
+            # The two entry points are gated first: the reconnect hook runs
+            # only after core's own Administrator-gated `action_reconnect`
+            # succeeded, and the manual re-run checks Reviewer/Administrator
+            # authority AND company access before anything elevates.
+            'shopify_connector_export_reconnect.py': 11,
             'shopify_connector_product_media_binding.py': 0,
             'shopify_connector_product_export_wizards.py': 0,
             # U3: the export preview projection reads as the CURRENT user on
