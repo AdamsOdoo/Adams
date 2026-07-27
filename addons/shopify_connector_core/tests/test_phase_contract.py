@@ -181,6 +181,55 @@ class TestPhaseContract(TransactionCase):
             'No `-standard` class was discovered at all; this guard is vacuous.',
         )
 
+    def test_every_tour_test_is_listed_in_the_suite_runner(self):
+        """`REQUIRED_TOUR_TESTS` must equal the tours that actually exist.
+
+        TD-010's fix makes `run_connector_suite.sh` FAIL when a required tour
+        did not execute, which only means anything if the required list is the
+        real list. A hand-maintained inventory drifts, so this asserts the
+        invariant directly, exactly as
+        `test_every_nonstandard_class_is_selected_by_the_suite_runner` does
+        for the non-standard tags: every test method that calls `start_tour`
+        must be named in the runner, and every name in the runner must exist.
+
+        Adding a tour and forgetting the runner would otherwise reduce browser
+        coverage silently -- which is the whole failure mode TD-010 is about.
+        """
+        runner = (pathlib.Path(__file__).resolve().parents[3]
+                  / 'tools' / 'run_connector_suite.sh')
+        self.assertTrue(runner.is_file(), 'suite runner not found at %s' % runner)
+        match = re.search(r'^REQUIRED_TOUR_TESTS="\\\n(.*?)"',
+                          runner.read_text(), re.M | re.S)
+        self.assertIsNotNone(
+            match, 'REQUIRED_TOUR_TESTS is not defined in the suite runner')
+        listed = {entry.strip() for entry in match.group(1).split('\\\n')
+                  if entry.strip()}
+
+        actual = set()
+        for path in _connector_test_files():
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ClassDef):
+                    continue
+                for item in node.body:
+                    if not isinstance(item, (ast.FunctionDef,
+                                             ast.AsyncFunctionDef)):
+                        continue
+                    if not item.name.startswith('test_'):
+                        continue
+                    if 'start_tour' in ast.unparse(item):
+                        actual.add('%s.%s' % (node.name, item.name))
+
+        self.assertTrue(
+            actual, 'no test method calling start_tour was discovered at all; '
+                    'this guard is vacuous')
+        self.assertEqual(
+            listed, actual,
+            'run_connector_suite.sh REQUIRED_TOUR_TESTS disagrees with the '
+            'tours in the repository.\n  only in the runner: %s\n  only in '
+            'the tests: %s' % (sorted(listed - actual), sorted(actual - listed)),
+        )
+
     def test_guard_actually_discovers_the_connector_suite(self):
         """Fail loudly if the file discovery silently matches nothing."""
         files = _connector_test_files()

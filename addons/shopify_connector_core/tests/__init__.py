@@ -47,3 +47,5 @@ from . import test_sec3_store_ownership
 from . import test_sec2_roles
 # PERF-1 core queue throughput calibration.
 from . import test_dispatch_throughput
+from . import test_ui_visual_evidence
+from . import test_suite_runner_fails_closed

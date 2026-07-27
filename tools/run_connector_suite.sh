@@ -43,6 +43,7 @@
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
 #                                [--tags <extra-test-tags>]
+#   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
 #
 # Environment
 #   ODOO_SRC      path to an odoo/odoo checkout (cloned if absent)
@@ -68,21 +69,63 @@ EXTRA_MODULES="account,stock"
 # here is a test class that `--test-enable` alone will NOT run.
 #
 # `shopify_connector_hoot` (added 2026-07-26) runs the connector's HOOT unit
-# suite in a real browser. It is `-standard` because it builds the full unit
-# asset bundle and boots Chrome, which is exactly this list's cost profile.
+# suites in a real browser. `shopify_connector_visual` (added 2026-07-27)
+# captures the rendered accessibility/visual evidence. Both are `-standard`
+# because they build the full asset bundle and boot Chrome, which is exactly
+# this list's cost profile.
 #
-# WARNING, and it applies to every browser test this runner executes: an
-# `HttpCase` test SKIPS -- it does not fail -- when `websocket-client` is
-# absent from the venv or when no Chrome/Chromium is resolvable, and a skip
-# still reports `0 failed, 0 error(s)`. This script does NOT yet install
-# `websocket-client`, does NOT resolve a browser, and does NOT fail on a skip;
-# see TD-010. Until it does, a green run here is NOT evidence that any tour or
-# HOOT test executed. Set ODOO_BROWSER_BIN and install websocket-client before
-# quoting browser evidence from this runner. Keep this list
-# in sync with docs/05-qa/pre-wave-5-debt-discovery.md §3; the guard test
-# `test_phase_contract.py` fails if a `-standard` class exists that no tag here
-# selects, so the two cannot drift apart silently.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot"
+# TD-010 IS CLOSED BELOW, NOT HERE. An `HttpCase` test SKIPS -- it does not
+# fail -- when `websocket-client` is absent or no Chrome/Chromium resolves, and
+# a skip still reports `0 failed, 0 error(s)`. That is the most dangerous shape
+# a result can take. This script now installs `websocket-client`, resolves the
+# browser explicitly, PROVES both before running anything browser-bearing, and
+# FAILS on an unexpected skip, a missing tour, or a missing HOOT marker. See
+# `preflight_browser` and `verify_browser_evidence`.
+#
+# Keep this list in sync with docs/05-qa/pre-wave-5-debt-discovery.md §3; the
+# guard test `test_phase_contract.py` fails if a `-standard` class exists that
+# no tag here selects, so the two cannot drift apart silently.
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual"
+
+# --- The browser-evidence contract (TD-010) ----------------------------------
+#
+# Odoo's console marker for a passing tour is the bare string "tour succeeded"
+# with NO tour name in it (`web_tour/static/src/js/tour_service.js` at the pin),
+# so a tour cannot be attributed from the marker alone. Attribution is by TEST
+# identity instead, which `OdooTestResult` logs as `Starting <Class>.<method>`.
+#
+# This list is the expected inventory. The guard test
+# `test_phase_contract.py::test_every_tour_test_is_listed_in_the_suite_runner`
+# asserts it equals the set of test methods that actually call `start_tour`, so
+# adding a tour without listing it here -- or dropping one -- fails a test
+# rather than silently shrinking browser coverage.
+REQUIRED_TOUR_TESTS="\
+TestUiTours.test_navigation_tour \
+TestUiTours.test_u2_navigation_tour \
+TestUiU2InventoryActionTours.test_first_push_confirm_tour \
+TestUiU2InventoryActionTours.test_first_push_pending_offers_no_control_tour \
+TestUiU2InventoryActionTours.test_first_push_denied_for_a_role_the_server_refuses \
+TestUiU2InventoryActionTours.test_push_toggle_tour \
+TestUiU2InventoryActionTours.test_recheck_tour_enqueues_exactly_one_successor \
+TestUiU2InventoryActionTours.test_recheck_blank_reason_is_refused_in_the_browser \
+TestUiU2InventoryActionTours.test_quarantined_pair_is_not_reachable_by_an_operator \
+TestUiU2SaleActionTours.test_order_approval_tour \
+TestUiU2SaleActionTours.test_order_approval_denied_for_a_role_the_server_refuses \
+TestU3ExportTours.test_export_navigation_tour \
+TestU3ExportTours.test_export_review_tour_discloses_before_it_offers \
+TestU3ExportTours.test_export_review_surface_is_keyboard_reachable"
+
+# The HOOT suites, by the exact name `test_u3_hoot_suite.py` re-emits after it
+# has verified each one. Keep in step with EXPECTED_SUITES in that file.
+REQUIRED_HOOT_SUITES="shopify connector dashboard|shopify connector export diff"
+
+# THE ONE SANCTIONED SKIP. Bound to an exact test identity and an exact reason,
+# deliberately: a general "one skip is allowed" rule would let ANY test skip,
+# which is the hole TD-010 is about. This test is gated on
+# SHOPIFY_LAYER2_RUN_PROCESS_DEATH=1 because it spawns and kills real OS
+# processes (`test_mutation_recovery.py`).
+ALLOWED_SKIP_TEST="TestMutationRecovery.test_real_process_death_harness"
+ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 
 # Restrict the STANDARD passes to the connector modules.
 #
@@ -106,6 +149,7 @@ export PGHOST PGPORT
 RUN_FRESH=1
 RUN_WARM=1
 RUN_NONSTANDARD=1
+RUN_SELF_TEST=0
 TEST_TAGS=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -114,12 +158,291 @@ while [[ $# -gt 0 ]]; do
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
+        # Proves the fail-closed checks actually fail. No database, no browser,
+        # no Odoo: runs against synthetic logs and exits. See `self_test`.
+        --self-test)        RUN_SELF_TEST=1; shift ;;
         --tags)             TEST_TAGS="$2"; shift 2 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 
 log() { printf '[connector-suite] %s\n' "$*"; }
+
+# --- Browser resolution and preflight (TD-010) -------------------------------
+#
+# Odoo resolves a browser by trying `google-chrome`, `chromium`,
+# `chromium-browser` and `google-chrome-stable` ON PATH, and raises
+# `unittest.SkipTest("Chrome executable not found")` when none matches
+# (odoo/tests/common.py::_find_executable at the pin). `ODOO_BROWSER_BIN`
+# short-circuits that lookup, and it is the only form that is reproducible:
+# a machine whose Chromium lives at a path under none of those four names --
+# a Playwright bundle, for instance -- silently skipped every browser test.
+resolve_browser() {
+    if [[ -n "${ODOO_BROWSER_BIN:-}" ]]; then
+        echo "$ODOO_BROWSER_BIN"; return 0
+    fi
+    local candidate
+    for candidate in google-chrome chromium chromium-browser google-chrome-stable; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            command -v "$candidate"; return 0
+        fi
+    done
+    # Playwright's bundle, which this repository's containers ship.
+    for candidate in /opt/pw-browsers/chromium-*/chrome-linux/chrome \
+                     /opt/pw-browsers/chromium; do
+        if [[ -x "$candidate" ]]; then echo "$candidate"; return 0; fi
+    done
+    return 1
+}
+
+# Prove the browser prerequisites BEFORE running anything that needs them.
+# A skip discovered afterwards is a green run that proved nothing; a failure
+# here is a red run that says exactly what is missing.
+preflight_browser() {
+    log "browser preflight"
+
+    if [[ "$WEBSOCKET_VERSION" == "missing" ]]; then
+        log "FATAL: websocket-client is not importable in ${VENV}."
+        log "Every HttpCase browser test would SKIP -- and a skip still reports"
+        log "'0 failed, 0 error(s)', so the run would look green while proving"
+        log "nothing. Refusing to run (TD-010)."
+        exit 2
+    fi
+
+    if ! ODOO_BROWSER_BIN="$(resolve_browser)"; then
+        log "FATAL: no Chrome/Chromium could be resolved."
+        log "Odoo would raise SkipTest('Chrome executable not found') for every"
+        log "browser test and still report a green suite. Install Chromium or"
+        log "set ODOO_BROWSER_BIN. Refusing to run (TD-010)."
+        exit 2
+    fi
+    export ODOO_BROWSER_BIN
+    if [[ ! -x "$ODOO_BROWSER_BIN" ]]; then
+        log "FATAL: ODOO_BROWSER_BIN=${ODOO_BROWSER_BIN} is not executable."
+        exit 2
+    fi
+    BROWSER_VERSION="$("$ODOO_BROWSER_BIN" --version 2>&1 | head -1 || true)"
+    if [[ -z "$BROWSER_VERSION" ]]; then
+        log "FATAL: ${ODOO_BROWSER_BIN} did not report a version, so it is not"
+        log "a working browser binary."
+        exit 2
+    fi
+
+    # The binary existing is not the same as the binary STARTING. A sandbox
+    # that forbids user namespaces, or a missing shared library, produces a
+    # binary that resolves and then dies -- which Odoo also turns into a skip.
+    local probe_dir
+    probe_dir="$(mktemp -d)"
+    if ! "$ODOO_BROWSER_BIN" --headless=new --no-sandbox --disable-gpu \
+            --disable-dev-shm-usage --user-data-dir="$probe_dir" \
+            --dump-dom about:blank >/dev/null 2>&1; then
+        rm -rf "$probe_dir"
+        log "FATAL: ${ODOO_BROWSER_BIN} resolves but cannot render a page"
+        log "headlessly. Odoo would turn the failed connection into a SkipTest."
+        exit 2
+    fi
+    rm -rf "$probe_dir"
+
+    log "browser: ${ODOO_BROWSER_BIN} (${BROWSER_VERSION})"
+    log "websocket-client: ${WEBSOCKET_VERSION}"
+}
+
+# --- Browser-evidence verification (TD-010) ----------------------------------
+#
+# The whole point of TD-010: a browser test that did not execute must make this
+# script exit non-zero. Odoo will not do it -- a skipped `HttpCase` is not a
+# failure to unittest -- so the log is inspected after every pass.
+#
+# `EVIDENCE_ERRORS` accumulates rather than exiting on the first problem, so one
+# run reports every missing piece instead of one per re-run.
+EVIDENCE_ERRORS=()
+
+evidence_fail() { EVIDENCE_ERRORS+=("$1"); log "EVIDENCE FAILURE: $1"; }
+
+# Any skip that is not the single sanctioned one fails the run.
+verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
+    local logfile="$1" label="$2" line identity
+    # `OdooTestResult.addSkip` logs `skipped <Class>.<method> : <reason>`.
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        identity="$(sed -E 's/^.*skipped ([A-Za-z0-9_]+\.[A-Za-z0-9_]+) : .*$/\1/' <<<"$line")"
+        if [[ "$identity" == "$ALLOWED_SKIP_TEST" && "$line" == *"$ALLOWED_SKIP_REASON"* ]]; then
+            log "${label}: sanctioned skip ${identity}"
+            continue
+        fi
+        evidence_fail "${label}: unexpected skipped test -> ${line#*skipped }"
+    done < <(grep -E 'skipped [A-Za-z0-9_]+\.[A-Za-z0-9_]+ : ' "$logfile" || true)
+}
+
+# Every required tour test must have STARTED and the run must contain one
+# "tour succeeded" marker per required tour.
+verify_tour_evidence() {  # verify_tour_evidence <log> <label>
+    local logfile="$1" label="$2" test_id missing=0 expected=0 seen
+    for test_id in $REQUIRED_TOUR_TESTS; do
+        expected=$((expected + 1))
+        if ! grep -q "Starting ${test_id} \.\.\." "$logfile"; then
+            evidence_fail "${label}: required tour test ${test_id} never ran"
+            missing=$((missing + 1))
+        fi
+    done
+    seen="$(grep -c 'tour succeeded' "$logfile" || true)"
+    log "${label}: ${seen} tour success markers, ${expected} required tours"
+    if [[ "$seen" -lt "$expected" ]]; then
+        evidence_fail "${label}: ${seen} 'tour succeeded' markers for ${expected} required tours -- a tour did not execute"
+    fi
+    return 0
+}
+
+# Both HOOT suites must have executed. `test_u3_hoot_suite.py` verifies the
+# marker and the exact test count itself and re-emits a line this can read;
+# see the note in that file about `assertLogs` swallowing the console.
+verify_hoot_evidence() {  # verify_hoot_evidence <log> <label>
+    local logfile="$1" label="$2" suite
+    while IFS= read -r suite; do
+        [[ -z "$suite" ]] && continue
+        if ! grep -q "CONNECTOR-HOOT-EVIDENCE suite=\"${suite}\".*marker=ok" "$logfile"; then
+            evidence_fail "${label}: HOOT suite '${suite}' produced no verified evidence line"
+        else
+            log "${label}: HOOT suite '${suite}' verified"
+        fi
+    done < <(tr '|' '\n' <<<"$REQUIRED_HOOT_SUITES")
+}
+
+# --- Fail-closed self-test (TD-010 regression verification) ------------------
+#
+# TD-010 is not closed by "the runner now checks"; it is closed by proving the
+# checks FAIL when they should. These assertions run against synthetic logs, so
+# they need no database, no browser and no Odoo -- they are deterministic and
+# take milliseconds, which is why `test_suite_runner_fails_closed.py` can run
+# them as an ordinary unit test on every pass.
+#
+# Invoked as `tools/run_connector_suite.sh --self-test`; exits before any
+# Odoo, venv or PostgreSQL work.
+self_test() {
+    local tmp failures=0
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' RETURN
+
+    _expect() {  # _expect <expected-error-count> <description>
+        local want="$1" desc="$2" got="${#EVIDENCE_ERRORS[@]}"
+        if [[ "$got" -eq "$want" ]]; then
+            log "self-test PASS: ${desc}"
+        else
+            log "self-test FAIL: ${desc} (expected ${want} errors, got ${got})"
+            failures=$((failures + 1))
+        fi
+        EVIDENCE_ERRORS=()
+    }
+
+    # A log with every required tour, both HOOT suites and only the sanctioned
+    # skip is the one shape that must pass.
+    local good="${tmp}/good.log" t
+    : > "$good"
+    for t in $REQUIRED_TOUR_TESTS; do
+        printf 'INFO db mod: Starting %s ...\n' "$t" >> "$good"
+        printf 'INFO db mod.browser: tour succeeded\n' >> "$good"
+    done
+    printf 'INFO db mod: CONNECTOR-HOOT-EVIDENCE suite="shopify connector dashboard" passed=8 marker=ok\n' >> "$good"
+    printf 'INFO db mod: CONNECTOR-HOOT-EVIDENCE suite="shopify connector export diff" passed=11 marker=ok\n' >> "$good"
+    printf 'INFO db mod: skipped %s : %s\n' "$ALLOWED_SKIP_TEST" "$ALLOWED_SKIP_REASON" >> "$good"
+
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$good" self-test
+    verify_tour_evidence "$good" self-test
+    verify_hoot_evidence "$good" self-test
+    _expect 0 "a complete log with only the sanctioned skip passes"
+
+    # 1. An unsanctioned skip must fail, however innocuous it looks.
+    local skipped="${tmp}/skipped.log"
+    cp "$good" "$skipped"
+    printf 'INFO db mod: skipped TestSomething.test_a_tour : Chrome executable not found\n' >> "$skipped"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$skipped" self-test
+    _expect 1 "an unsanctioned skip is an evidence failure"
+
+    # 2. The sanctioned identity with a DIFFERENT reason is still a failure --
+    #    the allowance is bound to the identity AND the reason, so a skip that
+    #    borrows the name cannot ride through.
+    local wrong_reason="${tmp}/wrong_reason.log"
+    printf 'INFO db mod: skipped %s : websocket-client module is not installed\n' \
+        "$ALLOWED_SKIP_TEST" > "$wrong_reason"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$wrong_reason" self-test
+    _expect 1 "the sanctioned test skipping for a DIFFERENT reason still fails"
+
+    # 3. A required tour that never ran must fail, even when the marker COUNT
+    #    still adds up. This is the subtle case: identity is checked, not just
+    #    arithmetic, so a log with the right number of successes but the wrong
+    #    set of tests is still caught.
+    local missing_tour="${tmp}/missing_tour.log"
+    grep -v "Starting TestUiTours.test_navigation_tour " "$good" > "$missing_tour"
+    EVIDENCE_ERRORS=()
+    verify_tour_evidence "$missing_tour" self-test
+    _expect 1 "a required tour that never ran fails even when marker counts add up"
+
+    # 3b. And when the tour is gone entirely -- no start line, no marker --
+    #     both checks fire.
+    local dropped_tour="${tmp}/dropped_tour.log"
+    grep -v "Starting TestUiTours.test_navigation_tour " "$good" \
+        | awk '/tour succeeded/ && !seen { seen = 1; next } { print }' \
+        > "$dropped_tour"
+    EVIDENCE_ERRORS=()
+    verify_tour_evidence "$dropped_tour" self-test
+    _expect 2 "a tour dropped entirely fails on identity AND on marker count"
+
+    # 4. Tours that "ran" but emitted no success marker -- the exact shape a
+    #    skipped HttpCase produces -- must fail.
+    local no_markers="${tmp}/no_markers.log"
+    grep -v 'tour succeeded' "$good" > "$no_markers"
+    EVIDENCE_ERRORS=()
+    verify_tour_evidence "$no_markers" self-test
+    _expect 1 "required tours with no success markers fail"
+
+    # 5. A missing HOOT suite must fail.
+    local no_hoot="${tmp}/no_hoot.log"
+    grep -v 'shopify connector dashboard' "$good" > "$no_hoot"
+    EVIDENCE_ERRORS=()
+    verify_hoot_evidence "$no_hoot" self-test
+    _expect 1 "a HOOT suite with no verified evidence line fails"
+
+    # 6. An empty log -- the shape of a pass that executed nothing at all.
+    : > "${tmp}/empty.log"
+    EVIDENCE_ERRORS=()
+    verify_tour_evidence "${tmp}/empty.log" self-test
+    verify_hoot_evidence "${tmp}/empty.log" self-test
+    local want=$(( $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w) + 1 + 2 ))
+    _expect "$want" "an empty log fails for every required tour and both suites"
+
+    # 7. An unresolvable browser must abort the RUN, not warn. Checked in a
+    #    subshell so the exit does not end the self-test.
+    if ( ODOO_BROWSER_BIN="${tmp}/definitely-not-a-browser" \
+         WEBSOCKET_VERSION="1.0.0" preflight_browser >/dev/null 2>&1 ); then
+        log "self-test FAIL: preflight accepted a non-existent browser binary"
+        failures=$((failures + 1))
+    else
+        log "self-test PASS: preflight aborts on an unresolvable browser"
+    fi
+
+    # 8. A missing websocket-client must abort the run.
+    if ( WEBSOCKET_VERSION="missing" preflight_browser >/dev/null 2>&1 ); then
+        log "self-test FAIL: preflight accepted a missing websocket-client"
+        failures=$((failures + 1))
+    else
+        log "self-test PASS: preflight aborts when websocket-client is absent"
+    fi
+
+    if [[ "$failures" -ne 0 ]]; then
+        log "SELF-TEST FAILED (${failures} problems). The runner does NOT fail closed."
+        return 1
+    fi
+    log "self-test: all fail-closed assertions hold"
+    return 0
+}
+
+if [[ "$RUN_SELF_TEST" -eq 1 ]]; then
+    self_test
+    exit $?
+fi
 
 mkdir -p "$ARTIFACT_DIR"
 SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
@@ -211,6 +534,19 @@ if [[ ! -x "$VENV/bin/python" ]]; then
     "$VENV/bin/pip" install --quiet -r "$VENV/requirements.txt"
 fi
 
+# `websocket-client` is NOT in Odoo's requirements.txt, and without it every
+# `HttpCase` raises `unittest.SkipTest("websocket-client module is not
+# installed")` (odoo/tests/common.py at the pin) -- a SKIP, which still reports
+# `0 failed, 0 error(s)`. Installed on EVERY run, not only when the venv is
+# created, because a cached venv from before this change would otherwise keep
+# silently skipping every browser test. This is idempotent and near-instant
+# once satisfied.
+"$VENV/bin/pip" install --quiet websocket-client
+WEBSOCKET_VERSION="$("$VENV/bin/python" -c 'import websocket; print(websocket.__version__)' 2>/dev/null || echo missing)"
+
+preflight_browser
+
+
 # --- Odoo config -------------------------------------------------------------
 CONF="${ARTIFACT_DIR}/odoo.conf"
 cat > "$CONF" <<EOF
@@ -288,6 +624,8 @@ if [[ $RUN_FRESH -eq 1 ]]; then
     fi
     FRESH_RESULT="$(result_line "${ARTIFACT_DIR}/fresh.log")"
     log "fresh: ${FRESH_STATUS} ${FRESH_RESULT}"
+    verify_no_unexpected_skips "${ARTIFACT_DIR}/fresh.log" "fresh"
+    verify_tour_evidence "${ARTIFACT_DIR}/fresh.log" "fresh"
     # Keep the fresh database as the warm pass's template.
     TEMPLATE_DB="$DB"
 fi
@@ -316,6 +654,8 @@ if [[ $RUN_WARM -eq 1 ]]; then
     fi
     WARM_RESULT="$(result_line "${ARTIFACT_DIR}/warm.log")"
     log "warm: ${WARM_STATUS} ${WARM_RESULT}"
+    verify_no_unexpected_skips "${ARTIFACT_DIR}/warm.log" "warm"
+    verify_tour_evidence "${ARTIFACT_DIR}/warm.log" "warm"
 fi
 
 # --- Pass 3: the non-standard tag suite --------------------------------------
@@ -343,6 +683,24 @@ if [[ $RUN_NONSTANDARD -eq 1 ]]; then
     fi
     NONSTD_RESULT="$(result_line "${ARTIFACT_DIR}/nonstandard.log")"
     log "non-standard: ${NONSTD_STATUS} ${NONSTD_RESULT}"
+    verify_no_unexpected_skips "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
+    verify_hoot_evidence "${ARTIFACT_DIR}/nonstandard.log" "non-standard"
+fi
+
+# --- The fail-closed decision ------------------------------------------------
+# Odoo's own exit code covers failures and errors. It does NOT cover a test that
+# never ran, which is the entire subject of TD-010. A run that cannot prove its
+# browser evidence executed is not a green run.
+BROWSER_EVIDENCE_STATUS="verified"
+if (( ${#EVIDENCE_ERRORS[@]} )); then
+    BROWSER_EVIDENCE_STATUS="FAILED"
+    OVERALL=1
+    log "-------------------------------------------------------------------"
+    log "BROWSER EVIDENCE VERIFICATION FAILED (${#EVIDENCE_ERRORS[@]} problems)."
+    log "The suite's own pass/fail counts may be green; they do not describe"
+    log "tests that never executed. This run is NOT browser evidence."
+    for problem in "${EVIDENCE_ERRORS[@]}"; do log "  * ${problem}"; done
+    log "-------------------------------------------------------------------"
 fi
 
 # --- Durable summary ---------------------------------------------------------
@@ -364,6 +722,13 @@ cat > "$SUMMARY" <<EOF
   "odoo_sha": "${ODOO_SHA}",
   "odoo_pin_verified": true,
   "python": "$("$VENV/bin/python" --version 2>&1)",
+  "browser_bin": "${ODOO_BROWSER_BIN}",
+  "browser_version": "${BROWSER_VERSION}",
+  "websocket_client": "${WEBSOCKET_VERSION}",
+  "browser_evidence": "${BROWSER_EVIDENCE_STATUS}",
+  "required_tour_tests": $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w | tr -d ' '),
+  "required_hoot_suites": "${REQUIRED_HOOT_SUITES}",
+  "allowed_skip": "${ALLOWED_SKIP_TEST}",
   "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
   "postgres_server_version": "$(psql -tAc 'show server_version;' postgres 2>/dev/null | head -1 | tr -d '[:space:]')",
   "modules": "${MODULES}",
