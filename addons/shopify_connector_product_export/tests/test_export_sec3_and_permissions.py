@@ -1,5 +1,8 @@
 """SEC-3 scope/company isolation and the permission boundary for U3."""
 
+import json
+from unittest.mock import patch
+
 from odoo import fields
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests.common import new_test_user, tagged
@@ -141,6 +144,124 @@ class TestExportSec3AndPermissions(ExportCase):
         result = Check._check_product_export_scopes(self.store)
         self.assertEqual(result['result'], Check.RESULT_PASS)
         self.assertIn('Not applicable', result['reason'])
+
+    # ------------------------------------------------------------------
+    # Correction B (independent review, Defect #3): the domain-flag
+    # extension seam, and a genuine Product-Export-only activation.
+    # ------------------------------------------------------------------
+
+    def test_product_export_domain_flag_is_registered_through_the_seam(self):
+        """Not hand-added to a fixed core tuple: registered the same way
+        `_get_checks` already registers `_check_product_export_scopes`."""
+        Check = self.env['shopify.connector.readiness.check']
+        self.assertIn(
+            'product_export_domain_enabled', Check._accepted_domain_flags(),
+        )
+
+    def test_a_catalog_export_only_configuration_is_recognized_as_enabled(
+        self,
+    ):
+        """The accuracy half of Defect #3, isolated from every other
+        essential check: a store enabling ONLY Catalog export must be
+        reported as having a sync domain enabled, not "No sync domain is
+        enabled" -- the four core flags stay False throughout."""
+        Check = self.env['shopify.connector.readiness.check']
+        self.settings.sudo().write({
+            'product_export_domain_enabled': True,
+            'product_domain_enabled': False,
+            'sale_domain_enabled': False,
+            'inventory_domain_enabled': False,
+            'fulfillment_domain_enabled': False,
+        })
+        result = Check._check_domain_flag_enablement(self.store)
+        self.assertEqual(result['result'], Check.RESULT_PASS)
+
+    def test_the_setup_wizard_scope_catalog_names_write_products(self):
+        """Defect #3's companion accuracy gap: step 4's display list must
+        not stay silent about a scope this installed module will need."""
+        Check = self.env['shopify.connector.readiness.check']
+        catalog = Check._governed_scope_catalog()
+        self.assertIn(
+            'write_products', {entry['scope'] for entry in catalog},
+        )
+        # `write_files` is conditional on a Store Settings choice S1 never
+        # makes, so it must NOT be named unconditionally at step 4.
+        self.assertNotIn(
+            'write_files', {entry['scope'] for entry in catalog},
+        )
+
+    def test_a_product_export_only_store_can_activate_through_the_setup_wizard(
+        self,
+    ):
+        """Defect #3, end to end, through the real production route:
+        `shopify.connector.setup.wizard.activate()`. Every OTHER essential
+        readiness check is satisfied directly (this test's subject is the
+        domain-flag recognition, not the credential/scope/cron plumbing
+        already covered by core's own setup-wizard suite), and the
+        transport is a stand-in that fails the test if reached at all, so
+        neither a job nor a Shopify request can hide inside a passing
+        result.
+        """
+        Check = self.env['shopify.connector.readiness.check']
+        admin = new_test_user(
+            self.env, login='export-activate-admin',
+            groups=(
+                'base.group_user,'
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+        )
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://export-activate-test.example.test',
+        )
+        self.store.sudo().write({
+            # `ExportCase` creates the credential ROW directly (bypassing
+            # `action_set_token`), so `credential_present` -- a plain
+            # stored flag that service normally sets as a side effect --
+            # stays at its default False unless set explicitly here.
+            'credential_present': True,
+            'last_test_connection_result': 'pass',
+            'api_health_state': 'normal',
+            'granted_scopes': json.dumps(sorted(
+                set(Check.REQUIRED_MVP_SCOPES) | {'write_products'}
+            )),
+        })
+        self.settings.sudo().write({
+            'product_export_domain_enabled': True,
+            'product_domain_enabled': False,
+            'sale_domain_enabled': False,
+            'inventory_domain_enabled': False,
+            'fulfillment_domain_enabled': False,
+        })
+        Setup = self.env['shopify.connector.setup.wizard']
+        jobs_before = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', self.store.id),
+            ('state', 'in', ('queued', 'running')),
+        ])
+        Client = type(self.env['shopify.connector.api.client'])
+
+        def refuse(_self, _store, request, token=None, mutation_context=None):
+            raise AssertionError(
+                'product-export-only activation contacted Shopify'
+            )
+
+        with patch.object(Client, '_send', refuse):
+            Setup.with_user(admin).activate(self.store.id)
+        self.store.invalidate_recordset()
+        self.settings.invalidate_recordset()
+        self.assertEqual(self.store.last_readiness_result, 'pass')
+        self.assertTrue(self.settings.product_export_domain_enabled)
+        self.assertFalse(self.settings.product_domain_enabled)
+        self.assertFalse(self.settings.sale_domain_enabled)
+        self.assertFalse(self.settings.inventory_domain_enabled)
+        self.assertFalse(self.settings.fulfillment_domain_enabled)
+        self.assertEqual(
+            self.env['shopify.connector.job'].sudo().search_count([
+                ('store_id', '=', self.store.id),
+                ('state', 'in', ('queued', 'running')),
+            ]),
+            jobs_before,
+            'activation must admit no export job',
+        )
 
     # ------------------------------------------------------------------
     # The domain flag gates every export job type

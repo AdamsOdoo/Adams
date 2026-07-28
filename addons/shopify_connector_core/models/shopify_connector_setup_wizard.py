@@ -51,7 +51,7 @@ import json
 import re
 
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import AccessError, MissingError, UserError
 
 #: A Shopify permanent shop domain, matched WHOLE. Shopify's shop handle is
 #: lowercase alphanumerics and hyphens; anything else -- a scheme, a path, a
@@ -205,8 +205,8 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     def _resolve_store(self, store_id):
         """Turn a caller-supplied id into a store this caller may act on.
 
-        Three separate checks, in this order, because each catches something
-        the others do not:
+        Two checks, in this order, because each catches something the other
+        does not:
 
         1. **Administrator.** Before anything is read, so an unauthorized
            caller learns nothing -- not even whether the id exists.
@@ -214,19 +214,38 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
            and proves nothing either; `check_access` is what turns "an id
            somebody typed into an RPC call" into "a record they may read". The
            SEC-3 record rule makes a foreign store invisible, so this is where
-           a cross-company id is refused.
-        3. **Company consistency against `env.companies`.** The switcher
-           selection, which is what Odoo evaluates `company_ids` against in a
-           record rule -- not `user.company_ids`, which would let a user
-           allowed in two companies act on the one they are not currently in.
+           a cross-company id is refused. The explicit `env.companies` check
+           below it is the same rule's own comparison, restated for the case
+           a store's `company_id` is unset -- the switcher selection is what
+           Odoo evaluates `company_ids` against in a record rule, not
+           `user.company_ids`, which would let a user allowed in two
+           companies act on the one they are not currently in.
+
+        Correction E (independent review, P3). `check_access` alone can
+        raise either `AccessError` (a foreign-but-real store, excluded by
+        the SEC-3 `store_company_rule`) or `MissingError` (a store id that
+        was never real: evaluating that rule still requires reading the
+        id's own field values, and there are none to read -- the identical
+        ambiguity Odoo's own `fetch()` guards against with this same
+        two-exception `try`/`except`). The previous version called
+        `store.exists()` FIRST, before `check_access` -- and `exists()` is
+        a raw physical-row test that the SEC-3 rule does NOT filter, so it
+        returned `True` for a foreign store and `False` for a nonexistent
+        one. That let a cross-company Administrator learn a foreign store
+        id merely EXISTS -- no content, only a boolean -- by which of two
+        distinct refusals they received, before the company check had run
+        at all. Both outcomes now collapse to one generic refusal, and no
+        field of a foreign or nonexistent record is ever read to produce
+        it.
         """
         self._assert_setup_admin()
         if not store_id:
             raise UserError(_('No store was selected.'))
         store = self.env['shopify.connector.store'].browse(int(store_id))
-        if not store.exists():
-            raise UserError(_('This Shopify store no longer exists.'))
-        store.check_access('read')
+        try:
+            store.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError(_('This Shopify store is not available.'))
         if store.company_id and store.company_id not in self.env.companies:
             raise AccessError(_('This Shopify store belongs to another company.'))
         return store
@@ -271,38 +290,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
 
     @api.model
     def _setup_required_scopes(self, store):
-        """Required Shopify scopes with a business reason for each.
+        """Governed Shopify scopes with a business reason for each.
 
         Derived from the governed capability declarations the readiness check
         itself uses, so a scope cannot be added to the connector and stay
         invisible here -- a stale hand-written list on a setup screen is worse
         than no list, because an operator grants exactly what it names.
 
-        The domain-extension seam is the same one `_get_checks` uses: a domain
-        module overrides this, calls `super()`, and appends its own entries
-        when its domain is enabled.
+        Correction B (independent review, §7E). This reads
+        `Readiness._governed_scope_catalog()`, NOT `REQUIRED_MVP_SCOPES`
+        directly -- the same fixed-constant pattern flagged in Defects
+        #2/#3 would otherwise apply here too: step 4 runs before step 7's
+        domain choice exists, so it has to show the full installed
+        superset an operator might need, and a domain module's own scope
+        (e.g. Product Export's `write_products`) would otherwise stay
+        invisible on this screen even though the module is installed. The
+        domain-extension seam is the same one `_get_checks` uses: a domain
+        module overrides `_governed_scope_catalog`, calls `super()`, and
+        appends its own entries -- unconditionally, since this is a
+        DISPLAY list of what might be needed, not `REQUIRED_MVP_SCOPES`
+        (core's own unconditional baseline, read by `_check_required_
+        scopes` and never extended here).
         """
         Readiness = self.env['shopify.connector.readiness.check']
-        reasons = {
-            'read_products': _('so your Shopify catalog can be read into Odoo'),
-            'read_customers': _('so order customers can be matched to Odoo '
-                                'contacts'),
-            'read_orders': _('so Shopify orders can become Odoo sales orders'),
-            'read_inventory': _('so stock levels can be read as a baseline'),
-            'read_locations': _('so Shopify locations can be mapped to your '
-                                'Odoo warehouses'),
-            'read_merchant_managed_fulfillment_orders': _(
-                'so deliveries can be matched to the right Shopify '
-                'fulfillment order'
-            ),
-        }
+        granted = self._granted_scopes(store)
         return [
-            {
-                'scope': scope,
-                'reason': reasons.get(scope, _('required by this connector')),
-                'granted': scope in self._granted_scopes(store),
-            }
-            for scope in Readiness.REQUIRED_MVP_SCOPES
+            dict(entry, granted=entry['scope'] in granted)
+            for entry in Readiness._governed_scope_catalog()
         ]
 
     @api.model

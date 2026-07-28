@@ -167,7 +167,22 @@ ACKNOWLEDGEABLE_RECONCILE_REASON = 'checksum_unverifiable'
 #: Bound read for the store-form review list. The reconciliation surface shows
 #: the work an operator has to do, not an unbounded recordset: a store with
 #: thousands of diverged bindings must not turn its own form into a table scan.
+#: UI PRESENTATION ONLY. Correction D (independent review, Defect #5): this
+#: constant must never again be reused as a security-relevant processing
+#: boundary -- that reuse is exactly what let an acknowledged binding beyond
+#: the 200th (by id) escape re-validation. See
+#: `RECONCILE_REVALIDATION_BATCH_SIZE` below for the deliberately separate
+#: constant that bounds the re-validation pass instead.
 EXPORT_RECONCILE_REVIEW_LIMIT = 200
+
+#: Per-batch memory bound for the SECURITY-relevant re-validation pass in
+#: `_reassert_export_reconcile_acknowledgements`. Deliberately a distinct
+#: constant from `EXPORT_RECONCILE_REVIEW_LIMIT` even though it starts at the
+#: same value: this one is a keyset-pagination page size, not a ceiling --
+#: the pass below keeps paging until every matching binding has been
+#: examined, however many batches that takes, so raising or lowering this
+#: number changes memory-per-batch only, never correctness.
+RECONCILE_REVALIDATION_BATCH_SIZE = 200
 
 
 class ShopifyConnectorStoreExportReconnect(models.Model):
@@ -459,6 +474,33 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
     def _reassert_export_reconcile_acknowledgements(self):
         """Re-open the block if an acknowledgement stopped being true.
 
+        Correction D (independent review, Defect #5). The predecessor of
+        this method capped its search at `EXPORT_RECONCILE_REVIEW_LIMIT`
+        (200) -- a UI-sizing constant borrowed from the store-form review
+        list -- with no explicit order. A store with more than 200
+        concurrently-acknowledged review bindings therefore had every stale
+        acknowledgement beyond the 200th (by id) permanently excluded from
+        re-validation: `_assert_export_reconciliation_complete` kept
+        returning `True` for it forever, while the settlement path that
+        first reaches `complete` scans the store's FULL scope
+        (`_export_reconcile_scope`, unbounded). A UI display limit had
+        become a correctness and authorization boundary.
+
+        This walks EVERY `review`-state binding for the store, in
+        deterministic keyset-paginated batches of
+        `RECONCILE_REVALIDATION_BATCH_SIZE` ordered by id ascending, rather
+        than one bounded search. Keyset (`id > last_id`) rather than offset
+        pagination on purpose: this method writes no binding state as it
+        goes -- only the invalidation verdict below does, once, after the
+        full scan -- so no row this pass has already counted can change
+        state and be skipped or double-counted by a later page; offset
+        pagination would not carry that guarantee if a future change made
+        this method interleave reads with writes. The loop always
+        terminates: `last_id` strictly increases every iteration and the
+        scan stops as soon as a page comes back smaller than the batch
+        size, which happens once, deterministically, at the true end of the
+        matching set.
+
         Fail-closed and self-explaining: the store is moved back to
         `review_required` with a note naming the count, so an operator meets
         the reason rather than an unexplained refusal on their next export.
@@ -467,15 +509,23 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
         overwrites them with fresh evidence.
         """
         self.ensure_one()
-        outstanding = self.env[
-            'shopify.connector.product.template.binding'
-        ].sudo().search([
-            ('store_id', '=', self.id),
-            ('export_reconcile_state', '=', 'review'),
-        ], limit=EXPORT_RECONCILE_REVIEW_LIMIT)
-        invalidated = outstanding.filtered(
-            lambda b: not b._export_reconcile_ack_is_valid()
-        )
+        Binding = self.env['shopify.connector.product.template.binding']
+        invalidated = Binding.browse()
+        last_id = 0
+        while True:
+            batch = Binding.sudo().search([
+                ('store_id', '=', self.id),
+                ('export_reconcile_state', '=', 'review'),
+                ('id', '>', last_id),
+            ], order='id asc', limit=RECONCILE_REVALIDATION_BATCH_SIZE)
+            if not batch:
+                break
+            last_id = batch[-1].id
+            invalidated |= batch.filtered(
+                lambda b: not b._export_reconcile_ack_is_valid()
+            )
+            if len(batch) < RECONCILE_REVALIDATION_BATCH_SIZE:
+                break
         if not invalidated:
             return True
         _logger.info(
@@ -1401,28 +1451,33 @@ class ShopifyConnectorExportReconcileService(models.AbstractModel):
                 % len(failed)
             )
         absent = [row for row in rows if row.shopify_gid not in remote_by_gid]
-        if not absent:
-            # Every association was found, with a non-FAILED status, on the
-            # expected product. That is as far as a remote read can get --
-            # and it is short of what PD-PX-7 requires.
-            #
-            # TD-015: this is also the ONLY branch whose finding an operator
-            # may acknowledge, and it is reached only after store identity,
-            # product identity, archive state, the governed variant GID set,
-            # every File identity, every File status and the completeness of
-            # the response have all been established. The `truncated` case
-            # below cannot arrive here, because `absent` is empty exactly when
-            # every claimed File was seen.
-            return self._checksum_unverifiable_divergence(rows)
         if read.get('truncated'):
-            # Requirement 5: an unverifiable claim is never reported as
-            # verified, and never as a divergence either. The connector
-            # did not see the whole list, so "absent" is not established.
+            # Correction C (independent review, Defect #4). Every claimed
+            # File happening to appear in the FIRST page does not establish
+            # that the whole media list was read: `hasNextPage` means pages
+            # this pass never saw could still hold a divergence this pass
+            # cannot rule out. Truncation is therefore checked independently
+            # of, and before, the "every claimed File was found" case below
+            # -- not only when `absent` is non-empty. Requirement 5: an
+            # unverifiable claim is never reported as verified, and never as
+            # a divergence either.
             return 'media_read_truncated', (
                 'This product carries more than %d media items, so %d '
                 'connector-owned association(s) could not be re-verified '
                 'from a single read.' % (REMOTE_MEDIA_PAGE_SIZE, len(absent))
             )
+        if not absent:
+            # Every association was found, with a non-FAILED status, on the
+            # expected product, AND the response was proven complete above.
+            # That is as far as a remote read can get -- and it is short of
+            # what PD-PX-7 requires.
+            #
+            # TD-015: this is also the ONLY branch whose finding an operator
+            # may acknowledge, and it is reached only after store identity,
+            # product identity, archive state, the governed variant GID set,
+            # every File identity, every File status and the completeness of
+            # the response have all been established.
+            return self._checksum_unverifiable_divergence(rows)
         return self._absent_media_divergence(store, job, absent)
 
     @api.model

@@ -34,6 +34,7 @@ response taxonomy all run.
 
 import base64
 import contextlib
+import hashlib
 import inspect
 import json
 import logging
@@ -62,6 +63,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 from ..models.shopify_connector_export_reconnect import (
     JOB_TYPE_RECONNECT_RECONCILE,
     RECONCILE_BLOCKING_STATES,
+    RECONCILE_REVALIDATION_BATCH_SIZE,
 )
 from ..models.shopify_connector_media_export_service import image_checksum
 from .common import (
@@ -835,6 +837,37 @@ class TestExportReconnectRemoteMedia(TestExportReconnectReconcile):
             'absence.',
         )
 
+    def test_truncation_is_never_masked_by_every_claimed_file_being_present(
+        self,
+    ):
+        """Correction C (independent review, Defect #4).
+
+        The predecessor checked "every claimed File was found" BEFORE
+        checking `hasNextPage`, on the reasoning that `absent` is empty
+        exactly when every claimed File was seen. That reasoning is a
+        non-sequitur: every claimed File landing on the ONE page this pass
+        read does not prove the whole media list was read -- pages this
+        pass never saw could still hold a divergence. A product with more
+        media than one page holds, whose connector-owned images happen to
+        land in the first page, must still go to `media_read_truncated`,
+        never to the acknowledgeable `checksum_unverifiable` reason.
+        """
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=(FILE_GID,), has_next=True),
+        )
+        self.assertEqual(self.binding.export_reconcile_state, 'review')
+        self.assertEqual(
+            self.binding.export_reconcile_reason, 'media_read_truncated',
+            'Every claimed File appearing on the page that WAS read must '
+            'not be reported as a complete, checksum-unverifiable read.',
+        )
+        self.assertIn(
+            'could not be re-verified', self.binding.export_reconcile_note,
+        )
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+
     def test_a_foreign_media_item_on_the_product_is_left_alone(self):
         """Merchant-owned media is neither claimed nor touched.
 
@@ -1537,12 +1570,136 @@ class TestExportReconnectChecksumAcknowledgement(TestExportReconnectReconcile):
             foreign.action_shopify_export_open_checksum_ack_wizard()
 
     def test_the_wizard_model_is_not_readable_by_a_connector_user(self):
-        """The confirmation artifact is Administrator-only at the ACL too."""
+        """The confirmation artifact is Administrator-only at the ACL, and
+        that holds for the read/search surface, not only for `create()`.
+
+        Correction A: this test used to assert only a `create()` refusal
+        despite its name -- masked, harmlessly today, only by the model's
+        single all-or-nothing ACL row. It now drives a real row into
+        existence (as the Administrator who may legitimately do so) and
+        proves a Connector User can neither read nor search it.
+        """
         self._reach_checksum_review()
         with self.assertRaises(AccessError):
             self.Wizard.with_user(self.connector_user).create({
                 'binding_id': self.binding.id,
             })
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        with self.assertRaises(AccessError):
+            wizard.with_user(self.connector_user).read(['store_id'])
+        with self.assertRaises(AccessError):
+            self.Wizard.with_user(self.connector_user).search(
+                [('id', '=', wizard.id)],
+            )
+
+    # ------------------------------------------------------------------
+    # 3b. Correction A: the wizard model boundary itself (Defect #1)
+    # ------------------------------------------------------------------
+
+    def test_a_cross_company_administrator_is_refused_before_any_content_returns(
+        self,
+    ):
+        """The exact exploit named by independent-review Defect #1: a
+        same-ROLE, cross-COMPANY Administrator calling `create({'binding_id':
+        <foreign binding id>})` over plain RPC, no UI involved, then
+        `read(['store_id', 'product_gid', 'reconcile_note'])`.
+
+        The create is refused outright -- so there is no row a subsequent
+        read could ever disclose anything through.
+        """
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self.Wizard.with_user(self.other_admin).create({
+                'binding_id': self.binding.id,
+            })
+        self.assertFalse(
+            self.Wizard.with_user(self.other_admin).search([
+                ('binding_id', '=', self.binding.id),
+            ]),
+            'The refused create() must not have left a row behind.',
+        )
+
+    def test_a_cross_company_administrator_cannot_disclose_through_default_context_opening(
+        self,
+    ):
+        """The `default_get()`/context route -- the way the production
+        action actually opens this wizard -- must refuse BEFORE the related
+        display fields are ever computed against the foreign id, not only
+        at `create()` time."""
+        self._reach_checksum_review()
+        with self.assertRaises(AccessError):
+            self.Wizard.with_user(self.other_admin).with_context(
+                active_model='shopify.connector.product.template.binding',
+                active_id=self.binding.id,
+            ).default_get(
+                ['binding_id', 'store_id', 'product_gid', 'reconcile_note'],
+            )
+
+    def test_a_same_company_administrator_cannot_substitute_a_foreign_binding_via_write(
+        self,
+    ):
+        """Create an allowed wizard, then try to retarget it at a binding
+        outside the caller's company through `write()` -- the same
+        disclosure Defect #1 named, reached through a different verb."""
+        self._reach_checksum_review()
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        foreign_store = self.Store.sudo().create({
+            'name': 'Correction A Foreign Store',
+            'shop_domain': 'correction-a-foreign.myshopify.com',
+            'api_version': self.store.api_version,
+            'company_id': self.other_company.id,
+        })
+        foreign_binding = self.TemplateBinding.sudo().create({
+            'store_id': foreign_store.id,
+            'product_template_id': self.template.id,
+            'shopify_gid': 'gid://shopify/Product/correction-a-foreign-1',
+        })
+        with self.assertRaises(AccessError):
+            wizard.with_user(self.admin_user).write({
+                'binding_id': foreign_binding.id,
+            })
+
+    def test_a_cross_company_administrator_cannot_read_or_search_another_companys_wizard_row(
+        self,
+    ):
+        """A wizard row that legitimately exists must not be discoverable by
+        another actor at all -- the creator-scoped rule, independent of and
+        in addition to whichever company owns the underlying binding."""
+        self._reach_checksum_review()
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        with self.assertRaises(AccessError):
+            wizard.with_user(self.other_admin).read(
+                ['store_id', 'product_gid', 'reconcile_note'],
+            )
+        self.assertFalse(
+            self.Wizard.with_user(self.other_admin).search(
+                [('id', '=', wizard.id)],
+            ),
+            'A wizard row belongs to the actor who opened it, not to every '
+            'administrator who could theoretically read the model.',
+        )
+
+    def test_a_same_company_administrator_still_sees_an_authorized_wizard(
+        self,
+    ):
+        """Positive control: none of the corrections above narrows the
+        happy path. Same-company Administrator, same actor who created it,
+        still sees exactly the display fields it should."""
+        self._reach_checksum_review()
+        wizard = self.Wizard.with_user(self.admin_user).create({
+            'binding_id': self.binding.id,
+        })
+        self.assertEqual(wizard.store_id, self.store)
+        self.assertEqual(wizard.product_gid, self.binding.shopify_gid)
+        self.assertEqual(
+            wizard.reconcile_note, self.binding.export_reconcile_note,
+        )
 
     # ------------------------------------------------------------------
     # 4. Everything else stays blocked
@@ -1627,6 +1784,23 @@ class TestExportReconnectChecksumAcknowledgement(TestExportReconnectReconcile):
         self._run_pass(
             media=_media_body(file_gids=('gid://shopify/MediaImage/OTHER',),
                               has_next=True),
+        )
+        self._assert_not_acknowledgeable('media_read_truncated')
+
+    def test_a_truncated_read_cannot_be_acknowledged_even_when_every_claimed_file_is_present(
+        self,
+    ):
+        """Correction C companion: the acknowledgement route itself.
+
+        Not just the verdict -- an operator must never be able to accept
+        "nothing was truncated" through the real acknowledgement action
+        merely because every File this connector claims happened to land on
+        the one page that was read.
+        """
+        self._associated_media_row()
+        self._reconnect()
+        self._run_pass(
+            media=_media_body(file_gids=(FILE_GID,), has_next=True),
         )
         self._assert_not_acknowledgeable('media_read_truncated')
 
@@ -2080,6 +2254,159 @@ class TestExportReconnectChecksumAcknowledgement(TestExportReconnectReconcile):
             DUMMY_TOKEN,
             ' '.join(str(v) for v in logs.mapped('payload_snapshot') if v),
         )
+
+    # ------------------------------------------------------------------
+    # 6. Complete acknowledgement revalidation (Correction D)
+    # ------------------------------------------------------------------
+
+    def _create_valid_acknowledged_review_bindings(
+        self, count, gid_prefix, generation, verdict_at,
+    ):
+        """Bulk-construct `count` bindings whose acknowledgement is valid.
+
+        Bypasses the job/transport pipeline deliberately: that pipeline is
+        exercised elsewhere in this file, and re-running it hundreds of
+        times per test would make a >200-row scale regression prohibitively
+        slow. What THIS test exists to prove is that the real revalidation
+        route (`_reassert_export_reconcile_acknowledgements`, through
+        `_assert_export_reconciliation_complete`) walks every matching row
+        rather than the first `EXPORT_RECONCILE_REVIEW_LIMIT` of them -- so
+        each row is written, through `sudo()`, with the exact evidence and
+        acknowledgement fields `_export_reconcile_ack_is_valid` requires to
+        agree (no associated media rows are created, so every claim is the
+        empty-media claim; the digest below is computed the same way
+        `_export_reconcile_claim_digest` computes it).
+        """
+        Binding = self.TemplateBinding
+        # `(store_id, product_template_id)` is UNIQUE
+        # (`_store_product_template_uniq`), so a scale fixture needs a
+        # distinct product per row, not `self.template` reused `count`
+        # times.
+        templates = self.env['product.template'].create([
+            {'name': 'Scale fixture %s %d' % (gid_prefix, index)}
+            for index in range(count)
+        ])
+        vals_list = []
+        for index, template in enumerate(templates):
+            gid = 'gid://shopify/Product/%s-%d' % (gid_prefix, index)
+            digest = hashlib.sha256(
+                json.dumps(
+                    {'product_gid': gid, 'media': []},
+                    sort_keys=True, separators=(',', ':'),
+                ).encode('utf-8'),
+            ).hexdigest()
+            vals_list.append({
+                'store_id': self.store.id,
+                'product_template_id': template.id,
+                'shopify_gid': gid,
+                'export_reconcile_state': 'review',
+                'export_reconcile_reason': 'checksum_unverifiable',
+                'export_reconcile_at': verdict_at,
+                'export_reconcile_evidence_generation': generation,
+                'export_reconcile_evidence_product_gid': gid,
+                'export_reconcile_evidence_file_gids': '',
+                'export_reconcile_evidence_claim_digest': digest,
+                'export_reconcile_ack_at': verdict_at,
+                'export_reconcile_ack_uid': self.admin_user.id,
+                'export_reconcile_ack_reason': 'checksum_unverifiable',
+                'export_reconcile_ack_generation': generation,
+                'export_reconcile_ack_product_gid': gid,
+                'export_reconcile_ack_file_gids': '',
+                'export_reconcile_ack_claim_digest': digest,
+                'export_reconcile_ack_verdict_at': verdict_at,
+            })
+        bindings = Binding.sudo().create(vals_list)
+        for binding in bindings:
+            self.assertTrue(
+                binding._export_reconcile_ack_is_valid(),
+                'Fixture bug: the constructed acknowledgement must be valid '
+                'before it is tampered with.',
+            )
+        return bindings
+
+    def test_a_stale_acknowledgement_beyond_two_hundred_is_still_reached(
+        self,
+    ):
+        """Correction D (independent review, Defect #5), stated as a test.
+
+        More than `EXPORT_RECONCILE_REVIEW_LIMIT` (200) acknowledged review
+        bindings exist for one store; one stale acknowledgement sits well
+        beyond the 200th by id -- the exact position the predecessor's
+        bounded, unordered 200-row search could never reach. The REAL
+        production route must still find it, re-block the store, and leave
+        every other binding's valid acknowledgement untouched.
+        """
+        count = RECONCILE_REVALIDATION_BATCH_SIZE + 20
+        generation = 7
+        verdict_at = fields.Datetime.now()
+        self.store.sudo().write({
+            'export_reconcile_state': 'complete',
+            'export_reconcile_generation': generation,
+        })
+        bindings = self._create_valid_acknowledged_review_bindings(
+            count, 'stale-scale', generation, verdict_at,
+        )
+        stale = bindings[209]
+        others = bindings - stale
+        stale.sudo().write({
+            'export_reconcile_ack_product_gid': 'gid://shopify/Product/tampered',
+        })
+        self.assertFalse(stale._export_reconcile_ack_is_valid())
+        # Hand-caught rather than `assertRaises`: the block below writes
+        # `export_reconcile_state` to the database before it raises, and
+        # `TransactionCase.assertRaises` rolls back its savepoint on the
+        # caught exception, which would undo the very write this test
+        # exists to observe (see
+        # `test_a_changed_local_media_claim_invalidates_the_acknowledgement`
+        # above for the same pattern).
+        refused = False
+        try:
+            self.store._assert_export_reconciliation_complete()
+        except UserError:
+            refused = True
+        self.assertTrue(
+            refused,
+            'A stale acknowledgement beyond the old 200-row cutoff must '
+            'still re-block exports.',
+        )
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'review_required')
+        stale.invalidate_recordset()
+        self.assertEqual(
+            stale.export_reconcile_state, 'review',
+            'Revalidation records nothing on the binding itself; only the '
+            'store verdict moves.',
+        )
+        for binding in others:
+            binding.invalidate_recordset()
+            self.assertTrue(
+                binding._export_reconcile_ack_is_valid(),
+                'A stale sibling must never corrupt another binding\'s '
+                'still-valid acknowledgement.',
+            )
+
+    def test_a_fully_valid_population_beyond_two_hundred_stays_complete(
+        self,
+    ):
+        """The pagination fix must not become a vacuous permanent block.
+
+        Every binding beyond the 200th (by id) is genuinely still valid, so
+        walking the whole set must converge on `complete`, not on a refusal
+        manufactured merely by touching every row.
+        """
+        count = RECONCILE_REVALIDATION_BATCH_SIZE + 20
+        generation = 11
+        verdict_at = fields.Datetime.now()
+        self.store.sudo().write({
+            'export_reconcile_state': 'complete',
+            'export_reconcile_generation': generation,
+        })
+        self._create_valid_acknowledged_review_bindings(
+            count, 'valid-scale', generation, verdict_at,
+        )
+        self.assertTrue(self.store._assert_export_reconciliation_complete())
+        self.store.invalidate_recordset()
+        self.assertEqual(self.store.export_reconcile_state, 'complete')
 
 
 #: The dispatcher logs the SQLSTATE it observed before recovering. That line is

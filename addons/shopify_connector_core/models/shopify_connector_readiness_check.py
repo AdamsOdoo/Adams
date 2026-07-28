@@ -1,7 +1,7 @@
 import json
 import uuid
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 
 
 class ShopifyConnectorReadinessCheck(models.AbstractModel):
@@ -64,11 +64,12 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         'read_merchant_managed_fulfillment_orders',
     )
 
-    # The four DEC-008 domain-module flags on
-    # `shopify.connector.store.settings` -- readiness requires at least
-    # one to be True; `notification_default_enabled` and any other
-    # settings field is not a sync-domain flag and must never cause a
-    # pass by itself.
+    # The four DEC-008 domain-module flags core itself owns, on
+    # `shopify.connector.store.settings`. `notification_default_enabled`
+    # and any other settings field is not a sync-domain flag and must
+    # never cause a pass by itself. This is the CORE-owned base only --
+    # `_accepted_domain_flags()` below is the recognized set a domain
+    # module extends; nothing outside this file reads this tuple directly.
     ACCEPTED_DOMAIN_FLAGS = (
         'product_domain_enabled',
         'sale_domain_enabled',
@@ -197,6 +198,64 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
     @api.model
     def _check_result(self, code, tier, result, reason):
         return {'code': code, 'tier': tier, 'result': result, 'reason': reason}
+
+    @api.model
+    def _accepted_domain_flags(self):
+        """The recognized sync-domain flag names, extensible per module.
+
+        Correction B (independent review, Defect #3). The SAME
+        domain-extension shape `_get_checks` already uses: a domain module
+        overrides this, calls `super()._accepted_domain_flags()`, and
+        returns the union with its own flag name(s) -- never removing a
+        core-owned entry. `_check_domain_flag_enablement` reads this rather
+        than the fixed `ACCEPTED_DOMAIN_FLAGS` tuple directly, so an
+        installed domain's own sync-domain flag (e.g. Product Export's
+        `product_export_domain_enabled`) is recognized as enabled without
+        editing this file.
+        """
+        return self.ACCEPTED_DOMAIN_FLAGS
+
+    @api.model
+    def _governed_scope_catalog(self):
+        """The scopes this install may request, with a business reason each.
+
+        The same extension shape again, this time for the S1 wizard's step
+        4 "Permissions" DISPLAY list (`ShopifyConnectorSetupWizard.
+        _setup_required_scopes`). Step 4 runs before step 7's domain choice
+        exists, so it necessarily shows the full installed superset an
+        operator might need to grant, not a set narrowed by a decision they
+        have not made yet -- exactly why this is a catalog of "may be
+        needed", read here, rather than `REQUIRED_MVP_SCOPES` (the
+        unconditional baseline `_check_required_scopes` enforces for every
+        store regardless of which domains end up enabled). A domain module
+        extends this to add its own entries; it must not touch
+        `REQUIRED_MVP_SCOPES`, which stays core's own always-required set.
+        """
+        return [
+            {'scope': scope, 'reason': reason}
+            for scope, reason in (
+                ('read_products', _(
+                    'so your Shopify catalog can be read into Odoo',
+                )),
+                ('read_customers', _(
+                    'so order customers can be matched to Odoo contacts',
+                )),
+                ('read_orders', _(
+                    'so Shopify orders can become Odoo sales orders',
+                )),
+                ('read_inventory', _(
+                    'so stock levels can be read as a baseline',
+                )),
+                ('read_locations', _(
+                    'so Shopify locations can be mapped to your Odoo '
+                    'warehouses',
+                )),
+                ('read_merchant_managed_fulfillment_orders', _(
+                    'so deliveries can be matched to the right Shopify '
+                    'fulfillment order',
+                )),
+            )
+        ]
 
     # ------------------------------------------------------------------
     # Core-owned checks (MBQ-06 / DEC-018 essential set)
@@ -501,12 +560,30 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         """Reads `shopify.connector.store.settings` only -- no write, no
         domain-module dependency.
 
-        Passes only when at least one of `self.ACCEPTED_DOMAIN_FLAGS` is
-        True on the store's settings record -- a settings record simply
-        existing with every domain flag False means no sync domain would
-        actually run, so that state must not pass. Any other settings
+        Reports `pass` only when at least one of `self._accepted_domain_
+        flags()` is True on the store's settings record; any other settings
         field (e.g. `notification_default_enabled`) is not a sync-domain
-        flag and never contributes to this check.
+        flag and never contributes to this check. An unrecognized flag name
+        -- one not actually present on `settings` -- fails closed to "not
+        enabled" rather than raising, so a stale or misconfigured
+        registration can never silently enable anything.
+
+        Correction B (independent review, Defects #2/#3). WARNING tier, not
+        ESSENTIAL. A deliberate zero-domain "connect-only" configuration is
+        an explicitly accepted setup outcome (`docs/02-product/ui-ux-final-
+        design-spec.md`, S1 step 7's own on-screen copy) -- the operator has
+        already been shown, on the step-11 review screen, exactly which
+        domains (zero or more) are about to be activated, so this check
+        exists to surface an informational signal, not to gate activation a
+        second time on a choice the operator already reviewed. Downgrading
+        it to WARNING is what lets `activate()` complete for a genuine
+        connect-only store and for a store enabling only a
+        module-registered domain such as Product Export's
+        `product_export_domain_enabled` -- both previously an
+        unconditional essential failure ("No sync domain is enabled") no
+        operator could ever clear. The PASS/NOT_PROVEN/FAIL result
+        computation itself is unchanged; only the tier, and the flag set
+        it is computed over, are corrected.
         """
         code = 'domain_flag_enablement'
         settings = self.env['shopify.connector.store.settings'].search(
@@ -514,18 +591,20 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         )
         if not settings:
             return self._check_result(
-                code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
+                code, self.WARNING, self.RESULT_NOT_PROVEN,
                 'No store-settings record exists yet -- domain enablement '
                 'has not been configured.',
             )
         if any(
-            getattr(settings, flag) for flag in self.ACCEPTED_DOMAIN_FLAGS
+            getattr(settings, flag, False)
+            for flag in self._accepted_domain_flags()
         ):
             return self._check_result(
-                code, self.ESSENTIAL, self.RESULT_PASS,
+                code, self.WARNING, self.RESULT_PASS,
                 'At least one sync domain is enabled.',
             )
         return self._check_result(
-            code, self.ESSENTIAL, self.RESULT_FAIL,
-            'No sync domain is enabled.',
+            code, self.WARNING, self.RESULT_FAIL,
+            'No sync domain is enabled. This is a valid connect-only '
+            'configuration if deliberate.',
         )

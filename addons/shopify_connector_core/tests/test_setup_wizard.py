@@ -229,14 +229,25 @@ class TestSetupWizardShape(SetupWizardCase):
         self.assertEqual(state['steps'][10]['key'], 'review')
 
     def test_scopes_are_derived_from_the_governed_declaration(self):
-        """Not a hand-written list that can go stale on a setup screen."""
+        """Not a hand-written list that can go stale on a setup screen.
+
+        Correction B: the screen reads `_governed_scope_catalog()`, an
+        extensible seam an installed domain module can add its own entries
+        to (step 4 runs before step 7's domain choice exists, so it shows
+        the full installed superset). `REQUIRED_MVP_SCOPES` is therefore
+        asserted as a SUBSET, not an exact match: whichever other connector
+        modules happen to be installed alongside core in this test
+        environment may legitimately add more.
+        """
         store = self._make_store()
         state = self._as(self.admin_a).get_setup_state(store.id)
         declared = set(
             self.env['shopify.connector.readiness.check'].REQUIRED_MVP_SCOPES
         )
-        self.assertEqual(
-            {entry['scope'] for entry in state['scopes']}, declared,
+        shown = {entry['scope'] for entry in state['scopes']}
+        self.assertTrue(
+            declared <= shown,
+            'every unconditionally-required core scope must be shown',
         )
         for entry in state['scopes']:
             self.assertTrue(
@@ -657,20 +668,76 @@ class TestSetupWizardProgress(SetupWizardCase):
         self._assert_refused(
             lambda: self._as(self.admin_b).get_setup_state(store.id))
 
+    def test_a_foreign_store_id_is_not_a_useful_existence_oracle(self):
+        """Correction E (independent review, P3).
+
+        A same-ROLE, cross-COMPANY Administrator supplying a REAL foreign
+        store id and one supplying a nonexistent id must receive the
+        identical refusal -- same exception class, same message -- so
+        neither response lets them learn a foreign id merely exists.
+        """
+        store = self._ready_store()
+        nonexistent_id = store.id + 10 ** 6
+
+        def refusal_for(candidate_id):
+            try:
+                self._as(self.admin_b).get_setup_state(candidate_id)
+            except (AccessError, UserError) as exc:
+                return type(exc), str(exc)
+            raise AssertionError(
+                'candidate_id=%s was not refused' % candidate_id
+            )
+
+        foreign_class, foreign_message = refusal_for(store.id)
+        missing_class, missing_message = refusal_for(nonexistent_id)
+        self.assertEqual(
+            foreign_class, missing_class,
+            'A foreign store and a nonexistent one must fail the same way.',
+        )
+        self.assertEqual(
+            foreign_message, missing_message,
+            'The refusal text must not distinguish "not yours" from '
+            '"does not exist".',
+        )
+        self.assertEqual(foreign_class, UserError)
+
+    def test_a_foreign_store_id_reveals_no_field_of_the_foreign_record(self):
+        """The refusal is generic; nothing about the foreign store -- not
+        even its own existence, distinctly from a made-up id -- crosses the
+        boundary through `get_setup_state`."""
+        store = self._ready_store()
+        store.sudo().write({'name': 'Correction E Foreign Store Name'})
+        try:
+            self._as(self.admin_b).get_setup_state(store.id)
+        except (AccessError, UserError) as exc:
+            self.assertNotIn('Correction E Foreign Store Name', str(exc))
+            self.assertNotIn(store.shop_domain, str(exc))
+        else:
+            raise AssertionError('a foreign store id was not refused')
+
 
 @tagged('post_install', '-at_install')
 class TestSetupWizardActivation(SetupWizardCase):
 
-    def _complete_through_readiness(self):
+    def _complete_through_readiness(self, directions=None):
         """Walk steps 2-10 the way an operator does, with a passable
-        environment, so the success path is genuinely observable."""
+        environment, so the success path is genuinely observable.
+
+        `directions` defaults to `['sale']`, one accepted domain -- not
+        because a connect-only (zero-domain) setup is illegitimate (it is
+        explicitly accepted; see `test_a_genuine_connect_only_store_can_
+        activate` below, which drives that exact path through this same
+        production route) but because most callers of this helper are
+        testing something else entirely and picking any one valid domain
+        keeps their fixture unsurprising.
+        """
         self._make_readiness_passable()
         store = self._ready_store()
         setup = self._as(self.admin_a)
         setup.run_readiness(store.id)
-        # At least one sync domain, because `domain_flag_enablement` is an
-        # essential check and a connect-only store legitimately fails it.
-        setup.save_directions(store.id, ['sale'])
+        setup.save_directions(
+            store.id, ['sale'] if directions is None else directions,
+        )
         setup.save_source_of_truth(
             store.id, 'odoo_source', 'odoo_authoritative')
         setup.save_notification(store.id, False)
@@ -742,6 +809,67 @@ class TestSetupWizardActivation(SetupWizardCase):
         settings = self._settings(store)
         self.assertTrue(settings.setup_completed_at)
         self.assertEqual(settings.setup_completed_uid, self.admin_a)
+
+    def test_a_genuine_connect_only_store_can_activate(self):
+        """Correction B (independent review, Defect #2).
+
+        `docs/02-product/ui-ux-final-design-spec.md` and the wizard's own
+        step-7 copy both explicitly promise that skipping every domain is
+        an allowed, deliberate outcome ("connect-only setup"). Before this
+        correction, `_check_domain_flag_enablement` was an ESSENTIAL check
+        that unconditionally failed on zero enabled domains, with no
+        exception for that deliberate choice -- an Administrator who
+        followed the wizard's own instructions reached step 11 and could
+        never activate. This drives the exact production route: step 7
+        with an empty selection, through to `activate()`.
+        """
+        store = self._complete_through_readiness(directions=[])
+        settings = self._settings(store)
+        for flag in (
+            'product_domain_enabled', 'sale_domain_enabled',
+            'inventory_domain_enabled', 'fulfillment_domain_enabled',
+        ):
+            self.assertFalse(getattr(settings, flag))
+        jobs_before = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', store.id),
+            ('state', 'in', ('queued', 'running')),
+        ])
+        Client = type(self.env['shopify.connector.api.client'])
+
+        def refuse(_self, _store, request, token=None, mutation_context=None):
+            raise AssertionError('connect-only activation contacted Shopify')
+
+        with patch.object(Client, '_send', refuse):
+            self._as(self.admin_a).activate(store.id)
+        store.invalidate_recordset()
+        self.assertEqual(
+            store.state, 'connected',
+            'A deliberate connect-only setup must be able to activate.',
+        )
+        self.assertEqual(
+            self.env['shopify.connector.job'].sudo().search_count([
+                ('store_id', '=', store.id),
+                ('state', 'in', ('queued', 'running')),
+            ]),
+            jobs_before,
+            'connect-only activation must admit no domain job',
+        )
+        for flag in (
+            'product_domain_enabled', 'sale_domain_enabled',
+            'inventory_domain_enabled', 'fulfillment_domain_enabled',
+        ):
+            self.assertFalse(
+                getattr(settings, flag),
+                'activation must not silently enable a domain',
+            )
+
+    def test_the_domain_flag_check_is_non_blocking_not_essential(self):
+        """The tier correction directly: WARNING, never ESSENTIAL, so a
+        zero-domain result can never by itself fail the aggregate."""
+        store = self._ready_store()
+        Check = self.env['shopify.connector.readiness.check']
+        result = Check._check_domain_flag_enablement(store)
+        self.assertEqual(result['tier'], Check.WARNING)
 
     def test_completion_is_audited_with_the_actor(self):
         store = self._complete_through_readiness()

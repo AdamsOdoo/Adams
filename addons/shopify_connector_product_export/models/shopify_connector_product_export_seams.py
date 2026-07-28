@@ -6,7 +6,7 @@ what `super()` returned. No core file is edited by this module.
 
 import json
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, UserError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
@@ -232,6 +232,34 @@ class ShopifyConnectorReadinessCheckProductExport(models.AbstractModel):
         checks = super()._get_checks(store)
         checks.append(self._check_product_export_scopes(store))
         return checks
+
+    @api.model
+    def _accepted_domain_flags(self):
+        """Register `product_export_domain_enabled` (independent review,
+        Defect #3). Core's `_check_domain_flag_enablement` must recognize a
+        store enabling only Catalog export as having a sync domain enabled
+        -- an accepted, first-class DEC-003 direction offered at S1 step 7
+        -- without this module editing a fixed core tuple."""
+        return super()._accepted_domain_flags() + (
+            'product_export_domain_enabled',
+        )
+
+    @api.model
+    def _governed_scope_catalog(self):
+        """Add Product Export's own unconditional scope to the S1 step 4
+        display list. `write_files` is deliberately NOT added here: it is
+        conditional on `media_source_of_truth`, a Store Settings choice S1
+        never makes, so listing it unconditionally at step 4 would name a
+        scope this specific store might not need."""
+        catalog = super()._governed_scope_catalog()
+        catalog.append({
+            'scope': 'write_products',
+            'reason': _(
+                'so product changes made in Odoo can be exported to '
+                'Shopify'
+            ),
+        })
+        return catalog
 
     @api.model
     def _check_product_export_scopes(self, store):

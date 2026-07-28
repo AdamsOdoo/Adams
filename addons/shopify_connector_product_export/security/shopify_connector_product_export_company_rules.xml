@@ -64,5 +64,30 @@
             <field name="domain_force">['|', ('product_template_binding_id.product_template_id.company_id', '=', False), ('product_template_binding_id.product_template_id.company_id', 'in', company_ids)]</field>
         </record>
 
+        <!--
+            Correction A (independent review, Defect #1 on PR #204). The
+            TD-015 checksum-acknowledgement wizard is a TransientModel with
+            no rule at all before this: its ACL grants full CRUD to every
+            Connector Administrator, company-blind, so ANY administrator
+            could search_read another administrator's still-pending
+            confirmation row — including, before the `related_sudo=False`
+            correction in the wizard model itself, the foreign store
+            identity, product GID and reconciliation note it names.
+            Creator-scoped rather than company-scoped: the wizard carries no
+            `company_id` of its own (correctly — it is a display-and-
+            delegate artifact, not a business record), and this is the
+            standard, narrower Odoo idiom for "nobody but the person who
+            opened this confirmation may ever see it." The company decision
+            itself is still made where it belongs, on the binding, by
+            `_assert_export_reconcile_ack_authority` and the two production
+            actions that already call it.
+        -->
+        <record id="export_checksum_ack_wizard_creator_rule" model="ir.rule">
+            <field name="name">Shopify Connector Export Checksum Ack Wizard: creator only</field>
+            <field name="model_id" ref="model_shopify_connector_export_checksum_ack_wizard"/>
+            <field name="global" eval="True"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+        </record>
+
     </data>
 </odoo>

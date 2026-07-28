@@ -18,8 +18,8 @@ with zero side effects. This follows the precedent U1 set with the
 fulfillment review-release wizard and U2 with the inventory wizards.
 """
 
-from odoo import api, fields, models
-from odoo.exceptions import UserError
+from odoo import _, api, fields, models
+from odoo.exceptions import AccessError, MissingError, UserError
 
 
 class ShopifyConnectorProductExportRequestWizard(models.TransientModel):
@@ -219,6 +219,38 @@ class ShopifyConnectorExportChecksumAckWizard(models.TransientModel):
     operator's own words, what Shopify DID confirm, what it cannot confirm,
     what they are accepting, and what was NOT changed -- and the server
     refuses the call unless the box beside it is ticked.
+
+    Correction A (independent review, Defect #1). The delegation above is
+    real for the two ACTION methods, but this wizard MODEL is its own
+    boundary, and it was not equivalent to it: the model's sole ACL row
+    grants full CRUD to the whole company-unscoped
+    `group_shopify_connector_admin` group with no `ir.rule` anywhere in the
+    module (see `security/shopify_connector_product_export_company_rules.xml`
+    -- a creator-scoped rule closes that here), and `store_id`/`product_gid`/
+    `reconcile_note` are `related=` fields that default to Odoo's
+    `compute_sudo=True`, which computes them AS SUPERUSER regardless of who
+    is asking -- bypassing the SEC-3 record rule on
+    `shopify.connector.product.template.binding` entirely. A Connector
+    Administrator of one company could `create({'binding_id': <another
+    company's binding id>})` over plain RPC, with no UI involved, and then
+    `read(['store_id', 'product_gid', 'reconcile_note'])` and see it.
+
+    Two independent corrections, deliberately both applied:
+
+    1. `related_sudo=False` on the three display fields below, so their
+       computation runs as the CALLING user and is therefore subject to the
+       same SEC-3 record rule a direct read of the binding already is --
+       this is what protects every read path (`read()`, `search_read()`,
+       `default_get()`, an onchange), not only the ones this file happens to
+       call.
+    2. `_resolve_binding_for_ack` re-uses
+       `binding._assert_export_reconcile_ack_authority()` -- the EXACT gate
+       the two production actions already enforce -- to validate a
+       caller-supplied `binding_id` before it becomes this wizard's binding,
+       on `create()`, `write()` and default/context-based opening alike. A
+       foreign-company binding and one that does not exist collapse to the
+       identical refusal, so neither the exception raised nor its message
+       discloses which one it was.
     """
 
     _name = 'shopify.connector.export.checksum.ack.wizard'
@@ -232,16 +264,19 @@ class ShopifyConnectorExportChecksumAckWizard(models.TransientModel):
     )
     store_id = fields.Many2one(
         related='binding_id.store_id',
+        related_sudo=False,
         readonly=True,
         string='Shopify Store',
     )
     product_gid = fields.Char(
         related='binding_id.shopify_gid',
+        related_sudo=False,
         readonly=True,
         string='Shopify Product',
     )
     reconcile_note = fields.Char(
         related='binding_id.export_reconcile_note',
+        related_sudo=False,
         readonly=True,
         string='What the reconciliation found',
     )
@@ -269,14 +304,85 @@ class ShopifyConnectorExportChecksumAckWizard(models.TransientModel):
              'until this is ticked and confirmed.',
     )
 
+    # ------------------------------------------------------------------
+    # Correction A: validate a caller-supplied binding_id before it can
+    # become this wizard's binding, on every route that can set it.
+    # ------------------------------------------------------------------
+
+    def _resolve_binding_for_ack(self, binding_id):
+        """Fail-closed resolution of a caller-supplied binding id.
+
+        Delegates the whole authority, record-access and company decision
+        to `_assert_export_reconcile_ack_authority` on the binding -- the
+        exact gate `action_shopify_export_open_checksum_ack_wizard` and
+        `action_shopify_export_acknowledge_checksum` already enforce -- so
+        this wizard can never grant, through `create()`, `write()` or
+        `default_get()`, what the binding model itself would refuse.
+
+        A foreign-company binding and one that does not exist are
+        deliberately collapsed to the identical refusal: Odoo's own
+        `fetch()` raises `AccessError` for the former (the SEC-3 record
+        rule excludes it from the query) and `MissingError` for the latter
+        (there is no row to exclude), and neither the exception class nor
+        the message either produces here may let a caller tell which one it
+        was.
+        """
+        if not binding_id:
+            raise AccessError(_(
+                'This checksum acknowledgement is not available.'
+            ))
+        binding = self.env[
+            'shopify.connector.product.template.binding'
+        ].browse(int(binding_id))
+        try:
+            binding._assert_export_reconcile_ack_authority()
+        except (AccessError, MissingError):
+            raise AccessError(_(
+                'This checksum acknowledgement is not available.'
+            ))
+        return binding
+
+    # `@api.constrains` was considered and rejected here: Odoo runs
+    # constraint methods with `self` already `sudo()`'d
+    # (`_validate_fields`, "run constrains just as sudoed computed-stored
+    # fields" — `odoo/orm/models.py` at the pinned `30bde9ff`), so
+    # `check_access` inside `_assert_export_reconcile_ack_authority` would
+    # silently no-op (`env.su` short-circuits it) and the validation would
+    # never actually refuse anything. `create()`/`write()` overrides below
+    # run as the genuine calling user and are the correct place for this.
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if vals.get('binding_id'):
+                self._resolve_binding_for_ack(vals['binding_id'])
+        return super().create(vals_list)
+
+    def write(self, vals):
+        if vals.get('binding_id'):
+            self._resolve_binding_for_ack(vals['binding_id'])
+        return super().write(vals)
+
     def default_get(self, fields_list):
-        result = super().default_get(fields_list)
-        if self.env.context.get(
+        context = self.env.context
+        active_id = None
+        if context.get(
             'active_model'
         ) == 'shopify.connector.product.template.binding':
-            active_id = self.env.context.get('active_id')
-            if active_id:
-                result['binding_id'] = active_id
+            active_id = context.get('active_id')
+        # Validated BEFORE `super().default_get()` runs, not after: the base
+        # implementation resolves `context['default_binding_id']` (set by
+        # `action_shopify_export_open_checksum_ack_wizard`) itself, and if
+        # `fields_list` includes the related display fields it computes them
+        # against an ephemeral record built from those defaults. Validating
+        # only afterward would be too late to stop that computation from
+        # ever being attempted on an unauthorised id.
+        for candidate in (active_id, context.get('default_binding_id')):
+            if candidate:
+                self._resolve_binding_for_ack(candidate)
+        result = super().default_get(fields_list)
+        if active_id:
+            result['binding_id'] = active_id
         return result
 
     @api.depends('binding_id')

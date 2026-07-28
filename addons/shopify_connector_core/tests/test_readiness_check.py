@@ -443,3 +443,63 @@ class TestReadinessCheck(TransactionCase):
             self.store
         )
         self.assertEqual(check['result'], 'pass')
+
+    # ------------------------------------------------------------------
+    # 15. Correction B (independent review, Defects #2/#3): tier and the
+    # extensible flag-registration seam.
+    # ------------------------------------------------------------------
+
+    def test_domain_flag_check_is_warning_tier_not_essential(self):
+        """The exact tier correction: a zero-domain result must never be
+        able to fail the essential aggregate by itself."""
+        self._create_settings()
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['tier'], self.ReadinessCheck.WARNING)
+        self.assertEqual(check['result'], 'fail')
+
+    def test_no_settings_record_is_also_warning_tier(self):
+        check = self.ReadinessCheck._check_domain_flag_enablement(
+            self.store
+        )
+        self.assertEqual(check['tier'], self.ReadinessCheck.WARNING)
+        self.assertEqual(check['result'], 'not_proven')
+
+    def test_accepted_domain_flags_includes_the_core_owned_tuple(self):
+        """The extension seam's base guarantee: every core-owned flag is
+        always present. Asserted as a subset, not an exact match -- whatever
+        other connector domain modules happen to be installed alongside
+        core in this test environment may legitimately register more, the
+        same way `shopify_connector_product_export` does."""
+        result = tuple(self.ReadinessCheck._accepted_domain_flags())
+        for flag in self.ReadinessCheck.ACCEPTED_DOMAIN_FLAGS:
+            self.assertIn(flag, result)
+
+    def test_an_unrecognized_registered_flag_fails_closed_rather_than_raising(
+        self,
+    ):
+        """A domain module could register a flag name that is not actually
+        a field on `shopify.connector.store.settings` -- a stale or
+        misconfigured registration. That must fail closed to "not
+        enabled", never raise and never be silently treated as enabled."""
+        self._create_settings()
+        with patch.object(
+            type(self.ReadinessCheck), '_accepted_domain_flags',
+            lambda self: ('not_a_real_settings_field',),
+        ):
+            check = self.ReadinessCheck._check_domain_flag_enablement(
+                self.store
+            )
+        self.assertEqual(check['result'], 'fail')
+
+    def test_governed_scope_catalog_includes_the_core_owned_reasons(self):
+        """The step-4 display-list extension seam's base guarantee: every
+        core-owned scope is always present, with a reason. Asserted as a
+        subset for the same reason as the domain-flags test above."""
+        catalog = self.ReadinessCheck._governed_scope_catalog()
+        scopes = {entry['scope'] for entry in catalog}
+        for scope in self.ReadinessCheck.REQUIRED_MVP_SCOPES:
+            self.assertIn(scope, scopes)
+        for entry in catalog:
+            self.assertTrue(entry['reason'])

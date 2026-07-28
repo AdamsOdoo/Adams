@@ -36,6 +36,18 @@ class TestExportSourceGuards(TransactionCase):
         The U1/U2 precedent: the wizard collects an argument an object button
         cannot pass and calls a sanctioned server action. Anything else moves
         business logic into the UI layer, where none of the guards live.
+
+        Correction A (independent review, Defect #1) is the one sanctioned
+        exception to "never write/create": the TD-015 acknowledgement
+        wizard now overrides `create()`/`write()` to validate a
+        caller-supplied `binding_id` (access control, read-only) BEFORE
+        delegating to `super().create()`/`super().write()` to actually
+        persist it -- which every model's create/write override must
+        eventually do. `super().create(...)`/`super().write(...)` is
+        therefore excluded from `forbidden` matches; a call to `.create()`/
+        `.write()`/`.unlink()`/`.sudo()`/`.commit()`/`.enqueue()` on
+        anything else -- `self.env[...]`, `preview_id`, `binding_id`, or
+        any other record -- is still caught exactly as before.
         """
         wizard_dir = MODULE_ROOT / 'wizards'
         forbidden = {'create', 'write', 'unlink', 'sudo', 'commit', 'enqueue'}
@@ -45,11 +57,46 @@ class TestExportSourceGuards(TransactionCase):
             for node in ast.walk(tree):
                 if not isinstance(node, ast.Call):
                     continue
-                if isinstance(node.func, ast.Attribute) and (
-                    node.func.attr in forbidden
+                if not (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr in forbidden
                 ):
-                    offenders.append((path.name, node.func.attr, node.lineno))
+                    continue
+                callee = node.func.value
+                is_super_call = (
+                    node.func.attr in ('create', 'write')
+                    and isinstance(callee, ast.Call)
+                    and isinstance(callee.func, ast.Name)
+                    and callee.func.id == 'super'
+                )
+                if is_super_call:
+                    continue
+                offenders.append((path.name, node.func.attr, node.lineno))
         self.assertEqual(offenders, [], 'a wizard performs a write-side call')
+
+    def test_the_only_super_create_or_write_call_is_the_sanctioned_one(self):
+        """The exclusion above is narrow by construction, and this proves
+        it: exactly one wizard class overrides `create`/`write` at all, and
+        it is the one Correction A names."""
+        wizard_dir = MODULE_ROOT / 'wizards'
+        super_calls = []
+        for path in sorted(wizard_dir.rglob('*.py')):
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.FunctionDef):
+                    continue
+                if node.name not in ('create', 'write'):
+                    continue
+                super_calls.append((path.name, node.name, node.lineno))
+        self.assertEqual(
+            [name for _, name, _ in super_calls], ['create', 'write'],
+        )
+        self.assertTrue(
+            all(
+                path == 'shopify_connector_product_export_wizards.py'
+                for path, _, _ in super_calls
+            ),
+        )
 
     def test_no_view_file_contains_a_mutation_name(self):
         """Mutation logic never lives in XML.
