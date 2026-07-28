@@ -149,36 +149,40 @@ client-credentials) should be **expected**, not treated as a connector defect.
 ## 4. Required scopes
 
 The token must carry, at minimum, the six scopes the connector's shipped
-`REQUIRED_MVP_SCOPES` constant checks (`shopify_connector_readiness_check.py`):
+`REQUIRED_MVP_SCOPES` constant checks
+(`addons/shopify_connector_core/models/shopify_connector_readiness_check.py:53-65`,
+verified against the exact frozen source at this head):
 
 - `read_products`
 - `read_customers`
 - `read_orders`
 - `read_inventory`
 - `read_locations`
-- `read_fulfillments`
+- `read_merchant_managed_fulfillment_orders`
 
-**Known caveat, carried from `shopify-token-acquisition-notes.md` §3 and
-DEC-023 §5:** `read_fulfillments` is required here **only for current-code
-compatibility** with the shipped `REQUIRED_MVP_SCOPES` check — per official
-Shopify documentation it does not actually gate read access to order
-fulfillment data (it governs `FulfillmentService` only); `read_orders`
-(already in this list) is the scope that actually covers `Fulfillment` reads.
-Grant `read_fulfillments` anyway for this closure attempt (matching the
-shipped code's current check, so the readiness-check's required-scopes gate
-reports `pass` rather than an unrelated `fail`), but do not treat its
-presence as proof that fulfillment-object reads are covered by it. **This is
-a least-privilege correctness concern, not merely a naming nitpick:**
-requiring a scope that does not grant the access its name implies is exactly
-the kind of over-broad/mis-scoped grant DEC-004's least-privilege posture
-exists to avoid, and it must be explicitly routed (corrected or justified) by
-ChatGPT/a future task **before** this connector makes any customer-facing
-setup-readiness claim — it is flagged here, not resolved, and is not fixed by
-this closure plan.
+**`[Corrected 2026-07-28]`** This list previously named `read_fulfillments`
+in the sixth position, with a caveat that it was required only for
+compatibility with the shipped check and did not actually gate fulfillment
+reads. That is now stale: the TD-002/D-014-2 scope correction, already landed
+in the frozen source this closure plan validates against, replaced
+`read_fulfillments` with `read_merchant_managed_fulfillment_orders` in
+`REQUIRED_MVP_SCOPES` — because `read_fulfillments` governs
+`FulfillmentService` objects, not the merchant-managed `FulfillmentOrder`
+model this connector uses exclusively. That code correction is exactly the
+over-broad/mis-scoped-grant fix the prior version of this section flagged as
+unresolved; this edit only brings the closure plan's required-scope list back
+into agreement with the shipped check it is supposed to mirror. Requesting
+the stale `read_fulfillments` name instead of `read_merchant_managed_fulfillment_orders`
+would leave the actually-required scope ungranted and make the readiness
+check's `required_scopes` gate report `fail`.
 
 Do not grant broader scopes than these six for this validation. Any
 additional scope needed later belongs to a future domain task's own scope
-decision, not this closure.
+decision, not this closure — see
+[`shopify-live-validation-package.md`](./shopify-live-validation-package.md)
+§2.3 for the consolidated mutation-domain scope set (`write_products`,
+`write_inventory`, `write_merchant_managed_fulfillment_orders`, `write_files`)
+required once VAL-B2 itself is closed and mutation cases are attempted.
 
 ## 5. Test command / manual execution steps
 
@@ -246,12 +250,21 @@ results file — this plan does not itself edit that file), capture:
   not a 24-hour client-credentials token requiring an unimplemented refresh
   loop).
 
-**VAL-B2 fails if:** `action_test_connection()` raises `ShopifyClientError`,
-`last_test_connection_result == 'fail'`, or the only token obtainable is a
-24-hour client-credentials token that would expire before any realistic sync
-cycle without connector-side refresh logic that does not exist today — a
-failure here is evidence for DEC-023 §3.2 (build real OAuth), not a defect in
-the already-shipped code.
+**VAL-B2 fails if:** `action_test_connection()` raises `ShopifyClientError` or
+`last_test_connection_result == 'fail'` — a failure here is evidence for
+DEC-023 §3.2 (build real OAuth), not a defect in the already-shipped code.
+
+**`[Corrected 2026-07-28]`** **VAL-B2 is PARTIAL, not FAIL, if** the only
+token obtainable is a 24-hour client-credentials token. This section
+previously classified that outcome as an unqualified failure, contradicting
+§8 below, which already correctly treats it as a "partial/qualified" result
+to be escalated rather than recorded as a pass or a fail. A real, bounded
+connection did succeed in that outcome, so recording it as an unqualified
+failure understates what was observed — but it would expire before any
+realistic sync cycle without connector-side refresh logic that does not
+exist today, so it cannot be recorded as an unqualified pass either. Record
+and escalate exactly as §8/§12.4 already require for a 24-hour-token-only
+outcome.
 
 ## 8. What does NOT count as VAL-B2 passing
 

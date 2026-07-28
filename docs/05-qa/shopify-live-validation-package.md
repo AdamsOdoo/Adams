@@ -45,19 +45,67 @@ document, a test fixture, a log, or a GitHub comment.
 
 ### 2.3 Required scopes — request exactly these, and record the granted set
 
-| Scope | Why it is needed | Domain |
-| --- | --- | --- |
-| `read_orders` | Order import and order-binding reconciliation | Sale |
-| `read_products`, `read_inventory` | Product/variant read, inventory levels | Product, Inventory |
-| `write_inventory` | The CV-013 inventory mutation cases only | Inventory |
-| `read_assigned_fulfillment_orders`, `read_merchant_managed_fulfillment_orders` | FulfillmentOrder read | Fulfillment |
-| `write_assigned_fulfillment_orders`, `write_merchant_managed_fulfillment_orders` | Fulfillment create + tracking update | Fulfillment |
-| `read_customers` | Customer matching | Sale |
+**`[Corrected 2026-07-28]`** The prior version of this table was internally
+contradictory: it required execution of the M-EXP-* cases (§4.0a), which
+include product mutation and media upload/association, while its own scope
+list omitted `write_products` and `write_files` and stated they were
+forbidden. Both tiers below are re-derived directly from the frozen source at
+this head, not carried over from an earlier draft.
 
-**Explicitly NOT requested:** `write_orders`, `write_products`,
-`write_customers`, payments, price rules, discounts, files, themes, or any
-scope not named above. **Record the granted scope set verbatim** in the run
-record; a granted set wider than this table is itself a finding.
+**Core connection-readiness baseline** — the exact `REQUIRED_MVP_SCOPES`
+tuple, required for every store regardless of which domain this campaign
+exercises (`addons/shopify_connector_core/models/shopify_connector_readiness_check.py:53-65`):
+
+| Scope | Why it is needed |
+| --- | --- |
+| `read_products` | Product/variant read |
+| `read_customers` | Customer matching |
+| `read_orders` | Order import and order-binding reconciliation |
+| `read_inventory` | Inventory level read |
+| `read_locations` | Location read |
+| `read_merchant_managed_fulfillment_orders` | FulfillmentOrder read. **Not** `read_fulfillments` — that scope governs `FulfillmentService` objects, not this merchant-managed connector |
+
+**Mutation-domain scopes** — required by the specific domains this
+consolidated campaign's case list (§4) exercises, additional to the baseline
+above:
+
+| Scope | Why it is needed | Source |
+| --- | --- | --- |
+| `write_inventory` | M-INV-* cases (closes CV-013/#185); required by the inventory domain's own readiness seam whenever the inventory domain is enabled | `addons/shopify_connector_inventory/models/shopify_connector_inventory_service.py:430-473` |
+| `write_merchant_managed_fulfillment_orders` | M-FUL-* cases (Gate D/#186); required by the fulfillment domain's own readiness seam | `addons/shopify_connector_fulfillment/models/shopify_connector_readiness_check.py:11-73` |
+| `write_products` | M-EXP-* product/variant mutation cases — `productUpdate`/`productSet`/`productVariantsBulkUpdate`/`productVariantsBulkCreate` all require it | `addons/shopify_connector_product_export/models/shopify_connector_product_export_seams.py:75,84` |
+| `write_files` | M-EXP-14…M-EXP-18, the media cases — `fileCreate` and the association mutation `fileUpdate` both require it. The readiness check's own gate only requires this scope conditionally (when `media_source_of_truth == 'odoo'`), but this campaign's own case list (§4.0a) includes the media cases regardless, so it is **mandatory for this campaign**, not optional | `addons/shopify_connector_product_export/models/shopify_connector_product_export_seams.py:76-86,304-306` |
+
+**Explicitly forbidden:** `write_themes`. `fileUpdate` accepts `write_files`
+**or** `write_themes` for the media-association path; this connector always
+uses `write_files`, and `write_themes` is never requested — it would grant
+theme write access the connector has no use for
+(`shopify_connector_product_export_seams.py:82-83`).
+
+**Not requested — verified unused by this exact implementation:**
+`read_assigned_fulfillment_orders`, `write_assigned_fulfillment_orders`. The
+prior version of this table listed them for the fulfillment domain. Neither
+name appears anywhere in `addons/` (repository-wide search, this session) —
+assigned-fulfillment-order scopes govern fulfillment-service-app assignment
+functionality, a different mechanism from the merchant-managed
+`FulfillmentOrder` model this connector uses exclusively. Removed because
+they are not exercised anywhere in the frozen source, not because of a
+platform policy change.
+
+Verified against official Shopify documentation, API version 2026-07,
+accessed 2026-07-28 (Accessible):
+[Access scopes](https://shopify.dev/docs/api/usage/access-scopes) ·
+[productUpdate](https://shopify.dev/docs/api/admin-graphql/latest/mutations/productUpdate) ·
+[productSet](https://shopify.dev/docs/api/admin-graphql/latest/mutations/productSet) ·
+[productVariantsBulkUpdate](https://shopify.dev/docs/api/admin-graphql/latest/mutations/productVariantsBulkUpdate) ·
+[fileUpdate](https://shopify.dev/docs/api/admin-graphql/latest/mutations/fileUpdate) ·
+[inventorySetQuantities](https://shopify.dev/docs/api/admin-graphql/latest/mutations/inventorySetQuantities) ·
+[inventoryActivate](https://shopify.dev/docs/api/admin-graphql/latest/mutations/inventoryActivate) —
+each mutation's own Access Scopes section confirms the scope named above.
+
+**No Shopify resource exists and no campaign case has executed as of this
+correction.** **Record the granted scope set verbatim** in the run record; a
+granted set wider than this table is itself a finding.
 
 ### 2.4 Authorization gates
 

@@ -600,6 +600,45 @@ regression. **It carries no independent review, no Odoo.sh runtime, no
 live-Shopify contact of any kind, and no UAT.** The implementation worker has
 not reviewed, accepted or approved its own corrections, and may not.
 
+### 5e.6 PR #204 provisioning-package documentation correction — 2026-07-28
+
+> **Status: documentation-only correction record. NOT an acceptance, NOT a
+> review, NOT a new runtime or UAT claim.**
+
+The control room recorded the Odoo.sh standard-runtime-pass disposition for
+head `ee23c966a0b214c7974abbade4b384f251c4940f` (PR #204 comment `5103678435`)
+and a provisioning-readiness checklist for issue #200 (comment `5103684847`).
+That checklist's credential-scope section carried forward
+`docs/05-qa/shopify-live-validation-package.md` §2.3's scope table, which was
+internally contradictory: it required execution of the M-EXP-* media/mutation
+cases while excluding `write_products` and `write_files` as forbidden. A
+session-independent audit of the frozen source
+(`shopify_connector_readiness_check.py` in core and fulfillment,
+`shopify_connector_inventory_service.py`,
+`shopify_connector_product_export_seams.py`) and current official Shopify
+2026-07 documentation corrected the scope table in
+`shopify-live-validation-package.md` §2.3, and a stale `read_fulfillments`
+reference (pre-dating the already-landed TD-002/D-014-2 scope correction)
+plus a FAIL/PARTIAL classification contradiction in
+`docs/05-qa/val-b2-closure-plan.md` §4/§7.
+
+**Executable tree unchanged.** This correction touched
+`docs/05-qa/shopify-live-validation-package.md`,
+`docs/05-qa/val-b2-closure-plan.md`, and this file only — no `addons/`,
+`tools/`, or `.github/` path changed. The accepted Odoo.sh
+standard-runtime-pass evidence for `ee23c966a0b214c7974abbade4b384f251c4940f`
+therefore still applies unchanged to the new head: **executable tree
+unchanged from the accepted Odoo.sh standard-runtime head.** This correction
+does not claim a new Odoo.sh run, and none is needed for a documentation-only
+descendant.
+
+**No Shopify resource was provisioned or contacted by this correction.**
+Issues #185, #186, #197 and #200 remain open. PR #204 remains draft,
+unapproved and unmerged. Full record: the PR #204 comment titled
+`CONTROL-ROOM PROVISIONING-PACKAGE CORRECTION` and the issue #200 comment
+titled `AUTHORITATIVE CORRECTION TO PROVISIONING READINESS COMMENT 5103684847`
+(both posted this session, after this commit).
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.
