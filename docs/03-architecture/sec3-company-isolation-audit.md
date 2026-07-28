@@ -427,18 +427,48 @@ remains open: it requires an independent Tier-1 security review and exact-SHA
 runtime evidence before external UAT or release-candidate qualification, and
 neither exists for this head. Nothing below claims otherwise.
 
+> **2026-07-28 correction notice.** §8.1–§8.6 below were re-audited and
+> corrected against the exact source at head `ef67c8035e7ee2f6cafd564fcbf2e12153a7e817`
+> plus the correction commits pushed on top of it, in response to
+> independent-review comment
+> [`5100097485`](https://github.com/AdamsOdoo/Adams/pull/204#issuecomment-5100097485)
+> §12/§17/§18 (three count mismatches: stored fields undercounted by 1,
+> public/RPC methods overcounted by 2, elevated-seam count conflating two
+> different things) and one scoping gap the review traced to the root cause
+> of Defect #1 (the acknowledgement wizard's own fields, including its
+> `binding_id` connector-to-connector relation, were never itemized here at
+> all). Every number below was independently recounted from the source, not
+> copied from the review or from the prior version of this section. The
+> **counting conventions are stated explicitly** wherever a number could
+> otherwise be read two ways: "public/RPC methods" = unique externally
+> callable, non-underscore-prefixed production methods; "elevated methods" =
+> unique production methods containing a `.sudo()` call in this delta;
+> "sudo call sites" = individual syntactic `.sudo()` occurrences (one method
+> may contain more than one). §8.9 records what the 2026-07-28 correction
+> cycle itself added to this same surface — it is additive to this delta,
+> not a re-statement of it.
+
 ### 8.1 New models
 
 | Model | Kind | Durable? | Company path | Isolation |
 | --- | --- | --- | --- | --- |
 | `shopify.connector.setup.wizard` | AbstractModel | no table | n/a | No rows to leak. Every entry point checks the Administrator role, then `check_access('read')` on the store as the CALLING user, then `store.company_id in env.companies` — in that order, before any elevation. |
-| `shopify.connector.export.checksum.ack.wizard` | TransientModel | per-session only | via `binding_id` | Admin-only ACL row. Owns no business rule; the authority is the binding method it calls, which repeats all three checks. |
+| `shopify.connector.export.checksum.ack.wizard` | TransientModel | per-session only | via `binding_id` | **Corrected 2026-07-28** — see §8.9. At this head (`ef67c803`) the ACL row alone gated the model (Administrator-only, company-blind, no `ir.rule`), and the authority was intended to live entirely in the binding method the wizard delegates to. Independent review Defect #1 found that intent did not hold at the model boundary itself: `create()`/`default_get()` accepted a foreign `binding_id` before any binding-level check ran, and the three `related=` display fields computed under Odoo's default `compute_sudo=True`, bypassing the SEC-3 rule on the target binding entirely. §8.9 records the fix. |
 
 Neither is a durable store-scoped model, so
 `test_no_durable_store_scoped_model_escapes_this_matrix` correctly does not
 require a row builder for either.
 
-### 8.2 New stored fields
+### 8.2 New stored fields — 20, not 17
+
+**Corrected.** The prior version of this table itemized 18 fields (5 + 13
+below) but its own summary line, copied into four other tracker documents
+and the PR body, said 17 — a plain arithmetic error, not a scope
+disagreement. Independent review caught the arithmetic; re-auditing the
+scope for this correction found the table itself was incomplete: it never
+itemized the **2 stored fields the wizard model itself declares**
+(`binding_id`, `confirmed`), even though the wizard is listed as a new
+model in §8.1. The corrected total is **20**.
 
 | Model | Field | Kind | Company path | Notes |
 | --- | --- | --- | --- | --- |
@@ -448,6 +478,11 @@ require a row builder for either.
 | `…product.template.binding` | `export_reconcile_reason` | Selection | mixin `store_id.company_id` | The machine-readable verdict. Protected binding field. |
 | `…product.template.binding` | `export_reconcile_evidence_generation` / `_product_gid` / `_file_gids` / `_claim_digest` | Integer / Char ×3 | mixin | The evidence a verdict rests on. Protected. |
 | `…product.template.binding` | `export_reconcile_ack_at` / `_uid` / `_reason` / `_generation` / `_product_gid` / `_file_gids` / `_claim_digest` / `_verdict_at` | Datetime, M2o `res.users`, Selection, Integer, Char ×3, Datetime | mixin | The acknowledgement and exactly what it accepted. All protected. |
+| `shopify.connector.export.checksum.ack.wizard` | `binding_id` | Many2one → `…product.template.binding` | **none of its own — see §8.3** | **Newly itemized 2026-07-28.** Required, readonly, `ondelete='cascade'`. This is the connector-to-connector relationship §8.3 previously omitted; see §8.9 for the company-isolation correction made to how it is validated. |
+| `shopify.connector.export.checksum.ack.wizard` | `confirmed` | Boolean | n/a (TransientModel, no company) | The explicit consent checkbox. Not readonly; it is the one field the operator sets. |
+
+Subtotal: 5 (`store.settings`) + 13 (`…product.template.binding`) + 2 (the
+wizard's own) = **20**.
 
 Every binding field above is registered in
 `_additional_protected_binding_fields`, so a generic non-superuser
@@ -455,19 +490,50 @@ Every binding field above is registered in
 cosmetic: they are precisely the values `_export_reconcile_ack_is_valid`
 consults, so a writable one would BE the override the design forbids.
 
-### 8.3 New relationships
+### 8.2b Non-stored computed fields and relations — 7, not 1
+
+**New subsection, 2026-07-28.** The prior version of this delta's summary
+said "1 computed relation," counting only
+`export_reconcile_review_binding_ids`. It never itemized the wizard's own
+six non-stored computed fields, three of which (`store_id`, `product_gid`,
+`reconcile_note`) are exactly where independent-review Defect #1 lived: a
+`related=` field defaults to `compute_sudo=True` in Odoo 19
+(`odoo/orm/fields.py` at the pinned `30bde9ff`, verified), so computing them
+ran as superuser regardless of the calling user, bypassing the SEC-3 rule
+on the target binding the caller might not otherwise be able to read.
+
+| Model | Field | Kind | Non-stored because | Company path |
+| --- | --- | --- | --- | --- |
+| `shopify.connector.store` | `export_reconcile_review_binding_ids` | Many2many, computed | `compute='_compute_export_reconcile_review_binding_ids'`, no `store=True` | Runs as the calling user; `depends_context=('uid', 'company', 'allowed_company_ids')` keys the per-transaction field cache so one company's list is never served to another (see §8.3). |
+| `shopify.connector.export.checksum.ack.wizard` | `store_id` | Many2one, `related='binding_id.store_id'` | related fields are non-stored by default | **Corrected 2026-07-28**: `related_sudo=False` — see §8.9. |
+| `shopify.connector.export.checksum.ack.wizard` | `product_gid` | Char, `related='binding_id.shopify_gid'` | same | **Corrected 2026-07-28**: `related_sudo=False`. |
+| `shopify.connector.export.checksum.ack.wizard` | `reconcile_note` | Char, `related='binding_id.export_reconcile_note'` | same | **Corrected 2026-07-28**: `related_sudo=False`. |
+| `shopify.connector.export.checksum.ack.wizard` | `verified_summary` | Text, `compute='_compute_summaries'` | rendered prose, never persisted | n/a — reads only fields already on `self`/`binding_id`, no independent record access. |
+| `shopify.connector.export.checksum.ack.wizard` | `unprovable_summary` | Text, `compute='_compute_summaries'` | same | n/a — static/templated copy, not record data. |
+| `shopify.connector.export.checksum.ack.wizard` | `consequence_summary` | Text, `compute='_compute_summaries'` | same | n/a — static/templated copy, not record data. |
+
+Total: **7**.
+
+### 8.3 New relationships — the connector-to-connector gap
 
 | Owner | Field | Target | Stored? | Consistency |
 | --- | --- | --- | --- | --- |
 | `shopify.connector.store` | `export_reconcile_review_binding_ids` | `…product.template.binding` | **no** (computed Many2many) | Creates no column and no relation table. Computed by a store-scoped, `limit`-ed search that runs as the CALLING user, so the SEC-3 binding rules filter it. `depends_context=('uid', 'company', 'allowed_company_ids')` keys the field cache per user and per company selection — without it Odoo caches a non-stored computed field once per record for the whole transaction and the first reader's result is served to the second, in either direction. |
 | `shopify.connector.store.settings` | `setup_completed_uid`, `setup_last_rerun_uid` | `res.users` | yes | Not connector-to-connector, so the same-store scope mixin does not apply; `res.users` is not a store-scoped model. |
 | `…product.template.binding` | `export_reconcile_ack_uid` | `res.users` | yes | Same. |
+| `shopify.connector.export.checksum.ack.wizard` | `binding_id` | `…product.template.binding` | **yes** (Many2one, `ondelete='cascade'`) | **Corrected 2026-07-28.** This is a genuine connector-to-connector Many2one, on a **TransientModel**, and the prior version of this table did not list it — the exact gap independent review traced Defect #1 to. It carries no `check_company`/`domain` of its own; consistency is enforced in Python at `create()`/`write()`/`default_get()` time by `_resolve_binding_for_ack`, which delegates to `_assert_export_reconcile_ack_authority` on the target binding (Administrator role, `check_access('read')`, `store.company_id in env.companies` — the exact gate the two production actions already enforced). See §8.9. |
 
-No new connector-to-connector Many2one exists, so
-`test_no_undeclared_connector_relation_exists` needs no new declaration —
-and would fail if one were added silently.
+**Corrected claim.** The prior version stated "No new connector-to-connector
+Many2one exists." That was wrong: `export.checksum.ack.wizard.binding_id`
+is exactly one, and it exists at the SAME head (`ef67c803`) the claim was
+made about — this is a scoping correction, not a change introduced by the
+correction cycle. `test_no_undeclared_connector_relation_exists` covers
+durable models in `SEC3_MODELS`; a TransientModel relation is outside that
+guard's stated scope by design (a TransientModel is never itself a
+store-scoped durable record), which is precisely why this relation needed
+to be reasoned about here rather than caught by that automated guard alone.
 
-### 8.4 New public / RPC-callable methods
+### 8.4 New public / RPC-callable methods — 18, not 20
 
 | Method | Model | Authority | Company check |
 | --- | --- | --- | --- |
@@ -482,6 +548,19 @@ and would fail if one were added silently.
 | `action_shopify_export_open_checksum_ack_wizard` | template binding | **Administrator only** | same, before the dialog opens |
 | `action_confirm` | ack wizard | delegates | delegates |
 
+**Count.** 14 rows above expand to 18 unique methods: 15 in the setup-wizard
+feature (14 on `shopify.connector.setup.wizard` itself + 1
+`action_shopify_rerun_setup` on `shopify.connector.store`), 2 on the
+binding (`action_shopify_export_acknowledge_checksum`,
+`action_shopify_export_open_checksum_ack_wizard`), 1 on the ack wizard
+(`action_confirm`). The prior version of this delta's summary said 20 — an
+overcount by 2, independently confirmed by re-listing every non-underscore
+method on the four affected classes from source and counting once each.
+`create()`, `write()` and `default_get()` overrides (added by the
+correction cycle; see §8.9) are framework methods every model already has
+and are not counted here, consistent with how this table has never counted
+them for any other connector model.
+
 ### 8.5 New client payloads and UI routes
 
 | Surface | Route | Payload discipline |
@@ -493,25 +572,67 @@ and would fail if one were added silently.
 cannot be group-restricted at all — which is exactly why every server method
 enforces the role itself.
 
-### 8.6 New elevated (`sudo()`) seams
+### 8.6 New elevated (`sudo()`) seams — 15 methods / 19 call sites, not "14"
+
+**Corrected.** The prior version headlined "14 elevated seams," which was
+`shopify_connector_core`'s own count only (correct in isolation — see the
+`×N` annotations below, which have always meant "N syntactic `.sudo()`
+call sites in this one method," not "N methods"). It was then presented as
+the total for this WHOLE delta, silently dropping
+`shopify_connector_export_reconnect.py`'s 5 sudo call sites across 4
+methods. That file's own per-file inventory guard
+(`test_export_source_guards.py`) independently tracks its total budget and
+rose **15 → 20** in this delta (5 new sites) — a fact already true and
+already enforced by that guard before this correction; only this
+narrative summary had drifted from it.
 
 Recorded in the exact-inventory guards
 (`test_credential_service.py::CORE_SUDO_SITES`,
 `test_readiness_slot_closure.py`, and the per-file budget in
 `test_export_source_guards.py`), which fail on an unlisted addition.
 
-| Seam | Why elevation is necessary | Checks before it |
-| --- | --- | --- |
-| `setup.wizard._settings_for` ×2 | no connector group holds `create` on `store.settings` | role, record access, company |
-| `setup.wizard._record_progress` | resume point is a readonly column | as above |
-| `setup.wizard._last_readiness_checks` ×2 | reads one job + one log row for the already-authorised store | as above |
-| `setup.wizard.save_store_identity` ×2 | no connector group holds `create` on `shopify.connector.store` | role; company taken from `env.company` and refused unless the caller belongs to it |
-| `setup.wizard.save_directions` / `save_source_of_truth` / `save_notification` / `save_first_push_schedule` / `activate` / `restart_setup` | settings write ACL is Administrator-only but `create` is not, and the progress columns are readonly | role, record access, company |
-| `readiness.check._web_base_url` | system parameters are `base.group_system`; readiness runs as the connector administrator | called only from the readiness registry, which its callers gate |
-| `export_reconnect._export_reconcile_media_claim` | reads the binding's own media rows so a record rule cannot silently shorten the claim and make a partial digest match | role, record access, company |
-| `export_reconnect._export_reconcile_clear_acknowledgement` | ack fields are protected binding fields | as above, or a pass writing a fresh verdict |
-| `export_reconnect.action_shopify_export_acknowledge_checksum` | writes those protected fields | role, record access, company, eligibility |
-| `export_reconnect._reassert_export_reconcile_acknowledgements` ×2 | reads the store's own outstanding reviews and re-applies the block on readonly verdict fields | reached only from the store's own export assertion |
+| Seam | Call sites | Why elevation is necessary | Checks before it |
+| --- | --- | --- | --- |
+| `setup.wizard._settings_for` | 2 | no connector group holds `create` on `store.settings` | role, record access, company |
+| `setup.wizard._record_progress` | 1 | resume point is a readonly column | as above |
+| `setup.wizard._last_readiness_checks` | 2 | reads one job + one log row for the already-authorised store | as above |
+| `setup.wizard.save_store_identity` | 2 | no connector group holds `create` on `shopify.connector.store` | role; company taken from `env.company` and refused unless the caller belongs to it |
+| `setup.wizard.save_directions` | 1 | settings write ACL is Administrator-only but `create` is not, and the progress columns are readonly | role, record access, company |
+| `setup.wizard.save_source_of_truth` | 1 | same | same |
+| `setup.wizard.save_notification` | 1 | same | same |
+| `setup.wizard.save_first_push_schedule` | 1 | same | same |
+| `setup.wizard.activate` | 1 | same | same |
+| `setup.wizard.restart_setup` | 1 | same | same |
+| `readiness.check._web_base_url` | 1 | system parameters are `base.group_system`; readiness runs as the connector administrator | called only from the readiness registry, which its callers gate |
+| `export_reconnect._export_reconcile_media_claim` | 1 | reads the binding's own media rows so a record rule cannot silently shorten the claim and make a partial digest match | role, record access, company |
+| `export_reconnect._export_reconcile_clear_acknowledgement` | 1 | ack fields are protected binding fields | as above, or a pass writing a fresh verdict |
+| `export_reconnect.action_shopify_export_acknowledge_checksum` | 1 | writes those protected fields | role, record access, company, eligibility |
+| `export_reconnect._reassert_export_reconcile_acknowledgements` | 2 | reads the store's own outstanding reviews and re-applies the block on readonly verdict fields | reached only from the store's own export assertion |
+
+**Totals.** 15 unique elevated methods; 19 syntactic `.sudo()` call sites —
+the sum of the "Call sites" column above, added row by row: 2+1+2+2+1+1+1+
+1+1+1+1+1+1+1+2 = 19.
+
+Split by module: **`shopify_connector_core`** — the first 11 rows above
+(everything through `readiness.check._web_base_url`) = 11 methods, and
+2+1+2+2+1+1+1+1+1+1+1 = 14 call sites. **`shopify_connector_product_export`**
+— the last 4 rows (`_export_reconcile_media_claim` through
+`_reassert_export_reconcile_acknowledgements`) = 4 methods, and
+1+1+1+2 = 5 call sites. 11 + 4 = 15 methods; 14 + 5 = 19 call sites,
+matching the delta-wide totals above.
+
+This 5-call-site, 4-method `shopify_connector_product_export` figure is
+this delta's OWN contribution to that file, not the file's total sudo
+budget: `test_export_source_guards.py` tracks
+`shopify_connector_export_reconnect.py`'s complete, whole-file inventory
+(including sudo sites from BEFORE this delta) and recorded that total
+rising 15 → 20 across this same commit range — 5 more, which reconciles
+exactly with the 5 new call sites this table lists for that file. The two
+"15"s in this section (15 elevated METHODS delta-wide, and the file
+guard's PRE-delta whole-file call-site total) are different quantities
+that happen to share a value; they are not the same count restated. The
+correction cycle (§8.9) adds no new `.sudo()` call anywhere — every number
+in this subsection is unchanged by it.
 
 Actor attribution survives every one of them: the audit row is written through
 `store._create_lifecycle_audit_job`, whose `job.log` append runs in the
@@ -527,11 +648,21 @@ store `env.uid` rather than the superuser.
   "setup not yet walked" rather than as complete — the fail-safe direction.
 * An existing store's settings row is reused rather than replaced;
   `_settings_for` creates one only when none exists.
-* No new stored relation exists, so the SEC-3 historic quarantine sweep has
-  nothing new to scan and no existing row's scope changes.
+* **Corrected 2026-07-28.** The prior version of this bullet said "No new
+  stored relation exists." One does: `export.checksum.ack.wizard.binding_id`
+  (§8.2, §8.3). It needs no historic-quarantine-sweep entry regardless,
+  because it lives on a **TransientModel** — Odoo vacuums these rows on its
+  own schedule, none is ever a durable historic record, and the sweep's
+  scope (`docs/03-architecture/sec3-company-isolation-audit.md` §6/§7,
+  durable connector-owned rows) was never meant to include transient
+  confirmation artifacts. The correction claim is about the SENTENCE, not
+  about a gap in the sweep's actual behaviour.
 * Uninstall behaviour is unchanged: no new model is depended on by another
   module, and the two new models own no data that outlives a session
-  (transient) or a request (abstract).
+  (transient) or a request (abstract). The new `ir.rule` added by the
+  correction cycle (§8.9) is ordinary security data (`noupdate="0"`, per
+  this module's existing convention) and uninstalls the same way every
+  other rule in this file already does.
 
 ### 8.8 What this delta does NOT claim
 
@@ -540,3 +671,87 @@ store `env.uid` rather than the superuser.
 * No exact-SHA Odoo.sh runtime evidence exists for this head.
 * The local two-company/two-role negative matrix is green, and local green is
   supporting evidence, not acceptance.
+
+### 8.9 2026-07-28 correction cycle — company-isolation fixes on this same surface
+
+A fresh top-level independent review of head `ef67c8035e7ee2f6cafd564fcbf2e12153a7e817`
+(PR #204 comment
+[`5100097485`](https://github.com/AdamsOdoo/Adams/pull/204#issuecomment-5100097485))
+returned **HOLD**, with one P1 confidentiality defect (Defect #1) inside
+this exact §8 surface, plus the count/scope corrections applied above. This
+subsection records what the correction cycle changed to close Defect #1 —
+additive to §8.1–§8.8, not a re-statement of them, since none of this
+existed at head `ef67c803`.
+
+**Defect #1 — cross-company confidentiality bypass via the TD-015
+confirmation wizard.** `binding_id` (§8.2, §8.3) carried no
+`create()`/`write()`/`default_get()` validation of its own, and `store_id`
+/ `product_gid` / `reconcile_note` (§8.2b) computed with Odoo's default
+`related_sudo=True`. A Connector Administrator of one company could call,
+over plain RPC, `create({'binding_id': <another company's binding id>})`
+then `read(['store_id', 'product_gid', 'reconcile_note'])`, and the related
+fields' `compute_sudo=True` would compute them as superuser — bypassing the
+`product_template_binding_store_company_rule` `ir.rule` on the target
+binding entirely, before the downstream binding actions' own checks were
+ever reached.
+
+**Fix, four parts:**
+
+1. `related_sudo=False` on `store_id`, `product_gid`, `reconcile_note`
+   (`shopify_connector_product_export_wizards.py`) — the three fields now
+   compute as the CALLING user, so a foreign-company `binding_id` makes
+   the computation itself raise (`AccessError` via the SEC-3 rule, or
+   `MissingError` for a nonexistent id — see item 3) instead of returning
+   foreign data. This is the fix that protects every access path (`read()`,
+   `search_read()`, `default_get()`, an onchange), not only the ones the
+   wizard's own methods happen to call.
+2. `_resolve_binding_for_ack`, called from `create()`, `write()` (when
+   `binding_id` is present) and `default_get()` (before
+   `super().default_get()` runs, so a default computed against the
+   related fields above never gets the chance to try) — delegates the
+   whole decision to `_assert_export_reconcile_ack_authority` on the
+   target binding, the SAME gate `action_shopify_export_acknowledge_
+   checksum` and `action_shopify_export_open_checksum_ack_wizard` already
+   enforce. No new authority rule was invented; an existing one is now
+   reached from every entry point that can set `binding_id`, not only the
+   two action methods.
+3. A foreign-but-real binding and a nonexistent one are collapsed to the
+   identical refusal (`AccessError`, one generic message) rather than left
+   distinguishable — `check_access` can raise either `AccessError`
+   (excluded by the rule) or `MissingError` (nothing to read), verified
+   against the pinned Odoo 19 `fetch()` implementation
+   (`odoo/orm/models.py`, which guards the identical ambiguity the same
+   way), and both are caught.
+4. `export_checksum_ack_wizard_creator_rule` — a new, creator-scoped
+   `ir.rule` on the wizard model itself
+   (`[('create_uid', '=', user.id)]`, global,
+   `security/shopify_connector_product_export_company_rules.xml`,
+   `noupdate="0"`). Independent of and in addition to the three fixes
+   above: before it, the wizard model's ACL granted every Connector
+   Administrator full CRUD with no rule at all, so a wizard row that
+   legitimately exists (created by one Administrator for a binding they
+   are genuinely authorised on) was still `search_read()`-visible to every
+   OTHER Administrator, in any company, including the raw `binding_id`
+   integer it names. This closes that residual surface; the company
+   decision itself still lives entirely on the binding, per items 1–3.
+
+**Not changed.** No new model, stored field, public method, or `.sudo()`
+call site — §8.1–§8.6's counts above are unaffected by this correction
+cycle. No Shopify request, mutation, or job admission of any kind occurs
+anywhere in this fix. `_assert_export_reconcile_ack_authority` itself is
+untouched; every fix above reaches it rather than duplicating it.
+
+**Test coverage added:** same-role cross-company `create()` refusal before
+any content returns; the `default_get()`/context route refused before the
+related fields compute; a same-company Administrator refused when
+substituting a foreign `binding_id` via `write()`; direct `read()`/
+`search()` refused for a wizard row the caller did not create; a
+same-company positive control proving none of the above narrows the happy
+path — all in
+`addons/shopify_connector_product_export/tests/test_export_reconnect_reconcile.py`,
+`TestExportReconnectChecksumAcknowledgement`.
+
+This correction is **implementation coverage of its own fix**, not a
+Tier-1 independent security review of it. §8.8 still applies in full: SEC-3
+is not accepted, #197 remains open, and this exact correction still
+requires a fresh independent review before any further gate.

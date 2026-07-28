@@ -547,13 +547,21 @@ the field that already owns it. Administrator only on every entry point
 including the read. All three accepted entry routes exist and are driven in a
 browser.
 
-**C. SEC-3 integration.** This cycle's complete surface delta — 2 models, 17
-stored fields, 1 computed relation, 20 public methods, 14 elevated seams — is
-inventoried in [`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
-§8, with a local two-company/two-role negative matrix over every one.
-**Issue #197 remains OPEN.** This is implementation coverage; #197's own
-gates — full-surface inventory, independent Tier-1 security review, exact-SHA
-runtime evidence — are unmet at this head and are not claimed.
+**C. SEC-3 integration.** `[Corrected 2026-07-28]` This cycle's complete
+surface delta — 2 models, 20 stored fields, 7 non-stored computed
+fields/relations, 18 public/RPC methods, 15 elevated methods over 19
+`sudo()` call sites — is inventoried in
+[`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
+§8, with a local two-company/two-role negative matrix over every one. The
+prior "17 stored fields / 20 public methods / 14 elevated seams" headline
+did not match that section's own itemized tables (independent review) and
+is corrected here to the recount above. A P1 cross-company confidentiality
+defect found in this same delta by that same review — the TD-015
+acknowledgement wizard's company isolation — is corrected in §8.9 of the
+same document. **Issue #197 remains OPEN.** This is implementation
+coverage; #197's own gates — full-surface inventory, independent Tier-1
+security review, exact-SHA runtime evidence — are unmet at this head,
+including its corrected head, and are not claimed.
 
 **D. Present-tense tracker reconciliation.** S1, U1, Product Export, U3,
 SEC-2, SEC-3, CI and TD-002 were re-read against the source and corrected only

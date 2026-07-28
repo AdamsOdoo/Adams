@@ -139,6 +139,38 @@ classes it is pending on is genuinely absent:
 A row moves to `Resolved` when all four exist for it. Nothing here should be
 read as a release-readiness claim.
 
+## Status after the 2026-07-28 correction (independent review comment `5100097485`)
+
+> **Status: implementing-session record. NOT an acceptance, NOT a review.**
+> **The implementation worker has not reviewed or accepted its own work.**
+
+A fresh independent review of PR #204's head `ef67c8035e7ee2f6cafd564fcbf2e12153a7e817`
+returned **HOLD**: three P1 and two P2-material defects, none refuted under
+adversarial verification. Two of the five sit directly in **TD-015**'s own
+surface and are corrected here; none of the four evidence classes in the
+table above changes as a result — this correction adds source-inspection
+and local-test evidence only, same as every prior cycle.
+
+| Defect | TD-015 surface affected | Correction |
+| --- | --- | --- |
+| **#4 (P2-material)** | `_remote_media_divergence` (`shopify_connector_export_reconnect.py`) | A truncated remote media read (`hasNextPage=true`) reached the acknowledgeable `checksum_unverifiable` reason whenever every connector-claimed File GID happened to appear on the one page that WAS read — the code checked "every claimed File found" before checking "was the read complete", reasoning (incorrectly) that the first implies the second. Truncation is now checked independently of, and before, that case. Regression: a fixture with `hasNextPage=True` and every claimed File present now asserts `media_read_truncated`, not `checksum_unverifiable`. |
+| **#5 (P2-material)** | `_reassert_export_reconcile_acknowledgements` (same file) | The security-relevant re-validation pass that keeps an acknowledgement's invalidation load-bearing was capped at `EXPORT_RECONCILE_REVIEW_LIMIT` (200) — a constant borrowed from the store-form's UI display list — with no explicit order. A stale acknowledgement beyond the 200th (by id) was invisible to it forever, while the settlement path that first reaches `complete` scans unbounded. Replaced with deterministic keyset pagination (`RECONCILE_REVALIDATION_BATCH_SIZE`, a separate constant) that walks every matching row regardless of how many batches that takes. Regression: >200 acknowledged bindings, one stale beyond position 200, reached and re-blocked; a companion >200-valid-population test proves the walk is not a vacuous permanent block. |
+
+A third defect, **#1 (P1, cross-company confidentiality bypass)**, sits in
+the TD-015 acknowledgement wizard but is a SEC-3 company-isolation defect
+rather than a PD-PX-7 reconciliation-pass defect; it and its correction are
+recorded in
+[`../03-architecture/sec3-company-isolation-audit.md`](../03-architecture/sec3-company-isolation-audit.md)
+§8.9, not duplicated here. The remaining two defects (#2/#3, S1 connect-only
+and Catalog-export-only activation) are an S1 readiness-check defect, not
+TD-015; S1 has no row of its own in this register to correct.
+
+**Not reopened by this correction:** every other row above, and every other
+TD-015 claim not named in the table — the acknowledgement's binding to
+connection generation/product identity/File-GID-set/local-claim digest, its
+Administrator-only authority, its zero-Shopify-contact guarantee, and its
+audit trail are all unchanged and unaffected.
+
 ---
 
 _This register is active. TD-001 was its first real entry (logged via
