@@ -634,10 +634,57 @@ descendant.
 
 **No Shopify resource was provisioned or contacted by this correction.**
 Issues #185, #186, #197 and #200 remain open. PR #204 remains draft,
-unapproved and unmerged. Full record: the PR #204 comment titled
+unapproved and unmerged. **`[Corrected 2026-07-28]`** This subsection
+previously stated the PR #204 comment titled
 `CONTROL-ROOM PROVISIONING-PACKAGE CORRECTION` and the issue #200 comment
 titled `AUTHORITATIVE CORRECTION TO PROVISIONING READINESS COMMENT 5103684847`
-(both posted this session, after this commit).
+were "both posted this session" — they were not; that pre-claimed a future
+GitHub action before it happened. The accurate sequencing: this documentation
+correction is committed first; the control room's addendum then authorized
+one additional additive documentation-only commit (§5e.7) covering three
+further consistency corrections; the external PR #204 and issue #200 records
+above are posted only **after** the final documentation head's own GitHub
+Actions run completes with `success` — never before, and never claimed in
+advance of that result.
+
+**`EXECUTABLE TREE UNCHANGED FROM THE ACCEPTED ODOO.SH STANDARD-RUNTIME HEAD.`**
+
+### 5e.7 Control-room addendum — three documentation-consistency corrections — 2026-07-28
+
+> **Status: documentation-only correction record, additive to §5e.6. NOT an
+> acceptance, NOT a review, NOT a new runtime or UAT claim.**
+
+Before finalizing the §5e.6 correction, the control room found three further
+documentation inconsistencies and authorized exactly one additional additive
+documentation-only commit (parent `dd8ab135f494b5c2085662ef68e920fd1339e21e`,
+the §5e.6 commit) to fix them, without amending, rebasing, or force-pushing
+`dd8ab135` itself:
+
+1. `shopify-live-validation-package.md` §1's entry criteria E2/E3 conflated
+   "the connector SHA under test" (a single `git rev-parse HEAD`) with the
+   Odoo.sh-validated executable head, which does not distinguish a
+   documentation-only descendant from the executable head Odoo.sh actually
+   tested. Corrected to record the current campaign/package head and the
+   accepted runtime-tested executable head (`ee23c966a0b214c7974abbade4b384f251c4940f`)
+   **separately**, with an explicit zero-executable-delta proof requirement
+   and a fresh-qualification trigger if that delta is ever non-zero.
+2. `val-b2-closure-plan.md` §10 point 5 read "if VAL-B2 fails (including the
+   'qualified/partial' case in §8)," folding the PARTIAL outcome into FAIL —
+   contradicting §7's own PASS/PARTIAL/FAIL separation (corrected in the
+   §5e.6 cycle). Corrected so FAIL and PARTIAL are named as distinct,
+   independently-escalated outcomes; PARTIAL is never recorded as FAIL.
+3. This file's own §5e.6 stated the PR #204 and issue #200 correction
+   comments were "both posted this session" before they were posted —
+   corrected per §5e.6's own text above to accurate sequencing: those
+   comments are posted only after this commit's own Actions run succeeds.
+
+**Executable tree unchanged.** This commit touches the same three allowed
+documentation paths as §5e.6 and no other; `addons/`, `tools/`, and
+`.github/` remain byte-for-byte identical to
+`ee23c966a0b214c7974abbade4b384f251c4940f` across both correction commits
+combined. No Shopify resource was provisioned or contacted. Issues #185,
+#186, #197 and #200 remain open; PR #204 remains draft, unapproved and
+unmerged.
 
 ## 6. Re-derived Wave 5 completion scope and sequence
 

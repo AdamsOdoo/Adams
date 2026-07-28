@@ -22,11 +22,31 @@
 | # | Criterion | Verified by |
 | --- | --- | --- |
 | E1 | A **disposable** Shopify development store exists, used by no other workload | Provisioner, recorded on #200 |
-| E2 | The exact connector SHA under test is frozen and recorded | `git rev-parse HEAD` in the run record |
-| E3 | Exact-SHA Odoo.sh runtime for that SHA is green | Odoo.sh build id |
+| E2 | The **current campaign/package head** (`git rev-parse HEAD` on this package) is frozen and recorded, **separately** from the accepted runtime-tested executable head it descends from | Both SHAs in the run record |
+| E3 | The **accepted runtime-tested executable head** has green exact-head Odoo.sh runtime evidence, **and** the current campaign/package head is proven a documentation-only descendant of it with **zero executable-tree delta** | Odoo.sh build id (tied to the executable head only) + `git diff --name-only <executable-head>..<current-head> -- addons tools .github` recorded empty in the run record |
 | E4 | Credentials are least-privilege per §2 and are **not** production credentials | Scope dump in §2.3 |
 | E5 | A named human owner is on point for the run and for revocation | Run record |
 | E6 | Rollback (§8) has been read and the store's pre-run state is captured (§3.3) | Baseline snapshot file |
+
+**`[Corrected 2026-07-28]`** E2/E3 previously conflated "the connector SHA
+under test" with a single `git rev-parse HEAD`, which does not distinguish a
+documentation-only descendant from the executable head Odoo.sh actually
+validated. Stated explicitly:
+
+- `dd8ab135f494b5c2085662ef68e920fd1339e21e` and its forthcoming
+  documentation-only descendant are **not** described as exact-head Odoo.sh
+  validated — only `ee23c966a0b214c7974abbade4b384f251c4940f` carries that
+  evidence.
+- No additional Odoo.sh campaign is required **merely because documentation
+  changed** — a zero-executable-delta descendant inherits the accepted
+  disposition of the executable head it descends from.
+- Before campaign execution, **both** the final current head and the
+  runtime-tested executable ancestor it descends from must be frozen and
+  recorded — not one SHA standing in for both.
+- If any executable path (`addons/`, `tools/`, `.github/`) differs between
+  the current head and `ee23c966a0b214c7974abbade4b384f251c4940f`, this
+  equivalence is invalid and a fresh Odoo.sh qualification is required before
+  E3 can be satisfied.
 
 **If any entry criterion fails, STOP.** Do not partially run the campaign.
 

@@ -327,10 +327,17 @@ apply unchanged to this closure attempt. In particular:
 4. If VAL-B2 passes: note this explicitly does **not**, by itself, resolve
    MBQ-05 or authorize a setup wizard/OAuth build — those still require their
    own separate ChatGPT decision and gate, per DEC-023 §7/§8.
-5. If VAL-B2 fails (including the "qualified/partial" case in §8): escalate to
-   ChatGPT with the exact failure evidence, per DEC-023 §3.2's recommended next
-   step (build real OAuth, using the vendor-owned cross-organizational app
-   shape).
+5. **`[Corrected 2026-07-28]`** If VAL-B2 is **FAIL** (the genuine connection
+   attempt fails, or the required connection evidence in §5/§6 cannot be
+   produced despite valid provisioning) **or PARTIAL** (a genuine bounded
+   connection succeeds, but only a 24-hour client-credentials token is
+   obtainable — §7/§8): escalate to ChatGPT with the exact evidence, per
+   DEC-023 §3.2's recommended next step (build real OAuth, using the
+   vendor-owned cross-organizational app shape). This item previously read
+   "if VAL-B2 fails (including the 'qualified/partial' case in §8)," which
+   folded PARTIAL into FAIL — contradicting §7's corrected taxonomy. **PARTIAL
+   is never recorded as FAIL**; both are escalated, but they are distinct
+   outcomes with a distinct evidentiary meaning (§7).
 
 ## 11. Explicit non-claims
 
