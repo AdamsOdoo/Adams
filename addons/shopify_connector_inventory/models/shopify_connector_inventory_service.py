@@ -2605,8 +2605,179 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 raise UserError(
                     "A first stock push has already been previewed or "
                     "confirmed for this location, so its Odoo target cannot "
-                    "be changed here. Resolve those pairs first."
+                    "be changed here. An Administrator can withdraw each "
+                    "pair's first-push decision from the inventory pair "
+                    "itself (Withdraw first push), after which the remap "
+                    "becomes possible and a completely new preview and "
+                    "confirmation are required."
                 )
+        return True
+
+    def withdraw_first_push_decision(
+        self, binding, reason, confirmed=False, expected_state=None,
+    ):
+        """Withdraw a pair's previewed/confirmed first-push decision (TD-020).
+
+        WHY THIS EXISTS. `first_push_state='confirmed'` was terminal: no route
+        returned a confirmed pair to `pending`, so `_assert_remap_is_safe`'s
+        correct refusal became PERMANENT -- a merchant who physically moved a
+        warehouse after their first push could never re-point the Shopify
+        location again (TD-020). The refusal was right; the missing piece was
+        a governed way to unwind the DECISION it protects, and that unwinding
+        is a first-push-guard concern, which is why it lives here and not on
+        the mapping.
+
+        WHAT IT NEVER DOES. It never reuses the old confirmation -- the pair
+        returns to `pending`, so a completely new preview AND a new explicit
+        confirmation are mandatory before any mutation can ever be enqueued
+        again (the `inventory_push_sync` handler's D-013-4 gate is untouched).
+        It performs no Shopify call and enqueues nothing.
+
+        WHEN IT REFUSES. The decision may only be withdrawn from a PROVEN
+        safe terminal state:
+
+        * any non-terminal inventory job for the pair -- queued, running,
+          waiting to retry, or blocked in review -- must finish or be
+          resolved first (a job that already read the old pairing must not
+          have the decision changed underneath it);
+        * any unresolved mutation attempt -- `pending`, or `uncertain`
+          without a recorded resolution -- must be resolved through the
+          accepted mutation-resolution route first (an ambiguous outcome is
+          exactly the state in which nothing may be assumed);
+        * a pair flagged `stale`/`review` must be released through the
+          accepted re-check route first.
+
+        A pair whose past mutations all ended in recorded terminal outcomes
+        (succeeded, failed clean, or resolved) IS a proven safe terminal
+        state: the withdrawal changes only the stored decision, and the
+        consequence disclosure tells the operator that Shopify keeps the last
+        pushed quantity until a new first push is previewed, confirmed and
+        applied.
+
+        CONCURRENCY. The binding row is locked (`FOR UPDATE`) and the state
+        re-read under the lock; `expected_state` -- the state the wizard
+        showed the operator -- must still match, so a stale dialog or a
+        concurrent withdrawal/confirmation loses instead of silently winning.
+        """
+        binding.ensure_one()
+        # Same environment rebinding, same reason as `remap_location_mapping`:
+        # authorization questions must be about the CALLER.
+        binding = binding.with_env(self.env)
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Administrator may withdraw a "
+                "first-push decision."
+            )
+        if not confirmed:
+            raise UserError(
+                "Withdrawing the first-push decision means this pair cannot "
+                "push any stock until a new preview is run and explicitly "
+                "confirmed. Confirm that explicitly."
+            )
+        if not isinstance(reason, str) or not reason.strip():
+            raise UserError("A non-empty withdrawal reason is required.")
+        try:
+            binding.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError("This inventory pair is not available.")
+        store = self._resolve_store_for_location_action(binding.store_id.id)
+        # Lock the binding row so two withdrawals -- or a withdrawal racing a
+        # confirmation -- serialize, then re-read the state under the lock.
+        binding.flush_recordset()
+        self.env.cr.execute(
+            "SELECT first_push_state "
+            "FROM shopify_connector_inventory_level_binding "
+            "WHERE id = %s FOR UPDATE",
+            (binding.id,),
+        )
+        row = self.env.cr.fetchone()
+        binding.invalidate_recordset(['first_push_state'])
+        locked_state = row[0] if row else False
+        if expected_state is not None and locked_state != expected_state:
+            raise UserError(
+                "This pair's first-push state changed while the dialog was "
+                "open (it is now '%s'). Nothing was withdrawn; reopen the "
+                "pair and decide against its current state." % (
+                    locked_state or 'unknown',
+                )
+            )
+        if locked_state not in ('previewed', 'confirmed'):
+            raise UserError(
+                "This pair has no previewed or confirmed first push to "
+                "withdraw."
+            )
+        self._assert_first_push_withdrawal_is_safe(binding)
+        old_target = binding.location_mapping_id.odoo_location_id.display_name
+        safe_reason = binding._audit_safe_reason(reason)
+        binding.sudo().write({
+            'first_push_state': 'pending',
+            'first_push_preview_qty': False,
+            'first_push_confirmed_at': False,
+            'first_push_confirmed_by_uid': False,
+        })
+        # The one sanctioned audit-trail path lifecycle actions funnel
+        # through: actor and time are the job row's own provenance.
+        store._create_lifecycle_audit_job(
+            'First-push decision withdrawn for inventory pair #%d '
+            '(%s at %s): state %s returned to pending. A new preview and a '
+            'new explicit confirmation are required before any push. '
+            'Reason: %s' % (
+                binding.id,
+                binding.shopify_inventory_item_gid,
+                old_target,
+                locked_state,
+                safe_reason,
+            )
+        )
+        self._mark_location_readiness_stale(store)
+        return True
+
+    @api.model
+    def _assert_first_push_withdrawal_is_safe(self, binding):
+        """Refuse a withdrawal outside a proven safe terminal state."""
+        Job = self.env['shopify.connector.job']
+        Job.flush_model()
+        busy = Job.sudo().search_count([
+            ('store_id', '=', binding.store_id.id),
+            ('job_type', 'in', INVENTORY_JOB_TYPES),
+            ('res_model', '=', 'shopify.connector.inventory.level.binding'),
+            ('res_id', '=', binding.id),
+            ('state', 'not in', TERMINAL_JOB_STATES),
+        ])
+        if busy:
+            raise UserError(
+                "Inventory work for this pair has not finished. Wait for it "
+                "to complete, or resolve it, before withdrawing the "
+                "first-push decision."
+            )
+        Attempt = self.env['shopify.connector.mutation.attempt']
+        unresolved = Attempt.sudo().search_count([
+            ('job_id.store_id', '=', binding.store_id.id),
+            ('job_id.res_model', '=',
+             'shopify.connector.inventory.level.binding'),
+            ('job_id.res_id', '=', binding.id),
+            '|',
+            ('observed_outcome', '=', 'pending'),
+            '&',
+            ('observed_outcome', '=', 'uncertain'),
+            ('resolution_disposition', '=', False),
+        ])
+        if unresolved:
+            raise UserError(
+                "A Shopify mutation for this pair has an unresolved or "
+                "uncertain outcome. Resolve it through the mutation review "
+                "route first; nothing may be withdrawn while what Shopify "
+                "actually did is unknown."
+            )
+        if binding.status in ('stale', 'review'):
+            raise UserError(
+                "This pair is flagged '%s'. Release it through its re-check "
+                "route first, then withdraw the first-push decision." % (
+                    binding.status,
+                )
+            )
         return True
 
     @api.model

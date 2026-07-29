@@ -253,4 +253,75 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+
+    <record id="view_shopify_connector_first_push_withdraw_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.first.push.withdraw.wizard.form</field>
+        <field name="model">shopify.connector.first.push.withdraw.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Withdraw this first-push decision" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-warning" role="alert">
+                    <strong>This withdraws the pair's first-push decision.</strong>
+                    The pair returns to Pending: no stock can be pushed for
+                    this product and location until a new preview is run and
+                    explicitly confirmed. The old confirmation is never
+                    reused. Administrator only, and the reason below is
+                    recorded on the audit trail.
+                </div>
+                <div class="alert alert-info" role="note">
+                    Use this when the mapped Odoo location must change — for
+                    example after a physical warehouse move. Once every pair
+                    of a Shopify location is back to Pending, the
+                    Administrator remap on its location mapping becomes
+                    possible.
+                </div>
+                <!--
+                    Two different worlds, said explicitly: a pair that has
+                    never pushed leaves Shopify untouched by definition; a
+                    pair that HAS pushed leaves its last pushed quantity live
+                    on the storefront until the new ceremony completes.
+                -->
+                <div class="alert alert-info" role="note"
+                     invisible="has_pushed_before">
+                    Nothing has ever been pushed for this pair, so Shopify is
+                    not affected by withdrawing the decision.
+                </div>
+                <div class="alert alert-warning" role="alert"
+                     invisible="not has_pushed_before">
+                    Stock <strong>has</strong> been pushed for this pair
+                    before. Shopify keeps the last pushed quantity until a
+                    new first push is previewed, confirmed and applied — no
+                    quantity is changed or removed by withdrawing the
+                    decision.
+                </div>
+                <group>
+                    <field name="binding_id" invisible="1"/>
+                    <field name="expected_state" invisible="1"/>
+                    <field name="has_pushed_before" invisible="1"/>
+                    <field name="shopify_location_name" readonly="1"/>
+                    <field name="odoo_location_id" readonly="1"/>
+                    <field name="first_push_state" readonly="1"/>
+                    <field name="reason"
+                           placeholder="Why is this decision being withdrawn?"/>
+                    <field name="confirmed"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Withdraw first push" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_first_push_withdraw_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Withdraw this first-push decision</field>
+        <field name="res_model">shopify.connector.first.push.withdraw.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 </odoo>

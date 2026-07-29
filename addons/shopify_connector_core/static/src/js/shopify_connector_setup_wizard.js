@@ -103,6 +103,15 @@ export class ShopifyConnectorSetupWizard extends Component {
                 // a secret.
                 credentialMode: "dev_dashboard_client_credentials",
             },
+            // The location step's bounded server-side search (Wave 5). Kept
+            // OUTSIDE `form` so a mapping round trip does not clobber an
+            // active search: mapping 5 of 300 locations means searching once
+            // and mapping repeatedly. `items: null` means "no search active
+            // — render the payload's first page".
+            locationSearch: {
+                shopify: { query: "", items: null, total: 0, offset: 0 },
+                odoo: { query: "", items: null, total: 0, offset: 0 },
+            },
         });
 
         onWillStart(async () => {
@@ -514,6 +523,112 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (ok) {
             this.state.form.mapShopifyGid = "";
             this.state.form.mapOdooLocationId = "";
+            // A mapping changes the rows an active search is showing (its
+            // Mapped badge, its target); re-run it so the operator watches
+            // their own progress instead of a snapshot.
+            for (const side of ["shopify", "odoo"]) {
+                if (this.state.locationSearch[side].items !== null) {
+                    await this._searchLocations(side, {
+                        offset: this.state.locationSearch[side].offset,
+                        append: false,
+                    });
+                }
+            }
+        }
+    }
+
+    // --- the location step's bounded server-side search ---------------------
+
+    /** The rows the Shopify list/select actually renders. */
+    get visibleShopifyLocations() {
+        const search = this.state.locationSearch.shopify;
+        return search.items !== null ? search.items : this.locations.locations;
+    }
+
+    /** The rows the Odoo select actually renders. */
+    get visibleOdooLocations() {
+        const search = this.state.locationSearch.odoo;
+        return search.items !== null
+            ? search.items
+            : this.locations.odoo_locations;
+    }
+
+    /** Totals for the honest "Showing X of Y" line. */
+    locationShowing(side) {
+        const search = this.state.locationSearch[side];
+        if (search.items !== null) {
+            return { shown: search.items.length, total: search.total };
+        }
+        if (side === "shopify") {
+            return {
+                shown: this.locations.locations.length,
+                total: this.locations.shopify_total ||
+                    this.locations.locations.length,
+            };
+        }
+        return {
+            shown: this.locations.odoo_locations.length,
+            total: this.locations.odoo_total ||
+                this.locations.odoo_locations.length,
+        };
+    }
+
+    locationHasMore(side) {
+        const showing = this.locationShowing(side);
+        return showing.shown < showing.total;
+    }
+
+    async searchLocations(side) {
+        await this._searchLocations(side, { offset: 0, append: false });
+    }
+
+    /** Enter in a search box searches; nothing else is intercepted. */
+    onLocationSearchKeydown(ev, side) {
+        if (ev.key === "Enter") {
+            ev.preventDefault();
+            this.searchLocations(side);
+        }
+    }
+
+    async loadMoreLocations(side) {
+        const search = this.state.locationSearch[side];
+        // "Load more" without a query is a search for everything -- which is
+        // exactly what it should be: pagination over the full eligible set.
+        await this._searchLocations(side, {
+            offset: search.items === null ? 0 : search.items.length,
+            append: search.items !== null,
+        });
+    }
+
+    clearLocationSearch(side) {
+        this.state.locationSearch[side] = {
+            query: "",
+            items: null,
+            total: 0,
+            offset: 0,
+        };
+    }
+
+    async _searchLocations(side, { offset, append }) {
+        if (!this.store.id) {
+            return;
+        }
+        try {
+            const page = await this.orm.call(MODEL, "search_location_options", [], {
+                store_id: this.store.id,
+                side,
+                query: this.state.locationSearch[side].query || "",
+                offset,
+            });
+            const search = this.state.locationSearch[side];
+            search.total = page.total;
+            search.offset = page.offset;
+            search.items = append && search.items !== null
+                ? search.items.concat(page.items)
+                : page.items;
+            this.state.errorMessage = "";
+        } catch (error) {
+            this.state.errorMessage = this._message(error);
         }
     }
 

@@ -429,3 +429,162 @@ class TestSetupLocationStep(TransactionCase):
         # longer the missing-mapping one, and it is never a green result for
         # something unproven.
         self.assertNotEqual(checks['mapped_location']['tone'], 'success')
+
+
+@tagged('post_install', '-at_install')
+class TestSetupLocationSearch(TestSetupLocationStep):
+    """Wave 5: the mapping step's bounded server-side search.
+
+    The step's lists are bounded pages, and that stays true. What these prove
+    is the REACHABILITY contract: every eligible cached Shopify location and
+    every eligible internal Odoo location is findable through the search RPC,
+    paged, with the store and company filters structural on every page --
+    including rows far past the first page's cut.
+    """
+
+    def _search(self, side, query='', offset=0, user=None):
+        return self._as(user).search_location_options(
+            self.store.id, side, query=query, offset=offset,
+        )
+
+    # --- the shopify side ------------------------------------------------
+
+    def test_a_location_beyond_the_first_page_is_reachable(self):
+        """The TD-gap itself: with more cached locations than the payload's
+        first page, a named search finds the row the page cut off."""
+        from odoo.addons.shopify_connector_inventory.models.\
+            shopify_connector_inventory_setup import (
+                SETUP_LOCATION_LIST_LIMIT,
+            )
+        total = SETUP_LOCATION_LIST_LIMIT + 30
+        for index in range(total):
+            self._cache(
+                'gid://shopify/Location/SEARCH%04d' % index,
+                'Search Depot %04d' % index,
+            )
+        payload = self._as().get_setup_state(store_id=self.store.id)
+        listing = payload['location_mapping']
+        self.assertTrue(listing['truncated'])
+        self.assertEqual(listing['shopify_total'], total)
+        self.assertEqual(
+            len(listing['locations']), SETUP_LOCATION_LIST_LIMIT,
+        )
+        # The very last row alphabetically is past the first page --
+        # unreachable by scrolling, reachable by search.
+        page = self._search('shopify', query='Depot %04d' % (total - 1))
+        self.assertEqual(page['total'], 1)
+        self.assertEqual(
+            page['items'][0]['name'], 'Search Depot %04d' % (total - 1),
+        )
+
+    def test_search_pages_through_the_full_eligible_set(self):
+        from odoo.addons.shopify_connector_inventory.models.\
+            shopify_connector_inventory_setup import (
+                SETUP_LOCATION_SEARCH_PAGE,
+            )
+        total = SETUP_LOCATION_SEARCH_PAGE + 5
+        for index in range(total):
+            self._cache(
+                'gid://shopify/Location/PAGE%04d' % index,
+                'Paged Depot %04d' % index,
+            )
+        first = self._search('shopify', query='Paged Depot')
+        self.assertEqual(first['total'], total)
+        self.assertEqual(len(first['items']), SETUP_LOCATION_SEARCH_PAGE)
+        second = self._search(
+            'shopify', query='Paged Depot', offset=SETUP_LOCATION_SEARCH_PAGE,
+        )
+        self.assertEqual(len(second['items']), 5)
+        seen = {item['shopify_gid'] for item in first['items']}
+        seen |= {item['shopify_gid'] for item in second['items']}
+        self.assertEqual(len(seen), total)
+
+    def test_search_carries_the_mapping_state(self):
+        self._cache('gid://shopify/Location/SM1', 'Searchable Mapped')
+        self._cache('gid://shopify/Location/SM2', 'Searchable Unmapped')
+        self.Service.with_user(self.admin).create_or_update_location_mapping(
+            self.store, self.location_a, 'gid://shopify/Location/SM1',
+        )
+        page = self._search('shopify', query='Searchable')
+        by_name = {item['name']: item for item in page['items']}
+        self.assertTrue(by_name['Searchable Mapped']['mapped'])
+        self.assertEqual(
+            by_name['Searchable Mapped']['odoo_location_id'],
+            self.location_a.id,
+        )
+        self.assertFalse(by_name['Searchable Unmapped']['mapped'])
+
+    def test_an_inactive_location_is_not_searchable(self):
+        self._cache('gid://shopify/Location/SIN1', 'Searchable Gone',
+                    active=False)
+        page = self._search('shopify', query='Searchable Gone')
+        self.assertEqual(page['total'], 0)
+
+    def test_a_foreign_store_location_is_never_found(self):
+        foreign_store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Foreign Search Store',
+            'shop_domain': 'foreign-search-store.myshopify.com',
+            'api_version': '2026-07',
+            'company_id': self.env.company.id,
+        })
+        self._cache('gid://shopify/Location/SF1', 'Foreign Searchable',
+                    store=foreign_store)
+        page = self._search('shopify', query='Foreign Searchable')
+        self.assertEqual(page['total'], 0)
+        self.assertEqual(page['items'], [])
+
+    # --- the odoo side ---------------------------------------------------
+
+    def test_odoo_search_finds_internal_locations_by_name(self):
+        page = self._search('odoo', query='Setup Step Location A')
+        names = [item['name'] for item in page['items']]
+        self.assertTrue(
+            any('Setup Step Location A' in name for name in names),
+        )
+        self.assertTrue(page['total'] >= 1)
+
+    def test_odoo_search_excludes_non_internal_locations(self):
+        customer_location = self.env['stock.location'].search(
+            [('usage', '=', 'customer')], limit=1,
+        )
+        if not customer_location:
+            self.skipTest('no customer location in this database')
+        page = self._search('odoo', query=customer_location.name)
+        self.assertNotIn(
+            customer_location.id, [item['id'] for item in page['items']],
+        )
+
+    def test_odoo_search_excludes_a_foreign_company_location(self):
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Foreign Company Searchable Location',
+            'usage': 'internal',
+            'company_id': self.company_b.id,
+        })
+        page = self._search('odoo', query='Foreign Company Searchable')
+        self.assertNotIn(foreign.id, [item['id'] for item in page['items']])
+
+    # --- authorization and shape -----------------------------------------
+
+    def test_search_requires_the_setup_authority(self):
+        operator = self._user('setup_loc_search_operator', 'operator')
+        self._assert_refused(
+            lambda: self._search('shopify', query='x', user=operator),
+        )
+
+    def test_an_unknown_side_is_refused(self):
+        with self.assertRaises(UserError):
+            self._as().search_location_options(
+                self.store.id, 'everything', query='',
+            )
+
+    def test_search_makes_no_shopify_contact(self):
+        self._cache('gid://shopify/Location/SNC1', 'No Contact Depot')
+        with self._fail_on_contact():
+            self._search('shopify', query='No Contact')
+            self._search('odoo', query='Location A')
+
+    def test_a_malformed_offset_is_clamped_not_an_error(self):
+        page = self._as().search_location_options(
+            self.store.id, 'shopify', query='', offset='not-a-number',
+        )
+        self.assertEqual(page['offset'], 0)

@@ -164,6 +164,13 @@
             color: #FFFFFF;
         }
 
+        // Visually quieter than the default, for in-panel utility actions
+        // (Clear, Load more) that must never compete with the step's one
+        // primary action.
+        &.sc-btn--secondary {
+            background: var(--sc-surface-0);
+        }
+
         @media (prefers-reduced-motion: no-preference) {
             transition: background var(--sc-motion-2) var(--sc-ease);
         }
@@ -311,6 +318,27 @@
 
     .sc_setup__mode-hint {
         grid-column: 2;
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+    }
+
+    // The location step's search rows (Wave 5). The input grows; the buttons
+    // keep their natural size and wrap under it on a narrow viewport rather
+    // than clipping.
+    .sc_setup__search-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--sc-space-2);
+        align-items: center;
+
+        input {
+            flex: 1 1 16rem;
+            min-inline-size: 0;
+        }
+    }
+
+    .sc_setup__showing {
+        margin: 0;
         font-size: var(--sc-fs-secondary);
         color: var(--sc-text-secondary);
     }

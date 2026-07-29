@@ -462,6 +462,54 @@ class TestUiU2InventoryActionTours(HttpCase):
                         login='u2act_reviewer')
 
     # ------------------------------------------------------------------
+    # The TD-020 closure: withdrawing a confirmed first-push decision
+    # ------------------------------------------------------------------
+
+    def test_first_push_withdraw_tour_returns_the_pair_to_pending(self):
+        """The whole closure, driven from a real browser by the allowed role.
+
+        Fails on the starting head twice over: the button, the wizard and the
+        service do not exist there, and a confirmed pair was a permanent
+        strand. The assertions are the DATABASE consequences -- the state
+        transition, the cleared decision fields, and the audit row with the
+        actor and the typed reason -- not merely the screen.
+        """
+        admin = self._connector_user(
+            'u2act_withdraw_admin',
+            'shopify_connector_core.group_shopify_connector_admin',
+        )
+        binding = self._level(
+            'gid://shopify/InventoryItem/U2WD', 'confirmed',
+            first_push_preview_qty=12.0,
+            first_push_confirmed_at=fields.Datetime.now(),
+            first_push_confirmed_by_uid=self.reviewer.id,
+        )
+        self.env.flush_all()
+
+        self.start_tour(self._url(WORKSPACE_ACTION),
+                        'shopify_connector_u2_first_push_withdraw_tour',
+                        login='u2act_withdraw_admin')
+
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+        self.assertFalse(binding.first_push_preview_qty)
+        self.assertFalse(binding.first_push_confirmed_at)
+        self.assertFalse(binding.first_push_confirmed_by_uid)
+        audit = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ], order='id desc', limit=1)
+        self.assertTrue(audit)
+        self.assertEqual(audit.create_uid, admin)
+        log_bodies = ' '.join(
+            self.env['shopify.connector.job.log'].sudo().search([
+                ('job_id', '=', audit.id),
+            ]).mapped('message')
+        )
+        self.assertIn('withdrawn', log_bodies)
+        self.assertIn('Physical warehouse move - tour', log_bodies)
+
+    # ------------------------------------------------------------------
     # Cross-cutting properties the tours must not be trusted to imply
     # ------------------------------------------------------------------
 

@@ -770,6 +770,44 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         ))
 
     @api.model
+    def _setup_search_locations(self, store, side, query, offset):
+        """Bounded server-side location search for the mapping step. Seam.
+
+        Wave 5: the step's two lists are bounded pages, which is right --
+        but a bounded page whose tail is REACHABLE only through a different
+        screen made every location past the cut effectively unmappable here.
+        This seam is the reachability route: the inventory module overrides
+        it with an indexed, store-scoped, paginated search over ALL eligible
+        cached Shopify locations (`side='shopify'`) or internal Odoo
+        locations (`side='odoo'`).
+        """
+        raise UserError(_(
+            'Location mapping needs the Shopify Connector Inventory module, '
+            'which is not installed in this database.'
+        ))
+
+    @api.model
+    def search_location_options(self, store_id, side, query='', offset=0):
+        """The mapping step's search RPC: one bounded page of candidates.
+
+        Same authorization funnel as every other setup entry point
+        (`_resolve_store` re-establishes the Administrator role, record
+        access and company consistency), then the domain seam. `side` is
+        validated here so the seam only ever sees the two values it
+        documents.
+        """
+        store = self._resolve_store(store_id)
+        if side not in ('shopify', 'odoo'):
+            raise UserError(_('Unknown location search side.'))
+        if not isinstance(query, str):
+            query = ''
+        try:
+            offset = max(0, int(offset))
+        except (TypeError, ValueError):
+            offset = 0
+        return self._setup_search_locations(store, side, query.strip(), offset)
+
+    @api.model
     def _setup_create_location_mapping(
         self, store, shopify_location_gid, odoo_location_id,
     ):

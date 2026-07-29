@@ -499,6 +499,34 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             trigger: ".sc_setup_refresh_locations",
             content: "A refresh control exists on the step itself.",
         },
+
+        // --- Wave 5: the bounded server-side search, driven for real. The
+        //     reachability BOUND (a row past the first page) is a server
+        //     test; what the browser proves is that the search control
+        //     genuinely filters through the RPC and genuinely clears.
+        {
+            trigger: ".sc_setup_search_shopify",
+            run: "edit Warehouse C",
+        },
+        { trigger: ".sc_setup_search_shopify_go", run: "click" },
+        {
+            trigger: ".sc_setup__showing:contains('Showing 1 of 1')",
+            content: "The search narrowed the list, with an honest count.",
+        },
+        {
+            trigger: ".sc_setup__locations:not(:contains('Tour Warehouse A'))",
+            content: "Rows that do not match are genuinely gone, not hidden.",
+        },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse C')",
+            content: "The matching row is the one shown.",
+        },
+        { trigger: ".sc_setup_search_shopify_clear", run: "click" },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse A')",
+            content: "Clearing the search restores the full first page.",
+        },
+
         {
             // Create a second mapping through the governed route.
             trigger: "#sc_setup_map_shopify",

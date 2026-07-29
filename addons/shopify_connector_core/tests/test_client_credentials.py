@@ -109,6 +109,7 @@ class ClientCredentialsCase(TransactionCase):
         )
 
 
+@tagged('post_install', '-at_install')
 class TestExchangeRequestShape(ClientCredentialsCase):
 
     def test_exchange_posts_the_documented_form_body(self):
@@ -202,6 +203,7 @@ class TestExchangeRequestShape(ClientCredentialsCase):
         self.assertEqual(ctx.exception.error_class, ERROR_TEMPORARY)
 
 
+@tagged('post_install', '-at_install')
 class TestTokenCacheAndRefresh(ClientCredentialsCase):
 
     def test_first_ensure_exchanges_and_caches(self):
@@ -323,6 +325,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
         self.assertFalse(self._cached())
 
 
+@tagged('post_install', '-at_install')
 class TestFailedRefresh(ClientCredentialsCase):
 
     def test_auth_refusal_raises_and_writes_no_side_state(self):
@@ -385,6 +388,7 @@ class TestFailedRefresh(ClientCredentialsCase):
         )
 
 
+@tagged('post_install', '-at_install')
 class TestRotationInvalidation(ClientCredentialsCase):
 
     def test_new_client_credentials_discard_the_cache(self):
@@ -492,6 +496,7 @@ class TestRotationInvalidation(ClientCredentialsCase):
         )
 
 
+@tagged('post_install', '-at_install')
 class TestEndToEndAndLeakage(ClientCredentialsCase):
 
     def _passing_probe_transport(self):
@@ -629,6 +634,7 @@ class TestEndToEndAndLeakage(ClientCredentialsCase):
             self.assertNotIn(DUMMY_EXCHANGED_TOKEN, value)
 
 
+@tagged('post_install', '-at_install')
 class TestOfflineCompatibility(ClientCredentialsCase):
     """The pre-Wave-5 shape, replayed against the extended model."""
 

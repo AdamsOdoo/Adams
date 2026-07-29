@@ -320,6 +320,23 @@
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
                             groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                    <!--
+                        The TD-020 closure. A previewed/confirmed pair used to
+                        be a dead end: the remap guard (correctly) refuses to
+                        move the Odoo target under a pair whose first push
+                        carries a human decision, but no route existed to
+                        unwind that decision, so a merchant who physically
+                        moved a warehouse was stranded permanently. This
+                        wizard is that route: Administrator-only,
+                        consequence-confirmed, reason-audited, refused outside
+                        a proven safe terminal state, and it never reuses the
+                        old confirmation: the pair returns to Pending and the
+                        full preview-and-confirm ceremony is mandatory again.
+                    -->
+                    <button name="%(action_shopify_connector_first_push_withdraw_wizard)d"
+                            type="action" string="Withdraw First Push"
+                            invisible="first_push_state == 'pending'"
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <field name="first_push_state" widget="statusbar"
                            readonly="1"/>
                 </header>

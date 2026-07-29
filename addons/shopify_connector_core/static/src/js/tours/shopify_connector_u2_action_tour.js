@@ -443,3 +443,73 @@ tours.add("shopify_connector_u2_quarantined_is_not_listed_tour", {
         },
     ],
 });
+
+// ---------------------------------------------------------------------------
+// 6. The TD-020 closure: withdrawing a confirmed first-push decision.
+// ---------------------------------------------------------------------------
+// A confirmed pair used to be a permanent dead end -- the remap guard's
+// refusal was correct, and there was no governed way to unwind the decision
+// it protects. This traversal drives the closure from the browser: the
+// Administrator opens the confirmed pair, reads the consequence in words,
+// gives a reason, ticks the explicit confirmation, and watches the pair
+// return to Pending -- where the FULL preview-and-confirm ceremony is
+// mandatory again before any push.
+tours.add("shopify_connector_u2_first_push_withdraw_tour", {
+    steps: () => [
+        {
+            trigger: ".o_list_view .o_data_row .o_data_cell",
+            content: "Open the confirmed pair.",
+            run: "click",
+        },
+        {
+            trigger:
+                ".o_form_view .o_statusbar_status button.o_arrow_button_current:contains('Confirmed')",
+            content: "The pair is confirmed -- the state TD-020 stranded.",
+        },
+        // Selected by its visible label: the button's `name` attribute is a
+        // numeric action id resolved at load time, not the xmlid.
+        focusStep(
+            ".o_form_view button:contains('Withdraw First Push')",
+            "The withdrawal control takes keyboard focus and shows a focus ring."
+        ),
+        keyboardActivateStep(
+            ".o_form_view button:contains('Withdraw First Push')",
+            "Open the withdrawal dialog by keyboard."
+        ),
+        {
+            trigger: `${DIALOG}:contains('withdraws the pair')`,
+            content: "The consequence is named in words before anything changes.",
+        },
+        {
+            trigger: `${DIALOG}:contains('never') .alert-warning`,
+            content: "The dialog states the old confirmation is never reused.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='reason'] input`,
+            content: "A reason is mandatory and lands on the audit trail.",
+            run: "edit Physical warehouse move - tour",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='confirmed'] input`,
+            content: "The explicit confirmation is a deliberate second act.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content: "Withdraw the decision.",
+            run: "click",
+        },
+        {
+            trigger:
+                ".o_form_view .o_statusbar_status button.o_arrow_button_current:contains('Pending')",
+            content:
+                "The pair is back to Pending: a completely new preview and " +
+                "confirmation are required before any push.",
+        },
+        {
+            trigger:
+                ".o_form_view .alert-warning:contains('Waiting for a first-push preview')",
+            content: "The form says plainly what has to happen next.",
+        },
+    ],
+});

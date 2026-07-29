@@ -1,3 +1,4 @@
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
@@ -734,3 +735,390 @@ class TestLocationRemap(TransactionCase):
         self._remap()
         settings.invalidate_recordset()
         self.assertTrue(settings.setup_readiness_stale_since)
+
+
+@tagged('post_install', '-at_install')
+class TestFirstPushWithdrawal(TransactionCase):
+    """TD-020 closure: the governed route OUT of previewed/confirmed.
+
+    The remap guard's refusal on a previewed/confirmed pair is correct and is
+    not weakened by any test here. What was missing -- and what every test in
+    this class fails without on the starting head, because the method under
+    test does not exist there -- is a governed way to unwind the first-push
+    DECISION itself, so the refusal is a wait instead of a permanent strand.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.Service = cls.env['shopify.connector.inventory.service']
+        cls.store = cls.env['shopify.connector.store'].create({
+            'name': 'First Push Withdrawal Test Store',
+            'shop_domain': 'first-push-withdrawal-test.myshopify.com',
+            'api_version': '2026-07',
+        })
+        cls.env['shopify.connector.store.settings'].create({
+            'store_id': cls.store.id, 'inventory_domain_enabled': True,
+        })
+        cls.warehouse = cls.env['stock.warehouse'].search(
+            [('company_id', '=', cls.env.company.id)], limit=1,
+        )
+        cls.location_a = cls.env['stock.location'].create({
+            'name': 'Withdrawal Location A',
+            'usage': 'internal',
+            'location_id': cls.warehouse.view_location_id.id,
+        })
+        cls.location_b = cls.env['stock.location'].create({
+            'name': 'Withdrawal Location B',
+            'usage': 'internal',
+            'location_id': cls.warehouse.view_location_id.id,
+        })
+        cls.user_admin = cls.env['res.users'].create({
+            'name': 'First Push Withdrawal Admin',
+            'login': 'first_push_withdrawal_admin',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
+        cls.user_reviewer = cls.env['res.users'].create({
+            'name': 'First Push Withdrawal Reviewer',
+            'login': 'first_push_withdrawal_reviewer',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_reviewer'
+                ).id,
+            ])],
+        })
+        cls.gid = 'gid://shopify/Location/WITHDRAW'
+        cls.env['shopify.connector.location'].sudo().create({
+            'store_id': cls.store.id,
+            'shopify_location_gid': cls.gid,
+            'name': 'Withdrawal Warehouse',
+            'shopify_location_active': True,
+        })
+        cls.mapping = cls.env[
+            'shopify.connector.location.mapping'
+        ].sudo().create({
+            'store_id': cls.store.id,
+            'shopify_gid': cls.gid,
+            'odoo_location_id': cls.location_a.id,
+            'match_key': 'manual',
+            'shopify_location_name_snapshot': 'Withdrawal Warehouse',
+        })
+
+    _pair_sequence = 0
+
+    def _pair(self, first_push_state='confirmed'):
+        type(self)._pair_sequence += 1
+        tag = 'WD%d' % self._pair_sequence
+        template = self.env['product.template'].sudo().create({
+            'name': 'Withdrawal Widget %s' % tag})
+        tbinding = self.env[
+            'shopify.connector.product.template.binding'].sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Product/%s' % tag,
+                'product_template_id': template.id,
+            })
+        vbinding = self.env[
+            'shopify.connector.product.variant.binding'].sudo().create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/ProductVariant/%s' % tag,
+                'product_variant_id': template.product_variant_id.id,
+                'product_template_binding_id': tbinding.id,
+            })
+        values = {
+            'store_id': self.store.id,
+            'product_variant_binding_id': vbinding.id,
+            'location_mapping_id': self.mapping.id,
+            'shopify_inventory_item_gid':
+                'gid://shopify/InventoryItem/%s' % tag,
+            'first_push_state': first_push_state,
+        }
+        if first_push_state in ('previewed', 'confirmed'):
+            values['first_push_preview_qty'] = 7.0
+        if first_push_state == 'confirmed':
+            values['first_push_confirmed_at'] = fields.Datetime.now()
+            values['first_push_confirmed_by_uid'] = self.user_reviewer.id
+        return self.env[
+            'shopify.connector.inventory.level.binding'].sudo().create(values)
+
+    def _withdraw(self, binding, user=None, reason='Warehouse moved',
+                  confirmed=True, expected_state='__current__'):
+        if expected_state == '__current__':
+            expected_state = binding.first_push_state
+        return self.Service.with_user(
+            user or self.user_admin
+        ).withdraw_first_push_decision(
+            binding, reason, confirmed=confirmed,
+            expected_state=expected_state,
+        )
+
+    # --- the closure itself ---------------------------------------------
+
+    def test_a_previewed_decision_can_be_withdrawn(self):
+        binding = self._pair(first_push_state='previewed')
+        self._withdraw(binding)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+        self.assertFalse(binding.first_push_preview_qty)
+
+    def test_a_confirmed_decision_can_be_withdrawn(self):
+        binding = self._pair(first_push_state='confirmed')
+        self._withdraw(binding)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+        self.assertFalse(binding.first_push_preview_qty)
+        self.assertFalse(binding.first_push_confirmed_at)
+        self.assertFalse(binding.first_push_confirmed_by_uid)
+
+    def test_withdrawal_unblocks_the_remap(self):
+        """The complete TD-020 journey: confirmed pair -> remap refused ->
+        withdraw -> remap succeeds -> the pair requires the full ceremony
+        again at the new target."""
+        binding = self._pair(first_push_state='confirmed')
+        Service = self.Service.with_user(self.user_admin)
+        with self.assertRaises(UserError):
+            Service.remap_location_mapping(
+                self.mapping, self.location_b, 'Warehouse moved',
+                confirmed=True,
+            )
+        self._withdraw(binding)
+        Service.remap_location_mapping(
+            self.mapping, self.location_b, 'Warehouse moved',
+            confirmed=True,
+        )
+        self.mapping.invalidate_recordset()
+        self.assertEqual(self.mapping.odoo_location_id, self.location_b)
+        binding.invalidate_recordset()
+        # The old confirmation was NOT reused: a fresh preview and a fresh
+        # confirmation are required before any push.
+        self.assertEqual(binding.first_push_state, 'pending')
+
+    def test_withdrawal_is_audited_with_actor_and_reason(self):
+        binding = self._pair(first_push_state='confirmed')
+        Job = self.env['shopify.connector.job'].sudo()
+        before = Job.search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+        self._withdraw(binding, reason='Physical warehouse relocation')
+        audits = Job.search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ], order='id desc')
+        self.assertEqual(len(audits), before + 1)
+        audit = audits[0]
+        self.assertEqual(audit.create_uid, self.user_admin)
+        log_bodies = ' '.join(
+            self.env['shopify.connector.job.log'].sudo().search([
+                ('job_id', '=', audit.id),
+            ]).mapped('message')
+        )
+        self.assertIn('withdrawn', log_bodies)
+        self.assertIn('Physical warehouse relocation', log_bodies)
+        self.assertIn('confirmed', log_bodies)
+
+    def test_withdrawal_marks_readiness_evidence_stale(self):
+        binding = self._pair(first_push_state='confirmed')
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', self.store.id)], limit=1,
+        )
+        settings.sudo().write({'setup_readiness_stale_since': False})
+        self._withdraw(binding)
+        settings.invalidate_recordset()
+        self.assertTrue(settings.setup_readiness_stale_since)
+
+    # --- authority, confirmation, reason --------------------------------
+
+    def test_administrator_is_required(self):
+        binding = self._pair(first_push_state='confirmed')
+        with self.assertRaises(AccessError):
+            self._withdraw(binding, user=self.user_reviewer)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def test_explicit_confirmation_is_required(self):
+        binding = self._pair(first_push_state='confirmed')
+        with self.assertRaises(UserError):
+            self._withdraw(binding, confirmed=False)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def test_a_non_empty_reason_is_required(self):
+        binding = self._pair(first_push_state='confirmed')
+        for reason in ('', '   ', None, 7):
+            with self.subTest(reason=reason):
+                with self.assertRaises(UserError):
+                    self._withdraw(binding, reason=reason)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def test_a_pending_pair_has_nothing_to_withdraw(self):
+        binding = self._pair(first_push_state='pending')
+        with self.assertRaises(UserError):
+            self._withdraw(binding, expected_state='pending')
+
+    # --- staleness and concurrency --------------------------------------
+
+    def test_a_stale_dialog_is_refused(self):
+        """The state the wizard showed must still be the state acted on."""
+        binding = self._pair(first_push_state='previewed')
+        # A concurrent confirmation happens after the dialog opened.
+        binding.sudo().write({'first_push_state': 'confirmed'})
+        with self.assertRaises(UserError) as caught:
+            self._withdraw(binding, expected_state='previewed')
+        self.assertIn('changed while the dialog was open',
+                      str(caught.exception))
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def test_a_double_withdrawal_loses_cleanly(self):
+        binding = self._pair(first_push_state='confirmed')
+        self._withdraw(binding, expected_state='confirmed')
+        with self.assertRaises(UserError):
+            self._withdraw(binding, expected_state='confirmed')
+
+    # --- the proven-safe-terminal-state gates ----------------------------
+
+    def test_non_terminal_inventory_work_blocks_a_withdrawal(self):
+        binding = self._pair(first_push_state='confirmed')
+        self.store.sudo().write({'state': 'connected'})
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'inventory_push_sync',
+            'state': 'queued',
+            'res_model': 'shopify.connector.inventory.level.binding',
+            'res_id': binding.id,
+            'payload_hash': 'withdraw-block-probe',
+        })
+        try:
+            with self.assertRaises(UserError) as caught:
+                self._withdraw(binding)
+            self.assertIn('has not finished', str(caught.exception))
+        finally:
+            job.sudo().write({'state': 'cancelled'})
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def _attempt_for(self, binding, tag):
+        """A REAL mutation attempt through the sanctioned C2 seam.
+
+        The attempt model's create surface fails closed outside the Layer 2
+        sentinel, so the fixture satisfies the production guard rather than
+        bypassing it -- the same discipline the SEC-3 matrix fixtures use.
+        Freshly minted, its `observed_outcome` is `pending`, which is
+        exactly the unresolved shape the withdrawal gate must refuse.
+        """
+        import uuid as uuid_module
+        from odoo.addons.shopify_connector_core.models.\
+            shopify_connector_mutation_attempt import (
+                C2_SENTINEL_CONTEXT, C2_SIDE_CURSOR_SENTINEL,
+            )
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'inventory_set_quantities',
+            'state': 'queued',
+            'res_model': 'shopify.connector.inventory.level.binding',
+            'res_id': binding.id,
+            'payload_hash': 'withdraw-%s-probe' % tag,
+        })
+        token = uuid_module.uuid4().hex
+        job.sudo().write({'state': 'running', 'current_attempt_token': token})
+        context = dict(self.env.context)
+        context[C2_SENTINEL_CONTEXT] = C2_SIDE_CURSOR_SENTINEL
+        attempt = self.env['shopify.connector.mutation.attempt'].sudo(
+        ).with_context(context)._create_attempt_intent({
+            'job_id': job.id,
+            'attempt_token': token,
+            'mutation_domain': job.job_type,
+            'expected_connection_generation':
+                job.expected_connection_generation,
+            'expected_store_identity': self.store.shop_domain,
+            'remote_mutation_intent': {'operation_name': job.job_type},
+            'preconditions_snapshot': {'withdrawal_test': True},
+            'business_intent_fingerprint': 'wd-bif-%s' % token,
+            'exact_request_fingerprint': 'wd-erf-%s' % token,
+            'shopify_idempotency_key': str(uuid_module.uuid4()),
+        })
+        job.sudo().write({'state': 'succeeded'})
+        return attempt
+
+    def _settle_attempt(self, attempt, outcome):
+        """Fabricate historical evidence directly in SQL.
+
+        The production write surface for attempts is deliberately closed;
+        the test needs a row that LOOKS like history the sanctioned services
+        already wrote, and SQL is the honest way to say "this is fabricated
+        fixture state, not a production write path".
+        """
+        self.env.cr.execute(
+            "UPDATE shopify_connector_mutation_attempt "
+            "SET observed_outcome = %s WHERE id = %s",
+            (outcome, attempt.id),
+        )
+        attempt.invalidate_recordset()
+
+    def test_an_unresolved_mutation_attempt_blocks_a_withdrawal(self):
+        binding = self._pair(first_push_state='confirmed')
+        self.store.sudo().write({'state': 'connected'})
+        attempt = self._attempt_for(binding, 'unresolved')
+        with self.assertRaises(UserError) as caught:
+            self._withdraw(binding)
+        self.assertIn('unresolved or uncertain', str(caught.exception))
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+        # A resolved attempt is a proven terminal outcome: the withdrawal
+        # becomes possible without weakening anything.
+        self._settle_attempt(attempt, 'succeeded')
+        self._withdraw(binding)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+
+    def test_a_flagged_pair_blocks_a_withdrawal(self):
+        for status in ('stale', 'review'):
+            with self.subTest(status=status):
+                binding = self._pair(first_push_state='confirmed')
+                binding.sudo().write({'status': status})
+                with self.assertRaises(UserError) as caught:
+                    self._withdraw(binding)
+                self.assertIn(status, str(caught.exception))
+
+    def test_a_pair_that_already_pushed_can_still_be_withdrawn(self):
+        """A SUCCEEDED past mutation is a proven terminal outcome, not an
+        ambiguity: the withdrawal is allowed, and the wizard's consequence
+        copy (asserted at the view level) tells the operator Shopify keeps
+        the last pushed quantity until a new ceremony completes."""
+        binding = self._pair(first_push_state='confirmed')
+        binding.sudo().write({
+            'last_pushed_available': 5.0,
+            'last_pushed_at': fields.Datetime.now(),
+        })
+        self.store.sudo().write({'state': 'connected'})
+        attempt = self._attempt_for(binding, 'succeeded')
+        self._settle_attempt(attempt, 'succeeded')
+        self._withdraw(binding)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+
+    def test_the_wizard_delegates_with_the_snapshotted_state(self):
+        """The display-and-delegate wizard sends the state it OPENED on."""
+        binding = self._pair(first_push_state='confirmed')
+        wizard = self.env[
+            'shopify.connector.first.push.withdraw.wizard'
+        ].with_user(self.user_admin).with_context(
+            active_model='shopify.connector.inventory.level.binding',
+            active_id=binding.id,
+        ).create({
+            'reason': 'Wizard route works',
+            'confirmed': True,
+        })
+        self.assertEqual(wizard.expected_state, 'confirmed')
+        wizard.action_confirm()
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')

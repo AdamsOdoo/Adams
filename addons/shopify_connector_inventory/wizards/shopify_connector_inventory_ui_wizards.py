@@ -304,6 +304,89 @@ class ShopifyConnectorLocationMapWizard(models.TransientModel):
         }
 
 
+class ShopifyConnectorFirstPushWithdrawWizard(models.TransientModel):
+    """Withdraw a pair's previewed/confirmed first-push decision (TD-020).
+
+    Display-and-delegate, like every wizard in this file: it shows the
+    operator exactly what withdrawal means for THIS pair, collects the
+    required reason and the explicit confirmation, snapshots the state the
+    operator was looking at, and delegates to
+    `withdraw_first_push_decision`, which owns every check.
+    """
+
+    _name = 'shopify.connector.first.push.withdraw.wizard'
+    _description = 'Shopify Connector First Push Withdrawal'
+
+    binding_id = fields.Many2one(
+        comodel_name='shopify.connector.inventory.level.binding',
+        required=True,
+        readonly=True,
+    )
+    # Non-stored related reads: current truth, never a stale copy.
+    first_push_state = fields.Selection(
+        related='binding_id.first_push_state',
+        readonly=True,
+    )
+    odoo_location_id = fields.Many2one(
+        related='binding_id.location_mapping_id.odoo_location_id',
+        readonly=True,
+        string='Mapped Odoo location',
+    )
+    shopify_location_name = fields.Char(
+        related='binding_id.location_mapping_id.shopify_location_name_snapshot',
+        readonly=True,
+        string='Shopify location',
+    )
+    has_pushed_before = fields.Boolean(
+        compute='_compute_has_pushed_before',
+    )
+    # The state the dialog OPENED against. Sent back to the server, which
+    # refuses if the pair moved meanwhile -- a stale dialog must lose.
+    expected_state = fields.Char(readonly=True)
+    reason = fields.Char(
+        required=True,
+        help='Why this first-push decision is being withdrawn. Recorded on '
+             'the connector audit trail.',
+    )
+    confirmed = fields.Boolean(
+        string='I understand what this changes',
+        help='The pair returns to Pending: no stock can be pushed for it '
+             'until a new preview is run and explicitly confirmed.',
+    )
+
+    @api.depends('binding_id.last_pushed_at')
+    def _compute_has_pushed_before(self):
+        for wizard in self:
+            wizard.has_pushed_before = bool(wizard.binding_id.last_pushed_at)
+
+    def default_get(self, fields_list):
+        result = super().default_get(fields_list)
+        if self.env.context.get('active_model') == (
+            'shopify.connector.inventory.level.binding'
+        ):
+            active_id = self.env.context.get('active_id')
+            if active_id:
+                result['binding_id'] = active_id
+                result['expected_state'] = self.env[
+                    'shopify.connector.inventory.level.binding'
+                ].browse(active_id).first_push_state
+        return result
+
+    def action_confirm(self):
+        self.ensure_one()
+        if not self.binding_id:
+            raise UserError('Select an inventory pair first.')
+        self.env[
+            'shopify.connector.inventory.service'
+        ].withdraw_first_push_decision(
+            self.binding_id,
+            self.reason,
+            confirmed=self.confirmed,
+            expected_state=self.expected_state or None,
+        )
+        return {'type': 'ir.actions.act_window_close'}
+
+
 class ShopifyConnectorLocationRemapWizard(models.TransientModel):
     """Change which Odoo location an already-bound Shopify location means."""
 

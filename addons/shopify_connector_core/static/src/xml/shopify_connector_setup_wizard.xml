@@ -474,21 +474,59 @@
                                     </div>
                                 </div>
 
-                                <div t-if="locations.truncated"
-                                     class="sc-band sc-band--warning" role="status">
-                                    <i class="fa fa-list sc-band__icon" aria-hidden="true"/>
+                                <!--
+                                    Wave 5: the search IS the reachability
+                                    guarantee. The lists below are bounded
+                                    pages, and that stays true — but every
+                                    eligible location past the first page is
+                                    now reachable by typing a few letters,
+                                    with honest Showing-X-of-Y counts and a
+                                    Load more that pages through the full
+                                    eligible set. Store and company filters
+                                    are structural on the server for every
+                                    page and every query.
+                                -->
+                                <div t-if="locationHasMore('shopify') and state.locationSearch.shopify.items === null"
+                                     class="sc-band sc-band--info" role="status">
+                                    <i class="fa fa-search sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
-                                        <div class="sc-band__text">This store has more locations than this step lists</div>
+                                        <div class="sc-band__text">This store has more locations than one page shows</div>
                                         <div class="sc-band__hint">
-                                            Only the first batch is shown here. Map the rest from
-                                            Shopify Connector → Inventory → Location Mapping,
-                                            which is a searchable list.
+                                            Search below to find any of them — every location can
+                                            be found and mapped from this step.
                                         </div>
                                     </div>
                                 </div>
 
+                                <div class="sc_setup__field sc_setup__location-search">
+                                    <label for="sc_setup_search_shopify">Find a Shopify location</label>
+                                    <div class="sc_setup__search-row">
+                                        <input id="sc_setup_search_shopify" type="search"
+                                               class="o_input sc_setup_search_shopify"
+                                               placeholder="Type part of the location's name…"
+                                               t-model="state.locationSearch.shopify.query"
+                                               t-on-keydown="(ev) => this.onLocationSearchKeydown(ev, 'shopify')"/>
+                                        <button class="sc-btn sc_setup_search_shopify_go"
+                                                t-att-disabled="state.busy"
+                                                t-on-click="() => this.searchLocations('shopify')">
+                                            <span>Search</span>
+                                        </button>
+                                        <button t-if="state.locationSearch.shopify.items !== null"
+                                                class="sc-btn sc-btn--secondary sc_setup_search_shopify_clear"
+                                                t-on-click="() => this.clearLocationSearch('shopify')">
+                                            <span>Clear</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <p class="sc_setup__showing" role="status" aria-live="polite">
+                                    Showing <t t-esc="locationShowing('shopify').shown"/>
+                                    of <t t-esc="locationShowing('shopify').total"/>
+                                    Shopify locations<t t-if="state.locationSearch.shopify.items !== null"> matching the search</t>.
+                                </p>
+
                                 <ul class="sc_setup__locations">
-                                    <t t-foreach="locations.locations" t-as="location"
+                                    <t t-foreach="visibleShopifyLocations" t-as="location"
                                        t-key="location.shopify_gid">
                                         <li class="sc_setup__location">
                                             <span class="sc_setup__location-name" t-esc="location.name"/>
@@ -509,32 +547,75 @@
                                         </li>
                                     </t>
                                 </ul>
+                                <div t-if="locationHasMore('shopify') and state.locationSearch.shopify.items !== null">
+                                    <button class="sc-btn sc-btn--secondary sc_setup_more_shopify"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.loadMoreLocations('shopify')">
+                                        <span>Load more Shopify locations</span>
+                                    </button>
+                                </div>
 
-                                <div t-if="locations.locations.length" class="sc_setup__map">
+                                <div t-if="visibleShopifyLocations.length" class="sc_setup__map">
                                     <div class="sc_setup__field">
                                         <label for="sc_setup_map_shopify">Shopify location</label>
                                         <select id="sc_setup_map_shopify" class="o_input"
                                                 t-model="state.form.mapShopifyGid">
                                             <option value="">Choose a Shopify location…</option>
-                                            <t t-foreach="locations.locations" t-as="location"
+                                            <t t-foreach="visibleShopifyLocations" t-as="location"
                                                t-key="'opt-' + location.shopify_gid">
                                                 <option t-att-value="location.shopify_gid"
                                                         t-esc="location.name"/>
                                             </t>
                                         </select>
+                                        <small>
+                                            The choices follow the list above — search to bring a
+                                            location into it.
+                                        </small>
+                                    </div>
+                                    <div class="sc_setup__field">
+                                        <label for="sc_setup_search_odoo">Find an Odoo location</label>
+                                        <div class="sc_setup__search-row">
+                                            <input id="sc_setup_search_odoo" type="search"
+                                                   class="o_input sc_setup_search_odoo"
+                                                   placeholder="Type part of the location's name…"
+                                                   t-model="state.locationSearch.odoo.query"
+                                                   t-on-keydown="(ev) => this.onLocationSearchKeydown(ev, 'odoo')"/>
+                                            <button class="sc-btn sc_setup_search_odoo_go"
+                                                    t-att-disabled="state.busy"
+                                                    t-on-click="() => this.searchLocations('odoo')">
+                                                <span>Search</span>
+                                            </button>
+                                            <button t-if="state.locationSearch.odoo.items !== null"
+                                                    class="sc-btn sc-btn--secondary sc_setup_search_odoo_clear"
+                                                    t-on-click="() => this.clearLocationSearch('odoo')">
+                                                <span>Clear</span>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="sc_setup__field">
                                         <label for="sc_setup_map_odoo">Odoo location</label>
                                         <select id="sc_setup_map_odoo" class="o_input"
                                                 t-model="state.form.mapOdooLocationId">
                                             <option value="">Choose an Odoo location…</option>
-                                            <t t-foreach="locations.odoo_locations" t-as="odooLocation"
+                                            <t t-foreach="visibleOdooLocations" t-as="odooLocation"
                                                t-key="odooLocation.id">
                                                 <option t-att-value="odooLocation.id"
                                                         t-esc="odooLocation.name"/>
                                             </t>
                                         </select>
-                                        <small t-if="!locations.odoo_locations.length">
+                                        <p class="sc_setup__showing" role="status" aria-live="polite">
+                                            Showing <t t-esc="locationShowing('odoo').shown"/>
+                                            of <t t-esc="locationShowing('odoo').total"/>
+                                            Odoo locations<t t-if="state.locationSearch.odoo.items !== null"> matching the search</t>.
+                                        </p>
+                                        <div t-if="locationHasMore('odoo') and state.locationSearch.odoo.items !== null">
+                                            <button class="sc-btn sc-btn--secondary sc_setup_more_odoo"
+                                                    t-att-disabled="state.busy"
+                                                    t-on-click="() => this.loadMoreLocations('odoo')">
+                                                <span>Load more Odoo locations</span>
+                                            </button>
+                                        </div>
+                                        <small t-if="!visibleOdooLocations.length">
                                             No internal Odoo locations are visible to you in this
                                             company. Ask an Odoo administrator for Inventory
                                             access, or create a warehouse first.

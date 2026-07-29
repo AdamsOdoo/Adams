@@ -34,6 +34,14 @@ from odoo.exceptions import AccessError, UserError
 #: Named rather than inlined so the limit is visible to a reader and to a test.
 SETUP_LOCATION_LIST_LIMIT = 200
 
+#: One page of the mapping step's bounded server-side search (Wave 5). The
+#: search -- not the first page -- is what makes every eligible location
+#: reachable: the payload above may show a bounded batch, but a merchant with
+#: 300 cached Shopify locations or a deep warehouse tree types a few letters
+#: and gets the exact rows, paged, instead of a disclosure that the list is
+#: incomplete.
+SETUP_LOCATION_SEARCH_PAGE = 50
+
 
 class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
     """Seam: the `location_mapping` step's data and its two actions."""
@@ -103,7 +111,26 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
             # so the step and the readiness row cannot disagree about it.
             'has_valid_mapping': bool(mappings),
             'truncated': len(cached) >= SETUP_LOCATION_LIST_LIMIT,
+            # Honest totals for the "Showing X of Y" line and for deciding
+            # whether the search affordance is worth surfacing prominently.
+            'shopify_total': Location.sudo().search_count([
+                ('store_id', '=', store.id),
+                ('shopify_location_active', '=', True),
+            ]),
+            'odoo_total': self._eligible_odoo_location_count(store),
         }
+
+    @api.model
+    def _eligible_odoo_location_count(self, store):
+        """How many internal Odoo locations this caller could map, in total."""
+        domain = [('usage', '=', 'internal')]
+        company = store.company_id
+        if company:
+            domain.append(('company_id', 'in', [False, company.id]))
+        try:
+            return self.env['stock.location'].search_count(domain)
+        except AccessError:
+            return 0
 
     @api.model
     def _setup_eligible_odoo_locations(self, store):
@@ -142,6 +169,93 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         return self.env[
             'shopify.connector.inventory.service'
         ].action_refresh_shopify_locations(store.id)
+
+    @api.model
+    def _setup_search_locations(self, store, side, query, offset):
+        """One bounded page of eligible locations, filtered server-side.
+
+        The reachability route for a store whose location count exceeds the
+        step's first page (Wave 5): every ELIGIBLE row -- active cached
+        Shopify locations of THIS store, or internal Odoo locations the
+        CALLING user may see in this store's company -- is reachable through
+        an indexed, paginated, case-insensitive name search. The store and
+        company filters are structural on every page: `store_id` is a
+        mandatory term on the cache query, and the Odoo side is searched as
+        the calling user with the same company domain the payload uses, so
+        no page and no query can ever widen scope.
+        """
+        if not store:
+            return {'items': [], 'total': 0, 'offset': 0,
+                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+        if side == 'shopify':
+            Location = self.env['shopify.connector.location']
+            Mapping = self.env['shopify.connector.location.mapping']
+            domain = [
+                ('store_id', '=', store.id),
+                ('shopify_location_active', '=', True),
+            ]
+            if query:
+                domain.append(('name', 'ilike', query))
+            total = Location.sudo().search_count(domain)
+            rows = Location.sudo().search(
+                domain, order='name asc, id asc',
+                limit=SETUP_LOCATION_SEARCH_PAGE, offset=offset,
+            )
+            mappings = Mapping.search([
+                ('store_id', '=', store.id),
+                ('shopify_gid', 'in', [
+                    row.shopify_location_gid for row in rows
+                ]),
+            ])
+            by_gid = {m.shopify_gid: m for m in mappings}
+            items = []
+            for row in rows:
+                mapping = by_gid.get(row.shopify_location_gid)
+                items.append({
+                    'shopify_gid': row.shopify_location_gid,
+                    'name': row.name or row.shopify_location_gid,
+                    'mapped': bool(mapping),
+                    'mapping_id': mapping.id if mapping else False,
+                    'odoo_location_id': (
+                        mapping.odoo_location_id.id if mapping else False
+                    ),
+                    'odoo_location_name': (
+                        mapping.odoo_location_id.display_name
+                        if mapping else ''
+                    ),
+                    'push_enabled': (
+                        bool(mapping.push_enabled) if mapping else False
+                    ),
+                })
+            return {'items': items, 'total': total, 'offset': offset,
+                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+        # side == 'odoo' -- searched as the calling user, deliberately, for
+        # the same reason `_setup_eligible_odoo_locations` is: Odoo's own
+        # `stock.location` access decides what this operator may see.
+        domain = [('usage', '=', 'internal')]
+        company = store.company_id
+        if company:
+            domain.append(('company_id', 'in', [False, company.id]))
+        if query:
+            domain.append(('complete_name', 'ilike', query))
+        Location = self.env['stock.location']
+        try:
+            total = Location.search_count(domain)
+            rows = Location.search(
+                domain, order='complete_name asc, id asc',
+                limit=SETUP_LOCATION_SEARCH_PAGE, offset=offset,
+            )
+        except AccessError:
+            return {'items': [], 'total': 0, 'offset': 0,
+                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+        return {
+            'items': [
+                {'id': row.id, 'name': row.display_name} for row in rows
+            ],
+            'total': total,
+            'offset': offset,
+            'limit': SETUP_LOCATION_SEARCH_PAGE,
+        }
 
     @api.model
     def _setup_create_location_mapping(
