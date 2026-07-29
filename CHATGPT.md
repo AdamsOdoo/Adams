@@ -626,6 +626,37 @@ disposable database (see
 §6 for a case where source-reading alone would have missed a real,
 transaction-isolation-dependent bug) before relying on it.
 
+### 18.28 A background evidence run must own an untouched worktree, start to finish
+
+An "exact-SHA" regression run is only as good as the worktree it read code
+from for its *entire* duration, not merely at the moment it started. Editing
+any tracked file while an earlier pass of the same run is still executing
+means later passes read a different code state than earlier ones, silently
+turning the whole run into a mixture of two heads reported under one SHA.
+There is no partial-credit fix once discovered mid-run — discard the run and
+restart only after every edit lands and the worktree is confirmed clean.
+Moving files *out of* the tracked tree is not automatically safe either: an
+artifact directory relocated to an untracked path that is still *inside* the
+repository (rather than outside it, e.g. under a scratch directory) makes
+`git status` non-empty and a runner that checks worktree cleanliness will
+correctly flag the run as non-exact-SHA evidence even though no tracked file
+changed. Evidence-instrument working directories belong entirely outside the
+repository being measured.
+
+### 18.29 A single-package survival architecture does not make its own data survive
+
+Proving that a customer-facing package and its own lifecycle-controller state
+survive a dependency-loss cascade (18.21–18.24) is a narrower claim than
+proving the connector's domain data survives it. The two are easy to conflate
+because both use the phrase "survives the cascade." Odoo's `module_uninstall()`
+physically drops a cascaded-away module's own tables regardless of what any
+other, non-cascaded module does — so unless domain-owned data (mappings,
+bindings, jobs, evidence) is deliberately relocated into a surviving module or
+snapshotted before the cascade, it is deleted, not paused. State the narrower
+claim precisely and log the gap (with an empirical `to_regclass()`-style
+proof, not just an inference) rather than letting "the package survives"
+imply "the connector's history survives" by omission.
+
 ## 19. New-session startup protocol
 
 At the start of every ChatGPT control-room session:
