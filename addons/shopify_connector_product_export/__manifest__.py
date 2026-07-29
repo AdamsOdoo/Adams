@@ -60,6 +60,9 @@ before any retry, and no blind resend.
     'depends': [
         'shopify_connector_core',
         'shopify_connector_product',
+        # Wave 5: reverse edge onto the customer-facing package umbrella --
+        # see docs/03-architecture/single-package-lifecycle.md.
+        'shopify_connector',
     ],
     'data': [
         'security/ir.model.access.csv',

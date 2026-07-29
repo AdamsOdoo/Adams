@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Persistent fallback notification/UI (Section 7). Deliberately
+        minimal and self-contained: this view must still work even in the
+        degraded case where `shopify_connector_core`'s own richer dashboard
+        cannot be relied on (this module never depends on core, so it
+        renders correctly whether or not core is present/healthy).
+    -->
+    <record id="view_shopify_connector_package_form" model="ir.ui.view">
+        <field name="name">shopify.connector.package.form</field>
+        <field name="model">shopify.connector.package</field>
+        <field name="arch" type="xml">
+            <form string="Shopify Connector">
+                <header>
+                    <button name="action_recheck_dependencies" type="object"
+                            string="Recheck Dependencies" class="btn-secondary"/>
+                    <button name="action_restore_suite" type="object"
+                            string="Restore Suite" class="btn-secondary"
+                            invisible="state == 'healthy'"/>
+                    <button name="action_confirm_resume" type="object"
+                            string="Confirm Resume" class="btn-primary"
+                            invisible="state == 'healthy'"
+                            confirm="Resuming clears the package-wide pause. Each store's own readiness and activation rules still apply. Continue?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="healthy,dependency_paused"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="state == 'healthy'">
+                        <strong>Shopify Connector paused</strong><br/>
+                        One or more required Odoo applications are unavailable:
+                        <field name="missing_standard_apps" readonly="1" nolabel="1" class="oe_inline"/>.
+                        No Shopify synchronization will run while the connector is paused.
+                        Reinstall the missing applications, restore the connector suite,
+                        rerun readiness, and resume explicitly.
+                    </div>
+                    <group>
+                        <field name="missing_technical_modules" readonly="1"/>
+                        <field name="paused_at" readonly="1"/>
+                        <field name="resumed_at" readonly="1"/>
+                        <field name="resumed_by_uid" readonly="1"/>
+                        <field name="last_integrity_check" readonly="1"/>
+                    </group>
+                    <group string="Audit">
+                        <field name="audit_note" readonly="1" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_package" model="ir.actions.server">
+        <field name="name">Shopify Connector</field>
+        <field name="model_id" ref="model_shopify_connector_package"/>
+        <field name="state">code</field>
+        <field name="code">action = model.action_open_singleton()</field>
+    </record>
+
+    <menuitem id="menu_shopify_connector_package_root"
+              name="Shopify Connector"
+              action="action_shopify_connector_package"
+              groups="base.group_system"
+              sequence="60"/>
+</odoo>

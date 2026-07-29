@@ -323,6 +323,10 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         Returns the number of jobs dispatched in this pass.
         """
+        # Wave 5 single-package lifecycle: covers cron drain AND retry/replay
+        # dispatch, both of which are this same merged loop (Section 10 gates
+        # #3/#4/#5) -- checked first, before claiming a single job.
+        self.env['shopify.connector.package'].sudo().assert_healthy()
         cap = (
             self._resolve_drain_batch_size() if limit is None
             else limit

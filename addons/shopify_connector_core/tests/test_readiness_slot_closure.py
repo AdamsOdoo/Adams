@@ -598,10 +598,21 @@ class TestReadinessSlotClosure(TransactionCase):
                  'job', 1, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'job', 2, 'Probe audit job lifecycle.'),
+                # Wave 5 single-package lifecycle: the global execution-
+                # boundary gate (Section 10).
+                ('shopify_connector_store.py', '_run_connection_probe',
+                 "self.env['shopify.connector.package']", 1,
+                 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py',
                  '_sweep_quiescing_business_jobs', 'job', 1,
                  'Disconnect job sweep.'),
                 ('shopify_connector_store.py', 'action_force_disconnect',
                  'job', 1, 'Forced-disconnect audit.'),
+                ('shopify_connector_store.py', 'action_activate',
+                 "self.env['shopify.connector.package']", 1,
+                 'Package integrity gate.'),
+                ('shopify_connector_store.py', 'action_reconnect',
+                 "self.env['shopify.connector.package']", 1,
+                 'Package integrity gate.'),
             ),
         )

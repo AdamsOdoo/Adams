@@ -34,7 +34,9 @@ logic. No UI, wizard, webhook, or OAuth file.
     'author': 'Adams',
     'license': 'LGPL-3',
     'category': 'Connector',
-    'depends': ['shopify_connector_core', 'product'],
+    # 'shopify_connector' (Wave 5): reverse edge onto the customer-facing
+    # package umbrella -- see docs/03-architecture/single-package-lifecycle.md.
+    'depends': ['shopify_connector_core', 'product', 'shopify_connector'],
     'data': [
         'security/ir.model.access.csv',
         'security/shopify_connector_product_company_rules.xml',

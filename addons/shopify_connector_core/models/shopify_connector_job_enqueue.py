@@ -62,5 +62,8 @@ class ShopifyConnectorJobEnqueue(models.AbstractModel):
             vals['trigger_origin_event_ref'] = trigger_origin_event_ref
         if trigger_origin_event_at:
             vals['trigger_origin_event_at'] = trigger_origin_event_at
+        # Wave 5 single-package lifecycle: job admission gate (Section 10 #2)
+        # -- checked before ANY job row is created, for every domain caller.
+        self.env['shopify.connector.package'].sudo().assert_healthy()
         job = self.env['shopify.connector.job'].sudo().create(vals)
         return self.env['shopify.connector.job'].browse(job.id)

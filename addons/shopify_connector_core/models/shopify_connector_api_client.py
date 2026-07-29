@@ -180,6 +180,9 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         response Shopify served on another version is refused rather than
         returned with a fall-forward marker.
         """
+        # Wave 5 single-package lifecycle: final pre-network boundary gate
+        # (Section 10 #8) -- see the identical check in `execute_business`.
+        self.env['shopify.connector.package'].sudo().assert_healthy()
         self._validate_graphql_operation(
             query, variables or {}, mutation_context=None,
         )
@@ -428,6 +431,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         **Dormant in this slice** — no production call site enters this context
         yet.
         """
+        # Wave 5 single-package lifecycle: final pre-network boundary gate
+        # (Section 10 #8) -- `execute`/`execute_business` are the sole
+        # transport surface (see the class docstring), so this single check,
+        # duplicated in `execute` below, covers every Shopify mutation and
+        # read in the codebase. Checked before any admission, lease, or
+        # transport -- same position as the configuration precondition below.
+        self.env['shopify.connector.package'].sudo().assert_healthy()
         # Same configuration precondition as execute() -- fail before any
         # admission, lease, or transport (no lease, no _send).
         variables = variables or {}
