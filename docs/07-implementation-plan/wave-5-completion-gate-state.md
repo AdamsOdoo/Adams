@@ -686,6 +686,104 @@ combined. No Shopify resource was provisioned or contacted. Issues #185,
 #186, #197 and #200 remain open; PR #204 remains draft, unapproved and
 unmerged.
 
+### 5e.8 Control-room rejection and additive reversion of the single-package dependency-recovery experiment — 2026-07-29
+
+> **Status: `[Decision — control room]` recorded here as a governance record,
+> not made here. Documentation-only. NOT an acceptance, NOT a review, NOT a
+> runtime, Shopify or UAT claim, and NOT a new architecture decision. No
+> architecture decision was created or accepted in the reverting session.**
+
+**The batch from `4ac4ce2a5144907673fea1b753764823857916aa` (exclusive)
+through `69562d34ae4f37e6eb2dbd4aa2f0a91250119cfe` (inclusive) is REJECTED
+by the control room.** It does not proceed to independent acceptance review,
+Odoo.sh qualification, Shopify validation, UAT, ready-mark or merge.
+
+| Item | Value |
+| --- | --- |
+| Rejected starting head | `69562d34ae4f37e6eb2dbd4aa2f0a91250119cfe` |
+| Restored executable checkpoint | `4ac4ce2a5144907673fea1b753764823857916aa` |
+| Previously accepted Odoo.sh-tested executable ancestor | `ee23c966a0b214c7974abbade4b384f251c4940f` |
+| Additive revert commit | `6c6cef38d08cb7e855736164618e19c4791f7fc2` |
+
+**Seven commits reverted, newest-first, in one additive revert commit** — no
+amend, rebase, squash, reset or force-push; nothing at or before `4ac4ce2a`
+touched:
+
+1. `69562d34ae4f37e6eb2dbd4aa2f0a91250119cfe`
+2. `105314d1373b0c7f6a9e414d2a5da52cef852d3d`
+3. `a208a562f1cf9249c9f7e4f0a30e75131a477058`
+4. `ffb769c7a8ed6f0a71390f77b8e993d229430a94`
+5. `b44ccce24fae99660e10011c2670f94a270e2a2f`
+6. `6e622e1ca72d8ce196d824858bff514f4142cc03`
+7. `6e1db1d271fce14676ebede9db340c6ad248d7c2`
+
+**Grounds for rejection `[Decision — control room, verified
+mandatory-requirement failures]`:**
+
+1. **TD-019 is a feasibility blocker for the rejected architecture, not
+   acceptable technical debt.** A standard-dependency cascade physically
+   deletes domain-owned mappings, bindings, jobs, logs and mutation
+   evidence.
+2. That outcome **violates mandatory feasibility invariant H** and should
+   have triggered the governing prompt's **Section 30 no-edit stop** before
+   any file was edited.
+3. The global resume implementation does not perform **per-store
+   selection**, **production-path readiness**, **explicit store
+   confirmation**, **interrupted-job reconciliation**, or **prevention of
+   automatic queued-work resumption**.
+4. The pause record and workflow **omit mandatory audit and recovery
+   facts**.
+5. **Restore does not upgrade every component.**
+6. The required **setup, mapping, remap, readiness and browser-evidence
+   scope was not implemented** — governing-prompt **Sections 15–20 and 26
+   were not delivered**.
+7. Customer-facing copy claiming affected components are "paused
+   automatically, not deleted" is **false**: Odoo removes the modules and
+   their owned tables.
+
+**TD-017 and TD-018, as recorded in the rejected batch, were mandatory gaps
+— not accepted limitations.** They were logged there as scoped-out debt;
+the control room does not accept that classification. TD-017 (no per-store
+resume selection) and TD-018 (restore does not force-upgrade
+already-installed components) are the same defects named in grounds 3 and 5
+above. TD-017, TD-018 and TD-019 were introduced by the reverted commits
+and are not present in the restored tree; they are recorded here as facts
+about the rejected experiment, not as carried-forward debt against the
+restored baseline.
+
+**Evidence status of the rejected head.** The green local regression results
+(2069 fresh / 2069 warm / 39 non-standard) and the green GitHub Actions runs
+recorded for that batch **remain historical evidence for the rejected subset
+only**. They are not evidence for the restored tree, and they never
+established the mandatory requirements the batch failed. **No Odoo.sh,
+Shopify, UAT or acceptance claim applies to `69562d34…` — none was ever
+made, and none may be inferred.**
+
+**Restored evidence baseline.** After the reversion the executable tree
+under `addons/**`, `tools/**` and `.github/**` is byte-for-byte identical to
+`4ac4ce2a`, and — because `4ac4ce2a` was documentation-only after
+`ee23c966` — identical to `ee23c966a0b214c7974abbade4b384f251c4940f`, the
+previously accepted Odoo.sh-tested executable ancestor. `[Inference,
+mechanically verified]` the disposition already recorded for that executable
+head therefore continues to describe the current executable tree; **no new
+runtime evidence is claimed by the reversion, and none is required, because
+no new executable tree was produced.** `addons/shopify_connector/**` no
+longer exists; the six pre-existing connector modules' manifests and
+production files match `4ac4ce2a` exactly.
+
+**Forward disposition `[Decision — control room]`:**
+
+- **Dependency-uninstall survival is deferred from the MVP.** It is not an
+  MVP requirement and no MVP work depends on it.
+- **The next implementation will address UAT-critical onboarding
+  separately**, as its own bounded task.
+
+**Historical evidence is preserved.** The seven rejected commits remain in
+this branch's history, reachable and unmodified, and §5e.1–§5e.7 above are
+untouched. Nothing in this record rewrites an earlier record as though the
+experiment never occurred. PR #204 remains **draft, open, unapproved and
+unmerged**; issues #185, #186, #197 and #200 remain open.
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.
