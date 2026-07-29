@@ -47,6 +47,7 @@ class ShopifyConnectorReadinessCheckFulfillmentExtension(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_PASS,
                 'Not applicable — the fulfillment domain is not enabled for '
                 'this store.',
+                not_applicable=True,
             )
         if not store.granted_scopes:
             return self._check_result(
@@ -83,6 +84,7 @@ class ShopifyConnectorReadinessCheckFulfillmentExtension(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_PASS,
                 'Not applicable — the fulfillment domain is not enabled for '
                 'this store.',
+                not_applicable=True,
             )
         if not store.api_version:
             return self._check_result(
@@ -118,10 +120,19 @@ class ShopifyConnectorReadinessCheckFulfillmentExtension(models.AbstractModel):
                 code, self.WARNING, self.RESULT_PASS,
                 'Not applicable — the fulfillment domain is not enabled for '
                 'this store.',
+                not_applicable=True,
             )
+        # Wave 5: the reason is what an operator READS on the final-readiness
+        # step, so it names the two axes as separate things and gives the
+        # exact Shopify navigation path rather than a scope handle nobody can
+        # act on. The severity, the tier and the not-proven verdict are
+        # unchanged -- only the wording an operator has to act on is.
         return self._check_result(
             code, self.WARNING, self.RESULT_NOT_PROVEN,
-            'The fulfill_and_ship_orders staff permission cannot be proven '
-            'from API scopes; it must be manually confirmed and dev-store '
-            'verified (CV-013) before live fulfillment mutation.',
+            'Shopify API scopes and Shopify staff permissions are separate '
+            'things, and the connector cannot prove the staff role '
+            'automatically. Check it yourself in Shopify Admin -> Settings '
+            '-> Users and permissions -> role -> Orders -> Fulfill and ship. '
+            'It must also be dev-store verified (CV-013) before live '
+            'fulfillment mutation.',
         )

@@ -142,7 +142,23 @@ CORE_SUDO_SITES = [
     # create them.
     ('shopify_connector_setup_wizard.py', '_settings_for', 'Settings', 1),
     ('shopify_connector_setup_wizard.py', '_settings_for', 'Settings', 2),
+    # Wave 5: two writes, because a legacy row whose position does not
+    # advance still gets its semantic step key backfilled -- the branch that
+    # upgrades a pre-Wave-5 row in place rather than leaving it dependent on
+    # the read-time numeric translation forever.
     ('shopify_connector_setup_wizard.py', '_record_progress', 'settings', 1),
+    ('shopify_connector_setup_wizard.py', '_record_progress', 'settings', 2),
+    # Wave 5: the readiness-staleness stamp. It lives on the settings model
+    # rather than in the setup service because the INVENTORY domain has to be
+    # able to set it too -- a location mapping is exactly what
+    # `mapped_location` reads -- and a second copy of "which field means
+    # stale" is how the two would drift. `readonly` structure, like the
+    # setup-progress columns beside it, so the write is elevated for the same
+    # reason they are; every caller has established its own authority first.
+    ('shopify_connector_store_settings.py',
+     '_mark_setup_readiness_stale', 'self', 1),
+    ('shopify_connector_store_settings.py',
+     '_clear_setup_readiness_stale', 'self', 1),
     ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
      "self.env['shopify.connector.job']", 1),
     ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
@@ -272,6 +288,10 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_settings_for'): 'S1 store-settings row create.',
     ('shopify_connector_setup_wizard.py',
      '_record_progress'): 'S1 resume-point write.',
+    ('shopify_connector_store_settings.py',
+     '_mark_setup_readiness_stale'): 'S1 readiness-staleness stamp.',
+    ('shopify_connector_store_settings.py',
+     '_clear_setup_readiness_stale'): 'S1 readiness-staleness clear.',
     ('shopify_connector_setup_wizard.py',
      '_last_readiness_checks'): 'S1 per-check readiness evidence read.',
     ('shopify_connector_setup_wizard.py',

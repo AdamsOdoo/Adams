@@ -1,4 +1,4 @@
-"""S1: the 11-step guided setup wizard's server side.
+"""S1: the 12-step guided setup wizard's server side.
 
 What this is
 ------------
@@ -63,23 +63,107 @@ SHOP_DOMAIN_RE = re.compile(r'^[a-z0-9][a-z0-9-]*\.myshopify\.com$')
 #: docs/02-product/ui-ux-final-design-spec.md "Setup wizard detailed flow").
 #: This tuple IS the order: the client renders from it, the server validates
 #: against it, and `test_the_step_order_is_the_accepted_one` asserts it.
+#:
+#: Wave 5 corrects the ORDER and the addressing at the same time, and the two
+#: corrections are the same correction.
+#:
+#: The order was wrong: readiness ran at position 6, BEFORE the operator had
+#: chosen what to sync, which locations to map, where the source of truth
+#: lives, whether customers are emailed, or when the first stock push
+#: happens. Two of the accepted checks -- `domain_flag_enablement` and
+#: `mapped_location` -- read exactly those choices, so the screen an operator
+#: was asked to read and act on was evaluating a configuration that did not
+#: exist yet. Activation compensated by re-running readiness server-side,
+#: which made activation correct and left the operator-facing step
+#: misleading. Readiness is now `final_readiness` at position 11, after every
+#: choice it reads, and a new `location_mapping` step at position 7 gives the
+#: `mapped_location` check something an operator can actually satisfy.
+#:
+#: The addressing was wrong for the same reason it is now being changed:
+#: inserting one step renumbers every later one, so a stored "8" meant
+#: `source_of_truth` before this change and `notification` after it. The KEY
+#: is authoritative everywhere -- persistence, validation, navigation, deep
+#: links, conditional skipping and resume -- and the ordinal is derived from
+#: this tuple for display only.
 SETUP_STEPS = (
     ('welcome', 'Welcome'),
     ('identity', 'Store identity'),
     ('credential', 'Credentials'),
     ('scopes', 'Permissions'),
     ('test_connection', 'Test connection'),
-    ('readiness', 'Readiness checks'),
     ('directions', 'What to sync'),
+    ('location_mapping', 'Location mapping'),
     ('source_of_truth', 'Source of truth'),
     ('notification', 'Customer notifications'),
     ('first_push', 'First stock push'),
+    ('final_readiness', 'Final readiness'),
     ('review', 'Review and activate'),
 )
 
 SETUP_STEP_COUNT = len(SETUP_STEPS)
 
-#: Step 7. Only DEC-003-supported directions appear. An unsupported direction
+#: The step keys, in order, and their display ordinals. `SETUP_STEP_ORDER` is
+#: the ONLY place a step key becomes a number, and the number it becomes is
+#: used for rendering and for monotonic comparison -- never for addressing.
+SETUP_STEP_KEYS = tuple(key for key, _label in SETUP_STEPS)
+SETUP_STEP_ORDER = {
+    key: index for index, key in enumerate(SETUP_STEP_KEYS, start=1)
+}
+
+#: The PRE-Wave-5 eleven-step numeric order, and the semantic step each stored
+#: number translates to. This table is a one-way compatibility bridge for
+#: progress recorded before the semantic key existed; it is never used to
+#: WRITE progress and it never grows a new entry.
+#:
+#: Two entries deserve their reasons stated, because both are judgement calls
+#: and a future reader will otherwise assume a typo:
+#:
+#: * **6 -> `directions`.** Legacy 6 was "Readiness checks", which no longer
+#:   exists at that position -- the new flow runs readiness at the END. The
+#:   readiness EVIDENCE that store recorded is not discarded: its
+#:   `core_readiness_check` job and its `last_readiness_*` mirrors are
+#:   untouched, and `final_readiness` re-evaluates them against the current
+#:   configuration exactly as it would for a new store. What moves is the
+#:   resume POINT, to the first step of the new order the operator has not
+#:   answered, which is `directions`.
+#: * **8 -> `source_of_truth`.** A legacy store resuming past `directions`
+#:   skips the new `location_mapping` step, which it never had. That is not a
+#:   silent skip: if its inventory domain is enabled and it has no mapping,
+#:   `final_readiness` reports `mapped_location` as Blocking with a
+#:   "Fix location mapping" action that deep-links back to the step by key.
+LEGACY_NUMERIC_STEP_KEYS = {
+    1: 'welcome',
+    2: 'identity',
+    3: 'credential',
+    4: 'scopes',
+    5: 'test_connection',
+    6: 'directions',
+    7: 'directions',
+    8: 'source_of_truth',
+    9: 'notification',
+    10: 'first_push',
+    11: 'review',
+}
+
+#: The five presentation states the final-readiness step renders. They are a
+#: PROJECTION of the readiness service's own `{tier, result}` verdict plus the
+#: context the verdict does not carry (is the domain enabled, is a refresh
+#: still running, is the evidence older than the configuration it describes).
+#: The readiness decision itself stays entirely server-owned in
+#: `shopify.connector.readiness.check`; this module never recomputes it.
+READINESS_PASSED = 'passed'
+READINESS_WARNING = 'warning'
+READINESS_BLOCKING = 'blocking'
+READINESS_WAITING = 'waiting'
+READINESS_NOT_REQUIRED = 'not_required'
+
+
+def setup_step_index(step_key):
+    """The display ordinal of a step key, or 0 for an unknown key."""
+    return SETUP_STEP_ORDER.get(step_key, 0)
+
+#: Step 6 (`directions`). Only DEC-003-supported directions appear. An
+#: unsupported direction
 #: is ABSENT rather than rendered disabled: a disabled control still tells an
 #: operator the feature exists and they cannot have it, which is a promise this
 #: MVP does not make.
@@ -131,7 +215,8 @@ SETUP_DOMAINS = (
     },
 )
 
-#: Step 8. Both choices are required and NEITHER is pre-selected: converting an
+#: Step 8 (`source_of_truth`). Both choices are required and NEITHER is
+#: pre-selected: converting an
 #: existing backend default into consent by leaving it selected is exactly the
 #: silent-consent shape DEC-012 §1 item 7 forbids.
 SETUP_MATCHING_CHOICES = (
@@ -272,17 +357,117 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             settings = Settings.sudo().create({'store_id': store.id})
         return settings
 
+    # ------------------------------------------------------------------
+    # Durable progress: semantic key authoritative, ordinal derived
+    # ------------------------------------------------------------------
+
     @api.model
-    def _record_progress(self, settings, step_index):
+    def _resume_key(self, settings):
+        """The durable resume point of `settings`, as a semantic step key.
+
+        Three sources, in this order, and the order is the whole point:
+
+        1. the stored semantic key, when it is one this build knows;
+        2. otherwise the PRE-Wave-5 numeric column, translated through
+           `LEGACY_NUMERIC_STEP_KEYS` -- the identical translation
+           `19.0.1.15.0/post-migrate.py` performs, applied at read time so a
+           row the migration never reached (an older dump restored later, a
+           fixture that wrote the number directly) resumes at the same place
+           rather than being silently reset to step 1;
+        3. `welcome`, for a store with no progress at all.
+
+        A stored key this build does not recognise falls through to the
+        numeric translation rather than raising: a resume point is not worth
+        refusing to render a screen over, and every later write repairs it.
+        """
+        if not settings:
+            return SETUP_STEP_KEYS[0]
+        stored_key = settings.setup_wizard_step_key
+        if stored_key in SETUP_STEP_ORDER:
+            return stored_key
+        try:
+            legacy = int(settings.setup_wizard_step or 1)
+        except (TypeError, ValueError):
+            legacy = 1
+        if legacy in LEGACY_NUMERIC_STEP_KEYS:
+            return LEGACY_NUMERIC_STEP_KEYS[legacy]
+        if legacy >= max(LEGACY_NUMERIC_STEP_KEYS):
+            # A number above the legacy range can only come from a build
+            # that already used this order, so it is already an ordinal in
+            # THIS tuple; clamp rather than invent.
+            return SETUP_STEP_KEYS[min(legacy, SETUP_STEP_COUNT) - 1]
+        return SETUP_STEP_KEYS[0]
+
+    @api.model
+    def _record_progress(self, settings, step_key):
         """Advance the durable resume point, never rewind it.
 
-        Monotonic on purpose: paging Back to re-read step 4 must not throw away
-        the fact that steps 5 and 6 were already completed, or Back would
-        quietly become a destructive control.
+        Monotonic on purpose: paging Back to re-read the credential step must
+        not throw away the fact that the later steps were already completed,
+        or Back would quietly become a destructive control.
+
+        Monotonic ON THE SEMANTIC ORDER, not on the stored integer, because
+        the integer is only a rendering of the key and a legacy row's integer
+        was produced by a different order entirely. The ordinal is written
+        alongside so the two never disagree, and a legacy row is upgraded in
+        place the first time any step is completed -- so a store stops
+        depending on the read-time translation as soon as it is touched.
         """
-        if step_index > settings.setup_wizard_step:
-            settings.sudo().write({'setup_wizard_step': step_index})
-        return settings.setup_wizard_step
+        if step_key not in SETUP_STEP_ORDER:
+            raise UserError(_('That is not a setup step.'))
+        current_key = self._resume_key(settings)
+        if SETUP_STEP_ORDER[step_key] > SETUP_STEP_ORDER[current_key]:
+            settings.sudo().write({
+                'setup_wizard_step_key': step_key,
+                'setup_wizard_step': SETUP_STEP_ORDER[step_key],
+            })
+            return step_key
+        if settings.setup_wizard_step_key != current_key:
+            settings.sudo().write({
+                'setup_wizard_step_key': current_key,
+                'setup_wizard_step': SETUP_STEP_ORDER[current_key],
+            })
+        return current_key
+
+    @api.model
+    def _mark_readiness_stale(self, settings):
+        """A readiness-relevant choice changed; earlier evidence is stale.
+
+        Called from the two steps whose values readiness actually reads --
+        the domain flags, and (through the inventory domain's own service)
+        the location mappings. Nothing is invalidated destructively: the
+        stored readiness result stays exactly where it is, and the surface
+        stops calling it green until a run newer than this stamp exists.
+        """
+        if settings:
+            settings._mark_setup_readiness_stale()
+        return True
+
+    @api.model
+    def _clear_readiness_stale(self, settings):
+        """Readiness has just run here; its evidence is current again."""
+        if settings:
+            settings._clear_setup_readiness_stale()
+        return True
+
+    @api.model
+    def _readiness_is_stale(self, store, settings):
+        """Is the stored readiness evidence older than the configuration?
+
+        The wizard's own readiness runs clear the mark outright, so this
+        comparison is the SAFETY NET for a run performed somewhere else --
+        `action_reconnect` runs `run_for_store` too. `>=` rather than `>`
+        because Odoo stores `Datetime` at one-second resolution: a change and
+        an unrelated readiness run inside the same second are indistinguishable
+        here, and treating that tie as stale is the fail-closed direction --
+        it asks for one more run, where `>` would silently present evidence
+        that may predate the change as current.
+        """
+        if not settings or not settings.setup_readiness_stale_since:
+            return False
+        if not store or not store.last_readiness_at:
+            return True
+        return settings.setup_readiness_stale_since >= store.last_readiness_at
 
     # ------------------------------------------------------------------
     # Step 4: the required scopes, derived rather than hard-coded
@@ -358,13 +543,16 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             store = candidates
 
         settings = self._settings_for(store) if store else False
+        resume_key = self._resume_key(settings)
+        locations = self._setup_location_payload(store, settings)
         payload = {
-            'steps': [
-                {'index': index, 'key': key, 'label': label}
-                for index, (key, label) in enumerate(SETUP_STEPS, start=1)
-            ],
+            'steps': self._step_payload(settings, locations),
             'step_count': SETUP_STEP_COUNT,
-            'resume_step': settings.setup_wizard_step if settings else 1,
+            # The resume point the client navigates by. The ordinal beside it
+            # is what the heading renders ("Step 7 of 12") and is never what
+            # the client compares against.
+            'resume_step_key': resume_key,
+            'resume_step': setup_step_index(resume_key),
             'store': self._store_payload(store, settings),
             'stores': [
                 {'id': candidate.id, 'name': candidate.display_name}
@@ -372,12 +560,63 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             ],
             'scopes': self._setup_required_scopes(store) if store else [],
             'domains': self._domain_payload(settings),
+            'location_mapping': locations,
             'matching_choices': list(SETUP_MATCHING_CHOICES),
             'price_choices': list(SETUP_PRICE_CHOICES),
-            'readiness': self._readiness_payload(store),
-            'summary': self._summary_payload(store, settings),
+            'readiness': self._readiness_payload(store, settings, locations),
+            'summary': self._summary_payload(store, settings, locations),
         }
         return payload
+
+    @api.model
+    def _step_payload(self, settings, locations):
+        """Every step, always, with its applicability stated rather than hidden.
+
+        A conditional step is NOT removed from the list when it does not
+        apply. Removing it would renumber everything after it -- reintroducing
+        exactly the coupling this wave removes -- and would leave an operator
+        wondering whether a step they half-remember still exists. It stays in
+        place, is rendered as `Not required`, and says why.
+        """
+        applicable = self._step_applicability(settings, locations)
+        return [
+            {
+                'index': index,
+                'key': key,
+                'label': label,
+                'applicable': applicable.get(key, {}).get('applicable', True),
+                'skipped_reason': applicable.get(key, {}).get('reason', ''),
+            }
+            for index, (key, label) in enumerate(SETUP_STEPS, start=1)
+        ]
+
+    @api.model
+    def _step_applicability(self, settings, locations):
+        """Which steps do not apply to this store, and the reason for each."""
+        inventory_on = bool(settings and settings.inventory_domain_enabled)
+        result = {}
+        if not inventory_on:
+            reason = _(
+                'Inventory syncing is not enabled for this store, so there '
+                'is nothing to map. You can enable it later in Store '
+                'Settings and come back to this step.'
+            )
+            result['location_mapping'] = {
+                'applicable': False, 'reason': reason,
+            }
+            result['first_push'] = {
+                'applicable': False,
+                'reason': _(
+                    'Inventory syncing is not enabled for this store, so '
+                    'there is no first stock push to schedule.'
+                ),
+            }
+        elif not locations.get('available'):
+            result['location_mapping'] = {
+                'applicable': False,
+                'reason': locations.get('reason') or '',
+            }
+        return result
 
     @api.model
     def _store_payload(self, store, settings):
@@ -440,30 +679,221 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             ))
         return domains
 
+    # ------------------------------------------------------------------
+    # The location-mapping step's data, through a domain seam
+    # ------------------------------------------------------------------
+
     @api.model
-    def _readiness_payload(self, store):
-        """The last recorded readiness result, per check.
+    def _setup_location_payload(self, store, settings):
+        """Cached Shopify locations and their mapping state, or "unavailable".
+
+        The domain-extension seam for the `location_mapping` step, in exactly
+        the shape `_get_checks` and `_governed_scope_catalog` already use: the
+        inventory module overrides this by ordinary model inheritance. Core
+        owns no mapping concept and must not grow one -- it does not import
+        the inventory models, does not read
+        `shopify.connector.location.mapping`, and cannot, because a database
+        without the inventory addon has no such table.
+        """
+        return {
+            'available': False,
+            'reason': _(
+                'Location mapping needs the Shopify Connector Inventory '
+                'module, which is not installed in this database.'
+            ),
+            'locations': [],
+            'odoo_locations': [],
+            'refresh': {
+                'state': 'none', 'job_id': False, 'label': '', 'reason': '',
+            },
+            'mapped_count': 0,
+            'unmapped_count': 0,
+            'has_valid_mapping': False,
+            'truncated': False,
+        }
+
+    @api.model
+    def _setup_refresh_locations(self, store):
+        """Admit a governed Shopify-location refresh job. Domain seam."""
+        raise UserError(_(
+            'Location mapping needs the Shopify Connector Inventory module, '
+            'which is not installed in this database.'
+        ))
+
+    @api.model
+    def _setup_create_location_mapping(
+        self, store, shopify_location_gid, odoo_location_id,
+    ):
+        """Create one explicit location mapping. Domain seam."""
+        raise UserError(_(
+            'Location mapping needs the Shopify Connector Inventory module, '
+            'which is not installed in this database.'
+        ))
+
+    # ------------------------------------------------------------------
+    # Readiness: rendered, never recomputed
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _readiness_payload(self, store, settings=False, locations=None):
+        """The last recorded readiness result, per check, as presentation.
 
         Stored evidence only -- reading this screen never runs a check and
-        never calls Shopify. Step 6 runs them explicitly.
+        never calls Shopify. The `final_readiness` step runs them explicitly.
+
+        The VERDICT is not computed here and never has been: it comes from
+        `shopify.connector.readiness.check`, with its accepted
+        essential/warning split and its accepted fail-closed aggregation.
+        What this adds is the presentation state, which needs three facts the
+        verdict does not carry -- whether the check applies at all, whether a
+        location refresh is still in flight, and whether the evidence is
+        older than the configuration it describes.
         """
+        if locations is None:
+            locations = self._setup_location_payload(store, settings)
+        stale = self._readiness_is_stale(store, settings)
         empty = {
-            'ran': False, 'overall': False, 'checks': [], 'blocking': [],
+            'ran': False, 'overall': False, 'stale': stale,
+            'checks': [], 'blocking': [], 'waiting': [],
         }
         if not store or not store.last_readiness_at:
             return empty
         checks = self._last_readiness_checks(store)
         if not checks:
             return dict(empty, ran=True, overall=store.last_readiness_result)
+        projected = [
+            self._project_readiness_check(check, settings, locations, stale)
+            for check in checks
+        ]
         return {
             'ran': True,
             'overall': store.last_readiness_result,
-            'checks': checks,
+            'stale': stale,
+            'checks': projected,
+            # `blocking` is what refuses activation and what the review step
+            # lists. It is the PROJECTED state, so a check that is waiting on
+            # a refresh is not reported as a failure the operator caused, and
+            # a not-required check never appears here at all.
             'blocking': [
-                check for check in checks
-                if check['tier'] == 'essential' and check['result'] != 'pass'
+                check for check in projected
+                if check['state'] == READINESS_BLOCKING
+            ],
+            'waiting': [
+                check for check in projected
+                if check['state'] == READINESS_WAITING
             ],
         }
+
+    @api.model
+    def _project_readiness_check(self, check, settings, locations, stale):
+        """One check's presentation state, tone, action and copy."""
+        state = self._readiness_state(check, settings, locations, stale)
+        action = self._readiness_action(check, state)
+        return dict(
+            check,
+            label=self._readiness_label(check.get('code')),
+            state=state,
+            tone=self._readiness_tone(state),
+            state_label=self._readiness_state_label(state),
+            owner=self._readiness_owner(check.get('code')),
+            reason=self._readiness_reason(check, state, locations),
+            action_label=action.get('label', ''),
+            action_step_key=action.get('step_key', ''),
+        )
+
+    @api.model
+    def _readiness_state(self, check, settings, locations, stale):
+        """Map a stored `{tier, result}` verdict onto a presentation state.
+
+        The rules, in the order they are applied, and why each exists:
+
+        1. **Stale beats everything, including Not required.** The order
+           matters and is not obvious. "Not applicable" is itself a
+           CONCLUSION about a configuration -- `mapped_location` reports it
+           because the inventory domain was off when the check ran. Enable
+           inventory and that stored conclusion is exactly as out of date as
+           any other, so ranking Not required above Waiting would leave the
+           one row an operator most needs to re-read looking settled.
+
+        2. **Waiting beats a verdict.** A `mapped_location` check whose
+           location refresh has not finished is a result nobody has yet. An
+           unfinished check must never read as a success, and it must not
+           read as the operator's failure either.
+
+        3. **Not required beats a pass.** A check that examined nothing
+           passed because there was nothing to examine. Rendering that as a
+           green "Passed" tells an operator something was proven.
+
+        4. **Otherwise the accepted verdict stands**, with essential failures
+           Blocking and warning failures Warning -- unchanged from the
+           accepted severity split.
+        """
+        if stale:
+            return READINESS_WAITING
+        if check.get('not_applicable'):
+            return READINESS_NOT_REQUIRED
+        code = check.get('code')
+        result = check.get('result')
+        tier = check.get('tier')
+        if code == 'mapped_location':
+            refresh_state = (locations or {}).get('refresh', {}).get('state')
+            if result != 'pass' and refresh_state in ('waiting', 'running'):
+                # A refresh is genuinely in flight, so "no mapping yet" is
+                # not yet a fact about this store. It is also NEVER reported
+                # as "Shopify has no locations": an empty cache while a
+                # refresh is pending is an unfinished read, not an answer.
+                return READINESS_WAITING
+        if result == 'pass':
+            return READINESS_PASSED
+        return (
+            READINESS_BLOCKING if tier == 'essential' else READINESS_WARNING
+        )
+
+    @api.model
+    def _readiness_action(self, check, state):
+        """The one control that fixes this check, addressed by STEP KEY.
+
+        Never by ordinal. A deep link built from a number is a link that
+        silently points at a different screen the next time a step is added,
+        which is the defect this wave exists to close.
+        """
+        if check.get('code') != 'mapped_location':
+            return {}
+        if state in (READINESS_PASSED, READINESS_NOT_REQUIRED):
+            return {}
+        return {
+            'label': _('Fix location mapping'),
+            'step_key': 'location_mapping',
+        }
+
+    @api.model
+    def _readiness_reason(self, check, state, locations):
+        """The sentence under a check, corrected for what is actually known."""
+        if state == READINESS_WAITING and check.get('code') == 'mapped_location':
+            refresh = (locations or {}).get('refresh', {})
+            if refresh.get('state') in ('waiting', 'running'):
+                return _(
+                    'The Shopify location list is still being refreshed, so '
+                    'whether a location is mapped is not known yet. This is '
+                    'not a report that Shopify has no locations.'
+                )
+        if state == READINESS_WAITING:
+            return _(
+                'Something this check reads has changed since it last ran, '
+                'so this result no longer describes the current settings. '
+                'Run the checks again.'
+            )
+        return check.get('reason') or ''
+
+    @api.model
+    def _readiness_state_label(self, state):
+        return {
+            READINESS_PASSED: _('Passed'),
+            READINESS_WARNING: _('Worth checking'),
+            READINESS_BLOCKING: _('Must be fixed'),
+            READINESS_WAITING: _('Waiting'),
+            READINESS_NOT_REQUIRED: _('Not required'),
+        }.get(state, _('Waiting'))
 
     @api.model
     def _last_readiness_checks(self, store):
@@ -497,14 +927,14 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         return [
             {
                 'code': entry.get('code') or '',
-                'label': self._readiness_label(entry.get('code')),
                 'tier': entry.get('tier') or 'warning',
                 'result': entry.get('result') or 'not_proven',
-                'tone': self._readiness_tone(
-                    entry.get('tier'), entry.get('result'),
-                ),
+                # A snapshot written before Wave 5 carries no
+                # `not_applicable` key. `.get()` defaults it to False, which
+                # is the safe direction: an old snapshot renders its accepted
+                # verdict rather than claiming something is not required.
+                'not_applicable': bool(entry.get('not_applicable')),
                 'reason': entry.get('reason') or '',
-                'owner': self._readiness_owner(entry.get('code')),
             }
             for entry in raw
             if isinstance(entry, dict)
@@ -519,9 +949,20 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'store_identity': _('The shop domain matches this store'),
             'web_base_url': _('Odoo knows its own public address'),
             'webhook_hmac': _('Webhook signatures can be verified'),
-            'mapped_location': _('A Shopify location is mapped to a warehouse'),
+            # Wave 5 renames. "A Shopify location is mapped to a warehouse"
+            # named a mechanism; "Inventory location mapping" names the thing
+            # the operator has to go and fix, which is what the row's action
+            # deep-links to. "At least one thing is set to sync" was vague
+            # enough that a connect-only store read it as an error.
+            'mapped_location': _('Inventory location mapping'),
             'cron_queue_health': _('Background jobs are running'),
-            'domain_flag_enablement': _('At least one thing is set to sync'),
+            'domain_flag_enablement': _('Sync features selected'),
+            'product_export_scopes': _('Catalog export permissions'),
+            'fulfillment_write_scope': _('Fulfillment write permission'),
+            'fulfillment_api_version': _('Fulfillment API version'),
+            'fulfillment_staff_permission': _(
+                'Shopify staff can fulfill and ship',
+            ),
         }.get(code, code or _('Check'))
 
     @api.model
@@ -536,22 +977,36 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'mapped_location': _('Administrator'),
             'cron_queue_health': _('Odoo administrator'),
             'domain_flag_enablement': _('Administrator'),
+            'product_export_scopes': _('Shopify admin'),
+            'fulfillment_write_scope': _('Shopify admin'),
+            'fulfillment_api_version': _('Administrator'),
+            'fulfillment_staff_permission': _('Shopify admin'),
         }.get(code, _('Administrator'))
 
     @api.model
-    def _readiness_tone(self, tier, result):
-        if result == 'pass':
-            return 'success'
-        return 'danger' if tier == 'essential' else 'warning'
+    def _readiness_tone(self, state):
+        """Colour follows the presentation state, and never leads it.
+
+        Every row also carries `state_label` as text, so a reader who cannot
+        see the colour still gets the same five distinctions.
+        """
+        return {
+            READINESS_PASSED: 'success',
+            READINESS_WARNING: 'warning',
+            READINESS_BLOCKING: 'danger',
+            READINESS_WAITING: 'info',
+            READINESS_NOT_REQUIRED: 'neutral',
+        }.get(state, 'neutral')
 
     @api.model
-    def _summary_payload(self, store, settings):
-        """Step 11, in plain words rather than as a pass/fail grid."""
+    def _summary_payload(self, store, settings, locations=None):
+        """The review step, in plain words rather than as a pass/fail grid."""
         if not store or not settings:
             return {
                 'domains': [], 'matching': '', 'price': '',
-                'notification': '', 'first_push': '', 'can_activate': False,
-                'blocking': [],
+                'notification': '', 'first_push': '', 'location_mapping': '',
+                'can_activate': False, 'blocking': [], 'waiting': [],
+                'already_active': False,
             }
         enabled = [
             domain['label'] for domain in self._domain_payload(settings)
@@ -565,19 +1020,50 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             (choice['value'], choice['label'])
             for choice in SETUP_PRICE_CHOICES
         ).get(settings.price_source_of_truth, '')
-        readiness = self._readiness_payload(store)
+        if locations is None:
+            locations = self._setup_location_payload(store, settings)
+        readiness = self._readiness_payload(store, settings, locations)
         return {
             'domains': enabled,
             'matching': matching,
             'price': price,
             'notification': self._notification_summary(settings),
             'first_push': self._first_push_summary(settings),
+            'location_mapping': self._location_summary(settings, locations),
+            # `can_activate` is advisory rendering. Activation itself re-runs
+            # readiness server-side and re-decides; this is only what the
+            # screen says while the operator is looking at it.
             'can_activate': bool(
-                readiness['ran'] and not readiness['blocking']
+                readiness['ran']
+                and not readiness['blocking']
+                and not readiness['waiting']
+                and not readiness['stale']
             ),
             'blocking': readiness['blocking'],
+            'waiting': readiness['waiting'],
             'already_active': store.state == 'connected',
         }
+
+    @api.model
+    def _location_summary(self, settings, locations):
+        if not settings.inventory_domain_enabled:
+            return _('Inventory is not enabled, so no location mapping is '
+                     'required.')
+        if not locations.get('available'):
+            return locations.get('reason') or ''
+        mapped = locations.get('mapped_count') or 0
+        unmapped = locations.get('unmapped_count') or 0
+        if not mapped and not unmapped:
+            return _('No Shopify locations have been read yet. Refresh the '
+                     'list on the Location mapping step.')
+        if not mapped:
+            return _('No Shopify location is mapped yet. %(unmapped)d '
+                     'location(s) are waiting.', unmapped=unmapped)
+        if unmapped:
+            return _('%(mapped)d location(s) mapped, %(unmapped)d not mapped. '
+                     'An unmapped location does not synchronise.',
+                     mapped=mapped, unmapped=unmapped)
+        return _('%(mapped)d location(s) mapped.', mapped=mapped)
 
     @api.model
     def _notification_summary(self, settings):
@@ -664,7 +1150,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             })
             store = store.with_env(self.env)
         settings = self._settings_for(store)
-        self._record_progress(settings, 2)
+        self._record_progress(settings, 'identity')
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------
@@ -694,11 +1180,11 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         # the value cannot survive into a traceback frame of the code below.
         token = None
         settings = self._settings_for(store)
-        self._record_progress(settings, 3)
+        self._record_progress(settings, 'credential')
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------
-    # Steps 4, 5 and 6 -- scopes, test connection, readiness
+    # Steps 4 and 5 -- scopes and test connection
     # ------------------------------------------------------------------
 
     @api.model
@@ -711,7 +1197,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
-        self._record_progress(settings, 4)
+        self._record_progress(settings, 'scopes')
         return self.get_setup_state(store_id=store.id)
 
     @api.model
@@ -733,26 +1219,41 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         store.invalidate_recordset()
         settings = self._settings_for(store)
         if store.last_test_connection_result == 'pass':
-            self._record_progress(settings, 5)
+            self._record_progress(settings, 'test_connection')
         return self.get_setup_state(store_id=store.id)
+
+    # ------------------------------------------------------------------
+    # Step 11 -- final readiness, run against the saved configuration
+    # ------------------------------------------------------------------
 
     @api.model
     def run_readiness(self, store_id):
-        """Step 6. The accepted check set, with its accepted severity split."""
+        """Step 11. The accepted check set, with its accepted severity split.
+
+        It runs LAST now, and that is the whole correction: every choice a
+        check reads -- the domain flags, the location mappings -- has already
+        been written by the time this executes, so the result describes the
+        store the operator is about to activate rather than the empty one
+        they started with.
+
+        Nothing here decides readiness. `run_for_store` owns the verdict, and
+        it reads stored evidence only: no Shopify request is made.
+        """
         store = self._resolve_store(store_id)
         self.env['shopify.connector.readiness.check'].run_for_store(store)
         store.invalidate_recordset()
         settings = self._settings_for(store)
-        self._record_progress(settings, 6)
+        self._clear_readiness_stale(settings)
+        self._record_progress(settings, 'final_readiness')
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------
-    # Steps 7 to 10 -- the durable choices
+    # Steps 6 to 10 -- the durable choices
     # ------------------------------------------------------------------
 
     @api.model
     def save_directions(self, store_id, enabled_keys):
-        """Step 7. Only accepted domains, and never silently.
+        """Step 6. Only accepted domains, and never silently.
 
         Enabling nothing is a valid outcome -- connect-only setup is
         explicitly permitted -- so this does not require a selection. What it
@@ -771,10 +1272,86 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 names=', '.join(sorted(unknown)),
             ))
         values = {}
+        changed = False
         for domain in self._domain_payload(settings):
-            values[domain['field']] = domain['key'] in keys
+            enabled = domain['key'] in keys
+            values[domain['field']] = enabled
+            if bool(settings[domain['field']]) != enabled:
+                changed = True
         settings.sudo().write(values)
-        self._record_progress(settings, 7)
+        if changed:
+            # `domain_flag_enablement` and `mapped_location` both read these
+            # flags, so a readiness result recorded before this write no
+            # longer describes this store. Marked rather than deleted: the
+            # evidence stays, and the surface stops calling it green.
+            self._mark_readiness_stale(settings)
+        self._record_progress(settings, 'directions')
+        return self.get_setup_state(store_id=store.id)
+
+    # ------------------------------------------------------------------
+    # Step 7 -- location mapping (conditional on the inventory domain)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def acknowledge_location_mapping(self, store_id):
+        """Step 7's Continue.
+
+        Records progress and nothing else. It deliberately does NOT require a
+        mapping to exist: whether a mapping is required is a readiness
+        decision, made by `mapped_location` on the final-readiness step with
+        the full picture, and duplicating that rule here would give an
+        operator two different answers to the same question. It also
+        deliberately enqueues nothing -- a step that silently contacted
+        Shopify because somebody pressed Continue would be a surprise.
+        """
+        store = self._resolve_store(store_id)
+        settings = self._settings_for(store)
+        self._record_progress(settings, 'location_mapping')
+        return self.get_setup_state(store_id=store.id)
+
+    @api.model
+    def refresh_shopify_locations(self, store_id):
+        """Ask Shopify for this store's locations, through the job queue.
+
+        This method admits a JOB. It makes no Shopify request itself, and
+        neither does anything else in this file: the request happens later,
+        on the ordinary dispatcher, inside
+        `_handle_inventory_location_sync`, which is the one governed place
+        the `locations` query lives. The setup service, Owl, the wizards and
+        the mapping views never hold a transport.
+
+        Every authorization the inventory domain requires is re-checked
+        inside the seam it delegates to, as the calling user -- this
+        Administrator gate is in addition to those, not instead of them.
+        """
+        store = self._resolve_store(store_id)
+        self._setup_refresh_locations(store)
+        return self.get_setup_state(store_id=store.id)
+
+    @api.model
+    def save_location_mapping(
+        self, store_id, shopify_location_gid, odoo_location_id,
+    ):
+        """Map one cached Shopify location to one Odoo internal location.
+
+        Both identities are EXPLICIT and both are validated on the server.
+        The Shopify side must be an active location this store's own cache
+        actually contains -- a GID typed into an RPC call is not an identity
+        -- and the Odoo side must be a location this caller can already see,
+        internal, and in a compatible company. None of that is decided here:
+        it is decided by `create_or_update_location_mapping`, the one
+        sanctioned creation service, which this delegates to through the
+        domain seam.
+        """
+        store = self._resolve_store(store_id)
+        settings = self._settings_for(store)
+        self._setup_create_location_mapping(
+            store, shopify_location_gid, odoo_location_id,
+        )
+        # A new mapping is exactly what `mapped_location` reads, so any
+        # earlier readiness result is now stale.
+        self._mark_readiness_stale(settings)
+        self._record_progress(settings, 'location_mapping')
         return self.get_setup_state(store_id=store.id)
 
     @api.model
@@ -800,7 +1377,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'product_first_sync_source': matching,
             'price_source_of_truth': price,
         })
-        self._record_progress(settings, 8)
+        self._record_progress(settings, 'source_of_truth')
         return self.get_setup_state(store_id=store.id)
 
     @api.model
@@ -828,7 +1405,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         if 'fulfillment_notification_confirmed' in settings._fields:
             values['fulfillment_notification_confirmed'] = enabled
         settings.sudo().write(values)
-        self._record_progress(settings, 9)
+        self._record_progress(settings, 'notification')
         return self.get_setup_state(store_id=store.id)
 
     @api.model
@@ -850,16 +1427,16 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             settings.sudo().write({
                 'inventory_scheduled_sync_enabled': bool(schedule_now),
             })
-        self._record_progress(settings, 10)
+        self._record_progress(settings, 'first_push')
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------
-    # Step 11 -- review and activate
+    # Step 12 -- review and activate
     # ------------------------------------------------------------------
 
     @api.model
     def activate(self, store_id):
-        """Step 11. Delegate to the existing activation, then hand off.
+        """Step 12. Delegate to the existing activation, then hand off.
 
         `action_activate` keeps its whole evidence contract: a credential on
         record, verified after its last change, a passing test connection, and
@@ -877,18 +1454,20 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         settings = self._settings_for(store)
         # Re-run readiness against the configuration actually being activated.
         #
-        # The accepted step order puts readiness at 6 and the domain, ownership
-        # and notification choices at 7-10, so the result an operator saw on
-        # step 6 describes a store that did not yet have any of them. Two of
-        # the accepted checks -- `domain_flag_enablement` and `mapped_location`
-        # -- read exactly those choices, so judging activation on the step-6
-        # run would judge it on stale evidence. `action_activate` requires the
-        # readiness result to be no older than the credential verification for
-        # the same reason, one level down.
+        # The step order now puts `final_readiness` after every choice a check
+        # reads, so the operator-facing result and this one describe the same
+        # store. This re-run stays anyway, and deliberately: the review step
+        # is a screen an operator can sit on, and a setting can change in
+        # another tab, in another session, or through the store form while
+        # they do. `action_activate` requires the readiness result to be no
+        # older than the credential verification for the same reason, one
+        # level down.
         if store.credential_present:
             self.env['shopify.connector.readiness.check'].run_for_store(store)
             store.invalidate_recordset()
-        readiness = self._readiness_payload(store)
+            self._clear_readiness_stale(settings)
+        settings.invalidate_recordset()
+        readiness = self._readiness_payload(store, settings)
         if not readiness['ran']:
             raise UserError(_(
                 'Run the readiness checks before activating this store.'
@@ -901,10 +1480,19 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                     check['label'] for check in readiness['blocking']
                 ),
             ))
+        if readiness['waiting']:
+            raise UserError(_(
+                'These checks have not finished, so this store cannot be '
+                'activated yet: %(names)s',
+                names='; '.join(
+                    check['label'] for check in readiness['waiting']
+                ),
+            ))
         if store.state != 'connected':
             store.action_activate()
             store.invalidate_recordset()
         settings.sudo().write({
+            'setup_wizard_step_key': 'review',
             'setup_wizard_step': SETUP_STEP_COUNT,
             'setup_completed_at': fields.Datetime.now(),
             'setup_completed_uid': self.env.uid,
@@ -930,18 +1518,25 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def save_and_exit(self, store_id, step_index):
-        """Record the last valid step so reopening resumes in the right place."""
+    def save_and_exit(self, store_id, step_key):
+        """Record the last valid step so reopening resumes in the right place.
+
+        Takes the SEMANTIC key and takes nothing else. An ordinal is
+        deliberately refused rather than translated: a client that still
+        sends `8` is a client built against the old order, and quietly
+        interpreting that as whatever step is eighth today would resume an
+        operator on a screen they never asked for. Refusing is loud, and
+        loud is correct here.
+        """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
-        try:
-            step_index = int(step_index)
-        except (TypeError, ValueError):
+        if not isinstance(step_key, str) or step_key not in SETUP_STEP_ORDER:
             raise UserError(_('That is not a setup step.'))
-        if not 1 <= step_index <= SETUP_STEP_COUNT:
-            raise UserError(_('That is not a setup step.'))
-        self._record_progress(settings, step_index)
-        return {'resume_step': settings.setup_wizard_step}
+        recorded = self._record_progress(settings, step_key)
+        return {
+            'resume_step_key': recorded,
+            'resume_step': setup_step_index(recorded),
+        }
 
     @api.model
     def restart_setup(self, store_id):
@@ -956,6 +1551,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
         settings.sudo().write({
+            'setup_wizard_step_key': SETUP_STEP_KEYS[0],
             'setup_wizard_step': 1,
             'setup_last_rerun_at': fields.Datetime.now(),
             'setup_last_rerun_uid': self.env.uid,

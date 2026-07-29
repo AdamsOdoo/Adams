@@ -1,7 +1,7 @@
 /** @odoo-module **/
 // Part of the Shopify Connector (S1 guided setup).
 //
-// The 11-step setup wizard: one bounded Owl client action inside the normal
+// The 12-step setup wizard: one bounded Owl client action inside the normal
 // Odoo web client. Standard action, standard ORM service, standard breadcrumbs.
 // No SPA, no custom router, no external library, no CDN, no external font, no
 // second store-management system.
@@ -12,6 +12,16 @@
 // no readiness verdict — every one of those came from
 // `shopify.connector.setup.wizard`, which delegates in turn to the services
 // that already own them.
+//
+// NAVIGATION IS BY SEMANTIC STEP KEY, NOT BY POSITION. `state.stepKey` is a
+// string — "credential", "location_mapping", "final_readiness" — and every
+// branch, every guard, every server call and every deep link compares against
+// one. The ordinal exists only to render "Step 7 of 12", and it is read out of
+// the server's own step list rather than counted here. This is not stylistic:
+// Wave 5 inserted a step into the middle of the accepted order, and a client
+// that had switched on `state.step === 8` would have silently started running
+// the Customer-notifications branch on the Source-of-truth screen. A string
+// mismatch is a visible bug; a number that still matches is not.
 //
 // WHY THERE IS NO CLIENT-SIDE AUTHORIZATION. There is none to have. The server
 // re-checks the Administrator role, record access and company consistency on
@@ -51,6 +61,10 @@ function localeDirection() {
 
 const MODEL = "shopify.connector.setup.wizard";
 
+// The first step's key. Used only as the fallback when the server payload has
+// not arrived yet; every other key in this file comes from that payload.
+const FIRST_STEP_KEY = "welcome";
+
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";
     static props = { "*": true };
@@ -66,7 +80,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             status: "loading", // "loading" | "ready" | "error"
             errorMessage: "",
             busy: false,
-            step: 1,
+            stepKey: FIRST_STEP_KEY,
             data: null,
             // Per-step drafts. Nothing here is authoritative: each is sent to
             // the server, which writes it to the field that owns it and
@@ -81,6 +95,8 @@ export class ShopifyConnectorSetupWizard extends Component {
                 notificationConfirmed: false,
                 schedulePush: false,
                 scopesRead: false,
+                mapShopifyGid: "",
+                mapOdooLocationId: "",
             },
         });
 
@@ -97,7 +113,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                     this.headingRef.el.focus();
                 }
             },
-            () => [this.state.step]
+            () => [this.state.stepKey]
         );
     }
 
@@ -118,40 +134,85 @@ export class ShopifyConnectorSetupWizard extends Component {
         return (this.state.data && this.state.data.summary) || {};
     }
 
+    get locations() {
+        return (
+            (this.state.data && this.state.data.location_mapping) || {
+                available: false,
+                reason: "",
+                locations: [],
+                odoo_locations: [],
+                refresh: { state: "none" },
+                mapped_count: 0,
+                unmapped_count: 0,
+            }
+        );
+    }
+
     get readiness() {
         return (
             (this.state.data && this.state.data.readiness) || {
                 ran: false,
+                stale: false,
                 checks: [],
                 blocking: [],
+                waiting: [],
             }
         );
     }
 
     get currentStep() {
-        return this.steps.find((s) => s.index === this.state.step) || {};
+        return this.steps.find((s) => s.key === this.state.stepKey) || {};
+    }
+
+    /** Position of the current step in the server's own ordered list. */
+    get currentIndex() {
+        return this.steps.findIndex((s) => s.key === this.state.stepKey);
     }
 
     get isFirstStep() {
-        return this.state.step <= 1;
+        return this.currentIndex <= 0;
     }
 
     get isLastStep() {
-        return this.state.step >= (this.state.data?.step_count || 11);
+        const index = this.currentIndex;
+        return index >= 0 && index === this.steps.length - 1;
+    }
+
+    /** Is the current step one this store actually has to answer? */
+    get currentStepApplies() {
+        const step = this.currentStep;
+        return step.applicable === undefined ? true : step.applicable;
     }
 
     stepClass(step) {
         let cls = "sc_setup_step";
-        if (step.index === this.state.step) {
+        if (step.key === this.state.stepKey) {
             cls += " sc_setup_step--current";
-        } else if (step.index < this.state.step) {
+        } else if (step.index < (this.currentStep.index || 0)) {
             cls += " sc_setup_step--done";
+        }
+        if (step.applicable === false) {
+            cls += " sc_setup_step--skipped";
         }
         return cls;
     }
 
     checkClass(check) {
         return "sc_setup_check sc_setup_check--" + (check.tone || "neutral");
+    }
+
+    refreshState() {
+        return (this.locations.refresh || {}).state || "none";
+    }
+
+    refreshLabel() {
+        return {
+            waiting: _t("Waiting"),
+            running: _t("Running"),
+            succeeded: _t("Succeeded"),
+            failed: _t("Failed"),
+            none: _t("Not run yet"),
+        }[this.refreshState()];
     }
 
     // --- server round trips -------------------------------------------------
@@ -161,8 +222,9 @@ export class ShopifyConnectorSetupWizard extends Component {
             const data = await this.orm.call(MODEL, "get_setup_state", [], {
                 store_id: storeId || null,
             });
-            this._adopt(data);
+            this._adopt(data, true);
             this.state.status = "ready";
+            await this._onEnterStep();
         } catch (error) {
             this.state.status = "error";
             this.state.errorMessage = this._message(error);
@@ -170,7 +232,7 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     /** Adopt the server payload as the single source of truth. */
-    _adopt(data) {
+    _adopt(data, resume = false) {
         this.state.data = data;
         const store = data.store || {};
         this.state.form.name = store.name || "";
@@ -178,21 +240,20 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.enabledDomains = (data.domains || [])
             .filter((d) => d.enabled)
             .map((d) => d.key);
-        // Deliberately NOT seeded from the stored values. Step 8 requires an
-        // explicit choice, and pre-selecting whatever the backend default
-        // happens to be is precisely how a default becomes "consent" without
-        // anybody consenting to it. A store that has already been through
-        // setup shows its stored answer in the summary instead.
+        // Deliberately NOT seeded from the stored values. The source-of-truth
+        // step requires an explicit choice, and pre-selecting whatever the
+        // backend default happens to be is precisely how a default becomes
+        // "consent" without anybody consenting to it. A store that has already
+        // been through setup shows its stored answer in the summary instead.
         this.state.form.matching = "";
         this.state.form.price = "";
         this.state.form.notification = false;
         this.state.form.notificationConfirmed = false;
         this.state.form.schedulePush = false;
-        if (data.resume_step && this.state.step === 1) {
-            this.state.step = Math.min(
-                data.resume_step,
-                data.step_count || 11
-            );
+        this.state.form.mapShopifyGid = "";
+        this.state.form.mapOdooLocationId = "";
+        if (resume && data.resume_step_key) {
+            this.state.stepKey = data.resume_step_key;
         }
     }
 
@@ -225,24 +286,66 @@ export class ShopifyConnectorSetupWizard extends Component {
 
     // --- navigation ---------------------------------------------------------
 
-    back() {
-        if (!this.isFirstStep) {
-            this.state.step -= 1;
-            this.state.errorMessage = "";
+    /**
+     * Move to a step by KEY. Every navigation in this component goes through
+     * here, including the readiness deep links, so there is exactly one place
+     * a step transition can happen and exactly one place the on-enter work
+     * can be triggered from.
+     */
+    async goToStep(stepKey) {
+        if (!this.steps.some((s) => s.key === stepKey)) {
+            return;
+        }
+        this.state.stepKey = stepKey;
+        this.state.errorMessage = "";
+        await this._onEnterStep();
+    }
+
+    async back() {
+        const index = this.currentIndex;
+        if (index > 0) {
+            await this.goToStep(this.steps[index - 1].key);
         }
     }
 
-    _advance() {
-        if (!this.isLastStep) {
-            this.state.step += 1;
+    async _advance() {
+        const index = this.currentIndex;
+        if (index >= 0 && index < this.steps.length - 1) {
+            await this.goToStep(this.steps[index + 1].key);
         }
+    }
+
+    /**
+     * Work that happens on ARRIVING at a step, whichever direction it was
+     * reached from.
+     *
+     * Final readiness is the one step with any: entering it must evaluate the
+     * configuration as it is NOW, not replay a result recorded before the
+     * choices above it were made. It re-runs only when there is nothing to
+     * show or when what is shown is stale, so paging back and forth does not
+     * queue a run per keystroke. `run_readiness` reads stored evidence and
+     * contacts nothing.
+     */
+    async _onEnterStep() {
+        if (this.state.stepKey !== "final_readiness") {
+            return;
+        }
+        if (!this.store.id) {
+            return;
+        }
+        if (this.readiness.ran && !this.readiness.stale) {
+            return;
+        }
+        await this._call("run_readiness", { store_id: this.store.id });
     }
 
     async saveAndExit() {
         if (this.store.id) {
             await this.orm.call(MODEL, "save_and_exit", [], {
                 store_id: this.store.id,
-                step_index: this.state.step,
+                // The KEY, never the ordinal. The server refuses an ordinal
+                // outright rather than translating it.
+                step_key: this.state.stepKey,
             });
         }
         this.notification.add(
@@ -252,34 +355,34 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.action.doAction("shopify_connector_core.action_shopify_connector_dashboard");
     }
 
-    /** One handler per step. Each calls exactly one guarded server method. */
+    /** One handler per step, selected by KEY. Each calls one guarded method. */
     async continueStep() {
         const storeId = this.store.id;
         let ok = false;
-        switch (this.state.step) {
-            case 1:
+        switch (this.state.stepKey) {
+            case "welcome":
                 ok = true;
                 break;
-            case 2:
+            case "identity":
                 ok = await this._call("save_store_identity", {
                     name: this.state.form.name,
                     shop_domain: this.state.form.shopDomain,
                     store_id: storeId || null,
                 });
                 break;
-            case 3:
+            case "credential":
                 // Read from the DOM node and cleared immediately: the token is
                 // never bound into component state, so it cannot be read back
                 // out of it, serialised into a snapshot or survive a re-render.
                 ok = await this._submitCredential();
                 break;
-            case 4:
+            case "scopes":
                 ok = await this._call("acknowledge_scopes", {
                     store_id: storeId,
                 });
                 break;
-            case 5:
-                // Continue ADVANCES; it does not run the check. Step 5's
+            case "test_connection":
+                // Continue ADVANCES; it does not run the check. This step's
                 // whole job is to show the operator an explicit pass or an
                 // actionable failure, and a Continue that ran the probe and
                 // moved on in the same click would never show either.
@@ -291,7 +394,38 @@ export class ShopifyConnectorSetupWizard extends Component {
                 }
                 ok = true;
                 break;
-            case 6:
+            case "directions":
+                ok = await this._call("save_directions", {
+                    store_id: storeId,
+                    enabled_keys: this.state.form.enabledDomains,
+                });
+                break;
+            case "location_mapping":
+                ok = await this._call("acknowledge_location_mapping", {
+                    store_id: storeId,
+                });
+                break;
+            case "source_of_truth":
+                ok = await this._call("save_source_of_truth", {
+                    store_id: storeId,
+                    matching: this.state.form.matching,
+                    price: this.state.form.price,
+                });
+                break;
+            case "notification":
+                ok = await this._call("save_notification", {
+                    store_id: storeId,
+                    enabled: this.state.form.notification,
+                    confirmed: this.state.form.notificationConfirmed,
+                });
+                break;
+            case "first_push":
+                ok = await this._call("save_first_push_schedule", {
+                    store_id: storeId,
+                    schedule_now: this.state.form.schedulePush,
+                });
+                break;
+            case "final_readiness":
                 if (!this.readiness.ran) {
                     this.state.errorMessage = _t(
                         "Run the readiness checks before continuing."
@@ -300,33 +434,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                 }
                 ok = true;
                 break;
-            case 7:
-                ok = await this._call("save_directions", {
-                    store_id: storeId,
-                    enabled_keys: this.state.form.enabledDomains,
-                });
-                break;
-            case 8:
-                ok = await this._call("save_source_of_truth", {
-                    store_id: storeId,
-                    matching: this.state.form.matching,
-                    price: this.state.form.price,
-                });
-                break;
-            case 9:
-                ok = await this._call("save_notification", {
-                    store_id: storeId,
-                    enabled: this.state.form.notification,
-                    confirmed: this.state.form.notificationConfirmed,
-                });
-                break;
-            case 10:
-                ok = await this._call("save_first_push_schedule", {
-                    store_id: storeId,
-                    schedule_now: this.state.form.schedulePush,
-                });
-                break;
-            case 11:
+            case "review":
                 ok = await this._call("activate", { store_id: storeId });
                 if (ok) {
                     this.notification.add(
@@ -340,11 +448,11 @@ export class ShopifyConnectorSetupWizard extends Component {
                 return;
         }
         if (ok) {
-            this._advance();
+            await this._advance();
         }
     }
 
-    /** Step 5's explicit action. Stays on the step, whatever the outcome. */
+    /** The test-connection step's explicit action. Stays put, whatever happens. */
     async runTestConnection() {
         const ok = await this._call("run_test_connection", {
             store_id: this.store.id,
@@ -358,9 +466,37 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
     }
 
-    /** Step 6's explicit action, and its "re-run readiness" secondary. */
+    /** The final-readiness step's explicit "run again". */
     async runReadiness() {
         await this._call("run_readiness", { store_id: this.store.id });
+    }
+
+    /** The location step's refresh. Admits a job; contacts nothing from here. */
+    async refreshLocations() {
+        await this._call("refresh_shopify_locations", {
+            store_id: this.store.id,
+        });
+    }
+
+    /** The location step's create. Both identities explicit, both server-checked. */
+    async createMapping() {
+        if (!this.state.form.mapShopifyGid) {
+            this.state.errorMessage = _t("Choose a Shopify location to map.");
+            return;
+        }
+        if (!this.state.form.mapOdooLocationId) {
+            this.state.errorMessage = _t("Choose an Odoo location to map it to.");
+            return;
+        }
+        const ok = await this._call("save_location_mapping", {
+            store_id: this.store.id,
+            shopify_location_gid: this.state.form.mapShopifyGid,
+            odoo_location_id: parseInt(this.state.form.mapOdooLocationId, 10),
+        });
+        if (ok) {
+            this.state.form.mapShopifyGid = "";
+            this.state.form.mapOdooLocationId = "";
+        }
     }
 
     async _submitCredential() {
@@ -400,8 +536,10 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     async rerun() {
-        await this._call("restart_setup", { store_id: this.store.id });
-        this.state.step = 1;
+        const ok = await this._call("restart_setup", { store_id: this.store.id });
+        if (ok) {
+            await this.goToStep(FIRST_STEP_KEY);
+        }
     }
 }
 

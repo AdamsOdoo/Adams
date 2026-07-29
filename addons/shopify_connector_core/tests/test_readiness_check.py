@@ -405,7 +405,12 @@ class TestReadinessCheck(TransactionCase):
         )
         self.assertEqual(check['result'], 'fail')
         self.assertNotEqual(check['result'], 'pass')
-        self.assertIn('No sync domain is enabled', check['reason'])
+        # Wave 5 wording. The reason is what an operator READS on the
+        # final-readiness step, so it names the outcome in their words and
+        # says the store still connects -- "No sync domain is enabled" read
+        # as an error for a deliberate connect-only setup.
+        self.assertIn('No sync features are enabled', check['reason'])
+        self.assertIn('connect without syncing', check['reason'])
 
     def test_domain_flag_notification_default_alone_does_not_pass(self):
         # notification_default_enabled is not one of the four accepted

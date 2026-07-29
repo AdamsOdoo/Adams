@@ -196,8 +196,28 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         ]
 
     @api.model
-    def _check_result(self, code, tier, result, reason):
-        return {'code': code, 'tier': tier, 'result': result, 'reason': reason}
+    def _check_result(self, code, tier, result, reason, not_applicable=False):
+        """One check result.
+
+        `not_applicable` (Wave 5) is a PRESENTATION fact, not a new verdict:
+        several checks legitimately return `pass` because the thing they
+        verify does not apply to this store -- the inventory domain is off,
+        webhook intake is not installed. Aggregation is unchanged (a
+        not-applicable check still counts as a pass and still cannot block),
+        but a surface that renders "Passed" in green for a domain the
+        operator deliberately disabled is telling them something was proven
+        when nothing was checked. The setup wizard's readiness projection
+        renders these as `Not required`, which is the true statement.
+
+        Written as a key on the dict rather than inferred from the reason
+        text: a check's copy is translatable and editable, and a
+        presentation rule that depends on a phrase inside it breaks the
+        first time somebody rewords it.
+        """
+        return {
+            'code': code, 'tier': tier, 'result': result, 'reason': reason,
+            'not_applicable': bool(not_applicable),
+        }
 
     @api.model
     def _accepted_domain_flags(self):
@@ -429,6 +449,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             'webhook_hmac', self.ESSENTIAL, self.RESULT_PASS,
             'Not applicable — webhook intake is not installed; '
             'scheduled/manual sync is the active trigger mechanism.',
+            not_applicable=True,
         )
 
     @api.model
@@ -455,6 +476,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_PASS,
                 'Not applicable — the inventory domain is not enabled for '
                 'this store.',
+                not_applicable=True,
             )
         return self._check_result(
             code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
@@ -605,6 +627,6 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             )
         return self._check_result(
             code, self.WARNING, self.RESULT_FAIL,
-            'No sync domain is enabled. This is a valid connect-only '
-            'configuration if deliberate.',
+            'No sync features are enabled. This store will connect without '
+            'syncing. You can enable features later from Store Settings.',
         )

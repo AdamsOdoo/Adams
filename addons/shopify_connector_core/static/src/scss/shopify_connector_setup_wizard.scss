@@ -26,12 +26,27 @@
 // and the action row wraps rather than pushing the primary control off-screen.
 
 .o_sc_setup {
+    // Local, named, derived from the token scale rather than measured off a
+    // screenshot. Used by the sticky bar's own sizing AND by the scroll
+    // margin that keeps focus out from under it, so the two can never drift.
+    --sc-setup-actions-inset: var(--sc-space-3);
+    --sc-setup-actions-clearance: var(--sc-space-8);
+
     background: var(--sc-surface-0);
     color: var(--sc-text-primary);
     font-family: var(--sc-font);
     min-height: 100%;
     padding: var(--sc-space-6);
-    overflow-x: hidden; // never a connector-created horizontal page scroll
+    // NEVER a connector-created horizontal page scroll -- and `clip` rather
+    // than `hidden` deliberately. `overflow-x: hidden` with a visible
+    // block axis makes the used `overflow-y` compute to `auto`, which turns
+    // this element into a scroll container: `position: sticky` on the action
+    // row below would then resolve against THIS box, which never scrolls,
+    // and the bar would silently stop being sticky. `clip` suppresses the
+    // horizontal overflow without creating a scroll container, so the bar
+    // sticks to Odoo's own scrolling content area, which is the one that
+    // actually moves.
+    overflow-x: clip;
 
     * { box-sizing: border-box; }
 
@@ -47,10 +62,25 @@
     a:focus-visible,
     button:focus-visible,
     input:focus-visible,
+    select:focus-visible,
     [tabindex]:focus-visible {
         outline: 2px solid var(--sc-focus);
         outline-offset: 2px;
         border-radius: 4px;
+    }
+
+    // --- Focus must never land UNDER the sticky action bar (WCAG 2.4.11) ---
+    //
+    // When the browser scrolls a focused control into view it honours that
+    // control's own scroll margin, so reserving the bar's height here is what
+    // stops a keyboard user tabbing to a control that is technically focused
+    // and visually hidden behind the bar. `scroll-padding` on the scroll
+    // container would be the other half of this, but the container is Odoo's
+    // `.o_content`, which is not this repository's to restyle -- and the
+    // margin on the target achieves the same thing from the side we own.
+    a, button, input, select, textarea, [tabindex] {
+        scroll-margin-block-end: var(--sc-setup-actions-clearance);
+        scroll-margin-block-start: var(--sc-space-4);
     }
 
     // --- Status band ---
@@ -305,11 +335,133 @@
         dd { margin: 0; }
     }
 
+    // --- The location-mapping step ---
+    .sc_setup__refresh {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--sc-space-3);
+    }
+
+    .sc_setup__locations {
+        margin: 0;
+        padding-inline-start: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-3);
+    }
+
+    .sc_setup__location {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+        padding: var(--sc-space-3);
+        border-inline-start: 3px solid var(--sc-border);
+        background: var(--sc-surface-0);
+        border-radius: var(--sc-radius);
+        text-align: start;
+    }
+
+    .sc_setup__location-name { font-weight: var(--sc-fw-label); }
+    .sc_setup__location-target {
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+    }
+
+    // The Shopify Location GID, shown because it is the only unambiguous
+    // identity an operator can quote in a support conversation. It is long
+    // and unbreakable, which is exactly the shape that overflows a 390px
+    // viewport, so it wraps at any character rather than pushing the card
+    // sideways.
+    .sc_setup__location-gid {
+        font-size: var(--sc-fs-caption);
+        color: var(--sc-text-secondary);
+        overflow-wrap: anywhere;
+        word-break: break-all;
+        max-inline-size: 100%;
+    }
+
+    .sc_setup__map {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-3);
+        padding: var(--sc-space-4);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+
+        select {
+            inline-size: 100%;
+            max-inline-size: 100%;
+            padding: var(--sc-space-2) var(--sc-space-3);
+            border: 1px solid var(--sc-border-strong);
+            border-radius: var(--sc-radius);
+            font-family: inherit;
+            font-size: var(--sc-fs-body);
+        }
+    }
+
+    // A readiness row's own fix control sits under its explanation rather
+    // than beside it, so a long reason never pushes it off the edge.
+    .sc_setup_check_action { align-self: start; }
+
+    // A step that does not apply to this store stays in the rail, in place,
+    // and says so. It is not removed: removing it would renumber every step
+    // after it, which is the coupling this surface exists without.
+    .sc_setup_step--skipped {
+        border-style: dashed;
+        color: var(--sc-text-secondary);
+    }
+
+    // --- The sticky action row -------------------------------------------
+    //
+    // A normal-flow sibling AFTER the panel that lifts to the bottom edge of
+    // the scrollport while there is content below it. At the very bottom of
+    // the page it settles into its own space, so it never permanently covers
+    // the last field of a form -- which a fixed bar would.
+    //
+    // Logical properties throughout (`inset-block-end`, `padding-inline`), so
+    // RTL needs no mirrored rule. No transition and no animation anywhere on
+    // it: there is nothing here that benefits from movement, so there is
+    // nothing for a reduced-motion user to switch off.
     .sc_setup__actions {
+        position: sticky;
+        inset-block-end: 0;
+        z-index: 1;
         display: flex;
         flex-wrap: wrap;
         gap: var(--sc-space-3);
         margin-block-start: var(--sc-space-2);
+        padding-block: var(--sc-setup-actions-inset);
+        // Safe-area inset on a phone, so the row clears a home indicator
+        // rather than sitting under it. `max()` keeps the ordinary spacing on
+        // every device that reports no inset.
+        //
+        // INTERPOLATED, and it has to be. Sass owns the name `max()` and
+        // evaluates it at compile time, so an unescaped
+        // `max(var(...), env(...))` is not a CSS function call -- it is a
+        // Sass call with two arguments Sass cannot compare, and it fails the
+        // WHOLE bundle with `"var(--...)" is not a number for 'max'`. That
+        // takes every connector stylesheet down with it, which is worse than
+        // the missing inset would have been. `#{}` emits the text verbatim
+        // and lets the browser resolve it.
+        padding-block-end: #{
+            "max(var(--sc-setup-actions-inset), env(safe-area-inset-bottom))"
+        };
+        // NO negative inline margin. The first version bled the bar's
+        // background 16px past `.o_sc_setup__inner` on each side so it would
+        // span the full surface, and that is exactly the connector-owned
+        // horizontal overflow the TD-016 instrument exists to catch: it
+        // measured `scroll_width 896` against `client_width 880` at every
+        // width, in both directions. The bar spans the content column, which
+        // is what it should have done: the column is already centred with
+        // `max-inline-size: 880px; margin-inline: auto`, so a bar aligned to
+        // it reads as part of the same card rather than as a page chrome.
+        background: var(--sc-surface-0);
+        // The only thing separating a floating bar from the content sliding
+        // under it. A hairline, not a shadow: a shadow at this size reads as
+        // decoration and costs contrast on the border below it.
+        border-block-start: 1px solid var(--sc-border);
     }
 
     // --- Single column at and below 768px (master specification S1) ---

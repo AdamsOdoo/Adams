@@ -277,6 +277,7 @@ class ShopifyConnectorReadinessCheckProductExport(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_PASS,
                 'Not applicable — product export is not enabled for this '
                 'store.',
+                not_applicable=True,
             )
         try:
             scopes = json.loads(store.granted_scopes or '[]')

@@ -6,6 +6,11 @@
     control is a real focusable element with a visible focus ring, and the step
     heading is focusable so focus can land on it after each advance.
 
+    EVERY BRANCH COMPARES A STEP KEY, NEVER A POSITION. `state.stepKey === 'credential'`
+    reads as what it is; `state.step === 3` reads as nothing and silently means
+    something different the moment a step is inserted — which Wave 5 did. The
+    ordinal in the heading comes from the server's own ordered step list.
+
     No decoration on the credential or readiness steps: those are the two
     moments an operator most needs to read carefully, and an animation there
     would be a distraction dressed as delight.
@@ -41,18 +46,31 @@
                         <ol>
                             <t t-foreach="steps" t-as="step" t-key="step.key">
                                 <li t-att-class="stepClass(step)"
-                                    t-att-aria-current="step.index === state.step ? 'step' : false">
+                                    t-att-data-step-key="step.key"
+                                    t-att-aria-current="step.key === state.stepKey ? 'step' : false">
                                     <span class="sc_setup_step__index" t-esc="step.index"/>
                                     <span class="sc_setup_step__label" t-esc="step.label"/>
+                                    <span t-if="step.applicable === false"
+                                          class="sc-badge sc-badge--neutral">Not required</span>
                                 </li>
                             </t>
                         </ol>
                     </nav>
 
+                    <!--
+                        THE SCROLLING REGION.
+
+                        The panel scrolls; the action row below it does not.
+                        Splitting them is what lets Back / Continue / Save &amp;
+                        Exit stay on screen through a long Permissions list or a
+                        long readiness result, which is where an operator most
+                        needs them and exactly where they used to disappear
+                        below the fold.
+                    -->
                     <section class="sc_setup__panel" aria-live="polite">
                         <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
                             <span class="sc_setup__heading-count">
-                                Step <t t-esc="state.step"/> of <t t-esc="state.data.step_count"/>
+                                Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
                             </span>
                             <span t-esc="currentStep.label"/>
                         </h1>
@@ -68,8 +86,8 @@
                             </div>
                         </div>
 
-                        <!-- ===== 1. Welcome / prerequisites ===== -->
-                        <t t-if="state.step === 1">
+                        <!-- ===== welcome ===== -->
+                        <t t-if="state.stepKey === 'welcome'">
                             <p class="sc_setup__lead">
                                 This connects one Shopify store to this Odoo database. It
                                 takes about ten minutes, and <strong>nothing synchronises
@@ -95,8 +113,8 @@
                             </div>
                         </t>
 
-                        <!-- ===== 2. Store identity ===== -->
-                        <t t-if="state.step === 2">
+                        <!-- ===== identity ===== -->
+                        <t t-if="state.stepKey === 'identity'">
                             <p class="sc_setup__lead">
                                 Name this store so you recognise it later, and point it at
                                 the right Shopify shop.
@@ -129,12 +147,49 @@
                             </p>
                         </t>
 
-                        <!-- ===== 3. Credential entry ===== -->
-                        <t t-if="state.step === 3">
+                        <!-- ===== credential ===== -->
+                        <t t-if="state.stepKey === 'credential'">
                             <p class="sc_setup__lead">
                                 In Shopify, create a custom app and copy its
                                 <strong>Admin API access token</strong>. Paste it once here.
                             </p>
+                            <!--
+                                WHY THIS DISCLOSURE EXISTS, IN THESE WORDS.
+
+                                A Shopify custom app shows three secret-looking
+                                values, and only one of them is the one Odoo
+                                needs. Operators paste the Client ID or the
+                                Client Secret, get an authentication failure at
+                                the next step, and have no way to tell from the
+                                error which of the three was wrong. Naming all
+                                three, and saying plainly what the other two are
+                                for, is the whole fix.
+                            -->
+                            <div class="sc-band sc-band--info" role="note">
+                                <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">Odoo needs the Admin API access token — not the Client ID, and not the Client Secret</div>
+                                    <div class="sc-band__hint">
+                                        Your Shopify custom app shows all three. The
+                                        <strong>Admin API access token</strong> is the one that
+                                        goes in the field below.
+                                    </div>
+                                    <ul class="sc_setup__list">
+                                        <li>A <strong>Client ID</strong> is not the access token.</li>
+                                        <li>A <strong>Client Secret</strong> is not the access token.</li>
+                                        <li>
+                                            A Client ID and Client Secret can be used
+                                            <em>outside</em> Odoo to obtain an access token, but
+                                            neither of them belongs in this field.
+                                        </li>
+                                    </ul>
+                                    <div class="sc-band__hint">
+                                        How long a token stays valid depends on how it was
+                                        issued. Check your Shopify app's authentication method
+                                        rather than assuming a fixed lifetime.
+                                    </div>
+                                </div>
+                            </div>
                             <div class="sc_setup__field">
                                 <label for="sc_setup_token">Admin API access token</label>
                                 <input id="sc_setup_token" type="password"
@@ -164,8 +219,8 @@
                             </div>
                         </t>
 
-                        <!-- ===== 4. Scope presentation ===== -->
-                        <t t-if="state.step === 4">
+                        <!-- ===== scopes ===== -->
+                        <t t-if="state.stepKey === 'scopes'">
                             <p class="sc_setup__lead">
                                 These are the permissions the connector needs, and why. You
                                 grant them in Shopify when you create the custom app —
@@ -184,8 +239,8 @@
                             </ul>
                         </t>
 
-                        <!-- ===== 5. Test connection ===== -->
-                        <t t-if="state.step === 5">
+                        <!-- ===== test_connection ===== -->
+                        <t t-if="state.stepKey === 'test_connection'">
                             <p class="sc_setup__lead">
                                 This makes one read-only call to Shopify to prove the token
                                 works. Nothing is created, changed or deleted.
@@ -205,8 +260,9 @@
                                     <div class="sc-band__text">The connection did not work</div>
                                     <div class="sc-band__hint" t-esc="store.test_connection_reason"/>
                                     <div class="sc-band__hint">
-                                        Go back one step and paste the token again, or check the
-                                        shop domain.
+                                        Go back one step and paste the token again — check that
+                                        you copied the Admin API access token and not the Client
+                                        ID or Client Secret — or check the shop domain.
                                     </div>
                                 </div>
                             </div>
@@ -223,47 +279,8 @@
                             </div>
                         </t>
 
-                        <!-- ===== 6. Readiness checks ===== -->
-                        <t t-if="state.step === 6">
-                            <p class="sc_setup__lead">
-                                Everything known to break a first sync, checked before you
-                                start. Each result says what it means, who fixes it, and
-                                whether it blocks activation.
-                            </p>
-                            <t t-if="readiness.ran">
-                                <ul class="sc_setup__checks">
-                                    <t t-foreach="readiness.checks" t-as="check" t-key="check.code">
-                                        <li t-att-class="checkClass(check)">
-                                            <span class="sc_setup__check-label" t-esc="check.label"/>
-                                            <!-- Text, not colour alone. -->
-                                            <span class="sc-badge" t-att-class="'sc-badge--' + check.tone">
-                                                <t t-if="check.result === 'pass'">Passed</t>
-                                                <t t-elif="check.tier === 'essential'">Must be fixed</t>
-                                                <t t-else="">Worth checking</t>
-                                            </span>
-                                            <span class="sc_setup__check-reason" t-esc="check.reason"/>
-                                            <span class="sc_setup__check-owner">
-                                                Who fixes this: <t t-esc="check.owner"/>
-                                            </span>
-                                        </li>
-                                    </t>
-                                </ul>
-                            </t>
-                            <p t-else="" class="sc_setup__note" role="status">
-                                Not run yet.
-                            </p>
-                            <div>
-                                <button class="sc-btn sc_setup_run_readiness"
-                                        t-att-disabled="state.busy"
-                                        t-on-click="() => this.runReadiness()">
-                                    <span t-if="readiness.ran">Re-run readiness</span>
-                                    <span t-else="">Run readiness checks</span>
-                                </button>
-                            </div>
-                        </t>
-
-                        <!-- ===== 7. Sync direction per domain ===== -->
-                        <t t-if="state.step === 7">
+                        <!-- ===== directions ===== -->
+                        <t t-if="state.stepKey === 'directions'">
                             <p class="sc_setup__lead">
                                 Choose what this connector does. Enabling nothing is a valid
                                 choice — a connected store that syncs nothing yet is fine.
@@ -287,8 +304,163 @@
                             </ul>
                         </t>
 
-                        <!-- ===== 8. Source of truth ===== -->
-                        <t t-if="state.step === 8">
+                        <!-- ===== location_mapping ===== -->
+                        <t t-if="state.stepKey === 'location_mapping'">
+                            <!--
+                                CONDITIONAL, AND SAID SO RATHER THAN HIDDEN.
+
+                                When inventory is off this step is Not required. It
+                                stays in the list and keeps its position: removing it
+                                would renumber every step after it, which is precisely
+                                the coupling this wave removes.
+                            -->
+                            <t t-if="!currentStepApplies">
+                                <div class="sc-band sc-band--info sc_setup_location_skipped"
+                                     role="status">
+                                    <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">Not required</div>
+                                        <div class="sc-band__hint" t-esc="currentStep.skipped_reason"/>
+                                    </div>
+                                </div>
+                            </t>
+                            <t t-else="">
+                                <p class="sc_setup__lead">
+                                    Each Shopify location has to be paired with an Odoo
+                                    internal location before its stock can be synchronised.
+                                    <strong>An unmapped Shopify location is not
+                                    synchronised.</strong> Pairing is always explicit —
+                                    nothing is matched by name.
+                                </p>
+
+                                <!-- Refresh, and the state of the refresh. Text, never
+                                     colour alone, and never silence. -->
+                                <div class="sc_setup__refresh">
+                                    <button class="sc-btn sc_setup_refresh_locations"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.refreshLocations()">
+                                        <span>Refresh Shopify locations</span>
+                                    </button>
+                                    <span class="sc-badge sc_setup_refresh_state"
+                                          t-att-class="'sc-badge--' + (refreshState() === 'succeeded' ? 'success' : (refreshState() === 'failed' ? 'danger' : (refreshState() === 'none' ? 'neutral' : 'info')))"
+                                          t-esc="refreshLabel()"/>
+                                </div>
+                                <div t-if="refreshState() === 'waiting' or refreshState() === 'running'"
+                                     class="sc-band sc-band--info" role="status">
+                                    <i class="fa fa-clock-o sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">Reading your Shopify locations</div>
+                                        <div class="sc-band__hint">
+                                            This runs in the background. Until it finishes, an
+                                            empty list below is not a report that Shopify has no
+                                            locations — it just means we have not read them yet.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div t-if="refreshState() === 'failed'"
+                                     class="sc-band sc-band--danger" role="alert">
+                                    <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">The last location refresh did not finish</div>
+                                        <div class="sc-band__hint">
+                                            The list below is whatever was read last time, and may
+                                            be incomplete. Try refreshing again; if it keeps
+                                            failing, check the connection and the read_locations
+                                            permission.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div t-if="refreshState() === 'none' and !locations.locations.length"
+                                     class="sc-band sc-band--warning" role="status">
+                                    <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">No locations have been read yet</div>
+                                        <div class="sc-band__hint">
+                                            Press Refresh Shopify locations to read this store's
+                                            list.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div t-if="locations.truncated"
+                                     class="sc-band sc-band--warning" role="status">
+                                    <i class="fa fa-list sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">This store has more locations than this step lists</div>
+                                        <div class="sc-band__hint">
+                                            Only the first batch is shown here. Map the rest from
+                                            Shopify Connector → Inventory → Location Mapping,
+                                            which is a searchable list.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <ul class="sc_setup__locations">
+                                    <t t-foreach="locations.locations" t-as="location"
+                                       t-key="location.shopify_gid">
+                                        <li class="sc_setup__location">
+                                            <span class="sc_setup__location-name" t-esc="location.name"/>
+                                            <span t-if="location.mapped"
+                                                  class="sc-badge sc-badge--success">Mapped</span>
+                                            <span t-else=""
+                                                  class="sc-badge sc-badge--warning">Not mapped</span>
+                                            <span t-if="location.mapped"
+                                                  class="sc_setup__location-target">
+                                                Odoo location: <t t-esc="location.odoo_location_name"/>
+                                            </span>
+                                            <span t-else="" class="sc_setup__location-target">
+                                                Stock for this Shopify location will not be
+                                                synchronised until it is mapped.
+                                            </span>
+                                            <code class="sc_setup__location-gid"
+                                                  t-esc="location.shopify_gid"/>
+                                        </li>
+                                    </t>
+                                </ul>
+
+                                <div t-if="locations.locations.length" class="sc_setup__map">
+                                    <div class="sc_setup__field">
+                                        <label for="sc_setup_map_shopify">Shopify location</label>
+                                        <select id="sc_setup_map_shopify" class="o_input"
+                                                t-model="state.form.mapShopifyGid">
+                                            <option value="">Choose a Shopify location…</option>
+                                            <t t-foreach="locations.locations" t-as="location"
+                                               t-key="'opt-' + location.shopify_gid">
+                                                <option t-att-value="location.shopify_gid"
+                                                        t-esc="location.name"/>
+                                            </t>
+                                        </select>
+                                    </div>
+                                    <div class="sc_setup__field">
+                                        <label for="sc_setup_map_odoo">Odoo location</label>
+                                        <select id="sc_setup_map_odoo" class="o_input"
+                                                t-model="state.form.mapOdooLocationId">
+                                            <option value="">Choose an Odoo location…</option>
+                                            <t t-foreach="locations.odoo_locations" t-as="odooLocation"
+                                               t-key="odooLocation.id">
+                                                <option t-att-value="odooLocation.id"
+                                                        t-esc="odooLocation.name"/>
+                                            </t>
+                                        </select>
+                                        <small t-if="!locations.odoo_locations.length">
+                                            No internal Odoo locations are visible to you in this
+                                            company. Ask an Odoo administrator for Inventory
+                                            access, or create a warehouse first.
+                                        </small>
+                                    </div>
+                                    <div>
+                                        <button class="sc-btn sc_setup_create_mapping"
+                                                t-att-disabled="state.busy"
+                                                t-on-click="() => this.createMapping()">
+                                            <span>Map this location</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </t>
+                        </t>
+
+                        <!-- ===== source_of_truth ===== -->
+                        <t t-if="state.stepKey === 'source_of_truth'">
                             <p class="sc_setup__lead">
                                 Two decisions with real consequences, and no default. Both
                                 are required.
@@ -326,8 +498,8 @@
                             </p>
                         </t>
 
-                        <!-- ===== 9. Notification default ===== -->
-                        <t t-if="state.step === 9">
+                        <!-- ===== notification ===== -->
+                        <t t-if="state.stepKey === 'notification'">
                             <p class="sc_setup__lead">
                                 Right now, <strong>customers will not be emailed</strong> when
                                 a delivery is fulfilled. You can change this any time in Store
@@ -359,8 +531,8 @@
                             </div>
                         </t>
 
-                        <!-- ===== 10. Inventory first-push scheduling ===== -->
-                        <t t-if="state.step === 10">
+                        <!-- ===== first_push ===== -->
+                        <t t-if="state.stepKey === 'first_push'">
                             <t t-if="isDomainEnabled('inventory')">
                                 <p class="sc_setup__lead">
                                     <strong>Nothing is written to Shopify until you review and
@@ -389,16 +561,84 @@
                                 </label>
                             </t>
                             <t t-else="">
-                                <p class="sc_setup__lead" role="status">
-                                    Inventory syncing is not enabled for this store, so there is
-                                    no first stock push to schedule. You can enable it later in
-                                    Store Settings, and this step will be waiting.
-                                </p>
+                                <div class="sc-band sc-band--info" role="status">
+                                    <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">Not required</div>
+                                        <div class="sc-band__hint">
+                                            Inventory syncing is not enabled for this store, so
+                                            there is no first stock push to schedule. You can
+                                            enable it later in Store Settings, and this step will
+                                            be waiting.
+                                        </div>
+                                    </div>
+                                </div>
                             </t>
                         </t>
 
-                        <!-- ===== 11. Review and activate ===== -->
-                        <t t-if="state.step === 11">
+                        <!-- ===== final_readiness ===== -->
+                        <t t-if="state.stepKey === 'final_readiness'">
+                            <p class="sc_setup__lead">
+                                Everything known to break a first sync, checked against the
+                                choices you have just made. Each result says what it means,
+                                who fixes it, and whether it blocks activation.
+                            </p>
+                            <div t-if="readiness.stale" class="sc-band sc-band--info" role="status">
+                                <i class="fa fa-clock-o sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">These results are out of date</div>
+                                    <div class="sc-band__hint">
+                                        Something these checks read has changed since they last
+                                        ran. Run them again before activating.
+                                    </div>
+                                </div>
+                            </div>
+                            <t t-if="readiness.ran">
+                                <ul class="sc_setup__checks">
+                                    <t t-foreach="readiness.checks" t-as="check" t-key="check.code">
+                                        <li t-att-class="checkClass(check)"
+                                            t-att-data-check-state="check.state">
+                                            <span class="sc_setup__check-label" t-esc="check.label"/>
+                                            <!-- Text, not colour alone. All five states. -->
+                                            <span class="sc-badge" t-att-class="'sc-badge--' + check.tone"
+                                                  t-esc="check.state_label"/>
+                                            <span class="sc_setup__check-reason" t-esc="check.reason"/>
+                                            <span class="sc_setup__check-owner">
+                                                Who fixes this: <t t-esc="check.owner"/>
+                                            </span>
+                                            <!--
+                                                The one control that fixes this check,
+                                                addressed by STEP KEY. Never by ordinal:
+                                                a numeric deep link silently points at a
+                                                different screen the next time a step is
+                                                added.
+                                            -->
+                                            <button t-if="check.action_step_key"
+                                                    class="sc-btn sc_setup_check_action"
+                                                    t-att-data-step-key="check.action_step_key"
+                                                    t-att-disabled="state.busy"
+                                                    t-on-click="() => this.goToStep(check.action_step_key)">
+                                                <span t-esc="check.action_label"/>
+                                            </button>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </t>
+                            <p t-else="" class="sc_setup__note" role="status">
+                                Not run yet.
+                            </p>
+                            <div>
+                                <button class="sc-btn sc_setup_run_readiness"
+                                        t-att-disabled="state.busy"
+                                        t-on-click="() => this.runReadiness()">
+                                    <span t-if="readiness.ran">Run the checks again</span>
+                                    <span t-else="">Run readiness checks</span>
+                                </button>
+                            </div>
+                        </t>
+
+                        <!-- ===== review ===== -->
+                        <t t-if="state.stepKey === 'review'">
                             <p class="sc_setup__lead">
                                 Here is what this connector will do. You can change any of it
                                 later in Store Settings.
@@ -411,6 +651,8 @@
                                     <t t-if="summary.domains.length" t-esc="summary.domains.join(', ')"/>
                                     <t t-else="">Nothing yet — the store is connected and idle.</t>
                                 </dd>
+                                <dt>Location mapping</dt>
+                                <dd t-esc="summary.location_mapping"/>
                                 <dt>Catalog source</dt>
                                 <dd><t t-esc="summary.matching or 'Not chosen'"/></dd>
                                 <dt>Price authority</dt>
@@ -422,9 +664,16 @@
                                 <dt>Readiness</dt>
                                 <dd>
                                     <t t-if="!readiness.ran">Not run yet</t>
+                                    <t t-elif="readiness.stale">
+                                        Out of date — something these checks read has changed
+                                    </t>
                                     <t t-elif="readiness.blocking.length">
                                         Blocked: <t t-esc="readiness.blocking.length"/> essential
                                         check(s) still failing
+                                    </t>
+                                    <t t-elif="readiness.waiting.length">
+                                        Waiting: <t t-esc="readiness.waiting.length"/> check(s)
+                                        have not finished
                                     </t>
                                     <t t-else="">All essential checks passed</t>
                                 </dd>
@@ -440,42 +689,70 @@
                                     </ul>
                                 </div>
                             </div>
+                            <div t-if="!readiness.blocking.length and summary.domains.length === 0"
+                                 class="sc-band sc-band--warning sc_setup_connect_only" role="status">
+                                <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
+                                <div class="sc-band__body">
+                                    <div class="sc-band__text">
+                                        No sync features are enabled. This store will connect
+                                        without syncing. You can enable features later from
+                                        Store Settings.
+                                    </div>
+                                </div>
+                            </div>
                             <p class="sc_setup__note">
                                 Activating does not start a sync. Nothing is written to Shopify.
                                 The dashboard shows you the next explicit action.
                             </p>
                         </t>
 
-                        <!-- ===== Actions ===== -->
-                        <div class="sc_setup__actions">
-                            <button class="sc-btn" t-att-disabled="isFirstStep or state.busy"
-                                    t-on-click="() => this.back()">
-                                <span>Back</span>
-                            </button>
-                            <button class="sc-btn sc-btn--primary sc_setup_continue"
-                                    t-att-disabled="state.busy"
-                                    t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
-                                    t-on-click="() => this.continueStep()">
-                                <span t-if="isLastStep">Activate</span>
-                                <span t-else="">Continue</span>
-                            </button>
-                            <button t-if="store.id" class="sc-btn sc_setup_exit"
-                                    t-att-disabled="state.busy"
-                                    t-on-click="() => this.saveAndExit()">
-                                <span>Save &amp; Exit</span>
-                            </button>
-                            <button t-if="store.id and store.setup_completed_at"
-                                    class="sc-btn sc_setup_rerun"
-                                    t-att-disabled="state.busy"
-                                    t-on-click="() => this.rerun()">
-                                <span>Start again</span>
-                            </button>
-                        </div>
                         <p t-if="store.setup_completed_at" class="sc_setup__note" role="status">
                             Setup was completed by <t t-esc="store.setup_completed_by"/>. Re-running
                             it changes nothing until you save a step.
                         </p>
                     </section>
+
+                    <!-- ===== Actions =====
+                         STICKY to the bottom of the viewport while long content
+                         scrolls past it. On a long step the primary control used
+                         to sit below the fold, so a mobile operator had to scroll
+                         through the whole Permissions list to find Continue and
+                         scroll back up to read the error it produced.
+
+                         It is a normal-flow sibling AFTER the panel, so at the
+                         very bottom of the page it sits in its own space and
+                         covers nothing — sticky only lifts it while there is
+                         still content below. Keyboard focus is kept clear of it
+                         by `scroll-margin-block-end` on every focusable element
+                         in this surface, which is in the stylesheet and is
+                         asserted in the rendered-browser evidence rather than
+                         read out of the CSS.
+                    -->
+                    <div class="sc_setup__actions" role="group" aria-label="Setup navigation">
+                        <button class="sc-btn sc_setup_back"
+                                t-att-disabled="isFirstStep or state.busy"
+                                t-on-click="() => this.back()">
+                            <span>Back</span>
+                        </button>
+                        <button class="sc-btn sc-btn--primary sc_setup_continue"
+                                t-att-disabled="state.busy"
+                                t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
+                                t-on-click="() => this.continueStep()">
+                            <span t-if="isLastStep">Activate</span>
+                            <span t-else="">Continue</span>
+                        </button>
+                        <button t-if="store.id" class="sc-btn sc_setup_exit"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.saveAndExit()">
+                            <span>Save &amp; Exit</span>
+                        </button>
+                        <button t-if="store.id and store.setup_completed_at"
+                                class="sc-btn sc_setup_rerun"
+                                t-att-disabled="state.busy"
+                                t-on-click="() => this.rerun()">
+                            <span>Start again</span>
+                        </button>
+                    </div>
                 </t>
             </div>
         </div>

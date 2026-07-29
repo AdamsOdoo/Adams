@@ -63,8 +63,13 @@ HOOT_SUCCESS = "[HOOT] Test suite succeeded"
 EXPECTED_SUITES = {
     'shopify connector dashboard': 8,
     'shopify connector export diff': 11,
-    # S1 (2026-07-27): the guided setup client action.
-    'shopify connector setup wizard': 9,
+    # S1 (2026-07-27): the guided setup client action. Wave 5 (2026-07-29)
+    # raised this from 9 to 17: the twelve-step order, semantic-key
+    # navigation, the conditional location step, the credential guidance, the
+    # five readiness presentation states, staleness and the pending-refresh
+    # disclosure are all client-rendered, so each is a mounted-component
+    # assertion rather than a server one.
+    'shopify connector setup wizard': 17,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
