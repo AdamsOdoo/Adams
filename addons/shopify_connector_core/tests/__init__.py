@@ -56,5 +56,3 @@ from . import test_vocabulary_reconciliation
 # browser traversal that proves it is reachable at all.
 from . import test_setup_wizard
 from . import test_ui_setup_tours
-# Wave 5 single-package lifecycle: global execution-boundary gate coverage.
-from . import test_package_pause_gates

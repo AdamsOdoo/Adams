@@ -682,12 +682,6 @@ class TestJobDispatch(TransactionCase):
             # the value is clamped before use.
             ('shopify_connector_job_dispatch.py',
              '_resolve_drain_batch_size', "self.env['ir.config_parameter']"),
-            # Wave 5 single-package lifecycle: the global execution-boundary
-            # gate (Section 10), checked before claiming a single job.
-            ('shopify_connector_job_dispatch.py', 'run_drain',
-             "self.env['shopify.connector.package']"),
-            ('shopify_connector_job_enqueue.py', 'enqueue',
-             "self.env['shopify.connector.package']"),
         ])
         actual = []
         for path in self._find_new_model_files():

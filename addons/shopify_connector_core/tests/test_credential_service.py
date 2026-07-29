@@ -98,17 +98,6 @@ CORE_SUDO_SITES = [
     ('shopify_connector_job_dispatch.py', '_start_running', 'job', 1),
     ('shopify_connector_job_enqueue.py', 'enqueue',
      "self.env['shopify.connector.job']", 1),
-    # Wave 5 single-package lifecycle: the global execution-boundary gate
-    # (Section 10). `shopify.connector.package` grants no connector-group
-    # read/write, so every gated call site elevates to read the singleton.
-    ('shopify_connector_api_client.py', 'execute',
-     "self.env['shopify.connector.package']", 1),
-    ('shopify_connector_api_client.py', 'execute_business',
-     "self.env['shopify.connector.package']", 1),
-    ('shopify_connector_job_dispatch.py', 'run_drain',
-     "self.env['shopify.connector.package']", 1),
-    ('shopify_connector_job_enqueue.py', 'enqueue',
-     "self.env['shopify.connector.package']", 1),
     ('shopify_connector_job_log.py', '_system_append', 'self', 1),
     ('shopify_connector_mutation_attempt.py', '_surface', 'self', 1),
     ('shopify_connector_mutation_attempt.py',
@@ -207,18 +196,9 @@ CORE_SUDO_SITES = [
     ('shopify_connector_store.py', '_run_connection_probe', 'Job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
-    # Wave 5 single-package lifecycle: the global execution-boundary gate
-    # (Section 10), the shared implementation behind action_test_connection
-    # and action_reconnect.
-    ('shopify_connector_store.py', '_run_connection_probe',
-     "self.env['shopify.connector.package']", 1),
     ('shopify_connector_store.py',
      '_sweep_quiescing_business_jobs', 'job', 1),
     ('shopify_connector_store.py', 'action_force_disconnect', 'job', 1),
-    ('shopify_connector_store.py', 'action_activate',
-     "self.env['shopify.connector.package']", 1),
-    ('shopify_connector_store.py', 'action_reconnect',
-     "self.env['shopify.connector.package']", 1),
     ('shopify_connector_store_credential.py', '_get_access_token',
      'self', 1),
 ]
@@ -270,15 +250,6 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_start_running'): 'Claim transition.',
     ('shopify_connector_job_enqueue.py',
      'enqueue'): 'Protected job creation.',
-    # Wave 5 single-package lifecycle: the global execution-boundary gate
-    # (Section 10) -- `shopify.connector.package` grants no connector-group
-    # read, so every gated call site elevates to check package integrity.
-    ('shopify_connector_api_client.py',
-     'execute'): 'Package integrity gate.',
-    ('shopify_connector_api_client.py',
-     'execute_business'): 'Package integrity gate.',
-    ('shopify_connector_job_dispatch.py',
-     'run_drain'): 'Package integrity gate.',
     ('shopify_connector_job_log.py',
      '_system_append'): 'System audit-log append.',
     ('shopify_connector_mutation_attempt.py',
@@ -360,10 +331,6 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_sweep_quiescing_business_jobs'): 'Disconnect job sweep.',
     ('shopify_connector_store.py',
      'action_force_disconnect'): 'Forced-disconnect audit.',
-    ('shopify_connector_store.py',
-     'action_activate'): 'Package integrity gate.',
-    ('shopify_connector_store.py',
-     'action_reconnect'): 'Package integrity gate.',
     ('shopify_connector_store_credential.py',
      '_get_access_token'): 'Single-store credential read.',
 }

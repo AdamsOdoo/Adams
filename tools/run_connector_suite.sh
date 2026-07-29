@@ -58,12 +58,7 @@
 
 set -euo pipefail
 
-# Wave 5 single-package lifecycle: 'shopify_connector' is the customer-facing
-# umbrella (docs/03-architecture/single-package-lifecycle.md). Listed first,
-# alongside the six technical modules rather than in place of them, so both
-# the fresh-install and warm-upgrade passes keep exercising every module's own
-# load order exactly as before (issue #193) while also covering the new one.
-MODULES="shopify_connector,shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -159,7 +154,7 @@ ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector,/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"

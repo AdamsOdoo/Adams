@@ -15,9 +15,6 @@
         'shopify_connector_sale',
         'stock_delivery',
         'sale_stock',
-        # Wave 5: reverse edge onto the customer-facing package umbrella --
-        # see docs/03-architecture/single-package-lifecycle.md.
-        'shopify_connector',
     ],
     'data': [
         'security/shopify_connector_fulfillment_security.xml',

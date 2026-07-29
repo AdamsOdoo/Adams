@@ -34,9 +34,7 @@ file.
     'author': 'Adams',
     'license': 'LGPL-3',
     'category': 'Connector',
-    # 'shopify_connector' (Wave 5): reverse edge onto the customer-facing
-    # package umbrella -- see docs/03-architecture/single-package-lifecycle.md.
-    'depends': ['shopify_connector_core', 'shopify_connector_product', 'sale', 'shopify_connector'],
+    'depends': ['shopify_connector_core', 'shopify_connector_product', 'sale'],
     'data': [
         'security/ir.model.access.csv',
         'security/shopify_connector_sale_company_rules.xml',

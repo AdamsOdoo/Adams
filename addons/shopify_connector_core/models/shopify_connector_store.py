@@ -626,11 +626,6 @@ class ShopifyConnectorStore(models.Model):
         job/job.log rows -- never the token.
         """
         self.ensure_one()
-        # Wave 5 single-package lifecycle: user-facing action entry gate
-        # (Section 10 #1/#7) -- covers both `action_test_connection` and
-        # `action_reconnect`, the two callers of this shared probe, before
-        # any job/log row is created.
-        self.env['shopify.connector.package'].sudo().assert_healthy()
         allowed_states = LIFECYCLE_PURPOSE_STATES.get(purpose)
         if allowed_states is None:
             raise UserError(
@@ -959,10 +954,6 @@ class ShopifyConnectorStore(models.Model):
         (DEC-022 §4.4).
         """
         self.ensure_one()
-        # Wave 5 single-package lifecycle: setup-activation gate (Section 10
-        # #1) -- setup cannot complete while the package is dependency-paused
-        # or incomplete, checked before any lock or state change.
-        self.env['shopify.connector.package'].sudo().assert_healthy()
         # SEC (Stage R1): Administrator boundary before the store-row lifecycle
         # lock and any audit-job side effect (analogous to Test Connection).
         self._ensure_connector_admin_boundary()
@@ -1508,10 +1499,6 @@ class ShopifyConnectorStore(models.Model):
         `self.state` after calling, not rely on an exception.
         """
         self.ensure_one()
-        # Wave 5 single-package lifecycle: reconnect gate (Section 10 #1/#7),
-        # named as its own layer distinct from the shared probe this method
-        # calls into further down.
-        self.env['shopify.connector.package'].sudo().assert_healthy()
         # SEC (Stage R1): Administrator boundary before `_run_connection_probe`
         # (reconnect shares Test Connection's job/log/credential/transport path)
         # or any reconnect_needed audit-job side effect.

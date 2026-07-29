@@ -43,14 +43,8 @@ later, separately authorized tasks.
     'license': 'LGPL-3',
     'category': 'Connector',
     # 'web' is required by the U0 operator UI (menus, views, the Owl dashboard
-    # client action, SCSS/JS assets, and browser tours). 'shopify_connector'
-    # (added Wave 5 single-package lifecycle) is the customer-facing package
-    # umbrella: this reverse edge -- core depends on the package, not the
-    # other way around -- is what lets 'shopify_connector' survive a
-    # standard-dependency cascade (docs/03-architecture/
-    # single-package-lifecycle.md) while still being swept along with the
-    # rest of the technical suite when the package itself is uninstalled.
-    'depends': ['base', 'web', 'shopify_connector'],
+    # client action, SCSS/JS assets, and browser tours).
+    'depends': ['base', 'web'],
     'data': [
         'security/shopify_connector_security.xml',
         'security/ir.model.access.csv',
@@ -142,10 +136,6 @@ later, separately authorized tasks.
         ],
     },
     'installable': True,
-    # Wave 5 single-package lifecycle: 'shopify_connector' is now the ONLY
-    # customer-facing application in the connector family. Core keeps its
-    # views/menus/dashboard (a technical module's UI does not require
-    # application=True), it just no longer shows as a second app card.
-    'application': False,
+    'application': True,
     'auto_install': False,
 }

@@ -2056,13 +2056,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         protected-field create/write itself. Identity is always
         explicit: the Shopify Location GID must be supplied by the
         caller, never inferred by name.
-
-        Wave 5: the GID must also correspond to a currently-active,
-        this-store cached `shopify.connector.location` row -- refuses an
-        arbitrary, foreign-store, or inactive GID before any mapping
-        exists, rather than accepting whatever string a caller supplies.
-        `shopify_location_name_snapshot` is then populated from that
-        validated cached row, never from caller input.
         """
         if not (
             self.env.user.has_group(
@@ -2078,23 +2071,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
         if not isinstance(shopify_location_gid, str) or not shopify_location_gid:
             raise UserError("An explicit Shopify Location GID is required.")
-        cached_location = self.env['shopify.connector.location'].sudo().search([
-            ('store_id', '=', store.id),
-            ('shopify_location_gid', '=', shopify_location_gid),
-        ], limit=1)
-        if not cached_location:
-            raise UserError(
-                "This Shopify Location GID is not a location cached for "
-                "this store. Refresh Shopify locations and select one "
-                "from the refreshed list; a mapping can never be created "
-                "for an arbitrary or foreign-store GID."
-            )
-        if not cached_location.shopify_location_active:
-            raise UserError(
-                "This Shopify location is not active in the cached "
-                "location list and cannot be mapped. Refresh Shopify "
-                "locations and select an active one."
-            )
         odoo_location = odoo_location.exists()
         if not odoo_location:
             raise UserError("The Odoo location does not exist.")
@@ -2125,10 +2101,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     "mapping's identity; use the reviewed binding-"
                     "override path to change it."
                 )
-            existing.sudo().write({
-                'push_enabled': bool(push_enabled),
-                'shopify_location_name_snapshot': cached_location.name,
-            })
+            existing.sudo().write({'push_enabled': bool(push_enabled)})
             return existing
         # Never silently move an already-mapped Shopify GID to a
         # different Odoo location either.
@@ -2149,7 +2122,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             'odoo_location_id': odoo_location.id,
             'match_key': 'manual',
             'push_enabled': bool(push_enabled),
-            'shopify_location_name_snapshot': cached_location.name,
         })
 
     @api.model

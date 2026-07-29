@@ -68,14 +68,6 @@ class TestLocationMapping(TransactionCase):
             'match_key': 'manual',
         })
 
-    def _cache_location(self, gid, name=None, active=True, store=None):
-        return self.env['shopify.connector.location'].sudo().create({
-            'store_id': (store or self.store).id,
-            'shopify_location_gid': gid,
-            'name': name or ('Cached %s' % gid),
-            'shopify_location_active': active,
-        })
-
     def test_explicit_identity_no_name_inference(self):
         """Creation requires an explicit Shopify Location GID and Odoo
         location -- there is no name-matching creation path at all."""
@@ -156,7 +148,6 @@ class TestLocationMapping(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_sanctioned_service_creates_mapping_for_operator(self):
-        self._cache_location('gid://shopify/Location/900', name='Warehouse 900')
         Service = self.env['shopify.connector.inventory.service']
         mapping = Service.with_user(
             self.user_operator
@@ -167,10 +158,8 @@ class TestLocationMapping(TransactionCase):
         self.assertEqual(mapping.odoo_location_id, self.internal_location)
         self.assertEqual(mapping.match_key, 'manual')
         self.assertTrue(mapping.push_enabled)
-        self.assertEqual(mapping.shopify_location_name_snapshot, 'Warehouse 900')
 
     def test_sanctioned_service_updates_existing_mapping_idempotently(self):
-        self._cache_location('gid://shopify/Location/901', name='Warehouse 901')
         Service = self.env['shopify.connector.inventory.service']
         first = Service.with_user(
             self.user_operator
@@ -188,7 +177,6 @@ class TestLocationMapping(TransactionCase):
         self.assertFalse(second.push_enabled)
 
     def test_sanctioned_service_denied_for_auditor(self):
-        self._cache_location('gid://shopify/Location/902')
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(Exception):
             Service.with_user(
@@ -201,7 +189,6 @@ class TestLocationMapping(TransactionCase):
     def test_sanctioned_service_rejects_customer_location(self):
         if not self.customer_location:
             self.skipTest('No customer-usage location available in demo data.')
-        self._cache_location('gid://shopify/Location/903')
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
@@ -220,57 +207,10 @@ class TestLocationMapping(TransactionCase):
                 self.store, self.internal_location, '',
             )
 
-    def test_sanctioned_service_rejects_uncached_gid(self):
-        """An arbitrary GID with no corresponding cached Shopify location
-        for this store is refused before any mapping is created."""
-        Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(UserError):
-            Service.with_user(
-                self.user_operator
-            ).create_or_update_location_mapping(
-                self.store, self.internal_location,
-                'gid://shopify/Location/NEVER-CACHED',
-            )
-
-    def test_sanctioned_service_rejects_foreign_store_gid(self):
-        """A GID cached for a DIFFERENT store is refused for this store."""
-        other_store = self.env['shopify.connector.store'].create({
-            'name': 'Other Store For Location Mapping Test',
-            'shop_domain': 'other-location-mapping-test.myshopify.com',
-            'api_version': '2026-07',
-        })
-        self._cache_location(
-            'gid://shopify/Location/FOREIGN', store=other_store,
-        )
-        Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(UserError):
-            Service.with_user(
-                self.user_operator
-            ).create_or_update_location_mapping(
-                self.store, self.internal_location,
-                'gid://shopify/Location/FOREIGN',
-            )
-
-    def test_sanctioned_service_rejects_inactive_gid(self):
-        """A cached but no-longer-active Shopify location is refused."""
-        self._cache_location(
-            'gid://shopify/Location/INACTIVE', active=False,
-        )
-        Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(UserError):
-            Service.with_user(
-                self.user_operator
-            ).create_or_update_location_mapping(
-                self.store, self.internal_location,
-                'gid://shopify/Location/INACTIVE',
-            )
-
     def test_sanctioned_service_denies_silent_gid_replacement(self):
         """A differing GID for an already-mapped Odoo location fails
         closed -- never silently replaces the recorded Shopify identity
         (PR #182 comment 5028910116 item 13)."""
-        self._cache_location('gid://shopify/Location/910')
-        self._cache_location('gid://shopify/Location/DIFFERENT')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
             self.user_operator
@@ -293,7 +233,6 @@ class TestLocationMapping(TransactionCase):
     def test_sanctioned_service_denies_silent_gid_move(self):
         """An already-mapped GID cannot be silently moved to a different
         Odoo location either (PR #182 comment 5028910116 item 13)."""
-        self._cache_location('gid://shopify/Location/911')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
             self.user_operator
