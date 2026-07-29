@@ -1,3 +1,73 @@
+### Merchant-operability closure — authentication mode + TD-020/location search (2026-07-29)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `50b770a315b53f0c05f0b8867bb801d75c6476ef` (the onboarding batch's final
+  head). **Not self-reviewed, not self-accepted, not ready-marked, not
+  merged.** All commits additive; no rebase, reset, amend, squash or
+  force-push.
+- **Authorization:** the 2026-07-29 control-room instruction "CLAUDE CODE —
+  WAVE 5 UNIFIED MERCHANT-OPERABILITY CLOSURE". **The standing branch
+  conflict is flagged again and again not resolved unilaterally:** the
+  harness designated `claude/wave-5-merchant-operability-wqyt3g` while the
+  instruction authorises `fable/wave-5-completion` (PR #204's head) and
+  explicitly forbids mirroring commits to a harness-designated `claude/**`
+  branch. The instruction was followed; nothing was pushed to the
+  `claude/**` ref by this session.
+- **Identity gate, before any edit.** Repository `AdamsOdoo/Adams`; local
+  HEAD = `origin/fable/wave-5-completion` = PR #204 head = `50b770a3…`;
+  PR #204 open, draft, unmerged, base
+  `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d`; head
+  descends from the base with the eight-commit onboarding fast-forward
+  (`d6d44fa` → `50b770a3`, executable head `624bf8f2`) intact; worktree
+  clean; Odoo pin `30bde9ff` verified; repository unshallowed to prove
+  ancestry.
+- **What was built (two executable commits + one docs/evidence tail).**
+  (1) `b223a0e` — the `dev_dashboard_client_credentials` credential mode
+  beside the fully-compatible offline token: write-only client pair, a
+  no-ACL ephemeral-token cache model, exchange/refresh at the single
+  transport boundary with per-store advisory-lock coalescing,
+  identity-based probe revalidation (a 24-hour rotation is not a
+  credential change), migration `19.0.1.16.0`, the credential step's
+  two-path chooser, and the granted-scopes JSON parse fix.
+  (2) `cad932f` — TD-020's governed closure
+  (`withdraw_first_push_decision` + wizard + pair-form control, refused
+  outside a proven safe terminal state, old confirmation never reused) and
+  the setup location step's bounded server-side search
+  (`search_location_options` over a new core seam; store/company filters
+  structural; every eligible location reachable).
+- **Evidence.** Baseline at `50b770a3`: 0 failed, 0 errors of 2131
+  (fresh-install standard). Definitive three-pass run at `cad932f`:
+  fresh 0/0 of 2189 (24/24 tours), warm `-u` 0/0 of 2189 (24/24 tours, migration 19.0.1.16.0 executed), non-standard 0/0 of 42 with all three HOOT suites verified — clean worktree, source head verified, Odoo pin `30bde9ff`, Python 3.12.3, PostgreSQL 16.13. New coverage: `test_client_credentials.py`
+  (six classes), `TestFirstPushWithdrawal`, `TestSetupLocationSearch`, the
+  real-browser withdrawal tour, S1 search steps, HOOT setup suite at 20.
+  Zero live Shopify contact; no real credential anywhere.
+- **REPEATABLE READ lesson (recorded for the learning loop).** A side
+  transaction must never write a row the caller's transaction later locks:
+  the initial design mirrored refresh evidence onto the credential row and
+  both corrupted the probe's version check (false supersession on every
+  routine rotation) and manufactured serialization failures under the
+  revalidation lock. The committed design writes the cache row only, and
+  reads committed state through fresh snapshots — found by test, not in
+  review, which is the reason journey tests drive production routes.
+- **Remaining campaign scope, deferred explicitly:** see
+  `docs/07-implementation-plan/wave-5-merchant-operability-closure-2026-07-29.md`
+  §6 (canonical Store Settings, import admission routes, tax/customer
+  completion, dashboard liveness, attention consolidation, §26 families
+  C/D/F/G/H/J). Each is a confirmed audit finding, none silently dropped.
+- **Next-session prompt (exact).** "Continue the Wave 5 unified
+  merchant-operability closure on PR #204 from its current control-room
+  verified head: implement the canonical Store Settings entry point (§13)
+  reusing the setup wizard's fields, validation and readiness, then the
+  production admission routes for product import (§14) — in that order,
+  under the same identity gate, batch discipline and zero-live-Shopify
+  rules as the 2026-07-29 instruction."
+- **Gates that remain:** independent merchant-journey/security review;
+  exact-head Odoo.sh qualification; controlled live-Shopify validation;
+  business UAT; control-room acceptance/merge. The implementing session
+  performs none of them.
+
 ### Bounded UAT-critical onboarding, location mapping and final readiness (2026-07-29)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft
