@@ -1,0 +1,865 @@
+[
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-focus-1366px.png",
+    "bytes": 94743,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-focus-1366px.png",
+    "bytes": 91863,
+    "criterion": "S1 long Permissions step; sticky actions over long content (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-1366px.png",
+    "bytes": 92046,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-1366px.png",
+    "bytes": 87509,
+    "criterion": "S1 Final readiness with a long result list (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-focus-1366px.png",
+    "bytes": 46084,
+    "criterion": "U2 S9 orders; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-focus-1366px.png",
+    "bytes": 52832,
+    "criterion": "U2 COD ledger; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-focus-1366px.png",
+    "bytes": 52937,
+    "criterion": "U2 S6 customer matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-focus-1366px.png",
+    "bytes": 52190,
+    "criterion": "U2 S8 product matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-focus-1366px.png",
+    "bytes": 43223,
+    "criterion": "U2 S19 inventory workspace (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-focus-1366px.png",
+    "bytes": 42293,
+    "criterion": "U2 S11 first-push guard; warning state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-focus-1366px.png",
+    "bytes": 94954,
+    "criterion": "U2 S11 form; warning state + action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-focus-1366px.png",
+    "bytes": 61063,
+    "criterion": "U2 S10 location mapping; action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-focus-1366px.png",
+    "bytes": 44573,
+    "criterion": "U3 S7 export review queue (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-focus-1366px.png",
+    "bytes": 60814,
+    "criterion": "U3 media registry (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-focus-1366px.png",
+    "bytes": 64106,
+    "criterion": "U3 S25/S26 reconnect and backfill (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-focus-1366px.png",
+    "bytes": 55620,
+    "criterion": "U3 S31 export diagnostics (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-focus-1366px.png",
+    "bytes": 39333,
+    "criterion": "U3 export settings/ownership/retention (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-focus-1366px.png",
+    "bytes": 91125,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "focus-visible.json",
+    "criterion": "WCAG 2.2 SC 2.4.7 Focus Visible; SC 2.5.8 Target Size"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-bottom-1366px.png",
+    "bytes": 75941,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-bottom-1366px.png",
+    "bytes": 76125,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-bottom-390px.png",
+    "bytes": 66004,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-bottom-390px.png",
+    "bytes": 64808,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "sticky-focus-clearance.json",
+    "criterion": "WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)"
+  },
+  {
+    "artifact": "contrast.json",
+    "criterion": "WCAG 2.2 SC 1.4.3 / SC 1.4.11"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-reduced-motion-1366px.png",
+    "bytes": 55270,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-reduced-motion-1366px.png",
+    "bytes": 94982,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-reduced-motion-1366px.png",
+    "bytes": 104782,
+    "criterion": "S1 long Permissions step; sticky actions over long content (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-reduced-motion-1366px.png",
+    "bytes": 120256,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-reduced-motion-1366px.png",
+    "bytes": 113204,
+    "criterion": "S1 Final readiness with a long result list (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-reduced-motion-1366px.png",
+    "bytes": 45992,
+    "criterion": "U2 S9 orders; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-reduced-motion-1366px.png",
+    "bytes": 52656,
+    "criterion": "U2 COD ledger; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-reduced-motion-1366px.png",
+    "bytes": 52619,
+    "criterion": "U2 S6 customer matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-reduced-motion-1366px.png",
+    "bytes": 52256,
+    "criterion": "U2 S8 product matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-reduced-motion-1366px.png",
+    "bytes": 42968,
+    "criterion": "U2 S19 inventory workspace (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-reduced-motion-1366px.png",
+    "bytes": 42040,
+    "criterion": "U2 S11 first-push guard; warning state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-reduced-motion-1366px.png",
+    "bytes": 94868,
+    "criterion": "U2 S11 form; warning state + action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-reduced-motion-1366px.png",
+    "bytes": 61180,
+    "criterion": "U2 S10 location mapping; action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-reduced-motion-1366px.png",
+    "bytes": 45495,
+    "criterion": "U3 S7 export review queue (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-reduced-motion-1366px.png",
+    "bytes": 60654,
+    "criterion": "U3 media registry (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-reduced-motion-1366px.png",
+    "bytes": 64113,
+    "criterion": "U3 S25/S26 reconnect and backfill (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-reduced-motion-1366px.png",
+    "bytes": 55529,
+    "criterion": "U3 S31 export diagnostics (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-reduced-motion-1366px.png",
+    "bytes": 39126,
+    "criterion": "U3 export settings/ownership/retention (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-reduced-motion-1366px.png",
+    "bytes": 104584,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "reduced-motion.json",
+    "criterion": "DESIGN SYSTEM \u00a78 reduced motion (V-7); WCAG 2.2 SC 2.3.3"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-desktop-1366px.png",
+    "bytes": 55270,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-desktop-1366px.png",
+    "bytes": 94982,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-desktop-1366px.png",
+    "bytes": 104782,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-desktop-1366px.png",
+    "bytes": 120256,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-desktop-1366px.png",
+    "bytes": 113204,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-desktop-1366px.png",
+    "bytes": 45997,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-desktop-1366px.png",
+    "bytes": 52655,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-desktop-1366px.png",
+    "bytes": 52619,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-desktop-1366px.png",
+    "bytes": 52258,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-desktop-1366px.png",
+    "bytes": 43042,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-desktop-1366px.png",
+    "bytes": 42116,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-desktop-1366px.png",
+    "bytes": 95011,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-desktop-1366px.png",
+    "bytes": 61227,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-desktop-1366px.png",
+    "bytes": 45486,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-desktop-1366px.png",
+    "bytes": 60654,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-desktop-1366px.png",
+    "bytes": 64167,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-desktop-1366px.png",
+    "bytes": 55527,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-desktop-1366px.png",
+    "bytes": 39126,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-desktop-1366px.png",
+    "bytes": 104584,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-tablet-768px.png",
+    "bytes": 49886,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-tablet-768px.png",
+    "bytes": 88319,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-tablet-768px.png",
+    "bytes": 93598,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-tablet-768px.png",
+    "bytes": 111620,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-tablet-768px.png",
+    "bytes": 103681,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-tablet-768px.png",
+    "bytes": 37463,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-tablet-768px.png",
+    "bytes": 43714,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-tablet-768px.png",
+    "bytes": 44763,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-tablet-768px.png",
+    "bytes": 44057,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-tablet-768px.png",
+    "bytes": 30073,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-tablet-768px.png",
+    "bytes": 29126,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-tablet-768px.png",
+    "bytes": 84188,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-tablet-768px.png",
+    "bytes": 52744,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-tablet-768px.png",
+    "bytes": 32983,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-tablet-768px.png",
+    "bytes": 52260,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-tablet-768px.png",
+    "bytes": 53837,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-tablet-768px.png",
+    "bytes": 46393,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-tablet-768px.png",
+    "bytes": 29550,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-tablet-768px.png",
+    "bytes": 96850,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-mobile-390px.png",
+    "bytes": 40955,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-mobile-390px.png",
+    "bytes": 81819,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-mobile-390px.png",
+    "bytes": 79057,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-mobile-390px.png",
+    "bytes": 82649,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-mobile-390px.png",
+    "bytes": 77801,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-mobile-390px.png",
+    "bytes": 26633,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-mobile-390px.png",
+    "bytes": 33180,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-mobile-390px.png",
+    "bytes": 30611,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-mobile-390px.png",
+    "bytes": 28819,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-mobile-390px.png",
+    "bytes": 17313,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-mobile-390px.png",
+    "bytes": 16225,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-mobile-390px.png",
+    "bytes": 47652,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-mobile-390px.png",
+    "bytes": 37251,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-mobile-390px.png",
+    "bytes": 15800,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-mobile-390px.png",
+    "bytes": 37519,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-mobile-390px.png",
+    "bytes": 35580,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-mobile-390px.png",
+    "bytes": 31585,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-mobile-390px.png",
+    "bytes": 15010,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-mobile-390px.png",
+    "bytes": 69869,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "responsive.json",
+    "criterion": "DESIGN SYSTEM \u00a710 responsive; \u00a714 screenshot set; TD-016 per-surface clipping"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-1366px.png",
+    "bytes": 55865,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-1366px.png",
+    "bytes": 94370,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-1366px.png",
+    "bytes": 104320,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-1366px.png",
+    "bytes": 115999,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-1366px.png",
+    "bytes": 112772,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-1366px.png",
+    "bytes": 45514,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-1366px.png",
+    "bytes": 52096,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-1366px.png",
+    "bytes": 52106,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-1366px.png",
+    "bytes": 51731,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-1366px.png",
+    "bytes": 42469,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-1366px.png",
+    "bytes": 41560,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-1366px.png",
+    "bytes": 95585,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-1366px.png",
+    "bytes": 61238,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-1366px.png",
+    "bytes": 44642,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-1366px.png",
+    "bytes": 60205,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-1366px.png",
+    "bytes": 63447,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-1366px.png",
+    "bytes": 54979,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-1366px.png",
+    "bytes": 38630,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-1366px.png",
+    "bytes": 103064,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-768px.png",
+    "bytes": 50347,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-768px.png",
+    "bytes": 87671,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-768px.png",
+    "bytes": 92938,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-768px.png",
+    "bytes": 108846,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-768px.png",
+    "bytes": 102534,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-768px.png",
+    "bytes": 36971,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-768px.png",
+    "bytes": 43263,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-768px.png",
+    "bytes": 44348,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-768px.png",
+    "bytes": 43163,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-768px.png",
+    "bytes": 29483,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-768px.png",
+    "bytes": 28532,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-768px.png",
+    "bytes": 84741,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-768px.png",
+    "bytes": 52766,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-768px.png",
+    "bytes": 31836,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-768px.png",
+    "bytes": 51790,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-768px.png",
+    "bytes": 52951,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-768px.png",
+    "bytes": 45597,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-768px.png",
+    "bytes": 29071,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-768px.png",
+    "bytes": 96189,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-390px.png",
+    "bytes": 42299,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-390px.png",
+    "bytes": 82294,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-390px.png",
+    "bytes": 74611,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-390px.png",
+    "bytes": 82995,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-390px.png",
+    "bytes": 77142,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-390px.png",
+    "bytes": 26633,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-390px.png",
+    "bytes": 33180,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-390px.png",
+    "bytes": 30611,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-390px.png",
+    "bytes": 28819,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-390px.png",
+    "bytes": 17313,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-390px.png",
+    "bytes": 16224,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-390px.png",
+    "bytes": 47693,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-390px.png",
+    "bytes": 37257,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-390px.png",
+    "bytes": 15427,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-390px.png",
+    "bytes": 37519,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-390px.png",
+    "bytes": 35315,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-390px.png",
+    "bytes": 31585,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-390px.png",
+    "bytes": 15010,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-390px.png",
+    "bytes": 70632,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "rtl.json",
+    "criterion": "DESIGN SYSTEM \u00a710 RTL check at every required width (V-8); TD-016 per-surface clipping"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-1366px.png",
+    "bytes": 81471,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-1366px.png",
+    "bytes": 93564,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-1366px.png",
+    "bytes": 88084,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-1440px.png",
+    "bytes": 102412,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-1440px.png",
+    "bytes": 114162,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-1440px.png",
+    "bytes": 103457,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-768px.png",
+    "bytes": 94385,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-768px.png",
+    "bytes": 101761,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-768px.png",
+    "bytes": 94602,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-390px.png",
+    "bytes": 71653,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-390px.png",
+    "bytes": 83150,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-390px.png",
+    "bytes": 75640,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "sticky-action-row.json",
+    "criterion": "Wave 5 sticky action row; DESIGN SYSTEM \u00a710; WCAG 2.2 SC 2.4.11"
+  }
+]
