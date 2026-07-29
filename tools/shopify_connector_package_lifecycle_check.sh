@@ -102,6 +102,19 @@ module_state() {  # module_state <db> <module_name>
         "SELECT state FROM ir_module_module WHERE name = '$2'"
 }
 
+package_state() {  # package_state <db>
+    # A genuinely fresh connection/query, deliberately NOT the same shell
+    # session that ran the preceding stage: Postgres's REPEATABLE READ
+    # (Odoo's default) fixes a transaction's snapshot at its own start, so
+    # a long-running shell session can never see its own side-cursor
+    # commits (see shopify_connector_package.py::_apply_detected_state's
+    # docstring) -- checking from a fresh connection is what a real next
+    # page load/request would also see, and is the only way this check
+    # means anything.
+    psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$1" -tAc \
+        "SELECT state FROM shopify_connector_package LIMIT 1"
+}
+
 drop_db() { dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$1" 2>/dev/null || true; }
 
 # ---------------------------------------------------------------------------
@@ -220,16 +233,22 @@ pkg = env['shopify.connector.package'].search([], limit=1)
 print("STATE_BEFORE:" + pkg.state)
 pkg.action_recheck_dependencies()
 pkg.action_restore_suite()
+# `action_restore_suite`'s own hard commit + registry reload gives this
+# script's cursor a fresh transaction, so this read (unlike the confirm
+# check below) is genuinely current -- see package_state()'s docstring.
 print("STATE_AFTER_RESTORE:" + pkg.state)
-pkg.action_confirm_resume()
-print("STATE_AFTER_CONFIRM:" + pkg.state)
+confirm_integrity = pkg.action_confirm_resume()
+print("CONFIRM_RETURNED_HEALTHY:" + str(confirm_integrity['healthy']))
 env.cr.commit()
 EOF
 if run_shell "$DB" "${ARTIFACT_DIR}/restore_resume.py" "${ARTIFACT_DIR}/4b_restore_resume.log"; then
     ok=1
     grep -q "STATE_BEFORE:dependency_paused" "${ARTIFACT_DIR}/4b_restore_resume.log" || { fail "$STAGE: did not start paused"; ok=0; }
     grep -q "STATE_AFTER_RESTORE:dependency_paused" "${ARTIFACT_DIR}/4b_restore_resume.log" || { fail "$STAGE: restore alone resumed automatically"; ok=0; }
-    grep -q "STATE_AFTER_CONFIRM:healthy" "${ARTIFACT_DIR}/4b_restore_resume.log" || { fail "$STAGE: explicit confirm did not resume"; ok=0; }
+    grep -q "CONFIRM_RETURNED_HEALTHY:True" "${ARTIFACT_DIR}/4b_restore_resume.log" || { fail "$STAGE: action_confirm_resume did not report healthy"; ok=0; }
+    # The durable check: a genuinely fresh connection (a real next request
+    # in production), not this same script's own REPEATABLE READ snapshot.
+    [[ "$(package_state "$DB")" == "healthy" ]] || { fail "$STAGE: explicit confirm did not durably resume"; ok=0; }
     for name in $SIX_MODULES; do
         for n in ${name//,/ }; do
             [[ "$(module_state "$DB" "$n")" == "installed" ]] || { fail "$STAGE: $n not restored"; ok=0; }

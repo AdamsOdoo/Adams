@@ -27,6 +27,23 @@ class TestPackageLifecycle(TransactionCase):
         cls.Package = cls.env['shopify.connector.package']
         cls.Module = cls.env['ir.module.module'].sudo()
 
+    def setUp(self):
+        super().setUp()
+        # Every state-changing method on this model persists via an
+        # independent `registry.cursor()` side transaction (see
+        # `_commit_via_side_cursor`'s docstring). Without registry test
+        # mode that side cursor is a genuinely separate connection: the
+        # package singleton it creates on the very first call would be
+        # REALLY committed and would leak into every later test in this
+        # class (and beyond) instead of rolling back with the rest of the
+        # test's fixtures, and a same-row write immediately after an
+        # uncommitted write in this test's own transaction would simply
+        # hang waiting for a lock this same test is holding. Test mode
+        # makes every `registry.cursor()` reuse this one test connection
+        # instead (the same fix `test_api_client.py` applies).
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     def _break_module(self, name, state='uninstalled'):
         module = self.Module.search([('name', '=', name)])
         module.write({'state': state})
@@ -34,7 +51,7 @@ class TestPackageLifecycle(TransactionCase):
 
     def test_fresh_singleton_is_healthy_when_everything_installed(self):
         record = self.Package._get_singleton()
-        integrity = record._apply_detected_state()
+        integrity, _effective_state = record._apply_detected_state()
         self.assertTrue(integrity['healthy'])
         self.assertEqual(record.state, 'healthy')
         self.assertFalse(record.missing_technical_modules)
@@ -56,18 +73,40 @@ class TestPackageLifecycle(TransactionCase):
         # harness). Breaking only the technical module is covered by
         # test_abnormal_partial_state_falls_back_to_technical_module_name
         # below.
+        #
+        # The state-mutating call (`_apply_detected_state`) is invoked
+        # directly here, OUTSIDE any `assertRaises` block, on purpose:
+        # Odoo's own `TransactionCase.assertRaises` takes a savepoint
+        # before its body and rolls it back the instant the expected
+        # exception fires (`odoo/tests/common.py::_assertRaises`), which
+        # would silently undo this same write if it were made inside that
+        # block. That savepoint rollback is a test-harness artifact -- in
+        # real production the state persists via a genuinely separate,
+        # already-committed connection (`_commit_via_side_cursor`) that a
+        # later exception/rollback elsewhere in the SAME request cannot
+        # touch; the disposable-database harness
+        # (tools/shopify_connector_package_lifecycle_check.sh) is what
+        # proves that property end-to-end. This test asserts the pause
+        # LOGIC; `test_assert_healthy_raises_with_the_correct_message`
+        # below asserts the exception separately.
+        self._break_module('shopify_connector_inventory')
+        self._break_module('stock')
+        record = self.Package._get_singleton()
+        integrity, _effective_state = record._apply_detected_state()
+        self.assertFalse(integrity['healthy'])
+        self.assertEqual(record.state, 'dependency_paused')
+        self.assertIn('shopify_connector_inventory', record.missing_technical_modules)
+        self.assertIn('Inventory', record.missing_standard_apps)
+        self.assertTrue(record.paused_at)
+        self.assertEqual(record.prior_state, 'healthy')
+
+    def test_assert_healthy_raises_with_the_correct_message(self):
         self._break_module('shopify_connector_inventory')
         self._break_module('stock')
         with self.assertRaises(UserError) as cm:
             self.Package.assert_healthy()
         self.assertIn('paused', str(cm.exception))
         self.assertIn('Inventory', str(cm.exception))
-        record = self.Package._get_singleton()
-        self.assertEqual(record.state, 'dependency_paused')
-        self.assertIn('shopify_connector_inventory', record.missing_technical_modules)
-        self.assertIn('Inventory', record.missing_standard_apps)
-        self.assertTrue(record.paused_at)
-        self.assertEqual(record.prior_state, 'healthy')
 
     def test_abnormal_partial_state_falls_back_to_technical_module_name(self):
         # The technical module alone goes missing while its standard Odoo
@@ -85,35 +124,37 @@ class TestPackageLifecycle(TransactionCase):
         self.assertFalse(record.missing_standard_apps)
 
     def test_pause_state_is_sticky_until_explicit_resume(self):
+        # See test_missing_technical_module_pauses_and_reports_missing_app
+        # for why the state-mutating calls below run outside `assertRaises`.
         self._break_module('shopify_connector_inventory')
-        with self.assertRaises(UserError):
-            self.Package.assert_healthy()
+        record = self.Package._get_singleton()
+        record._apply_detected_state()
+        self.assertEqual(record.state, 'dependency_paused')
         # Restore the module row directly (simulating the technical module
         # coming back) WITHOUT calling the explicit resume action.
         self._break_module('shopify_connector_inventory', state='installed')
-        record = self.Package._get_singleton()
-        record.invalidate_recordset()
-        with self.assertRaises(UserError):
-            self.Package.assert_healthy()
-        record.invalidate_recordset()
+        record._apply_detected_state()
         self.assertEqual(
             record.state, 'dependency_paused',
             "state must never auto-heal back to healthy on its own",
         )
+        with self.assertRaises(UserError):
+            self.Package.assert_healthy()
 
     def test_action_confirm_resume_requires_genuine_integrity(self):
         self._break_module('shopify_connector_inventory')
-        with self.assertRaises(UserError):
-            self.Package.assert_healthy()
         record = self.Package._get_singleton()
-        record.invalidate_recordset()
+        record._apply_detected_state()
+        self.assertEqual(record.state, 'dependency_paused')
         with self.assertRaises(UserError):
             record.action_confirm_resume()
         record.invalidate_recordset()
-        self.assertEqual(record.state, 'dependency_paused')
+        self.assertEqual(
+            record.state, 'dependency_paused',
+            "a refused resume must not have changed anything",
+        )
         self._break_module('shopify_connector_inventory', state='installed')
         record.action_confirm_resume()
-        record.invalidate_recordset()
         self.assertEqual(record.state, 'healthy')
         self.assertTrue(record.resumed_at)
         self.assertEqual(record.resumed_by_uid, self.env.user)

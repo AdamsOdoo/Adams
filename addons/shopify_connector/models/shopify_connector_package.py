@@ -213,17 +213,44 @@ class ShopifyConnectorPackage(models.Model):
         method's docstring for why an ordinary `write()` would not survive
         the `UserError` most callers (e.g. `assert_healthy`) raise
         immediately afterward.
+
+        Deliberately makes NO database write at all in the common case
+        (already healthy, staying healthy): this runs on every job
+        admission/dispatch and every Shopify transport call, so a side
+        cursor -- a genuinely separate connection and transaction -- on
+        every single healthy invocation would add needless round-trips and
+        lock contention to the hottest paths in the connector for a
+        `last_integrity_check` timestamp nobody is blocked on. It still
+        writes whenever there is something worth persisting: the pause
+        transition itself, or (much rarer) a re-check while already paused,
+        which keeps the audit trail current for whoever is looking at it.
+
+        Returns `(integrity, effective_state)`. A caller that needs to know
+        whether THIS call just paused the record must use the returned
+        `effective_state`, never re-read `self.state`/`record.state`
+        afterward: Postgres's REPEATABLE READ (Odoo's default isolation)
+        fixes the calling transaction's snapshot at its own start, so it can
+        never observe the side cursor's commit -- a genuinely different
+        transaction -- for the rest of its own lifetime, no matter how
+        thoroughly the ORM cache is invalidated. `effective_state` is
+        tracked in plain Python specifically to sidestep that, and is
+        exactly what was just written (or, if nothing changed, the
+        already-correct prior value).
         """
         self.ensure_one()
         integrity = integrity if integrity is not None else self._compute_integrity()
+        effective_state = self.state
+        if integrity['healthy'] and self.state == 'healthy':
+            return integrity, effective_state
         vals = {
             'last_integrity_check': fields.Datetime.now(),
             'missing_technical_modules': ', '.join(integrity['missing_technical_modules']) or False,
             'missing_standard_apps': ', '.join(integrity['missing_standard_apps']) or False,
         }
         if not integrity['healthy'] and self.state == 'healthy':
+            effective_state = 'dependency_paused'
             vals.update({
-                'state': 'dependency_paused',
+                'state': effective_state,
                 'paused_at': fields.Datetime.now(),
                 'prior_state': self.state,
                 'audit_note': (
@@ -235,7 +262,7 @@ class ShopifyConnectorPackage(models.Model):
                 ),
             })
         self._commit_via_side_cursor(self.id, vals)
-        return integrity
+        return integrity, effective_state
 
     @api.model
     def is_healthy(self):
@@ -258,8 +285,13 @@ class ShopifyConnectorPackage(models.Model):
         final pre-network boundary check independently of every earlier one.
         """
         record = self._get_singleton()
-        record._apply_detected_state()
-        if record.state != 'healthy':
+        integrity, effective_state = record._apply_detected_state()
+        if effective_state != 'healthy':
+            # Read from the locally-computed `integrity` dict, never from
+            # `record.missing_standard_apps`/`record.missing_technical_modules`
+            # -- same reasoning as `effective_state` above, since this call
+            # may be the very one that just wrote them.
+            #
             # Normally a missing standard app IS the root cause and is named
             # directly. If one cannot be identified -- the technical module
             # itself went missing/corrupted while its standard Odoo
@@ -267,8 +299,8 @@ class ShopifyConnectorPackage(models.Model):
             # (Section 11) rather than an ordinary dependency loss -- name
             # the technical component(s) instead of a bare "unknown".
             missing = (
-                record.missing_standard_apps
-                or record.missing_technical_modules
+                ', '.join(integrity['missing_standard_apps'])
+                or ', '.join(integrity['missing_technical_modules'])
                 or _('unknown')
             )
             raise UserError(PAUSE_MESSAGE_TEMPLATE % {'missing': missing})
@@ -302,7 +334,7 @@ class ShopifyConnectorPackage(models.Model):
         """
         self.ensure_one()
         self._require_system_admin()
-        integrity = self._apply_detected_state()
+        integrity, _effective_state = self._apply_detected_state()
         if integrity['healthy']:
             note = (
                 "Dependency recheck: every required application and "
@@ -341,7 +373,7 @@ class ShopifyConnectorPackage(models.Model):
         self.ensure_one()
         self_id = self.id
         self._require_system_admin()
-        integrity = self._apply_detected_state()
+        integrity, _effective_state = self._apply_detected_state()
         if integrity['missing_standard_apps']:
             raise UserError(_(
                 'Cannot restore the Shopify Connector suite yet: the '
@@ -368,14 +400,15 @@ class ShopifyConnectorPackage(models.Model):
             # of its installed version (Section 11 "component version
             # mismatch") is Odoo's own ordinary Apps "Upgrade" action; it is
             # not blocked by anything this method does.
-            return self._apply_detected_state()
+            integrity, _effective_state = self._apply_detected_state()
+            return integrity
         to_install.button_install()
         self.env.cr.commit()
         from odoo.modules.registry import Registry
         Registry.new(self.env.cr.dbname, update_module=True)
         self.env.cr.reset()
         record = self.env['shopify.connector.package'].browse(self_id)
-        integrity = record._apply_detected_state()
+        integrity, _effective_state = record._apply_detected_state()
         record._commit_via_side_cursor(record.id, {'audit_note': (
             "Restore Suite completed: technical components (re)installed. "
             "Package integrity: %s. Run Readiness for each store, then "
@@ -403,7 +436,15 @@ class ShopifyConnectorPackage(models.Model):
         """
         self.ensure_one()
         self._require_system_admin()
-        integrity = self._apply_detected_state()
+        # `_apply_detected_state` never transitions FROM `dependency_paused`
+        # (only ever TO it -- see its docstring), so it cannot have touched
+        # `state` here: either integrity is unhealthy and this raises before
+        # `self.state` is ever read below, or it is healthy and the
+        # transition condition is false, leaving `state` exactly as it was
+        # before this call. Reading `self.state` afterward is therefore
+        # safe here despite the REPEATABLE READ caveat documented on
+        # `_apply_detected_state` -- this call never writes it.
+        integrity, _effective_state = self._apply_detected_state()
         if not integrity['healthy']:
             raise UserError(_(
                 'Cannot resume: the Shopify Connector is still missing '

@@ -32,6 +32,22 @@ class TestPackagePauseGates(TransactionCase):
         cls.Job = cls.env['shopify.connector.job']
         cls.Client = cls.env['shopify.connector.api.client']
 
+    def setUp(self):
+        super().setUp()
+        # `assert_healthy` persists via an independent `registry.cursor()`
+        # side transaction (see `shopify_connector_package.py::
+        # _commit_via_side_cursor` -- the same CORE-R2 pattern
+        # `_admit_lifecycle` already uses). `_force_paused` below writes the
+        # SAME package row through the ordinary (uncommitted) test
+        # transaction first; without test mode, the side cursor would be a
+        # genuinely separate connection and would hang forever waiting for
+        # a row lock the test itself is holding. Registry test mode makes
+        # every `registry.cursor()` reuse this single test connection
+        # instead (the same fix `test_api_client.py` applies for the
+        # identical reason).
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
     def _force_paused(self):
         record = self.Package._get_singleton()
         record.sudo().write({

@@ -42,3 +42,16 @@ def _post_init_install_full_suite(env):
             '%s' % ', '.join(sorted(missing))
         )
     modules.button_install()
+    # Seed the package singleton now, with a PLAIN create on the ordinary
+    # install-time env -- deliberately not `_get_singleton`'s side-cursor
+    # path (there is nothing to protect against here: if this whole
+    # install later fails and rolls back, this row correctly disappears
+    # with everything else it was installed alongside, which is exactly
+    # what should happen). This is the ONLY reason `_get_singleton`'s own
+    # lazy, side-cursor-backed creation exists at all: to cover a database
+    # that somehow reaches runtime without ever having run this hook --
+    # there is no such supported path, but detecting a missing singleton
+    # is cheap and strictly safer than assuming one always exists.
+    Package = env['shopify.connector.package']
+    if not Package.sudo().search([], limit=1):
+        Package.sudo().create({'name': 'Shopify Connector'})
