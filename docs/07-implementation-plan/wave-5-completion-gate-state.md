@@ -784,6 +784,117 @@ untouched. Nothing in this record rewrites an earlier record as though the
 experiment never occurred. PR #204 remains **draft, open, unapproved and
 unmerged**; issues #185, #186, #197 and #200 remain open.
 
+### 5e.9 Bounded UAT-critical onboarding, location mapping and final readiness — 2026-07-29
+
+`[Fact — implementation batch. NOT an acceptance, NOT a review, NOT a
+ready-mark, NOT a merge, NOT an Odoo.sh, Shopify, campaign or UAT claim.]`
+
+**Scope.** The control room's bounded post-reversion instruction: make the
+guided setup's onboarding path customer-operable end to end, and nothing else.
+No part of the rejected single-package lifecycle architecture is reintroduced —
+`addons/shopify_connector/**` does not exist, no customer package controller,
+no reverse module dependency, no component-uninstall protection, no
+dependency-loss pause, no dependency snapshot or restoration, no automatic
+technical-module installation, and no DEC-042/TD-017/TD-018/TD-019 work.
+Dependency-uninstall survival stays deferred from the MVP.
+
+**Starting head.** `d6d44fa6d93ac688d6ca6f187f552586e1616461` (the accepted
+rollback head). Base `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d`.
+Executable ancestor `ee23c966a0b214c7974abbade4b384f251c4940f`. Exact-head
+GitHub Actions run `30470359888` completed `success`. Additive commits only —
+no rebase, reset, amend, squash or force-push.
+
+#### The five defects closed
+
+| # | Defect at the starting head | What now holds |
+| --- | --- | --- |
+| 1 | Readiness ran at step 6, before the choices two of its checks read | 12-step order with `final_readiness` at 11, after every step whose value a check evaluates. Activation still re-runs it server-side |
+| 2 | Progress was addressed by numeric position despite steps having semantic keys | `setup_wizard_step_key` is the stored authority; the ordinal is derived for display. `save_and_exit` refuses an ordinal rather than translating it. Existing numeric progress is translated deterministically by `19.0.1.15.0/post-migrate.py` and by an identical read-time fallback; no store is reset and no durable choice is rewritten |
+| 3 | `_enqueue_location_sync` had no customer-operable route at all | `action_refresh_shopify_locations` — one public guarded action, reached from the setup step and from the Location Mapping workspace, admitting an `inventory_location_sync` job through the ordinary queue and dispatcher. No surface holds a transport |
+| 4 | `create_or_update_location_mapping` accepted any GID string and never set the name snapshot | The GID must name an ACTIVE cached `shopify.connector.location` of THIS store; the snapshot comes from that validated row. Arbitrary, foreign-store and inactive GIDs are refused with identical non-enumerating messages |
+| 5 | The Location Mapping list/form said a mapping "is created" and offered no route | Three governed wizards — refresh, map, remap — plus an Administrator-only `remap_location_mapping` service in front of the binding mixin. `create="false"` is unchanged; the mixin is neither weakened nor bypassed |
+
+Plus the two the packet named directly: the sticky, responsive action row, and
+the credential step's three-value disclosure (Admin API access token vs Client
+ID vs Client Secret, with no universal-24-hour-expiry claim).
+
+#### Why the pre-activation refresh is not a hole in the business gate
+
+`inventory_location_sync` was admitted only under `scheduled_sync`, a
+business-gated source, so it could not be created for a store that is not
+`connected` — while `mapped_location` is an essential readiness check that
+blocks activation and needs a mapping, a mapping needs a Shopify location, and
+the location list needed the store activated first. A circular gate.
+
+`action_refresh_shopify_locations` derives the source from the store's own
+lifecycle state and admits under exactly two:
+
+- `connected` → `manual_sync`, fully business-gated at create and at start;
+- `setup_incomplete` → `setup_readiness_check`, one of core's two sources
+  deliberately exempt from store-state gating because such jobs "exist to
+  determine connection/readiness state, so gating them on 'connected' would be
+  circular" (`shopify_connector_job.py`, unchanged).
+
+`reconnect_needed`, `disconnecting` and `disconnected` are **refused outright**
+rather than routed down the ungated path — that is what keeps a deliberate
+exemption from becoming a way around the business gate. No new `job_source`
+value, no change to core's gating, and the `inventory_domain_enabled` gate
+still applies to every one of them at start time.
+
+#### Readiness presentation
+
+Five states — Passed, Warning, Blocking, Waiting, Not required — projected from
+the readiness service's own `{tier, result}` verdict plus the three facts the
+verdict does not carry: whether the check applies at all (`not_applicable`,
+now an explicit key rather than a phrase inside translatable copy), whether a
+location refresh is still in flight, and whether the evidence predates the
+configuration it describes. Stale outranks Not required, because "not
+applicable" is itself a conclusion about a configuration that may have changed.
+No green result is rendered for a check that did not run, is stale, is waiting
+on a refresh, is not proven, or covers a disabled domain. The verdict itself
+stays server-owned; the surface renders it.
+
+#### Two defects the batch's own evidence found
+
+`[Fact]` Both were found by MEASURING, not by reading the stylesheet, and
+both are fixed in this batch.
+
+1. **The setup surface's content was clipped and unreachable.** A client
+   action renders inside `.o_action_manager`, which is `overflow: hidden` at
+   the pinned Odoo and provides no scrolling of its own. With
+   `min-height: 100%` on `.o_sc_setup` and nothing scrolling anywhere, the
+   rendered-evidence instrument measured between **328px and 1774px** of setup
+   content overflowing that ancestor, with `doc_extent: 0` and no scrollable
+   element in the whole chain, at all four required widths. The bottom of
+   every long step — the rest of the Permissions list, the rest of the
+   location list, the rest of the readiness results — was clipped away with no
+   scrollbar for anyone to notice. This predates the batch; the batch is what
+   measured it. The surface now owns its own scrolling.
+2. **The sticky action row's negative inline margin was a real
+   connector-owned horizontal overflow**, 16px past `.o_sc_setup__inner` on
+   each side at every width in both directions. Removed.
+
+`unreachable_vertical_content` is now a measured and asserted defect class
+for every connector surface, not only the setup one, and measures zero
+everywhere at every width.
+
+#### What this batch does not do or claim
+
+- **No Shopify contact, no credential use, no campaign, no Odoo.sh run, no
+  UAT.** Every test that could reach the transport replaces it with a
+  fail-on-contact stand-in; the two that drive the dispatcher answer `execute`
+  locally.
+- **No acceptance.** Not reviewed, not ready-marked, not merged, not
+  self-accepted. PR #204 stays draft and open.
+- **No new architecture decision.** The decision register was inspected; no
+  new identifier was assigned, because nothing here is a new architectural
+  choice — it is the delivery of scope the existing decisions already
+  describe.
+- **No mutation-path change.** Product import/export, customer/order import,
+  quantity calculation, inventory mutation, first-push state machine,
+  fulfillment, retry/replay/idempotency, API version, throttle, reconnect,
+  webhooks, OAuth and licensing are all untouched.
+
 ## 6. Re-derived Wave 5 completion scope and sequence
 
 `[Re-derived from wave-5-definition-of-ready.md §1/§3 and the merged record.

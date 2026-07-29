@@ -527,6 +527,43 @@ confirmed.
 Odoo constraint, required-field, SQL, and ACL tests can emit alarming log lines
 while passing. Use the complete final summary and asserted outcome.
 
+### 18.16 A caller-supplied recordset carries its own environment
+
+A service that documents "resolves the record in the caller's own,
+non-elevated environment" does no such thing unless it rebinds:
+`record.with_env(self.env)`. A recordset arrives carrying whatever environment
+its caller built it in — including `su=True` from a `sudo()` several frames
+away — so `check_access`, every record rule and every `has_group` question
+asked of it are answered by that environment rather than by the person who
+pressed the button. Found in Wave 5 on a mapping service whose docstring had
+claimed caller-environment resolution since it was written, and whose tests
+passed because every one of them handed in a superuser recordset. The
+rebinding is one line; noticing that it is missing is the hard part, because
+the code reads correctly and the tests are green.
+
+### 18.17 Sass owns `max()` and `min()`, and the failure lands somewhere else
+
+`max(var(--x), env(safe-area-inset-bottom))` in an `.scss` file is not a CSS
+function call — Sass evaluates it at compile time, cannot compare the
+arguments, and fails the **entire asset bundle**. Two things make this
+expensive. The break is total, not local: every connector stylesheet in that
+bundle disappears, not just the rule. And the failure surfaces in an unrelated
+place — an existing browser tour on a different surface failing with "Style
+error. The style compilation failed", with nothing pointing at the file that
+was edited. Interpolate CSS-native functions that share a Sass name:
+`#{"max(var(--x), env(safe-area-inset-bottom))"}`.
+
+### 18.18 A surface-root selector that survives an error renders a false capture
+
+A rendered-evidence harness that waits for a surface's root class will happily
+photograph that surface's ERROR state, because a well-built component renders
+its root in both branches. Wave 5 found the guided-setup capture running as a
+Connector User against an Administrator-only screen: `.o_sc_setup` was present,
+the screenshot was taken, every assertion passed, and what was measured was a
+permission error. A capture harness needs an assertion that distinguishes the
+screen it means to photograph from the screen it will accept — the step rail,
+the action row, the specific control — not merely the container both share.
+
 ## 19. New-session startup protocol
 
 At the start of every ChatGPT control-room session:

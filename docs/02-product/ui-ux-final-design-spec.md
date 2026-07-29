@@ -564,6 +564,20 @@ flow"). Summary spec:
   prior step); one masked credential input; helper text naming where the
   operator finds the token in Shopify's admin (exact mechanics **MBQ-05,
   descoped/open**).
+- **The three-value disclosure (binding, Wave 5, 2026-07-29).** A Shopify
+  custom app shows three secret-looking values and only one of them is the
+  one Odoo needs, so the screen must name all three:
+  - Odoo requires the **Admin API access token**.
+  - A **Client ID** is **not** the access token.
+  - A **Client Secret** is **not** the access token.
+  - A Client ID and Client Secret may be used *outside* Odoo to obtain an
+    access token, but neither belongs in the access-token field.
+  - Token lifetime **depends on the authentication method**. The screen must
+    **not** claim that every Shopify token expires after 24 hours.
+
+  Without this, an operator who pastes the Client ID gets an authentication
+  failure one step later with nothing telling them which of the three values
+  was wrong. **[Decided — Wave 5 correction packet, 2026-07-29]**
 - **Primary action.** Save & continue (which masks permanently).
 - **Secondary action.** Back.
 - **Layout / visual hierarchy.** One centered content column: read-only
@@ -1209,22 +1223,66 @@ flow"). Summary spec:
 
 ## Setup wizard detailed flow
 
-The accepted step set is the **11-step Part A §E.1 / DEC-012 §1 wizard**
-(**[Accepted]**). The task brief's nine phases map onto those 11 accepted
-steps as follows — this spec **groups**, but does not add, remove, or
-reorder, accepted steps. Grouping is **[Design proposal — this spec]**.
+> **Wave 5 correction, 2026-07-29 — the flow is now 12 steps, addressed by
+> semantic key.** Two changes, and they are the same change. (1) Readiness
+> moved from position 6 to position 11 (`final_readiness`), because
+> `domain_flag_enablement` and `mapped_location` read choices the operator
+> had not yet made at position 6 — activation already compensated by
+> re-running readiness server-side, which made activation correct and left
+> the operator-facing step evaluating a store that did not exist yet.
+> (2) A new `location_mapping` step at position 7 gives `mapped_location`
+> something an operator can actually satisfy: before it, the Shopify location
+> cache had no customer-operable route at all, so an essential activation gate
+> depended on a list only a scheduled cron on an already-activated store could
+> populate. Every step now carries a **stable semantic key** and the ordinal is
+> derived for display only; progress recorded under the old eleven-step
+> numbering is translated deterministically (see the Wave 5 delta section
+> below). **[Decided — Wave 5 correction packet, 2026-07-29]**
 
-| Brief phase | Accepted step(s) |
-| --- | --- |
-| Welcome / prerequisites | 1 |
-| Store identity | 2 |
-| Credential entry | 3 (+ 4 scope presentation) |
-| Test connection | 5 |
-| Scope/readiness check | 6 |
-| Location baseline | 10 (first-push **scheduling only**) + S10 link |
-| Domain feature flags | 7 (directions per domain) |
-| First sync choice | 8 (source of truth) + 9 (notification default) |
-| Review and activate | 11 |
+The accepted step set is the **12-step wizard** — the Part A §E.1 / DEC-012 §1
+set (**[Accepted]**) with the Wave 5 reordering and the added location-mapping
+step above. The task brief's nine phases map onto those 12 steps as follows —
+this spec **groups**, but does not add, remove, or reorder, accepted steps
+beyond the recorded Wave 5 correction. Grouping is **[Design proposal — this
+spec]**.
+
+| Brief phase | Step key | Step |
+| --- | --- | --- |
+| Welcome / prerequisites | `welcome` | 1 |
+| Store identity | `identity` | 2 |
+| Credential entry | `credential` (+ `scopes`) | 3, 4 |
+| Test connection | `test_connection` | 5 |
+| Domain feature flags | `directions` | 6 |
+| Location baseline | `location_mapping` (7) + `first_push` scheduling (10) | 7, 10 |
+| First sync choice | `source_of_truth` (8) + `notification` (9) | 8, 9 |
+| Scope/readiness check | `final_readiness` | 11 |
+| Review and activate | `review` | 12 |
+
+### Wave 5 delta — semantic keys, the location step, and progress migration
+
+- **The key is authoritative.** Persistence, validation, navigation, deep
+  links, conditional skipping and resume all evaluate the step KEY;
+  `setup_wizard_step_key` is the stored resume point and `setup_wizard_step`
+  is its ordinal, kept in step and used for display only. A client that sends
+  an ordinal to `save_and_exit` is refused rather than translated — quietly
+  reinterpreting `8` would resume an operator on a screen they never asked
+  for, because `8` meant Source of truth before this change.
+- **Existing progress moves, and loses nothing.** `19.0.1.15.0/post-migrate.py`
+  translates each stored number through the OLD order; the setup service
+  applies the identical translation at read time for any row the migration did
+  not reach. Legacy 6 ("Readiness checks") resumes at `directions` — its
+  readiness evidence is untouched and is re-evaluated by `final_readiness`.
+  No store is reset and no durable choice is rewritten.
+- **`location_mapping` is conditional and never hidden.** With inventory
+  disabled it renders as **Not required** with the reason on screen and keeps
+  its position; removing it would renumber every later step, which is exactly
+  the coupling this correction removes.
+- **Readiness presentation has five states** — Passed, Warning, Blocking,
+  Waiting, Not required — and a green result is never shown for a check that
+  did not run, whose evidence is stale, whose location refresh is still
+  pending, whose result is not proven, or whose domain is disabled. The
+  verdict itself remains server-owned by
+  `shopify.connector.readiness.check`; the surface renders it.
 
 Wizard-wide premium treatment **[Design proposal — this spec]**: one
 decision per screen; a visible step indicator with plain step names; each
@@ -1293,15 +1351,7 @@ As specified in screen 6 above. **User goal:** prove the credential works
 *now*. Explicit pass/fail with a reason; failure keeps the operator on the
 step with a fix, never a raw HTTP code. **MVP:** all. **Deferred:** none.
 
-### Step 6 — Readiness checks
-
-As specified in screen 6 above (the decided essential-vs-warning split —
-**[Decided — DEC-018 MBQ-06]**). **User goal:** know, before first sync,
-that everything known-to-fail has been checked. **MVP:** the decided
-essential set blocking; warnings carried to the dashboard. **Deferred:**
-exact thresholds/copy (task-spec detail).
-
-### Step 7 — Sync direction per domain
+### Step 6 — Sync direction per domain
 
 - **User goal.** Choose what this connector does, per domain.
 - **Fields/actions.** For each domain: enable + direction choice limited
@@ -1317,8 +1367,36 @@ exact thresholds/copy (task-spec detail).
   inventory → first-push guard pending).
 - **Validation/errors.** No domain enabled silently; skipping all domains
   is allowed (connect-only setup).
-- **Next best action.** Continue → source of truth.
+- **Next best action.** Continue → location mapping.
 - **MVP:** all. **Deferred:** none.
+
+### Step 7 — Location mapping (conditional)
+
+- **User goal.** Pair each Shopify location with an Odoo internal location,
+  so inventory has somewhere to synchronise to.
+  **[Decided — Wave 5 correction packet, 2026-07-29]**
+- **Fields/actions.** **Refresh Shopify locations** (admits a governed
+  `inventory_location_sync` job through the ordinary queue and dispatcher —
+  no surface in this product holds a Shopify transport); the cached, active
+  Shopify locations for this store, each with its name, its read-only
+  Shopify Location GID and an explicit **Mapped / Not mapped** state; the
+  currently mapped Odoo location where one exists; and an explicit pairing
+  control over the eligible internal Odoo locations visible to the caller.
+- **Helper text.** "An unmapped Shopify location is not synchronised."
+  Pairing is always explicit — **nothing is ever matched by name**, and a
+  Shopify Location GID that this store's own cache does not contain is
+  refused.
+- **Premium treatment.** The refresh state is stated in words — Waiting,
+  Running, Succeeded, Failed — and while a refresh is pending or has failed
+  the screen says plainly that an empty list is **not** a report that Shopify
+  has no locations.
+- **Validation/errors.** Applicable only when the inventory domain is
+  enabled; otherwise the step renders **Not required** with the reason and
+  keeps its position in the order. Whether a mapping is REQUIRED is
+  `mapped_location`'s decision on step 11, not this step's — Continue never
+  fabricates a mapping and never enqueues anything.
+- **Next best action.** Continue → source of truth.
+- **MVP:** all. **Deferred:** bulk mapping; automatic first-time proposals.
 
 ### Step 8 — Source-of-truth choices
 
@@ -1376,7 +1454,21 @@ exact thresholds/copy (task-spec detail).
 - **Next best action.** Continue → review and activate.
 - **MVP:** all. **Deferred:** none.
 
-### Step 11 — Review and activate (final readiness summary)
+### Step 11 — Final readiness
+
+As specified in screen 6 above (the decided essential-vs-warning split —
+**[Decided — DEC-018 MBQ-06]**). **User goal:** know, before first sync,
+that everything known-to-fail has been checked — **against the choices just
+made**, which is why this step runs last rather than sixth
+(**[Decided — Wave 5 correction packet, 2026-07-29]**). Entering the step
+evaluates the currently saved configuration; changing anything a check reads
+marks the earlier result stale rather than leaving it on screen as a
+success; and activation re-runs the whole set server-side regardless.
+**MVP:** the decided essential set blocking, warnings surfaced, the five
+presentation states above, and a "Fix location mapping" action that deep-links
+to step 7 **by key**. **Deferred:** exact thresholds/copy (task-spec detail).
+
+### Step 12 — Review and activate (confidence statement)
 
 - **User goal.** Confirm, in plain words, what the connector will now do.
 - **Fields/actions.** The confidence statement: connection status; enabled

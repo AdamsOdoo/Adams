@@ -1,3 +1,83 @@
+### Bounded UAT-critical onboarding, location mapping and final readiness (2026-07-29)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `d6d44fa6d93ac688d6ca6f187f552586e1616461` (the accepted rollback head).
+  **Not self-reviewed, not self-accepted, not ready-marked, not merged.**
+  All commits additive; no rebase, reset, amend, squash or force-push, and the
+  unsigned rollback commits were left exactly as they are.
+- **Authorization:** the 2026-07-29 control-room instruction "CLAUDE OPUS —
+  WAVE 5 BOUNDED UAT-CRITICAL ONBOARDING COMPLETION", which assigns this
+  session a bounded implementation-worker role and reserves review,
+  acceptance, runtime disposition, ready-marking and merge to the control
+  room. **The same standing branch conflict is flagged again and again not
+  resolved unilaterally:** the harness designated
+  `claude/wave-5-onboarding-o4crhn` while the instruction authorises
+  `fable/wave-5-completion`, which is PR #204's head. The instruction was
+  followed — the identity invariant (local head = remote head = PR head) is
+  unsatisfiable on any other branch.
+- **Identity gate, before any edit.** Repository `AdamsOdoo/Adams`; local HEAD
+  = `origin/fable/wave-5-completion` = PR #204 head =
+  `d6d44fa6d93ac688d6ca6f187f552586e1616461`; PR #204 open, draft, unmerged;
+  base `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d`;
+  worktree clean; both rollback commits present; `addons/shopify_connector/**`
+  absent; Actions run `30470359888` on that exact SHA `completed`/`success`.
+- **What was built.** The five verified starting defects, closed: the
+  twelve-step order with `final_readiness` after every choice it reads; a new
+  conditional `location_mapping` step; semantic-key addressing everywhere with
+  a deterministic warm translation of existing numeric progress; one public
+  guarded `action_refresh_shopify_locations` reaching
+  `_enqueue_location_sync` → job queue → dispatcher →
+  `_handle_inventory_location_sync`; cache-validated mapping creation with the
+  name snapshot taken from the validated row; an Administrator-only remap in
+  front of the binding mixin; the five-state readiness presentation; the
+  credential three-value disclosure; and a sticky, responsive, focus-safe
+  action row.
+- **Two findings the work itself produced, both corrected.**
+  (1) `create_or_update_location_mapping` had never resolved the Odoo location
+  in the caller's environment despite documenting that it did — a
+  caller-supplied recordset carries its own environment, so every visibility
+  and company question was being answered by whatever env the caller built.
+  Rebound with `with_env(self.env)`; the fixtures that had been masking it
+  were users holding only a connector group, which is not a shape a real
+  backend user takes.
+  (2) The rendered-evidence harness ran as a Connector User against an
+  Administrator-only screen, so the S1 capture had been photographing a
+  permission error while passing every assertion. Corrected, with a new test
+  that distinguishes the wizard from its own error branch.
+- **Not claimed.** No Shopify contact, no credential use, no campaign, no
+  Odoo.sh run, no UAT, no approval, no ready-mark, no merge. No part of the
+  rejected single-package lifecycle architecture was reintroduced.
+- **Evidence:**
+  [`docs/05-qa/wave-5-onboarding-completion-validation-results.md`](../05-qa/wave-5-onboarding-completion-validation-results.md),
+  [`docs/07-implementation-plan/wave-5-completion-gate-state.md`](../07-implementation-plan/wave-5-completion-gate-state.md)
+  §5e.9, and the rendered captures under `docs/05-qa/evidence/`.
+
+#### Learning feedback loop
+
+- **What went wrong that a rule would have caught.** Three things, all now in
+  [`CHATGPT.md`](../../CHATGPT.md) §18.16–§18.18: a caller-supplied recordset
+  carries its own environment; Sass owns `max()`/`min()` and an unescaped CSS
+  `max()` fails the whole bundle with the error surfacing on an unrelated
+  surface; and a capture harness that waits on a surface root will photograph
+  that surface's error state and call it evidence.
+- **What the tests had to be changed to hold.** Two guards were added because
+  the properties they protect regress silently: a source guard that the client
+  never addresses a step by position (over code, with comments stripped —
+  the first version found the sentence warning about the shape and reported
+  it as the shape), and an AST guard that every "Not applicable" readiness
+  result declares `not_applicable=True`, so the presentation rule can depend
+  on a key rather than on translatable prose.
+- **Next-session prompt.** Independent Claude review of this head:
+  re-verify the identity gate, read the complete PR diff against the exact
+  base/head checkout, and adversarially re-verify each of §4's five starting
+  defects, the store-state-derived job source (that the `setup_readiness_check`
+  exemption cannot be reached from `reconnect_needed`/`disconnecting`/
+  `disconnected`), the caller-environment rebinding, the warm progress
+  translation against a seeded legacy row, and that no green readiness result
+  is rendered for anything unproven. Do not accept, ready-mark or merge.
+
 ### PR #204 implementation-freeze cycle (2026-07-27)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft
