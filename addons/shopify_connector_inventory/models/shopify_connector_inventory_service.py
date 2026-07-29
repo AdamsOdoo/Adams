@@ -6,7 +6,12 @@ from datetime import datetime, timedelta, timezone
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
-from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.exceptions import (
+    AccessError,
+    MissingError,
+    UserError,
+    ValidationError,
+)
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
@@ -89,6 +94,17 @@ SUBREASON_NO_STRATEGY = 'no_reconciliation_strategy'
 INVENTORY_JOB_TYPES = (
     JOB_TYPE_PUSH_SYNC, JOB_TYPE_PUSH_SCAN, JOB_TYPE_FIRST_PUSH_PREVIEW,
     JOB_TYPE_LOCATION_SYNC, JOB_TYPE_ACTIVATE, JOB_TYPE_SET_QUANTITIES,
+)
+
+# The ONLY job sources a location sync may ever be admitted under (Wave 5).
+# `scheduled_sync` is the existing scheduled path; `manual_sync` is an
+# operator pressing Refresh on a connected store; `setup_readiness_check` is
+# the pre-activation guided-setup path, and is one of core's own two
+# deliberately store-state-ungated sources. Every one of them is still gated
+# on `inventory_domain_enabled` at start time, and nothing outside
+# `action_refresh_shopify_locations` chooses between them.
+LOCATION_SYNC_JOB_SOURCES = (
+    'scheduled_sync', 'manual_sync', 'setup_readiness_check',
 )
 
 # The three "pair execution" job types (DEC-037 §5.3): the only types
@@ -446,6 +462,7 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
                 code, self.ESSENTIAL, self.RESULT_PASS,
                 'Not applicable — the inventory domain is not enabled for '
                 'this store.',
+                not_applicable=True,
             )
         mapping_count = self.env[
             'shopify.connector.location.mapping'
@@ -453,8 +470,9 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
         if not mapping_count:
             return self._check_result(
                 code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-                'The inventory domain is enabled but no Shopify location '
-                'is mapped to an Odoo internal location yet.',
+                'Inventory syncing is on, but no Shopify location is mapped '
+                'to an Odoo location yet. Stock cannot be synchronised for '
+                'a location that is not mapped.',
             )
         try:
             scopes = json.loads(store.granted_scopes or '[]')
@@ -1858,16 +1876,28 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             return self.env['shopify.connector.job']
 
     @api.model
-    def _enqueue_location_sync(self, store):
+    def _enqueue_location_sync(self, store, job_source='scheduled_sync'):
         """Sanctioned `inventory_location_sync` job admission (PR #182
         comment 5025803697 item 22.C; hardened per comment 5028910116
-        item 13). Private service method (leading underscore) -- no
-        public action/UI is added, and explicit Operator/Administrator
-        authority is required so this is never an unguarded admission
-        surface. Domain-gated on `inventory_domain_enabled`; the
-        underlying store-connected gate for this business `job_source`
-        is enforced by the core enqueue service itself.
+        item 13). Private service method (leading underscore) -- explicit
+        Operator/Administrator authority is required so this is never an
+        unguarded admission surface. Domain-gated on
+        `inventory_domain_enabled`; the store-state gate for a business
+        `job_source` is enforced by the core job model itself, at both
+        creation and start.
+
+        `job_source` is a bounded choice, not a free parameter (Wave 5).
+        Only the three values in `LOCATION_SYNC_JOB_SOURCES` are accepted,
+        and the ONE public caller --
+        `action_refresh_shopify_locations` -- derives which one applies
+        from the store's own lifecycle state rather than taking it from a
+        caller. Anything else raises, so no RPC can pick its own gate.
         """
+        if job_source not in LOCATION_SYNC_JOB_SOURCES:
+            raise ValidationError(
+                "A location sync may only be admitted under one of the "
+                "sanctioned job sources."
+            )
         if not (
             self.env.user.has_group(
                 'shopify_connector_core.group_shopify_connector_operator'
@@ -1888,9 +1918,226 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'The inventory domain is not enabled for this store.'
             )
         return self.env['shopify.connector.job.enqueue'].enqueue(
-            store, 'scheduled_sync', JOB_TYPE_LOCATION_SYNC,
+            store, job_source, JOB_TYPE_LOCATION_SYNC,
             payload_hash=uuid.uuid4().hex,
         )
+
+    @api.model
+    def _resolve_store_for_location_action(self, store_id):
+        """A caller-supplied store id -> a store this caller may act on.
+
+        Two checks, in this order, because each catches something the other
+        does not, and both run BEFORE any elevation anywhere below them.
+
+        1. **Ordinary record access, as the calling user.** `browse(id)`
+           bypasses no ACL and proves nothing; `check_access` is what turns
+           an id somebody typed into an RPC call into a record they may
+           read. The SEC-3 record rule makes a foreign store invisible, so
+           this is where a cross-company id is refused. Both refusals --
+           `AccessError` for a real-but-foreign store and `MissingError`
+           for an id that was never real -- collapse to ONE generic
+           message, so the difference between them cannot be used as an
+           existence oracle for stores in another company.
+        2. **`env.companies`.** The same rule's own comparison, restated
+           for the case a store's `company_id` is unset, and evaluated
+           against the switcher selection rather than `user.company_ids`
+           -- otherwise a user allowed in two companies could act on the
+           one they are not currently in.
+        """
+        Store = self.env['shopify.connector.store']
+        if not store_id:
+            raise UserError('No Shopify store was selected.')
+        store = Store.browse(int(store_id))
+        try:
+            store.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError('This Shopify store is not available.')
+        if store.company_id and store.company_id not in self.env.companies:
+            raise AccessError(
+                'This Shopify store belongs to another company.'
+            )
+        return store
+
+    @api.model
+    def _location_refresh_job(self, store):
+        """The non-terminal location-sync job for this store, if any."""
+        Job = self.env['shopify.connector.job']
+        Job.flush_model()
+        return Job.sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+            ('state', 'not in', TERMINAL_JOB_STATES),
+        ], order='id desc', limit=1)
+
+    @api.model
+    def location_refresh_state(self, store):
+        """What the last/current Shopify-location refresh is actually doing.
+
+        Four states an operator can act on, and the distinction between them
+        is load bearing: an EMPTY location cache means something completely
+        different depending on which one applies.
+
+        * `waiting`  -- a job is admitted and has not started.
+        * `running`  -- a job has started.
+        * `succeeded`-- the most recent job finished; the cache is an answer.
+        * `failed`   -- the most recent job did not finish successfully, so
+          the cache is whatever it was before and is NOT an answer.
+        * `none`     -- no refresh has ever been asked for.
+
+        A surface that reported "Shopify has no locations" while a refresh
+        was queued or had failed would be stating a fact about the merchant's
+        Shopify store that nobody has established. `waiting`/`running`/
+        `failed` all exist so it cannot.
+
+        Read-only, and elevated only to read connector-owned job rows for a
+        store the caller may see. Callers have already resolved the store, but
+        the visibility check is repeated here rather than assumed: this is a
+        public method, and a public method that trusts its caller's resolution
+        is one refactor away from being the route that skipped it. The
+        elevation is scoped to this store's own jobs and exposes an id, a
+        state and a fixed-vocabulary error class -- never a Shopify response,
+        never a traceback.
+        """
+        store = self._resolve_store_for_location_action(store.id)
+        pending = self._location_refresh_job(store)
+        if pending:
+            return {
+                'state': 'running' if pending.state == 'running' else 'waiting',
+                'job_id': pending.id,
+                'job_state': pending.state,
+                'reason': '',
+            }
+        last = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+        ], order='id desc', limit=1)
+        if not last:
+            return {
+                'state': 'none', 'job_id': False, 'job_state': '', 'reason': '',
+            }
+        if last.state == 'succeeded':
+            return {
+                'state': 'succeeded', 'job_id': last.id,
+                'job_state': last.state, 'reason': '',
+            }
+        # Everything else terminal is a refresh that did not deliver: failed,
+        # cancelled, skipped. The operator gets the connector's own error
+        # CLASS, which is a fixed vocabulary value -- never a raw traceback,
+        # never a Shopify response body.
+        return {
+            'state': 'failed',
+            'job_id': last.id,
+            'job_state': last.state,
+            'reason': last.error_class or '',
+        }
+
+    @api.model
+    def action_refresh_shopify_locations(self, store_id):
+        """Ask Shopify for this store's locations. The customer-operable route.
+
+        This is the ONE public entry point for a location refresh, shared by
+        the guided setup's Location mapping step and the Location Mapping
+        workspace, and it admits a JOB. It issues no Shopify request: the
+        request happens later, on the ordinary dispatcher, inside
+        `_handle_inventory_location_sync`. No wizard, no Owl component, no
+        controller and no view in this repository holds a transport, and this
+        method is what makes that possible rather than merely intended.
+
+        WHY THE JOB SOURCE DEPENDS ON THE STORE'S STATE, AND WHY THAT IS NOT
+        A LOOPHOLE.
+
+        `manual_sync` is a business job source, so core refuses to create it
+        -- and refuses to start it -- for a store that is not `connected`.
+        That is exactly right for the workspace: an operator refreshing a
+        live store's locations is doing business work and should be stopped
+        while the store is disconnecting.
+
+        It is exactly wrong for guided setup, where the whole point is that
+        the store is NOT connected yet: the `mapped_location` readiness check
+        gates activation, mapping needs the location list, and the location
+        list would need the store to be activated first. Core already names
+        that shape and already provides for it -- `setup_readiness_check` is
+        one of two sources deliberately exempt from store-state gating,
+        because such jobs "exist to determine connection/readiness state, so
+        gating them on 'connected' would be circular". A pre-activation
+        location refresh is that, precisely: it exists so a readiness check
+        can be satisfied.
+
+        So the source is derived from the state, and only two states admit
+        anything at all:
+
+        * `connected`        -> `manual_sync`, fully business-gated;
+        * `setup_incomplete` -> `setup_readiness_check`, the setup path.
+
+        `reconnect_needed`, `disconnecting` and `disconnected` are refused
+        outright rather than routed down the ungated path -- using the setup
+        source there would turn a deliberate exemption into a way around the
+        business gate, which is the one thing this must not become. The
+        domain-enablement gate (`inventory_domain_enabled`) applies to every
+        one of these at start time regardless, since core evaluates it for
+        every job whatever its source.
+        """
+        if not (
+            self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_operator'
+            )
+            or self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            )
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Operator or Administrator may "
+                "refresh the Shopify location list."
+            )
+        store = self._resolve_store_for_location_action(store_id)
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if not settings or not settings.inventory_domain_enabled:
+            raise UserError(
+                'Inventory syncing is not enabled for this store, so there '
+                'are no locations to refresh. Enable it first.'
+            )
+        # The credential conditions this read-only operation genuinely
+        # needs, and no more: a token on record, verified since it was last
+        # changed, and a test connection that actually passed. Without all
+        # three the request could only fail, and it would fail after being
+        # queued -- which reads to an operator as "Shopify is broken" rather
+        # than "finish the previous step".
+        if not store.credential_present:
+            raise UserError(
+                'Enter the Shopify Admin API access token before refreshing '
+                'the location list.'
+            )
+        if not store.credential_last_verified_at:
+            raise UserError(
+                'Test the connection before refreshing the location list. '
+                'The stored token has not been verified since it was last '
+                'changed.'
+            )
+        if store.last_test_connection_result != 'pass':
+            raise UserError(
+                'The last connection test did not pass, so the location list '
+                'cannot be refreshed yet. Fix the connection first.'
+            )
+        if store.state == 'connected':
+            job_source = 'manual_sync'
+        elif store.state == 'setup_incomplete':
+            job_source = 'setup_readiness_check'
+        else:
+            raise UserError(
+                'This store is not in a state where its Shopify location '
+                'list can be refreshed. Reconnect it first.'
+            )
+        # Duplicate admission is coalesced rather than queued twice: two
+        # refreshes of the same read-only list are the same refresh, and a
+        # second one would only compete for the same rate limit. The caller
+        # gets the REAL admitted job either way, so the surface reports the
+        # identity and state of work that genuinely exists.
+        existing = self._location_refresh_job(store)
+        if existing:
+            return existing
+        return self._enqueue_location_sync(store, job_source=job_source)
 
     @api.model
     def _validate_locations_response(self, result):
@@ -2056,6 +2303,19 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         protected-field create/write itself. Identity is always
         explicit: the Shopify Location GID must be supplied by the
         caller, never inferred by name.
+
+        Wave 5 closes the hole that made "explicit" weaker than it sounds.
+        The GID was accepted as whatever string the caller passed: every
+        existing test handed it a fabricated one and every one of them
+        passed, which is the proof that nothing ever checked it. A GID must
+        now correspond to a currently-ACTIVE cached
+        `shopify.connector.location` row belonging to THIS store, so an
+        arbitrary GID typed into an RPC call, a GID belonging to another
+        store, and a location Shopify no longer reports are all refused
+        before any mapping exists. `shopify_location_name_snapshot` is then
+        taken from that validated cached row -- never from caller input,
+        which would let a browser choose the name an operator later reads
+        back as identity.
         """
         if not (
             self.env.user.has_group(
@@ -2069,11 +2329,24 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 "Only a Shopify Connector Operator or Administrator may "
                 "create or update a location mapping."
             )
+        store = self._resolve_store_for_location_action(store.id)
         if not isinstance(shopify_location_gid, str) or not shopify_location_gid:
             raise UserError("An explicit Shopify Location GID is required.")
-        odoo_location = odoo_location.exists()
+        cached_location = self._validated_cached_location(
+            store, shopify_location_gid,
+        )
+        # Rebound into this service's own environment before anything is
+        # checked: a caller-supplied recordset carries its own environment,
+        # and an elevated one would otherwise answer its own visibility and
+        # company questions. The docstring's "resolves in the caller's own
+        # (non-elevated) environment" is only true because of this line.
+        odoo_location = odoo_location.with_env(self.env).exists()
         if not odoo_location:
             raise UserError("The Odoo location does not exist.")
+        try:
+            odoo_location.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError("That Odoo location is not available.")
         if odoo_location.usage != 'internal':
             raise UserError(
                 "Only an internal Odoo stock location can be mapped."
@@ -2098,10 +2371,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     "A location mapping already exists for this Odoo "
                     "location with a different Shopify Location GID. "
                     "This service never silently replaces an existing "
-                    "mapping's identity; use the reviewed binding-"
-                    "override path to change it."
+                    "mapping's identity; use the reviewed remap path to "
+                    "change it."
                 )
-            existing.sudo().write({'push_enabled': bool(push_enabled)})
+            existing.sudo().write({
+                'push_enabled': bool(push_enabled),
+                'shopify_location_name_snapshot': cached_location.name,
+            })
             return existing
         # Never silently move an already-mapped Shopify GID to a
         # different Odoo location either.
@@ -2114,15 +2390,224 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 "This Shopify Location GID is already mapped to a "
                 "different Odoo location for this store. This service "
                 "never silently moves an existing mapping's identity; "
-                "use the reviewed binding-override path to move it."
+                "use the reviewed remap path to move it."
             )
-        return Mapping.sudo().create({
+        mapping = Mapping.sudo().create({
             'store_id': store.id,
             'shopify_gid': shopify_location_gid,
             'odoo_location_id': odoo_location.id,
             'match_key': 'manual',
             'push_enabled': bool(push_enabled),
+            'shopify_location_name_snapshot': cached_location.name,
         })
+        self._mark_location_readiness_stale(store)
+        return mapping
+
+    @api.model
+    def _validated_cached_location(self, store, shopify_location_gid):
+        """The active cached Shopify location this GID names, or a refusal.
+
+        The cache is read elevated because `shopify.connector.location`
+        deliberately grants no group create/write and this module's own named
+        elevation is how it is maintained -- but the STORE was already
+        resolved through the caller's own record access, so this can only
+        ever read rows belonging to a store the caller may act on. The
+        `store_id` term is what makes that true, and it is not optional.
+
+        Every refusal is deliberately identical in shape and says nothing
+        about what does exist elsewhere: a caller must not be able to
+        distinguish "no such location anywhere" from "that location belongs
+        to somebody else's store" by comparing two messages.
+        """
+        cached = self.env['shopify.connector.location'].sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_location_gid', '=', shopify_location_gid),
+        ], limit=1)
+        if not cached:
+            raise UserError(
+                "This is not an active Shopify location for this store. "
+                "Refresh the Shopify location list and choose one from it; "
+                "a mapping is never created for a location this store's "
+                "own list does not contain."
+            )
+        if not cached.shopify_location_active:
+            raise UserError(
+                "This Shopify location is no longer active in this store's "
+                "location list and cannot be mapped. Refresh the list and "
+                "choose an active location."
+            )
+        return cached
+
+    @api.model
+    def _mark_location_readiness_stale(self, store):
+        """A mapping changed, so `mapped_location`'s last result is stale."""
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if settings:
+            settings._mark_setup_readiness_stale()
+        return True
+
+    # ------------------------------------------------------------------
+    # Remap: change the Odoo target of an already-bound Shopify location
+    # ------------------------------------------------------------------
+
+    @api.model
+    def remap_location_mapping(
+        self, mapping, odoo_location, reason, confirmed=False,
+    ):
+        """Point an existing Shopify location at a different Odoo location.
+
+        WHY THIS EXISTS RATHER THAN A DIRECT `action_override_binding` BUTTON.
+
+        The generic protected-binding mixin can already change a binding's
+        bound Many2one, and it is correct for what it does -- but it admits
+        **Reviewer** or Administrator, and it proves nothing about whether an
+        INVENTORY remap is operationally safe. Moving the Odoo location under
+        a pair whose first push is already previewed or confirmed silently
+        changes which warehouse's stock is about to be written to a live
+        storefront, and doing it while inventory work is in flight changes
+        the target under a job that has already read the old one. Neither is
+        something the mixin can know about, so exposing it directly on this
+        screen would be exposing a control that looks reviewed and is not.
+
+        So the mixin is not weakened and is not bypassed: it is called, once,
+        as the final step, AFTER this method has established every additional
+        thing the inventory domain requires. The Shopify identity
+        (`shopify_gid`) is never touched, and nothing is ever unlinked and
+        recreated -- a remap that deleted and re-made the row would discard
+        the binding's own provenance and every foreign key pointing at it.
+        """
+        mapping.ensure_one()
+        # REBIND THE RECORD INTO THIS SERVICE'S OWN ENVIRONMENT, FIRST.
+        #
+        # A caller hands in a recordset, and a recordset carries its
+        # environment with it -- including `su=True` if it was obtained
+        # through `sudo()`. Every check below would then be evaluated against
+        # THAT environment rather than against the caller: `check_access`
+        # would pass unconditionally, and the mixin's own
+        # Reviewer-or-Administrator gate would be answered by whichever user
+        # the caller's recordset happened to carry rather than by the person
+        # pressing the button. Rebinding makes the authorization questions be
+        # about the caller, which is the only reading under which asking them
+        # means anything.
+        mapping = mapping.with_env(self.env)
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Administrator may remap a Shopify "
+                "location to a different Odoo location."
+            )
+        if not confirmed:
+            raise UserError(
+                "Remapping changes which Odoo location's stock this Shopify "
+                "location reflects. Confirm that explicitly."
+            )
+        if not isinstance(reason, str) or not reason.strip():
+            raise UserError("A non-empty remap reason is required.")
+        try:
+            mapping.check_access('write')
+        except (AccessError, MissingError):
+            raise UserError("This location mapping is not available.")
+        store = self._resolve_store_for_location_action(mapping.store_id.id)
+        # The Shopify side must still be a real, active location OF THIS
+        # STORE. A remap of a location Shopify no longer reports would bind
+        # an Odoo warehouse to an identity that cannot receive anything.
+        cached = self._validated_cached_location(store, mapping.shopify_gid)
+        # Same rebinding, same reason: an elevated `stock.location` recordset
+        # must not be able to answer its own visibility check.
+        odoo_location = odoo_location.with_env(self.env).exists()
+        if not odoo_location:
+            raise UserError("The Odoo location does not exist.")
+        try:
+            odoo_location.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError("That Odoo location is not available.")
+        if odoo_location.usage != 'internal':
+            raise UserError(
+                "Only an internal Odoo stock location can be mapped."
+            )
+        if (
+            odoo_location.company_id
+            and odoo_location.company_id != self.env.company
+        ):
+            raise UserError(
+                "The Odoo location belongs to a different company."
+            )
+        if odoo_location == mapping.odoo_location_id:
+            raise UserError(
+                "This Shopify location is already mapped to that Odoo "
+                "location."
+            )
+        self._assert_remap_is_safe(mapping)
+        # The mixin owns the write, the duplicate check, the company
+        # comparison and the audit entry. The reason is sanitized by its own
+        # `_audit_safe_reason` before it reaches the audit trail, so a
+        # merchant email or phone number typed into the box never lands in
+        # connector history.
+        mapping.action_override_binding(odoo_location.id, reason=reason)
+        mapping.sudo().write({
+            'shopify_location_name_snapshot': cached.name,
+        })
+        self._mark_location_readiness_stale(store)
+        return mapping
+
+    @api.model
+    def _assert_remap_is_safe(self, mapping):
+        """Refuse a remap that would move the target under live work.
+
+        Two distinct refusals, because they fail for two different reasons
+        and an operator needs to know which one they are looking at.
+
+        **Non-terminal inventory work.** A queued or running inventory job
+        for one of this mapping's pairs has already read -- or is about to
+        read -- the location this mapping currently names. Changing it
+        underneath would make that job's own evidence describe a pairing
+        that no longer exists.
+
+        **Dependent first-push state.** A pair whose first push is
+        `previewed` or `confirmed` carries a decision a human made about a
+        specific Odoo location's stock. Silently re-pointing it would reuse
+        that confirmation for a quantity nobody reviewed, which is exactly
+        what the first-push guard exists to prevent.
+
+        `pending` pairs are deliberately NOT a refusal: nothing has been
+        computed or confirmed for them yet, so the mapping is still free.
+        """
+        Binding = self.env['shopify.connector.inventory.level.binding']
+        bindings = Binding.sudo().search([
+            ('location_mapping_id', '=', mapping.id),
+        ])
+        if bindings:
+            Job = self.env['shopify.connector.job']
+            Job.flush_model()
+            busy = Job.sudo().search_count([
+                ('store_id', '=', mapping.store_id.id),
+                ('job_type', 'in', INVENTORY_JOB_TYPES),
+                ('res_model', '=',
+                 'shopify.connector.inventory.level.binding'),
+                ('res_id', 'in', bindings.ids),
+                ('state', 'not in', TERMINAL_JOB_STATES),
+            ])
+            if busy:
+                raise UserError(
+                    "Inventory work for this location has not finished. "
+                    "Wait for it to complete, or resolve it, before "
+                    "remapping."
+                )
+            committed = bindings.filtered(
+                lambda binding: binding.first_push_state in (
+                    'previewed', 'confirmed',
+                )
+            )
+            if committed:
+                raise UserError(
+                    "A first stock push has already been previewed or "
+                    "confirmed for this location, so its Odoo target cannot "
+                    "be changed here. Resolve those pairs first."
+                )
+        return True
 
     @api.model
     def ensure_inventory_level_binding(

@@ -99,6 +99,43 @@
                             type="action" string="Change Push"
                             class="btn-primary"
                             groups="shopify_connector_core.group_shopify_connector_operator"/>
+                    <!--
+                        WAVE 5 — REMAP.
+
+                        `action_override_binding` on the shared binding mixin
+                        can already move a bound Many2one, and it is
+                        deliberately NOT wired here. It admits Reviewer OR
+                        Administrator, and it proves nothing about whether an
+                        inventory remap is operationally safe: moving the Odoo
+                        location under a pair whose first push is already
+                        previewed or confirmed silently changes which
+                        warehouse's stock is about to reach a live storefront,
+                        and doing it while inventory work is in flight changes
+                        the target under a job that already read the old one.
+
+                        So the button opens a dialog that delegates to
+                        `remap_location_mapping`, an Administrator-only
+                        inventory service that performs those additional
+                        checks and THEN calls the mixin. The mixin is neither
+                        weakened nor bypassed; it is reached through a gate
+                        that knows what this domain needs.
+
+                        The group here is Administrator, matching that server
+                        guard exactly. Showing a control to a role the server
+                        refuses is a UI defect the packet names as a test
+                        failure.
+                    -->
+                    <button name="%(action_shopify_connector_location_remap_wizard)d"
+                            type="action" string="Remap"
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    <!--
+                        Refresh, on the form as well as on the menu, because
+                        an operator who has just discovered a mapping is
+                        stale is already here.
+                    -->
+                    <button name="%(action_shopify_connector_location_refresh_wizard)d"
+                            type="action" string="Refresh Shopify Locations"
+                            groups="shopify_connector_core.group_shopify_connector_operator"/>
                 </header>
                 <sheet>
                     <div class="alert alert-danger" role="alert"
@@ -144,9 +181,14 @@
                 No locations mapped yet.
             </p>
             <p>
-                A mapping is created when a Shopify location is paired with an
-                Odoo location. Until a pair exists, inventory for that Shopify
-                location stays paused.
+                Start with <b>Refresh Shopify Locations</b> to read this
+                store's location list, then <b>Map a Shopify Location</b> to
+                pair one with an Odoo location. Both are in the Inventory
+                menu beside this one.
+            </p>
+            <p>
+                Until a pair exists, inventory for that Shopify location stays
+                paused. An unmapped location is not synchronised.
             </p>
         </field>
     </record>

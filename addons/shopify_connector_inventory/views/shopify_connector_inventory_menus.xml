@@ -39,4 +39,32 @@
               parent="menu_shopify_connector_inventory"
               action="action_shopify_connector_location_mapping"
               sequence="30"/>
+
+    <!--
+        WAVE 5 — the two governed routes the Location Mapping list was
+        missing. It carries `create="false"` (correctly: the binding mixin
+        refuses a generic create of protected identity fields) and told the
+        operator a mapping "is created" without offering anywhere to create
+        one. These are that route.
+
+        Both are gated on Operator, matching the server guard on
+        `action_refresh_shopify_locations` and
+        `create_or_update_location_mapping` exactly. Remap is Administrator
+        only and lives on the mapping form, next to the record it changes,
+        because it is a correction to something that already exists rather
+        than a way in.
+    -->
+    <menuitem id="menu_shopify_connector_location_refresh"
+              name="Refresh Shopify Locations"
+              parent="menu_shopify_connector_inventory"
+              action="action_shopify_connector_location_refresh_wizard"
+              groups="shopify_connector_core.group_shopify_connector_operator"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_connector_location_map"
+              name="Map a Shopify Location"
+              parent="menu_shopify_connector_inventory"
+              action="action_shopify_connector_location_map_wizard"
+              groups="shopify_connector_core.group_shopify_connector_operator"
+              sequence="50"/>
 </odoo>

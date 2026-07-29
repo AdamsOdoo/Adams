@@ -97,4 +97,160 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+
+    <!-- ==============================================================
+         Wave 5 — the three governed Location Mapping workspace actions.
+
+         WHY THESE ARE WIZARDS AND NOT LIST/FORM CONTROLS. The mapping
+         model inherits the protected binding mixin, so a generic create or
+         write of its identity fields is refused by the server — correctly.
+         `create="false"` on the list and form is therefore right, and what
+         was missing was a governed route, not a relaxation. Each dialog
+         collects the arguments the sanctioned service method requires and
+         calls it; the server owns every check and re-runs all of them as
+         the calling user.
+         ============================================================== -->
+
+    <record id="view_shopify_connector_location_refresh_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.refresh.wizard.form</field>
+        <field name="model">shopify.connector.location.refresh.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Refresh Shopify locations" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-info" role="status">
+                    This asks Shopify for the store's list of locations and
+                    updates the cached list Odoo maps against. It runs in the
+                    background as an ordinary connector job, reads only, and
+                    changes nothing on Shopify.
+                </div>
+                <group>
+                    <field name="store_id"/>
+                    <field name="refresh_state" readonly="1"
+                           string="Current refresh"
+                           invisible="not store_id"/>
+                    <field name="refresh_job_id" readonly="1"
+                           invisible="not refresh_job_id"/>
+                </group>
+                <!-- A refresh already in flight is NOT an error and is not
+                     silently duplicated: the server coalesces onto the job
+                     that exists, and this says so before the click. -->
+                <div class="alert alert-warning" role="status"
+                     invisible="refresh_state not in ('waiting', 'running')">
+                    A refresh for this store is already in progress.
+                    Confirming shows you that job rather than starting a
+                    second one.
+                </div>
+                <div class="alert alert-danger" role="alert"
+                     invisible="refresh_state != 'failed'">
+                    The last refresh did not finish. Until one succeeds, an
+                    empty location list is not evidence that this Shopify
+                    store has no locations.
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Refresh locations" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_location_refresh_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Refresh Shopify locations</field>
+        <field name="res_model">shopify.connector.location.refresh.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_shopify_connector_location_map_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.map.wizard.form</field>
+        <field name="model">shopify.connector.location.map.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Map a Shopify location" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-info" role="status">
+                    Pair one Shopify location with one Odoo internal
+                    location. The Shopify side is chosen from this store's
+                    refreshed list — it is never matched by name, and never
+                    typed in by hand.
+                </div>
+                <group>
+                    <field name="store_id"/>
+                    <field name="shopify_location_id"
+                           options="{'no_create': True, 'no_open': True}"/>
+                    <field name="odoo_location_id"
+                           options="{'no_create': True}"/>
+                    <field name="push_enabled"/>
+                </group>
+                <div class="alert alert-warning" role="status">
+                    Mapping a location does not push any stock. The first
+                    push for each product and location still waits for its
+                    own explicit confirmation.
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Create mapping" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_location_map_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Map a Shopify location</field>
+        <field name="res_model">shopify.connector.location.map.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <record id="view_shopify_connector_location_remap_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.location.remap.wizard.form</field>
+        <field name="model">shopify.connector.location.remap.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Remap this Shopify location" role="dialog"
+                  aria-modal="true">
+                <div class="alert alert-warning" role="alert">
+                    <strong>This changes which Odoo location's stock this
+                    Shopify location reflects.</strong>
+                    The Shopify location itself is unchanged, and the mapping
+                    is never deleted and recreated. Administrator only, and
+                    the reason below is recorded on the audit trail.
+                </div>
+                <group>
+                    <field name="mapping_id" invisible="1"/>
+                    <field name="location_name" readonly="1"/>
+                    <field name="current_location_id" readonly="1"/>
+                    <field name="new_location_id"
+                           options="{'no_create': True}"/>
+                    <field name="reason"
+                           placeholder="Why is this being remapped?"/>
+                    <field name="confirmed"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Remap location" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_location_remap_wizard"
+            model="ir.actions.act_window">
+        <field name="name">Remap this Shopify location</field>
+        <field name="res_model">shopify.connector.location.remap.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 </odoo>
