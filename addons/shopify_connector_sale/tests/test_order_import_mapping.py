@@ -362,7 +362,11 @@ class TestOrderImportMappingStatic(TransactionCase):
         self.assertEqual(manifest['version'], '19.0.2.4.0')
         self.assertEqual(
             manifest['depends'],
-            ['shopify_connector_core', 'shopify_connector_product', 'sale'],
+            # Wave 5 single-package lifecycle: reverse edge onto the
+            # customer-facing package umbrella -- see
+            # docs/03-architecture/single-package-lifecycle.md.
+            ['shopify_connector_core', 'shopify_connector_product', 'sale',
+             'shopify_connector'],
         )
         # U2 added the four operator-UI data files. Recorded here in load
         # order deliberately: the order is itself the contract -- the wizard
