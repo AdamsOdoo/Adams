@@ -40,7 +40,7 @@ dependency-uninstall survival stays deferred from the MVP.
 | Item | Value |
 | --- | --- |
 | Odoo | pinned `30bde9ff758834a4912c5ae55843d3a7dad849f1` (19.0), verified on every suite run |
-| PostgreSQL | 16.10 |
+| PostgreSQL | 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) |
 | Python | 3.11.15 |
 | Browser | Chromium 141.0.7390.37 (headless, resolved and proven before any browser-bearing pass) |
 | Modules | `shopify_connector_core`, `_product`, `_sale`, `_inventory`, `_fulfillment`, `_product_export`, plus `account` and `stock` |
@@ -245,7 +245,7 @@ verification enabled, zero Shopify operations.
 | --- | --- | --- |
 | Fresh install + standard suite | **0 failed, 0 error(s)** | 2131 |
 | Warm `-u` update + standard suite | **0 failed, 0 error(s)** | 2131 |
-| Non-standard tag suite | __NONSTD__ | __NONSTDN__ |
+| Non-standard tag suite | **0 failed, 0 error(s)** | 42 |
 | Required tours | **23 of 23** started and produced a success marker | — |
 | HOOT suites | 3 of 3 verified | — |
 | Skips | exactly one, the sanctioned `TestMutationRecovery.test_real_process_death_harness` | — |
@@ -315,6 +315,43 @@ two cannot drift.
 other two suites are unchanged at 8 and 11. `EXPECTED_SUITES` in
 `test_u3_hoot_suite.py` is an EXACT count by design, so this is declared in
 the same change rather than allowed to drift.
+
+### 4.4 Non-standard tag delta
+
+`[Fact]` The recorded historical baseline is **39** non-standard tests; this
+head runs **42** — a delta of **+3**, and all three are the visual-evidence
+tests this batch adds under the `shopify_connector_visual` tag:
+`test_the_setup_captures_render_the_wizard_not_a_permission_error`,
+`test_the_setup_action_row_stays_reachable_while_content_scrolls` and
+`test_focus_near_the_bottom_of_long_content_is_not_concealed`. The file goes
+from 8 to 11 test methods, which is the whole of the delta. The HOOT change
+(§4.3) adds no Python test — a HOOT suite runs as browser JS inside one
+existing Python test — so it does not move this count.
+
+### 4.5 Exact run identity
+
+`[Fact]` Recorded by the runner in `ci-artifacts/definitive/summary.json`:
+
+| Field | Value |
+| --- | --- |
+| `tested_checkout_sha` / `connector_sha` / `source_head_sha` | `624bf8f25d53e4bdbf219d31d0d899448c7cc4e7` |
+| `source_base_sha` | `87f1763a1ca699947d665c92bef614bd1fc3168d` |
+| `source_head_verified` | `true` |
+| `connector_worktree_dirty` | `false` |
+| `odoo_pin_verified` | `true` (`30bde9ff758834a4912c5ae55843d3a7dad849f1`) |
+| `browser_evidence` | `verified` |
+| `required_tour_tests` | `23` |
+| `hoot_suites_executed` | `true` |
+| `allowed_skip` | `TestMutationRecovery.test_real_process_death_harness` |
+| `shopify_operations` | `none` |
+| `evidence_class` | CI supporting evidence, NOT Odoo.sh exact-SHA acceptance (DEC-041 D8) |
+
+`624bf8f2` is the **final executable head**: every production, test, tooling
+and evidence path of this batch is at that commit. The commit that adds this
+subsection is documentation-only and changes no executable path — results
+cannot be recorded before the run that produces them exists, so the recording
+commit is necessarily the tail. Independent review should re-run the suite at
+whichever head it reviews and compare against the table in §4.
 
 ## 5. Commands
 

@@ -17,10 +17,10 @@ Chromium through the DevTools protocol.
 | Connector head | `75ebb1560335390edc564854d473fc26699f2dcf` |
 | Odoo | pinned `30bde9ff758834a4912c5ae55843d3a7dad849f1` (19.0) |
 | Browser | Chromium 141.0.7390.37, headless |
-| PostgreSQL | 16.10 |
+| PostgreSQL | 16.13 (Ubuntu 16.13-0ubuntu0.24.04.1) |
 | Python | 3.11.15 |
 | Result | **11 of 11 visual-evidence tests passed, 0 failed, 0 errors** |
-| Artifacts | 174 (167 screenshots + 7 measurement records) |
+| Artifacts | 174 browser-evidence artifacts (167 screenshots + 7 measurement records), plus `manifest.json` |
 
 ## What each record holds
 
@@ -33,6 +33,14 @@ Chromium through the DevTools protocol.
 | `contrast.json` | ratios computed from rendered colour, backgrounds resolved up the ancestor chain and alpha-composited | SC 1.4.3, SC 1.4.11 |
 | `sticky-action-row.json` | **Wave 5.** The setup action row at 1366 / 1440 / 768 / 390 px on the three longest steps: what scrolled, how far, the bar's `position`, and its bottom edge against the scrollport's pin target | Wave 5 §11; §10 |
 | `sticky-focus-clearance.json` | **Wave 5.** The last focusable control in the scrolling panel, focused and scrolled into view, measured for overlap with the bar | WCAG 2.2 SC 2.4.11 |
+
+`definitive-suite-summary.json` is **not** a browser-evidence artifact and is
+not part of the 174. It is the connector suite runner's own record of the
+definitive validation run, kept here so the run identity survives outside the
+gitignored `ci-artifacts/` directory. It describes the **final head**
+`624bf8f25d53e4bdbf219d31d0d899448c7cc4e7`, not the capture head above: the
+browser evidence was captured at the last production commit, and the suite
+then ran across the whole batch. No executable path differs between them.
 
 ## The two findings this capture produced
 
