@@ -551,10 +551,25 @@ class TestUiVisualEvidence(HttpCase):
             cls._persist = False
         (cls._out / 'screenshots').mkdir(parents=True, exist_ok=True)
         cls.manifest = []
+        # ADMINISTRATOR, not User -- and this is a correction, not a
+        # convenience (Wave 5).
+        #
+        # The guided setup is Administrator-only on every entry point
+        # INCLUDING the read, so a Connector User opening it gets an
+        # `AccessError` from `get_setup_state`, the component renders its
+        # error band, and `.o_sc_setup` is present on the page. Every
+        # instrument here waits for that selector — so the S1 capture was
+        # succeeding, and photographing a permission error rather than the
+        # wizard. Nothing asserted was wrong; what was measured was the wrong
+        # screen.
+        #
+        # Administrator implies User, Operator and Reviewer under the accepted
+        # SEC-2 role model, so this strictly widens what every other surface
+        # in the set renders. It never narrows one.
         cls.user = new_test_user(
             cls.env, login='sc_visual', password='sc_visual',
             groups='base.group_user,'
-                   'shopify_connector_core.group_shopify_connector_user',
+                   'shopify_connector_core.group_shopify_connector_admin',
         )
 
     @classmethod
@@ -684,6 +699,7 @@ class TestUiVisualEvidence(HttpCase):
             'store_id': store.id,
             'inventory_domain_enabled': True,
         })
+        self._seed_setup_states(store)
         warehouse = self.env['stock.warehouse'].search(
             [('company_id', '=', self.env.company.id)], limit=1)
         location = self.env['stock.location'].sudo().create({
@@ -730,6 +746,54 @@ class TestUiVisualEvidence(HttpCase):
             'template_binding': tbinding, 'variant_binding': vbinding,
             'preview': preview,
         }
+
+    def _seed_setup_states(self, store):
+        """Put the guided setup into the three states worth photographing.
+
+        Wave 5 makes the setup surface the one that most needs measuring at
+        390px: the Permissions step is the longest body copy in the connector,
+        the Location mapping step renders an unbounded list of Shopify
+        identities (long, unbreakable strings -- the classic overflow shape),
+        and the Final readiness step renders one row per check with a reason
+        and an action control on each. All three are captured, and all three
+        are measured for connector-owned horizontal overflow rather than only
+        looked at.
+
+        The resume point is what selects which step renders, so it is written
+        here per capture -- the surfaces list below re-points it before each
+        one. Odoo rows only: no credential is used and nothing is enqueued.
+        """
+        settings = self.env['shopify.connector.store.settings'].sudo().search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        # A populated Shopify location cache, so the Location mapping step has
+        # something to render -- and enough rows that the list is long.
+        if 'shopify.connector.location' in self.env:
+            for index in range(1, 7):
+                gid = 'gid://shopify/Location/VISUAL%d' % index
+                if not self.env['shopify.connector.location'].sudo().search(
+                    [('store_id', '=', store.id),
+                     ('shopify_location_gid', '=', gid)], limit=1,
+                ):
+                    self.env['shopify.connector.location'].sudo().create({
+                        'store_id': store.id,
+                        'shopify_location_gid': gid,
+                        'name': 'Visual evidence warehouse %d' % index,
+                        'shopify_location_active': True,
+                    })
+        # A recorded readiness result, so the Final readiness step renders a
+        # full result list rather than "Not run yet".
+        self.env['shopify.connector.readiness.check'].run_for_store(store)
+        settings.sudo().write({'setup_wizard_step_key': 'scopes'})
+        self.env.flush_all()
+        return settings
+
+    def _set_setup_step(self, store, step_key):
+        """Point the wizard at one step, for one capture."""
+        self.env['shopify.connector.store.settings'].sudo().search(
+            [('store_id', '=', store.id)], limit=1,
+        ).write({'setup_wizard_step_key': step_key})
+        self.env.flush_all()
 
     def _seed_export_preview(self, store, template, binding):
         """One export preview carrying a REFUSAL and a TAG REMOVAL.
@@ -803,9 +867,13 @@ class TestUiVisualEvidence(HttpCase):
             'expires_at': fields.Datetime.add(now, hours=24),
         })
 
-    #: (name, path, wait-for selector, criterion[, after_js]) for every
-    #: captured surface. `after_js` runs once the page has rendered, for the
-    #: one surface that is reached by pressing a control rather than by URL.
+    #: (name, path, wait-for selector, criterion[, after_js[, setup_step]])
+    #: for every captured surface. `after_js` runs once the page has rendered,
+    #: for the one surface that is reached by pressing a control rather than
+    #: by URL. `setup_step` is a SEMANTIC step key written to the store's
+    #: resume point BEFORE the page is opened, which is how the guided setup
+    #: is photographed on a specific step -- the wizard resumes where the
+    #: server says it left off, so that is the only honest way to select one.
     def _surfaces(self, seeded):
         act = '/odoo/action-%s'
         return [
@@ -821,7 +889,28 @@ class TestUiVisualEvidence(HttpCase):
             # and therefore the most contrast pairs.
             ('s1-setup-wizard-welcome',
              act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
-             '.o_sc_setup', 'S1 guided setup; §12 a11y gates, §14 responsive'),
+             '.o_sc_setup', 'S1 guided setup; §12 a11y gates, §14 responsive',
+             None, 'welcome'),
+            # WAVE 5. The three states that make the sticky action row and the
+            # 390px overflow rule falsifiable rather than merely asserted:
+            # the longest body copy in the connector, an unbounded list of
+            # long unbreakable Shopify identities, and one row per readiness
+            # check with a reason and an action control on each.
+            ('s1-setup-permissions-long',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 long Permissions step; sticky actions over long content',
+             None, 'scopes'),
+            ('s1-setup-location-mapping',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 Location mapping with multiple cached Shopify locations',
+             None, 'location_mapping'),
+            ('s1-setup-final-readiness',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 Final readiness with a long result list',
+             None, 'final_readiness'),
             ('u2-orders-workspace-empty',
              act % 'shopify_connector_sale.action_shopify_connector_order_workspace',
              '.o_list_view, .o_view_nocontent', 'U2 S9 orders; §11 empty state'),
@@ -889,9 +978,10 @@ class TestUiVisualEvidence(HttpCase):
         for entry in self._surfaces(seeded):
             name, path, wait, criterion = entry[:4]
             after = entry[4] if len(entry) > 4 else None
+            setup_step = entry[5] if len(entry) > 5 else None
             xmlid = path.split('/odoo/action-')[1].split('/')[0]
             if self.env.ref(xmlid, raise_if_not_found=False):
-                out.append((name, path, wait, criterion, after))
+                out.append((name, path, wait, criterion, after, setup_step))
             else:
                 _logger.info(
                     'visual evidence: skipping %s -- action %s not present '
@@ -923,6 +1013,58 @@ class TestUiVisualEvidence(HttpCase):
             'u3-export-diff-refusal-and-tag-removal', names,
             'the S7 export diff is not in the captured surface set',
         )
+
+    def test_the_setup_captures_render_the_wizard_not_a_permission_error(self):
+        """The S1 captures must photograph the wizard, not its error band.
+
+        `.o_sc_setup` is present in BOTH the ready and the error branch of the
+        component, so every instrument in this file waits for a selector that
+        an `AccessError` also satisfies. That is how a Connector User could
+        produce a green, complete, entirely worthless S1 capture set. This
+        asserts the distinguishing evidence directly: the step rail exists,
+        it carries all twelve steps, the action row exists, and no error band
+        is on screen.
+        """
+        seeded = self._seed()
+        checked = 0
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+            for name, path, wait, _criterion, after, setup_step in (
+                self._reachable_surfaces(seeded)
+            ):
+                if not name.startswith('s1-setup'):
+                    continue
+                checked += 1
+                if setup_step:
+                    self._set_setup_step(seeded['store'], setup_step)
+                self._open(browser, path, wait, after)
+                payload = json.loads(self._eval(browser, r"""
+(() => JSON.stringify({
+  steps: document.querySelectorAll(".sc_setup_step").length,
+  has_actions: !!document.querySelector(".sc_setup__actions"),
+  has_error: !!document.querySelector(".sc_setup__panel") ? false : true,
+  heading: (document.querySelector(".sc_setup__heading") || {}).textContent
+    ? document.querySelector(".sc_setup__heading").textContent.trim()
+      .replace(/\s+/g, " ").slice(0, 60)
+    : null,
+}))()
+"""))
+                self.assertEqual(
+                    payload['steps'], 12,
+                    '%s rendered %d steps, so it is not the wizard'
+                    % (name, payload['steps']))
+                self.assertTrue(
+                    payload['has_actions'],
+                    '%s has no action row, so it rendered the error branch'
+                    % name)
+                self.assertFalse(
+                    payload['has_error'],
+                    '%s rendered no step panel at all' % name)
+                self.assertTrue(payload['heading'], '%s has no heading' % name)
+        self.assertGreaterEqual(
+            checked, 4,
+            'only %d S1 setup surfaces were reachable; the Wave 5 capture set '
+            'is not present' % checked)
 
     # ------------------------------------------------------------------
     # A + B. Desktop, tablet and mobile
@@ -1028,9 +1170,13 @@ class TestUiVisualEvidence(HttpCase):
         seeded = self._seed()
         with self._browser() as browser:
             self._viewport(browser, WIDTHS['mobile'])
-            name, path, wait, _criterion, after = (
+            name, path, wait, _criterion, after, setup_step = (
                 self._reachable_surfaces(seeded)[0]
             )
+            # The guided setup resumes where the server says it left off, so
+            # selecting a step to photograph means moving that resume point.
+            if setup_step:
+                self._set_setup_step(seeded['store'], setup_step)
             self._open(browser, path, wait, after)
 
             clean = json.loads(self._eval(browser, OVERFLOW_JS))
@@ -1108,7 +1254,12 @@ class TestUiVisualEvidence(HttpCase):
         with self._browser() as browser:
             for label, width in WIDTHS.items():
                 self._viewport(browser, width)
-                for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+                for name, path, wait, criterion, after, setup_step in (
+                    self._reachable_surfaces(seeded)):
+                    # The guided setup resumes where the server says it left off, so
+                    # selecting a step to photograph means moving that resume point.
+                    if setup_step:
+                        self._set_setup_step(seeded['store'], setup_step)
                     self._open(browser, path, wait, after)
                     self._shoot(browser, '%s-%s-%dpx' % (name, label, width),
                                 criterion)
@@ -1157,6 +1308,250 @@ class TestUiVisualEvidence(HttpCase):
             % json.dumps(clipping, indent=2))
 
     # ------------------------------------------------------------------
+    # B2. The sticky setup action row (Wave 5)
+    # ------------------------------------------------------------------
+
+    #: The four widths the correction packet names for the action row. 1440 is
+    #: measured HERE rather than added to `WIDTHS`: it matters for this one
+    #: rule, and adding it to the global set would multiply every screenshot
+    #: in the file by a third for surfaces where 1366 already proves the same
+    #: thing.
+    STICKY_WIDTHS = (1366, 1440, 768, 390)
+
+    #: The setup steps whose content is long enough for the rule to be
+    #: falsifiable at all. On a short step the bar is on screen whatever the
+    #: stylesheet does, so measuring one would prove nothing.
+    STICKY_STEPS = ('scopes', 'location_mapping', 'final_readiness')
+
+    STICKY_JS = r"""
+(() => {
+  const bar = document.querySelector(".sc_setup__actions");
+  if (!bar) return JSON.stringify({error: "no action row on this surface"});
+  const surface = document.querySelector(".o_sc_setup");
+  const rect = bar.getBoundingClientRect();
+  // Every control in the row, and whether each is inside the viewport.
+  const controls = Array.from(
+    bar.querySelectorAll("button")
+  ).map((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      label: (el.textContent || "").trim().slice(0, 24),
+      disabled: !!el.disabled,
+      top: r.top, bottom: r.bottom, left: r.left, right: r.right,
+      in_viewport:
+        r.bottom <= window.innerHeight + 1 && r.top >= -1 &&
+        r.right <= window.innerWidth + 1 && r.left >= -1,
+      scroll_margin_block_end:
+        parseFloat(getComputedStyle(el).scrollMarginBlockEnd) || 0,
+    };
+  });
+  return JSON.stringify({
+    error: null,
+    position: getComputedStyle(bar).position,
+    surface_direction: surface ? getComputedStyle(surface).direction : null,
+    bar: {top: rect.top, bottom: rect.bottom, left: rect.left,
+          right: rect.right, height: rect.height},
+    viewport: {width: window.innerWidth, height: window.innerHeight},
+    document_scroll_width: document.documentElement.scrollWidth,
+    // The page must not have grown sideways because of the row.
+    horizontal_overflow:
+      Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+    controls: controls,
+  });
+})()
+"""
+
+    #: Scroll the connector surface's own scroll container to the middle, so
+    #: the measurement happens while there IS content above and below -- which
+    #: is the only state in which "sticky" means anything.
+    SCROLL_JS = r"""
+(() => {
+  const scroller = (() => {
+    let node = document.querySelector(".o_sc_setup");
+    while (node) {
+      const cs = getComputedStyle(node);
+      if (/auto|scroll/.test(cs.overflowY) &&
+          node.scrollHeight > node.clientHeight + 4) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return document.scrollingElement;
+  })();
+  const before = scroller.scrollTop;
+  scroller.scrollTop = Math.floor(
+    (scroller.scrollHeight - scroller.clientHeight) / 2
+  );
+  return JSON.stringify({
+    scroller: scroller.className || scroller.tagName,
+    scrollable: scroller.scrollHeight - scroller.clientHeight,
+    from: before,
+    to: scroller.scrollTop,
+  });
+})()
+"""
+
+    def _setup_surface_path(self):
+        return ('/odoo/action-shopify_connector_core.'
+                'action_shopify_connector_setup_wizard')
+
+    def test_the_setup_action_row_stays_reachable_while_content_scrolls(self):
+        """Back / Continue / Save & Exit stay on screen through long content.
+
+        MEASURED, not read out of the stylesheet. `position: sticky` resolves
+        against the nearest scrolling ancestor, and a surface that
+        accidentally becomes its own scroll container silently stops being
+        sticky while the CSS still says it is -- which is exactly the failure
+        a stylesheet review cannot see. So this scrolls the real container to
+        the middle of real content and reads the rendered rectangle back.
+
+        Three of the four viewport widths the packet names carry no
+        `prefers-reduced-motion` or RTL variation here; both are covered by
+        the whole-surface loops that already include this surface.
+        """
+        seeded = self._seed()
+        measured = {}
+        failures = []
+        with self._browser() as browser:
+            for width in self.STICKY_WIDTHS:
+                self._viewport(browser, width, 768 if width == 1366 else 900)
+                for step in self.STICKY_STEPS:
+                    self._set_setup_step(seeded['store'], step)
+                    self._open(browser, self._setup_surface_path(),
+                               '.o_sc_setup')
+                    scroll = json.loads(self._eval(browser, self.SCROLL_JS))
+                    self._eval(browser,
+                               'new Promise(r => requestAnimationFrame('
+                               '() => requestAnimationFrame(r)))')
+                    payload = json.loads(self._eval(browser, self.STICKY_JS))
+                    key = '%s@%dpx' % (step, width)
+                    measured[key] = {**payload, 'scroll': scroll}
+                    if payload.get('error'):
+                        failures.append({'case': key,
+                                         'why': payload['error']})
+                        continue
+                    self._shoot(browser, 's1-setup-%s-sticky-%dpx'
+                                % (step.replace('_', '-'), width),
+                                'Wave 5 sticky action row; §10 responsive, '
+                                'SC 2.4.11 focus not obscured')
+                    if payload['position'] != 'sticky':
+                        failures.append({
+                            'case': key, 'why': 'the action row is not sticky',
+                            'position': payload['position'],
+                        })
+                    for control in payload['controls']:
+                        if control['disabled']:
+                            continue
+                        if not control['in_viewport']:
+                            failures.append({
+                                'case': key,
+                                'why': 'an action control is off screen',
+                                'control': control,
+                            })
+                        if control['scroll_margin_block_end'] <= 0:
+                            failures.append({
+                                'case': key,
+                                'why': 'an action control reserves no scroll '
+                                       'clearance, so keyboard focus can land '
+                                       'under the bar',
+                                'control': control,
+                            })
+                    if payload['horizontal_overflow'] > 1:
+                        failures.append({
+                            'case': key,
+                            'why': 'the page scrolls horizontally',
+                            'overflow': payload['horizontal_overflow'],
+                        })
+        self._record(
+            'sticky-action-row',
+            {'widths': list(self.STICKY_WIDTHS),
+             'steps': list(self.STICKY_STEPS),
+             'measured': measured, 'failures': failures},
+            'Wave 5 sticky action row; DESIGN SYSTEM §10; WCAG 2.2 SC 2.4.11')
+        self.assertTrue(measured, 'no sticky-bar case was measured at all')
+        self.assertFalse(failures, (
+            'the setup action row is not reachable in these cases:\n%s'
+            % json.dumps(failures, indent=2)[:4000]))
+
+    def test_focus_near_the_bottom_of_long_content_is_not_concealed(self):
+        """SC 2.4.11: a focused control must not be hidden by the sticky bar.
+
+        Focus is moved to the LAST focusable control inside the scrolling
+        panel, the browser is allowed to scroll it into view, and the
+        resulting rectangle is compared against the bar's. `scroll-margin` on
+        the target is what is supposed to keep them apart; this is the
+        measurement that proves it did.
+        """
+        seeded = self._seed()
+        overlaps = []
+        measured = {}
+        with self._browser() as browser:
+            for width in (1366, 390):
+                self._viewport(browser, width, 768 if width == 1366 else 900)
+                for step in self.STICKY_STEPS:
+                    self._set_setup_step(seeded['store'], step)
+                    self._open(browser, self._setup_surface_path(),
+                               '.o_sc_setup')
+                    payload = json.loads(self._eval(browser, r"""
+(() => {
+  const panel = document.querySelector(".sc_setup__panel");
+  const bar = document.querySelector(".sc_setup__actions");
+  if (!panel || !bar) return JSON.stringify({error: "surface incomplete"});
+  const focusables = Array.from(panel.querySelectorAll(
+    "button:not([disabled]), a[href], input:not([disabled]), " +
+    "select:not([disabled]), textarea:not([disabled])"
+  )).filter((el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  if (!focusables.length) return JSON.stringify({error: "no focusable"});
+  const target = focusables[focusables.length - 1];
+  target.focus();
+  target.scrollIntoView({block: "nearest"});
+  const t = target.getBoundingClientRect();
+  const b = bar.getBoundingClientRect();
+  return JSON.stringify({
+    error: null,
+    focused: document.activeElement === target,
+    label: (target.textContent || target.id || target.tagName).trim()
+      .slice(0, 40),
+    target: {top: t.top, bottom: t.bottom},
+    bar: {top: b.top, bottom: b.bottom},
+    // Positive means the focused control is underneath the bar.
+    concealed_by: Math.max(0, Math.min(t.bottom, b.bottom) - Math.max(t.top, b.top)),
+    in_viewport: t.bottom <= window.innerHeight + 1 && t.top >= -1,
+  });
+})()
+"""))
+                    key = '%s@%dpx' % (step, width)
+                    measured[key] = payload
+                    if payload.get('error') == 'no focusable':
+                        continue
+                    self.assertIsNone(
+                        payload.get('error'),
+                        'the setup surface did not render for %s' % key)
+                    self.assertTrue(
+                        payload['focused'],
+                        'the probe control did not take focus in %s' % key)
+                    if payload['concealed_by'] > 1:
+                        overlaps.append({'case': key, **payload})
+                    if not payload['in_viewport']:
+                        overlaps.append({'case': key, 'why': 'off screen',
+                                         **payload})
+                    self._shoot(browser, 's1-setup-%s-focus-bottom-%dpx'
+                                % (step.replace('_', '-'), width),
+                                'WCAG 2.2 SC 2.4.11 focus not obscured by the '
+                                'sticky action row')
+        self._record(
+            'sticky-focus-clearance',
+            {'measured': measured, 'overlaps': overlaps},
+            'WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)')
+        self.assertTrue(measured, 'no focus-clearance case was measured')
+        self.assertFalse(overlaps, (
+            'a focused control is concealed by the sticky action row:\n%s'
+            % json.dumps(overlaps, indent=2)[:4000]))
+
+    # ------------------------------------------------------------------
     # C. RTL
     # ------------------------------------------------------------------
 
@@ -1185,9 +1580,13 @@ class TestUiVisualEvidence(HttpCase):
             # OPPOSITE edge, and the narrow viewports are where it does it.
             for label, width in WIDTHS.items():
                 self._viewport(browser, width)
-                for name, path, wait, criterion, after in (
+                for name, path, wait, criterion, after, setup_step in (
                     self._reachable_surfaces(seeded)
                 ):
+                    # The guided setup resumes where the server says it left off, so
+                    # selecting a step to photograph means moving that resume point.
+                    if setup_step:
+                        self._set_setup_step(seeded['store'], setup_step)
                     self._open(browser, path, wait, after)
                     self._shoot(browser, '%s-rtl-%dpx' % (name, width),
                                 criterion + ' (RTL, SC 1.3.2 / §10)')
@@ -1270,7 +1669,12 @@ class TestUiVisualEvidence(HttpCase):
         with self._browser() as browser:
             self._viewport(browser, WIDTHS['desktop'])
             self._emulate_reduced_motion(browser, True)
-            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+            for name, path, wait, criterion, after, setup_step in (
+                    self._reachable_surfaces(seeded)):
+                # The guided setup resumes where the server says it left off, so
+                # selecting a step to photograph means moving that resume point.
+                if setup_step:
+                    self._set_setup_step(seeded['store'], setup_step)
                 self._open(browser, path, wait, after)
                 payload = json.loads(self._eval(browser, MOTION_JS))
                 matched[name] = payload['reduced_motion_matches']
@@ -1314,7 +1718,12 @@ class TestUiVisualEvidence(HttpCase):
             browser._websocket_request('DOM.enable')
             browser._websocket_request('CSS.enable')
             self._viewport(browser, WIDTHS['desktop'])
-            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+            for name, path, wait, criterion, after, setup_step in (
+                    self._reachable_surfaces(seeded)):
+                # The guided setup resumes where the server says it left off, so
+                # selecting a step to photograph means moving that resume point.
+                if setup_step:
+                    self._set_setup_step(seeded['store'], setup_step)
                 self._open(browser, path, wait, after)
                 controls = json.loads(self._eval(browser, FOCUSABLES_JS))
                 for control in controls:
@@ -1385,7 +1794,12 @@ class TestUiVisualEvidence(HttpCase):
         rows, failures = [], []
         with self._browser() as browser:
             self._viewport(browser, WIDTHS['desktop'])
-            for name, path, wait, criterion, after in self._reachable_surfaces(seeded):
+            for name, path, wait, criterion, after, setup_step in (
+                    self._reachable_surfaces(seeded)):
+                # The guided setup resumes where the server says it left off, so
+                # selecting a step to photograph means moving that resume point.
+                if setup_step:
+                    self._set_setup_step(seeded['store'], setup_step)
                 self._open(browser, path, wait, after)
                 for entry in json.loads(self._eval(browser, CONTRAST_JS)):
                     entry['surface'] = name

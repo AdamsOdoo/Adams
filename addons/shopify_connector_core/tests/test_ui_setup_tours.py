@@ -17,6 +17,7 @@ response taxonomy all run with only the socket absent.
 
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.tests.common import HttpCase, new_test_user, tagged
 
 from .test_api_client import FakeResponse
@@ -86,12 +87,15 @@ class TestUiSetupTours(HttpCase):
             'web.base.url', 'https://s1-tour.example.test',
         )
 
-    def test_setup_wizard_traverses_all_eleven_steps(self):
+    def test_setup_wizard_traverses_all_twelve_steps(self):
         """Nothing to an activated store, through the browser, in order.
 
         The tour asserts the step COUNT as well as each step's name at every
-        stop ("Step 4 of 11"), so a dropped, added or reordered step fails
-        here rather than passing quietly.
+        stop ("Step 4 of 12"), so a dropped, added or reordered step fails
+        here rather than passing quietly. It also asserts the two Wave 5
+        corrections that only exist on screen: that the conditional location
+        step is rendered as Not required rather than removed, and that
+        readiness runs after the choices it reads rather than before them.
         """
         self._admin('s1_tour_admin')
         self._make_readiness_passable()
@@ -153,7 +157,14 @@ class TestUiSetupTours(HttpCase):
         )
 
     def _seed_resumable_store(self):
-        """A store left mid-setup at step 7, with one direction saved."""
+        """A store left mid-setup under the PRE-Wave-5 numeric progress.
+
+        Seeded exactly as an existing database holds it: `setup_wizard_step`
+        set, `setup_wizard_step_key` absent. That is deliberate -- it makes
+        this tour the browser-level proof of the warm progress translation as
+        well as of resume, since legacy 7 has to reappear as the `directions`
+        step under the new order rather than as whatever is seventh now.
+        """
         store = self.env['shopify.connector.store'].sudo().create({
             'name': 'S1 Resume Store',
             'shop_domain': RESUME_SHOP_DOMAIN,
@@ -183,9 +194,10 @@ class TestUiSetupTours(HttpCase):
         settings = self.env['shopify.connector.store.settings'].sudo().search(
             [('store_id', '=', store.id)], limit=1,
         )
-        self.assertGreaterEqual(
-            settings.setup_wizard_step, 7,
-            'Save & Exit rewound the resume point',
+        self.assertEqual(
+            settings.setup_wizard_step_key, 'directions',
+            'Save & Exit rewound the resume point, or the legacy numeric '
+            'progress was not translated',
         )
         self.assertTrue(
             settings.sale_domain_enabled,
@@ -204,4 +216,115 @@ class TestUiSetupTours(HttpCase):
         self.start_tour(
             '/odoo', 'shopify_connector_s1_keyboard_tour',
             login='s1_keyboard_admin',
+        )
+
+    # ------------------------------------------------------------------
+    # Wave 5: the location step and the readiness deep link, in a browser
+    # ------------------------------------------------------------------
+
+    LOCATION_SHOP_DOMAIN = 's1-location.myshopify.com'
+    READINESS_SHOP_DOMAIN = 's1-readiness.myshopify.com'
+
+    def _seed_inventory_store(self, domain, cached, mapped_gid=None,
+                              resume='location_mapping'):
+        """A store with inventory on, its cache populated, and a resume point.
+
+        The Shopify location cache is seeded as ROWS rather than fetched: the
+        governed refresh route has its own server tests, and a tour that
+        admitted a job would be waiting on a dispatcher it does not control.
+        What only a browser can show is the RENDERING -- mapped versus
+        unmapped, the visible identity, the refresh state and the create
+        control -- which is what these two tours are for.
+        """
+        store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'S1 Location Store',
+            'shop_domain': domain,
+            'company_id': self.env.company.id,
+            'credential_present': True,
+            'credential_last_verified_at': fields.Datetime.now(),
+            'last_test_connection_result': 'pass',
+        })
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'inventory_domain_enabled': True,
+            'setup_wizard_step_key': resume,
+        })
+        for gid, name in cached:
+            self.env['shopify.connector.location'].sudo().create({
+                'store_id': store.id,
+                'shopify_location_gid': gid,
+                'name': name,
+                'shopify_location_active': True,
+            })
+        if mapped_gid:
+            warehouse = self.env['stock.warehouse'].search(
+                [('company_id', '=', self.env.company.id)], limit=1,
+            )
+            location = self.env['stock.location'].sudo().create({
+                'name': 'S1 Tour Odoo Location',
+                'usage': 'internal',
+                'location_id': warehouse.view_location_id.id,
+            })
+            self.env['shopify.connector.location.mapping'].sudo().create({
+                'store_id': store.id,
+                'shopify_gid': mapped_gid,
+                'odoo_location_id': location.id,
+                'match_key': 'manual',
+                'shopify_location_name_snapshot': dict(cached)[mapped_gid],
+            })
+        return store
+
+    def test_the_location_step_shows_every_cached_location_and_maps_one(self):
+        if 'shopify.connector.location.mapping' not in self.env:
+            self.skipTest('shopify_connector_inventory is not installed')
+        self._admin('s1_location_admin')
+        store = self._seed_inventory_store(
+            self.LOCATION_SHOP_DOMAIN,
+            cached=[
+                ('gid://shopify/Location/TOURA', 'Tour Warehouse A'),
+                ('gid://shopify/Location/TOURB', 'Tour Warehouse B'),
+                ('gid://shopify/Location/TOURC', 'Tour Warehouse C'),
+            ],
+            mapped_gid='gid://shopify/Location/TOURA',
+        )
+        self.env.flush_all()
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_location_tour',
+            login='s1_location_admin',
+        )
+        # The DATABASE consequence, not merely the screen: the browser
+        # traversal created a second mapping through the sanctioned service.
+        mappings = self.env['shopify.connector.location.mapping'].sudo().search(
+            [('store_id', '=', store.id)],
+        )
+        self.assertEqual(len(mappings), 2)
+        self.assertIn(
+            'gid://shopify/Location/TOURB', mappings.mapped('shopify_gid'),
+        )
+        created = mappings.filtered(
+            lambda m: m.shopify_gid == 'gid://shopify/Location/TOURB'
+        )
+        self.assertEqual(
+            created.shopify_location_name_snapshot, 'Tour Warehouse B',
+            'the name snapshot must come from the validated cache row',
+        )
+        self.assertEqual(created.match_key, 'manual')
+
+    def test_a_blocking_readiness_row_deep_links_by_step_key(self):
+        if 'shopify.connector.location.mapping' not in self.env:
+            self.skipTest('shopify_connector_inventory is not installed')
+        self._admin('s1_readiness_admin')
+        self._make_readiness_passable()
+        store = self._seed_inventory_store(
+            self.READINESS_SHOP_DOMAIN,
+            cached=[('gid://shopify/Location/RDY', 'Readiness Warehouse')],
+            resume='final_readiness',
+        )
+        # Inventory is on and nothing is mapped, so `mapped_location` is a
+        # genuine essential failure -- produced, not simulated.
+        self.env['shopify.connector.readiness.check'].run_for_store(store)
+        self.env.flush_all()
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_readiness_tour',
+            login='s1_readiness_admin',
         )

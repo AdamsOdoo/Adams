@@ -8,13 +8,15 @@
 // method is correct and correctly guarded. They cannot prove there is a
 // reachable control that calls it, that the Owl template renders without
 // throwing, that the asset bundle builds, that the client action's tag
-// resolves, or that the eleven steps appear in the accepted order on screen.
+// resolves, or that the twelve steps appear in the accepted order on screen.
 // Those failures only exist in a browser, and they are exactly the ones that
 // make a feature look implemented and be unusable.
 //
-// The traversal tour walks all ELEVEN steps in order and finishes by
+// The traversal tour walks all TWELVE steps in order and finishes by
 // activating. It contacts no Shopify store: the test patches the transport
-// seam before starting the browser, so step 5's probe is answered locally.
+// seam before starting the browser, so the test-connection step's probe is
+// answered locally, and no tour here ever admits a location-refresh job that
+// would reach a socket.
 
 import { registry } from "@web/core/registry";
 import { stepUtils } from "@web_tour/tour_utils";
@@ -65,33 +67,36 @@ const openConnectorSection = (xmlid) => ({
     },
 });
 
-// The step heading states "Step N of 11". Asserting the COUNT as well as the
-// name is what makes a dropped or reordered step fail here rather than pass
-// quietly with ten.
+// The step heading states "Step N of 12". Asserting the COUNT as well as the
+// name is what makes a dropped, added or reordered step fail here rather than
+// pass quietly with eleven.
 const heading = (n, label) =>
-    `.sc_setup__heading:contains('Step ${n} of 11'):contains('${label}')`;
+    `.sc_setup__heading:contains('Step ${n} of 12'):contains('${label}')`;
 
 const CONTINUE = ".sc_setup_continue";
 
-// --- 1. The full 11-step traversal, ending in activation. ---
+const openSetupWizard = () => [
+    stepUtils.showAppsMenuItem(),
+    {
+        trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+        content: "Open the Shopify Connector app.",
+        run: "click",
+    },
+    openConnectorSection("menu_shopify_connector_configuration"),
+    {
+        trigger: menu("menu_shopify_connector_setup_wizard"),
+        content: "Open the guided setup.",
+        run: "click",
+    },
+];
+
+// --- 1. The full 12-step traversal, ending in activation. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
     url: "/odoo",
     steps: () => [
-        stepUtils.showAppsMenuItem(),
-        {
-            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
-            content: "Open the Shopify Connector app.",
-            run: "click",
-        },
-        // Entry route 2 of 3: Configuration -> Setup Wizard.
-        openConnectorSection("menu_shopify_connector_configuration"),
-        {
-            trigger: menu("menu_shopify_connector_setup_wizard"),
-            content: "Open the guided setup.",
-            run: "click",
-        },
+        ...openSetupWizard(),
 
-        // --- Step 1: welcome / prerequisites ---
+        // --- 1: welcome / prerequisites ---
         {
             trigger: heading(1, "Welcome"),
             content: "The wizard opens on the welcome step.",
@@ -105,7 +110,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 2: store identity ---
+        // --- 2: store identity ---
         { trigger: heading(2, "Store identity") },
         {
             trigger: "#sc_setup_name",
@@ -117,8 +122,20 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 3: credential entry ---
+        // --- 3: credential entry ---
         { trigger: heading(3, "Credentials") },
+        {
+            // The three-value disclosure. An operator who pastes the Client
+            // ID gets an authentication failure one step later with no way to
+            // tell which of the three values was wrong, so the screen has to
+            // say which one it wants and what the other two are not.
+            trigger: ".sc_setup__panel:contains('not the Client ID')",
+            content: "The token guidance names the Client ID as NOT the token.",
+        },
+        {
+            trigger: ".sc_setup__panel:contains('Client Secret')",
+            content: "...and the Client Secret as NOT the token either.",
+        },
         {
             // The token field must be a password input: a plain text input is
             // readable over a shoulder and captured by every screenshot tool.
@@ -127,7 +144,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 4: scope presentation ---
+        // --- 4: scope presentation ---
         { trigger: heading(4, "Permissions") },
         {
             trigger: ".sc_setup__scopes li:contains('read_products')",
@@ -143,9 +160,26 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             trigger: "body:not(:has(#sc_setup_token))",
             content: "The token input no longer exists once it is submitted.",
         },
+        {
+            // The action row is reachable without scrolling to the bottom of
+            // this long step -- which is the whole point of it being sticky.
+            trigger: CONTINUE,
+            content: "Continue is on screen on the longest step.",
+            run() {
+                const bar = document.querySelector(".sc_setup__actions");
+                const rect = bar.getBoundingClientRect();
+                if (rect.bottom > window.innerHeight + 1 || rect.top < 0) {
+                    throw new Error(
+                        "the action row is outside the viewport on the " +
+                        "Permissions step; a sticky bar that is not on " +
+                        "screen is not sticky"
+                    );
+                }
+            },
+        },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 5: test connection ---
+        // --- 5: test connection ---
         { trigger: heading(5, "Test connection") },
         {
             trigger: ".sc_setup_run_test",
@@ -158,25 +192,8 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 6: readiness checks ---
-        { trigger: heading(6, "Readiness checks") },
-        {
-            trigger: ".sc_setup_run_readiness",
-            content: "Run the accepted check set.",
-            run: "click",
-        },
-        {
-            trigger: ".sc_setup__checks li",
-            content: "Each check reports independently, with a reason and an owner.",
-        },
-        {
-            // Text, never colour alone.
-            trigger: ".sc_setup__checks .sc-badge",
-        },
-        { trigger: CONTINUE, run: "click" },
-
-        // --- Step 7: sync direction per domain ---
-        { trigger: heading(7, "What to sync") },
+        // --- 6: what to sync (BEFORE readiness now) ---
+        { trigger: heading(6, "What to sync") },
         {
             trigger: "#sc_setup_domain_sale",
             content: "Enable order import.",
@@ -184,7 +201,21 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 8: source of truth ---
+        // --- 7: location mapping, conditional ---
+        {
+            trigger: heading(7, "Location mapping"),
+            content: "The conditional step exists and keeps its position.",
+        },
+        {
+            // Inventory was not enabled, so this step is Not required -- and
+            // it says so rather than vanishing. A step that disappeared would
+            // renumber every step after it.
+            trigger: ".sc_setup_location_skipped:contains('Not required')",
+            content: "A skipped step explains itself instead of disappearing.",
+        },
+        { trigger: CONTINUE, run: "click" },
+
+        // --- 8: source of truth ---
         { trigger: heading(8, "Source of truth") },
         {
             // Nothing may be pre-selected: a default that arrives ticked is a
@@ -203,7 +234,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 9: notification default ---
+        // --- 9: notification default ---
         { trigger: heading(9, "Customer notifications") },
         {
             trigger: "#sc_setup_notify:not(:checked)",
@@ -211,12 +242,35 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 10: inventory first-push scheduling ---
+        // --- 10: inventory first-push scheduling ---
         { trigger: heading(10, "First stock push") },
         { trigger: CONTINUE, run: "click" },
 
-        // --- Step 11: review and activate ---
-        { trigger: heading(11, "Review and activate") },
+        // --- 11: final readiness, AFTER every choice it reads ---
+        { trigger: heading(11, "Final readiness") },
+        {
+            // Entering the step evaluated the CURRENT configuration: the
+            // results are on screen without anybody pressing anything.
+            trigger: ".sc_setup__checks li",
+            content: "Entering the step ran the checks against what is saved.",
+        },
+        {
+            // Text, never colour alone, and the corrected wording.
+            trigger: ".sc_setup__checks li:contains('Sync features selected')",
+            content: "The domain check reads as a feature selection, not an error.",
+        },
+        {
+            // Inventory is off, so the location check is Not required rather
+            // than a green Passed for something nobody examined.
+            trigger:
+                ".sc_setup__checks li:contains('Inventory location mapping')" +
+                ":contains('Not required')",
+            content: "A check for a disabled domain is Not required, not Passed.",
+        },
+        { trigger: CONTINUE, run: "click" },
+
+        // --- 12: review and activate ---
+        { trigger: heading(12, "Review and activate") },
         {
             trigger: ".sc_setup__summary dd:contains('s1-tour.myshopify.com')",
             content: "The summary is in plain words, and it is this store's.",
@@ -262,21 +316,14 @@ registry.category("web_tour.tours").add("shopify_connector_s1_dashboard_entry_to
 registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     url: "/odoo",
     steps: () => [
-        stepUtils.showAppsMenuItem(),
+        ...openSetupWizard(),
         {
-            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
-            run: "click",
-        },
-        openConnectorSection("menu_shopify_connector_configuration"),
-        {
-            trigger: menu("menu_shopify_connector_setup_wizard"),
-            run: "click",
-        },
-        {
-            // The seeded store's resume point is step 7, so the wizard must
-            // open THERE rather than at step 1 -- which is the whole point of
-            // a durable resume.
-            trigger: heading(7, "What to sync"),
+            // The seeded store's resume point is the `directions` step, so the
+            // wizard must open THERE rather than at step 1 -- which is the
+            // whole point of a durable resume. The store was seeded with the
+            // PRE-Wave-5 numeric progress and no semantic key, so this also
+            // proves the warm translation reaches the browser.
+            trigger: heading(6, "What to sync"),
             content: "The wizard resumes at the step the operator left.",
         },
         {
@@ -292,26 +339,17 @@ registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     ],
 });
 
-// --- 4. Keyboard traversal and focus management. ---
+// --- 4. Keyboard traversal, focus management and the sticky action row. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
     url: "/odoo",
     steps: () => [
-        stepUtils.showAppsMenuItem(),
-        {
-            trigger: `.o_app${menu("menu_shopify_connector_root")}`,
-            run: "click",
-        },
-        openConnectorSection("menu_shopify_connector_configuration"),
-        {
-            trigger: menu("menu_shopify_connector_setup_wizard"),
-            run: "click",
-        },
+        ...openSetupWizard(),
         {
             trigger: heading(1, "Welcome"),
             content: "Focus lands on the step heading, not at the page bottom.",
             run() {
-                const heading = document.querySelector(".sc_setup__heading");
-                if (document.activeElement !== heading) {
+                const stepHeading = document.querySelector(".sc_setup__heading");
+                if (document.activeElement !== stepHeading) {
                     throw new Error(
                         "focus did not move to the step heading; a keyboard " +
                         "user would be left where the previous step ended"
@@ -326,7 +364,8 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
                 // Tab order, asserted rather than assumed: every actionable
                 // control in the panel must be focusable.
                 const controls = document.querySelectorAll(
-                    ".sc_setup__panel button, .sc_setup__panel input"
+                    ".sc_setup__panel button, .sc_setup__panel input, " +
+                    ".sc_setup__actions button"
                 );
                 if (!controls.length) {
                     throw new Error("the panel exposes no focusable control");
@@ -350,6 +389,31 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
             },
         },
         {
+            trigger: ".sc_setup__actions",
+            content:
+                "Every action-row control reserves clearance so focus cannot " +
+                "land underneath the sticky bar.",
+            run() {
+                const controls = document.querySelectorAll(
+                    ".sc_setup__actions button:not([disabled])"
+                );
+                if (!controls.length) {
+                    throw new Error("the action row exposes no enabled control");
+                }
+                for (const control of controls) {
+                    const margin = getComputedStyle(control)
+                        .scrollMarginBlockEnd;
+                    if (!margin || parseFloat(margin) <= 0) {
+                        throw new Error(
+                            "an action-row control reserves no scroll " +
+                            "clearance, so keyboard focus can land under the " +
+                            "sticky bar: " + control.outerHTML.slice(0, 80)
+                        );
+                    }
+                }
+            },
+        },
+        {
             trigger: CONTINUE,
             content: "Advance with the keyboard alone.",
             run() {
@@ -361,13 +425,115 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
             trigger: heading(2, "Store identity"),
             content: "The keyboard advance worked and focus followed it.",
             run() {
-                const heading = document.querySelector(".sc_setup__heading");
-                if (document.activeElement !== heading) {
+                const stepHeading = document.querySelector(".sc_setup__heading");
+                if (document.activeElement !== stepHeading) {
                     throw new Error(
                         "focus did not follow the step advance"
                     );
                 }
             },
+        },
+    ],
+});
+
+// --- 5. The location-mapping step with real cached locations. ---
+//
+// Inventory IS enabled for this store and three Shopify locations are already
+// in the cache, one of them already mapped. That is the state the step exists
+// for, and none of it can be observed from a server test: the mapped/unmapped
+// distinction, the visible GID, the refresh state and the create control are
+// all rendering.
+registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
+    url: "/odoo",
+    steps: () => [
+        ...openSetupWizard(),
+        {
+            trigger: heading(7, "Location mapping"),
+            content: "The wizard resumes on the location step.",
+        },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse A')" +
+                     ":contains('Mapped')",
+            content: "An already-mapped location says so.",
+        },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse B')" +
+                     ":contains('Not mapped')",
+            content:
+                "An unmapped location is never described as synchronised.",
+        },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse C')" +
+                     ":contains('Not mapped')",
+            content: "Every cached location has a visible mapped state.",
+        },
+        {
+            trigger: ".sc_setup__location-gid:contains('gid://shopify/Location/')",
+            content: "The Shopify identity is shown, read-only.",
+        },
+        {
+            trigger: ".sc_setup_refresh_locations",
+            content: "A refresh control exists on the step itself.",
+        },
+        {
+            // Create a second mapping through the governed route.
+            trigger: "#sc_setup_map_shopify",
+            run: "select gid://shopify/Location/TOURB",
+        },
+        {
+            // The eligible-Odoo-location assertion lives INSIDE this step's
+            // `run()` rather than as its own `:not([value=''])` trigger. An
+            // `<option>` inside a closed `<select>` has no layout box, so
+            // hoot-dom correctly reports it as not visible and a trigger on
+            // one can only ever time out -- it would be asserting that a
+            // dropdown is open, which is not the claim.
+            trigger: "#sc_setup_map_odoo",
+            content: "At least one eligible Odoo location is offered, and is "
+                     + "chosen.",
+            run() {
+                const select = document.querySelector("#sc_setup_map_odoo");
+                const option = Array.from(select.options).find((o) => o.value);
+                if (!option) {
+                    throw new Error("no eligible Odoo location is offered");
+                }
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            },
+        },
+        { trigger: ".sc_setup_create_mapping", run: "click" },
+        {
+            trigger: ".sc_setup__location:contains('Tour Warehouse B')" +
+                     ":contains('Mapped')",
+            content: "The mapping was created through the sanctioned service.",
+        },
+    ],
+});
+
+// --- 6. A blocking readiness row, and its deep link BY STEP KEY. ---
+registry.category("web_tour.tours").add("shopify_connector_s1_readiness_tour", {
+    url: "/odoo",
+    steps: () => [
+        ...openSetupWizard(),
+        {
+            trigger: heading(11, "Final readiness"),
+            content: "The wizard resumes on the final-readiness step.",
+        },
+        {
+            trigger:
+                ".sc_setup__checks li:contains('Inventory location mapping')" +
+                ":contains('Must be fixed')",
+            content:
+                "Inventory is on and nothing is mapped, so the check blocks.",
+        },
+        {
+            // The deep link carries the semantic key, not a position.
+            trigger: ".sc_setup_check_action[data-step-key='location_mapping']",
+            content: "The fix control addresses the step by key.",
+            run: "click",
+        },
+        {
+            trigger: heading(7, "Location mapping"),
+            content: "The deep link landed on the location step.",
         },
     ],
 });
