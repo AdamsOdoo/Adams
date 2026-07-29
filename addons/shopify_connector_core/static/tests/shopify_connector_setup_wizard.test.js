@@ -56,6 +56,10 @@ function payload(overrides = {}) {
                 state_label: "Setup Incomplete",
                 credential_present: false,
                 credential_verified: false,
+                auth_mode: "offline_access_token",
+                client_credentials_present: false,
+                token_expires_at: false,
+                token_last_failure_reason: "",
                 test_connection_result: false,
                 test_connection_reason: "",
                 setup_completed_at: false,
@@ -249,15 +253,90 @@ describe("shopify connector setup wizard", () => {
         expect(queryText(".sc_setup__heading")).toInclude("Store identity");
     });
 
-    test("the credential step names the two values that are not the token", async () => {
+    test("the credential step opens on the Dev Dashboard path by default", async () => {
         mockOrm(() => payload({ resume_step_key: "credential" }));
         await mount();
+        const panel = queryText(".sc_setup__panel");
+        // The current Shopify path: same-organization requirement and the
+        // automatic 24-hour renewal are stated; a "token shown once" claim --
+        // the OLD path's copy -- must not be shown to a Dev Dashboard user.
+        expect(panel).toInclude("same Shopify organization");
+        expect(panel).toInclude("24 hours");
+        expect(panel).not.toInclude("shown once");
+        expect(Boolean(queryFirst(".sc_setup_client_id"))).toBe(true);
+        expect(
+            queryFirst(".sc_setup_client_secret").getAttribute("type")
+        ).toBe("password");
+        // The offline token field belongs to the OTHER path and is absent.
+        expect(queryFirst(".sc_setup_token")).toBe(null);
+    });
+
+    test("the offline path names the two values that are not the token", async () => {
+        mockOrm(() => payload({ resume_step_key: "credential" }));
+        await mount();
+        queryFirst(".sc_setup__mode input[value='offline_access_token']").click();
+        await animationFrame();
         const panel = queryText(".sc_setup__panel");
         expect(panel).toInclude("Admin API access token");
         expect(panel).toInclude("not the Client ID");
         expect(panel).toInclude("Client Secret");
-        // No universal-expiry claim anywhere on the step.
+        // No universal-expiry claim on the offline path: how long an existing
+        // token lives depends on how it was issued.
         expect(panel).not.toInclude("24 hours");
+        // And the client-credential inputs belong to the other path.
+        expect(queryFirst(".sc_setup_client_secret")).toBe(null);
+    });
+
+    test("a stored mode reopens the step on the merchant's actual path", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 9,
+                    credential_present: true,
+                    auth_mode: "offline_access_token",
+                }),
+            })
+        );
+        await mount();
+        expect(queryText(".sc_setup__mode--selected")).toInclude(
+            "Existing Admin API access token"
+        );
+        expect(Boolean(queryFirst(".sc_setup_token"))).toBe(true);
+    });
+
+    test("the client secret is never held in component state", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, { id: 7 }),
+                });
+            }
+            return payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 7,
+                    credential_present: true,
+                    auth_mode: "dev_dashboard_client_credentials",
+                    client_credentials_present: true,
+                }),
+            });
+        });
+        const component = await mount();
+        queryFirst(".sc_setup_client_id").value = "hoot-client-id";
+        queryFirst(".sc_setup_client_secret").value =
+            "hoot-secret-LEAKCANARY-000";
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        const sent = calls.find((c) => c.method === "save_client_credentials");
+        expect(Boolean(sent)).toBe(true);
+        expect(sent.kwargs.client_id).toBe("hoot-client-id");
+        // Neither value survives into state; the secret is gone from the DOM.
+        expect(JSON.stringify(component.state)).not.toInclude("LEAKCANARY");
+        expect(JSON.stringify(component.state)).not.toInclude("hoot-client-id");
+        expect(document.body.innerHTML).not.toInclude("LEAKCANARY");
     });
 
     test("the token is never held in component state", async () => {
@@ -277,6 +356,8 @@ describe("shopify connector setup wizard", () => {
             });
         });
         const component = await mount();
+        queryFirst(".sc_setup__mode input[value='offline_access_token']").click();
+        await animationFrame();
         const input = queryFirst(".sc_setup_token");
         input.value = "shpat_HOOTDUMMY0000000000000000000000";
         queryFirst(".sc_setup_continue").click();

@@ -59,6 +59,18 @@
             <field name="global" eval="True"/>
         </record>
 
+        <!-- The cached 24-hour access token of the client-credentials mode.
+             It carries no ACL row at all, so no group reaches it through RPC;
+             this global rule exists anyway, because "unreachable today" is a
+             property of the current ACL file and this is a property of the
+             data. Both must hold. -->
+        <record id="store_access_token_company_rule" model="ir.rule">
+            <field name="name">Shopify store access token: own company only</field>
+            <field name="model_id" ref="model_shopify_connector_store_access_token"/>
+            <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+            <field name="global" eval="True"/>
+        </record>
+
         <record id="store_settings_company_rule" model="ir.rule">
             <field name="name">Shopify store settings: own company only</field>
             <field name="model_id" ref="model_shopify_connector_store_settings"/>

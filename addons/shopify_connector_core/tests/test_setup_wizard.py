@@ -434,7 +434,27 @@ class TestSetupWizardSteps(SetupWizardCase):
         self.assertNotIn(DUMMY_TOKEN[:12], json.dumps(state))
 
     def test_no_setup_payload_ever_carries_the_credential(self):
-        """Every read shape, not only the one that wrote it."""
+        """Every read shape, not only the one that wrote it.
+
+        Wave 5 sharpened this from a substring scan to a structural walk. The
+        payload now legitimately carries the MODE NAME
+        `offline_access_token`, whose spelling contains the old forbidden
+        substring, so the substring test would flag a mode label while still
+        missing a secret under a differently-named key. The walk is stricter
+        on what matters: no KEY anywhere in the payload may be a secret field
+        name, and no VALUE may be the credential.
+        """
+        forbidden_keys = {'access_token', 'client_secret'}
+
+        def walk_keys(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    self.assertNotIn(key, forbidden_keys)
+                    walk_keys(value)
+            elif isinstance(node, (list, tuple)):
+                for item in node:
+                    walk_keys(item)
+
         store = self._ready_store()
         setup = self._as(self.admin_a)
         for payload in (
@@ -446,7 +466,7 @@ class TestSetupWizardSteps(SetupWizardCase):
             serialised = json.dumps(payload)
             self.assertNotIn(DUMMY_TOKEN, serialised)
             self.assertNotIn(DUMMY_TOKEN[:12], serialised)
-            self.assertNotIn('access_token', serialised)
+            walk_keys(payload)
 
     def test_an_empty_credential_is_refused(self):
         store = self._make_store()
@@ -1314,7 +1334,18 @@ class TestSetupWizardReadinessPresentation(SetupWizardCase):
         self.assertNotEqual(store.state, 'connected')
 
     def test_the_credential_step_names_the_two_values_that_are_not_a_token(self):
-        """B: the copy is on the shipped template, not only in a docstring."""
+        """B: the copy is on the shipped template, not only in a docstring.
+
+        Wave 5 split the credential step into two paths, and the expiry rule
+        split with it. The OFFLINE path must still make no universal-expiry
+        claim -- how long a pasted token lives depends on how it was issued,
+        and the copy that says so must stay. The DEV DASHBOARD path is the
+        opposite case: Shopify documents that its token "expires after 24
+        hours" as a fact, and the screen must state it NEXT TO the automatic
+        renewal, never as something the merchant has to manage by hand. And
+        no path may tell a Dev Dashboard user a token is "shown once" --
+        that is the old flow's copy, and it is false in the current one.
+        """
         import pathlib
         template = (
             pathlib.Path(__file__).resolve().parents[1]
@@ -1323,11 +1354,18 @@ class TestSetupWizardReadinessPresentation(SetupWizardCase):
         self.assertIn('Admin API access token', template)
         self.assertIn('not the Client ID', template)
         self.assertIn('Client Secret', template)
-        self.assertIn('obtain an access token', template)
-        # No universal-expiry claim: token lifetime depends on the
-        # authentication method and this screen must not pretend otherwise.
-        self.assertNotIn('24 hours', template)
-        self.assertNotIn('24-hour', template)
+        # The offline path's anti-universal-expiry copy, verbatim.
+        self.assertIn('How long a token stays valid depends on how it was', template)
+        # The Dev Dashboard path: the documented 24-hour fact appears exactly
+        # once, and in the same sentence as the automatic renewal.
+        self.assertEqual(template.count('24 hours'), 1)
+        self.assertIn(
+            'lasts 24 hours; Odoo requests a fresh one', template,
+        )
+        self.assertIn('same Shopify organization', template)
+        # Never the old path's "token shown once" claim.
+        self.assertNotIn('shown once', template)
+        self.assertNotIn('displayed once', template)
 
 
 @tagged('post_install', '-at_install')

@@ -643,6 +643,29 @@ class ShopifyConnectorStore(models.Model):
         Client = self.env['shopify.connector.api.client']
         Job = self.env['shopify.connector.job']
         JobLog = self.env['shopify.connector.job.log']
+        # Wave 5: a client-credentials store obtains/refreshes its 24-hour token
+        # before ANY lock exists -- before the audit job, before
+        # `_admit_lifecycle`'s `FOR SHARE`, and therefore certainly before the
+        # network call this probe makes. A no-op for the offline mode. A failure
+        # here is the accepted `ShopifyClientError` taxonomy and is recorded by
+        # the same `_apply_probe_failure` path an unusable credential already
+        # took, so Test Connection reports "we could not authenticate" rather
+        # than an unhandled error.
+        try:
+            self.env[
+                'shopify.connector.store.credential'
+            ]._ensure_access_token(self)
+        except ShopifyClientError as exc:
+            probe_job = Job.sudo().create({
+                'store_id': self.id,
+                'job_source': 'setup_readiness_check',
+                'job_type': 'core_test_connection',
+                'state': 'running',
+                'payload_hash': str(uuid.uuid4()),
+                'started_at': fields.Datetime.now(),
+            })
+            self._apply_probe_failure(Job.browse(probe_job.id), exc)
+            return None
         job = Job.sudo().create({
             'store_id': self.id,
             'job_source': 'setup_readiness_check',
@@ -790,7 +813,15 @@ class ShopifyConnectorStore(models.Model):
                 'shopify.connector.store.credential'
             ].search([('store_id', '=', self.id)], limit=1)
             if credential:
-                credential.write({'credential_state': 'invalid'})
+                # Wave 5: the non-secret failure hint lives beside the state
+                # flip, and is written HERE -- in the caller's own transaction
+                # -- rather than by the token-refresh side transaction, whose
+                # write to this row would collide with this same request's
+                # later revalidation lock under REPEATABLE READ.
+                credential.write({
+                    'credential_state': 'invalid',
+                    'token_last_failure_reason': redact(exc.reason or ''),
+                })
         if exc.credential_invalid or exc.error_class == ERROR_AUTH:
             self.action_mark_reconnect_needed(reason=exc.reason)
         job.sudo().write({
@@ -849,7 +880,19 @@ class ShopifyConnectorStore(models.Model):
             return True
         # Value revalidation under the held credential-row lock: any set/replace
         # changes the stored value even when its write_date is transaction-fixed.
-        if Credential._get_access_token(self) != snapshot['token']:
+        #
+        # Wave 5: the compared value is the credential IDENTITY, not whatever
+        # token happens to be current. Under the offline mode those are the same
+        # thing and this is byte-for-byte the previous check. Under the
+        # client-credentials mode the access token rotates on a 24-hour schedule
+        # that no merchant initiated, so comparing tokens would discard a
+        # perfectly valid probe result once a day and report it as a credential
+        # change that never happened; the app's own client id and secret are
+        # what actually change when a merchant replaces the credential.
+        if (
+            Credential._lifecycle_credential_identity(self)
+            != snapshot.get('identity')
+        ):
             return True
         return False
 

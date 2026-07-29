@@ -89,6 +89,10 @@ CORE = 'shopify_connector_core'
 SEC3_MODELS = (
     ('shopify.connector.store', '_row_store'),
     ('shopify.connector.store.credential', '_row_credential'),
+    # Wave 5. The cached 24-hour token of the client-credentials mode is
+    # durable and store-scoped, so it is in the matrix rather than trusted to
+    # be safe because no group can read it today.
+    ('shopify.connector.store.access.token', '_row_access_token'),
     ('shopify.connector.store.settings', '_row_settings'),
     ('shopify.connector.location', '_row_location'),
     ('shopify.connector.job', '_row_job'),
@@ -111,9 +115,22 @@ SEC3_MODELS = (
     ('shopify.connector.product.media.binding', '_row_export_media_binding'),
 )
 
+# Models that deliberately carry NO `ir.model.access.csv` row, so no connector
+# group -- not even Administrator -- may read them through RPC. They are still
+# in SEC3_MODELS (they are durable and store-scoped and must have the company
+# rule and the relation declarations), but the four read-shape tests assert the
+# stronger "nobody may read this at all" instead of "reads are isolated",
+# because the ordinary assertion's "the owner CAN read it" half is exactly what
+# these models must NOT satisfy.
+SEC3_NO_ACL_MODELS = frozenset((
+    # The cached 24-hour access token of the client-credentials mode (Wave 5).
+    'shopify.connector.store.access.token',
+))
+
 # Connector-to-connector relations that must agree on the STORE, and the models
 # that own them. Company equality is insufficient for every entry here.
 SEC3_STORE_RELATIONS = (
+    ('shopify.connector.store.access.token', 'credential_id'),
     ('shopify.connector.job', 'mutation_attempt_id'),
     ('shopify.connector.job', 'superseded_by_job_id'),
     ('shopify.connector.job.log', 'job_id'),
@@ -342,6 +359,19 @@ class Sec3Base(TransactionCase):
         Credential = self.env['shopify.connector.store.credential'].sudo()
         existing = Credential.search([('store_id', '=', store.id)], limit=1)
         return existing or Credential.create({'store_id': store.id})
+
+    def _row_access_token(self, store):
+        Cache = self.env['shopify.connector.store.access.token'].sudo()
+        existing = Cache.search([('store_id', '=', store.id)], limit=1)
+        if existing:
+            return existing
+        return Cache.create({
+            'store_id': store.id,
+            'credential_id': self._row_credential(store).id,
+            'access_token': 'sec3-fixture-token-%s' % store.id,
+            'obtained_at': fields.Datetime.now(),
+            'expires_at': fields.Datetime.add(fields.Datetime.now(), hours=24),
+        })
 
     def _row_settings(self, store):
         Settings = self.env['shopify.connector.store.settings'].sudo()
@@ -597,6 +627,31 @@ class TestSec3ModelMatrix(Sec3Base):
         foreign = self._build(model, builder, self.store_b)
         return own, foreign
 
+    def _assert_unreadable_by_every_group(self, model):
+        """A model no group may read at all satisfies isolation by exceeding it.
+
+        The four read-shape tests below all assert the same pair of facts: the
+        owner CAN read its own row, and a foreigner CANNOT read theirs. The
+        "owner can" half is deliberate -- it stops the "foreigner cannot" half
+        from passing vacuously because a rule hid the model from everybody.
+
+        `shopify.connector.store.access.token` is the one model where hiding it
+        from everybody is the POINT rather than a regression. It holds the
+        cached 24-hour Shopify access token, and it carries no
+        `ir.model.access.csv` row on purpose, so no connector group -- including
+        Administrator -- can reach it through RPC. The token is reachable only
+        through the sanctioned, store-scoped `sudo()` accessor on
+        `shopify.connector.store.credential`.
+
+        So this asserts the stronger property directly instead of skipping:
+        EVERY interactive user is refused, on the model and on both rows. If a
+        future change ever grants a group read access here, this fails and the
+        model rejoins the ordinary matrix -- it cannot quietly become readable.
+        """
+        for user in (self.user_a, self.user_b):
+            with self.assertRaises(AccessError, msg=model):
+                self._as(user, model).search([])
+
     # ------------------------------------------------------------------
     # Read shapes
     # ------------------------------------------------------------------
@@ -605,6 +660,9 @@ class TestSec3ModelMatrix(Sec3Base):
         for model, builder in SEC3_MODELS:
             with self.subTest(model=model):
                 own, foreign = self._pair(model, builder)
+                if model in SEC3_NO_ACL_MODELS:
+                    self._assert_unreadable_by_every_group(model)
+                    continue
                 if own is None or foreign is None:
                     continue  # module not installed, or no fixture is
                     # constructible here; completeness is enforced
@@ -624,6 +682,9 @@ class TestSec3ModelMatrix(Sec3Base):
         for model, builder in SEC3_MODELS:
             with self.subTest(model=model):
                 own, foreign = self._pair(model, builder)
+                if model in SEC3_NO_ACL_MODELS:
+                    self._assert_unreadable_by_every_group(model)
+                    continue
                 if own is None or foreign is None:
                     continue  # module not installed, or no fixture is
                     # constructible here; completeness is enforced
@@ -639,6 +700,9 @@ class TestSec3ModelMatrix(Sec3Base):
         for model, builder in SEC3_MODELS:
             with self.subTest(model=model):
                 own, foreign = self._pair(model, builder)
+                if model in SEC3_NO_ACL_MODELS:
+                    self._assert_unreadable_by_every_group(model)
+                    continue
                 if own is None or foreign is None:
                     continue  # module not installed, or no fixture is
                     # constructible here; completeness is enforced
@@ -657,6 +721,9 @@ class TestSec3ModelMatrix(Sec3Base):
         for model, builder in SEC3_MODELS:
             with self.subTest(model=model):
                 own, foreign = self._pair(model, builder)
+                if model in SEC3_NO_ACL_MODELS:
+                    self._assert_unreadable_by_every_group(model)
+                    continue
                 if own is None or foreign is None:
                     continue  # module not installed, or no fixture is
                     # constructible here; completeness is enforced

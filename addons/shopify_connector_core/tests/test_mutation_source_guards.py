@@ -530,6 +530,21 @@ class TestMutationSourceGuards(TransactionCase):
                     and func.attr == 'post'
                     and owner_name == '_send'
                 ) or (
+                    # Wave 5: the client-credentials token exchange. It is a
+                    # POST to the shop's own `/admin/oauth/access_token`, not a
+                    # GraphQL call -- there is no operation to admit, no
+                    # mutation to confirm and no lease to hold, so it cannot go
+                    # through `execute_business`. Narrowed to the same one
+                    # file, one verb and one owning function every other entry
+                    # here uses, and that function does nothing but build and
+                    # post the request.
+                    relative.endswith(
+                        'shopify_connector_core/models/'
+                        'shopify_connector_api_client.py'
+                    )
+                    and func.attr == 'post'
+                    and owner_name == '_send_token_exchange'
+                ) or (
                     relative.endswith(
                         'shopify_connector_product/models/'
                         'shopify_connector_product_importer.py'

@@ -96,7 +96,7 @@
                             </p>
                             <h2 class="sc_setup__subheading">What you'll need</h2>
                             <ul class="sc_setup__list">
-                                <li>Admin access to your Shopify store, so you can create a custom app and copy its Admin API access token.</li>
+                                <li>Admin access to your Shopify organization, so you can create an app for this store in the Dev Dashboard and copy its Client ID and Client secret — or an Admin API access token you already hold from an app created the older way. Either path works; the credential step explains both.</li>
                                 <li>About ten minutes. You can stop at any point and pick up where you left off.</li>
                             </ul>
                             <div class="sc-band sc-band--info" role="note">
@@ -150,70 +150,155 @@
                         <!-- ===== credential ===== -->
                         <t t-if="state.stepKey === 'credential'">
                             <p class="sc_setup__lead">
-                                In Shopify, create a custom app and copy its
-                                <strong>Admin API access token</strong>. Paste it once here.
+                                Choose how this store authenticates with Shopify, then
+                                enter that path's credentials once.
                             </p>
                             <!--
-                                WHY THIS DISCLOSURE EXISTS, IN THESE WORDS.
+                                TWO REAL PATHS, STATED AS WHAT THE MERCHANT HAS.
 
-                                A Shopify custom app shows three secret-looking
-                                values, and only one of them is the one Odoo
-                                needs. Operators paste the Client ID or the
-                                Client Secret, get an authentication failure at
-                                the next step, and have no way to tell from the
-                                error which of the three was wrong. Naming all
-                                three, and saying plainly what the other two are
-                                for, is the whole fix.
+                                Shopify's current app-creation flow (the Dev
+                                Dashboard) does not show a permanent Admin API
+                                token to copy: the app exchanges its Client ID
+                                and Client secret for a 24-hour token, and the
+                                connector does that exchange and renewal itself.
+                                A merchant who created their app the older way,
+                                or was handed a long-lived token, still has that
+                                token and it still works. The chooser asks which
+                                of those two things the merchant actually holds,
+                                because no error message downstream can tell
+                                them which one they should have pasted.
                             -->
-                            <div class="sc-band sc-band--info" role="note">
-                                <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
-                                <div class="sc-band__body">
-                                    <div class="sc-band__text">Odoo needs the Admin API access token — not the Client ID, and not the Client Secret</div>
-                                    <div class="sc-band__hint">
-                                        Your Shopify custom app shows all three. The
-                                        <strong>Admin API access token</strong> is the one that
-                                        goes in the field below.
-                                    </div>
-                                    <ul class="sc_setup__list">
-                                        <li>A <strong>Client ID</strong> is not the access token.</li>
-                                        <li>A <strong>Client Secret</strong> is not the access token.</li>
-                                        <li>
-                                            A Client ID and Client Secret can be used
-                                            <em>outside</em> Odoo to obtain an access token, but
-                                            neither of them belongs in this field.
-                                        </li>
-                                    </ul>
-                                    <div class="sc-band__hint">
-                                        How long a token stays valid depends on how it was
-                                        issued. Check your Shopify app's authentication method
-                                        rather than assuming a fixed lifetime.
+                            <div class="sc_setup__modes" role="radiogroup"
+                                 aria-label="How this store authenticates">
+                                <label class="sc_setup__mode"
+                                       t-att-class="state.form.credentialMode === 'dev_dashboard_client_credentials' ? 'sc_setup__mode--selected' : ''">
+                                    <input type="radio" name="sc_credential_mode"
+                                           value="dev_dashboard_client_credentials"
+                                           t-att-checked="state.form.credentialMode === 'dev_dashboard_client_credentials' ? 'checked' : undefined"
+                                           t-on-change="() => this.setCredentialMode('dev_dashboard_client_credentials')"/>
+                                    <span class="sc_setup__mode-title">Dev Dashboard app (Client ID and secret)</span>
+                                    <span class="sc_setup__mode-hint">
+                                        For an app created in Shopify's Dev Dashboard. Odoo
+                                        exchanges these for an access token and renews it
+                                        automatically — Shopify does not show you a token to
+                                        copy on this path.
+                                    </span>
+                                </label>
+                                <label class="sc_setup__mode"
+                                       t-att-class="state.form.credentialMode === 'offline_access_token' ? 'sc_setup__mode--selected' : ''">
+                                    <input type="radio" name="sc_credential_mode"
+                                           value="offline_access_token"
+                                           t-att-checked="state.form.credentialMode === 'offline_access_token' ? 'checked' : undefined"
+                                           t-on-change="() => this.setCredentialMode('offline_access_token')"/>
+                                    <span class="sc_setup__mode-title">Existing Admin API access token</span>
+                                    <span class="sc_setup__mode-hint">
+                                        For a store that already holds a long-lived Admin API
+                                        access token from an app created the older way.
+                                    </span>
+                                </label>
+                            </div>
+
+                            <t t-if="state.form.credentialMode === 'dev_dashboard_client_credentials'">
+                                <div class="sc-band sc-band--info" role="note">
+                                    <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">Both values are on your app's Overview page in the Dev Dashboard</div>
+                                        <div class="sc-band__hint">
+                                            This works only when the app and the store belong to
+                                            the same Shopify organization. The token Shopify
+                                            issues lasts 24 hours; Odoo requests a fresh one
+                                            before it expires, so there is nothing to renew by
+                                            hand. Shopify's guide:
+                                            <a href="https://shopify.dev/docs/apps/build/dev-dashboard/get-api-access-tokens"
+                                               target="_blank" rel="noopener noreferrer">Get API access tokens (Dev Dashboard)</a>.
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="sc_setup__field">
-                                <label for="sc_setup_token">Admin API access token</label>
-                                <input id="sc_setup_token" type="password"
-                                       class="o_input sc_setup_token"
-                                       autocomplete="off" spellcheck="false"
-                                       aria-describedby="sc_setup_token_help"/>
-                                <small id="sc_setup_token_help">
-                                    Stored behind administrator-only access and never shown
-                                    again — not here, not in the store form, not in a log. If
-                                    you lose it, create a new one in Shopify and paste that.
-                                </small>
-                            </div>
+                                <div class="sc_setup__field">
+                                    <label for="sc_setup_client_id">Client ID</label>
+                                    <input id="sc_setup_client_id" type="text"
+                                           class="o_input sc_setup_client_id"
+                                           autocomplete="off" spellcheck="false"
+                                           aria-describedby="sc_setup_client_id_help"/>
+                                    <small id="sc_setup_client_id_help">
+                                        The app's public identifier. Shopify shows it beside
+                                        the Client secret.
+                                    </small>
+                                </div>
+                                <div class="sc_setup__field">
+                                    <label for="sc_setup_client_secret">Client secret</label>
+                                    <input id="sc_setup_client_secret" type="password"
+                                           class="o_input sc_setup_client_secret"
+                                           autocomplete="off" spellcheck="false"
+                                           aria-describedby="sc_setup_client_secret_help"/>
+                                    <small id="sc_setup_client_secret_help">
+                                        Stored behind administrator-only access and never shown
+                                        again — not here, not in the store form, not in a log.
+                                        Rotate it in the Dev Dashboard if it is ever exposed.
+                                    </small>
+                                </div>
+                            </t>
+
+                            <t t-if="state.form.credentialMode === 'offline_access_token'">
+                                <!--
+                                    WHY THIS DISCLOSURE EXISTS, IN THESE WORDS.
+
+                                    A Shopify custom app shows three secret-looking
+                                    values, and only one of them is the one this path
+                                    needs. Operators paste the Client ID or the
+                                    Client Secret, get an authentication failure at
+                                    the next step, and have no way to tell from the
+                                    error which of the three was wrong. Naming all
+                                    three, and saying plainly what the other two are
+                                    for, is the whole fix.
+                                -->
+                                <div class="sc-band sc-band--info" role="note">
+                                    <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">This path needs the Admin API access token — not the Client ID, and not the Client Secret</div>
+                                        <div class="sc-band__hint">
+                                            An older-style custom app shows all three. The
+                                            <strong>Admin API access token</strong> is the one that
+                                            goes in the field below. If your app only shows a
+                                            Client ID and Client secret, use the Dev Dashboard
+                                            path above instead.
+                                        </div>
+                                        <div class="sc-band__hint">
+                                            How long a token stays valid depends on how it was
+                                            issued. Check your Shopify app's authentication method
+                                            rather than assuming a fixed lifetime.
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="sc_setup__field">
+                                    <label for="sc_setup_token">Admin API access token</label>
+                                    <input id="sc_setup_token" type="password"
+                                           class="o_input sc_setup_token"
+                                           autocomplete="off" spellcheck="false"
+                                           aria-describedby="sc_setup_token_help"/>
+                                    <small id="sc_setup_token_help">
+                                        Stored behind administrator-only access and never shown
+                                        again — not here, not in the store form, not in a log. If
+                                        you lose it, create a new one in Shopify and paste that.
+                                    </small>
+                                </div>
+                            </t>
+
                             <p t-if="store.credential_present" class="sc_setup__note" role="status">
-                                A credential is already on record for this store. Pasting a new
-                                one replaces it, and the connection has to be tested again.
+                                A credential is already on record for this store
+                                <t t-if="store.auth_mode === 'dev_dashboard_client_credentials'">(Dev Dashboard app)</t>
+                                <t t-else="">(access token)</t>.
+                                Saving new values replaces it, and the connection has to be
+                                tested again.
                             </p>
                             <div class="sc-band sc-band--info" role="note">
                                 <i class="fa fa-lock sc-band__icon" aria-hidden="true"/>
                                 <div class="sc-band__body">
-                                    <div class="sc-band__text">This token is write-only</div>
+                                    <div class="sc-band__text">Secrets entered here are write-only</div>
                                     <div class="sc-band__hint">
-                                        It is protected by access control, not by encryption at
-                                        rest. Anyone with database access can read it, so treat
-                                        database backups as containing it.
+                                        They are protected by access control, not by encryption at
+                                        rest. Anyone with database access can read them, so treat
+                                        database backups as containing them.
                                     </div>
                                 </div>
                             </div>
@@ -242,8 +327,8 @@
                         <!-- ===== test_connection ===== -->
                         <t t-if="state.stepKey === 'test_connection'">
                             <p class="sc_setup__lead">
-                                This makes one read-only call to Shopify to prove the token
-                                works. Nothing is created, changed or deleted.
+                                This makes one read-only call to Shopify to prove the
+                                credentials work. Nothing is created, changed or deleted.
                             </p>
                             <div t-if="store.test_connection_result === 'pass'"
                                  class="sc-band sc-band--success" role="status">
@@ -259,7 +344,14 @@
                                 <div class="sc-band__body">
                                     <div class="sc-band__text">The connection did not work</div>
                                     <div class="sc-band__hint" t-esc="store.test_connection_reason"/>
-                                    <div class="sc-band__hint">
+                                    <div t-if="store.auth_mode === 'dev_dashboard_client_credentials'"
+                                         class="sc-band__hint">
+                                        Go back one step and re-enter the Client ID and Client
+                                        secret from your app's page in the Dev Dashboard. Check
+                                        that the app belongs to the same Shopify organization as
+                                        this store, and check the shop domain.
+                                    </div>
+                                    <div t-else="" class="sc-band__hint">
                                         Go back one step and paste the token again — check that
                                         you copied the Admin API access token and not the Client
                                         ID or Client Secret — or check the shop domain.

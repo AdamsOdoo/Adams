@@ -68,8 +68,12 @@ EXPECTED_SUITES = {
     # navigation, the conditional location step, the credential guidance, the
     # five readiness presentation states, staleness and the pending-refresh
     # disclosure are all client-rendered, so each is a mounted-component
-    # assertion rather than a server one.
-    'shopify connector setup wizard': 17,
+    # assertion rather than a server one. The merchant-operability closure
+    # (same day) raised it to 20: the credential step's two-path chooser --
+    # the Dev Dashboard default with its same-organization/24-hour copy, the
+    # offline path's three-value disclosure, the stored-mode reopen, and the
+    # client-secret never-in-state proof -- are each client-rendered too.
+    'shopify connector setup wizard': 20,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so

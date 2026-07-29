@@ -2796,7 +2796,16 @@ class TestLifecycleAdmissionSourceGuards(TransactionCase):
         self.assertIn('_lock_store_for_lifecycle', reval)
         self.assertIn('_lifecycle_credential_version', reval)
         self.assertIn("snapshot['generation']", reval)
-        self.assertIn("snapshot['token']", reval)
+        # Wave 5: the value revalidation compares the credential IDENTITY, not
+        # whatever access token happens to be current. Under the offline mode
+        # the identity IS the token and this is the same comparison it always
+        # was; under the client-credentials mode the token rotates every 24
+        # hours by design, so comparing tokens would report a routine rotation
+        # as a credential replacement and discard a valid probe result once a
+        # day. The assertion is kept -- and strengthened, because it now names
+        # the accessor as well as the snapshot key, so removing either fails.
+        self.assertIn('_lifecycle_credential_identity', reval)
+        self.assertIn("snapshot.get('identity')", reval)
 
     def test_admission_refusal_before_send_is_superseded(self):
         # A matrix refusal under the lock (disconnect won before the FOR SHARE)

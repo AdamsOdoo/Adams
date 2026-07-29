@@ -506,9 +506,27 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
 
     @api.model
     def _granted_scopes(self, store):
-        """The scopes Shopify last reported, as a set. Never a live call."""
+        """The scopes Shopify last reported, as a set. Never a live call.
+
+        `store.granted_scopes` is a JSON array -- `_run_connection_probe`
+        writes it with `json.dumps([scope['handle'] ...])`. The previous
+        comma-split parsed that JSON as prose, so every element kept a quote
+        or a bracket and no scope ever compared equal to its handle: the
+        Permissions step's "Granted" badge was unrenderable against real
+        evidence (Wave 5 audit, P1). JSON first; the comma fallback stays for
+        any legacy row that predates the JSON mirror.
+        """
         if not store or not store.granted_scopes:
             return set()
+        try:
+            parsed = json.loads(store.granted_scopes)
+        except (TypeError, ValueError):
+            parsed = None
+        if isinstance(parsed, list):
+            return {
+                scope.strip() for scope in parsed
+                if isinstance(scope, str) and scope.strip()
+            }
         return {
             token.strip()
             for token in store.granted_scopes.replace('\n', ',').split(',')
@@ -645,6 +663,10 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             # places that could quietly stop being true.
             'credential_present': bool(store.credential_present),
             'credential_verified': bool(store.credential_last_verified_at),
+            # Wave 5: which acquisition path this store uses, plus the
+            # NON-SECRET mirrors of the client-credentials mode. Mode names and
+            # timestamps only -- no token, no secret, no length, ever.
+            **self._credential_mode_payload(store),
             'test_connection_result': store.last_test_connection_result or False,
             'test_connection_reason': store.last_test_connection_reason or '',
             'setup_completed_at': (
@@ -655,6 +677,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 settings.setup_completed_uid.display_name
                 if settings and settings.setup_completed_uid else ''
             ),
+        }
+
+    @api.model
+    def _credential_mode_payload(self, store):
+        """Non-secret credential-mode facts for the setup and settings surfaces.
+
+        Everything here is safe to render: the mode name, presence booleans and
+        expiry/failure mirrors. The elevated read is the same store-scoped
+        `_credential_for` accessor the credential service itself uses; nothing
+        secret leaves it because nothing secret is selected.
+        """
+        Credential = self.env['shopify.connector.store.credential']
+        credential = Credential._credential_for(store)
+        cache = Credential._token_cache_status(store)
+        return {
+            'auth_mode': credential.auth_mode if credential else
+                'offline_access_token',
+            'client_credentials_present': bool(
+                credential.client_credentials_present
+            ) if credential else False,
+            'token_expires_at': (
+                fields.Datetime.to_string(cache['expires_at'])
+                if cache['expires_at'] else False
+            ),
+            'token_last_failure_reason': (
+                credential.token_last_failure_reason or ''
+            ) if credential else '',
         }
 
     @api.model
@@ -1179,6 +1228,37 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         # Deliberate: the local name is rebound before any other statement, so
         # the value cannot survive into a traceback frame of the code below.
         token = None
+        settings = self._settings_for(store)
+        self._record_progress(settings, 'credential')
+        return self.get_setup_state(store_id=store.id)
+
+    @api.model
+    def save_client_credentials(self, store_id, client_id, client_secret):
+        """The credential step's OTHER path: a Dev Dashboard app (Wave 5).
+
+        The sibling of `save_credential`, for the merchant Shopify's current
+        app-creation flow actually produces: a Dev Dashboard app shows no
+        permanent Admin API token to copy, and the connector exchanges the
+        app's Client ID and Client secret for a 24-hour token itself
+        (client-credentials grant, same-organization apps only).
+
+        Exactly the same secrecy contract as the token path: the secret is
+        handed to the credential service, the local name is rebound so no
+        traceback frame can carry it, and the response is the ordinary setup
+        state in which the credential appears only as booleans and non-secret
+        expiry mirrors. No token exchange happens here -- entering credentials
+        is configuration; the first exchange happens at Test Connection, which
+        is the step that already owns "talk to Shopify and show the result".
+        """
+        store = self._resolve_store(store_id)
+        if not isinstance(client_id, str) or not client_id.strip():
+            raise UserError(_("Enter the app's Client ID to continue."))
+        if not isinstance(client_secret, str) or not client_secret.strip():
+            raise UserError(_("Enter the app's Client secret to continue."))
+        self.env['shopify.connector.store.credential'].action_set_client_credentials(
+            store, client_id.strip(), client_secret.strip(),
+        )
+        client_secret = None
         settings = self._settings_for(store)
         self._record_progress(settings, 'credential')
         return self.get_setup_state(store_id=store.id)

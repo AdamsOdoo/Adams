@@ -125,6 +125,30 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         // --- 3: credential entry ---
         { trigger: heading(3, "Credentials") },
         {
+            // Wave 5: the step opens on a two-path chooser, defaulting to the
+            // Dev Dashboard path a merchant creating an app today actually
+            // has. Its guidance states the same-organization requirement and
+            // the automatic 24-hour renewal, and must NOT tell this user a
+            // token will be shown once -- that is the old path's copy.
+            trigger: ".sc_setup__mode--selected:contains('Dev Dashboard app')",
+            content: "The Dev Dashboard path is the pre-selected default.",
+        },
+        {
+            trigger: ".sc_setup__panel:contains('same Shopify organization')",
+            content: "The same-organization requirement is stated up front.",
+        },
+        {
+            // The client-secret field must be a password input for the same
+            // reason the token field always was.
+            trigger: "#sc_setup_client_secret[type='password']",
+            content: "The Client secret is a password input on the default path.",
+        },
+        {
+            // Switch to the offline-token path the rest of this tour uses.
+            trigger: ".sc_setup__mode input[value='offline_access_token']",
+            run: "click",
+        },
+        {
             // The three-value disclosure. An operator who pastes the Client
             // ID gets an authentication failure one step later with no way to
             // tell which of the three values was wrong, so the screen has to

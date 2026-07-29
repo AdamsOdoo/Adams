@@ -268,6 +268,53 @@
 
     .sc_setup__list { padding-inline-start: var(--sc-space-5); list-style: disc; }
 
+    // The credential step's two-path chooser (Wave 5). Ordinary labelled radio
+    // cards: the input is a real radio (keyboard and screen-reader native), the
+    // card is its label, selection is conveyed by the radio itself plus a
+    // border — never by colour alone.
+    .sc_setup__modes {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-3);
+    }
+
+    .sc_setup__mode {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: var(--sc-space-3);
+        row-gap: var(--sc-space-1);
+        align-items: start;
+        padding: var(--sc-space-3);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-0);
+        cursor: pointer;
+        margin: 0;
+
+        input[type="radio"] {
+            grid-row: span 2;
+            margin-block-start: var(--sc-space-1);
+        }
+
+        &.sc_setup__mode--selected {
+            border-color: var(--sc-border-strong);
+            box-shadow: inset 3px 0 0 var(--sc-info-text);
+        }
+
+        &:focus-within {
+            outline: 2px solid var(--sc-focus, var(--sc-info-text));
+            outline-offset: 2px;
+        }
+    }
+
+    .sc_setup__mode-title { font-weight: var(--sc-fw-label); }
+
+    .sc_setup__mode-hint {
+        grid-column: 2;
+        font-size: var(--sc-fs-secondary);
+        color: var(--sc-text-secondary);
+    }
+
     .sc_setup__field {
         display: flex;
         flex-direction: column;

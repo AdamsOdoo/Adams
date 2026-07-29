@@ -188,9 +188,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 'A shop domain and API version are required before '
                 'contacting Shopify.'
             )
-        token = self.env['shopify.connector.store.credential']._get_access_token(
-            store
-        )
+        Credential = self.env['shopify.connector.store.credential']
+        # Wave 5: obtain/refresh a client-credentials token BEFORE anything is
+        # locked. A no-op for the offline mode. Placed here, and not inside the
+        # token read below, because obtaining one is itself a network call and
+        # no lock in this connector may span a network call.
+        Credential._ensure_access_token(store)
+        token = Credential._get_access_token(store)
         if not token:
             raise ShopifyClientError(
                 error_class=ERROR_AUTH,
@@ -318,6 +322,16 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             )
             snapshot = {
                 'token': token,
+                # Wave 5: the value the post-network revalidation compares to
+                # decide whether the CREDENTIAL changed. For the offline mode it
+                # is the token itself, exactly as before. For the
+                # client-credentials mode it is the app's `(client_id,
+                # client_secret)` pair, because that token rotates every 24
+                # hours by design and a scheduled rotation must not be read as
+                # a merchant replacing their credential.
+                'identity': side_credential._lifecycle_credential_identity(
+                    side_store,
+                ),
                 'credential_id': version[0] if version else False,
                 'credential_version': version[1] if version else False,
                 'generation': generation,
@@ -533,6 +547,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         slice, so the admission-vs-disconnect linearization is not yet closed end
         to end; this method builds and commits the admission half only.
         """
+        # Wave 5: a client-credentials store obtains/refreshes its 24-hour token
+        # HERE, before the side cursor opens and therefore before the `FOR
+        # SHARE` lock exists. A no-op for the offline mode. The single token
+        # read below is unchanged and still reads exactly once, under the lock.
+        self.env['shopify.connector.store.credential']._ensure_access_token(
+            store,
+        )
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
         try:
@@ -606,6 +627,11 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyQuiescedError(
                 'Layer 2 admission requires immutable job/store ids.'
             )
+        # Wave 5: same placement and same reason as `_admit` -- obtain/refresh
+        # before the side cursor and its row locks exist, never inside them.
+        self.env['shopify.connector.store.credential']._ensure_access_token(
+            self.env['shopify.connector.store'].browse(store_id),
+        )
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
         try:
@@ -839,6 +865,139 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             url,
             json=body,
             headers=headers,
+            timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
+        )
+
+    # ------------------------------------------------------------------
+    # Wave 5: the client-credentials token exchange
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _exchange_client_credentials(self, store, client_id, client_secret):
+        """Exchange a Dev Dashboard app's credentials for an access token.
+
+        Returns `(access_token, expires_at, granted_scope)`. Raises the
+        accepted `ShopifyClientError` taxonomy on any failure -- never a bare
+        exception, and never one carrying the secret, the token, or a raw
+        response body.
+
+        WHY THIS LIVES HERE. This model is the single transport boundary in
+        this repository; `test_mutation_source_guards.py` enforces that with a
+        repo-wide AST guard whose allowlist names one file, one verb and one
+        owning function per sanctioned raw HTTP call. Putting the exchange in
+        the credential model would have needed a second allowlist entry in a
+        file that holds no other transport, which is precisely the drift the
+        guard exists to prevent.
+
+        WHAT THIS IS NOT. It is not OAuth as a distribution mechanism: there is
+        no authorization URL, no redirect, no callback route, no controller and
+        no state parameter, because the client-credentials grant has none of
+        those. Nothing here implements public App Store distribution, billing
+        or compliance webhooks, and this method must not grow toward them.
+
+        Verified against Shopify's Dev Dashboard token documentation (accessed
+        2026-07-29): POST to `/admin/oauth/access_token` on the shop's own
+        domain, `application/x-www-form-urlencoded`, with `client_id`,
+        `client_secret` and `grant_type=client_credentials`; the response
+        carries `access_token`, `scope` and `expires_in` ("Always 86399").
+        """
+        if not store.shop_domain:
+            raise UserError(
+                'A shop domain is required before contacting Shopify.'
+            )
+        try:
+            response = self._send_token_exchange(
+                store, client_id, client_secret,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=redact(str(exc)),
+            )
+        status = getattr(response, 'status_code', 0)
+        if status in (400, 401, 403):
+            # The app, the secret, or the app-store organisation pairing is
+            # wrong. That is an authentication failure the merchant must fix by
+            # correcting the credentials -- not something a retry resolves.
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        if status == 429:
+            raise ShopifyClientError(
+                error_class=ERROR_THROTTLE,
+                reason=REASON_THROTTLED,
+            )
+        if status != 200:
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail='token endpoint returned HTTP %s' % status,
+            )
+        try:
+            payload = response.json()
+        except ValueError:
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail='token endpoint returned a non-JSON body',
+            )
+        token = (payload or {}).get('access_token')
+        expires_in = (payload or {}).get('expires_in')
+        if not token or not isinstance(token, str):
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        try:
+            lifetime = int(expires_in)
+        except (TypeError, ValueError):
+            lifetime = 0
+        if lifetime <= 0:
+            # A token with no stated lifetime cannot be scheduled around.
+            # Refusing it is safer than inventing an expiry the connector would
+            # then treat as fact.
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail='token endpoint returned no usable expiry',
+            )
+        expires_at = fields.Datetime.now() + timedelta(seconds=lifetime)
+        granted_scope = (payload or {}).get('scope') or ''
+        if not isinstance(granted_scope, str):
+            granted_scope = ''
+        return token, expires_at, granted_scope
+
+    @api.model
+    def _send_token_exchange(self, store, client_id, client_secret):
+        """The only method containing the token-exchange HTTP call.
+
+        Deliberately separate from `_send` and equally deliberately trivial:
+        the repo-wide raw-transport guard allowlists exactly one verb in one
+        named function per sanctioned call site, so keeping this to "build the
+        request, post it, return the response" is what makes that allowlist
+        entry reviewable. It parses nothing and raises nothing of its own --
+        the caller owns the taxonomy -- and it is the seam tests patch, so no
+        test ever needs a real credential or a live Shopify store.
+
+        The secret travels in the request body over HTTPS and appears in no
+        log, no header this connector records, and no exception.
+        """
+        url = 'https://%s/admin/oauth/access_token' % store.shop_domain
+        return requests.post(
+            url,
+            data={
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'grant_type': 'client_credentials',
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+            },
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
         )
 

@@ -594,6 +594,16 @@ class TestReadinessSlotClosure(TransactionCase):
                  'self', 1, 'Rate deferral recovery sweep.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'Job', 1, 'Probe audit job lifecycle.'),
+                # Wave 5. The probe obtains/refreshes a client-credentials
+                # token before it creates its audit job, so an authentication
+                # failure at that point has no job to be recorded against. This
+                # second `Job` elevation creates one and hands it to the
+                # unchanged `_apply_probe_failure`, so the failure is audited
+                # exactly like every other probe failure rather than escaping
+                # as an unhandled error. Same store, same job shape, no new
+                # trust surface.
+                ('shopify_connector_store.py', '_run_connection_probe',
+                 'Job', 2, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'job', 1, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',

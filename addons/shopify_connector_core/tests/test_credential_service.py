@@ -210,6 +210,13 @@ CORE_SUDO_SITES = [
     ('shopify_connector_store.py', '_recover_throttled_stores',
      'self', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'Job', 1),
+    # Wave 5. The probe now obtains/refreshes a client-credentials token BEFORE
+    # it creates its audit job, so a refresh failure has no job to record
+    # against yet. This second elevation creates that job and hands it straight
+    # to the unchanged `_apply_probe_failure`, so an authentication failure is
+    # recorded exactly like every other one instead of escaping as an unhandled
+    # error. Same store, same scope, same audit shape as ordinal 1.
+    ('shopify_connector_store.py', '_run_connection_probe', 'Job', 2),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
     ('shopify_connector_store.py',
@@ -217,6 +224,29 @@ CORE_SUDO_SITES = [
     ('shopify_connector_store.py', 'action_force_disconnect', 'job', 1),
     ('shopify_connector_store_credential.py', '_get_access_token',
      'self', 1),
+    # ------------------------------------------------------------------
+    # Wave 5 -- the client-credentials mode.
+    #
+    # Every elevation below is the SAME elevation `_get_access_token` has
+    # always had, factored into named helpers so the token cache and the
+    # credential row are read through one place each rather than through a
+    # `sudo()` repeated at every call site. Each is scoped to the single store
+    # already being operated on, and none can cross a store or company
+    # boundary: `store_id` is an explicit term in every search, and
+    # `company_id` on both tables is a stored related field through `store_id`,
+    # so a row's company is its store's company by construction.
+    #
+    # The credential and token-cache models are default-deny by design -- the
+    # credential grants only the Administrator, and the token cache grants NO
+    # group at all -- which is precisely why the connector's own internal reads
+    # need a named, inventoried elevation rather than an ACL widening.
+    # ------------------------------------------------------------------
+    ('shopify_connector_store_credential.py', '_cached_token_row',
+     "self.env['shopify.connector.store.access.token']", 1),
+    ('shopify_connector_store_credential.py', '_credential_for',
+     'self', 1),
+    ('shopify_connector_store_credential.py', '_write_token_cache',
+     "self.env['shopify.connector.store.access.token']", 1),
 ]
 CORE_SUDO_PURPOSE_BY_OWNER = {
     ('shopify_connector_binding_mixin.py',
@@ -353,6 +383,12 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      'action_force_disconnect'): 'Forced-disconnect audit.',
     ('shopify_connector_store_credential.py',
      '_get_access_token'): 'Single-store credential read.',
+    ('shopify_connector_store_credential.py',
+     '_cached_token_row'): 'Single-store token-cache read.',
+    ('shopify_connector_store_credential.py',
+     '_credential_for'): 'Single-store credential row read.',
+    ('shopify_connector_store_credential.py',
+     '_write_token_cache'): 'Single-store token-cache write.',
 }
 
 SUDO_INVENTORY_FIELDS = (

@@ -217,3 +217,9 @@ ci-artifacts/
 
 # Session-local focused-test helper (not a repository deliverable).
 tools/.focused-test.sh
+
+# Wave 5 local focused-run helper (a chromium symlink the suite places on PATH);
+# never repository content.
+.focused-bin/
+# Local baseline artifacts from ad-hoc suite runs outside ci-artifacts/.
+ci-artifacts-*/

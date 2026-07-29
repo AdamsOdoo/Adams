@@ -97,6 +97,11 @@ export class ShopifyConnectorSetupWizard extends Component {
                 scopesRead: false,
                 mapShopifyGid: "",
                 mapOdooLocationId: "",
+                // Which credential path the merchant is entering. Seeded from
+                // the store's stored mode on load, so re-running setup shows
+                // the path they actually use. The value is a mode NAME, never
+                // a secret.
+                credentialMode: "dev_dashboard_client_credentials",
             },
         });
 
@@ -252,9 +257,22 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.schedulePush = false;
         this.state.form.mapShopifyGid = "";
         this.state.form.mapOdooLocationId = "";
+        // Seed the credential-path choice from what the store already uses, so
+        // a rerun opens on the merchant's actual path. A store with no
+        // credential yet defaults to the Dev Dashboard path, because that is
+        // the app-creation flow Shopify currently gives a new merchant.
+        if (store.credential_present && store.auth_mode) {
+            this.state.form.credentialMode = store.auth_mode;
+        }
         if (resume && data.resume_step_key) {
             this.state.stepKey = data.resume_step_key;
         }
+    }
+
+    /** The credential step's path switch. A mode name, never a secret. */
+    setCredentialMode(mode) {
+        this.state.form.credentialMode = mode;
+        this.state.errorMessage = "";
     }
 
     _message(error) {
@@ -500,6 +518,9 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     async _submitCredential() {
+        if (this.state.form.credentialMode === "dev_dashboard_client_credentials") {
+            return this._submitClientCredentials();
+        }
         const input = document.querySelector(".sc_setup_token");
         const value = input ? input.value : "";
         if (!value) {
@@ -517,6 +538,39 @@ export class ShopifyConnectorSetupWizard extends Component {
         // afterwards.
         if (input) {
             input.value = "";
+        }
+        return ok;
+    }
+
+    async _submitClientCredentials() {
+        // Same discipline as the token path: read from the DOM nodes, never
+        // bind into component state, clear both fields whatever the outcome.
+        const idInput = document.querySelector(".sc_setup_client_id");
+        const secretInput = document.querySelector(".sc_setup_client_secret");
+        const clientId = idInput ? idInput.value : "";
+        const clientSecret = secretInput ? secretInput.value : "";
+        if (!clientId) {
+            this.state.errorMessage = _t(
+                "Enter the app's Client ID to continue."
+            );
+            return false;
+        }
+        if (!clientSecret) {
+            this.state.errorMessage = _t(
+                "Enter the app's Client secret to continue."
+            );
+            return false;
+        }
+        const ok = await this._call("save_client_credentials", {
+            store_id: this.store.id,
+            client_id: clientId,
+            client_secret: clientSecret,
+        });
+        if (secretInput) {
+            secretInput.value = "";
+        }
+        if (ok && idInput) {
+            idInput.value = "";
         }
         return ok;
     }
