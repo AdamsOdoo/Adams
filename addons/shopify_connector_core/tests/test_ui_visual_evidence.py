@@ -398,9 +398,44 @@ OVERFLOW_JS = r"""
       if (escaped.length >= 12) break;  // enough to diagnose; not a dump
     }
 
+    // VERTICAL REACHABILITY (Wave 5). The horizontal rules above say
+    // nothing about whether content BELOW the fold can be got to, and a
+    // client action is exactly where it cannot: `.o_action_manager` is
+    // `overflow: hidden` at the pinned Odoo and provides no scrolling of
+    // its own, because scrolling is a view's job and a bare client action
+    // is not a view. A surface that does not declare its own
+    // `overflow-y: auto` therefore has everything past the first screen
+    // clipped away with no scrollbar for anyone to notice -- which is the
+    // same defect shape as `clipped_silently`, one axis over, and was
+    // measured on the guided setup at up to 1774px before this wave.
+    const vs = getComputedStyle(el);
+    const selfScrollsY = /auto|scroll/.test(vs.overflowY);
+    let reachableBy = null;
+    for (let node = el; node; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (/auto|scroll/.test(cs.overflowY) &&
+          node.scrollHeight > node.clientHeight + 4) {
+        reachableBy = name(node);
+        break;
+      }
+      if (node === document.body) break;
+    }
+    const docEl = document.scrollingElement;
+    if (!reachableBy && docEl.scrollHeight > docEl.clientHeight + 4) {
+      reachableBy = "document";
+    }
+    const verticalOverflow = el.scrollHeight - el.clientHeight;
+
     const ownRect = own ? own.node.getBoundingClientRect() : null;
     surfaces.push({
       cls: name(el),
+      // How far this surface's own content extends past its box, and
+      // whether ANY ancestor can actually scroll to it.
+      vertical_overflow: verticalOverflow,
+      scrolls_vertically: selfScrollsY,
+      vertical_reachable_by: reachableBy,
+      unreachable_vertical: (verticalOverflow > 4 && !reachableBy)
+        ? verticalOverflow : 0,
       rect: box(el),
       scroll_width: el.scrollWidth,
       client_width: el.clientWidth,
@@ -1081,6 +1116,16 @@ class TestUiVisualEvidence(HttpCase):
         container (§10); a surface that overflows without offering that is
         content the user simply cannot get to.
 
+        `unreachable_vertical_content` (Wave 5) — the same defect one axis
+        over, and the one the horizontal rules were structurally unable to
+        see. A client action renders inside `.o_action_manager`, which is
+        `overflow: hidden` and provides no scrolling of its own, so a
+        surface that does not declare `overflow-y: auto` has everything past
+        the first screen clipped away with no scrollbar for anyone to
+        notice. Measured on the guided setup at between 328px and 1774px
+        before this wave, at all four required widths, with `doc_extent: 0`
+        and no scrollable element anywhere in the ancestor chain.
+
         `escaped_descendants` — something inside the surface is rendered
         outside the rectangle its clipping ancestor actually shows. This is
         the case the document-total check could never see, because an
@@ -1096,6 +1141,14 @@ class TestUiVisualEvidence(HttpCase):
                     'scroll_width': surface['scroll_width'],
                     'client_width': surface['client_width'],
                     'overflow_x': surface['overflow_x'],
+                })
+            if surface.get('unreachable_vertical'):
+                defects.append({
+                    'kind': 'unreachable_vertical_content',
+                    'page': name, 'width': width, 'surface': surface['cls'],
+                    'vertical_overflow': surface['vertical_overflow'],
+                    'scrolls_vertically': surface['scrolls_vertically'],
+                    'vertical_reachable_by': surface['vertical_reachable_by'],
                 })
             if surface['escapes_left'] > 1 or surface['escapes_right'] > 1:
                 defects.append({
@@ -1273,7 +1326,9 @@ class TestUiVisualEvidence(HttpCase):
                                 'overflow_x', 'self_overflow',
                                 'unhandled_self_overflow', 'clipped_by',
                                 'clipped_silently', 'escapes_left',
-                                'escapes_right',
+                                'escapes_right', 'vertical_overflow',
+                                'scrolls_vertically', 'vertical_reachable_by',
+                                'unreachable_vertical',
                             )}
                             for surface in metrics.get('surfaces') or []
                         ],
@@ -1345,12 +1400,38 @@ class TestUiVisualEvidence(HttpCase):
         parseFloat(getComputedStyle(el).scrollMarginBlockEnd) || 0,
     };
   });
+  // WHERE THE BAR IS SUPPOSED TO BE PINNED.
+  //
+  // Not the viewport bottom. `position: sticky` pins to the bottom of the
+  // nearest SCROLLPORT's padding box, and this surface carries its own
+  // padding -- so the correct target is the scroll container's bottom edge
+  // minus its bottom padding. Comparing against `innerHeight` reports the
+  // surface's own padding as a defect, which is how a correct sticky bar
+  // gets "fixed" into a wrong one.
+  const scroller = (() => {
+    for (let node = bar.parentElement; node; node = node.parentElement) {
+      const cs = getComputedStyle(node);
+      if (/auto|scroll/.test(cs.overflowY)) return node;
+      if (node === document.body) break;
+    }
+    return document.scrollingElement;
+  })();
+  const sRect = scroller.getBoundingClientRect();
+  const sPadBottom = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
   return JSON.stringify({
     error: null,
     position: getComputedStyle(bar).position,
     surface_direction: surface ? getComputedStyle(surface).direction : null,
     bar: {top: rect.top, bottom: rect.bottom, left: rect.left,
           right: rect.right, height: rect.height},
+    scrollport: {
+      cls: (scroller.className && String(scroller.className).split(/\s+/)[0])
+           || scroller.tagName,
+      bottom: sRect.bottom,
+      padding_bottom: sPadBottom,
+      pin_target: sRect.bottom - sPadBottom,
+      extent: scroller.scrollHeight - scroller.clientHeight,
+    },
     viewport: {width: window.innerWidth, height: window.innerHeight},
     document_scroll_width: document.documentElement.scrollWidth,
     // The page must not have grown sideways because of the row.
@@ -1366,27 +1447,55 @@ class TestUiVisualEvidence(HttpCase):
     #: is the only state in which "sticky" means anything.
     SCROLL_JS = r"""
 (() => {
-  const scroller = (() => {
-    let node = document.querySelector(".o_sc_setup");
-    while (node) {
-      const cs = getComputedStyle(node);
-      if (/auto|scroll/.test(cs.overflowY) &&
-          node.scrollHeight > node.clientHeight + 4) {
-        return node;
-      }
-      node = node.parentElement;
-    }
-    return document.scrollingElement;
-  })();
+  // WHICH ELEMENT ACTUALLY SCROLLS, AND WHAT IT DID.
+  //
+  // Walked from the surface upwards, and every candidate is REPORTED --
+  // including the ones that could not scroll. The first version returned only
+  // the winner, which meant a run where nothing scrolled at all recorded
+  // `from: 0, to: 0` and looked indistinguishable from a run where the
+  // scroll was attempted and the page happened to already be at the middle.
+  // A mid-scroll claim that was never mid-scroll is exactly the kind of
+  // evidence this whole file exists to stop producing.
+  const chain = [];
+  let scroller = null;
+  for (let node = document.querySelector(".o_sc_setup"); node;
+       node = node.parentElement) {
+    const cs = getComputedStyle(node);
+    const extent = node.scrollHeight - node.clientHeight;
+    const scrollable = /auto|scroll/.test(cs.overflowY) && extent > 4;
+    chain.push({
+      node: (node.className && String(node.className).split(/\s+/)[0])
+            || node.tagName,
+      overflow_y: cs.overflowY,
+      extent: extent,
+      scrollable: scrollable,
+    });
+    if (scrollable && !scroller) { scroller = node; }
+    if (node === document.body) { break; }
+  }
+  const doc = document.scrollingElement;
+  const docExtent = doc.scrollHeight - doc.clientHeight;
+  if (!scroller && docExtent > 4) { scroller = doc; }
+  if (!scroller) {
+    return JSON.stringify({
+      scroller: null, scrolled: false, chain: chain,
+      doc_extent: docExtent,
+      note: "nothing on this surface scrolls at this viewport",
+    });
+  }
   const before = scroller.scrollTop;
   scroller.scrollTop = Math.floor(
     (scroller.scrollHeight - scroller.clientHeight) / 2
   );
   return JSON.stringify({
-    scroller: scroller.className || scroller.tagName,
+    scroller: (scroller.className && String(scroller.className).split(/\s+/)[0])
+              || scroller.tagName,
+    scrolled: scroller.scrollTop > before,
     scrollable: scroller.scrollHeight - scroller.clientHeight,
     from: before,
     to: scroller.scrollTop,
+    chain: chain,
+    doc_extent: docExtent,
   });
 })()
 """
@@ -1404,6 +1513,18 @@ class TestUiVisualEvidence(HttpCase):
         sticky while the CSS still says it is -- which is exactly the failure
         a stylesheet review cannot see. So this scrolls the real container to
         the middle of real content and reads the rendered rectangle back.
+
+        WHAT "STICKY" IS ASSERTED AS, AND WHY IT IS NOT "SCROLLED TO THE
+        MIDDLE". The scroll is attempted and what actually scrolled is
+        recorded, but the assertion does not depend on it: when a surface's
+        content extends below the viewport, a sticky bar's bottom edge sits
+        exactly at the viewport's bottom edge, and a non-sticky bar's does
+        not — it sits at the end of the content, below the fold. That
+        equality is therefore the direct evidence, it holds at the top of a
+        long page as well as mid-scroll, and it fails for the defect this
+        exists to catch (a surface that accidentally becomes its own scroll
+        container, which makes `position` still report `sticky` while the bar
+        stops being lifted).
 
         Three of the four viewport widths the packet names carry no
         `prefers-reduced-motion` or RTL variation here; both are covered by
@@ -1438,6 +1559,31 @@ class TestUiVisualEvidence(HttpCase):
                         failures.append({
                             'case': key, 'why': 'the action row is not sticky',
                             'position': payload['position'],
+                        })
+                    # THE DIRECT EVIDENCE that the bar is being LIFTED
+                    # rather than merely declared sticky: while there is
+                    # content still below it, its bottom edge sits at the
+                    # scrollport's pin target. A bar that had stopped being
+                    # lifted would be at the end of the content instead,
+                    # hundreds of pixels lower. 2px of tolerance for
+                    # sub-pixel layout rounding.
+                    port = payload['scrollport']
+                    still_below = (
+                        port['extent'] - (scroll.get('to') or 0)
+                    ) > 4
+                    off_target = abs(
+                        payload['bar']['bottom'] - port['pin_target']
+                    ) > 2
+                    if still_below and off_target:
+                        failures.append({
+                            'case': key,
+                            'why': 'content remains below the fold but the '
+                                   'action row is not pinned to the '
+                                   'scrollport, so it is declared sticky and '
+                                   'is not behaving so',
+                            'bar_bottom': payload['bar']['bottom'],
+                            'pin_target': port['pin_target'],
+                            'scrollport': port['cls'],
                         })
                     for control in payload['controls']:
                         if control['disabled']:
@@ -1485,6 +1631,7 @@ class TestUiVisualEvidence(HttpCase):
         seeded = self._seed()
         overlaps = []
         measured = {}
+        skipped = []
         with self._browser() as browser:
             for width in (1366, 390):
                 self._viewport(browser, width, 768 if width == 1366 else 900)
@@ -1526,6 +1673,12 @@ class TestUiVisualEvidence(HttpCase):
                     key = '%s@%dpx' % (step, width)
                     measured[key] = payload
                     if payload.get('error') == 'no focusable':
+                        # A read-only step (Permissions is a list, not a form)
+                        # genuinely has no focusable control inside the
+                        # scrolling panel. Recorded rather than passed over in
+                        # silence, and bounded by the assertion below, so this
+                        # cannot quietly become "every case skipped".
+                        skipped.append(key)
                         continue
                     self.assertIsNone(
                         payload.get('error'),
@@ -1544,9 +1697,17 @@ class TestUiVisualEvidence(HttpCase):
                                 'sticky action row')
         self._record(
             'sticky-focus-clearance',
-            {'measured': measured, 'overlaps': overlaps},
+            {'measured': measured, 'overlaps': overlaps,
+             'skipped_no_focusable_control': skipped},
             'WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)')
-        self.assertTrue(measured, 'no focus-clearance case was measured')
+        measured_cases = [
+            key for key, value in measured.items() if not value.get('error')
+        ]
+        self.assertGreaterEqual(
+            len(measured_cases), 4,
+            'only %d focus-clearance cases actually measured a control '
+            '(skipped: %s); the check is too thin to mean anything'
+            % (len(measured_cases), skipped))
         self.assertFalse(overlaps, (
             'a focused control is concealed by the sticky action row:\n%s'
             % json.dumps(overlaps, indent=2)[:4000]))

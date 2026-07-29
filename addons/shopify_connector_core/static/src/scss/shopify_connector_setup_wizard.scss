@@ -35,18 +35,40 @@
     background: var(--sc-surface-0);
     color: var(--sc-text-primary);
     font-family: var(--sc-font);
-    min-height: 100%;
     padding: var(--sc-space-6);
-    // NEVER a connector-created horizontal page scroll -- and `clip` rather
-    // than `hidden` deliberately. `overflow-x: hidden` with a visible
-    // block axis makes the used `overflow-y` compute to `auto`, which turns
-    // this element into a scroll container: `position: sticky` on the action
-    // row below would then resolve against THIS box, which never scrolls,
-    // and the bar would silently stop being sticky. `clip` suppresses the
-    // horizontal overflow without creating a scroll container, so the bar
-    // sticks to Odoo's own scrolling content area, which is the one that
-    // actually moves.
+
+    // THIS SURFACE OWNS ITS OWN VERTICAL SCROLLING, AND IT HAS TO.
+    //
+    // Measured, not assumed. A client action renders inside
+    // `.o_action_manager`, which is `overflow: hidden` at the pinned Odoo
+    // and provides no scrolling of its own -- scrolling is a view's job,
+    // and a bare client action is not a view. With `min-height: 100%` here
+    // and nothing scrolling anywhere, the rendered-evidence instrument
+    // measured between 328px and 1774px of setup content overflowing that
+    // ancestor, with `doc_extent: 0` and no scrollable element anywhere in
+    // the chain: the bottom of every long step was CLIPPED AND
+    // UNREACHABLE, at all four required widths. A sticky action row over
+    // content nobody can scroll to would have been polish on an unusable
+    // screen.
+    //
+    // `block-size: 100%` resolves against that ancestor's definite height,
+    // so this box is exactly the visible region and its content scrolls
+    // inside it -- which also gives `position: sticky` on the action row a
+    // real scrollport to stick to.
+    block-size: 100%;
+    max-block-size: 100%;
+    overflow-y: auto;
+    // NEVER a connector-created horizontal page scroll. `clip` rather than
+    // `hidden` so the pair stays explicit: beside `overflow-y: auto` either
+    // keyword behaves the same, but `clip` says "this axis does not scroll"
+    // rather than "this axis scrolls and its bar is hidden".
     overflow-x: clip;
+    // The scroll container is now ours, so the sanctioned scroll padding is
+    // available at last: a control scrolled into view lands clear of the
+    // sticky row rather than under it. The `scroll-margin` on each control
+    // below stays as well -- belt and braces, and the one that still works
+    // if this box ever stops being the scroller.
+    scroll-padding-block-end: var(--sc-setup-actions-clearance);
 
     * { box-sizing: border-box; }
 
@@ -74,10 +96,10 @@
     // When the browser scrolls a focused control into view it honours that
     // control's own scroll margin, so reserving the bar's height here is what
     // stops a keyboard user tabbing to a control that is technically focused
-    // and visually hidden behind the bar. `scroll-padding` on the scroll
-    // container would be the other half of this, but the container is Odoo's
-    // `.o_content`, which is not this repository's to restyle -- and the
-    // margin on the target achieves the same thing from the side we own.
+    // and visually hidden behind the bar. The other half -- `scroll-padding`
+    // on the scroll container -- is set on this surface's root above, now
+    // that the root is the scroll container; this stays because it is the
+    // half that keeps working if that ever changes.
     a, button, input, select, textarea, [tabindex] {
         scroll-margin-block-end: var(--sc-setup-actions-clearance);
         scroll-margin-block-start: var(--sc-space-4);
