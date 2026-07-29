@@ -273,6 +273,67 @@ This is recorded here because it is the kind of subtlety a future maintainer
 extending this gate (or writing a similar one elsewhere) needs to know about
 up front, not rediscover the hard way.
 
+## 6a. HEADLINE GAP — domain data owned by a cascaded-away technical module is physically deleted, not preserved
+
+**This is the single most important limitation in this implementation and is
+stated here prominently, not buried in a debt-register line.**
+
+Section 12 of the governing task requires inventorying every connector-owned
+persistent object a standard-dependency loss could affect (location mappings,
+product/customer/order bindings, inventory-level bindings, jobs, job logs,
+mutation-attempt evidence, ...) and proving a recovery architecture for it —
+either Pattern A (recovery-critical data lives in a surviving module) or
+Pattern B (a durable, versioned snapshot taken before the cascade, with proven
+restoration).
+
+**This implementation does neither, for domain-owned data.** It proves and
+implements Pattern A/persistence **only for the package controller's own
+state** (`shopify.connector.package`, which genuinely lives in a module —
+`shopify_connector` — that never gets cascaded). It does **not** move, snapshot,
+or otherwise protect the data owned by the five domain technical modules
+themselves (`shopify.connector.location.mapping`, product/customer/order
+bindings, inventory-level bindings, their jobs and job logs, mutation-attempt
+evidence, ...) — because those modules are exactly the ones a standard-
+dependency loss cascades away, and Odoo's `module_uninstall()` physically
+drops their tables when that happens.
+
+**Verified empirically, not merely reasoned about** — **[Fact]**: a
+`shopify.connector.location.mapping` row was created, then `stock` was
+uninstalled (cascading `shopify_connector_inventory` away, exactly as
+designed and proven in §5). `SELECT to_regclass('shopify_connector_location_mapping')`
+against the same database, run immediately afterward, returned `NULL` — the
+table itself no longer exists. The mapping row, and by the identical
+mechanism every other row any of the five domain modules owned, is
+unrecoverably gone. Restoring the suite afterward (§5 stage 4) recreates the
+table from scratch, empty — it does not, and structurally cannot, bring back
+the deleted rows.
+
+**What this implementation actually delivers, precisely stated:** the
+customer-facing package, its lifecycle state, and the ability to detect and
+communicate a dependency-loss pause all survive a standard-dependency
+cascade intact. The **connector's own domain configuration and history**
+(which Shopify location maps to which Odoo warehouse, which products/
+customers/orders are bound to which Shopify records, in-flight and
+historical jobs) does **not** survive that same cascade — an administrator
+who restores the suite gets back a structurally complete, but functionally
+empty, connector for whichever domains were affected, and must redo that
+configuration.
+
+**Why this was not fixed in this pass:** the only two proven-safe patterns
+(moving the owning data model into a surviving module, or building a
+snapshot/restore mechanism) both require materially altering the five domain
+technical modules' own data ownership or adding new mutation-time snapshot
+logic to them — outside the task's own allowed-file scope for those modules
+("only the minimum files required to apply the proven global package-
+integrity gate... do not alter their domain semantics") and a substantially
+larger, riskier undertaking than the package-lifecycle mechanism this pass
+was scoped around and did complete correctly.
+
+**This is a control-room decision, not a worker one.** Recorded as its own
+finding in the PR evidence and a dedicated technical-debt entry (TD-019,
+High severity) rather than narrowed, assumed away, or silently left for a
+reader to discover on their own.
+
 ## 7. Requirement-to-proof matrix (excerpt — see PR body for the full matrix)
 
 | Requirement | Entry point | Test/evidence |
@@ -285,8 +346,15 @@ up front, not rediscover the hard way.
 | Global pause blocks admission/dispatch/network/actions | `assert_healthy()` instrumented at 7 seams | `test_package_pause_gates.py` |
 | Never auto-resumes | `action_confirm_resume` is the only healing path | `test_package_lifecycle.py` |
 | Restore is staged, not atomic | `action_recheck_dependencies`/`action_restore_suite`/`action_confirm_resume` | Harness stage 4 |
+| Domain data (mappings/bindings/jobs) preserved across a cascade | **Not implemented** — see §6a | Disproven empirically: `to_regclass()` shows the table dropped |
 
 ## 8. Remaining limitations (honestly disclosed, not silently narrowed)
+
+- **Domain data is not preserved across a standard-dependency cascade — see
+  §6a, the headline gap.** Restated here because this section is where a
+  reader scanning only "remaining limitations" would look: this is not a
+  minor rough edge, it is the one requirement (Section 12 of the governing
+  task) this implementation does not meet.
 
 - **Per-store granular resume selection.** This package-level gate is a
   global circuit breaker layered on top of the existing per-store

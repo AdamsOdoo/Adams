@@ -106,6 +106,22 @@ disposable-database proof of every invariant (A-K) are in
     transitive `product` cascade, end to end, with real Odoo module
     operations (never simulated).
 - **Negative / trade-offs:**
+  - **HEADLINE, not a minor trade-off: domain-owned data does NOT survive a
+    standard-dependency cascade.** Only the package controller's own state
+    survives (it lives in a module that is never cascaded); location
+    mappings, product/customer/order bindings, inventory-level bindings,
+    their jobs/job logs, and mutation-attempt evidence all live in the five
+    domain technical modules themselves, and Odoo's `module_uninstall()`
+    physically drops their tables the moment a standard dependency loss
+    cascades them away — verified empirically (`to_regclass()` against the
+    dropped table returns `NULL`; see `single-package-lifecycle.md` §6a).
+    Restoring the suite recreates those tables empty; it does not and cannot
+    restore the deleted rows. Neither Pattern A (move the data into a
+    surviving module) nor Pattern B (a versioned snapshot/restore mechanism)
+    is implemented for this data in this change. This is the one Section-12
+    requirement this decision does not satisfy, and is a control-room
+    decision on how to proceed, not something this session resolved or
+    narrowed unilaterally. Tracked as TD-019 (High).
   - The reverse dependency direction is unusual and must be understood by
     anyone extending the six technical modules; each new technical module
     added to the family must remember to add `shopify_connector` to its own
