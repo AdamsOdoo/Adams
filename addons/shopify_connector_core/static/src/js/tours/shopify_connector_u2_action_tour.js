@@ -513,3 +513,331 @@ tours.add("shopify_connector_u2_first_push_withdraw_tour", {
         },
     ],
 });
+
+// ---------------------------------------------------------------------------
+// The TD-020 mapping-level closure: withdrawing EVERY first-push decision
+// under one Shopify location, driven through the real action/view/wizard/
+// service chain.
+// ---------------------------------------------------------------------------
+// A service-level or direct-wizard-method test cannot see any of the things
+// that go wrong here, because all of them are on the way IN: whether the
+// control exists for the role the server admits and not for the one it
+// refuses, whether the counts the operator confirms against are the counts the
+// service will act on, whether the consequence that Shopify is NOT changed is
+// stated where the decision is made, and whether a refusal reaches the screen
+// rather than a stack trace. So this is driven end to end.
+
+/**
+ * Confirm one still-previewed pair under the mapping the dialog is open on.
+ *
+ * This is the interfering actor the staleness refusal exists for, and it has
+ * to be REAL: the signature is snapshotted when the dialog opens, so the
+ * refusal can only fire if something genuinely moves afterwards. It calls the
+ * same `type="object"` method the pair form's own Confirm First Push button
+ * calls, through the same RPC endpoint the web client uses, so what races the
+ * dialog is an ordinary operator action rather than a contrivance.
+ *
+ * The pair is FOUND rather than passed in: a tour that had an id threaded into
+ * it would silently do nothing if the fixture changed, and "did nothing" is
+ * indistinguishable from "the refusal did not fire" in the assertion below.
+ * Finding no pair is an explicit failure instead.
+ */
+const CONCURRENT_CONFIRM_STEP = {
+    trigger: `${DIALOG} footer button[name='action_confirm']`,
+    content: "A concurrent administrator confirms one of the pairs.",
+    async run() {
+        const { rpc } = odoo.loader.modules.get("@web/core/network/rpc");
+        const call = (model, method, args, kwargs = {}) =>
+            rpc("/web/dataset/call_kw", { model, method, args, kwargs });
+        // Scoped by the SEC-3 record rules to what this user may see, and the
+        // fixture holds exactly one still-previewed pair, which the Python
+        // assertions then name explicitly. Looked up rather than threaded in:
+        // an id baked into a tour goes stale silently, and "did nothing" is
+        // indistinguishable from "the refusal never fired".
+        const rows = await call(
+            "shopify.connector.inventory.level.binding",
+            "search_read",
+            [[["first_push_state", "=", "previewed"]], ["id"]],
+            { limit: 1 }
+        );
+        if (!rows.length) {
+            throw new Error(
+                "no previewed pair to confirm, so nothing would have moved " +
+                    "and the staleness assertion below could not mean anything"
+            );
+        }
+        await call(
+            "shopify.connector.inventory.level.binding",
+            "action_confirm_first_push",
+            [[rows[0].id]]
+        );
+        // The interference has to have LANDED, or the refusal asserted below
+        // would be proving nothing. Re-read the same pair and require it.
+        const after = await call(
+            "shopify.connector.inventory.level.binding",
+            "read",
+            [[rows[0].id], ["first_push_state"]]
+        );
+        if (after[0].first_push_state !== "confirmed") {
+            throw new Error(
+                `pair ${rows[0].id} is ${after[0].first_push_state} after the ` +
+                    "concurrent confirmation, so nothing moved and the " +
+                    "staleness refusal below cannot mean anything"
+            );
+        }
+    },
+};
+
+tours.add("shopify_connector_u2_location_withdraw_all_tour", {
+    steps: () => [
+        {
+            trigger: ".o_list_view .o_data_row .o_data_cell",
+            content: "Open the Shopify location whose warehouse has moved.",
+            run: "click",
+        },
+        focusStep(
+            ".o_form_view button:contains('Withdraw First Pushes')",
+            "The mapping-level withdrawal control is keyboard operable."
+        ),
+        keyboardActivateStep(
+            ".o_form_view button:contains('Withdraw First Pushes')",
+            "Open the mapping-level withdrawal dialog by keyboard."
+        ),
+        {
+            trigger: `${DIALOG}:contains('withdraws the first-push decision of every')`,
+            content:
+                "The consequence is stated for the WHOLE location before " +
+                "anything is written.",
+        },
+        // The counts, each read from its own labelled field rather than from
+        // the dialog's text as a whole: a single `:contains('3')` would be
+        // satisfied by any 3 anywhere on screen, including a different count.
+        {
+            trigger: `${DIALOG} .o_field_widget[name='total_pairs']:contains('4')`,
+            content: "Every pair under this location is counted.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='affected_pairs']:contains('3')`,
+            content: "The pairs this actually acts on are counted separately.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='previewed_pairs']:contains('1')`,
+            content: "Previewed and confirmed pairs are distinguished.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='confirmed_pairs']:contains('2')`,
+            content: "...so the operator can see what each decision was.",
+        },
+        // The remote-inventory consequence, as a NUMBER. "Nothing is changed
+        // on Shopify" is the reassuring half; how much is still live out there
+        // is the half an operator actually needs to decide with.
+        {
+            trigger: `${DIALOG} .alert-warning:contains('Shopify is not changed by this')`,
+            content: "The storefront consequence is named.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='pairs_live_on_shopify']:contains('2')`,
+            content:
+                "...and quantified: how many of the affected pairs have a " +
+                "quantity live on the storefront right now.",
+        },
+        {
+            trigger: `${DIALOG}:contains('STAY as they are')`,
+            content:
+                "The copy states the quantities STAY -- it never implies " +
+                "they were reverted or zeroed.",
+        },
+        // Refusal one: no reason.
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content: "Confirming with nothing typed must be refused.",
+            run: "click",
+        },
+        {
+            trigger:
+                `${DIALOG} [name='reason'].o_field_invalid, ` +
+                ".o_notification_body:contains('Invalid fields')",
+            content:
+                "The mandatory reason is enforced before the request is even " +
+                "sent.",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='reason'] input`,
+            content: "A reason is mandatory and lands on the audit trail.",
+            run: "edit Warehouse physically relocated - tour",
+        },
+        // Refusal two: a reason, but no consequence confirmation.
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content:
+                "A reason alone is not consent: the consequence has to be " +
+                "confirmed explicitly.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG}:contains('Confirm that explicitly')`,
+            content: "The service refuses, and the refusal reaches the screen.",
+        },
+        {
+            trigger: `${DIALOG} footer button`,
+            content: "Dismiss the refusal and complete the decision properly.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='confirmed'] input`,
+            content: "The single consequence confirmation is a deliberate act.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content: "Withdraw every first-push decision for this location.",
+            run: "click",
+        },
+        {
+            trigger: "body:not(:has(.modal))",
+            content: "The dialog closes: the decision was accepted.",
+        },
+    ],
+});
+
+tours.add("shopify_connector_u2_location_withdraw_all_stale_tour", {
+    steps: () => [
+        {
+            trigger: ".o_list_view .o_data_row .o_data_cell",
+            content: "Open the location mapping.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view button:contains('Withdraw First Pushes')",
+            content: "Open the withdrawal dialog.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='affected_pairs']:contains('2')`,
+            content:
+                "The dialog snapshots the state it is being decided against.",
+        },
+        // ANOTHER administrator confirms one of these pairs while this dialog
+        // sits open. Same method the pair form's own control calls.
+        CONCURRENT_CONFIRM_STEP,
+        {
+            trigger: `${DIALOG} .o_field_widget[name='reason'] input`,
+            content: "The operator types their reason, unaware anything moved.",
+            run: "edit Warehouse physically relocated - stale tour",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='confirmed'] input`,
+            content: "...and confirms the consequence.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content: "Applying a decision made against stale information.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG}:contains('changed while the dialog was open')`,
+            content:
+                "Refused, and told to reopen and decide against the current " +
+                "state. NOTHING was withdrawn.",
+        },
+    ],
+});
+
+tours.add("shopify_connector_u2_location_withdraw_all_denied_tour", {
+    steps: () => [
+        {
+            trigger: ".o_list_view .o_data_row .o_data_cell",
+            content: "A Connector User opens the same location mapping.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view .o_form_statusbar, .o_form_view header",
+            content: "The form renders for this role...",
+        },
+        {
+            // Absence, asserted by reading every button in the header. A CSS
+            // `:not(:has(:contains()))` cannot express this: `:contains()` is
+            // a hoot-dom extension, not CSS, so it is unavailable inside the
+            // structural pseudo-classes the browser evaluates itself.
+            //
+            // Absent, not disabled: a control a role can see and cannot use is
+            // a worse screen than no control at all, and it is the exact
+            // defect shape three other U2 controls shipped with.
+            trigger: ".o_form_view",
+            content:
+                "...without the mapping-level withdrawal control, which the " +
+                "server admits for Administrator alone.",
+            run() {
+                const header = document.querySelector(
+                    ".o_form_view .o_form_statusbar, .o_form_view header"
+                );
+                if (!header) {
+                    throw new Error(
+                        "the mapping form rendered no header at all, so the " +
+                            "absence of one control proves nothing"
+                    );
+                }
+                const buttons = [...header.querySelectorAll("button")];
+                if (!buttons.length) {
+                    throw new Error(
+                        "the header carries no controls at all for this role, " +
+                            "so this is not evidence about one of them"
+                    );
+                }
+                const offending = buttons.filter((b) =>
+                    b.textContent.includes("Withdraw First Pushes")
+                );
+                if (offending.length) {
+                    throw new Error(
+                        "a Connector User was offered the mapping-level " +
+                            "withdrawal control, which the server refuses"
+                    );
+                }
+            },
+        },
+    ],
+});
+
+// The same staleness protection on the SINGLE-PAIR route. Both wizards
+// snapshot the state they were opened against into a `readonly` field, and
+// both were losing it the same way, so both need the evidence.
+tours.add("shopify_connector_u2_first_push_withdraw_stale_tour", {
+    steps: () => [
+        {
+            trigger: ".o_list_view .o_data_row .o_data_cell",
+            content: "Open the previewed pair.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view button:contains('Withdraw First Push')",
+            content: "Open the single-pair withdrawal dialog.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG}:contains('withdraws the pair')`,
+            content:
+                "The dialog snapshots the state it is being decided against.",
+        },
+        CONCURRENT_CONFIRM_STEP,
+        {
+            trigger: `${DIALOG} .o_field_widget[name='reason'] input`,
+            content: "The operator types their reason, unaware anything moved.",
+            run: "edit Withdrawn against stale state - tour",
+        },
+        {
+            trigger: `${DIALOG} .o_field_widget[name='confirmed'] input`,
+            content: "...and confirms the consequence.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG} footer button[name='action_confirm']`,
+            content: "Applying a decision made against stale information.",
+            run: "click",
+        },
+        {
+            trigger: `${DIALOG}:contains('changed while the dialog was open')`,
+            content: "Refused. NOTHING was withdrawn.",
+        },
+    ],
+});

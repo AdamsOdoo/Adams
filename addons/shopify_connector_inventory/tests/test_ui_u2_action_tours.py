@@ -39,6 +39,7 @@ assuming it.
 import uuid
 
 from odoo import fields
+from odoo.exceptions import AccessError
 from odoo.tests import tagged
 from odoo.tests.common import HttpCase
 
@@ -587,4 +588,352 @@ class TestUiU2InventoryActionTours(HttpCase):
             'cr.commit()', source,
             'a U2 control that commits would survive the rollback and leave '
             'residue in the test database',
+        )
+
+    # ------------------------------------------------------------------
+    # The TD-020 mapping-level closure, driven end to end
+    # ------------------------------------------------------------------
+
+    def _mapping_pairs(self, spec):
+        """One inventory pair per entry, each on its own product variant.
+
+        `UNIQUE(store_id, product_variant_binding_id, location_mapping_id)`
+        means a mapping-level fixture needs a distinct variant per pair, which
+        is also what the real case looks like: the pairs under one Shopify
+        location are one per product variant, and that multiplicity is the
+        whole reason the single-pair route was a dead end for a moved
+        warehouse.
+        """
+        created = []
+        for index, (state, extra) in enumerate(spec):
+            template = self.env['product.template'].create(
+                {'name': 'U2 withdraw widget %d' % index})
+            template_binding = self.env[
+                'shopify.connector.product.template.binding'
+            ].create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/Product/U2WDALL%d' % index,
+                'product_template_id': template.id,
+            })
+            variant_binding = self.env[
+                'shopify.connector.product.variant.binding'
+            ].create({
+                'store_id': self.store.id,
+                'shopify_gid': 'gid://shopify/ProductVariant/U2WDALL%d' % index,
+                'product_variant_id': template.product_variant_id.id,
+                'product_template_binding_id': template_binding.id,
+            })
+            values = {
+                'store_id': self.store.id,
+                'product_variant_binding_id': variant_binding.id,
+                'location_mapping_id': self.mapping.id,
+                'shopify_inventory_item_gid':
+                    'gid://shopify/InventoryItem/U2WDALL%d' % index,
+                'first_push_state': state,
+                'pending_target_available': 12.0,
+            }
+            values.update(extra)
+            created.append(self.env[
+                'shopify.connector.inventory.level.binding'
+            ].sudo().create(values))
+        self.env.flush_all()
+        return created
+
+    def _withdrawal_admin(self, login='u2act_wdall_admin'):
+        return self._connector_user(
+            login, 'shopify_connector_core.group_shopify_connector_admin')
+
+    def _audit_logs(self):
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_manual_maintenance'),
+        ])
+        return self.env['shopify.connector.job.log'].sudo().search([
+            ('job_id', 'in', jobs.ids),
+        ]), jobs
+
+    def test_location_withdraw_all_tour_returns_every_pair_to_pending(self):
+        """The whole mapping-level closure, driven through the real chain.
+
+        Fails on the starting head three times over: the control, the wizard
+        and the service do not exist there, and a moved warehouse was a
+        permanent strand -- `_assert_remap_is_safe` scans every pair under the
+        location, and the only route out was one dialog, one reason and one
+        confirmation per product variant with no atomicity.
+
+        What the tour proves that a service test cannot: that the control is
+        reachable BY KEYBOARD from the mapping form, that the counts the
+        operator confirms against are rendered from the same preview the
+        service acts on, that the storefront consequence is stated AND
+        quantified where the decision is made, and that both refusals -- an
+        empty reason and an unconfirmed consequence -- reach the screen rather
+        than a stack trace. What this method then proves is the database
+        consequence, which the screen cannot show.
+        """
+        admin = self._withdrawal_admin()
+        previewed, confirmed_live, confirmed_dry, untouched = self._mapping_pairs([
+            # affected, and live on the storefront
+            ('previewed', {
+                'first_push_preview_qty': 7.0,
+                'last_pushed_at': fields.Datetime.now(),
+            }),
+            # affected, live on the storefront
+            ('confirmed', {
+                'first_push_preview_qty': 12.0,
+                'first_push_confirmed_at': fields.Datetime.now(),
+                'first_push_confirmed_by_uid': self.reviewer.id,
+                'last_pushed_at': fields.Datetime.now(),
+            }),
+            # affected, nothing pushed yet
+            ('confirmed', {
+                'first_push_preview_qty': 3.0,
+                'first_push_confirmed_at': fields.Datetime.now(),
+                'first_push_confirmed_by_uid': self.reviewer.id,
+            }),
+            # NOT affected: already pending, and must be left exactly alone
+            ('pending', {}),
+        ])
+        # The counts the tour asserts on screen, computed here from the same
+        # preview the dialog renders -- so a fixture drift breaks this test
+        # rather than making the tour assert the wrong numbers quietly.
+        preview = self.env[
+            'shopify.connector.inventory.service'
+        ].with_user(admin).first_push_withdrawal_preview(self.mapping)
+        self.assertEqual(
+            (preview['total_pairs'], preview['affected_pairs'],
+             preview['previewed_pairs'], preview['confirmed_pairs'],
+             preview['pairs_live_on_shopify']),
+            (4, 3, 1, 2, 2),
+            'the fixture no longer produces the counts the tour asserts',
+        )
+
+        self.start_tour(self._url(MAPPING_ACTION),
+                        'shopify_connector_u2_location_withdraw_all_tour',
+                        login='u2act_wdall_admin')
+
+        for binding in (previewed, confirmed_live, confirmed_dry, untouched):
+            binding.invalidate_recordset()
+        # ALL of the affected pairs moved...
+        for binding in (previewed, confirmed_live, confirmed_dry):
+            self.assertEqual(binding.first_push_state, 'pending')
+            self.assertFalse(binding.first_push_preview_qty)
+            self.assertFalse(binding.first_push_confirmed_at)
+            self.assertFalse(binding.first_push_confirmed_by_uid)
+        # ...and the one that was already pending is untouched, including the
+        # quantity that is live on the storefront for the two that were.
+        self.assertEqual(untouched.first_push_state, 'pending')
+        self.assertTrue(
+            confirmed_live.last_pushed_at,
+            'withdrawing a decision must not erase the record that a quantity '
+            'is live on Shopify; the dialog says those quantities STAY',
+        )
+
+        logs, jobs = self._audit_logs()
+        self.assertTrue(jobs)
+        self.assertEqual(
+            set(jobs.mapped('create_uid')), {admin},
+            'the audit trail must name the administrator who decided',
+        )
+        bodies = logs.mapped('message')
+        joined = ' '.join(bodies)
+        self.assertIn('Warehouse physically relocated - tour', joined)
+        # BOTH levels: one record of the decision, and one per pair, so the set
+        # acted on can be reconstructed exactly rather than inferred.
+        mapping_level = [b for b in bodies if 'mapping #%d' % self.mapping.id in b
+                         and '3 of 4 pair(s) returned to pending' in b]
+        self.assertEqual(
+            len(mapping_level), 1,
+            'expected exactly one mapping-level audit entry stating the '
+            'counts; got:\n%s' % '\n'.join(bodies),
+        )
+        self.assertIn('2 of which have a quantity live on Shopify', joined)
+        for binding in (previewed, confirmed_live, confirmed_dry):
+            self.assertTrue(
+                any('inventory pair #%d' % binding.id in b for b in bodies),
+                'pair #%d was withdrawn with no per-pair audit entry'
+                % binding.id,
+            )
+        self.assertFalse(
+            any('inventory pair #%d' % untouched.id in b for b in bodies),
+            'a pair that was not withdrawn must not appear in the audit trail',
+        )
+        # The old confirmation is never reused: D-013-4's untouched gate now
+        # refuses a push for every one of them.
+        for binding in (previewed, confirmed_live, confirmed_dry):
+            self.assertNotEqual(binding.first_push_state, 'confirmed')
+
+    def test_location_withdraw_all_refuses_a_decision_made_against_stale_state(self):
+        """A pair confirmed while the dialog is open voids the decision.
+
+        The interference is a REAL concurrent operator action performed from
+        the browser through the same RPC endpoint the web client uses -- the
+        pair form's own `action_confirm_first_push` -- because the signature is
+        snapshotted when the dialog opens and the refusal can only be proved by
+        something genuinely moving afterwards.
+
+        All-or-nothing is the assertion: the refusal must leave EVERY pair
+        exactly as it was, including the one the concurrent actor moved.
+        """
+        self._withdrawal_admin('u2act_wdall_stale')
+        confirmed, previewed = self._mapping_pairs([
+            ('confirmed', {
+                'first_push_preview_qty': 12.0,
+                'first_push_confirmed_at': fields.Datetime.now(),
+                'first_push_confirmed_by_uid': self.reviewer.id,
+            }),
+            ('previewed', {'first_push_preview_qty': 5.0}),
+        ])
+
+        self.start_tour(
+            self._url(MAPPING_ACTION),
+            'shopify_connector_u2_location_withdraw_all_stale_tour',
+            login='u2act_wdall_stale',
+        )
+
+        confirmed.invalidate_recordset()
+        previewed.invalidate_recordset()
+        # The concurrent confirmation stands...
+        self.assertEqual(
+            previewed.first_push_state, 'confirmed',
+            'the interfering action did not happen, so the refusal this test '
+            'asserts could not have been caused by staleness',
+        )
+        # ...and the withdrawal did nothing at all.
+        self.assertEqual(confirmed.first_push_state, 'confirmed')
+        self.assertEqual(confirmed.first_push_preview_qty, 12.0)
+        self.assertTrue(confirmed.first_push_confirmed_at)
+        logs, _jobs = self._audit_logs()
+        self.assertFalse(
+            [b for b in logs.mapped('message') if 'withdrawn' in b],
+            'a refused withdrawal must leave no withdrawal audit entry',
+        )
+
+    def test_location_withdraw_all_control_is_absent_for_a_connector_user(self):
+        """The role the server refuses is never offered the control.
+
+        Absent, not disabled: a control a role can see and cannot use is a
+        worse screen than no control, and it is the exact defect shape three
+        other U2 controls shipped with.
+        """
+        self._mapping_pairs([
+            ('confirmed', {
+                'first_push_preview_qty': 12.0,
+                'first_push_confirmed_at': fields.Datetime.now(),
+                'first_push_confirmed_by_uid': self.reviewer.id,
+            }),
+        ])
+
+        self.start_tour(
+            self._url(MAPPING_ACTION),
+            'shopify_connector_u2_location_withdraw_all_denied_tour',
+            login='u2act_reviewer',
+        )
+
+        # And the server refuses the same role at every layer beneath it, so
+        # the hidden control is a courtesy rather than the protection.
+        Service = self.env['shopify.connector.inventory.service'].with_user(
+            self.reviewer)
+        with self.assertRaises(AccessError):
+            Service.first_push_withdrawal_preview(self.mapping)
+        with self.assertRaises(AccessError):
+            Service.withdraw_first_push_decisions_for_mapping(
+                self.mapping, 'no', confirmed=True, expected_signature='x')
+        with self.assertRaises(AccessError):
+            self.env[
+                'shopify.connector.location.withdraw.all.wizard'
+            ].with_user(self.reviewer).create({'mapping_id': self.mapping.id})
+
+    def test_location_withdrawal_performs_no_shopify_request(self):
+        """The mapping-level route reaches no transport, and enqueues nothing.
+
+        Asserted twice: structurally against the source of every method the
+        route touches, and behaviourally by proving the withdrawal creates
+        only lifecycle-audit rows and no job any dispatcher would send.
+        """
+        import inspect
+
+        Service = self.env['shopify.connector.inventory.service']
+        for method in ('first_push_withdrawal_preview',
+                       'withdraw_first_push_decisions_for_mapping',
+                       '_first_push_bindings_of',
+                       '_first_push_withdrawal_signature'):
+            source = inspect.getsource(getattr(type(Service), method))
+            for forbidden in ('api_client', 'graphql', 'requests.', '_send'):
+                self.assertNotIn(
+                    forbidden, source,
+                    '%s reaches %r; withdrawing a decision must not contact '
+                    'Shopify' % (method, forbidden),
+                )
+
+        admin = self._withdrawal_admin('u2act_wdall_transport')
+        binding, = self._mapping_pairs([
+            ('confirmed', {
+                'first_push_preview_qty': 12.0,
+                'first_push_confirmed_at': fields.Datetime.now(),
+                'first_push_confirmed_by_uid': self.reviewer.id,
+            }),
+        ])
+        before = self.env['shopify.connector.job'].sudo().search([])
+        preview = Service.with_user(admin).first_push_withdrawal_preview(
+            self.mapping)
+        Service.with_user(admin).withdraw_first_push_decisions_for_mapping(
+            self.mapping, 'transport check', confirmed=True,
+            expected_signature=preview['signature'],
+        )
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'pending')
+        created = self.env['shopify.connector.job'].sudo().search([]) - before
+        self.assertTrue(created)
+        self.assertEqual(
+            set(created.mapped('job_type')), {'core_manual_maintenance'},
+            'the withdrawal enqueued a job type a dispatcher would send to '
+            'Shopify: %s' % created.mapped('job_type'),
+        )
+        self.assertFalse(
+            self.env['shopify.connector.mutation.attempt'].sudo().search([
+                ('store_id', '=', self.store.id),
+            ]),
+            'no Shopify mutation may be attempted by a withdrawal',
+        )
+
+    def test_single_pair_withdrawal_refuses_a_decision_made_against_stale_state(self):
+        """The same snapshot defect, on the single-pair route.
+
+        `expected_state` and `expected_signature` are both `readonly` fields
+        declared in their wizard's view, and a readonly field is EXCLUDED from
+        what the web client sends on save. Both dialogs were therefore losing
+        the snapshot on the way to the server, and `create()` filled the gap
+        from `default_get` -- recomputing the state at SAVE time, which is
+        precisely the state the check exists to detect having moved. Neither
+        refusal could fire from the UI, and the `expected_state`-is-mandatory
+        correction protected only callers that were not the wizard.
+
+        Driven rather than asserted structurally, because the defect lives in
+        the request the browser sends and nowhere else: every server test
+        passes `expected_state` explicitly and so cannot see it.
+        """
+        self._connector_user(
+            'u2act_wd_stale_pair',
+            'shopify_connector_core.group_shopify_connector_admin')
+        binding = self._level(
+            'gid://shopify/InventoryItem/U2WDSTALE', 'previewed',
+            first_push_preview_qty=9.0,
+        )
+        self.env.flush_all()
+
+        self.start_tour(
+            self._url(WORKSPACE_ACTION),
+            'shopify_connector_u2_first_push_withdraw_stale_tour',
+            login='u2act_wd_stale_pair',
+        )
+
+        binding.invalidate_recordset()
+        # The interfering confirmation stands, and the withdrawal did nothing.
+        self.assertEqual(binding.first_push_state, 'confirmed')
+        self.assertEqual(binding.first_push_preview_qty, 9.0)
+        logs, _jobs = self._audit_logs()
+        self.assertFalse(
+            [b for b in logs.mapped('message')
+             if 'Withdrawn against stale state - tour' in b],
+            'a refused withdrawal must leave no withdrawal audit entry',
         )

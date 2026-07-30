@@ -297,7 +297,21 @@
                 </div>
                 <group>
                     <field name="binding_id" invisible="1"/>
-                    <field name="expected_state" invisible="1"/>
+                    <!--
+                        `force_save` is the staleness protection, not a
+                        detail. A `readonly` field declared in a view is
+                        EXCLUDED from what the web client sends on save
+                        (`_getChanges` in web/model/relational_model/record.js
+                        skips it unless `forceSave`), so the snapshot this
+                        dialog opened against never reached the server. The
+                        record is new, so `create()` then filled the gap from
+                        `default_get`: recomputing the state AT SAVE TIME,
+                        which is exactly the state the check is supposed to
+                        detect having changed. The comparison could not fail,
+                        and a decision made against stale information was
+                        applied.
+                    -->
+                    <field name="expected_state" invisible="1" force_save="1"/>
                     <field name="has_pushed_before" invisible="1"/>
                     <field name="shopify_location_name" readonly="1"/>
                     <field name="odoo_location_id" readonly="1"/>
@@ -368,7 +382,13 @@
                     <group>
                         <group string="Location">
                             <field name="mapping_id" invisible="1"/>
-                            <field name="expected_signature" invisible="1"/>
+                            <!-- See `expected_state` above: without
+                                 `force_save` the client drops this readonly
+                                 field and `create()` recomputes the signature
+                                 from live state at save time, so the staleness
+                                 refusal could never fire. -->
+                            <field name="expected_signature" invisible="1"
+                                   force_save="1"/>
                             <field name="shopify_location" readonly="1"/>
                             <field name="odoo_location" readonly="1"/>
                         </group>
