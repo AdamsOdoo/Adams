@@ -186,10 +186,18 @@ class TestUiVisibilityMatrix(TransactionCase):
     # ------------------------------------------------------------------ #
     def _make_credentialed_store(self, state):
         store = self._make_store(state=state, credential_present=True)
-        self.env['shopify.connector.store.credential'].sudo().create({
+        # Batch 1 correction (§9.1): credential rows are created only by the
+        # credential service, so this fixture goes through the sanctioned
+        # surface. `_credential_surface` is used rather than `action_set_token`
+        # deliberately -- the latter takes the store lifecycle lock and would
+        # move a `connected` store to `reconnect_needed`, which is exactly the
+        # state this fixture is constructing.
+        Credential = self.env['shopify.connector.store.credential'].sudo()
+        Credential._credential_surface('_mutate_token').create({
             'store_id': store.id,
             'access_token': 'shpat_dummydummydummy0000000000000',
             'credential_state': 'present',
+            'credential_epoch': 1,
         })
         return store
 

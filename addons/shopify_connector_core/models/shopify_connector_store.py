@@ -651,10 +651,22 @@ class ShopifyConnectorStore(models.Model):
         # the same `_apply_probe_failure` path an unusable credential already
         # took, so Test Connection reports "we could not authenticate" rather
         # than an unhandled error.
+        #
+        # Batch 1 correction: the exchange purpose is derived from the probe's
+        # OWN purpose rather than assumed. `reconnect_probe` is the one route
+        # valid for a `disconnected` store, and it is the only exchange purpose
+        # that admits one; `test_connection`/`readiness_probe` are the explicit
+        # setup route. `disconnecting` is admitted by no purpose, and the matrix
+        # pre-check above has already refused it in any case -- this is the same
+        # gate applied to the token exchange itself, which previously ran outside
+        # every gate because it ran before all of them.
+        exchange_purpose = (
+            'reconnect' if purpose == 'reconnect_probe' else 'setup'
+        )
         try:
             self.env[
                 'shopify.connector.store.credential'
-            ]._ensure_access_token(self)
+            ]._ensure_access_token(self, purpose=exchange_purpose)
         except ShopifyClientError as exc:
             probe_job = Job.sudo().create({
                 'store_id': self.id,
@@ -809,16 +821,27 @@ class ShopifyConnectorStore(models.Model):
             'last_test_connection_reason': redact(exc.reason),
         })
         if exc.credential_invalid:
-            credential = self.env[
-                'shopify.connector.store.credential'
-            ].search([('store_id', '=', self.id)], limit=1)
+            Credential = self.env['shopify.connector.store.credential']
+            credential = Credential.search(
+                [('store_id', '=', self.id)], limit=1,
+            )
             if credential:
                 # Wave 5: the non-secret failure hint lives beside the state
                 # flip, and is written HERE -- in the caller's own transaction
                 # -- rather than by the token-refresh side transaction, whose
                 # write to this row would collide with this same request's
                 # later revalidation lock under REPEATABLE READ.
-                credential.write({
+                #
+                # Batch 1 correction: routed through the credential model's
+                # closed write surface. This is a sanctioned lifecycle writer and
+                # is named in `CREDENTIAL_WRITE_SURFACES`; it writes no secret and
+                # deliberately does NOT bump the identity epoch, because
+                # recording that an exchange failed does not supersede the
+                # credential a merchant configured -- the same pair may well work
+                # on the next attempt.
+                Credential._credential_surface(
+                    '_apply_probe_failure',
+                ).browse(credential.id).write({
                     'credential_state': 'invalid',
                     'token_last_failure_reason': redact(exc.reason or ''),
                 })
@@ -1316,6 +1339,19 @@ class ShopifyConnectorStore(models.Model):
         escalation snapshot; then **zero rows -> `completed`**, **rows within the
         timeout -> `quiescing`** (schedule a delayed re-poll), **rows at/past
         `DISCONNECT_QUIESCE_TIMEOUT` -> `timed_out`**.
+
+        BATCH 1 CORRECTION -- the token exchange is a fourth blocker. A
+        client-credentials token exchange is a Shopify network call that holds no
+        call lease and no row lock, so every signal above was blind to it: a
+        disconnect could reach `completed`, clear the credential, and only then
+        have a token minted from that credential arrive. `_token_exchange_in_
+        flight` closes that by probing the store's refresh advisory lock, which an
+        in-flight exchange holds for its whole duration. It is a `try` lock, so it
+        can never block this held-`FOR UPDATE` transaction, and a `False` answer
+        leaves the lock with this transaction -- which also stops a NEW exchange
+        starting while this pass finalizes. Unlike a lease row it is released by
+        PostgreSQL if the exchanging backend dies, so a crashed refresher cannot
+        strand a disconnect forever.
         """
         self.ensure_one()
         if self.state != 'disconnecting':
@@ -1326,14 +1362,21 @@ class ShopifyConnectorStore(models.Model):
         leases = Lease.search([('store_id', '=', self.id)])
         count = len(leases)
         oldest = min(leases.mapped('admitted_at')) if leases else False
+        exchanging = self.env[
+            'shopify.connector.store.credential'
+        ]._token_exchange_in_flight(self)
         self.write({
             'disconnect_open_lease_count': count,
             'disconnect_oldest_admitted_at': oldest,
         })
         attempts, reconciliations = self._layer2_disconnect_blockers()
-        if count == 0 and not attempts and not reconciliations:
-            # Completion requires both call-lease quiescence and Layer 2
-            # mutation/reconciliation quiescence.
+        if (
+            count == 0 and not attempts and not reconciliations
+            and not exchanging
+        ):
+            # Completion requires call-lease quiescence, Layer 2
+            # mutation/reconciliation quiescence, AND no in-flight token
+            # exchange.
             self._finalize_disconnect_completed()
             return
         requested_at = self.disconnect_requested_at or fields.Datetime.now()
@@ -1344,15 +1387,23 @@ class ShopifyConnectorStore(models.Model):
                     attempts, reconciliations, count,
                 )
             else:
+                # The deadline is reached and the only remaining blockers are
+                # leases and/or an exchange. `timed_out` clears the credential,
+                # which is the accepted bounded outcome -- and an exchange that
+                # commits after it cannot resurrect anything, because the clear
+                # bumps the identity epoch and no cache row minted from the old
+                # one can be read.
                 self._finalize_disconnect_timed_out(leases)
         else:
             self.write({
                 'disconnect_status': 'quiescing',
                 'disconnect_status_reason': (
                     '%d call lease(s), %d unresolved mutation attempt(s), '
-                    'and %d reconciliation job(s) remain; waiting for '
+                    '%d reconciliation job(s)%s remain; waiting for '
                     'quiescence.' % (
                         count, len(attempts), len(reconciliations),
+                        ' and an in-flight access-token exchange'
+                        if exchanging else '',
                     )
                 ),
             })

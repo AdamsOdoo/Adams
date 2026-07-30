@@ -149,9 +149,9 @@ class TestExchangeRequestShape(ClientCredentialsCase):
         """
         captured = {}
 
-        def fake_post(url, data=None, headers=None, timeout=None):
+        def fake_post(url, data=None, headers=None, timeout=None, **kwargs):
             captured.update(url=url, data=data, headers=headers,
-                            timeout=timeout)
+                            timeout=timeout, **kwargs)
             return _token_response()
 
         from ..models import shopify_connector_api_client as client_module
@@ -175,6 +175,19 @@ class TestExchangeRequestShape(ClientCredentialsCase):
             'application/x-www-form-urlencoded',
         )
         self.assertTrue(captured['timeout'])
+        # Batch 1 correction. Requests enables redirect-following by default,
+        # including for POST, and a 307/308 preserves method AND body -- so
+        # without this the client secret would be re-posted to whatever host the
+        # response named. Asserted as `is False`, not falsy: a missing argument is
+        # `None`, which is exactly the defect.
+        self.assertIs(
+            captured.get('allow_redirects'), False,
+            'the client-secret POST must not follow redirects',
+        )
+        self.assertIs(
+            captured.get('verify'), True,
+            'TLS verification must stay enabled on the token exchange',
+        )
 
     def test_refused_exchange_is_the_auth_taxonomy(self):
         for status in (400, 401, 403):
@@ -213,7 +226,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             side_effect=lambda *a: calls.append(1) or _token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(len(calls), 1)
         cached = self._cached()
         self.assertEqual(cached.access_token, DUMMY_EXCHANGED_TOKEN)
@@ -240,9 +253,9 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             side_effect=lambda *a: calls.append(1) or _token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
-            self.Credential._ensure_access_token(self.store)
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
+            self.Credential._ensure_access_token(self.store, purpose='setup')
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(len(calls), 1)
 
     def test_refresh_happens_before_expiry_with_the_margin(self):
@@ -251,14 +264,26 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         cached = self._cached()
         # Age the token INTO the refresh margin but not past expiry: it is
         # still usable, and must nevertheless be replaced on the next ensure.
+        #
+        # `obtained_at` moves with `expires_at`, so the row describes a genuine
+        # 24-hour Shopify token that has been alive for nearly 24 hours -- which
+        # is what aging actually looks like. Moving `expires_at` alone would
+        # instead describe a token whose WHOLE LIFETIME was 14 minutes, and the
+        # effective-margin clamp correctly declines to refresh such a token at
+        # 840 of its 840 seconds (see `_effective_refresh_margin`: a token
+        # shorter-lived than the margin would otherwise re-exchange on every
+        # single call, which is the loop that clamp exists to stop).
         nearly = fields.Datetime.now() + timedelta(
             seconds=credential_module.TOKEN_REFRESH_MARGIN_SECONDS - 60,
         )
-        cached.sudo().write({'expires_at': nearly})
+        cached.sudo().write({
+            'obtained_at': nearly - timedelta(seconds=86399),
+            'expires_at': nearly,
+        })
         calls = []
         with patch.object(
             type(self.Client), '_send_token_exchange',
@@ -266,7 +291,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
                 token='shpat_SECONDEXCHANGE0000000000000000',
             ),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(len(calls), 1)
         self.assertEqual(
             self.Credential._get_access_token(self.store),
@@ -281,7 +306,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self._cached().sudo().write({
             'expires_at': fields.Datetime.now() - timedelta(seconds=1),
         })
@@ -294,7 +319,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         # The cache is fresh, so a waiter polls once and comes back True
         # without any exchange seam in reach at all.
         self.assertTrue(self.Credential._await_peer_refresh(self.store))
@@ -317,7 +342,7 @@ class TestTokenCacheAndRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             side_effect=AssertionError('offline mode must never exchange'),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(
             self.Credential._get_access_token(self.store),
             DUMMY_OFFLINE_TOKEN,
@@ -340,7 +365,7 @@ class TestFailedRefresh(ClientCredentialsCase):
             return_value=FakeResponse(401, json_body={}, headers={}),
         ):
             with self.assertRaises(ShopifyClientError) as ctx:
-                self.Credential._ensure_access_token(self.store)
+                self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(ctx.exception.error_class, ERROR_AUTH)
         self.assertTrue(ctx.exception.credential_invalid)
         # No cache row was minted for a refused exchange.
@@ -357,7 +382,7 @@ class TestFailedRefresh(ClientCredentialsCase):
             return_value=FakeResponse(503, json_body={}, headers={}),
         ):
             with self.assertRaises(ShopifyClientError) as ctx:
-                self.Credential._ensure_access_token(self.store)
+                self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertEqual(ctx.exception.error_class, ERROR_TEMPORARY)
         self.assertFalse(ctx.exception.credential_invalid)
         credential = self.Credential._credential_for(self.store)
@@ -371,7 +396,7 @@ class TestFailedRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self._cached().sudo().write({
             'expires_at': fields.Datetime.now() + timedelta(
                 seconds=credential_module.TOKEN_REFRESH_MARGIN_SECONDS - 60,
@@ -381,7 +406,7 @@ class TestFailedRefresh(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=FakeResponse(503, json_body={}, headers={}),
         ):
-            self.assertTrue(self.Credential._ensure_access_token(self.store))
+            self.assertTrue(self.Credential._ensure_access_token(self.store, purpose='setup'))
         self.assertEqual(
             self.Credential._get_access_token(self.store),
             DUMMY_EXCHANGED_TOKEN,
@@ -397,7 +422,7 @@ class TestRotationInvalidation(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.assertTrue(self._cached())
         self.Credential.with_user(self.user_admin).action_set_client_credentials(
             self.store, 'rotated-client-id', 'rotated-client-secret',
@@ -423,7 +448,7 @@ class TestRotationInvalidation(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.Credential.with_user(self.user_admin).action_replace_token(
             self.store, DUMMY_OFFLINE_TOKEN,
         )
@@ -455,7 +480,7 @@ class TestRotationInvalidation(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         self.Credential.with_user(self.user_admin).action_clear_token(
             self.store,
         )
@@ -466,16 +491,21 @@ class TestRotationInvalidation(ClientCredentialsCase):
         self.assertFalse(self._cached())
         self.assertFalse(self.Credential._get_access_token(self.store))
 
-    def test_probe_identity_is_the_pair_not_the_rotating_token(self):
+    def test_probe_identity_is_the_epoch_not_the_rotating_token(self):
         """A routine 24-hour rotation is NOT a credential change; replacing
         the client credentials IS. `_lifecycle_credential_identity` is what
-        the post-network revalidation compares, so both halves matter."""
+        the post-network revalidation compares, so both halves matter.
+
+        Batch 1 correction: the compared value is the non-secret identity epoch
+        rather than the `(client_id, client_secret)` pair. Both halves of the
+        claim are unchanged -- a rotation writes only the cache row, so the epoch
+        does not move; a replace goes through `_mutate_token`, so it does."""
         self._set_client_credentials()
         with patch.object(
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         before = self.Credential._lifecycle_credential_identity(self.store)
         # Simulate the scheduled rotation: a new token lands in the cache.
         self._cached().sudo().write({
@@ -578,7 +608,7 @@ class TestEndToEndAndLeakage(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         state = self.env['shopify.connector.setup.wizard'].with_user(
             self.user_admin,
         ).get_setup_state(store_id=self.store.id)
@@ -597,7 +627,7 @@ class TestEndToEndAndLeakage(ClientCredentialsCase):
             type(self.Client), '_send_token_exchange',
             return_value=_token_response(),
         ):
-            self.Credential._ensure_access_token(self.store)
+            self.Credential._ensure_access_token(self.store, purpose='setup')
         with self.assertRaises(AccessError):
             self.env['shopify.connector.store.access.token'].with_user(
                 self.user_admin,
@@ -664,11 +694,30 @@ class TestOfflineCompatibility(ClientCredentialsCase):
             self.store.with_user(self.user_admin).action_test_connection()
         self.assertEqual(self.store.last_test_connection_result, 'pass')
 
-    def test_offline_identity_is_the_token_exactly_as_before(self):
-        self.Credential.with_user(self.user_admin).action_set_token(
-            self.store, DUMMY_OFFLINE_TOKEN,
-        )
-        self.assertEqual(
-            self.Credential._lifecycle_credential_identity(self.store),
-            DUMMY_OFFLINE_TOKEN,
+    def test_offline_identity_is_the_non_secret_epoch_not_the_token(self):
+        """Batch 1 correction: the probe's identity is the epoch, both modes.
+
+        This test previously asserted that the offline mode's identity was the
+        token VALUE. That worked, and it was worse than this in two ways: it put
+        a live credential into a snapshot carried across a network call for the
+        sake of an equality test, and comparing values missed a same-value
+        replace -- an operator re-entering the identical token, which the service
+        treats as a credential change (it clears the verification evidence) but
+        the value comparison read as "unchanged". The epoch advances on that
+        write like any other, so it is caught.
+        """
+        Credential = self.Credential.with_user(self.user_admin)
+        Credential.action_set_token(self.store, DUMMY_OFFLINE_TOKEN)
+        first = self.Credential._lifecycle_credential_identity(self.store)
+        self.assertIsInstance(first, int)
+        self.assertGreater(first, 0)
+        # The identity must not BE the secret, and must not contain it.
+        self.assertNotEqual(first, DUMMY_OFFLINE_TOKEN)
+        self.assertNotIn(DUMMY_OFFLINE_TOKEN, str(first))
+        # A same-VALUE replace is still a credential change, and is now caught.
+        Credential.action_replace_token(self.store, DUMMY_OFFLINE_TOKEN)
+        self.assertGreater(
+            self.Credential._lifecycle_credential_identity(self.store), first,
+            're-entering the identical token is a credential change and must '
+            'advance the identity the probe compares',
         )

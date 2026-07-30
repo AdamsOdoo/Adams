@@ -609,9 +609,16 @@ class TestExportMutationExpiryThroughTheDispatcher(TransactionCase):
         # would "prove" the guard for the wrong reason. Set before the job is
         # enqueued, so the job captures the store's settled
         # `connection_generation`.
-        env['shopify.connector.store.credential'].create({
+        # Batch 1 correction (§9.1): minted through the credential service's
+        # write surface, which is now the only route to a credential row.
+        # Mechanical, test-only; the surface avoids `action_set_token`'s
+        # lifecycle lock, which would demote this `connected` store.
+        env['shopify.connector.store.credential']._credential_surface(
+            '_mutate_token',
+        ).create({
             'store_id': store.id,
             'access_token': 'shpat_DUMMYDUMMYDUMMY0000000000000000',
+            'credential_epoch': 1,
         })
         store.write({'state': 'connected'})
         env['shopify.connector.store.settings'].create({

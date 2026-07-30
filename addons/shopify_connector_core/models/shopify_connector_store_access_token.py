@@ -32,11 +32,35 @@ The token is stored plain behind that access control. It is **not** encrypted at
 rest -- the same honest residual recorded for `access_token` on the credential
 row (AR-022/AR-024/AR-025). No copy anywhere in this connector claims otherwise.
 
+PROVENANCE (Batch 1 correction, 2026-07-30)
+-------------------------------------------
+
+`credential_id` alone does NOT prove which credential minted a token. A
+rotation updates the credential row **in place**, so the relation still points
+at the same record afterwards and a token minted from the previous secret keeps
+a relation that looks perfectly current. That is the exact shape of the
+reproduced obsolete-token defect: a refresh that read secret pair A, was
+overtaken by a rotation to pair B, and then inserted a cache row whose
+`credential_id` referenced the (now-rotated) row.
+
+`credential_epoch` and `auth_mode` are therefore stored beside the token and
+are what every read compares. The epoch is a monotonic counter the credential
+service bumps exactly once per sanctioned set/replace/clear/mode switch, in the
+same transaction as the mutation, so a token minted from a superseded identity
+is structurally unusable rather than merely unlikely: the read predicate
+`cache.credential_epoch = credential.credential_epoch` fails, and the caller
+gets the fail-closed "no token" answer instead of an obsolete one.
+
+Neither column is a secret. They exist so provenance can be proved without any
+code path reading a token or a client secret to answer the question.
+
 No Shopify request is made in this file. The exchange itself belongs to the API
 client, which is the one place in this repository allowed to hold transport.
 """
 
 from odoo import api, fields, models
+
+from .shopify_connector_store_credential import AUTH_MODE_SELECTION
 
 
 class ShopifyConnectorStoreAccessToken(models.Model):
@@ -62,10 +86,9 @@ class ShopifyConnectorStoreAccessToken(models.Model):
         index=True,
         readonly=True,
     )
-    # Which credential minted this token. A cache row whose credential row has
-    # been replaced is stale by construction; the credential service unlinks it
-    # on every mutation, and this relation is what makes that provable rather
-    # than assumed.
+    # Which credential row minted this token. Necessary but NOT sufficient on
+    # its own -- see the PROVENANCE note in the module docstring. Kept for the
+    # store-axis SEC-3 relation below and for the cascade.
     credential_id = fields.Many2one(
         comodel_name='shopify.connector.store.credential',
         required=True,
@@ -73,12 +96,29 @@ class ShopifyConnectorStoreAccessToken(models.Model):
         readonly=True,
         ondelete='cascade',
     )
+    # The credential identity this token was actually minted from, captured
+    # before the exchange and revalidated against committed state after it.
+    # Non-secret. `required=True` with no default: a cache row that cannot say
+    # which identity minted it is exactly the unprovable row this correction
+    # refuses to create, and the migration deletes the pre-correction rows that
+    # could not carry one rather than inventing a value for them.
+    credential_epoch = fields.Integer(required=True, readonly=True)
+    # The acquisition mode in force at mint time. A token minted under the
+    # client-credentials mode must not survive a switch to the offline mode and
+    # be served as if it belonged to it, so the mode travels with the token and
+    # every read compares it.
+    auth_mode = fields.Selection(
+        selection=AUTH_MODE_SELECTION,
+        required=True,
+        readonly=True,
+    )
     access_token = fields.Char(readonly=True)
     obtained_at = fields.Datetime(readonly=True)
     expires_at = fields.Datetime(required=True, readonly=True, index=True)
-    # The `scope` string Shopify returns with the token. Non-secret, and the
-    # only evidence available about what the exchanged token may actually do,
-    # so it is worth keeping next to the token it describes.
+    # The `scope` string Shopify returned WITH THIS TOKEN, verbatim. Non-secret.
+    # It describes the token in this row and nothing else: it is not the store's
+    # granted-scope evidence (Test Connection records that separately), and it
+    # must never be read as a statement about a token this row no longer holds.
     granted_scope_snapshot = fields.Char(readonly=True)
 
     _store_id_uniq = models.Constraint(

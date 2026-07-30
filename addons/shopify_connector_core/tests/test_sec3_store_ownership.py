@@ -356,18 +356,30 @@ class Sec3Base(TransactionCase):
         return store
 
     def _row_credential(self, store):
+        # Batch 1 correction (§9.1): the credential model refuses a direct
+        # `create()`, so this fixture mints through the service's own surface --
+        # the same shape `_row_mutation_attempt` already uses for the Layer 2
+        # sentinel. Satisfying the production guard rather than bypassing it is
+        # the point: a fixture that could sidestep it would prove nothing.
         Credential = self.env['shopify.connector.store.credential'].sudo()
         existing = Credential.search([('store_id', '=', store.id)], limit=1)
-        return existing or Credential.create({'store_id': store.id})
+        if existing:
+            return existing
+        return Credential._credential_surface('_mutate_token').create({
+            'store_id': store.id, 'credential_epoch': 1,
+        })
 
     def _row_access_token(self, store):
         Cache = self.env['shopify.connector.store.access.token'].sudo()
         existing = Cache.search([('store_id', '=', store.id)], limit=1)
         if existing:
             return existing
+        credential = self._row_credential(store)
         return Cache.create({
             'store_id': store.id,
-            'credential_id': self._row_credential(store).id,
+            'credential_id': credential.id,
+            'credential_epoch': credential.credential_epoch,
+            'auth_mode': credential.auth_mode,
             'access_token': 'sec3-fixture-token-%s' % store.id,
             'obtained_at': fields.Datetime.now(),
             'expires_at': fields.Datetime.add(fields.Datetime.now(), hours=24),

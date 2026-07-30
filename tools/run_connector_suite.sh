@@ -96,7 +96,15 @@ EXTRA_MODULES="account,stock"
 # case that strands the store with the serialization boundary removed. It is
 # `-standard` for the same reason and a stronger one -- a serialization
 # failure cannot occur on a single shared connection at all.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race"
+# `shopify_connector_credential_provenance_race` (added 2026-07-30) is the
+# Batch 1 obsolete-token proof. It is `-standard` for the same reason as the two
+# above and one specific to it: `pg_try_advisory_xact_lock` is RE-GRANTABLE
+# within a single PostgreSQL session, so on the shared in-test connection the
+# refresh's losing/waiter branch cannot execute at all and a rotation cannot
+# overtake the exchange it is racing. This class opens genuine `db_connect`
+# sessions with distinct backend PIDs, and its first half is written to run
+# unchanged against the vulnerable head as a before/after reproducer.
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race"
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #

@@ -44,12 +44,87 @@ class TestCredentialAccess(TransactionCase):
             'group_ids': [(6, 0, [group.id])],
         })
 
+    def _admin_credential(self):
+        """One credential row, created the ONLY way a credential row is created.
+
+        Batch 1 correction: `create()` on this model is refused outright now --
+        including for an Administrator -- so a fixture cannot mint a row directly
+        any more. That refusal is the subject of
+        `test_direct_orm_mutation_cannot_bypass_the_credential_service`; here it
+        just means the fixture goes through the sanctioned service, which is what
+        production does.
+        """
+        Credential = self.env['shopify.connector.store.credential']
+        Credential.with_user(self.user_admin).action_set_token(
+            self.store, 'shpat_ACCESSFIXTURE0000000000000000',
+        )
+        return Credential.sudo().search(
+            [('store_id', '=', self.store.id)], limit=1,
+        )
+
+    def test_direct_orm_mutation_cannot_bypass_the_credential_service(self):
+        """§9.1: no role, not even Administrator, mutates this row directly.
+
+        The ACL grants an Administrator `create`/`write`, so before this the
+        direct route was open and skipped every invalidation the service performs
+        -- the token-cache discard, the identity-epoch bump, the cleared
+        verification stamp and the `connected` -> `reconnect_needed` demotion. The
+        refusal is therefore not an ACL tightening (the ACL is unchanged); it is a
+        closed write surface on top of it.
+        """
+        Credential = self.env['shopify.connector.store.credential']
+        credential = self._admin_credential()
+        as_admin = Credential.with_user(self.user_admin)
+        with self.assertRaises(AccessError):
+            as_admin.create({'store_id': self.store.id})
+        with self.assertRaises(AccessError):
+            as_admin.browse(credential.id).write({'credential_state': 'absent'})
+        with self.assertRaises(AccessError):
+            as_admin.browse(credential.id).write(
+                {'access_token': 'shpat_SMUGGLED000000000000000000000'},
+            )
+        with self.assertRaises(AccessError):
+            as_admin.browse(credential.id).unlink()
+        # `sudo()` is not a way round it either: the guard does not key off
+        # `env.su`, it keys off the unforgeable service sentinel.
+        with self.assertRaises(AccessError):
+            Credential.sudo().create({'store_id': self.store.id})
+        with self.assertRaises(AccessError):
+            credential.sudo().write({'credential_state': 'absent'})
+        with self.assertRaises(AccessError):
+            credential.sudo().unlink()
+        # A forged context cannot open the surface, because the sentinel is a
+        # Python object identity and every RPC context value is JSON.
+        with self.assertRaises(AccessError):
+            Credential.with_user(self.user_admin).with_context(
+                shopify_credential_write_surface='_mutate_token',
+                shopify_credential_service_sentinel='_mutate_token',
+            ).browse(credential.id).write({'credential_state': 'absent'})
+        with self.assertRaises(AccessError):
+            Credential.with_user(self.user_admin).with_context(
+                shopify_credential_write_surface='_mutate_token',
+                shopify_credential_service_sentinel=True,
+            ).create({'store_id': self.store.id})
+        # And an unknown surface name is refused at the seam itself.
+        with self.assertRaises(AccessError):
+            Credential._credential_surface('_not_a_surface')
+        # The sanctioned route still works, and the row is intact.
+        Credential.with_user(self.user_admin).action_replace_token(
+            self.store, 'shpat_LEGITIMATEREPLACE00000000000000',
+        )
+        self.assertEqual(credential.credential_state, 'present')
+
     def test_non_admin_roles_denied_all_crud_and_search(self):
         Credential = self.env['shopify.connector.store.credential']
-        admin_credential = Credential.with_user(self.user_admin).create({
-            'store_id': self.store.id,
-        })
+        admin_credential = self._admin_credential()
         for user in (self.user_auditor, self.user_operator, self.user_reviewer):
+            # The sanctioned route is refused for these roles by the ACL, which
+            # is the guarantee that actually matters: `action_set_token` runs as
+            # the calling user precisely so this check stays live.
+            with self.assertRaises(AccessError):
+                Credential.with_user(user).action_set_token(
+                    self.store, 'shpat_SHOULDNEVERLAND0000000000000',
+                )
             credential_as_user = Credential.with_user(user)
             with self.assertRaises(AccessError):
                 credential_as_user.search([])
@@ -78,14 +153,28 @@ class TestCredentialAccess(TransactionCase):
             # protection (which fields_get() *does* honor) is separately
             # covered by test_field_groups_independent_of_model_acl below.
 
-    def test_admin_can_crud_except_unlink(self):
-        credential = self.env['shopify.connector.store.credential'].with_user(
-            self.user_admin
-        ).create({'store_id': self.store.id})
-        credential.read(['credential_state'])
-        credential.write({'credential_state': 'absent'})
+    def test_admin_reads_directly_and_mutates_only_through_the_service(self):
+        """The Administrator's real capability, stated exactly.
+
+        READ is direct and unchanged -- the ACL grants it and surfaces depend on
+        it. MUTATION is service-only (§9.1), and `unlink` is refused to everyone
+        including the service, because credential history is retained (MBQ-08).
+        """
+        Credential = self.env['shopify.connector.store.credential']
+        credential = self._admin_credential()
+        as_admin = Credential.with_user(self.user_admin)
+        # Read: allowed, directly.
+        as_admin.browse(credential.id).read(['credential_state'])
+        self.assertTrue(as_admin.search([('store_id', '=', self.store.id)]))
+        # Mutate: only through the service.
         with self.assertRaises(AccessError):
-            credential.unlink()
+            as_admin.browse(credential.id).write({'credential_state': 'absent'})
+        as_admin.action_clear_token(self.store)
+        self.assertEqual(credential.credential_state, 'absent')
+        # Delete: never, by any route.
+        with self.assertRaises(AccessError):
+            as_admin.browse(credential.id).unlink()
+        self.assertTrue(credential.exists())
 
     def test_field_groups_independent_of_model_acl(self):
         model = self.env['ir.model'].search(
@@ -107,9 +196,7 @@ class TestCredentialAccess(TransactionCase):
             'perm_unlink': False,
         })
         Credential = self.env['shopify.connector.store.credential']
-        admin_credential = Credential.with_user(self.user_admin).create({
-            'store_id': self.store.id,
-        })
+        admin_credential = self._admin_credential()
         credential_as_operator = Credential.with_user(self.user_operator)
         # Unlike test_non_admin_roles_denied_all_crud_and_search above,
         # this fields_get() call is not standing in for a model-ACL check

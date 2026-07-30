@@ -11,6 +11,7 @@ from . import test_disconnect_quiescence
 from . import test_credential_access
 from . import test_credential_service
 from . import test_client_credentials
+from . import test_credential_provenance_race
 from . import test_job_dispatch
 from . import test_job_enqueue
 from . import test_job_log_system_append

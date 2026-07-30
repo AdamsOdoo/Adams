@@ -781,7 +781,12 @@ class TestCredentialService(TransactionCase):
             'shop_domain': 'duplicate-credential-test.myshopify.com',
             'api_version': '2026-07',
         })
-        Credential.create({'store_id': store.id})
+        # Batch 1 correction (§9.1): `create()` is refused outside the credential
+        # service's own surface, so both creates below go through it. The
+        # constraint being proven is the database's, not the guard's -- the guard
+        # has its own coverage in `test_credential_access.py`.
+        surface = Credential._credential_surface('_mutate_token')
+        surface.create({'store_id': store.id, 'credential_epoch': 1})
         # The second create()'s UNIQUE(store_id) violation is a raw
         # database-level error (Odoo 19 `models.Constraint`, not a Python
         # `@api.constrains` ValidationError) -- run it under its own
@@ -791,7 +796,7 @@ class TestCredentialService(TransactionCase):
         # the job model's own unique constraint.
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
-                Credential.create({'store_id': store.id})
+                surface.create({'store_id': store.id, 'credential_epoch': 1})
 
     def test_empty_or_non_string_value_raises_without_echoing(self):
         Credential = self._credential_as_admin()

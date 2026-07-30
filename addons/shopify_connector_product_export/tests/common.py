@@ -63,9 +63,18 @@ class ExportCase(TransactionCase):
             'api_version': SHOPIFY_API_VERSION,
         })
         cls.store.sudo().write({'state': 'connected'})
-        cls.env['shopify.connector.store.credential'].sudo().create({
+        # Batch 1 correction (§9.1): `create()` on the credential model is
+        # refused outside the credential service's own write surface, so this
+        # fixture mints through that surface. Mechanical, test-only, and
+        # deliberately NOT `action_set_token`, which takes the store lifecycle
+        # lock and would demote this `connected` store to `reconnect_needed` --
+        # the opposite of what the fixture is building.
+        cls.env['shopify.connector.store.credential'].sudo()._credential_surface(
+            '_mutate_token',
+        ).create({
             'store_id': cls.store.id,
             'access_token': DUMMY_TOKEN,
+            'credential_epoch': 1,
         })
         cls.settings = cls.env['shopify.connector.store.settings'].sudo().create({
             'store_id': cls.store.id,

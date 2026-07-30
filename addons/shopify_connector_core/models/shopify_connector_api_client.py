@@ -193,7 +193,16 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         # locked. A no-op for the offline mode. Placed here, and not inside the
         # token read below, because obtaining one is itself a network call and
         # no lock in this connector may span a network call.
-        Credential._ensure_access_token(store)
+        #
+        # Batch 1 correction: `purpose='setup'`. `execute()` is the legacy
+        # read-only entry point, and its live callers are the setup/diagnostic
+        # family -- Test Connection and the readiness probe -- whose whole job is
+        # to authenticate a store that is NOT yet connected. It is not the
+        # business path (that is `execute_business`/`_admit`, which declares
+        # `business`), so it must not be gated to `connected` only. It IS gated:
+        # `disconnecting` appears in no matrix, so a store mid-disconnect cannot
+        # reach the token endpoint through here either.
+        Credential._ensure_access_token(store, purpose='setup')
         token = Credential._get_access_token(store)
         if not token:
             raise ShopifyClientError(
@@ -551,8 +560,16 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         # HERE, before the side cursor opens and therefore before the `FOR
         # SHARE` lock exists. A no-op for the offline mode. The single token
         # read below is unchanged and still reads exactly once, under the lock.
+        #
+        # Batch 1 correction: `purpose='business'`. This is the business
+        # admission path, so the exchange is admitted for `connected` only --
+        # the same state this method's own gate enforces a few lines below. The
+        # gate was previously unreachable for the exchange, because the exchange
+        # ran before it: a `disconnected` or `disconnecting` store contacted the
+        # token endpoint and was only then refused the call it needed the token
+        # for.
         self.env['shopify.connector.store.credential']._ensure_access_token(
-            store,
+            store, purpose='business',
         )
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
@@ -629,8 +646,12 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             )
         # Wave 5: same placement and same reason as `_admit` -- obtain/refresh
         # before the side cursor and its row locks exist, never inside them.
+        # Batch 1 correction: Layer 2 mutation dispatch is business traffic, so
+        # the exchange is admitted for `connected` only, exactly like the
+        # snapshot gate below.
         self.env['shopify.connector.store.credential']._ensure_access_token(
             self.env['shopify.connector.store'].browse(store_id),
+            purpose='business',
         )
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
@@ -916,6 +937,25 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 technical_detail=redact(str(exc)),
             )
         status = getattr(response, 'status_code', 0)
+        if 300 <= status < 400:
+            # The token endpoint must answer on the validated store domain and
+            # nowhere else. `_send_token_exchange` does not follow redirects, so
+            # a 3xx arrives here as a response rather than as a secret already
+            # re-posted somewhere unvalidated -- and it is refused. Classified
+            # TEMPORARY, not AUTH: nothing has been learned about the
+            # credential, so marking it invalid would be a false accusation.
+            # `technical_detail` names the status only; the `Location` header is
+            # deliberately not recorded, because a redirect target chosen by
+            # whatever answered is not information this connector should store or
+            # display.
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=(
+                    'token endpoint answered with a redirect (HTTP %s), which '
+                    'is refused; the client secret was not re-sent' % status
+                ),
+            )
         if status in (400, 401, 403):
             # The app, the secret, or the app-store organisation pairing is
             # wrong. That is an authentication failure the merchant must fix by
@@ -985,6 +1025,20 @@ class ShopifyConnectorApiClient(models.AbstractModel):
 
         The secret travels in the request body over HTTPS and appears in no
         log, no header this connector records, and no exception.
+
+        REDIRECTS ARE REFUSED, EXPLICITLY. `allow_redirects` defaults to **True**
+        in Requests, for POST as much as for GET
+        (https://requests.readthedocs.io/en/latest/api/, accessed 2026-07-30), so
+        the absence of this argument was not a neutral omission: a 307 or 308
+        response preserves the method and body, which means Requests would have
+        re-POSTED the client secret to whatever `Location` the response named.
+        A redirect target is not the validated store domain, and a client secret
+        must reach exactly one host. `False` here means the 3xx is returned to
+        `_exchange_client_credentials` as an ordinary response, where it is
+        classified as a sanitized failure at the existing taxonomy boundary.
+
+        `verify` is left at its default, which is TLS verification ON. It is
+        named here only so that a future edit has to be deliberate about it.
         """
         url = 'https://%s/admin/oauth/access_token' % store.shop_domain
         return requests.post(
@@ -999,6 +1053,8 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 'Accept': 'application/json',
             },
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
+            allow_redirects=False,
+            verify=True,
         )
 
     @api.model

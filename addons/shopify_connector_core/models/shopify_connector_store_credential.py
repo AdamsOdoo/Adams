@@ -2,7 +2,8 @@ import logging
 import time
 
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 _logger = logging.getLogger(__name__)
 
@@ -23,6 +24,13 @@ _logger = logging.getLogger(__name__)
 AUTH_MODE_OFFLINE = 'offline_access_token'
 AUTH_MODE_CLIENT_CREDENTIALS = 'dev_dashboard_client_credentials'
 
+#: Declared once, here, and imported by the token-cache model so the cache's
+#: `auth_mode` column can never drift from the credential's.
+AUTH_MODE_SELECTION = [
+    (AUTH_MODE_OFFLINE, 'Existing Admin API access token'),
+    (AUTH_MODE_CLIENT_CREDENTIALS, 'Dev Dashboard app (Client ID and secret)'),
+]
+
 #: Refresh this many seconds BEFORE the recorded expiry. Shopify's own example
 #: refreshes 60s early; this connector uses a far wider margin because an Odoo
 #: job can be admitted, queued and drained minutes after the token was checked,
@@ -40,9 +48,95 @@ TOKEN_MIN_USABLE_SECONDS = 30
 #: the exchange for a store and the others reuse its result instead of creating
 #: a stampede. It is NOT the store row lock: it blocks only other refreshers,
 #: never a business admission or a lifecycle transition.
+#:
+#: It is also the primitive that makes an in-flight exchange VISIBLE to the
+#: disconnect quiescence controller (`_token_exchange_in_flight`). A call-lease
+#: row was considered and rejected for that job: under direction C an
+#: expired-but-unreleased lease is treated as live forever and is never
+#: reclaimed, so a worker that died mid-exchange would strand the disconnect
+#: permanently and starve every later refresher. A transaction-scoped advisory
+#: lock is released by PostgreSQL when the backend goes away, which is the
+#: crash-recovery behaviour this path needs and a lease row cannot provide.
+#:
+#: Every acquisition anywhere is `pg_try_advisory_xact_lock` -- never the
+#: blocking form. That is what makes the lock deadlock-free against the store
+#: row lock: the refresh takes the advisory lock and then waits for the store
+#: row, the controller holds the store row and only ever *tries* the advisory
+#: lock, and a try-lock cannot be an edge in a wait-for cycle.
 TOKEN_REFRESH_ADVISORY_CLASSID = 0x5348_5046  # 'SHPF'
 TOKEN_REFRESH_WAIT_ATTEMPTS = 40
 TOKEN_REFRESH_WAIT_SECONDS = 0.25
+
+#: Which store states may reach the Shopify token endpoint, by the purpose of
+#: the call that needs a token (§7 of the Batch 1 correction). Obtaining a token
+#: IS a Shopify network call, so it obeys lifecycle control exactly like every
+#: other one instead of running before the gate that would have refused it.
+#:
+#: `business` is the routine/background family: jobs, drains and Layer 2. It is
+#: `connected` only, matching the four business gates
+#: (`shopify.connector.job._check_store_state`, the dispatcher's pre-dispatch
+#: check, `_admit`'s `FOR SHARE` state check and `_admit_mutation`'s snapshot).
+#:
+#: `setup` is the explicit operator-driven family: the guided setup's Test
+#: Connection and the reconnect probe. Its matrix is the UNION of the
+#: `LIFECYCLE_PURPOSE_STATES` purposes that actually need a token, because a
+#: merchant configuring a brand-new store or recovering a broken one must be
+#: able to authenticate -- that is the whole point of the button they pressed.
+#:
+#: `disconnecting` and `disconnected` appear in NEITHER family bar the one
+#: purpose Shopify-side reconnect evidence requires (`reconnect_probe`, which
+#: `LIFECYCLE_PURPOSE_STATES` already admits for `disconnected`). No path may
+#: start an exchange for a `disconnecting` store: a disconnect is one-way and
+#: is in the middle of clearing the very credential the exchange would use.
+TOKEN_EXCHANGE_PURPOSE_STATES = {
+    'business': ('connected',),
+    'setup': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    'reconnect': ('reconnect_needed', 'disconnected'),
+}
+
+#: The closed credential-mutation surface (§9.1 of the Batch 1 correction).
+#:
+#: Before this, `shopify.connector.store.credential` had no `create`/`write`/
+#: `unlink` override at all. The ACL row grants a Connector Administrator
+#: `read`/`write`/`create`, so an Administrator -- or anything running as one,
+#: including a data import or a plain RPC `write` from a script -- could set or
+#: replace a credential value directly and skip EVERY invalidation the service
+#: performs: the token-cache discard, the identity-epoch bump, the cleared
+#: verification stamp, and the `connected` -> `reconnect_needed` demotion with
+#: its generation bump. A rotated secret with a stale `credential_last_verified_
+#: at` and a live cached token is exactly the state this correction exists to
+#: make impossible, so the direct route has to close too.
+#:
+#: The guard is modelled on `shopify.connector.mutation.attempt` -- the strongest
+#: pattern in this repository -- with ONE deliberate difference: it does not
+#: require `env.su`. `_mutate_token` runs as the CALLING user on purpose, so the
+#: Administrator-only ACL is still evaluated by the ORM for every credential
+#: change (a non-admin gets `AccessError` from Odoo itself, not from here).
+#: Requiring `sudo()` would have replaced that live ACL check with a bypass of
+#: it, which is a weaker posture, not a stronger one.
+#:
+#: What makes the surface unforgeable is `CREDENTIAL_SERVICE_SENTINEL`: a
+#: module-level `object()` compared with `is`. Odoo's RPC context arrives as
+#: JSON, so no remote caller can construct it by any combination of forged
+#: context values. The surface NAME is checked as well, so a sanctioned method
+#: cannot borrow another method's authorisation.
+CREDENTIAL_WRITE_CONTEXT = 'shopify_credential_write_surface'
+CREDENTIAL_SERVICE_SENTINEL_CONTEXT = 'shopify_credential_service_sentinel'
+CREDENTIAL_SERVICE_SENTINEL = object()
+#: Every method allowed to create or change a credential row, by name. Pinned
+#: exactly by `test_credential_service.py`, so adding a fourth writer is a
+#: decision somebody makes on purpose rather than an implementation detail.
+CREDENTIAL_CREATE_SURFACES = frozenset(('_mutate_token',))
+CREDENTIAL_WRITE_SURFACES = frozenset((
+    '_mutate_token',
+    '_clear_token_under_store_lock',
+    # The connection probe's authentication-failure record. It writes only
+    # `credential_state`/`token_last_failure_reason` -- never a secret, never
+    # the epoch -- and it is the reason this set has three members rather than
+    # two: `_apply_probe_failure` is a sanctioned lifecycle writer that must not
+    # have to route a failure report through the value-mutation path.
+    '_apply_probe_failure',
+))
 
 
 class ShopifyConnectorStoreCredential(models.Model):
@@ -126,15 +220,31 @@ class ShopifyConnectorStoreCredential(models.Model):
     # existed before Wave 5 reads as the offline mode it actually is even if a
     # migration has not yet run against it.
     auth_mode = fields.Selection(
-        selection=[
-            (AUTH_MODE_OFFLINE, 'Existing Admin API access token'),
-            (
-                AUTH_MODE_CLIENT_CREDENTIALS,
-                'Dev Dashboard app (Client ID and secret)',
-            ),
-        ],
+        selection=AUTH_MODE_SELECTION,
         required=True,
         default=AUTH_MODE_OFFLINE,
+    )
+    # The credential's IDENTITY VERSION, and the load-bearing column of the
+    # Batch 1 obsolete-token correction.
+    #
+    # WHY NEITHER THE ROW ID NOR `write_date` IS ENOUGH. A rotation updates this
+    # row in place, so the id is unchanged and a cache row pointing at it still
+    # looks current -- that is precisely how a token minted from the previous
+    # secret survived. `write_date` is no better: PostgreSQL fixes
+    # `transaction_timestamp()` for a whole transaction, so a replace that lands
+    # in the same transaction as the read it must invalidate carries an
+    # identical stamp, and Odoo will not advance it at all for a write whose
+    # values match. A counter the service bumps EXACTLY ONCE per sanctioned
+    # mutation has neither weakness.
+    #
+    # Bumped only by `_bump_credential_epoch`, only under the store lifecycle
+    # lock, always in the same transaction as the mutation it describes. Never
+    # written by the refresh side transaction, never caller input (the ORM guard
+    # below refuses it), and non-secret -- it is safe in a snapshot, a log or an
+    # exception, which is why the probe's identity comparison now uses it
+    # instead of holding a client secret in memory.
+    credential_epoch = fields.Integer(
+        required=True, default=0, readonly=True,
     )
     # Not itself a secret -- Shopify shows it in the Dev Dashboard -- but kept
     # behind the same Administrator group as everything else on this row, so a
@@ -178,6 +288,104 @@ class ShopifyConnectorStoreCredential(models.Model):
         'UNIQUE(store_id)',
         'Only one credential record is allowed per store.',
     )
+
+    # ------------------------------------------------------------------
+    # The closed credential-mutation surface (§9.1)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _credential_surface(self, name):
+        """The only way to reach `create`/`write` on this model.
+
+        Returns `self` re-bound with the surface name and the unforgeable
+        service sentinel in context. Deliberately **not** `sudo()`: see
+        `CREDENTIAL_WRITE_CONTEXT`. An unknown name is refused here rather than
+        silently granted, so the surface list is the authorisation.
+        """
+        if (
+            name not in CREDENTIAL_CREATE_SURFACES
+            and name not in CREDENTIAL_WRITE_SURFACES
+        ):
+            raise AccessError(_('Unknown credential write surface.'))
+        return self.with_context(**{
+            CREDENTIAL_WRITE_CONTEXT: name,
+            CREDENTIAL_SERVICE_SENTINEL_CONTEXT: CREDENTIAL_SERVICE_SENTINEL,
+        })
+
+    @api.model
+    def _credential_surface_is_open(self, surfaces):
+        """True only inside a sanctioned surface named in `surfaces`."""
+        context = self.env.context
+        return (
+            context.get(CREDENTIAL_SERVICE_SENTINEL_CONTEXT)
+            is CREDENTIAL_SERVICE_SENTINEL
+            and context.get(CREDENTIAL_WRITE_CONTEXT) in surfaces
+        )
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Credential rows exist only where the service puts them.
+
+        A direct `create` -- Administrator RPC, a data import, a script -- would
+        establish a credential without the store mirrors, without the identity
+        epoch's meaning, and without the token-cache discard, so it is refused
+        outright. `_mutate_token` is the one creator.
+        """
+        if not self._credential_surface_is_open(CREDENTIAL_CREATE_SURFACES):
+            raise AccessError(_(
+                'Shopify credentials can only be created through the '
+                'connector credential service, which invalidates the cached '
+                'token, the recorded verification and the connection state '
+                'at the same time. Use the setup surface or Store Settings.'
+            ))
+        return super().create(vals_list)
+
+    def write(self, vals):
+        """Every credential change routes through a sanctioned service method.
+
+        There is no partial allowance and no "safe field" list. Every column on
+        this row is either a secret, the identity the connector authenticates
+        with, or a mirror of one of those two -- so a write that skipped the
+        service would leave the store's cached token, verification evidence and
+        connection generation describing a credential that no longer exists.
+        """
+        if not self._credential_surface_is_open(CREDENTIAL_WRITE_SURFACES):
+            raise AccessError(_(
+                'Shopify credentials can only be changed through the '
+                'connector credential service, which invalidates the cached '
+                'token, the recorded verification and the connection state '
+                'at the same time. Use the setup surface or Store Settings.'
+            ))
+        return super().write(vals)
+
+    def unlink(self):
+        """Credential history is never deleted (MBQ-08).
+
+        `action_clear_token` empties the row and leaves it in place, so
+        `credential_last_replaced_at` and the audit trail survive. Deletion
+        would also silently cascade the token cache away, which is the one
+        removal that must be a decision rather than a side effect.
+        """
+        raise AccessError(_(
+            'Shopify credential records are never deleted. Clear the '
+            'credential instead; the record and its history are retained.'
+        ))
+
+    @api.model
+    def _next_credential_epoch(self, credential):
+        """The identity version the mutation about to happen must write.
+
+        Returned rather than written, deliberately: the caller folds it into the
+        SAME `write()`/`create()` as the values it describes, so "the epoch
+        changes exactly once, in the same transaction as the mutation" is a
+        property of one statement instead of an ordering convention between two.
+        A second write would also be a second chance to forget one.
+
+        The caller must already hold the store lifecycle lock -- every sanctioned
+        mutation takes it first -- which is what makes the increment
+        linearizable per store rather than merely usually-correct.
+        """
+        return (credential.credential_epoch or 0) + 1 if credential else 1
 
     @api.model
     def action_set_token(self, store, value):
@@ -294,18 +502,42 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'token_last_failure_reason': False,
             }
         credential = self.search([('store_id', '=', store.id)], limit=1)
+        # "Was there a credential here to replace?" A row that exists but is
+        # `absent` is the shape `action_clear_token` leaves behind (MBQ-08 keeps
+        # the row and its history); it holds no credential, so setting one on top
+        # of it is a first set, not a replacement.
+        had_existing_credential = bool(
+            credential and credential.credential_state != 'absent'
+        )
+        # (4a) The identity epoch advances in the SAME statement as the values it
+        # describes. Every mode -- offline set, offline replace, client-credential
+        # set, client-credential replace, and the mode switch between them -- goes
+        # through this one place, so none of them can grow a path that mutates a
+        # credential without superseding the identity a cached token was minted
+        # from. `_refresh_access_token` compares exactly this number after its
+        # network exchange returns.
+        values['credential_epoch'] = self._next_credential_epoch(credential)
+        surface = self._credential_surface('_mutate_token')
         if credential:
-            credential.write(values)
+            surface.browse(credential.id).write(values)
         else:
-            credential = self.create(dict(values, store_id=store.id))
+            credential = surface.create(dict(values, store_id=store.id))
         # Any cached 24-hour token belonged to the credential just replaced.
+        # Belt AND braces: the epoch bump above already makes any surviving row
+        # unreadable, and this removes it outright.
         self._discard_token_cache(store)
         # (5)/(6) store mirrors + connected-state/epoch invalidation.
         store_vals = {
             'credential_present': True,
             'credential_last_verified_at': False,
         }
-        if is_replace:
+        # `credential_last_replaced_at` means "an existing credential was
+        # replaced". Stamping it when the store had no credential row -- or an
+        # empty one, the shape `action_clear_token` leaves behind -- reports a
+        # replacement that never happened, and the setup surface renders that
+        # stamp to a merchant. A first-ever set is not a replacement, whichever
+        # entry point performed it.
+        if is_replace and had_existing_credential:
             store_vals['credential_last_replaced_at'] = fields.Datetime.now()
         if locked_state == 'connected':
             store_vals['state'] = 'reconnect_needed'
@@ -375,7 +607,9 @@ class ShopifyConnectorStoreCredential(models.Model):
         """
         credential = self.search([('store_id', '=', store.id)], limit=1)
         if credential:
-            credential.write({
+            self._credential_surface(
+                '_clear_token_under_store_lock',
+            ).browse(credential.id).write({
                 'access_token': False,
                 # Wave 5: the client-credentials pair is a credential too, and
                 # a clear that left it behind would leave the store able to
@@ -384,6 +618,11 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'client_secret': False,
                 'client_credentials_present': False,
                 'credential_state': 'absent',
+                # A clear supersedes the identity as decisively as a replace
+                # does. Without this bump a refresh that read the pair before
+                # the clear could still prove its provenance afterwards, which
+                # is the `cache absent + clear` half of the reproduced defect.
+                'credential_epoch': self._next_credential_epoch(credential),
             })
         self._discard_token_cache(store)
         store.write({
@@ -464,36 +703,112 @@ class ShopifyConnectorStoreCredential(models.Model):
             return self._read_cached_token_committed(store)
         return credential.access_token
 
+    #: The provenance predicate, written ONCE and shared by every committed
+    #: cache read (§6.9, §9.4). Two readers with two hand-written predicates is
+    #: how "the token is checked" becomes "the token is checked on one of the two
+    #: paths", so both callers below select through this same string.
+    #:
+    #: Every clause is a refusal the correction requires:
+    #:  * `t.credential_epoch = c.credential_epoch` -- stale provenance. A token
+    #:    minted from a rotated, cleared or mode-switched identity fails here.
+    #:  * `c.credential_state = 'present'` -- absent or `invalid` credential.
+    #:  * `c.auth_mode = %(mode)s AND t.auth_mode = c.auth_mode` -- wrong mode,
+    #:    in both directions: the store must still be on the client-credentials
+    #:    mode AND the token must have been minted under it.
+    #:  * the `client_id`/`client_secret` emptiness tests -- a credential whose
+    #:    pair has been emptied cannot vouch for a token, even if the row itself
+    #:    still says `present`.
+    #:  * `t.sec3_scope_quarantined = FALSE` -- a quarantined row never
+    #:    authenticates. The SEC-3 record rules already hide it from ORM readers;
+    #:    this is raw SQL, so the rule does not apply and the clause is what
+    #:    makes the guarantee hold on this path too.
+    #:  * `c.store_id = t.store_id`, `s.company_id = t.company_id`,
+    #:    `c.company_id = t.company_id` -- cross-store and cross-company
+    #:    inconsistency, refused structurally rather than assumed away.
+    #:  * `t.expires_at IS NOT NULL` plus the caller's expiry arithmetic below.
+    _TOKEN_CACHE_PROVENANCE_SQL = """
+        SELECT t.access_token, t.expires_at, t.obtained_at
+          FROM shopify_connector_store_access_token t
+          JOIN shopify_connector_store_credential c ON c.id = t.credential_id
+          JOIN shopify_connector_store s ON s.id = t.store_id
+         WHERE t.store_id = %(store_id)s
+           AND COALESCE(t.sec3_scope_quarantined, FALSE) = FALSE
+           AND c.store_id = t.store_id
+           -- `IS NOT DISTINCT FROM`, not `=`. Both companies are stored related
+           -- fields through `store_id`, so they agree by construction -- but a
+           -- store with no company yet (a fresh store before
+           -- `action_assign_company`, and the shape most fixtures take) has NULL
+           -- on all three rows, and `NULL = NULL` is NULL, not TRUE. Plain `=`
+           -- would therefore refuse every company-less store's token and break
+           -- authentication for stores that are otherwise perfectly operable.
+           -- This form means "agree, including both-absent" and still refuses a
+           -- genuine divergence, which is the invariant being asserted.
+           AND c.company_id IS NOT DISTINCT FROM t.company_id
+           AND s.company_id IS NOT DISTINCT FROM t.company_id
+           AND c.credential_state = 'present'
+           AND c.auth_mode = %(mode)s
+           AND t.auth_mode = c.auth_mode
+           AND t.credential_epoch = c.credential_epoch
+           AND c.client_id IS NOT NULL AND c.client_id <> ''
+           AND c.client_secret IS NOT NULL AND c.client_secret <> ''
+           AND t.access_token IS NOT NULL AND t.access_token <> ''
+           AND t.expires_at IS NOT NULL
+    """
+
     @api.model
-    def _read_cached_token_committed(self, store):
-        """The store's currently valid cached token, from COMMITTED state.
+    def _read_committed_cache_row(self, store, cr=None):
+        """`(access_token, expires_at, obtained_at)` of the PROVABLE cached token.
 
         Read through a fresh independent snapshot on purpose. Odoo cursors run
-        REPEATABLE READ, and the refresh that just minted this token committed
-        in its own side transaction -- so a caller's main transaction, whose
-        snapshot opened before that commit, cannot see the new row at all. An
-        ordinary ORM read here would return "no token" immediately after a
-        successful refresh, every time, in every fresh transaction.
+        REPEATABLE READ, and the refresh that minted this token committed in its
+        own side transaction -- so a caller's main transaction, whose snapshot
+        opened before that commit, cannot see the new row at all. An ordinary ORM
+        read here would return "no token" immediately after a successful refresh,
+        every time, in every fresh transaction.
 
-        Raw SQL for the same reason `_lifecycle_credential_version` uses it:
-        two non-secret columns plus the token, selected by the store id the
-        caller was already authorized against. The row travels to exactly one
-        place -- the in-memory return value -- and is never logged.
+        Raw SQL for the same reason `_lifecycle_credential_version` uses it, and
+        additionally because the provenance predicate is a JOIN against the
+        credential row: this question is "does this token belong to the identity
+        the store authenticates with RIGHT NOW", and that cannot be asked of the
+        cache row alone. Returns `None` when no row satisfies it -- which is the
+        fail-closed answer, indistinguishable to the caller from "no token".
+        The token travels to exactly one place, the return value, and is never
+        logged.
+
+        `cr` lets a caller that ALREADY owns a transaction with a fresh snapshot
+        -- the refresh leader under its advisory lock, a waiter's poll -- run the
+        identical predicate on its own cursor instead of opening yet another one.
+        The predicate is the same string either way, which is the point: there is
+        exactly one definition of "a token this store may use".
         """
+        params = {'store_id': store.id, 'mode': AUTH_MODE_CLIENT_CREDENTIALS}
+        if cr is not None:
+            cr.execute(self._TOKEN_CACHE_PROVENANCE_SQL, params)
+            return cr.fetchone() or None
         self.env['shopify.connector.store.access.token'].flush_model()
+        self.flush_model()
         side_cr = self.env.registry.cursor()
         try:
-            side_cr.execute(
-                "SELECT access_token, expires_at "
-                "FROM shopify_connector_store_access_token "
-                "WHERE store_id = %s",
-                (store.id,),
-            )
+            side_cr.execute(self._TOKEN_CACHE_PROVENANCE_SQL, params)
             row = side_cr.fetchone()
         finally:
             side_cr.rollback()
             side_cr.close()
-        if not row or not row[0] or not row[1]:
+        return row or None
+
+    @api.model
+    def _read_cached_token_committed(self, store):
+        """The store's currently valid, PROVABLY-current cached token, or False.
+
+        A token that is alive but whose provenance cannot be proved is treated
+        exactly like no token at all: the caller raises the accepted
+        `REASON_TOKEN_INVALID` authentication failure and a refresh mints a new
+        one from the identity that is actually configured. That is the whole
+        structural half of the correction -- even if a write path were ever to
+        slip an obsolete row in, no reader would serve it.
+        """
+        row = self._read_committed_cache_row(store)
+        if not row:
             return False
         if (row[1] - fields.Datetime.now()).total_seconds() <= 0:
             return False
@@ -512,31 +827,40 @@ class ShopifyConnectorStoreCredential(models.Model):
 
     @api.model
     def _committed_token_remaining_seconds(self, store):
-        """Seconds of validity left on the COMMITTED cached token, or 0.
+        """Seconds of validity left on the COMMITTED, PROVABLE cached token, or 0.
 
-        Same fresh-snapshot read as `_read_cached_token_committed`, for the
-        same REPEATABLE READ reason -- a decision about whether to refresh must
-        see the refresh another worker committed a moment ago, or every worker
-        that raced the leader re-decides "expired" from its own stale snapshot.
+        The same fresh-snapshot, provenance-checked read `_read_cached_token_
+        committed` performs, for the same REPEATABLE READ reason -- a decision
+        about whether to refresh must see the refresh another worker committed a
+        moment ago, or every worker that raced the leader re-decides "expired"
+        from its own stale snapshot.
+
+        Routed through the shared predicate deliberately. When this returned
+        remaining time for a row the READ would then refuse, the two disagreed:
+        `_ensure_access_token` saw a comfortable margin and returned success,
+        and `_get_access_token` immediately answered "no token". Zero is the only
+        honest answer for a row that cannot be served.
         """
-        self.env['shopify.connector.store.access.token'].flush_model()
-        side_cr = self.env.registry.cursor()
-        try:
-            side_cr.execute(
-                "SELECT access_token, expires_at "
-                "FROM shopify_connector_store_access_token "
-                "WHERE store_id = %s",
-                (store.id,),
-            )
-            row = side_cr.fetchone()
-        finally:
-            side_cr.rollback()
-            side_cr.close()
-        if not row or not row[0] or not row[1]:
-            return 0
-        return max(
-            0, (row[1] - fields.Datetime.now()).total_seconds(),
+        return self._committed_token_window(store)[0]
+
+    @api.model
+    def _committed_token_window(self, store, cr=None):
+        """`(remaining_seconds, refresh_margin_seconds)` for the cached token.
+
+        One read answers both questions the refresher asks -- how much life is
+        left, and how early this particular token should be replaced -- so the
+        two can never be computed from different rows or different clocks.
+        `(0, TOKEN_REFRESH_MARGIN_SECONDS)` for a token that cannot be served,
+        which reads as "expired" to every caller.
+        """
+        row = self._read_committed_cache_row(store, cr=cr)
+        if not row:
+            return 0, TOKEN_REFRESH_MARGIN_SECONDS
+        remaining = max(0, (row[1] - fields.Datetime.now()).total_seconds())
+        lifetime = (
+            (row[1] - row[2]).total_seconds() if row[2] else 0
         )
+        return remaining, self._effective_refresh_margin(lifetime)
 
     # ------------------------------------------------------------------
     # Wave 5: the client-credentials mode
@@ -567,20 +891,31 @@ class ShopifyConnectorStoreCredential(models.Model):
         ].sudo().search([('store_id', '=', store.id)], limit=1)
 
     @api.model
-    def _token_is_expired(self, cached, margin=0):
-        """True when `cached` is absent, undated, or within `margin` of expiry.
+    def _effective_refresh_margin(self, lifetime_seconds):
+        """How early to refresh a token whose whole life is `lifetime_seconds`.
 
-        `margin=0` asks "is it dead", which is the question a read asks.
-        `margin=TOKEN_REFRESH_MARGIN_SECONDS` asks "should it be replaced
-        now", which is the question the refresher asks. Keeping both in one
-        predicate is what stops the two from drifting apart.
+        This is the clamp `TOKEN_MIN_USABLE_SECONDS` always claimed to describe
+        and never performed. The margin is a fixed 15 minutes, and Shopify's
+        client-credentials tokens live 86399 seconds, so for every real token the
+        answer is simply the margin. But a token whose recorded lifetime is
+        SHORTER than the margin is inside its own refresh window from the moment
+        it is minted, and the previous code re-exchanged on every single call for
+        as long as such a token was current -- an uncontrolled exchange loop
+        driven by nothing but arithmetic.
+
+        Clamping to half the lifetime makes a short-lived token get used for the
+        first half of its life and refreshed in the second, which is the
+        behaviour the constant's own comment described. `TOKEN_MIN_USABLE_SECONDS`
+        remains the floor below which a token is treated as too close to death to
+        rely on at all, and that is now the only thing it means.
         """
-        if not cached or not cached.access_token or not cached.expires_at:
-            return True
-        remaining = (
-            cached.expires_at - fields.Datetime.now()
-        ).total_seconds()
-        return remaining <= margin
+        try:
+            lifetime = float(lifetime_seconds or 0)
+        except (TypeError, ValueError):
+            lifetime = 0.0
+        if lifetime <= 0:
+            return TOKEN_REFRESH_MARGIN_SECONDS
+        return min(TOKEN_REFRESH_MARGIN_SECONDS, lifetime / 2.0)
 
     @api.model
     def action_set_client_credentials(self, store, client_id, client_secret):
@@ -611,9 +946,17 @@ class ShopifyConnectorStoreCredential(models.Model):
         )
 
     @api.model
-    def _write_token_cache(self, store, credential, access_token, expires_at,
+    def _write_token_cache(self, store, provenance, access_token, expires_at,
                            granted_scope):
         """Persist one freshly-obtained access token. Elevated, store-scoped.
+
+        `provenance` is `{'credential_id', 'credential_epoch', 'auth_mode'}`,
+        supplied by the caller from the values it has just read under the
+        credential row lock. Deliberately a plain dict and not a recordset: a
+        recordset would have to be read back through the Administrator-only ACL
+        -- adding a `sudo()` to this connector's trust surface -- to obtain three
+        numbers the caller already holds, and reading them again would also mean
+        the values written might not be the values verified.
 
         WRITES THE CACHE ROW ONLY -- never the credential row. That rule is
         structural, not stylistic. This method runs inside the refresh's
@@ -635,12 +978,20 @@ class ShopifyConnectorStoreCredential(models.Model):
         surface needs (`obtained_at`, `expires_at`, the scope string) lives on
         the cache row, which the main transaction never locks or writes inside
         the same request.
+
+        PROVENANCE. `credential_epoch` and `auth_mode` are written from the
+        identity the exchange was actually performed against, which the caller
+        has just revalidated against COMMITTED state under the credential row
+        lock. They are what every later read compares -- `credential_id` alone
+        proves nothing, because a rotation updates that row in place.
         """
         Cache = self.env['shopify.connector.store.access.token'].sudo()
         existing = Cache.search([('store_id', '=', store.id)], limit=1)
         values = {
             'store_id': store.id,
-            'credential_id': credential.id,
+            'credential_id': provenance['credential_id'],
+            'credential_epoch': provenance['credential_epoch'],
+            'auth_mode': provenance['auth_mode'],
             'access_token': access_token,
             'obtained_at': fields.Datetime.now(),
             'expires_at': expires_at,
@@ -666,7 +1017,7 @@ class ShopifyConnectorStoreCredential(models.Model):
         return True
 
     @api.model
-    def _ensure_access_token(self, store):
+    def _ensure_access_token(self, store, purpose='business'):
         """Make sure this store has a usable access token, obtaining one if not.
 
         **Called before any lock, never inside one.** Obtaining a token is an
@@ -679,23 +1030,36 @@ class ShopifyConnectorStoreCredential(models.Model):
         A no-op for `offline_access_token`: that value does not expire and
         nothing may re-fetch it.
 
+        `purpose` NAMES THE LIFECYCLE ROUTE (§7 of the Batch 1 correction), and
+        it is not optional in spirit even though it has a default. Obtaining a
+        token is a Shopify network call, so it obeys the same state control every
+        other Shopify call obeys -- and it previously did not: because this ran
+        *before* admission (correctly, for the lock reason above) it ran before
+        the gate that would have refused it, so a `disconnected` store, or one
+        whose generation had moved on, still reached the token endpoint. The
+        eligibility check below closes that without moving the call back inside a
+        lock: it is a FRESH COMMITTED read of `(state, connection_generation)`,
+        taken on its own snapshot, holding no row lock.
+
+        * `business` -- jobs, drains, Layer 2. `connected` only.
+        * `setup` -- the guided setup's Test Connection / readiness probe. The
+          explicit operator-driven route, which must work on a store that is not
+          connected yet; that is what the operator is trying to fix.
+        * `reconnect` -- the reconnect probe, the one route valid for a
+          `disconnected` store.
+
+        `disconnecting` is in no matrix at all, so no path starts an exchange
+        while a disconnect is clearing the credential.
+
         For `dev_dashboard_client_credentials`:
 
-        1. return immediately when the cache is comfortably valid (the common
-           case -- once per 24 hours a store actually refreshes);
-        2. otherwise take a per-store PostgreSQL **advisory** lock in an
-           independent transaction, so exactly one worker performs the exchange
-           (§11.8) and the rest reuse its result rather than each minting a
-           token. The lock is connector-private and store-scoped: it blocks
-           other refreshers only, never an admission and never a lifecycle
-           transition;
-        3. the worker that gets the lock re-reads the cache under it -- the
-           double-check that makes a queued waiter free rather than a second
-           exchange -- and only then exchanges;
-        4. a worker that does NOT get the lock waits, bounded, for the leader's
-           committed result. If none arrives it raises the accepted TEMPORARY
-           taxonomy, which the job layer already treats as retryable. It never
-           starts a competing exchange.
+        1. return immediately when the cache is comfortably valid AND provable
+           (the common case -- once per 24 hours a store actually refreshes);
+        2. otherwise refresh under the per-store advisory lock, exchange once,
+           and revalidate the credential identity against committed state before
+           anything is cached (`_refresh_access_token`);
+        3. a worker that does not get the lock waits, bounded, for the leader's
+           committed result and never starts a competing exchange.
 
         Returns True when a usable token exists afterwards. Raises the accepted
         `ShopifyClientError` taxonomy otherwise -- never a bare exception, and
@@ -704,16 +1068,20 @@ class ShopifyConnectorStoreCredential(models.Model):
         credential = self._credential_for(store)
         if not credential or credential.auth_mode != AUTH_MODE_CLIENT_CREDENTIALS:
             return True
-        remaining = self._committed_token_remaining_seconds(store)
-        if remaining > TOKEN_REFRESH_MARGIN_SECONDS:
+        remaining, margin = self._committed_token_window(store)
+        if remaining > margin:
             return True
+        # Lifecycle admission for the EXCHANGE itself, before any network.
+        self._assert_token_exchange_allowed(store, purpose)
         # A token that is still alive but inside the refresh margin is usable
         # RIGHT NOW. Refresh it, but never fail the call because the refresh
         # could not run -- that would turn a healthy store into an outage for
-        # the last 15 minutes of every token's life.
+        # the last 15 minutes of every token's life. `TOKEN_MIN_USABLE_SECONDS`
+        # is the floor: below it the token is too close to death to lean on, so
+        # a failed refresh is a real failure and is raised.
         usable_now = remaining > TOKEN_MIN_USABLE_SECONDS
         try:
-            self._refresh_access_token(store, credential)
+            self._refresh_access_token(store, credential, purpose)
         except Exception:
             if usable_now:
                 _logger.warning(
@@ -725,8 +1093,155 @@ class ShopifyConnectorStoreCredential(models.Model):
         return True
 
     @api.model
-    def _refresh_access_token(self, store, credential):
-        """Serialize on the advisory lock, then exchange exactly once."""
+    def _committed_lifecycle_state(self, store, cr=None):
+        """`(state, connection_generation)` of the store, from COMMITTED state.
+
+        A fresh snapshot and **no row lock**: this runs on the path that is about
+        to make a network call, and the one invariant this connector never bends
+        is that no row lock spans one. What it gives is linearizability against
+        anything already committed -- which is exactly what "is this store
+        eligible right now" needs -- and the post-exchange revalidation in
+        `_refresh_access_token`, which DOES take the lock (after the network),
+        catches anything that commits in between.
+        """
+        if cr is not None:
+            cr.execute(
+                'SELECT state, connection_generation '
+                'FROM shopify_connector_store WHERE id = %s',
+                (store.id,),
+            )
+            return cr.fetchone()
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                'SELECT state, connection_generation '
+                'FROM shopify_connector_store WHERE id = %s',
+                (store.id,),
+            )
+            return side_cr.fetchone()
+        finally:
+            side_cr.rollback()
+            side_cr.close()
+
+    @api.model
+    def _assert_token_exchange_allowed(self, store, purpose):
+        """Refuse a token exchange the store's lifecycle does not permit.
+
+        Fail-closed on an unknown purpose: a caller that has not declared its
+        route does not get the most permissive one.
+        """
+        from .shopify_connector_api_client import (
+            ERROR_AUTH, ERROR_TEMPORARY, REASON_TEMPORARY,
+            REASON_TOKEN_INVALID, ShopifyClientError,
+        )
+        allowed = TOKEN_EXCHANGE_PURPOSE_STATES.get(purpose)
+        if allowed is None:
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                technical_detail='unknown token-exchange purpose',
+            )
+        row = self._committed_lifecycle_state(store)
+        if not row:
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        state, _generation = row
+        if state not in allowed:
+            # Retryable rather than an authentication failure: nothing is wrong
+            # with the credential. The store is simply not in a state where a
+            # Shopify call is permitted, and the job layer's existing retry
+            # handling is the correct response -- as is the admission refusal
+            # this call would have met a moment later anyway.
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=(
+                    'store lifecycle state does not permit a token exchange'
+                ),
+            )
+        return True
+
+    @api.model
+    def _token_exchange_in_flight(self, store):
+        """True when some worker is mid-token-exchange for this store.
+
+        The disconnect quiescence controller's window into the refresh path
+        (§7.4/§7.5). A token exchange holds the store's refresh advisory lock for
+        its whole duration and holds no row lock, so it is invisible to every
+        lease and row-level signal the controller already consults -- and a
+        disconnect that finalized during one would clear the credential while a
+        token minted from it was still in flight.
+
+        Uses `pg_try_advisory_xact_lock`, never the blocking form, and that is
+        load-bearing rather than incidental: the controller calls this while
+        HOLDING the store row `FOR UPDATE`, and the refresh acquires the advisory
+        lock before it waits for that same row. A blocking acquisition here would
+        close a wait-for cycle and deadlock; a try-lock cannot be an edge in one.
+
+        A `True` result means "not quiesced, poll again". A `False` result leaves
+        the lock held by the controller's own transaction, which additionally
+        prevents a new exchange from starting while it finalizes -- the correct
+        behaviour, not a side effect to work around.
+        """
+        self.env.cr.execute(
+            'SELECT pg_try_advisory_xact_lock(%s, %s)',
+            (TOKEN_REFRESH_ADVISORY_CLASSID, store.id),
+        )
+        return not self.env.cr.fetchone()[0]
+
+    @api.model
+    def _refresh_access_token(self, store, credential, purpose='business'):
+        """Exchange once under the advisory lock, then cache only what is provable.
+
+        THE DEFECT THIS SHAPE EXISTS TO CLOSE (reproduced by independent review,
+        2026-07-30). The previous version did the whole refresh inside ONE side
+        transaction: it read the client pair, made the network call, and wrote the
+        cache, all on one snapshot. Odoo cursors run REPEATABLE READ, so a
+        rotation or a clear that committed DURING the network call was invisible
+        to that transaction -- and when the cache row was absent (the ordinary
+        first-refresh case) the write was a plain `INSERT` that conflicted with
+        nothing. The result was a committed token minted from secret pair A,
+        stamped as current, and served for up to 24 hours after the merchant had
+        rotated to pair B or cleared the credential outright. `credential_id` did
+        not catch it: a rotation updates that row in place, so the relation still
+        pointed at it.
+
+        THE SHAPE. Two transactions, and the split is the correction:
+
+        1. `lock_cr` -- takes the per-store refresh advisory lock (`try`, never
+           blocking), re-checks the committed cache under it, and CAPTURES the
+           identity it is about to exchange against: `(credential id, epoch,
+           auth_mode)` plus `(state, generation)`. It holds NO row lock and it
+           never writes. It stays open across the network call for one reason
+           only: the advisory lock is what stops a second worker exchanging, and
+           what makes the exchange visible to disconnect quiescence
+           (`_token_exchange_in_flight`).
+
+        2. the network exchange -- outside any row lock, exactly as before.
+
+        3. `write_cr` -- a **NEW** transaction, and therefore a **fresh snapshot**
+           that can see whatever committed while the network call was in flight.
+           It takes the store lifecycle lock and then the credential row lock (the
+           global store -> credential order), compares the captured identity
+           against what it now reads under those locks, and only then writes the
+           cache. A mismatch discards the token and writes nothing.
+
+        Why a second transaction and not a re-read in the first: a re-read through
+        `lock_cr` would return `lock_cr`'s own stale snapshot -- the exact
+        "protected by a plain reread" shape that is forbidden, and the reason the
+        original defect was invisible to the code that was supposed to catch it.
+
+        Why the locks in `write_cr` are safe: they are taken AFTER the network
+        call returns and released microseconds later at commit, so no row lock
+        spans the exchange. Their purpose is to make the window between "identity
+        verified" and "token cached" empty: a rotation racing that window either
+        committed first (we see the new epoch and discard) or blocks on our lock
+        until we commit and then discards our cache row itself. Both orders are
+        correct; there is no third.
+        """
         # Imported here rather than at module import time: the API client is an
         # AbstractModel in this same addon and the error taxonomy lives beside
         # it, so a module-level import would be a circular one.
@@ -735,75 +1250,248 @@ class ShopifyConnectorStoreCredential(models.Model):
             REASON_TOKEN_INVALID, ShopifyClientError,
         )
         self.env.flush_all()
-        side_cr = self.env.registry.cursor()
+        lock_cr = self.env.registry.cursor()
         try:
-            side_cr.execute(
+            lock_cr.execute(
                 'SELECT pg_try_advisory_xact_lock(%s, %s)',
                 (TOKEN_REFRESH_ADVISORY_CLASSID, store.id),
             )
-            acquired = side_cr.fetchone()[0]
-            if not acquired:
-                side_cr.rollback()
+            if not lock_cr.fetchone()[0]:
+                # Another worker owns the exchange for this store -- or the
+                # disconnect controller owns the store. Either way this worker
+                # never competes; it waits, bounded, for a committed result.
+                lock_cr.rollback()
                 return self._await_peer_refresh(store)
-            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
-            side_self = side_env[self._name]
-            side_store = side_env['shopify.connector.store'].browse(store.id)
-            side_credential = side_self._credential_for(side_store)
-            if not side_credential:
-                raise ShopifyClientError(
-                    error_class=ERROR_AUTH,
-                    reason=REASON_TOKEN_INVALID,
-                    credential_invalid=True,
-                )
-            # Double-check UNDER the lock. A worker that queued behind the
-            # leader arrives here after the leader committed, finds a fresh
+            # (1) Double-check the COMMITTED cache under the lock, on this
+            # transaction's own fresh snapshot. A worker that queued behind the
+            # leader arrives here after the leader committed, finds a provable
             # token, and performs no second exchange.
-            if not side_self._token_is_expired(
-                side_self._cached_token_row(side_store),
-                TOKEN_REFRESH_MARGIN_SECONDS,
-            ):
-                side_cr.rollback()
+            remaining, margin = self._committed_token_window(store, cr=lock_cr)
+            if remaining > margin:
+                lock_cr.rollback()
                 return True
-            client_id = side_credential.client_id
-            client_secret = side_credential.client_secret
-            if not client_id or not client_secret:
-                raise ShopifyClientError(
-                    error_class=ERROR_AUTH,
-                    reason=REASON_TOKEN_INVALID,
-                    credential_invalid=True,
-                )
-            # A failed exchange writes NOTHING here -- not the credential row,
-            # not the cache. The raised taxonomy is the failure evidence, and
-            # the CALLER's transaction owns recording it: the connection probe
-            # routes it through `_apply_probe_failure` (store mirrors,
+            snapshot = self._capture_exchange_identity(store, purpose, lock_cr)
+            # (2) The network call. No row lock is held; the advisory lock is.
+            #
+            # A failed exchange writes NOTHING -- not the credential row, not the
+            # cache. The raised taxonomy is the failure evidence, and the
+            # CALLER's transaction owns recording it: the connection probe routes
+            # it through `_apply_probe_failure` (store mirrors,
             # `credential_state`, reconnect), and a business call routes it
-            # through the dispatcher's auth-failure family. A side-transaction
-            # write to the credential row would advance its `write_date` and
-            # collide with the main transaction's later `FOR NO KEY UPDATE`
-            # revalidation lock under REPEATABLE READ -- a serialization
-            # failure manufactured out of a failure report.
-            token, expires_at, granted_scope = side_env[
+            # through the dispatcher's auth-failure family.
+            token, expires_at, granted_scope = self.env[
                 'shopify.connector.api.client'
             ]._exchange_client_credentials(
-                side_store, client_id, client_secret,
+                store, snapshot['client_id'], snapshot['client_secret'],
             )
-            side_self._write_token_cache(
-                side_store, side_credential, token, expires_at, granted_scope,
+            # The secrets have done their single job. Drop the references before
+            # anything else can reach them.
+            snapshot['client_id'] = None
+            snapshot['client_secret'] = None
+            # (3) Revalidate against COMMITTED state and cache atomically.
+            self._commit_token_if_identity_holds(
+                store, snapshot, token, expires_at, granted_scope,
             )
-            side_cr.commit()
+            # COMMIT rather than roll back, even though this transaction wrote
+            # nothing. In production the two cursors are independent connections
+            # and either would do -- but under Odoo's registry test mode
+            # `registry.cursor()` hands out `TestCursor`s layered as NESTED
+            # SAVEPOINTS on one connection, so the write cursor's savepoint is
+            # nested inside this one. Rolling this back would then discard the
+            # cache row that was just committed inside it, and the whole refresh
+            # would silently persist nothing while reporting success. Committing
+            # releases both savepoints in order and behaves identically on real
+            # connections, where it simply ends a read-only transaction and
+            # releases the advisory lock.
+            lock_cr.commit()
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY as exc:
+            # A genuine SQLSTATE 40001/40P01/55P03. Fail CLOSED and normalized:
+            # nothing is cached, and the caller sees the connector's own
+            # retryable taxonomy rather than a raw psycopg2 exception escaping
+            # through a Shopify-facing code path. `technical_detail` carries the
+            # SQLSTATE only -- no query, no row, no secret.
+            lock_cr.rollback()
+            _logger.info(
+                'Shopify access-token refresh for store %s hit a PostgreSQL '
+                'concurrency failure (SQLSTATE %s); nothing was cached.',
+                store.id, getattr(exc, 'pgcode', None),
+            )
+            raise ShopifyClientError(
+                error_class=ERROR_TEMPORARY,
+                reason=REASON_TEMPORARY,
+                technical_detail=(
+                    'token refresh hit a database concurrency conflict '
+                    '(SQLSTATE %s)' % (getattr(exc, 'pgcode', None) or '40001')
+                ),
+            )
         except Exception:
-            side_cr.rollback()
+            lock_cr.rollback()
             raise
         finally:
-            side_cr.close()
+            lock_cr.close()
             # The main environment must not keep serving what it read before
-            # the side transaction ran -- on the SUCCESS path that is the
+            # the side transactions ran -- on the SUCCESS path that is the
             # pre-refresh token cache, and on the FAILURE path it is the
-            # pre-failure `credential_state`/failure-reason mirrors the side
-            # transaction just committed. Both re-read correctly only after an
-            # invalidation, so it is unconditional.
+            # pre-failure `credential_state`/failure-reason mirrors. Both
+            # re-read correctly only after an invalidation, so it is
+            # unconditional.
             self.env['shopify.connector.store.access.token'].invalidate_model()
             self.invalidate_model()
+        return True
+
+    @api.model
+    def _capture_exchange_identity(self, store, purpose, cr):
+        """The exact identity and lifecycle position this exchange is bound to.
+
+        Read on `cr`, which holds the advisory lock and a fresh snapshot. The
+        secrets are returned for the one call that needs them and are dropped by
+        the caller the moment it returns; everything else in the dict is
+        non-secret and is what the post-network revalidation compares.
+        """
+        from .shopify_connector_api_client import (
+            ERROR_AUTH, REASON_TOKEN_INVALID, ShopifyClientError,
+        )
+        cr.execute(
+            'SELECT id, credential_epoch, auth_mode, credential_state, '
+            'client_id, client_secret '
+            'FROM shopify_connector_store_credential WHERE store_id = %s',
+            (store.id,),
+        )
+        row = cr.fetchone()
+        if (
+            not row
+            or row[2] != AUTH_MODE_CLIENT_CREDENTIALS
+            or row[3] != 'present'
+            or not row[4]
+            or not row[5]
+        ):
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        lifecycle = self._committed_lifecycle_state(store, cr=cr)
+        if not lifecycle:
+            raise ShopifyClientError(
+                error_class=ERROR_AUTH,
+                reason=REASON_TOKEN_INVALID,
+                credential_invalid=True,
+            )
+        return {
+            'credential_id': row[0],
+            'credential_epoch': row[1],
+            'auth_mode': row[2],
+            'client_id': row[4],
+            'client_secret': row[5],
+            'state': lifecycle[0],
+            'generation': lifecycle[1],
+            'purpose': purpose,
+        }
+
+    @api.model
+    def _commit_token_if_identity_holds(self, store, snapshot, token,
+                                        expires_at, granted_scope):
+        """Cache the exchanged token, or discard it -- atomically, on fresh state.
+
+        Runs in its OWN transaction so its snapshot begins after the network call
+        and can therefore see a rotation, a clear, a mode switch or a lifecycle
+        transition that committed while the exchange was in flight. Takes the
+        store lifecycle lock and then the credential row lock -- the global
+        `store -> credential` order every other path in this connector follows --
+        so no such change can interleave between the comparison and the write.
+
+        Discards on ANY of: the credential row gone; a different row id; a bumped
+        identity epoch; a changed acquisition mode; a `credential_state` that is
+        no longer `present`; an emptied client pair; a store state now ineligible
+        for the purpose this exchange was performed for; a changed
+        `connection_generation`.
+
+        Nothing is written on the discard path -- no cache row, no credential
+        column, no store mirror -- and the token is dropped without ever being
+        logged. The caller receives the accepted taxonomy: an authentication
+        failure when the credential is gone or unusable, and the retryable class
+        when the identity has simply moved on, because a retry against the NEW
+        identity is exactly the right next step.
+        """
+        from .shopify_connector_api_client import (
+            ERROR_AUTH, ERROR_TEMPORARY, REASON_TEMPORARY,
+            REASON_TOKEN_INVALID, ShopifyClientError,
+        )
+        write_cr = self.env.registry.cursor()
+        try:
+            # store -> credential, both blocking, both AFTER the network call.
+            write_cr.execute(
+                'SELECT state, connection_generation '
+                'FROM shopify_connector_store WHERE id = %s FOR NO KEY UPDATE',
+                (store.id,),
+            )
+            store_row = write_cr.fetchone()
+            write_cr.execute(
+                'SELECT id, credential_epoch, auth_mode, credential_state, '
+                '(client_id IS NOT NULL AND client_id <> \'\') AS has_id, '
+                '(client_secret IS NOT NULL AND client_secret <> \'\') AS has_secret '
+                'FROM shopify_connector_store_credential '
+                'WHERE store_id = %s FOR NO KEY UPDATE',
+                (store.id,),
+            )
+            cred_row = write_cr.fetchone()
+            if (
+                not cred_row
+                or cred_row[3] != 'present'
+                or not cred_row[4]
+                or not cred_row[5]
+            ):
+                write_cr.rollback()
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            allowed = TOKEN_EXCHANGE_PURPOSE_STATES.get(
+                snapshot['purpose'], (),
+            )
+            if (
+                cred_row[0] != snapshot['credential_id']
+                or cred_row[1] != snapshot['credential_epoch']
+                or cred_row[2] != snapshot['auth_mode']
+                or not store_row
+                or store_row[0] not in allowed
+                or store_row[1] != snapshot['generation']
+            ):
+                write_cr.rollback()
+                _logger.info(
+                    'Shopify access token for store %s was discarded: the '
+                    'credential identity or store lifecycle changed during the '
+                    'exchange. Nothing was cached.', store.id,
+                )
+                raise ShopifyClientError(
+                    error_class=ERROR_TEMPORARY,
+                    reason=REASON_TEMPORARY,
+                    technical_detail=(
+                        'the credential identity was superseded during the '
+                        'token exchange'
+                    ),
+                )
+            write_env = api.Environment(
+                write_cr, self.env.uid, self.env.context,
+            )
+            # The provenance written is EXACTLY the provenance just verified
+            # under the two locks -- the same three values, not a re-read.
+            write_env[self._name]._write_token_cache(
+                write_env['shopify.connector.store'].browse(store.id),
+                {
+                    'credential_id': cred_row[0],
+                    'credential_epoch': cred_row[1],
+                    'auth_mode': cred_row[2],
+                },
+                token, expires_at, granted_scope,
+            )
+            write_cr.commit()
+        except Exception:
+            write_cr.rollback()
+            raise
+        finally:
+            write_cr.close()
         return True
 
     @api.model
@@ -827,10 +1515,15 @@ class ShopifyConnectorStoreCredential(models.Model):
                 )
                 poll_self = poll_env[self._name]
                 poll_store = poll_env['shopify.connector.store'].browse(store.id)
-                fresh = not poll_self._token_is_expired(
-                    poll_self._cached_token_row(poll_store),
-                    TOKEN_MIN_USABLE_SECONDS,
+                # The SAME provenance predicate every other read uses. A waiter
+                # that accepted a row the reader would refuse would report
+                # success and then hand its caller "no token" -- and, worse, a
+                # waiter that accepted an obsolete-provenance row would be a
+                # second way into the defect this correction closes.
+                remaining, _margin = poll_self._committed_token_window(
+                    poll_store, cr=poll_cr,
                 )
+                fresh = remaining > TOKEN_MIN_USABLE_SECONDS
             finally:
                 poll_cr.rollback()
                 poll_cr.close()
@@ -854,17 +1547,30 @@ class ShopifyConnectorStoreCredential(models.Model):
         Under the client-credentials mode it no longer does. The access token
         rotates every 24 hours by design; a rotation is not a credential change
         and must not discard an in-flight probe. What actually identifies the
-        credential in that mode is the app's own `(client_id, client_secret)`
-        pair, so that is what is compared. The offline mode compares the token,
-        unchanged.
+        credential is the row's own identity EPOCH, which the credential service
+        bumps exactly once per sanctioned set, replace, clear or mode switch --
+        and never on a token rotation, which writes only the cache row.
 
-        The returned value is held in memory for the duration of one probe and
-        is never logged, persisted, or placed in an exception -- the same
-        contract the token snapshot has always had.
+        BATCH 1 CORRECTION. This used to return the `(client_id, client_secret)`
+        pair for the client-credentials mode and the raw `access_token` for the
+        offline mode. Both worked, and both were worse than this:
+
+        * they put a live secret in a snapshot that is carried across a network
+          call, for no purpose beyond an equality test;
+        * the offline branch compared VALUES, so an operator who re-entered the
+          identical token produced an "unchanged" identity even though the
+          service had invalidated the store's verification evidence. The epoch
+          advances on that write like any other, so a same-value replace is now
+          caught rather than missed.
+
+        The epoch is non-secret, so unlike its predecessor the returned value is
+        safe in a log or an exception. Nothing logs it anyway; the contract is
+        unchanged, the exposure is simply gone.
+
+        Returns `False` for a store with no credential row, which every caller
+        already treats as "superseded".
         """
         credential = self._credential_for(store)
         if not credential:
             return False
-        if credential.auth_mode == AUTH_MODE_CLIENT_CREDENTIALS:
-            return (credential.client_id or '', credential.client_secret or '')
-        return credential.access_token
+        return credential.credential_epoch or 0

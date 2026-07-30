@@ -2587,9 +2587,16 @@ class TestExportReconnectSettlementRace(TransactionCase):
             # `execute_business` refuses a connected store with no usable
             # token before `_send`, so without a credential neither worker
             # would reach the settlement boundary at all.
-            env['shopify.connector.store.credential'].create({
+            # Batch 1 correction (§9.1): minted through the credential service's
+            # write surface, which is now the only route to a credential row.
+            # Mechanical, test-only; the surface avoids `action_set_token`'s
+            # lifecycle lock, which would demote this `connected` store.
+            env['shopify.connector.store.credential']._credential_surface(
+                '_mutate_token',
+            ).create({
                 'store_id': store.id,
                 'access_token': DUMMY_TOKEN,
+                'credential_epoch': 1,
             })
             store.write({'state': 'connected'})
             env['shopify.connector.store.settings'].create({
