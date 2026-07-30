@@ -2,19 +2,30 @@
 
 **`DRAFT — NOT ACCEPTED — NOT REVIEWED — NOT READY — NOT MERGED — NOT SELF-ACCEPTED`**
 
-> **Scope of this record.** The unified Batch 2 campaign specified three
-> checkpoints. This record covers **checkpoint 1 only — canonical Store
-> Settings** — implemented under an explicit product-owner re-scope of the
-> campaign's no-partial-push rule (§5), taken during the session after the
-> unified scope was assessed against what one session can implement *and*
-> validate. Checkpoints 2 (order controls and tax decisions) and 3 (product
-> admission and matching) are **not begun**. Nothing here claims otherwise,
-> and nothing here weakens what those checkpoints must still prove.
+> **Scope of this record, and its limits.** The unified Batch 2 campaign
+> specified three checkpoints plus consolidated journeys, a browser campaign
+> and one definitive validation. This record covers what is **implemented and
+> focus-validated locally**: checkpoint 1 (canonical Store Settings),
+> checkpoint 2 (order controls and the tax decision route), and **§8.1 of
+> checkpoint 3** (the product enumeration producer).
+>
+> **NOT implemented, and not claimed:** §8.2 durable product/variant match
+> decisions; §9 consolidated vertical journeys; §10 the consolidated
+> browser/accessibility campaign; §15.2 the definitive seven-pass validation
+> at a final head. Nothing has been pushed. The branch `fable/wave-5-completion`
+> remains at `b0dbba2a` and PR #204 remains draft, unreviewed and unmerged.
+>
+> Per §5 and §15.2 the additive chain is not pushable until the consolidated
+> validation is green, so the four commits below are **local only**.
 
 ## 1. Heads
 
 - Starting head (identity-gate verified): `b0dbba2aa721d4b92799cbe71f9f5d06f4ad7d2e`
-- Checkpoint 1 commit: `9a706824b9fe1089c3785e4314ed8d3d05d74d19`
+- Local additive chain (unpushed):
+  - `9a70682` checkpoint 1 — canonical Store Settings
+  - `f5f3668` checkpoint 1 — the four guards the new surface had to answer to
+  - `39e5113` checkpoint 2 — order controls and tax decisions
+  - `2c5d190` checkpoint 3 §8.1 — product enumeration producer
 - Base: `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` (unchanged, confirmed ancestor)
 - Odoo pin: `30bde9ff758834a4912c5ae55843d3a7dad849f1`, verified on every run
 - History: **additive only** — no amend, rebase, squash, reset or force-push
@@ -53,9 +64,8 @@ both already existed and both already selected on that field. The only thing
 missing was a control a merchant could reach. That is now on the canonical
 form, writing through the ordinary model path.
 
-**Not claimed:** §7's order controls (`Import orders now`, `Refresh this
-order`, the tax decision route) and §8's product scan producer and durable
-match decisions are checkpoint 2 and 3 work and are untouched.
+§7's order controls and tax decision route are §5 below; §8.1's product scan
+producer is §5b. §8.2's durable match decisions are **not implemented**.
 
 ## 3. Field ownership and classification
 
@@ -100,14 +110,17 @@ was not authorized here.
 `product_import_media_enabled`, `product_import_refresh_mode`,
 `product_import_attribute_conflict_mode` — all canonical editable.
 
-**Deliberately absent, and why.** §6.3 lists a scheduled product-import
-enablement field and a product-import checkpoint/last-success observation, both
-explicitly "required by checkpoint 3". Checkpoint 3 is not implemented, so
-nothing in production enqueues product enumeration. Rendering a "run product
-import on a schedule" toggle now would be a control that silently does nothing
-— the same false-capability failure §6.4 forbids and the one this surface
-exists to end. A test asserts the field does not appear without the producer,
-and fails the moment one is added unwired.
+Plus, **added by checkpoint 3 together with the producer that makes them
+real**: `product_scheduled_sync_enabled` (canonical editable),
+`product_last_import_checkpoint_at` and `product_last_import_success_at`
+(canonical read-only).
+
+**The ordering was deliberate.** Checkpoint 1 declined to render the schedule
+switch while nothing in production enumerated a catalog — a control whose
+producer does not exist is a control that silently does nothing, the same
+false-capability failure §6.4 forbids. Its test asserted the field's absence.
+Checkpoint 3 built the producer, so that test is now inverted: the schedule
+must be the field the cron actually selects on.
 
 ### Sale (`shopify_connector_sale`)
 
@@ -302,3 +315,99 @@ review, accept, ready-mark or merge); checkpoints 2 and 3; the consolidated
 journeys and browser campaign; exact-head Odoo.sh qualification; controlled
 live-Shopify validation; business UAT; control-room acceptance and merge
 authorization. PR #204 stays draft.
+
+
+## 5. Checkpoint 2 — order controls and tax decisions
+
+**The controls.** `Import orders now` binds `action_sync_orders_now` on the
+store form; `Refresh this order` binds `action_sync_selected` on the order
+binding. Both methods pre-existed with their own server guards and neither had
+a caller in any view. `groups="operator"` matches `_assert_order_sync_operator`
+exactly — Administrator and User both imply Operator — and the server refuses a
+denied caller regardless. The store form now states the scheduled position, the
+discovery watermark and any scan in flight, so a manual button never stands
+beside a silent screen that reads as "this is handled".
+
+**The tax route.** The importer already canonicalised a Shopify `TaxLine` into
+a version-stamped fingerprint, refused to guess, and raised structured evidence
+with bounded candidates explicitly marked
+`rate_and_inclusion_only_non_binding`. None of it was reachable: the evidence
+sat in a job-log row and the only control was a generic retry that re-ran the
+identical import and failed identically.
+
+**The state is `failed_retryable`, not `blocked_manual_review`.**
+`odoo_validation_configuration` is a `MANUAL_FIX_THEN_RETRY` class, so a guard
+written against the phrase "blocked work" would never match what the dispatcher
+produces. It also means the generic `action_resolve_manual_review` already
+refuses these jobs (§7.2.13) — asserted rather than rebuilt.
+
+Identity comes from the structured payload after exact-key schema validation,
+never from the human sentence; a test rewords the message and asserts nothing
+changes. The fingerprint is displayed, never typed. Candidates are recomputed
+against the live database at open and again at confirm. Confirmation creates
+the mapping with `UNIQUE(store_id, evidence_key)` as arbiter and resumes the
+exact job via `action_manual_retry` — never a fresh scan.
+
+**Tax Mapping workspace**: list/form/search, `create="false" delete="false"`,
+and `account_tax_id` rendered **read-only** although the model permits writing
+it. Changing what a Shopify tax means after it has priced imported orders needs
+a preview and an audit; declining to offer the unsafe version is the honest
+move. **Governed remap is recorded as P1 debt.**
+
+**A defence that was not being tested.** Removing the candidate query's
+`company_id` filter broke nothing — Odoo's own multi-company rule on
+`account.tax` already hid the foreign tax from a single-company administrator.
+The new test runs the query as an administrator with *both* companies active,
+so the record rule lets the tax through and the filter is the only thing left.
+That mutation now fails exactly one test.
+
+21 tests. Whole sale module green at **251**.
+
+## 5b. Checkpoint 3 §8.1 — the product enumeration producer
+
+`product_import_sync` was registered, handled and replay-classified, and
+nothing in production ever created one. Now: a registered `product_import_scan`
+job type, `Import products now`, a module-owned hourly cron, per-store
+checkpoint and success stamps, and children admitted through the existing
+enqueue service. No second queue, dispatcher or transport.
+
+**Verified against the configured version `2026-07`, not `latest`.**
+`ProductSortKeys` carries `UPDATED_AT`; `ProductStatus` carries a fourth value,
+`UNLISTED`, which the schema notes is "only visible from 2025-10 and up". A
+scan written against the familiar three-value enum would meet it on this
+version, so status is carried as an opaque string and a test enumerates all
+four. Verification used schema introspection and official documentation only —
+**zero Admin API contact, zero credential**.
+
+- First run carries **no time lower bound** and no status clause: a
+  recent-changes default silently omits every product nobody edited lately.
+- Incremental runs reach one minute **behind** the checkpoint, because
+  `updated_at` has second resolution and a same-second write would fall in the
+  gap. Re-seeing products is free; the children collide on their idempotency
+  key.
+- The checkpoint advances once, after every page and child, inside the
+  handler's savepoint. A scan failing on page two discards page one's children
+  and leaves the checkpoint where it was.
+- Child `payload_hash` is the **verbatim** remote `updatedAt`.
+- Repeated cursors, non-progressing cursors, duplicate identities, malformed
+  shapes and the page ceiling all fail closed and visibly.
+
+25 tests. Whole product module green at **217**.
+
+## 5c. What is NOT done
+
+- **§8.2 durable product/variant match decisions** — not implemented. Ambiguous
+  matching still routes to the importer's existing `blocked_manual_review`
+  behaviour with no durable decision record, so generic requeue still repeats
+  the same failure. This is the one §2 defect left open.
+- **§9 consolidated vertical journeys** (C, D-P0, I, J-P0, K-P0) — not written.
+- **§10 consolidated browser/accessibility campaign** — not run. No new tour is
+  registered, so the runner's fail-closed tour inventory is unchanged.
+- **§15.2 definitive seven-pass validation** — not run at a final head.
+- **Nothing pushed.** Per §5/§15.2 the chain is not pushable until the
+  consolidated validation is green.
+
+An earlier seven-pass run was started after checkpoint 1 and terminated as
+premature under §15.1 per the control-room ruling. Its passes 1 and 2 (fresh
+and warm, 0 failed of 2260 tests, 28/28 tours) are **intermediate diagnostic
+evidence only** and describe `f5f3668`, not any later head.
