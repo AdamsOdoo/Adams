@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <!--
+        Batch 2 checkpoint 3: the scheduled product enumeration.
+
+        Module-owned, mirroring the order scan's cron exactly: it enqueues one
+        scan job per eligible store and does no enumeration itself. The work
+        runs on the job's own handler, so retry, failure classification,
+        replay policy and audit are the substrate's rather than the cron
+        thread's.
+
+        Hourly rather than the order scan's fifteen minutes. A catalog changes
+        far less often than an order book, each scan walks the whole eligible
+        set on its first run, and a store that wants a change reflected now
+        has `Import products now` for exactly that.
+
+        `noupdate="1"` so an administrator's interval or active-state change
+        survives a module update, the same as every other connector cron.
+    -->
+    <record id="ir_cron_shopify_connector_product_scan" model="ir.cron">
+        <field name="name">Shopify Connector: Enqueue Product Scans</field>
+        <field name="model_id" ref="shopify_connector_core.model_shopify_connector_store"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_enqueue_product_scans()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>

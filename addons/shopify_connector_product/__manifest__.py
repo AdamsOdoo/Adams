@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.5.0',
+    'version': '19.0.2.6.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '
@@ -39,6 +39,8 @@ logic. No UI, wizard, webhook, or OAuth file.
         'security/ir.model.access.csv',
         'security/shopify_connector_product_company_rules.xml',
         'data/shopify_connector_attribute_lock.xml',
+        # Batch 2 checkpoint 3: the scheduled product enumeration cron.
+        'data/shopify_connector_product_cron.xml',
         # U2 operator UI. Views before menus, so every action referenced by a
         # menu already exists when the menu record is created.
         'views/shopify_connector_product_binding_views.xml',
@@ -46,6 +48,10 @@ logic. No UI, wizard, webhook, or OAuth file.
         # Batch 2 checkpoint 1: the product-import section of the canonical
         # Store Settings form, contributed by inheritance.
         'views/shopify_connector_store_settings_product_views.xml',
+        # Batch 2 checkpoint 3: the product import controls, and the two
+        # settings the producer makes real. Loads after the settings section
+        # it extends by `inherit_id`.
+        'views/shopify_connector_product_controls_views.xml',
     ],
     'installable': True,
     'application': False,

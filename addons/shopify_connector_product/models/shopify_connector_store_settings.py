@@ -45,3 +45,23 @@ class ShopifyConnectorStoreSettingsProduct(models.Model):
         ],
         default='manual_review',
     )
+
+    # ------------------------------------------------------------------
+    # Batch 2 checkpoint 3: scheduled product import
+    # ------------------------------------------------------------------
+    #
+    # These arrive WITH the producer that makes them real, not before it.
+    # Checkpoint 1 deliberately declined to render a scheduled-import switch
+    # while nothing in production enumerated a catalog, because a control whose
+    # producer does not exist is a control that silently does nothing. The cron
+    # in `data/shopify_connector_product_cron.xml` selects on the flag below,
+    # so switching it on now genuinely starts scheduled scanning.
+    product_scheduled_sync_enabled = fields.Boolean(default=False)
+
+    # Written by the scan service only, and only after a scan completed. The
+    # checkpoint is what the next incremental window starts from; the success
+    # stamp is the human-facing "when did this last work", which is a
+    # different question and deserves a different field -- a scan that failed
+    # advances neither.
+    product_last_import_checkpoint_at = fields.Datetime(readonly=True)
+    product_last_import_success_at = fields.Datetime(readonly=True)

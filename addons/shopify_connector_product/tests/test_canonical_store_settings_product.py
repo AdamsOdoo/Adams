@@ -2,12 +2,21 @@
 
 §6.6 requires every module contributing a settings field to classify all of
 them. This is the product module's answer.
+
+UPDATED BY CHECKPOINT 3. Checkpoint 1 asserted that no scheduled-product-import
+setting existed, because nothing in production enumerated a catalog and a
+switch with no producer behind it is a control that silently does nothing.
+Checkpoint 3 built the producer, so the three fields it configures are now
+classified and rendered, and the guard is replaced by its opposite: the
+schedule must be wired to the cron that reads it.
 """
 
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
     CANONICAL_EDITABLE,
+    CANONICAL_READONLY,
+    SETTINGS_MODEL,
     assert_module_classification,
     canonical_form_field_nodes,
 )
@@ -18,6 +27,16 @@ PRODUCT_CLASSIFICATION = {
     'product_import_media_enabled': (CANONICAL_EDITABLE, ''),
     'product_import_refresh_mode': (CANONICAL_EDITABLE, ''),
     'product_import_attribute_conflict_mode': (CANONICAL_EDITABLE, ''),
+    'product_scheduled_sync_enabled': (CANONICAL_EDITABLE, ''),
+    'product_last_import_checkpoint_at': (
+        CANONICAL_READONLY,
+        'Enumeration watermark written by the product scan service; an '
+        'observation, not a decision.',
+    ),
+    'product_last_import_success_at': (
+        CANONICAL_READONLY,
+        'When a product scan last completed; written by the scan service.',
+    ),
 }
 
 
@@ -36,24 +55,31 @@ class TestCanonicalStoreSettingsProduct(TransactionCase):
                 'canonical Store Settings form by inheritance.',
             )
 
-    def test_no_scheduled_product_import_control_is_offered_yet(self):
-        """§6.4's anti-false-capability rule, applied to this module.
+    def test_the_scheduled_setting_is_the_field_the_cron_selects_on(self):
+        """The inverse of checkpoint 1's guard, now that the producer exists.
 
-        Nothing in production enqueues product enumeration at this head, so a
-        scheduled-product-import switch would be a control that silently does
-        nothing. This asserts the surface does not grow one before the
-        producer it configures exists -- and it is written to FAIL the moment
-        such a field is added without also being classified and wired.
+        A rendered schedule switch is only honest if something reads it. This
+        asserts the cron's own selection is over exactly this field plus the
+        domain flag -- so if the producer is ever removed, the control stops
+        being decoration by failing here rather than by quietly doing nothing.
         """
-        settings_fields = self.env['shopify.connector.store.settings']._fields
-        scheduled = {
-            name for name in settings_fields
-            if name.startswith('product_import_')
-            and ('schedul' in name or 'cron' in name)
-        }
-        self.assertFalse(
-            scheduled,
-            'A scheduled product-import setting exists (%s) but the product '
-            'scan producer does not. Either wire the producer and classify '
-            'the field, or do not render the control.' % sorted(scheduled),
+        import inspect
+        store = self.env['shopify.connector.store']
+        source = inspect.getsource(
+            type(store)._cron_enqueue_product_scans
         )
+        self.assertIn('product_scheduled_sync_enabled', source)
+        self.assertIn('product_domain_enabled', source)
+        self.assertFalse(
+            self.env[SETTINGS_MODEL]._fields[
+                'product_scheduled_sync_enabled'
+            ].readonly,
+        )
+
+    def test_the_scheduled_cron_record_exists_and_calls_the_producer(self):
+        cron = self.env.ref(
+            'shopify_connector_product.'
+            'ir_cron_shopify_connector_product_scan',
+        )
+        self.assertIn('_cron_enqueue_product_scans', cron.code)
+        self.assertEqual(cron.model_id.model, 'shopify.connector.store')

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 3: the product import controls.
+
+        `Import products now` binds `action_sync_products_now`, which enqueues
+        the registered `product_import_scan` job. Neither this button nor the
+        cron calls `import_product_sync()` directly: that would run a Shopify
+        read on the web worker, outside the substrate that owns retry, failure
+        classification, replay policy and audit for every per-product import.
+
+        Visibility mirrors the server guard exactly &#8212; Operator, which
+        Administrator and User both imply &#8212; and is still not the control;
+        `_assert_product_sync_operator` refuses a denied caller whether or not
+        a button rendered.
+    -->
+
+    <record id="view_shopify_connector_store_form_product_controls"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.product.controls</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/field[@name='state']" position="before">
+                <button name="action_sync_products_now" type="object"
+                        string="Import products now"
+                        groups="shopify_connector_core.group_shopify_connector_operator"
+                        invisible="state != 'connected' or not product_sync_domain_enabled"
+                        help="Look for Shopify products to import now. This
+                              queues one catalog scan; it imports nothing
+                              directly, and it never sends data to Shopify."/>
+            </xpath>
+            <xpath expr="//sheet/group[last()]" position="after">
+                <group string="Product import" name="product_sync_state"
+                       invisible="not product_sync_domain_enabled">
+                    <field name="product_sync_scheduled" readonly="1"/>
+                    <field name="product_sync_last_checkpoint_at" readonly="1"/>
+                    <field name="product_sync_active_scan_count" readonly="1"/>
+                    <div class="text-muted" colspan="2"
+                         invisible="product_sync_scheduled">
+                        <strong>Scheduled product import is off.</strong>
+                        The catalog is scanned only when somebody presses
+                        <em>Import products now</em>. Turn scheduling on in
+                        Configuration → Store Settings to keep it current on
+                        its own.
+                    </div>
+                    <div class="text-muted" colspan="2"
+                         invisible="product_sync_last_checkpoint_at">
+                        No catalog scan has completed yet. The first scan
+                        enumerates the whole eligible catalog, not just recent
+                        changes.
+                    </div>
+                    <div class="text-muted" colspan="2"
+                         invisible="product_sync_active_scan_count == 0">
+                        A catalog scan is already in flight for this store.
+                        Pressing <em>Import products now</em> again joins that
+                        scan rather than starting a second one.
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        The two settings the producer above makes real, added to the canonical
+        Store Settings form now that there is something behind them.
+    -->
+    <record id="view_shopify_connector_store_settings_canonical_form_product_schedule"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.store.form.product.schedule</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="inherit_id"
+               ref="shopify_connector_product.view_shopify_connector_store_settings_canonical_form_product"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='canonical_product']/group[@name='canonical_product_import']"
+                   position="inside">
+                <field name="product_scheduled_sync_enabled"/>
+                <field name="product_last_import_checkpoint_at" readonly="1"/>
+                <field name="product_last_import_success_at" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

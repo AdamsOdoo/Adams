@@ -12,3 +12,4 @@ from . import test_ui_u2_product
 
 # Batch 2 checkpoint 1: canonical Store Settings classification.
 from . import test_canonical_store_settings_product
+from . import test_product_scan_producer
