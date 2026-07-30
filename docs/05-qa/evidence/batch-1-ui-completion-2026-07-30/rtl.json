@@ -1,0 +1,3172 @@
+{
+  "clipping": [],
+  "lang": "ar_001",
+  "measured": {
+    "s1-setup-credential-dev-dashboard@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 229,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1096.78125,
+            "height": 1018.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-credential-dev-dashboard@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 636,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1519.78125,
+            "height": 1457.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-credential-dev-dashboard@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 201,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1084.78125,
+            "height": 1022.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-credential-offline-token@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 146,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1013.78125,
+            "height": 935.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-credential-offline-token@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 595,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1478.78125,
+            "height": 1416.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-credential-offline-token@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 139,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1022.78125,
+            "height": 960.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-final-readiness@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 1430,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2297.78125,
+            "height": 2219.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-final-readiness@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 1816,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2699.78125,
+            "height": 2637.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-final-readiness@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 1423,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2306.78125,
+            "height": 2244.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-loaded-more@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 7933,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 8800.78125,
+            "height": 8722.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-loaded-more@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 9496,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 10379.78125,
+            "height": 10317.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-loaded-more@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 7929,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 8812.78125,
+            "height": 8750.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-mapping@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 7933,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 8800.78125,
+            "height": 8722.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-mapping@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 9475,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 10358.78125,
+            "height": 10296.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-mapping@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 7929,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 8812.78125,
+            "height": 8750.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-no-result@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 218,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1085.96875,
+            "height": 1007.96875,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-no-result@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 538,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1421.78125,
+            "height": 1359.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-no-result@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 231,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1114.78125,
+            "height": 1052.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-search-results@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 1563,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2430.78125,
+            "height": 2352.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-search-results@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 2097,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2980.78125,
+            "height": 2918.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-location-search-results@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 1559,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 2442.78125,
+            "height": 2380.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-permissions-long@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 332,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1199.78125,
+            "height": 1121.78125,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-permissions-long@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 574,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1457.78125,
+            "height": 1395.78125,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-permissions-long@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 328,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1211.78125,
+            "height": 1149.78125,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-wizard-welcome@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 880,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 704.375,
+            "height": 626.375,
+            "left": 243,
+            "right": 1123,
+            "top": 78,
+            "width": 880
+          },
+          "scroll_width": 880,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "s1-setup-wizard-welcome@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 162,
+          "vertical_reachable_by": "o_sc_setup"
+        },
+        {
+          "client_width": 358,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1046.375,
+            "height": 984.375,
+            "left": 16,
+            "right": 374,
+            "top": 62,
+            "width": 358
+          },
+          "scroll_width": 358,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_setup"
+        }
+      ]
+    },
+    "s1-setup-wizard-welcome@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_setup",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_setup",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_setup",
+          "clipped_silently": true,
+          "cls": "o_sc_setup__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 692.375,
+            "height": 630.375,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u0-dashboard-healthy@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 1120,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 530.984375,
+            "height": 452.984375,
+            "left": 123,
+            "right": 1243,
+            "top": 78,
+            "width": 1120
+          },
+          "scroll_width": 1120,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u0-dashboard-healthy@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 366,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 696.984375,
+            "height": 638.984375,
+            "left": 12,
+            "right": 378,
+            "top": 58,
+            "width": 366
+          },
+          "scroll_width": 366,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u0-dashboard-healthy@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_dashboard",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "hidden",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 736,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_dashboard",
+          "clipped_silently": true,
+          "cls": "o_sc_dashboard__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 688.984375,
+            "height": 626.984375,
+            "left": 16,
+            "right": 752,
+            "top": 62,
+            "width": 736
+          },
+          "scroll_width": 736,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-cod-reconciliation-empty@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-cod-reconciliation-empty@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-cod-reconciliation-empty@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-customer-matching-empty@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-form-awaiting-confirmation@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-guard-previewed@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-first-push-withdraw-dialog@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 978,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 666.59375,
+            "height": 440,
+            "left": 194,
+            "right": 1172,
+            "top": 226.59375,
+            "width": 978
+          },
+          "scroll_width": 978,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 978,
+          "clip_rect": {
+            "left": 194,
+            "right": 1172
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 666.59375,
+            "height": 440,
+            "left": 194,
+            "right": 1172,
+            "top": 226.59375,
+            "width": 978
+          },
+          "scroll_width": 978,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-first-push-withdraw-dialog@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 842,
+            "height": 796,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_xxs_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 792,
+            "height": 746,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-first-push-withdraw-dialog@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 648,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 708.59375,
+            "height": 524,
+            "left": 60,
+            "right": 708,
+            "top": 184.59375,
+            "width": 648
+          },
+          "scroll_width": 648,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 648,
+          "clip_rect": {
+            "left": 60,
+            "right": 708
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 708.59375,
+            "height": 524,
+            "left": 60,
+            "right": 708,
+            "top": 184.59375,
+            "width": 648
+          },
+          "scroll_width": 648,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-inventory-workspace@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-inventory-workspace@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-mapping-form@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-location-withdraw-all-dialog@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 978,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 701.34375,
+            "height": 509.5,
+            "left": 194,
+            "right": 1172,
+            "top": 191.84375,
+            "width": 978
+          },
+          "scroll_width": 978,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 978,
+          "clip_rect": {
+            "left": 194,
+            "right": 1172
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 701.34375,
+            "height": 509.5,
+            "left": 194,
+            "right": 1172,
+            "top": 191.84375,
+            "width": 978
+          },
+          "scroll_width": 978,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-location-withdraw-all-dialog@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 821,
+            "height": 775,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 240,
+          "vertical_reachable_by": "modal-body"
+        },
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_xxs_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 900.125,
+            "height": 1015.125,
+            "left": 0,
+            "right": 390,
+            "top": -115,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "modal-body"
+        }
+      ]
+    },
+    "u2-location-withdraw-all-dialog@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 648,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 800.59375,
+            "height": 708,
+            "left": 60,
+            "right": 708,
+            "top": 92.59375,
+            "width": 648
+          },
+          "scroll_width": 648,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        },
+        {
+          "client_width": 648,
+          "clip_rect": {
+            "left": 60,
+            "right": 708
+          },
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 800.59375,
+            "height": 708,
+            "left": 60,
+            "right": 708,
+            "top": 92.59375,
+            "width": 648
+          },
+          "scroll_width": 648,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": null
+        }
+      ]
+    },
+    "u2-orders-workspace-empty@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-orders-workspace-empty@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-product-matching@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-product-matching@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u2-product-matching@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diagnostics@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-diff-refusal-and-tag-removal@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 1366,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 1366,
+            "top": 46,
+            "width": 1366
+          },
+          "scroll_width": 1366,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 201,
+          "vertical_reachable_by": "o_sc_export_diff"
+        },
+        {
+          "client_width": 960,
+          "clip_rect": {
+            "left": 0,
+            "right": 1366
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1101.359375,
+            "height": 1055.359375,
+            "left": 203,
+            "right": 1163,
+            "top": 46,
+            "width": 960
+          },
+          "scroll_width": 960,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_export_diff"
+        }
+      ]
+    },
+    "u3-export-diff-refusal-and-tag-removal@390px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 530,
+          "vertical_reachable_by": "o_sc_export_diff"
+        },
+        {
+          "client_width": 390,
+          "clip_rect": {
+            "left": 0,
+            "right": 390
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1430.359375,
+            "height": 1384.359375,
+            "left": 0,
+            "right": 390,
+            "top": 46,
+            "width": 390
+          },
+          "scroll_width": 390,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_export_diff"
+        }
+      ]
+    },
+    "u3-export-diff-refusal-and-tag-removal@768px": {
+      "body_direction": "ltr",
+      "connector_direction": "rtl",
+      "connector_root": "o_sc_export_diff",
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": [
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_action_manager",
+          "clipped_silently": true,
+          "cls": "o_sc_export_diff",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "auto",
+          "rect": {
+            "bottom": 900,
+            "height": 854,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": true,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 259,
+          "vertical_reachable_by": "o_sc_export_diff"
+        },
+        {
+          "client_width": 768,
+          "clip_rect": {
+            "left": 0,
+            "right": 768
+          },
+          "clipped_by": "o_sc_export_diff",
+          "clipped_silently": false,
+          "cls": "o_sc_export_diff__inner",
+          "escaped_descendants": [],
+          "escapes_left": 0,
+          "escapes_right": 0,
+          "overflow_x": "visible",
+          "rect": {
+            "bottom": 1159.359375,
+            "height": 1113.359375,
+            "left": 0,
+            "right": 768,
+            "top": 46,
+            "width": 768
+          },
+          "scroll_width": 768,
+          "scrolls_vertically": false,
+          "self_overflow": 0,
+          "unhandled_self_overflow": 0,
+          "unreachable_vertical": 0,
+          "vertical_overflow": 0,
+          "vertical_reachable_by": "o_sc_export_diff"
+        }
+      ]
+    },
+    "u3-export-previews@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-previews@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-previews@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-settings@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-settings@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-export-settings@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-exported-media@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-exported-media@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-exported-media@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@1366px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 1366,
+      "inner_width": 1366,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@390px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 390,
+      "inner_width": 390,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    },
+    "u3-reconnect-backfill@768px": {
+      "body_direction": "ltr",
+      "connector_direction": null,
+      "connector_root": null,
+      "direction": "ltr",
+      "doc_scroll_width": 768,
+      "inner_width": 768,
+      "odoo_rtl_class": true,
+      "rtl_stylesheets": 2,
+      "surfaces": []
+    }
+  },
+  "note": "Odoo 19 backend sets no `dir` on <html>/<body>; its RTL mechanism is rtlcss bundle flipping. The connector stylesheets use logical properties, which resolve against `direction`, so the meaningful measurement is the connector surface root.",
+  "overflows": [],
+  "widths": {
+    "desktop": 1366,
+    "mobile": 390,
+    "tablet": 768
+  }
+}

@@ -68,6 +68,49 @@ _logger = logging.getLogger(__name__)
 #: correction packet requires.
 WIDTHS = {'desktop': 1366, 'tablet': 768, 'mobile': 390}
 
+#: How many cached Shopify locations the fixture seeds. The search page is 50
+#: (`SETUP_LOCATION_SEARCH_PAGE`), so this is the smallest set that renders a
+#: full page, offers `Load more`, and is then exhausted by one more press.
+LOCATION_FIXTURE_ROWS = 60
+
+#: 200% browser zoom, expressed the way a browser expresses it: the CSS
+#: viewport halves and every CSS pixel is drawn twice as large. Emulating it
+#: with `deviceScaleFactor` alone changes nothing about layout, which is the
+#: only thing WCAG 2.2 SC 1.4.4 is about -- text has to remain readable and
+#: reachable without a second scroll axis when the page is enlarged, and that
+#: is a LAYOUT consequence of the narrower CSS viewport.
+ZOOM_FACTOR = 2
+
+#: WCAG 2.2 SC 1.4.10 specifies reflow at 320 CSS px. Halving 390 gives 195,
+#: a width no criterion requires and no browser lays out for, so the mobile
+#: row is measured at the floor instead of at a number chosen by arithmetic.
+REFLOW_FLOOR_PX = 320
+
+#: How far a keyboard user is asked to Tab before the traversal is called
+#: unreachable. The longest Batch 1 surface is the location step with a full
+#: 50-row page plus the search, select and map controls, and every row there
+#: is static text and contributes no tab stop -- so this is generous by a wide
+#: margin and a surface that exceeds it has a real focus-order defect rather
+#: than a long list.
+MAX_TAB_PRESSES = 200
+
+#: The surfaces the Batch 1 correction changed. Named, not derived: a surface
+#: joins this campaign because someone decided it should, and a future change
+#: that adds one and forgets this tuple should be a visible omission rather
+#: than a quietly smaller matrix.
+BATCH1_CHANGED_SURFACES = (
+    's1-setup-credential-dev-dashboard',
+    's1-setup-credential-offline-token',
+    's1-setup-location-mapping',
+    's1-setup-location-search-results',
+    's1-setup-location-loaded-more',
+    's1-setup-location-no-result',
+    'u2-first-push-form-awaiting-confirmation',
+    'u2-first-push-withdraw-dialog',
+    'u2-location-mapping-form',
+    'u2-location-withdraw-all-dialog',
+)
+
 #: WCAG 2.2 thresholds. SC 1.4.3 for text, SC 1.4.11 for components.
 CONTRAST_TEXT = 4.5
 CONTRAST_LARGE_TEXT = 3.0
@@ -272,6 +315,391 @@ REVIEW_EXPORT_JS = r"""
 })()
 """
 
+# --- Batch 1 UI completion: driving the surfaces the correction changed ------
+#
+# Four of the surfaces this campaign must measure do not exist until an
+# operator DOES something: a location search result set, a set with a second
+# page loaded, a search that matched nothing, and each of the two withdrawal
+# dialogs. Photographing the step they live on and calling that coverage is
+# the same mistake the tour made -- it measures the screen before the thing
+# under test is on it.
+#
+# These run as the surface's post-open action. Each waits for its own
+# completion rather than for a fixed delay, and each FAILS LOUDLY if what it
+# was driving is not there, because a post-open action that silently did
+# nothing leaves the previous screen to be photographed under the new name.
+
+#: Shared preamble: a real `input` event so Owl's `t-model` sees the value
+#: (assigning `.value` alone does not), and a condition waiter.
+_DRIVE_PRELUDE = r"""
+  const type = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (!el) { throw new Error("no element matched " + selector); }
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype, "value").set;
+    setter.call(el, value);
+    el.dispatchEvent(new Event("input", {bubbles: true}));
+    return el;
+  };
+  const press = (selector) => {
+    const el = document.querySelector(selector);
+    if (!el) { throw new Error("no control matched " + selector); }
+    if (el.disabled) { throw new Error(selector + " is disabled"); }
+    el.click();
+    return el;
+  };
+  const waitFor = async (label, predicate, ms = 30000) => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      if (predicate()) {
+        await new Promise((r) => requestAnimationFrame(
+          () => requestAnimationFrame(r)));
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    throw new Error("timed out waiting for " + label);
+  };
+  const rows = () => document.querySelectorAll(".sc_setup__location").length;
+"""
+
+#: A search with results on screen: the Clear control appears only once a
+#: search has actually been run, so it is the honest completion signal.
+LOCATION_SEARCH_JS = r"""
+(async () => {
+%s
+  type(".sc_setup_search_shopify", "warehouse 1");
+  press(".sc_setup_search_shopify_go");
+  await waitFor("a search result set",
+                () => document.querySelector(".sc_setup_search_shopify_clear")
+                      && rows() > 0);
+  return true;
+})()
+""" % _DRIVE_PRELUDE
+
+#: A full first page plus a second one, which is the state the accumulated-page
+#: rework exists for and the only one where the counter, the Load more control
+#: and a long list are all on screen together.
+LOCATION_LOAD_MORE_JS = r"""
+(async () => {
+%s
+  type(".sc_setup_search_shopify", "");
+  press(".sc_setup_search_shopify_go");
+  // BOTH controls, and the pair is the point: `Clear` appears only once a
+  // search has resolved and `Load more` only when the SERVER says another
+  // page exists. Counting rows instead raced the response -- the unsearched
+  // list already renders every seeded row, so a count taken before the first
+  // page landed was HIGHER than the page that replaced it and "more rows than
+  // before" could never become true.
+  await waitFor("a resolved first page with another page behind it",
+                () => document.querySelector(".sc_setup_search_shopify_clear")
+                      && document.querySelector(".sc_setup_more_shopify"));
+  const first = rows();
+  press(".sc_setup_more_shopify");
+  await waitFor("a second page", () => rows() > first);
+  return true;
+})()
+""" % _DRIVE_PRELUDE
+
+#: The zero-result state, which used to hide the search row, the Clear button
+#: and the Map control together -- so the screen that has to keep its way out
+#: is exactly the screen worth photographing.
+LOCATION_NO_RESULT_JS = r"""
+(async () => {
+%s
+  type(".sc_setup_search_shopify", "zzzz-no-location-matches-this-zzzz");
+  press(".sc_setup_search_shopify_go");
+  await waitFor("the empty-result band",
+                () => document.querySelector(".sc_setup__empty--shopify")
+                      && rows() === 0);
+  return true;
+})()
+""" % _DRIVE_PRELUDE
+
+#: The credential step with the offline path selected, so BOTH paths of the
+#: chooser are measured rather than only the default one.
+CREDENTIAL_OFFLINE_JS = r"""
+(async () => {
+%s
+  const radio = document.querySelector(
+    ".sc_setup__modes input[value='offline_access_token']");
+  if (!radio) { throw new Error("no offline path on the credential chooser"); }
+  radio.click();
+  await waitFor("the offline credential field",
+                () => document.querySelector(".sc_setup_token"));
+  return true;
+})()
+""" % _DRIVE_PRELUDE
+
+
+#: The LAST actionable control inside the connector surface on screen, and
+#: whether it can actually be got to. "Reachable" is asserted after scrolling
+#: it into view, because content below the fold is fine and content that
+#: cannot be scrolled to is not -- and the two look identical from a
+#: bounding rectangle alone.
+LAST_CONTROL_JS = r"""
+(() => {
+  // PRIORITY ORDER, not a comma list. `document.querySelector("a, b")`
+  // returns the first match in DOCUMENT ORDER of either selector, so with a
+  // dialog open it returned the form BEHIND the modal -- and the "last
+  // actionable control" was then an inert control the modal had made
+  // unreachable, which no amount of tabbing could ever land on.
+  const surfaceRoot = () => {
+    for (const selector of [
+      // `.modal-content`, not `.modal-body`: a dialog's FINAL actionable
+      // controls are its footer buttons, and the body excludes them, so a
+      // body-scoped search called the consequence checkbox the last control
+      // and never measured whether Confirm and Cancel could be reached.
+      ".modal:not(.o_inactive_modal) .modal-content",
+      ".o_sc_setup", ".o_sc_dashboard", ".o_sc_export_diff", ".o_form_view",
+    ]) {
+      const found = document.querySelector(selector);
+      if (found) { return found; }
+    }
+    return null;
+  };
+  const root = surfaceRoot();
+  if (!root) { return JSON.stringify({error: "no connector surface on screen"}); }
+  const name = (el) => {
+    const cls = String(el.className || "").split(/\s+/).filter(Boolean)[0];
+    return el.tagName.toLowerCase() + (cls ? "." + cls : "") +
+           (el.name ? "[name='" + el.name + "']" : "");
+  };
+  const controls = Array.from(root.querySelectorAll(
+    "button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+  )).filter((el) => {
+    if (el.disabled) { return false; }
+    if (!el.getClientRects().length) { return false; }
+    const cs = getComputedStyle(el);
+    return cs.visibility !== "hidden" && cs.display !== "none";
+  });
+  if (!controls.length) {
+    return JSON.stringify({error: "no actionable control on this surface"});
+  }
+  const last = controls[controls.length - 1];
+  last.scrollIntoView({block: "nearest", inline: "nearest"});
+  const r = last.getBoundingClientRect();
+  return JSON.stringify({
+    selector: name(last),
+    label: (last.textContent || last.value || "").trim().slice(0, 60),
+    control_count: controls.length,
+    rect: {top: r.top, right: r.right, bottom: r.bottom, left: r.left},
+    viewport: {width: window.innerWidth, height: window.innerHeight},
+    // 1px of tolerance throughout: sub-pixel layout rounding is not
+    // unreachability.
+    reachable: r.bottom <= window.innerHeight + 1 && r.top >= -1 &&
+               r.right <= window.innerWidth + 1 && r.left >= -1,
+  });
+})()
+"""
+
+#: Where focus actually is, after a real Tab press.
+ACTIVE_ELEMENT_JS = r"""
+(() => {
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) {
+    return JSON.stringify({is_body: true, selector: "body", visible: false,
+                           matches_target: false});
+  }
+  const name = (node) => {
+    const cls = String(node.className || "").split(/\s+/).filter(Boolean)[0];
+    return node.tagName.toLowerCase() + (cls ? "." + cls : "") +
+           (node.name ? "[name='" + node.name + "']" : "");
+  };
+  // See LAST_CONTROL_JS: priority order, never a comma list, or with a
+  // dialog open this resolves to the form behind the modal.
+  const surfaceRoot = () => {
+    for (const selector of [
+      // `.modal-content`, not `.modal-body`: a dialog's FINAL actionable
+      // controls are its footer buttons, and the body excludes them, so a
+      // body-scoped search called the consequence checkbox the last control
+      // and never measured whether Confirm and Cancel could be reached.
+      ".modal:not(.o_inactive_modal) .modal-content",
+      ".o_sc_setup", ".o_sc_dashboard", ".o_sc_export_diff", ".o_form_view",
+    ]) {
+      const found = document.querySelector(selector);
+      if (found) { return found; }
+    }
+    return null;
+  };
+  const root = surfaceRoot();
+  let target = null;
+  if (root) {
+    const controls = Array.from(root.querySelectorAll(
+      "button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+    )).filter((node) => {
+      if (node.disabled) { return false; }
+      if (!node.getClientRects().length) { return false; }
+      const cs = getComputedStyle(node);
+      return cs.visibility !== "hidden" && cs.display !== "none";
+    });
+    target = controls[controls.length - 1] || null;
+  }
+  const r = el.getBoundingClientRect();
+  const cs = getComputedStyle(el);
+  return JSON.stringify({
+    is_body: false,
+    selector: name(el),
+    // Focus landing on something the user cannot see is SC 2.4.11's failure
+    // and it is completely silent, so it is measured rather than assumed.
+    visible: r.width > 0 && r.height > 0 && cs.visibility !== "hidden" &&
+             cs.display !== "none" && parseFloat(cs.opacity || "1") > 0.01,
+    matches_target: target !== null && el === target,
+  });
+})()
+"""
+
+#: Every ARIA live region and every alert band inside one surface, with the
+#: text each one would announce. `%s` is the surface's root selector.
+LIVE_REGION_JS = r"""
+(() => {
+  const root = document.querySelector(%s);
+  if (!root) { return JSON.stringify({error: "surface not on screen"}); }
+  const text = (el) => (el.textContent || "").replace(/\s+/g, " ").trim();
+  const LIVE_ROLES = ["alert", "log", "marquee", "status", "timer"];
+  const regions = Array.from(
+    root.querySelectorAll("[role], [aria-live]")
+  ).map((el) => ({
+    role: el.getAttribute("role"),
+    aria_live: el.getAttribute("aria-live"),
+    is_live_region: LIVE_ROLES.includes(el.getAttribute("role")) ||
+                    Boolean(el.getAttribute("aria-live")),
+    cls: String(el.className || "").split(/\s+/)[0],
+    text: text(el).slice(0, 400),
+  }));
+  // An `alert-*` band with no role at all: styled to look urgent and
+  // carrying nothing that tells a screen reader to read it.
+  const rolelessAlerts = Array.from(
+    root.querySelectorAll("[class*='alert-']")
+  ).filter((el) => !el.getAttribute("role") &&
+                   !String(el.className).includes("alert-link"))
+   .map((el) => ({cls: String(el.className), text: text(el).slice(0, 200)}));
+  return JSON.stringify({regions: regions, roleless_alerts: rolelessAlerts});
+})()
+"""
+
+#: Fill in the open dialog's mandatory reason, so the `note` band can be
+#: compared before and after the operator has actually done something.
+TYPE_REASON_JS = r"""
+(async () => {
+  const dialog = document.querySelector(".modal:not(.o_inactive_modal)");
+  if (!dialog) { throw new Error("no dialog on screen"); }
+  const input = dialog.querySelector(
+    ".o_field_widget[name='reason'] input, .o_field_widget[name='reason'] textarea");
+  if (!input) { throw new Error("the dialog has no reason field"); }
+  const proto = input.tagName === "TEXTAREA"
+    ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value").set.call(
+    input, "Announced-state evidence run");
+  input.dispatchEvent(new Event("input", {bubbles: true}));
+  await new Promise((r) => requestAnimationFrame(
+    () => requestAnimationFrame(r)));
+  return true;
+})()
+"""
+
+#: Submit the open dialog with its mandatory field empty, then report how the
+#: refusal was communicated.
+INVALID_SUBMIT_JS = r"""
+(async () => {
+  const waitFor = async (label, predicate, ms = 20000) => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      if (predicate()) {
+        await new Promise((r) => requestAnimationFrame(
+          () => requestAnimationFrame(r)));
+        return true;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return false;
+  };
+  const dialog = document.querySelector(".modal:not(.o_inactive_modal)");
+  if (!dialog) { return JSON.stringify({error: "no dialog on screen"}); }
+  const confirm = dialog.querySelector("footer button[name='action_confirm']");
+  if (!confirm) { return JSON.stringify({error: "no confirm control"}); }
+  confirm.click();
+  const invalidShown = await waitFor(
+    "an invalid field",
+    () => document.querySelector(".o_field_invalid, [aria-invalid='true']"));
+  const text = (el) => (el.textContent || "").replace(/\s+/g, " ").trim();
+  const fields = Array.from(document.querySelectorAll(
+    ".o_field_invalid, [aria-invalid='true']"
+  )).map((el) => {
+    const widget = el.closest("[name]") || el;
+    const control = el.matches("input, select, textarea")
+      ? el : el.querySelector("input, select, textarea");
+    return {
+      field: widget.getAttribute("name"),
+      cls: String(el.className || "").split(/\s+/)[0],
+      // Odoo marks the CONTROL, so look there as well as at the wrapper --
+      // `aria-invalid` on neither is the finding.
+      aria_invalid: el.getAttribute("aria-invalid") === "true" ||
+                    Boolean(control && control.getAttribute("aria-invalid") === "true"),
+    };
+  });
+  // Anything that would be READ OUT: Odoo's notification manager, or any
+  // live region that appeared with the refusal in it.
+  const announced = Array.from(document.querySelectorAll(
+    "[role='alert'], [role='status'], [aria-live]"
+  )).map((el) => ({
+    role: el.getAttribute("role"),
+    aria_live: el.getAttribute("aria-live"),
+    cls: String(el.className || "").split(/\s+/)[0],
+    text: text(el).slice(0, 300),
+  })).filter((r) => r.text);
+  return JSON.stringify({
+    invalid_shown: invalidShown,
+    invalid_fields: fields,
+    announced: announced,
+  });
+})()
+"""
+
+
+def _open_dialog_js(label):
+    """Press a header control by its visible label and wait for its dialog.
+
+    An XML `type="action"` button renders its `name` as the RESOLVED numeric
+    action id, so there is no stable attribute to select on; the label is what
+    an operator reads and what the tours already target.
+    """
+    return r"""
+(async () => {
+%s
+  const labelled = () => Array.from(
+    document.querySelectorAll(".o_form_view button, .o-dropdown--menu button")
+  ).find((b) => b.textContent.includes(%s));
+  let btn = labelled();
+  if (!btn) {
+    // NOT a connector defect, and not something to route around silently.
+    // Odoo's own `web.StatusBarButtons` keeps the FIRST header control
+    // inline on a small screen and folds the rest into a "More" dropdown
+    // (`env.isSmall`), so at 390px the withdrawal control is behind that
+    // menu. A driver that only looked for the button would report the
+    // control missing on mobile, which would be a false finding; one that
+    // skipped the surface on mobile would report nothing at all. It is
+    // opened, the way an operator opens it, and then measured.
+    const more = document.querySelector(
+      ".o_form_view .o_statusbar_buttons .dropdown-toggle, " +
+      ".o_form_view .o_statusbar_buttons button[title='More']");
+    if (more) {
+      more.click();
+      await waitFor("the collapsed header menu", () => Boolean(labelled()));
+      btn = labelled();
+    }
+  }
+  if (!btn) {
+    throw new Error("no control labelled " + %s + " on this form");
+  }
+  btn.click();
+  await waitFor("the dialog",
+                () => document.querySelector(
+                  ".modal:not(.o_inactive_modal) .o_form_view"));
+  return true;
+})()
+""" % (_DRIVE_PRELUDE, json.dumps(label), json.dumps(label))
+
 OVERFLOW_JS = r"""
 (() => {
   // WHERE "DIRECTION" HAS TO BE READ, AND WHY NOT ON <html>.
@@ -321,6 +749,16 @@ OVERFLOW_JS = r"""
     // the `sc_` prefix precisely so this list stays the inventory of
     // MEASURED ROOTS rather than a list of every class in the connector.
     ".o_sc_setup", ".o_sc_setup__inner",
+    // BATCH 1 UI COMPLETION (2026-07-30). The two withdrawal wizards are
+    // connector-owned CONTENT rendered inside Odoo's dialog chrome, and they
+    // carry the longest consequence copy in the module plus a `<field>` on
+    // its own line inside a sentence -- the two shapes that overflow a
+    // 390px dialog. The chrome is Odoo's and is not the connector's to fix;
+    // the arch inside it is, so the modal BODY is what is measured. Nothing
+    // else opens a dialog in this campaign, so every measurement here is of
+    // a connector wizard.
+    ".modal:not(.o_inactive_modal) .modal-body",
+    ".modal:not(.o_inactive_modal) .modal-body .o_form_view",
   ].join(", ");
 
   const box = (el) => {
@@ -628,13 +1066,19 @@ class TestUiVisualEvidence(HttpCase):
             self.cr.clear()
             yield browser
 
-    def _eval(self, browser, expression):
+    def _eval(self, browser, expression, timeout=10.0):
         # `_websocket_request` returns the CDP RESULT PAYLOAD, not the whole
         # message (see `ChromeBrowser.take_screenshot`, which reads
         # `f.result()['data']` directly). So for `Runtime.evaluate` the shape
         # is {'result': {'type', 'value'}, 'exceptionDetails': ...} -- one
         # level shallower than the raw protocol message.
-        res = browser._websocket_request('Runtime.evaluate', params={
+        #
+        # `timeout` matters for the post-open ACTIONS: those await a real
+        # round trip to the server and Odoo's CDP default is 10s, so a slower
+        # machine turned a working page into a `TimeoutError` that hid the
+        # in-page error message entirely. The waits inside the scripts are
+        # shorter than this, so a genuine failure reports its own reason.
+        res = browser._websocket_request('Runtime.evaluate', timeout=timeout, params={
             'expression': expression,
             'returnByValue': True,
             'awaitPromise': True,
@@ -658,11 +1102,56 @@ class TestUiVisualEvidence(HttpCase):
             }],
         })
 
+    def _key(self, browser, key, code=None, vk=None):
+        """One real key press at the browser's input layer."""
+        for kind in ('rawKeyDown', 'keyUp'):
+            browser._websocket_request('Input.dispatchKeyEvent', params={
+                'type': kind, 'key': key, 'code': code or key,
+                'windowsVirtualKeyCode': vk or 0,
+                'nativeVirtualKeyCode': vk or 0,
+            })
+
+    def _dismiss_dialogs(self, browser):
+        """Close anything modal, the way an operator closes it.
+
+        A surface reached THROUGH a dialog leaves that dialog on screen, and
+        navigating away from one whose focus is trapped inside it stalled
+        `Page.navigate` until its 20-second timeout -- a failure that reads as
+        a slow machine and is not one. Escape is used rather than a synthetic
+        click on whatever button happens to match /cancel|close/: that
+        matched buttons in INACTIVE modals too, and pressing a control in a
+        dialog the user cannot see is not dismissal, it is a second action.
+
+        Blurs first, so focus is back on the document before the page changes
+        under it, and verifies the dialogs actually went rather than assuming
+        the keypress worked.
+        """
+        self._eval(browser,
+                   'document.activeElement && document.activeElement.blur(); '
+                   'true')
+        for _attempt in range(5):
+            if not self._eval(
+                browser, 'document.querySelector(".modal") !== null'
+            ):
+                return
+            self._key(browser, 'Escape', vk=27)
+            deadline = time.time() + 5
+            while time.time() < deadline:
+                if not self._eval(
+                    browser, 'document.querySelector(".modal") !== null'
+                ):
+                    return
+                time.sleep(0.1)
+        # Escape did not clear it; say so rather than navigating into a stall.
+        self.fail('a modal dialog would not close, so the next surface would '
+                  'have been measured behind it')
+
     def _open(self, browser, path, wait_for='.o_list_view, .o_form_view, '
                                             '.o_sc_dashboard, .o_sc_export_diff',
               after=None):
         from odoo.tests.common import HOST  # noqa: PLC0415
         url = 'http://%s:%s%s' % (HOST, odoo_http_port(), path)
+        self._dismiss_dialogs(browser)
         browser.navigate_to(url, wait_stop=True)
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -675,7 +1164,7 @@ class TestUiVisualEvidence(HttpCase):
                                     '() => requestAnimationFrame(r)))')
                 if after:
                     action_js, action_wait = after
-                    self._eval(browser, action_js)
+                    self._eval(browser, action_js, timeout=90.0)
                     if not self._wait_for_selector(browser, action_wait):
                         self.fail('surface %r never reached %r after its '
                                   'post-open action' % (path, action_wait))
@@ -803,19 +1292,32 @@ class TestUiVisualEvidence(HttpCase):
         )
         # A populated Shopify location cache, so the Location mapping step has
         # something to render -- and enough rows that the list is long.
+        #
+        # BATCH 1 UI COMPLETION. 60, not 6, and the number is load bearing:
+        # the search page is 50 rows, so a set of 60 is the smallest one that
+        # renders a FULL page, offers Load more, and then exhausts. Six rows
+        # photographed a list that never paged, so the surface the correction
+        # rebuilt -- the paged one, with its counter, its Load more control
+        # and its four empty states -- was never in the measured set at all.
         if 'shopify.connector.location' in self.env:
-            for index in range(1, 7):
-                gid = 'gid://shopify/Location/VISUAL%d' % index
-                if not self.env['shopify.connector.location'].sudo().search(
-                    [('store_id', '=', store.id),
-                     ('shopify_location_gid', '=', gid)], limit=1,
-                ):
-                    self.env['shopify.connector.location'].sudo().create({
-                        'store_id': store.id,
-                        'shopify_location_gid': gid,
-                        'name': 'Visual evidence warehouse %d' % index,
-                        'shopify_location_active': True,
-                    })
+            existing = self.env['shopify.connector.location'].sudo().search_count(
+                [('store_id', '=', store.id)],
+            )
+            for index in range(existing + 1, LOCATION_FIXTURE_ROWS + 1):
+                self.env['shopify.connector.location'].sudo().create({
+                    'store_id': store.id,
+                    'shopify_location_gid':
+                        'gid://shopify/Location/VISUAL%d' % index,
+                    # A long, unbreakable identity in the name of one row: the
+                    # classic horizontal-overflow shape, and the reason this
+                    # list is measured rather than looked at.
+                    'name': 'Visual evidence warehouse %d%s' % (
+                        index,
+                        ' — Groot-Bijgaarden distributiecentrum Noordwest'
+                        if index == 1 else '',
+                    ),
+                    'shopify_location_active': True,
+                })
         # A recorded readiness result, so the Final readiness step renders a
         # full result list rather than "Not run yet".
         self.env['shopify.connector.readiness.check'].run_for_store(store)
@@ -941,6 +1443,39 @@ class TestUiVisualEvidence(HttpCase):
              '.o_sc_setup',
              'S1 Location mapping with multiple cached Shopify locations',
              None, 'location_mapping'),
+            # BATCH 1 UI COMPLETION (2026-07-30). Everything below is a
+            # surface the correction CHANGED, and none of them existed in the
+            # measured set: four of the six do not exist until an operator
+            # acts, and the previous campaign photographed the step they live
+            # on before the thing under test was on it.
+            ('s1-setup-credential-dev-dashboard',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 credential chooser, Dev Dashboard path (default)',
+             None, 'credential'),
+            ('s1-setup-credential-offline-token',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 credential chooser, offline access-token path selected',
+             (CREDENTIAL_OFFLINE_JS, '.sc_setup_token'), 'credential'),
+            ('s1-setup-location-search-results',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 location search with a result set, counter and Clear',
+             (LOCATION_SEARCH_JS, '.sc_setup_search_shopify_clear'),
+             'location_mapping'),
+            ('s1-setup-location-loaded-more',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 location search with a second page accumulated',
+             (LOCATION_LOAD_MORE_JS, '.sc_setup_search_shopify_clear'),
+             'location_mapping'),
+            ('s1-setup-location-no-result',
+             act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
+             '.o_sc_setup',
+             'S1 location search that matched nothing, keeping its way out',
+             (LOCATION_NO_RESULT_JS, '.sc_setup__empty--shopify'),
+             'location_mapping'),
             ('s1-setup-final-readiness',
              act % 'shopify_connector_core.action_shopify_connector_setup_wizard',
              '.o_sc_setup',
@@ -972,6 +1507,26 @@ class TestUiVisualEvidence(HttpCase):
              (act % 'shopify_connector_inventory.action_shopify_connector_location_mapping')
              + '/%d' % seeded['mapping'].id,
              '.o_form_view', 'U2 S10 location mapping; action control'),
+            # The two withdrawal dialogs, opened by pressing the control an
+            # operator presses. The consequence copy inside them is the
+            # longest in the module and it is what an administrator reads
+            # before an irreversible ceremony restarts, so it is measured at
+            # every width, in both directions, and at 200% zoom.
+            ('u2-first-push-withdraw-dialog',
+             (act % 'shopify_connector_inventory.action_shopify_connector_inventory_first_push')
+             + '/%d' % seeded['level'].id,
+             '.o_form_view',
+             'TD-020 single-pair withdrawal dialog; consequence copy',
+             (_open_dialog_js('Withdraw First Push'),
+              '.modal:not(.o_inactive_modal) .o_form_view')),
+            ('u2-location-withdraw-all-dialog',
+             (act % 'shopify_connector_inventory.action_shopify_connector_location_mapping')
+             + '/%d' % seeded['mapping'].id,
+             '.o_form_view',
+             'TD-020 mapping-level withdrawal dialog; counts + storefront '
+             'consequence',
+             (_open_dialog_js('Withdraw First Pushes'),
+              '.modal:not(.o_inactive_modal) .o_form_view')),
             ('u3-export-previews',
              act % 'shopify_connector_product_export.action_shopify_connector_product_export_preview',
              '.o_list_view, .o_view_nocontent', 'U3 S7 export review queue'),
@@ -1990,6 +2545,512 @@ class TestUiVisualEvidence(HttpCase):
             ours,
             'these connector pairs are below their WCAG 2.2 AA threshold:\n%s'
             % json.dumps(ours, indent=2)[:4000])
+
+    # ==================================================================
+    # E. BATCH 1 UI COMPLETION (2026-07-30)
+    #
+    # The three dimensions the previous campaign never measured, on the
+    # surfaces the Batch 1 correction changed: enlargement, sequential
+    # keyboard traversal, and what a screen reader is told.
+    # ==================================================================
+
+    def _changed_surfaces(self, seeded):
+        """The Batch 1 surfaces, resolved, with the set proved complete."""
+        reachable = {
+            entry[0]: entry for entry in self._reachable_surfaces(seeded)
+        }
+        missing = [
+            name for name in BATCH1_CHANGED_SURFACES if name not in reachable
+        ]
+        self.assertFalse(
+            missing,
+            'these Batch 1 surfaces are not in the capture set, so the '
+            'campaign would silently cover less than it claims: %s' % missing,
+        )
+        return [reachable[name] for name in BATCH1_CHANGED_SURFACES]
+
+    def _zoom_viewport(self, browser, css_width, height=900):
+        """Emulate browser zoom the way a browser does it.
+
+        Enlargement is a LAYOUT event: the CSS viewport narrows and every CSS
+        pixel is painted larger. `deviceScaleFactor` alone changes only the
+        painting, so a "200% zoom" test built on it measures nothing that
+        SC 1.4.4 or SC 1.4.10 is about. The caller passes the CSS width that
+        results from the zoom, and this sets the matching device scale so the
+        rendering is genuinely enlarged rather than merely reflowed.
+        """
+        browser._websocket_request('Emulation.setDeviceMetricsOverride', params={
+            'width': css_width, 'height': height,
+            'deviceScaleFactor': ZOOM_FACTOR, 'mobile': css_width <= 480,
+        })
+
+    def _tab(self, browser):
+        """One REAL Tab press, at the browser's input layer.
+
+        A dispatched `KeyboardEvent` does not move focus: sequential focus
+        navigation is the browser's own behaviour and is not driven by DOM
+        events. `Input.dispatchKeyEvent` is, which is the difference between
+        testing the tab order and testing a loop that walks the DOM in source
+        order and calls it the tab order.
+        """
+        self._key(browser, 'Tab', vk=9)
+
+    def test_the_changed_surfaces_reflow_at_two_hundred_percent_zoom(self):
+        """Every Batch 1 surface, enlarged, in both directions, measured.
+
+        WHY THIS IS A SEPARATE TEST AND NOT A FOURTH WIDTH. Zoom is not a
+        narrower device: the viewport narrows AND the type gets larger, so the
+        same layout has less room for more ink. A surface that fits 390px at
+        100% can fail 683px at 200%, because at 200% the 683px holds the
+        content of a 341px column at normal size. That is the case SC 1.4.4
+        and SC 1.4.10 exist for and the one this campaign had no measurement
+        of at all.
+
+        THE 320px FLOOR. SC 1.4.10 specifies reflow at 320 CSS px, and no
+        success criterion applies below it, so the mobile row is measured at
+        the floor rather than at 195px -- a width no browser lays out for and
+        no criterion requires.
+
+        Reduced motion is carried as a column and measured in one LTR pass:
+        it cannot change layout, and the computed transition and animation
+        durations it CAN change are asserted by
+        `test_reduced_motion_removes_every_transition`. Recording it without
+        varying it would be a column that means nothing.
+        """
+        seeded = self._seed()
+        rtl_lang = self.env['res.lang'].sudo()._activate_lang('ar_001') \
+            or self.env['res.lang'].sudo()._activate_lang('ar_SY')
+        self.assertTrue(
+            rtl_lang, 'no Arabic locale is available in this build, so the '
+                      'RTL half of the zoom matrix cannot be performed; do '
+                      'not record it as passed')
+        rows, failures = [], []
+        for direction, code in (('ltr', 'en_US'), ('rtl', rtl_lang.code)):
+            self.user.sudo().write({'lang': code})
+            self.env.flush_all()
+            motions = ('no-preference', 'reduce') if direction == 'ltr' \
+                else ('no-preference',)
+            with self._browser() as browser:
+                for motion in motions:
+                    self._emulate_reduced_motion(browser, motion == 'reduce')
+                    for label, device_width in WIDTHS.items():
+                        css_width = max(device_width // ZOOM_FACTOR,
+                                        REFLOW_FLOOR_PX)
+                        self._zoom_viewport(browser, css_width)
+                        for (name, path, wait, criterion, after,
+                             setup_step) in self._changed_surfaces(seeded):
+                            if setup_step:
+                                self._set_setup_step(seeded['store'],
+                                                     setup_step)
+                            self._open(browser, path, wait, after)
+                            metrics = json.loads(
+                                self._eval(browser, OVERFLOW_JS))
+                            last = json.loads(
+                                self._eval(browser, LAST_CONTROL_JS))
+                            defects = self._clipping_defects(
+                                name, css_width, metrics)
+                            page_overflow = max(
+                                0,
+                                metrics['doc_scroll_width']
+                                - metrics['inner_width'] - 1,
+                            )
+                            if page_overflow:
+                                defects.append({
+                                    'kind': 'page_scrolls_horizontally',
+                                    'surface': name,
+                                    'overflow': page_overflow,
+                                })
+                            if last.get('error'):
+                                defects.append({
+                                    'kind': 'no_actionable_control',
+                                    'surface': name, 'why': last['error'],
+                                })
+                            elif not last['reachable']:
+                                defects.append({
+                                    'kind': 'final_control_unreachable',
+                                    'surface': name,
+                                    'control': last['selector'],
+                                    'rect': last['rect'],
+                                    'viewport': last['viewport'],
+                                })
+                            row = {
+                                'surface': name,
+                                'selector': wait,
+                                'device_width': device_width,
+                                'css_viewport_width': css_width,
+                                'viewport': '%s (%dpx device)'
+                                            % (label, device_width),
+                                'direction': direction,
+                                # PROOF the direction took effect, not just
+                                # the value we asked for. `connector_direction`
+                                # is null on a surface with no `o_sc_*` root
+                                # (the inventory forms and both dialogs), so
+                                # Odoo's own RTL signals are carried too --
+                                # otherwise an RTL row for those surfaces
+                                # would be a label with nothing behind it.
+                                'measured_direction':
+                                    metrics.get('connector_direction'),
+                                'odoo_rtl_class': metrics.get('odoo_rtl_class'),
+                                'rtl_stylesheets':
+                                    metrics.get('rtl_stylesheets'),
+                                'zoom': '%d%%' % (ZOOM_FACTOR * 100),
+                                'motion': motion,
+                                'connector_surfaces': [
+                                    {'cls': surface['cls'],
+                                     'scroll_width': surface['scroll_width'],
+                                     'client_width': surface['client_width'],
+                                     'self_overflow': surface['self_overflow'],
+                                     'unhandled_self_overflow':
+                                         surface['unhandled_self_overflow'],
+                                     'vertical_overflow':
+                                         surface['vertical_overflow'],
+                                     'vertical_reachable_by':
+                                         surface['vertical_reachable_by'],
+                                     'unreachable_vertical':
+                                         surface['unreachable_vertical'],
+                                     'clipped_by': surface['clipped_by'],
+                                     'clipped_silently':
+                                         surface['clipped_silently']}
+                                    for surface in metrics['surfaces']
+                                ],
+                                'page': {
+                                    'doc_scroll_width':
+                                        metrics['doc_scroll_width'],
+                                    'inner_width': metrics['inner_width'],
+                                    'horizontal_overflow': page_overflow,
+                                },
+                                'final_control': last,
+                                'defects': defects,
+                                'verdict': 'PASS' if not defects else 'FAIL',
+                            }
+                            rows.append(row)
+                            if defects:
+                                failures.append(row)
+                            self._shoot(
+                                browser,
+                                '%s-%s-zoom200-%dpx-css%d' % (
+                                    name, direction, device_width, css_width),
+                                criterion + ' (200%% zoom, %s, %s motion; '
+                                            'SC 1.4.4 / SC 1.4.10)'
+                                % (direction.upper(), motion))
+        self.user.sudo().write({'lang': 'en_US'})
+        self.env.flush_all()
+        self._record(
+            'batch1-zoom-matrix',
+            {'zoom': '%d%%' % (ZOOM_FACTOR * 100),
+             'reflow_floor_px': REFLOW_FLOOR_PX,
+             'device_widths': WIDTHS,
+             'surfaces': list(BATCH1_CHANGED_SURFACES),
+             'criteria': ['WCAG 2.2 SC 1.4.4 Resize Text',
+                          'WCAG 2.2 SC 1.4.10 Reflow',
+                          'DESIGN SYSTEM §10 responsive'],
+             'rows': rows, 'failures': failures},
+            'Batch 1 surfaces at 200% zoom, LTR and RTL; SC 1.4.4 / 1.4.10')
+        self.assertEqual(
+            len(rows),
+            len(BATCH1_CHANGED_SURFACES) * len(WIDTHS) * 3,
+            'the zoom matrix did not measure every planned combination',
+        )
+        # An RTL row that cannot show the page was in RTL is a label, not
+        # evidence. Odoo's backend sets no `dir` on <html>, so the signals
+        # are its flipped bundles and `.o_rtl`; the connector root's computed
+        # `direction` is the third and exists only where there is one.
+        unproved = [
+            {'surface': row['surface'],
+             'css_viewport_width': row['css_viewport_width'],
+             'measured_direction': row['measured_direction'],
+             'odoo_rtl_class': row['odoo_rtl_class'],
+             'rtl_stylesheets': row['rtl_stylesheets']}
+            for row in rows
+            if row['direction'] == 'rtl'
+            and row['measured_direction'] != 'rtl'
+            and not row['odoo_rtl_class']
+            and not row['rtl_stylesheets']
+        ]
+        self.assertFalse(
+            unproved,
+            'these rows are recorded as RTL with nothing measured to show '
+            'the page rendered right-to-left:\n%s'
+            % json.dumps(unproved, indent=2)[:3000])
+        self.assertFalse(
+            failures,
+            'these Batch 1 surfaces are not usable at 200%% zoom:\n%s'
+            % json.dumps(failures, indent=2)[:6000])
+
+    def test_keyboard_alone_reaches_the_final_control_on_every_changed_surface(self):
+        """Sequential focus navigation, driven at the browser input layer.
+
+        `focusStep` in the tours proves a control CAN take focus when it is
+        focused. That is not the same claim: a control can be focusable and
+        still be unreachable by Tab, and focus can be lost to the document
+        part way along, which strands a keyboard user in the middle of a
+        surface with no way forward. Both are measured here by pressing Tab
+        for real -- a dispatched `KeyboardEvent` does not move focus at all,
+        so a test built on one would pass on a surface with no tab order.
+
+        Recorded per surface: the traversal length, every element focus
+        landed on, whether the final actionable control was reached, and
+        whether focus was ever lost to `<body>` before it was.
+        """
+        seeded = self._seed()
+        rows, failures = [], []
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+            for (name, path, wait, criterion, after,
+                 setup_step) in self._changed_surfaces(seeded):
+                if setup_step:
+                    self._set_setup_step(seeded['store'], setup_step)
+                self._open(browser, path, wait, after)
+                target = json.loads(self._eval(browser, LAST_CONTROL_JS))
+                if target.get('error'):
+                    failures.append({'surface': name, 'why': target['error']})
+                    continue
+                # Start from the document, exactly where a keyboard user
+                # arrives, rather than from somewhere convenient.
+                self._eval(browser, 'document.activeElement.blur(); true')
+                visited, reached, lost = [], False, 0
+                for _step in range(MAX_TAB_PRESSES):
+                    self._tab(browser)
+                    seen = json.loads(self._eval(browser, ACTIVE_ELEMENT_JS))
+                    visited.append(seen)
+                    if seen['is_body']:
+                        # Wrapping past the end of the document is normal;
+                        # landing on the body BEFORE the target has been
+                        # reached is focus loss.
+                        lost += 1
+                        if lost > 1:
+                            break
+                        continue
+                    if seen['matches_target']:
+                        reached = True
+                        break
+                row = {
+                    'surface': name,
+                    'selector': wait,
+                    'viewport': 'desktop (1366px device)',
+                    'direction': 'ltr',
+                    'zoom': '100%',
+                    'motion': 'no-preference',
+                    'target': target['selector'],
+                    'presses': len(visited),
+                    'reached': reached,
+                    'focus_lost_to_body_before_target': lost,
+                    'path': [v['selector'] for v in visited],
+                    'concealed': [
+                        v for v in visited
+                        if not v['is_body'] and not v['visible']
+                    ],
+                    'verdict': 'PASS' if reached else 'FAIL',
+                }
+                _logger.info(
+                    'CONNECTOR-KEYBOARD %s target=%s presses=%d reached=%s '
+                    'lost=%d path=%s',
+                    name, target['selector'], len(visited), reached, lost,
+                    ' > '.join(v['selector'] for v in visited[-12:]))
+                rows.append(row)
+                if not reached:
+                    failures.append(row)
+                elif row['concealed']:
+                    # Focus that lands on something the user cannot see is
+                    # SC 2.4.11's failure, and it is silent.
+                    row['verdict'] = 'FAIL'
+                    failures.append(row)
+        self._record(
+            'batch1-keyboard-traversal',
+            {'max_presses': MAX_TAB_PRESSES,
+             'method': 'CDP Input.dispatchKeyEvent Tab; real sequential focus '
+                       'navigation, not a DOM-order walk',
+             'criteria': ['WCAG 2.2 SC 2.1.1 Keyboard',
+                          'WCAG 2.2 SC 2.4.3 Focus Order',
+                          'WCAG 2.2 SC 2.4.11 Focus Not Obscured'],
+             'surfaces': list(BATCH1_CHANGED_SURFACES),
+             'rows': rows, 'failures': failures},
+            'Batch 1 surfaces traversed by keyboard alone; SC 2.1.1 / 2.4.3')
+        self.assertEqual(
+            len(rows), len(BATCH1_CHANGED_SURFACES),
+            'the keyboard traversal did not cover every changed surface',
+        )
+        self.assertFalse(
+            failures,
+            'keyboard-only navigation fails on these surfaces:\n%s'
+            % json.dumps(failures, indent=2)[:6000])
+
+    def test_live_regions_announce_what_changes_and_note_stays_static(self):
+        """What a screen reader is TOLD, measured rather than declared.
+
+        Three claims, each falsifiable:
+
+        1. The credential step's guidance band is `role="status"` -- a polite
+           live region -- and it EARNS that role: its text really does change
+           when the operator switches authentication path, so a document
+           role would announce nothing at the moment the guidance silently
+           became different guidance. Both halves are measured; a live region
+           whose content never changes is noise, and a changing region with a
+           document role is silence.
+        2. The withdrawal dialog's `role="note"` band earns ITS role the
+           opposite way: the text is identical before and after the operator
+           fills the dialog in, so it is document structure and not a live
+           region. WAI-ARIA 1.2 lists the live-region roles as alert, log,
+           marquee, status and timer; `note` is deliberately not among them.
+           Odoo's own view validator warns about the `alert-*` class without
+           a live-region role, and this is the recorded answer: the class is
+           presentational, the copy is static, and promoting it to `status`
+           would announce a sentence nothing changed about.
+        3. A refused submission is ANNOUNCED and ATTRIBUTED: the empty
+           required field carries `aria-invalid`, and the refusal reaches a
+           live region rather than only a red border.
+        """
+        seeded = self._seed()
+        findings = {}
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+
+            # 1. A live region that earns the role.
+            self._set_setup_step(seeded['store'], 'credential')
+            self._open(browser, self._setup_surface_path(), '.o_sc_setup')
+            findings['credential_default'] = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps('.o_sc_setup')))
+            self._eval(browser, CREDENTIAL_OFFLINE_JS, timeout=90.0)
+            findings['credential_offline'] = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps('.o_sc_setup')))
+
+            # 2. The `note` band, which lives on the SINGLE-PAIR dialog,
+            # before and after the operator fills the dialog in.
+            dialog = '.modal:not(.o_inactive_modal)'
+            pair_path = ('/odoo/action-shopify_connector_inventory.'
+                         'action_shopify_connector_inventory_first_push/%d'
+                         % seeded['level'].id)
+            self._open(browser, pair_path, '.o_form_view',
+                       (_open_dialog_js('Withdraw First Push'),
+                        '%s .o_form_view' % dialog))
+            findings['pair_dialog_opened'] = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps(dialog)))
+            self._eval(browser, TYPE_REASON_JS, timeout=90.0)
+            findings['pair_dialog_filled'] = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps(dialog)))
+            self._dismiss_dialogs(browser)
+
+            # 3. The refusal, on the mapping-level dialog.
+            path = ('/odoo/action-shopify_connector_inventory.'
+                    'action_shopify_connector_location_mapping/%d'
+                    % seeded['mapping'].id)
+            self._open(browser, path, '.o_form_view',
+                       (_open_dialog_js('Withdraw First Pushes'),
+                        '%s .o_form_view' % dialog))
+            findings['dialog_opened'] = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps(dialog)))
+            findings['refusal'] = json.loads(
+                self._eval(browser, INVALID_SUBMIT_JS, timeout=90.0))
+            self._dismiss_dialogs(browser)
+
+        self._record(
+            'batch1-aria-semantics',
+            {'criteria': ['WAI-ARIA 1.2 live regions',
+                          'WCAG 2.2 SC 4.1.3 Status Messages',
+                          'WCAG 2.2 SC 3.3.1 Error Identification'],
+             'host_framework_limitation': {
+                 'what': 'Odoo 19 marks an invalid field with the class '
+                         '`o_field_invalid` and emits no `aria-invalid` '
+                         'anywhere in web/static/src at the pinned commit '
+                         '30bde9ff.',
+                 'consequence': 'The invalid state itself is conveyed '
+                                'visually; the REFUSAL is conveyed to '
+                                'assistive technology by Odoo\'s '
+                                'notification, which is `role="alert" '
+                                'aria-live="assertive"` and names the field.',
+                 'ownership': 'Odoo chrome, not connector arch. Not fixable '
+                              'from this repository without patching core, '
+                              'and disclosed rather than asserted away.',
+             },
+             'findings': findings},
+            'Batch 1 alert/note semantics and announced validation states')
+
+        # 1. The credential guidance is a live region AND its text changes.
+        default_status = [
+            region for region in findings['credential_default']['regions']
+            if region['role'] == 'status'
+        ]
+        offline_status = [
+            region for region in findings['credential_offline']['regions']
+            if region['role'] == 'status'
+        ]
+        self.assertTrue(
+            default_status,
+            'the credential step renders no polite live region, so switching '
+            'authentication path announces nothing')
+        self.assertTrue(offline_status)
+        self.assertNotEqual(
+            ' '.join(sorted(r['text'] for r in default_status)),
+            ' '.join(sorted(r['text'] for r in offline_status)),
+            'the guidance did not change between the two authentication '
+            'paths, so `role="status"` is announcing a sentence that never '
+            'varies')
+
+        # 2. The `note` band is static, which is why it is not a live region.
+        def note_text(key):
+            return ' '.join(sorted(
+                region['text'] for region in findings[key]['regions']
+                if region['role'] == 'note'))
+
+        self.assertTrue(
+            note_text('pair_dialog_opened'),
+            'the single-pair withdrawal dialog renders no `role="note"` '
+            'band, so this assertion is measuring nothing')
+        self.assertEqual(
+            note_text('pair_dialog_opened'), note_text('pair_dialog_filled'),
+            'the `note` band changed while the dialog was open, so it IS a '
+            'live region and a document role silences it')
+        self.assertFalse(
+            [region for region in findings['pair_dialog_opened']['regions']
+             if region['role'] == 'note' and region['aria_live']],
+            'a `note` element declares `aria-live`, which contradicts the '
+            'document role it was given')
+        # Every connector-owned alert band in the dialog carries a role.
+        self.assertFalse(
+            findings['dialog_opened']['roleless_alerts'],
+            'these alert bands carry no role, so a screen reader is given no '
+            'reason to read them: %s'
+            % json.dumps(findings['dialog_opened']['roleless_alerts']))
+
+        # 3. The refusal is ANNOUNCED and ATTRIBUTED.
+        #
+        # `aria-invalid` is deliberately NOT required here, and the reason is
+        # recorded rather than assumed: Odoo 19 at the pinned commit does not
+        # emit that attribute anywhere in `web/static/src` -- the invalid
+        # state is `.o_field_invalid`, a class, on chrome this repository
+        # does not own and cannot change without patching core. Asserting it
+        # would fail forever for something outside the connector, and quietly
+        # dropping the requirement would be worse. So it is MEASURED, carried
+        # in the artifact as a disclosed limitation of the host framework,
+        # and what the connector's own arch decides -- that the field is
+        # required at all, and therefore that Odoo refuses before the request
+        # is sent and names it -- is what is asserted.
+        refusal = findings['refusal']
+        self.assertTrue(
+            refusal['invalid_shown'],
+            'submitting with the mandatory reason empty marked no field '
+            'invalid, so the operator is not told WHICH field is wrong')
+        named = [
+            field for field in refusal['invalid_fields']
+            if field['field'] == 'reason'
+        ]
+        self.assertTrue(
+            named,
+            'the refusal did not attribute itself to `reason`: %s'
+            % json.dumps(refusal['invalid_fields']))
+        announced = [
+            region for region in refusal['announced']
+            if region['role'] in ('alert', 'status') or region['aria_live']
+        ]
+        self.assertTrue(
+            announced,
+            'the refusal reached no live region, so a screen reader user is '
+            'told nothing happened: %s' % json.dumps(refusal))
+        self.assertTrue(
+            any('reason' in region['text'].lower() for region in announced),
+            'the announcement does not name the field that was refused, so '
+            'it says only that something was wrong: %s'
+            % json.dumps(announced))
 
 
 def odoo_http_port():

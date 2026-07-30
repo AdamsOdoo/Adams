@@ -1,0 +1,200 @@
+{
+  "criteria": [
+    "WAI-ARIA 1.2 live regions",
+    "WCAG 2.2 SC 4.1.3 Status Messages",
+    "WCAG 2.2 SC 3.3.1 Error Identification"
+  ],
+  "findings": {
+    "credential_default": {
+      "regions": [
+        {
+          "aria_live": "polite",
+          "cls": "sc_setup__panel",
+          "is_live_region": true,
+          "role": null,
+          "text": "Step 3 of 12Credentials Choose how this store authenticates with Shopify, then enter that path's credentials once. Dev Dashboard app (Client ID and secret) For an app created in Shopify's Dev Dashboard. Odoo exchanges these for an access token and renews it automatically \u2014 Shopify does not show you a token to copy on this path. Existing Admin API access token For a store that already holds a long-"
+        },
+        {
+          "aria_live": null,
+          "cls": "sc_setup__modes",
+          "is_live_region": false,
+          "role": "radiogroup",
+          "text": "Dev Dashboard app (Client ID and secret) For an app created in Shopify's Dev Dashboard. Odoo exchanges these for an access token and renews it automatically \u2014 Shopify does not show you a token to copy on this path. Existing Admin API access token For a store that already holds a long-lived Admin API access token from an app created the older way."
+        },
+        {
+          "aria_live": null,
+          "cls": "sc-band",
+          "is_live_region": true,
+          "role": "status",
+          "text": "Both values are on your app's Overview page in the Dev Dashboard This works only when the app and the store belong to the same Shopify organization. The token Shopify issues lasts 24 hours; Odoo requests a fresh one before it expires, so there is nothing to renew by hand. Shopify's guide: Get API access tokens (Dev Dashboard)."
+        },
+        {
+          "aria_live": null,
+          "cls": "sc-band",
+          "is_live_region": false,
+          "role": "note",
+          "text": "Secrets entered here are write-only They are protected by access control, not by encryption at rest. Anyone with database access can read them, so treat database backups as containing them."
+        },
+        {
+          "aria_live": null,
+          "cls": "sc_setup__actions",
+          "is_live_region": false,
+          "role": "group",
+          "text": "BackContinueSave & Exit"
+        }
+      ],
+      "roleless_alerts": []
+    },
+    "credential_offline": {
+      "regions": [
+        {
+          "aria_live": "polite",
+          "cls": "sc_setup__panel",
+          "is_live_region": true,
+          "role": null,
+          "text": "Step 3 of 12Credentials Choose how this store authenticates with Shopify, then enter that path's credentials once. Dev Dashboard app (Client ID and secret) For an app created in Shopify's Dev Dashboard. Odoo exchanges these for an access token and renews it automatically \u2014 Shopify does not show you a token to copy on this path. Existing Admin API access token For a store that already holds a long-"
+        },
+        {
+          "aria_live": null,
+          "cls": "sc_setup__modes",
+          "is_live_region": false,
+          "role": "radiogroup",
+          "text": "Dev Dashboard app (Client ID and secret) For an app created in Shopify's Dev Dashboard. Odoo exchanges these for an access token and renews it automatically \u2014 Shopify does not show you a token to copy on this path. Existing Admin API access token For a store that already holds a long-lived Admin API access token from an app created the older way."
+        },
+        {
+          "aria_live": null,
+          "cls": "sc-band",
+          "is_live_region": true,
+          "role": "status",
+          "text": "This path needs the Admin API access token \u2014 not the Client ID, and not the Client Secret An older-style custom app shows all three. The Admin API access token is the one that goes in the field below. If your app only shows a Client ID and Client secret, use the Dev Dashboard path above instead. How long a token stays valid depends on how it was issued. Check your Shopify app's authentication meth"
+        },
+        {
+          "aria_live": null,
+          "cls": "sc-band",
+          "is_live_region": false,
+          "role": "note",
+          "text": "Secrets entered here are write-only They are protected by access control, not by encryption at rest. Anyone with database access can read them, so treat database backups as containing them."
+        },
+        {
+          "aria_live": null,
+          "cls": "sc_setup__actions",
+          "is_live_region": false,
+          "role": "group",
+          "text": "BackContinueSave & Exit"
+        }
+      ],
+      "roleless_alerts": []
+    },
+    "dialog_opened": {
+      "regions": [
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "alert",
+          "text": "This withdraws the first-push decision of every pair under this Shopify location. Each affected pair returns to Pending: no stock can be pushed for it until a new preview is run and explicitly confirmed, and the old confirmation is never reused. Administrator only, and the reason below is recorded on the audit trail against this location and against every pair it touches."
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "status",
+          "text": "Once every pair of this Shopify location is back to Pending, the Administrator remap on its location mapping becomes possible. The remap guard itself is unchanged: this is the governed route to the state it requires, not a way around it."
+        }
+      ],
+      "roleless_alerts": []
+    },
+    "pair_dialog_filled": {
+      "regions": [
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "alert",
+          "text": "This withdraws the pair's first-push decision. The pair returns to Pending: no stock can be pushed for this product and location until a new preview is run and explicitly confirmed. The old confirmation is never reused. Administrator only, and the reason below is recorded on the audit trail."
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": false,
+          "role": "note",
+          "text": "Use this when the mapped Odoo location must change \u2014 for example after a physical warehouse move. Once every pair of a Shopify location is back to Pending, the Administrator remap on its location mapping becomes possible."
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "status",
+          "text": "Nothing has ever been pushed for this pair, so Shopify is not affected by withdrawing the decision."
+        }
+      ],
+      "roleless_alerts": []
+    },
+    "pair_dialog_opened": {
+      "regions": [
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "alert",
+          "text": "This withdraws the pair's first-push decision. The pair returns to Pending: no stock can be pushed for this product and location until a new preview is run and explicitly confirmed. The old confirmation is never reused. Administrator only, and the reason below is recorded on the audit trail."
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": false,
+          "role": "note",
+          "text": "Use this when the mapped Odoo location must change \u2014 for example after a physical warehouse move. Once every pair of a Shopify location is back to Pending, the Administrator remap on its location mapping becomes possible."
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "is_live_region": true,
+          "role": "status",
+          "text": "Nothing has ever been pushed for this pair, so Shopify is not affected by withdrawing the decision."
+        }
+      ],
+      "roleless_alerts": []
+    },
+    "refusal": {
+      "announced": [
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "role": "alert",
+          "text": "This withdraws the first-push decision of every pair under this Shopify location. Each affected pair returns to Pending: no stock can be pushed for it until a new preview is run and explicitly confirmed, and the old confirmation is never reused. Administrator only, and the reason below is recorded o"
+        },
+        {
+          "aria_live": null,
+          "cls": "alert",
+          "role": "status",
+          "text": "Once every pair of this Shopify location is back to Pending, the Administrator remap on its location mapping becomes possible. The remap guard itself is unchanged: this is the governed route to the state it requires, not a way around it."
+        },
+        {
+          "aria_live": "assertive",
+          "cls": "o_notification",
+          "role": "alert",
+          "text": "Missing required fields"
+        }
+      ],
+      "invalid_fields": [
+        {
+          "aria_invalid": false,
+          "cls": "o_form_label",
+          "field": null
+        },
+        {
+          "aria_invalid": false,
+          "cls": "o_field_widget",
+          "field": "reason"
+        }
+      ],
+      "invalid_shown": true
+    }
+  },
+  "host_framework_limitation": {
+    "consequence": "The invalid state itself is conveyed visually; the REFUSAL is conveyed to assistive technology by Odoo's notification, which is `role=\"alert\" aria-live=\"assertive\"` and names the field.",
+    "ownership": "Odoo chrome, not connector arch. Not fixable from this repository without patching core, and disclosed rather than asserted away.",
+    "what": "Odoo 19 marks an invalid field with the class `o_field_invalid` and emits no `aria-invalid` anywhere in web/static/src at the pinned commit 30bde9ff."
+  }
+}

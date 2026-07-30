@@ -1,0 +1,1036 @@
+{
+  "failures": [],
+  "measured": {
+    "final_readiness@1366px": {
+      "bar": {
+        "bottom": 736,
+        "height": 67,
+        "left": 235.5,
+        "right": 1115.5,
+        "top": 669
+      },
+      "controls": [
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 235.5,
+          "right": 305.078125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 317.078125,
+          "right": 415.125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 427.125,
+          "right": 543.828125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        }
+      ],
+      "document_scroll_width": 1366,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 1562,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 1562,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 781
+      },
+      "scrollport": {
+        "bottom": 768,
+        "cls": "o_sc_setup",
+        "extent": 1562,
+        "padding_bottom": 32,
+        "pin_target": 736
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 768,
+        "width": 1366
+      }
+    },
+    "final_readiness@1440px": {
+      "bar": {
+        "bottom": 868,
+        "height": 67,
+        "left": 272.5,
+        "right": 1152.5,
+        "top": 801
+      },
+      "controls": [
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 272.5,
+          "right": 342.078125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 354.078125,
+          "right": 452.125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 464.125,
+          "right": 580.828125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        }
+      ],
+      "document_scroll_width": 1440,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 1430,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 1430,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 715
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 1430,
+        "padding_bottom": 32,
+        "pin_target": 868
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    "final_readiness@390px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 374,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 102.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 114.140625,
+          "right": 228.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 240.75,
+          "right": 374.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 390,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 1774,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 1774,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 887
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 1774,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 390
+      }
+    },
+    "final_readiness@768px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 737,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 223.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 235.140625,
+          "right": 470.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 482.75,
+          "right": 737.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 768,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 1402,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 1402,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 701
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 1402,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 768
+      }
+    },
+    "location_mapping@1366px": {
+      "bar": {
+        "bottom": 736,
+        "height": 67,
+        "left": 235.5,
+        "right": 1115.5,
+        "top": 669
+      },
+      "controls": [
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 235.5,
+          "right": 305.078125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 317.078125,
+          "right": 415.125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 427.125,
+          "right": 543.828125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        }
+      ],
+      "document_scroll_width": 1366,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 8065,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 8065,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 4032
+      },
+      "scrollport": {
+        "bottom": 768,
+        "cls": "o_sc_setup",
+        "extent": 8065,
+        "padding_bottom": 32,
+        "pin_target": 736
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 768,
+        "width": 1366
+      }
+    },
+    "location_mapping@1440px": {
+      "bar": {
+        "bottom": 868,
+        "height": 67,
+        "left": 272.5,
+        "right": 1152.5,
+        "top": 801
+      },
+      "controls": [
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 272.5,
+          "right": 342.078125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 354.078125,
+          "right": 452.125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 464.125,
+          "right": 580.828125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        }
+      ],
+      "document_scroll_width": 1440,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 7933,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 7933,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 3966
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 7933,
+        "padding_bottom": 32,
+        "pin_target": 868
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    "location_mapping@390px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 374,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 102.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 114.140625,
+          "right": 228.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 240.75,
+          "right": 374.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 390,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 9475,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 9475,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 4737
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 9475,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 390
+      }
+    },
+    "location_mapping@768px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 737,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 223.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 235.140625,
+          "right": 470.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 482.75,
+          "right": 737.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 768,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 7929,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 7929,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 3964
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 7929,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 768
+      }
+    },
+    "scopes@1366px": {
+      "bar": {
+        "bottom": 736,
+        "height": 67,
+        "left": 235.5,
+        "right": 1115.5,
+        "top": 669
+      },
+      "controls": [
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 235.5,
+          "right": 305.078125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 317.078125,
+          "right": 415.125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        },
+        {
+          "bottom": 724,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 427.125,
+          "right": 543.828125,
+          "scroll_margin_block_end": 64,
+          "top": 682
+        }
+      ],
+      "document_scroll_width": 1366,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 464,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 464,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 232
+      },
+      "scrollport": {
+        "bottom": 768,
+        "cls": "o_sc_setup",
+        "extent": 464,
+        "padding_bottom": 32,
+        "pin_target": 736
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 768,
+        "width": 1366
+      }
+    },
+    "scopes@1440px": {
+      "bar": {
+        "bottom": 868,
+        "height": 67,
+        "left": 272.5,
+        "right": 1152.5,
+        "top": 801
+      },
+      "controls": [
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 272.5,
+          "right": 342.078125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 354.078125,
+          "right": 452.125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        },
+        {
+          "bottom": 856,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 464.125,
+          "right": 580.828125,
+          "scroll_margin_block_end": 64,
+          "top": 814
+        }
+      ],
+      "document_scroll_width": 1440,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 332,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 332,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 166
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 332,
+        "padding_bottom": 32,
+        "pin_target": 868
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    },
+    "scopes@390px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 374,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 102.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 114.140625,
+          "right": 228.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 240.75,
+          "right": 374.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 390,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 553,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 553,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 276
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 553,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 390
+      }
+    },
+    "scopes@768px": {
+      "bar": {
+        "bottom": 884,
+        "height": 67,
+        "left": 16,
+        "right": 737,
+        "top": 817
+      },
+      "controls": [
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Back",
+          "left": 16,
+          "right": 223.140625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Continue",
+          "left": 235.140625,
+          "right": 470.75,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        },
+        {
+          "bottom": 872,
+          "disabled": false,
+          "in_viewport": true,
+          "label": "Save & Exit",
+          "left": 482.75,
+          "right": 737.015625,
+          "scroll_margin_block_end": 64,
+          "top": 830
+        }
+      ],
+      "document_scroll_width": 768,
+      "error": null,
+      "horizontal_overflow": 0,
+      "position": "sticky",
+      "scroll": {
+        "chain": [
+          {
+            "extent": 328,
+            "node": "o_sc_setup",
+            "overflow_y": "auto",
+            "scrollable": true
+          },
+          {
+            "extent": 0,
+            "node": "o_action_manager",
+            "overflow_y": "hidden",
+            "scrollable": false
+          },
+          {
+            "extent": 0,
+            "node": "o_web_client",
+            "overflow_y": "hidden",
+            "scrollable": false
+          }
+        ],
+        "doc_extent": 0,
+        "from": 0,
+        "scrollable": 328,
+        "scrolled": true,
+        "scroller": "o_sc_setup",
+        "to": 164
+      },
+      "scrollport": {
+        "bottom": 900,
+        "cls": "o_sc_setup",
+        "extent": 328,
+        "padding_bottom": 16,
+        "pin_target": 884
+      },
+      "surface_direction": "ltr",
+      "viewport": {
+        "height": 900,
+        "width": 768
+      }
+    }
+  },
+  "steps": [
+    "scopes",
+    "location_mapping",
+    "final_readiness"
+  ],
+  "widths": [
+    1366,
+    1440,
+    768,
+    390
+  ]
+}

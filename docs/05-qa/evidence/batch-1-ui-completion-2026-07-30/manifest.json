@@ -1,0 +1,1607 @@
+[
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-focus-1366px.png",
+    "bytes": 105497,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-focus-1366px.png",
+    "bytes": 91858,
+    "criterion": "S1 long Permissions step; sticky actions over long content (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-1366px.png",
+    "bytes": 94053,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-focus-1366px.png",
+    "bytes": 119804,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-focus-1366px.png",
+    "bytes": 129385,
+    "criterion": "S1 credential chooser, offline access-token path selected (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-focus-1366px.png",
+    "bytes": 94422,
+    "criterion": "S1 location search with a result set, counter and Clear (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-focus-1366px.png",
+    "bytes": 94053,
+    "criterion": "S1 location search with a second page accumulated (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-focus-1366px.png",
+    "bytes": 101417,
+    "criterion": "S1 location search that matched nothing, keeping its way out (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-1366px.png",
+    "bytes": 87504,
+    "criterion": "S1 Final readiness with a long result list (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-focus-1366px.png",
+    "bytes": 46079,
+    "criterion": "U2 S9 orders; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-focus-1366px.png",
+    "bytes": 52816,
+    "criterion": "U2 COD ledger; \u00a711 empty state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-focus-1366px.png",
+    "bytes": 52931,
+    "criterion": "U2 S6 customer matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-focus-1366px.png",
+    "bytes": 51952,
+    "criterion": "U2 S8 product matching (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-focus-1366px.png",
+    "bytes": 43882,
+    "criterion": "U2 S19 inventory workspace (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-focus-1366px.png",
+    "bytes": 42951,
+    "criterion": "U2 S11 first-push guard; warning state (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-focus-1366px.png",
+    "bytes": 97983,
+    "criterion": "U2 S11 form; warning state + action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-focus-1366px.png",
+    "bytes": 63103,
+    "criterion": "U2 S10 location mapping; action control (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-focus-1366px.png",
+    "bytes": 127847,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-focus-1366px.png",
+    "bytes": 120511,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-focus-1366px.png",
+    "bytes": 43989,
+    "criterion": "U3 S7 export review queue (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-focus-1366px.png",
+    "bytes": 60971,
+    "criterion": "U3 media registry (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-focus-1366px.png",
+    "bytes": 64136,
+    "criterion": "U3 S25/S26 reconnect and backfill (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-focus-1366px.png",
+    "bytes": 55613,
+    "criterion": "U3 S31 export diagnostics (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-focus-1366px.png",
+    "bytes": 39314,
+    "criterion": "U3 export settings/ownership/retention (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-focus-1366px.png",
+    "bytes": 91120,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (focus visible; SC 2.4.7)"
+  },
+  {
+    "artifact": "focus-visible.json",
+    "criterion": "WCAG 2.2 SC 2.4.7 Focus Visible; SC 2.5.8 Target Size"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-bottom-1366px.png",
+    "bytes": 78397,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-bottom-1366px.png",
+    "bytes": 76119,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-focus-bottom-390px.png",
+    "bytes": 67712,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-focus-bottom-390px.png",
+    "bytes": 64808,
+    "criterion": "WCAG 2.2 SC 2.4.11 focus not obscured by the sticky action row"
+  },
+  {
+    "artifact": "sticky-focus-clearance.json",
+    "criterion": "WCAG 2.2 SC 2.4.11 Focus Not Obscured (Minimum)"
+  },
+  {
+    "artifact": "batch1-keyboard-traversal.json",
+    "criterion": "Batch 1 surfaces traversed by keyboard alone; SC 2.1.1 / 2.4.3"
+  },
+  {
+    "artifact": "batch1-aria-semantics.json",
+    "criterion": "Batch 1 alert/note semantics and announced validation states"
+  },
+  {
+    "artifact": "contrast.json",
+    "criterion": "WCAG 2.2 SC 1.4.3 / SC 1.4.11"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-reduced-motion-1366px.png",
+    "bytes": 55264,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-reduced-motion-1366px.png",
+    "bytes": 105671,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-reduced-motion-1366px.png",
+    "bytes": 104777,
+    "criterion": "S1 long Permissions step; sticky actions over long content (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-reduced-motion-1366px.png",
+    "bytes": 119634,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-reduced-motion-1366px.png",
+    "bytes": 124378,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-reduced-motion-1366px.png",
+    "bytes": 132918,
+    "criterion": "S1 credential chooser, offline access-token path selected (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-reduced-motion-1366px.png",
+    "bytes": 119593,
+    "criterion": "S1 location search with a result set, counter and Clear (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-reduced-motion-1366px.png",
+    "bytes": 122093,
+    "criterion": "S1 location search with a second page accumulated (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-reduced-motion-1366px.png",
+    "bytes": 116210,
+    "criterion": "S1 location search that matched nothing, keeping its way out (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-reduced-motion-1366px.png",
+    "bytes": 113198,
+    "criterion": "S1 Final readiness with a long result list (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-reduced-motion-1366px.png",
+    "bytes": 45981,
+    "criterion": "U2 S9 orders; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-reduced-motion-1366px.png",
+    "bytes": 52645,
+    "criterion": "U2 COD ledger; \u00a711 empty state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-reduced-motion-1366px.png",
+    "bytes": 52604,
+    "criterion": "U2 S6 customer matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-reduced-motion-1366px.png",
+    "bytes": 52253,
+    "criterion": "U2 S8 product matching (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-reduced-motion-1366px.png",
+    "bytes": 43187,
+    "criterion": "U2 S19 inventory workspace (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-reduced-motion-1366px.png",
+    "bytes": 42282,
+    "criterion": "U2 S11 first-push guard; warning state (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-reduced-motion-1366px.png",
+    "bytes": 97409,
+    "criterion": "U2 S11 form; warning state + action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-reduced-motion-1366px.png",
+    "bytes": 63076,
+    "criterion": "U2 S10 location mapping; action control (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-reduced-motion-1366px.png",
+    "bytes": 127463,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-reduced-motion-1366px.png",
+    "bytes": 120205,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-reduced-motion-1366px.png",
+    "bytes": 45041,
+    "criterion": "U3 S7 export review queue (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-reduced-motion-1366px.png",
+    "bytes": 60651,
+    "criterion": "U3 media registry (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-reduced-motion-1366px.png",
+    "bytes": 64164,
+    "criterion": "U3 S25/S26 reconnect and backfill (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-reduced-motion-1366px.png",
+    "bytes": 55621,
+    "criterion": "U3 S31 export diagnostics (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-reduced-motion-1366px.png",
+    "bytes": 39127,
+    "criterion": "U3 export settings/ownership/retention (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-reduced-motion-1366px.png",
+    "bytes": 104575,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (prefers-reduced-motion: reduce; SC 2.3.3)"
+  },
+  {
+    "artifact": "reduced-motion.json",
+    "criterion": "DESIGN SYSTEM \u00a78 reduced motion (V-7); WCAG 2.2 SC 2.3.3"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-desktop-1366px.png",
+    "bytes": 55264,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-desktop-1366px.png",
+    "bytes": 105671,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-desktop-1366px.png",
+    "bytes": 104777,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-desktop-1366px.png",
+    "bytes": 119634,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-desktop-1366px.png",
+    "bytes": 124378,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-desktop-1366px.png",
+    "bytes": 132918,
+    "criterion": "S1 credential chooser, offline access-token path selected"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-desktop-1366px.png",
+    "bytes": 119593,
+    "criterion": "S1 location search with a result set, counter and Clear"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-desktop-1366px.png",
+    "bytes": 122093,
+    "criterion": "S1 location search with a second page accumulated"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-desktop-1366px.png",
+    "bytes": 116210,
+    "criterion": "S1 location search that matched nothing, keeping its way out"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-desktop-1366px.png",
+    "bytes": 113198,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-desktop-1366px.png",
+    "bytes": 45989,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-desktop-1366px.png",
+    "bytes": 52657,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-desktop-1366px.png",
+    "bytes": 52604,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-desktop-1366px.png",
+    "bytes": 52414,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-desktop-1366px.png",
+    "bytes": 43073,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-desktop-1366px.png",
+    "bytes": 42149,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-desktop-1366px.png",
+    "bytes": 97050,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-desktop-1366px.png",
+    "bytes": 62933,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-desktop-1366px.png",
+    "bytes": 127327,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-desktop-1366px.png",
+    "bytes": 120068,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-desktop-1366px.png",
+    "bytes": 45041,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-desktop-1366px.png",
+    "bytes": 60651,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-desktop-1366px.png",
+    "bytes": 64161,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-desktop-1366px.png",
+    "bytes": 55661,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-desktop-1366px.png",
+    "bytes": 39127,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-desktop-1366px.png",
+    "bytes": 104575,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-tablet-768px.png",
+    "bytes": 49921,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-tablet-768px.png",
+    "bytes": 99806,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-tablet-768px.png",
+    "bytes": 93631,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-tablet-768px.png",
+    "bytes": 114616,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-tablet-768px.png",
+    "bytes": 117660,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-tablet-768px.png",
+    "bytes": 127198,
+    "criterion": "S1 credential chooser, offline access-token path selected"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-tablet-768px.png",
+    "bytes": 114707,
+    "criterion": "S1 location search with a result set, counter and Clear"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-tablet-768px.png",
+    "bytes": 117131,
+    "criterion": "S1 location search with a second page accumulated"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-tablet-768px.png",
+    "bytes": 107071,
+    "criterion": "S1 location search that matched nothing, keeping its way out"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-tablet-768px.png",
+    "bytes": 103717,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-tablet-768px.png",
+    "bytes": 37496,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-tablet-768px.png",
+    "bytes": 43746,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-tablet-768px.png",
+    "bytes": 44763,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-tablet-768px.png",
+    "bytes": 44183,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-tablet-768px.png",
+    "bytes": 30105,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-tablet-768px.png",
+    "bytes": 29158,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-tablet-768px.png",
+    "bytes": 86255,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-tablet-768px.png",
+    "bytes": 54416,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-tablet-768px.png",
+    "bytes": 110738,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-tablet-768px.png",
+    "bytes": 102908,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-tablet-768px.png",
+    "bytes": 32986,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-tablet-768px.png",
+    "bytes": 52261,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-tablet-768px.png",
+    "bytes": 54002,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-tablet-768px.png",
+    "bytes": 46542,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-tablet-768px.png",
+    "bytes": 29581,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-tablet-768px.png",
+    "bytes": 96879,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-mobile-390px.png",
+    "bytes": 40945,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-mobile-390px.png",
+    "bytes": 84405,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-mobile-390px.png",
+    "bytes": 79050,
+    "criterion": "S1 long Permissions step; sticky actions over long content"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-mobile-390px.png",
+    "bytes": 79705,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-mobile-390px.png",
+    "bytes": 85253,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-mobile-390px.png",
+    "bytes": 83748,
+    "criterion": "S1 credential chooser, offline access-token path selected"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-mobile-390px.png",
+    "bytes": 79419,
+    "criterion": "S1 location search with a result set, counter and Clear"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-mobile-390px.png",
+    "bytes": 81730,
+    "criterion": "S1 location search with a second page accumulated"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-mobile-390px.png",
+    "bytes": 79706,
+    "criterion": "S1 location search that matched nothing, keeping its way out"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-mobile-390px.png",
+    "bytes": 77794,
+    "criterion": "S1 Final readiness with a long result list"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-mobile-390px.png",
+    "bytes": 26628,
+    "criterion": "U2 S9 orders; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-mobile-390px.png",
+    "bytes": 33174,
+    "criterion": "U2 COD ledger; \u00a711 empty state"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-mobile-390px.png",
+    "bytes": 30599,
+    "criterion": "U2 S6 customer matching"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-mobile-390px.png",
+    "bytes": 28809,
+    "criterion": "U2 S8 product matching"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-mobile-390px.png",
+    "bytes": 17299,
+    "criterion": "U2 S19 inventory workspace"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-mobile-390px.png",
+    "bytes": 16213,
+    "criterion": "U2 S11 first-push guard; warning state"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-mobile-390px.png",
+    "bytes": 47643,
+    "criterion": "U2 S11 form; warning state + action control"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-mobile-390px.png",
+    "bytes": 37245,
+    "criterion": "U2 S10 location mapping; action control"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-mobile-390px.png",
+    "bytes": 67625,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-mobile-390px.png",
+    "bytes": 56459,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-mobile-390px.png",
+    "bytes": 15865,
+    "criterion": "U3 S7 export review queue"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-mobile-390px.png",
+    "bytes": 37509,
+    "criterion": "U3 media registry"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-mobile-390px.png",
+    "bytes": 35576,
+    "criterion": "U3 S25/S26 reconnect and backfill"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-mobile-390px.png",
+    "bytes": 31569,
+    "criterion": "U3 S31 export diagnostics"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-mobile-390px.png",
+    "bytes": 14994,
+    "criterion": "U3 export settings/ownership/retention"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-mobile-390px.png",
+    "bytes": 69858,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals"
+  },
+  {
+    "artifact": "responsive.json",
+    "criterion": "DESIGN SYSTEM \u00a710 responsive; \u00a714 screenshot set; TD-016 per-surface clipping"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-1366px.png",
+    "bytes": 55860,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-1366px.png",
+    "bytes": 105837,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-1366px.png",
+    "bytes": 104317,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-1366px.png",
+    "bytes": 116144,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-1366px.png",
+    "bytes": 123504,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-1366px.png",
+    "bytes": 131954,
+    "criterion": "S1 credential chooser, offline access-token path selected (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-1366px.png",
+    "bytes": 115800,
+    "criterion": "S1 location search with a result set, counter and Clear (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-1366px.png",
+    "bytes": 118054,
+    "criterion": "S1 location search with a second page accumulated (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-1366px.png",
+    "bytes": 113852,
+    "criterion": "S1 location search that matched nothing, keeping its way out (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-1366px.png",
+    "bytes": 112764,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-1366px.png",
+    "bytes": 45510,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-1366px.png",
+    "bytes": 52082,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-1366px.png",
+    "bytes": 52113,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-1366px.png",
+    "bytes": 51809,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-1366px.png",
+    "bytes": 41850,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-1366px.png",
+    "bytes": 40933,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-1366px.png",
+    "bytes": 97850,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-1366px.png",
+    "bytes": 63077,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-1366px.png",
+    "bytes": 127898,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-1366px.png",
+    "bytes": 120197,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-1366px.png",
+    "bytes": 44763,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-1366px.png",
+    "bytes": 60200,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-1366px.png",
+    "bytes": 63438,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-1366px.png",
+    "bytes": 55095,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-1366px.png",
+    "bytes": 38632,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-1366px.png",
+    "bytes": 103057,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-768px.png",
+    "bytes": 50376,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-768px.png",
+    "bytes": 99686,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-768px.png",
+    "bytes": 92970,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-768px.png",
+    "bytes": 112230,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-768px.png",
+    "bytes": 115989,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-768px.png",
+    "bytes": 125456,
+    "criterion": "S1 credential chooser, offline access-token path selected (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-768px.png",
+    "bytes": 111934,
+    "criterion": "S1 location search with a result set, counter and Clear (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-768px.png",
+    "bytes": 114148,
+    "criterion": "S1 location search with a second page accumulated (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-768px.png",
+    "bytes": 105328,
+    "criterion": "S1 location search that matched nothing, keeping its way out (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-768px.png",
+    "bytes": 102564,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-768px.png",
+    "bytes": 37004,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-768px.png",
+    "bytes": 43294,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-768px.png",
+    "bytes": 44347,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-768px.png",
+    "bytes": 43609,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-768px.png",
+    "bytes": 29515,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-768px.png",
+    "bytes": 28563,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-768px.png",
+    "bytes": 87035,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-768px.png",
+    "bytes": 54558,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-768px.png",
+    "bytes": 111127,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-768px.png",
+    "bytes": 102928,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-768px.png",
+    "bytes": 31333,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-768px.png",
+    "bytes": 51791,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-768px.png",
+    "bytes": 53142,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-768px.png",
+    "bytes": 46116,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-768px.png",
+    "bytes": 29103,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-768px.png",
+    "bytes": 96217,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u0-dashboard-healthy-rtl-390px.png",
+    "bytes": 42286,
+    "criterion": "DESIGN SYSTEM \u00a79 dashboard hierarchy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-wizard-welcome-rtl-390px.png",
+    "bytes": 83374,
+    "criterion": "S1 guided setup; \u00a712 a11y gates, \u00a714 responsive (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-permissions-long-rtl-390px.png",
+    "bytes": 74607,
+    "criterion": "S1 long Permissions step; sticky actions over long content (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-390px.png",
+    "bytes": 80704,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-390px.png",
+    "bytes": 84326,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-390px.png",
+    "bytes": 82973,
+    "criterion": "S1 credential chooser, offline access-token path selected (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-390px.png",
+    "bytes": 80258,
+    "criterion": "S1 location search with a result set, counter and Clear (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-390px.png",
+    "bytes": 82718,
+    "criterion": "S1 location search with a second page accumulated (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-390px.png",
+    "bytes": 80156,
+    "criterion": "S1 location search that matched nothing, keeping its way out (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-rtl-390px.png",
+    "bytes": 77138,
+    "criterion": "S1 Final readiness with a long result list (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-orders-workspace-empty-rtl-390px.png",
+    "bytes": 26628,
+    "criterion": "U2 S9 orders; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-cod-reconciliation-empty-rtl-390px.png",
+    "bytes": 33174,
+    "criterion": "U2 COD ledger; \u00a711 empty state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-customer-matching-empty-rtl-390px.png",
+    "bytes": 30599,
+    "criterion": "U2 S6 customer matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-product-matching-rtl-390px.png",
+    "bytes": 28809,
+    "criterion": "U2 S8 product matching (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-inventory-workspace-rtl-390px.png",
+    "bytes": 17298,
+    "criterion": "U2 S19 inventory workspace (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-guard-previewed-rtl-390px.png",
+    "bytes": 16214,
+    "criterion": "U2 S11 first-push guard; warning state (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-390px.png",
+    "bytes": 47794,
+    "criterion": "U2 S11 form; warning state + action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-390px.png",
+    "bytes": 37251,
+    "criterion": "U2 S10 location mapping; action control (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-390px.png",
+    "bytes": 67625,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-390px.png",
+    "bytes": 56459,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-previews-rtl-390px.png",
+    "bytes": 15496,
+    "criterion": "U3 S7 export review queue (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-exported-media-rtl-390px.png",
+    "bytes": 37509,
+    "criterion": "U3 media registry (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-reconnect-backfill-rtl-390px.png",
+    "bytes": 35308,
+    "criterion": "U3 S25/S26 reconnect and backfill (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diagnostics-rtl-390px.png",
+    "bytes": 31569,
+    "criterion": "U3 S31 export diagnostics (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-settings-rtl-390px.png",
+    "bytes": 14993,
+    "criterion": "U3 export settings/ownership/retention (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "screenshots/u3-export-diff-refusal-and-tag-removal-rtl-390px.png",
+    "bytes": 70623,
+    "criterion": "U3 S7 export diff: refusal disclosure + enumerated tag removals (RTL, SC 1.3.2 / \u00a710)"
+  },
+  {
+    "artifact": "rtl.json",
+    "criterion": "DESIGN SYSTEM \u00a710 RTL check at every required width (V-8); TD-016 per-surface clipping"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-1366px-css683.png",
+    "bytes": 245344,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-1366px-css683.png",
+    "bytes": 256456,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-1366px-css683.png",
+    "bytes": 258527,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-1366px-css683.png",
+    "bytes": 258865,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-1366px-css683.png",
+    "bytes": 263526,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-1366px-css683.png",
+    "bytes": 220849,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-1366px-css683.png",
+    "bytes": 165200,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-1366px-css683.png",
+    "bytes": 232195,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-1366px-css683.png",
+    "bytes": 104741,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-1366px-css683.png",
+    "bytes": 227615,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-768px-css384.png",
+    "bytes": 222205,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-768px-css384.png",
+    "bytes": 221605,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-768px-css384.png",
+    "bytes": 204652,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-768px-css384.png",
+    "bytes": 201221,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-768px-css384.png",
+    "bytes": 206035,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-768px-css384.png",
+    "bytes": 185863,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-768px-css384.png",
+    "bytes": 119317,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-768px-css384.png",
+    "bytes": 194402,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-768px-css384.png",
+    "bytes": 90424,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-768px-css384.png",
+    "bytes": 150506,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-390px-css320.png",
+    "bytes": 185719,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-390px-css320.png",
+    "bytes": 180510,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-390px-css320.png",
+    "bytes": 173347,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-390px-css320.png",
+    "bytes": 166743,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-390px-css320.png",
+    "bytes": 171221,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-390px-css320.png",
+    "bytes": 169808,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-390px-css320.png",
+    "bytes": 115454,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-390px-css320.png",
+    "bytes": 206214,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-390px-css320.png",
+    "bytes": 87260,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-390px-css320.png",
+    "bytes": 134268,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-1366px-css683.png",
+    "bytes": 245344,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-1366px-css683.png",
+    "bytes": 256456,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-1366px-css683.png",
+    "bytes": 258527,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-1366px-css683.png",
+    "bytes": 258865,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-1366px-css683.png",
+    "bytes": 263526,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-1366px-css683.png",
+    "bytes": 220849,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-1366px-css683.png",
+    "bytes": 165200,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-1366px-css683.png",
+    "bytes": 232195,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-1366px-css683.png",
+    "bytes": 104741,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-1366px-css683.png",
+    "bytes": 227615,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-768px-css384.png",
+    "bytes": 222205,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-768px-css384.png",
+    "bytes": 221605,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-768px-css384.png",
+    "bytes": 204652,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-768px-css384.png",
+    "bytes": 201221,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-768px-css384.png",
+    "bytes": 206035,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-768px-css384.png",
+    "bytes": 185863,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-768px-css384.png",
+    "bytes": 119317,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-768px-css384.png",
+    "bytes": 194402,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-768px-css384.png",
+    "bytes": 90424,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-768px-css384.png",
+    "bytes": 150506,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-ltr-zoom200-390px-css320.png",
+    "bytes": 185719,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-ltr-zoom200-390px-css320.png",
+    "bytes": 180510,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-ltr-zoom200-390px-css320.png",
+    "bytes": 173347,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-ltr-zoom200-390px-css320.png",
+    "bytes": 166743,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-ltr-zoom200-390px-css320.png",
+    "bytes": 171221,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-ltr-zoom200-390px-css320.png",
+    "bytes": 169808,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-ltr-zoom200-390px-css320.png",
+    "bytes": 115454,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-ltr-zoom200-390px-css320.png",
+    "bytes": 206214,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-ltr-zoom200-390px-css320.png",
+    "bytes": 87260,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-ltr-zoom200-390px-css320.png",
+    "bytes": 134268,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, LTR, reduce motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-zoom200-1366px-css683.png",
+    "bytes": 244340,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-zoom200-1366px-css683.png",
+    "bytes": 256687,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-zoom200-1366px-css683.png",
+    "bytes": 257828,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-zoom200-1366px-css683.png",
+    "bytes": 256375,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-zoom200-1366px-css683.png",
+    "bytes": 261668,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-zoom200-1366px-css683.png",
+    "bytes": 216735,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-zoom200-1366px-css683.png",
+    "bytes": 165163,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-zoom200-1366px-css683.png",
+    "bytes": 232171,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-zoom200-1366px-css683.png",
+    "bytes": 104699,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-zoom200-1366px-css683.png",
+    "bytes": 227606,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-zoom200-768px-css384.png",
+    "bytes": 223808,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-zoom200-768px-css384.png",
+    "bytes": 222467,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-zoom200-768px-css384.png",
+    "bytes": 205138,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-zoom200-768px-css384.png",
+    "bytes": 200779,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-zoom200-768px-css384.png",
+    "bytes": 205083,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-zoom200-768px-css384.png",
+    "bytes": 184627,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-zoom200-768px-css384.png",
+    "bytes": 119308,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-zoom200-768px-css384.png",
+    "bytes": 194402,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-zoom200-768px-css384.png",
+    "bytes": 90465,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-zoom200-768px-css384.png",
+    "bytes": 150506,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-dev-dashboard-rtl-zoom200-390px-css320.png",
+    "bytes": 185489,
+    "criterion": "S1 credential chooser, Dev Dashboard path (default) (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-credential-offline-token-rtl-zoom200-390px-css320.png",
+    "bytes": 180697,
+    "criterion": "S1 credential chooser, offline access-token path selected (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-rtl-zoom200-390px-css320.png",
+    "bytes": 170250,
+    "criterion": "S1 Location mapping with multiple cached Shopify locations (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-search-results-rtl-zoom200-390px-css320.png",
+    "bytes": 163190,
+    "criterion": "S1 location search with a result set, counter and Clear (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-loaded-more-rtl-zoom200-390px-css320.png",
+    "bytes": 168449,
+    "criterion": "S1 location search with a second page accumulated (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-no-result-rtl-zoom200-390px-css320.png",
+    "bytes": 166419,
+    "criterion": "S1 location search that matched nothing, keeping its way out (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-form-awaiting-confirmation-rtl-zoom200-390px-css320.png",
+    "bytes": 115514,
+    "criterion": "U2 S11 form; warning state + action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-first-push-withdraw-dialog-rtl-zoom200-390px-css320.png",
+    "bytes": 206214,
+    "criterion": "TD-020 single-pair withdrawal dialog; consequence copy (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-mapping-form-rtl-zoom200-390px-css320.png",
+    "bytes": 87289,
+    "criterion": "U2 S10 location mapping; action control (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "screenshots/u2-location-withdraw-all-dialog-rtl-zoom200-390px-css320.png",
+    "bytes": 134268,
+    "criterion": "TD-020 mapping-level withdrawal dialog; counts + storefront consequence (200% zoom, RTL, no-preference motion; SC 1.4.4 / SC 1.4.10)"
+  },
+  {
+    "artifact": "batch1-zoom-matrix.json",
+    "criterion": "Batch 1 surfaces at 200% zoom, LTR and RTL; SC 1.4.4 / 1.4.10"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-1366px.png",
+    "bytes": 81466,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-1366px.png",
+    "bytes": 95615,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-1366px.png",
+    "bytes": 88074,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-1440px.png",
+    "bytes": 102407,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-1440px.png",
+    "bytes": 118659,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-1440px.png",
+    "bytes": 103447,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-768px.png",
+    "bytes": 94421,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-768px.png",
+    "bytes": 101096,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-768px.png",
+    "bytes": 94636,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-scopes-sticky-390px.png",
+    "bytes": 71648,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-location-mapping-sticky-390px.png",
+    "bytes": 83990,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "screenshots/s1-setup-final-readiness-sticky-390px.png",
+    "bytes": 75638,
+    "criterion": "Wave 5 sticky action row; \u00a710 responsive, SC 2.4.11 focus not obscured"
+  },
+  {
+    "artifact": "sticky-action-row.json",
+    "criterion": "Wave 5 sticky action row; DESIGN SYSTEM \u00a710; WCAG 2.2 SC 2.4.11"
+  }
+]

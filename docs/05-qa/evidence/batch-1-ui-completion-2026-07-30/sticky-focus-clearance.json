@@ -1,0 +1,75 @@
+{
+  "measured": {
+    "final_readiness@1366px": {
+      "bar": {
+        "bottom": 735.78125,
+        "top": 668.78125
+      },
+      "concealed_by": 0,
+      "error": null,
+      "focused": true,
+      "in_viewport": true,
+      "label": "Run the checks again",
+      "target": {
+        "bottom": 603.78125,
+        "top": 561.78125
+      }
+    },
+    "final_readiness@390px": {
+      "bar": {
+        "bottom": 883.78125,
+        "top": 816.78125
+      },
+      "concealed_by": 0,
+      "error": null,
+      "focused": true,
+      "in_viewport": true,
+      "label": "Run the checks again",
+      "target": {
+        "bottom": 767.78125,
+        "top": 725.78125
+      }
+    },
+    "location_mapping@1366px": {
+      "bar": {
+        "bottom": 735.78125,
+        "top": 668.78125
+      },
+      "concealed_by": 0,
+      "error": null,
+      "focused": true,
+      "in_viewport": true,
+      "label": "Map this location",
+      "target": {
+        "bottom": 586.78125,
+        "top": 544.78125
+      }
+    },
+    "location_mapping@390px": {
+      "bar": {
+        "bottom": 883.78125,
+        "top": 816.78125
+      },
+      "concealed_by": 0,
+      "error": null,
+      "focused": true,
+      "in_viewport": true,
+      "label": "Map this location",
+      "target": {
+        "bottom": 750.78125,
+        "top": 708.78125
+      }
+    },
+    "scopes@1366px": {
+      "error": "no focusable"
+    },
+    "scopes@390px": {
+      "error": "no focusable"
+    }
+  },
+  "overlaps": [],
+  "skipped_no_focusable_control": [
+    "scopes@1366px",
+    "scopes@390px"
+  ]
+}
