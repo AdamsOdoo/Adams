@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.5.0',
+    'version': '19.0.2.6.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '
@@ -48,6 +48,14 @@ file.
         # Batch 2 checkpoint 1: the order-import section of the canonical
         # Store Settings form, contributed by inheritance.
         'views/shopify_connector_store_settings_sale_views.xml',
+        # Batch 2 checkpoint 2: the manual order controls. Inherits the core
+        # store form and this module's own order-binding form, so both must
+        # already be loaded.
+        'views/shopify_connector_order_controls_views.xml',
+        # Batch 2 checkpoint 2: the tax decision dialog, its entry point on
+        # the stopped job, and the Tax Mapping workspace. Loads after the
+        # sale menus, whose Orders branch its two menu items hang off.
+        'views/shopify_connector_tax_decision_views.xml',
     ],
     'installable': True,
     'application': False,

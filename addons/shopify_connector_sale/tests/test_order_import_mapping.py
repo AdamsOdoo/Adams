@@ -360,8 +360,10 @@ class TestOrderImportMappingStatic(TransactionCase):
         # meant to catch an *unintended* manifest change, so an intended one is
         # recorded here deliberately rather than the guard being relaxed.
         # Batch 2 checkpoint 1 contributed the order section of the canonical
-        # Store Settings form and bumped the patch version accordingly.
-        self.assertEqual(manifest['version'], '19.0.2.5.0')
+        # Store Settings form; checkpoint 2 added the order controls, the tax
+        # decision wizard model and its least-privilege ACL row. One patch
+        # bump each, recorded rather than the guard being relaxed.
+        self.assertEqual(manifest['version'], '19.0.2.6.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
@@ -384,6 +386,12 @@ class TestOrderImportMappingStatic(TransactionCase):
             # by `inherit_id`, so it depends on nothing this module defines
             # and must not precede the menus that do.
             'views/shopify_connector_store_settings_sale_views.xml',
+            # Batch 2 checkpoint 2: the manual order controls, then the tax
+            # decision route. The controls inherit the core store form and
+            # this module's order-binding form; the tax file adds two menu
+            # items under the Orders branch, so both must already exist.
+            'views/shopify_connector_order_controls_views.xml',
+            'views/shopify_connector_tax_decision_views.xml',
         ])
 
     def test_job_types_have_lc1_ondelete_and_replay_policy(self):

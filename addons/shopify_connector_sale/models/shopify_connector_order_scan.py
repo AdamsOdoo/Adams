@@ -536,6 +536,65 @@ class ShopifyConnectorStoreOrderScanExtension(models.Model):
         help='Connector jobs currently waiting for failure recovery or review.',
     )
 
+    # ------------------------------------------------------------------
+    # Batch 2 checkpoint 2: what the operator surface must be able to say
+    # ------------------------------------------------------------------
+    #
+    # These exist so the screen carrying `Import orders now` can state the
+    # scheduled position honestly beside it. Before this there was no way for
+    # any surface to answer "is order import running on its own?", and a
+    # manual button with no such answer beside it invites exactly the wrong
+    # conclusion -- that pressing it occasionally is all that is required, or
+    # conversely that automation is handling it when the flag is off.
+    #
+    # Computed, never stored: they are a projection of the settings row and
+    # the live job table, and storing them would create a second copy of the
+    # truth that could disagree with the cron's own SELECT.
+    order_sync_domain_enabled = fields.Boolean(
+        compute='_compute_order_sync_state',
+        string='Order sync enabled',
+    )
+    order_sync_scheduled = fields.Boolean(
+        compute='_compute_order_sync_state',
+        string='Scheduled order import',
+    )
+    order_sync_last_checkpoint_at = fields.Datetime(
+        compute='_compute_order_sync_state',
+        string='Discovered up to',
+    )
+    order_sync_active_scan_count = fields.Integer(
+        compute='_compute_order_sync_state',
+        string='Order scans in flight',
+    )
+
+    def _compute_order_sync_state(self):
+        Settings = self.env['shopify.connector.store.settings']
+        Job = self.env['shopify.connector.job']
+        for store in self:
+            settings = Settings.search(
+                [('store_id', '=', store.id)], limit=1,
+            )
+            store.order_sync_domain_enabled = bool(
+                settings and settings.sale_domain_enabled
+            )
+            store.order_sync_scheduled = bool(
+                settings and settings.sale_domain_enabled
+                and settings.order_scheduled_sync_enabled
+            )
+            store.order_sync_last_checkpoint_at = (
+                settings.sale_order_last_import_checkpoint_at
+                if settings else False
+            )
+            store.order_sync_active_scan_count = Job.search_count([
+                ('store_id', '=', store.id),
+                ('res_model', '=', 'shopify.connector.store'),
+                ('res_id', '=', store.id),
+                ('shopify_target_gid', '=', ORDER_SCAN_TARGET),
+                ('state', 'not in', (
+                    'succeeded', 'failed_final', 'skipped', 'cancelled',
+                )),
+            ])
+
     def _compute_order_job_counts(self):
         pending_states = (
             'draft', 'queued', 'running', 'retry_waiting', 'failed_retryable',

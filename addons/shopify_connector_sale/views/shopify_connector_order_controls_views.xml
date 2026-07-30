@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 2: the order controls, made reachable.
+
+        Both production methods already existed and both already carried their
+        own server-side authorization. Neither had a single caller in any view,
+        so an operator had no way to start an order import or refresh one
+        order short of an RPC console. This file is that route and nothing
+        more: it binds the existing methods, it does not reimplement them, and
+        it adds no new server behaviour of its own.
+
+        `groups="...operator"` matches the server guard EXACTLY rather than
+        approximately. `_assert_order_sync_operator` accepts Operator or
+        Administrator, and Administrator and User both imply Operator
+        (`shopify_connector_security.xml`), so the group that hides the button
+        and the check that refuses the call select the same people. Visibility
+        is still not the control &#8212; the server refuses a denied caller whether
+        or not a button rendered.
+    -->
+
+    <record id="view_shopify_connector_store_form_order_controls"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.order.controls</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header/field[@name='state']" position="before">
+                <button name="action_sync_orders_now" type="object"
+                        string="Import orders now"
+                        groups="shopify_connector_core.group_shopify_connector_operator"
+                        invisible="state != 'connected' or not order_sync_domain_enabled"
+                        help="Look for Shopify orders to import now. This queues
+                              one discovery scan; it does not import anything
+                              directly, and it never sends data to Shopify."/>
+            </xpath>
+            <xpath expr="//sheet/group[last()]" position="after">
+                <!--
+                    The honest answer to "is this running on its own?", beside
+                    the button that runs it once. §7.1 forbids a silent
+                    healthy/automatic impression while scheduling is off, and
+                    the only way to avoid one is to say so where the operator
+                    is standing.
+                -->
+                <group string="Order import" name="order_sync_state"
+                       invisible="not order_sync_domain_enabled">
+                    <field name="order_sync_scheduled" readonly="1"/>
+                    <field name="order_sync_last_checkpoint_at" readonly="1"/>
+                    <field name="order_sync_active_scan_count" readonly="1"/>
+                    <div class="text-muted" colspan="2"
+                         invisible="order_sync_scheduled">
+                        <strong>Scheduled order import is off.</strong>
+                        Orders are discovered only when somebody presses
+                        <em>Import orders now</em>. Turn scheduling on in
+                        Configuration → Store Settings if this store should
+                        keep itself up to date.
+                    </div>
+                    <div class="text-muted" colspan="2"
+                         invisible="not order_sync_scheduled">
+                        Scheduled order import is on: the connector looks for
+                        new orders on its own. <em>Import orders now</em> asks
+                        it to look immediately instead of waiting.
+                    </div>
+                    <div class="text-muted" colspan="2"
+                         invisible="order_sync_active_scan_count == 0">
+                        A discovery scan is already in flight for this store.
+                        Pressing <em>Import orders now</em> again joins that
+                        scan rather than starting a second one.
+                    </div>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_order_binding_form_refresh"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.order.binding.form.refresh</field>
+        <field name="model">shopify.connector.order.binding</field>
+        <field name="inherit_id"
+               ref="shopify_connector_sale.view_shopify_connector_order_binding_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <!--
+                    Queues one per-order import job through the existing
+                    governed path. It deliberately does NOT call the single-
+                    order importer inline: that would run a Shopify read on the
+                    web worker, outside the job substrate that owns retry,
+                    failure classification, replay policy and audit for every
+                    other order import.
+                -->
+                <button name="action_sync_selected" type="object"
+                        string="Refresh this order"
+                        groups="shopify_connector_core.group_shopify_connector_operator"
+                        invisible="sec3_scope_quarantined"
+                        help="Fetch this order from Shopify again and re-apply
+                              it. Queues one import job for this order only;
+                              nothing is sent to Shopify."/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,1 +1,2 @@
 from . import shopify_connector_sale_ui_wizards
+from . import shopify_connector_tax_decision_wizard

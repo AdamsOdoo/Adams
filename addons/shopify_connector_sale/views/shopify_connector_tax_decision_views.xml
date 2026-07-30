@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 2: the tax decision dialog, the route into it from
+        the stopped order, and the Tax Mapping workspace.
+
+        THE DIALOG SHOWS EVIDENCE AND COLLECTS ONE CHOICE. Everything above
+        the choice is `readonly` because it is evidence rather than input: the
+        fingerprint identifies which Shopify tax this is, and an editable
+        fingerprint would let an administrator map one tax while believing
+        they had mapped another. The rate and inclusion posture are shown
+        because they are the two facts that make a candidate eligible at all.
+    -->
+
+    <record id="view_shopify_connector_tax_decision_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.tax.decision.wizard.form</field>
+        <field name="model">shopify.connector.tax.decision.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Map this Shopify tax">
+                <div class="alert alert-info" role="status">
+                    <strong>This order stopped because Shopify charged a tax
+                    the connector has not been told about.</strong>
+                    Choose the Odoo tax it means. Nothing is sent to Shopify,
+                    and no tax is created for you. Once mapped, this order
+                    resumes automatically.
+                </div>
+                <group>
+                    <group string="What Shopify charged"
+                           name="tax_decision_evidence">
+                        <field name="rate_percentage" readonly="1"/>
+                        <field name="price_included" readonly="1"/>
+                        <field name="title_preview" readonly="1"/>
+                        <field name="source_preview" readonly="1"
+                               invisible="not source_preview"/>
+                    </group>
+                    <group string="Affected work" name="tax_decision_work">
+                        <field name="store_id" readonly="1"
+                               options="{'no_open': True}"/>
+                        <field name="company_id" readonly="1"
+                               options="{'no_open': True}"/>
+                        <field name="shopify_order_gid" readonly="1"/>
+                        <field name="job_id" readonly="1"
+                               options="{'no_open': True}"/>
+                    </group>
+                </group>
+                <group string="Your decision" name="tax_decision_choice">
+                    <field name="candidate_tax_ids" invisible="1"/>
+                    <field name="account_tax_id"
+                           domain="[('id', 'in', candidate_tax_ids)]"
+                           options="{'no_create': True, 'no_open': True}"/>
+                </group>
+                <div class="text-muted" role="note">
+                    <p>
+                        Only active sale taxes of this store's order company,
+                        at the same rate and with the same tax-inclusion
+                        posture, can be chosen. Taxes matching on rate alone
+                        are <strong>not</strong> proof of equivalence, which is
+                        why the choice is yours rather than automatic.
+                    </p>
+                    <p>
+                        If the right tax does not exist yet, close this,
+                        create it in Accounting, and reopen.
+                    </p>
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Map tax and resume order"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!--
+        The route in, on the job that is actually waiting. Placed on the job
+        form because that is the record that stopped; the button appears only
+        when this job genuinely holds parseable tax evidence, which is a
+        structural test rather than a guess from the error message.
+    -->
+    <record id="view_shopify_connector_job_form_tax_decision"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.job.form.tax.decision</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_tax_mapping_decision" type="object"
+                        string="Map tax"
+                        class="btn-primary"
+                        groups="shopify_connector_core.group_shopify_connector_admin"
+                        invisible="not tax_decision_pending"/>
+                <field name="tax_decision_pending" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_tax_mapping_list" model="ir.ui.view">
+        <field name="name">shopify.connector.tax.mapping.list</field>
+        <field name="model">shopify.connector.tax.mapping</field>
+        <field name="arch" type="xml">
+            <list string="Tax Mappings" create="false" delete="false">
+                <field name="store_id"/>
+                <field name="company_id" optional="show"/>
+                <field name="title_preview" string="Shopify tax"/>
+                <field name="shopify_price_included"/>
+                <field name="account_tax_id"/>
+                <field name="shopify_tax_evidence_key" optional="hide"
+                       string="Fingerprint"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_tax_mapping_form" model="ir.ui.view">
+        <field name="name">shopify.connector.tax.mapping.form</field>
+        <field name="model">shopify.connector.tax.mapping</field>
+        <field name="arch" type="xml">
+            <!--
+                EVERY field readonly, including `account_tax_id`, and that is
+                a deliberate narrowing rather than an oversight. The model
+                permits a direct write to it; doing so on a mapping that has
+                already priced imported orders would silently change what past
+                and future orders mean, with no preview, no audit and no
+                reconciliation. A governed remap is real work with a real
+                state machine, and it is explicitly out of this campaign's
+                scope, so the safe move is to decline to offer the unsafe
+                version. Recorded as P1 debt rather than left implied.
+            -->
+            <form string="Tax Mapping" create="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Shopify evidence">
+                            <field name="title_preview" readonly="1"
+                                   string="Shopify tax"/>
+                            <field name="source_preview" readonly="1"
+                                   invisible="not source_preview"/>
+                            <field name="shopify_price_included" readonly="1"/>
+                            <field name="shopify_tax_evidence_key" readonly="1"
+                                   string="Fingerprint"/>
+                            <field name="shopify_tax_fingerprint_version"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Odoo">
+                            <field name="store_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                            <field name="company_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                            <field name="account_tax_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <div class="text-muted" role="note">
+                        A mapping is created from observed Shopify evidence
+                        when an administrator maps a stopped order's tax. It
+                        cannot be edited here: changing which Odoo tax a
+                        Shopify tax means would change what already-imported
+                        orders say, so it needs a governed route of its own
+                        rather than a field on a form.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_tax_mapping_search" model="ir.ui.view">
+        <field name="name">shopify.connector.tax.mapping.search</field>
+        <field name="model">shopify.connector.tax.mapping</field>
+        <field name="arch" type="xml">
+            <search string="Tax Mappings">
+                <field name="store_id"/>
+                <field name="account_tax_id"/>
+                <field name="title_preview" string="Shopify tax"/>
+                <field name="shopify_tax_evidence_key" string="Fingerprint"/>
+                <filter name="filter_price_included" string="Price includes tax"
+                        domain="[('shopify_price_included', '=', True)]"/>
+                <filter name="filter_price_excluded" string="Tax added on top"
+                        domain="[('shopify_price_included', '=', False)]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_tax" string="Odoo tax"
+                            context="{'group_by': 'account_tax_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_tax_mapping"
+            model="ir.actions.act_window">
+        <field name="name">Tax Mappings</field>
+        <field name="res_model">shopify.connector.tax.mapping</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_tax_mapping_search"/>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_tax_mapping_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_tax_mapping_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No Shopify tax has needed mapping yet.
+            </p>
+            <p>
+                When an imported order carries a tax the connector has not
+                seen before, the order stops and an administrator maps it to
+                an Odoo tax. Those decisions are recorded here.
+            </p>
+        </field>
+    </record>
+
+    <!--
+        The pending side, listed from the jobs that are actually stopped.
+        The domain is structural and therefore searchable: `tax_decision_
+        pending` is computed from a job-log payload and cannot appear in a
+        SQL domain, so filtering on it would silently return nothing. This
+        selects every order import stopped on a configuration decision — tax
+        is one kind — and the per-row Map tax button appears only where tax
+        evidence is genuinely present. Naming it after what the domain
+        actually selects is the honest option.
+    -->
+    <record id="action_shopify_connector_orders_awaiting_configuration"
+            model="ir.actions.act_window">
+        <field name="name">Orders Awaiting Configuration</field>
+        <field name="res_model">shopify.connector.job</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('job_type', '=', 'order_import_sync'),
+                              ('state', '=', 'failed_retryable'),
+                              ('error_class', '=', 'odoo_validation_configuration')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No order is waiting on a configuration decision.
+            </p>
+            <p>
+                An order lands here when importing it needs something decided
+                first — most often a Shopify tax with no Odoo equivalent yet.
+                Open one to see what it is waiting for.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_shopify_connector_orders_awaiting_configuration"
+              name="Awaiting Configuration"
+              parent="menu_shopify_connector_orders"
+              action="action_shopify_connector_orders_awaiting_configuration"
+              sequence="25"/>
+
+    <menuitem id="menu_shopify_connector_tax_mapping"
+              name="Tax Mappings"
+              parent="menu_shopify_connector_orders"
+              action="action_shopify_connector_tax_mapping"
+              sequence="30"/>
+</odoo>
