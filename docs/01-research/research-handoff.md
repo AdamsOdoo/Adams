@@ -1,3 +1,67 @@
+### Batch 1 UI and evidence completion (2026-07-30)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `2e4f4278dc14a508408b1e8a3900a3c987f12d77`. **Not self-reviewed, not
+  self-accepted, not ready-marked, not merged.** All commits additive; no
+  rebase, reset, amend, squash or force-push.
+- **Authorization:** the 2026-07-30 control-room instruction "CLAUDE CODE —
+  PR #204 BATCH 1 UI AND EVIDENCE COMPLETION", closing the three proof gaps
+  the implementing report at `2e4f4278` admitted in its own work. **The
+  standing branch conflict is flagged again and again not resolved
+  unilaterally:** the harness designated `claude/prompt-attached-ttzs1v` while
+  the instruction authorises `fable/wave-5-completion`. Same reasoning and
+  same choice as every prior cycle recorded in this file.
+- **Identity gate, before any edit.** Repository `AdamsOdoo/Adams`; local HEAD
+  = `origin/fable/wave-5-completion` = PR #204 head = `2e4f4278`; PR open,
+  draft, unmerged, **unapproved** (zero reviews); base exact and an ancestor;
+  `0a15b176 → 2e4f4278` is the five-commit, 35-path, +4852/-309 additive
+  correction delta; worktree clean; Odoo pin `30bde9ff` verified against a
+  real checkout; no other repository writer.
+- **Full record:**
+  [`docs/07-implementation-plan/pr-204-batch-1-ui-evidence-completion-2026-07-30.md`](../07-implementation-plan/pr-204-batch-1-ui-evidence-completion-2026-07-30.md);
+  browser artifacts in
+  [`docs/05-qa/evidence/batch-1-ui-completion-2026-07-30/`](../05-qa/evidence/batch-1-ui-completion-2026-07-30/README.md).
+
+**Learning feedback loop**
+
+1. **A test can be green because the property it claims is untestable at that
+   layer.** The location client's continuation, deduplication and
+   revalidation were all proved on the server and by a tour walking one happy
+   path. Neither layer can hold a response open, inspect what was sent, or
+   tell "asked for the right page" from "asked for the wrong page and the
+   fixture made the two agree". Every one of the ten new HOOT tests was
+   therefore run against a production client with its property removed —
+   seven mutations, seven catches, one to one. A test not proved against the
+   defect it claims to catch is a claim, not evidence.
+2. **A security control can be inert at the only surface that uses it, and
+   every server test will still pass.** `expected_signature` and
+   `expected_state` are `readonly` fields declared in their views, and the web
+   client excludes readonly fields from what it sends on save; `create()` then
+   refilled them from `default_get` at SAVE time — recomputing precisely the
+   state the check exists to detect having moved. Every server test passes the
+   snapshot explicitly, so none of them could see it. **A control whose only
+   caller is the UI must have a test that goes through the UI.**
+3. **Aim the campaign at what changed, not at what is easy to open.** Four of
+   the six surfaces this correction rebuilt do not exist until an operator
+   acts, so photographing the step they live on measured the screen before the
+   thing under test was on it. The location fixture had six rows where the
+   page size is fifty, so the paged surface the correction was *about* was
+   never rendered once.
+4. **An instrument that lies is worse than no instrument.** Three defects in
+   this session's own measurement code: `querySelector("a, b")` resolves in
+   document order, so with a dialog open the "surface" was the form behind the
+   modal; the dialog root excluded the footer, where a dialog's real final
+   controls live; and an RTL row recorded a direction it could not show had
+   taken effect. All three would have produced confident, wrong evidence.
+5. **Name the host framework's limits instead of asserting around them.**
+   Odoo 19 emits no `aria-invalid` anywhere in `web/static/src`. Requiring it
+   would fail forever for something this repository cannot fix; dropping the
+   requirement silently would be worse. It is measured, recorded as a
+   disclosed limitation, and what the connector's own arch decides is what is
+   asserted.
+
 ### Batch 1 consolidated security and operability correction (2026-07-30)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft
