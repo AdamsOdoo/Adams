@@ -299,6 +299,13 @@ class TestUiSourceGuards(TransactionCase):
             # accepted MVP screen, so it joins the allowlist rather than
             # dissolving it.
             'shopify_connector_setup_views.xml',
+            # Batch 2 checkpoint 1: the canonical per-store configuration
+            # surface (Configuration -> Store Settings). It renders existing
+            # settings fields that had no merchant-reachable route after
+            # onboarding; it adds no client action, no controller and no
+            # second setup flow. An accepted MVP screen, so it joins the
+            # allowlist rather than dissolving it.
+            'shopify_connector_store_settings_views.xml',
         }
         present = {f for f in os.listdir(views_dir) if f.endswith('.xml')}
         self.assertEqual(
@@ -310,9 +317,25 @@ class TestUiSourceGuards(TransactionCase):
         # over every other file -- the guard exists to stop out-of-scope UI
         # leaking into the U0 files, not to forbid an accepted screen from
         # naming itself.
+        # Batch 2 checkpoint 1, same principle, narrower carve-out. The
+        # canonical Store Settings form renders `fulfillment_domain_enabled`
+        # -- one of the FOUR sync-domain flags core declares on its own
+        # settings model -- and its prose names Fulfillment Settings as the
+        # surface owning the mode fields this one deliberately does not
+        # duplicate. Neither is out-of-scope UI leaking into core; core is
+        # naming a field it owns. So `fulfillment` alone is exempted for that
+        # one file, per-token rather than per-file: `setup_wizard`,
+        # `matching`, `mapping` and `export_preview` stay enforced there, and
+        # every token stays enforced everywhere else.
+        token_exemptions = {
+            'shopify_connector_store_settings_views.xml': {'fulfillment'},
+        }
         for f in present - {'shopify_connector_setup_views.xml'}:
             text = open(os.path.join(views_dir, f), encoding='utf-8').read().lower()
+            exempt = token_exemptions.get(f, frozenset())
             for token in forbidden_tokens:
+                if token in exempt:
+                    continue
                 self.assertNotIn(
                     token, text,
                     "%s must not contain out-of-scope UI token %r." % (f, token),

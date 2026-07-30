@@ -359,7 +359,9 @@ class TestOrderImportMappingStatic(TransactionCase):
         # version accordingly. This assertion is a frozen-contract guard: it is
         # meant to catch an *unintended* manifest change, so an intended one is
         # recorded here deliberately rather than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.4.0')
+        # Batch 2 checkpoint 1 contributed the order section of the canonical
+        # Store Settings form and bumped the patch version accordingly.
+        self.assertEqual(manifest['version'], '19.0.2.5.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
@@ -377,6 +379,11 @@ class TestOrderImportMappingStatic(TransactionCase):
             'views/shopify_connector_order_binding_views.xml',
             'views/shopify_connector_customer_binding_views.xml',
             'views/shopify_connector_sale_menus.xml',
+            # Batch 2 checkpoint 1: the order-import section of the canonical
+            # Store Settings form. Loads last because it inherits a core view
+            # by `inherit_id`, so it depends on nothing this module defines
+            # and must not precede the menus that do.
+            'views/shopify_connector_store_settings_sale_views.xml',
         ])
 
     def test_job_types_have_lc1_ondelete_and_replay_policy(self):

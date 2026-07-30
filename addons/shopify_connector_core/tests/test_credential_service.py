@@ -159,6 +159,9 @@ CORE_SUDO_SITES = [
      '_mark_setup_readiness_stale', 'self', 1),
     ('shopify_connector_store_settings.py',
      '_clear_setup_readiness_stale', 'self', 1),
+    ('shopify_connector_store_settings.py',
+     '_ensure_canonical_settings_rows',
+     "self.env['shopify.connector.store.settings']", 1),
     ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
      "self.env['shopify.connector.job']", 1),
     ('shopify_connector_setup_wizard.py', '_last_readiness_checks',
@@ -322,6 +325,12 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      '_mark_setup_readiness_stale'): 'S1 readiness-staleness stamp.',
     ('shopify_connector_store_settings.py',
      '_clear_setup_readiness_stale'): 'S1 readiness-staleness clear.',
+    ('shopify_connector_store_settings.py',
+     '_ensure_canonical_settings_rows'): (
+        'Batch 2 canonical Store Settings row ensure. Elevated only to create '
+        'the structural settings row for store ids the caller already '
+        'resolved in its own environment; never used to discover a store.'
+    ),
     ('shopify_connector_setup_wizard.py',
      '_last_readiness_checks'): 'S1 per-check readiness evidence read.',
     ('shopify_connector_setup_wizard.py',

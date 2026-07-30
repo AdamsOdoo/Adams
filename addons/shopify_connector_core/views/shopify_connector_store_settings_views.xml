@@ -25,7 +25,18 @@
 
     <record id="view_shopify_connector_store_settings_canonical_list"
             model="ir.ui.view">
-        <field name="name">shopify.connector.store.settings.canonical.list</field>
+        <!--
+            NAME, NOT JUST LABEL. `default_view()` orders by
+            `priority,name,id`, and `shopify_connector_product_export`'s
+            binding test pins which view an UNBOUND action would fall back to,
+            as its proof that binding is load-bearing. A name sorting before
+            `...fulfillment.list` would silently become that fallback and
+            break another module's evidence about its own action. `store`
+            sorts after both existing lists, so the recorded ordering is
+            unchanged — and it describes this surface better than internal
+            jargon would.
+        -->
+        <field name="name">shopify.connector.store.settings.store.list</field>
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
             <!--
@@ -49,7 +60,7 @@
 
     <record id="view_shopify_connector_store_settings_canonical_form"
             model="ir.ui.view">
-        <field name="name">shopify.connector.store.settings.canonical.form</field>
+        <field name="name">shopify.connector.store.settings.store.form</field>
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
             <form string="Store Settings" create="false" delete="false">
@@ -116,7 +127,7 @@
 
     <record id="view_shopify_connector_store_settings_canonical_search"
             model="ir.ui.view">
-        <field name="name">shopify.connector.store.settings.canonical.search</field>
+        <field name="name">shopify.connector.store.settings.store.search</field>
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
             <search string="Store Settings">
