@@ -382,7 +382,102 @@ class ShopifyConnectorFirstPushWithdrawWizard(models.TransientModel):
             self.binding_id,
             self.reason,
             confirmed=self.confirmed,
-            expected_state=self.expected_state or None,
+            # NOT `or None`. That turned a wizard which failed to snapshot into
+            # one that silently skipped the staleness check -- the exact
+            # protection this field exists to provide. An empty snapshot is a
+            # broken dialog and must be refused by the service, not excused
+            # here.
+            expected_state=self.expected_state,
+        )
+        return {'type': 'ir.actions.act_window_close'}
+
+
+class ShopifyConnectorLocationWithdrawAllWizard(models.TransientModel):
+    """Display-and-delegate for the mapping-level first-push withdrawal.
+
+    Holds no authority of its own. Every value on it is rendered from
+    `first_push_withdrawal_preview`, which re-establishes the Administrator
+    role, the record access and the company as the CALLING user before it
+    discloses a single count -- so this transient cannot become an enumeration
+    surface for a mapping its opener may not act on.
+
+    The signature it snapshots is the whole staleness protection: it is computed
+    from the exact pairs and states the operator is looking at, and the service
+    refuses the withdrawal if anything about them has moved. Two administrators
+    who open the dialog at once therefore cannot both apply a decision made
+    against different information -- the second one is refused and told to
+    reopen.
+    """
+
+    _name = 'shopify.connector.location.withdraw.all.wizard'
+    _description = 'Shopify Connector Location First-Push Withdrawal'
+
+    mapping_id = fields.Many2one(
+        comodel_name='shopify.connector.location.mapping',
+        required=True,
+        readonly=True,
+    )
+    shopify_location = fields.Char(readonly=True)
+    odoo_location = fields.Char(readonly=True)
+    total_pairs = fields.Integer(readonly=True)
+    affected_pairs = fields.Integer(readonly=True)
+    previewed_pairs = fields.Integer(readonly=True)
+    confirmed_pairs = fields.Integer(readonly=True)
+    # How many of the affected pairs have a quantity live on Shopify right now.
+    # The precise remote-inventory consequence, as a number rather than a
+    # sentence: withdrawing changes nothing on the storefront, and an operator
+    # deciding otherwise needs to know exactly how much is still out there.
+    pairs_live_on_shopify = fields.Integer(readonly=True)
+    # The state the dialog OPENED against. Sent back and required; the service
+    # refuses if any pair was added, removed, previewed or confirmed meanwhile.
+    expected_signature = fields.Char(readonly=True)
+    reason = fields.Char(
+        required=True,
+        help='Why every first-push decision for this Shopify location is '
+             'being withdrawn. Recorded on the connector audit trail.',
+    )
+    confirmed = fields.Boolean(
+        string='I understand what this changes',
+        help='Every affected pair returns to Pending: no stock can be pushed '
+             'for any of them until each is previewed and confirmed again. '
+             'Nothing is changed or removed on Shopify.',
+    )
+
+    @api.model
+    def default_get(self, fields_list):
+        values = super().default_get(fields_list)
+        if self.env.context.get('active_model') != (
+            'shopify.connector.location.mapping'
+        ):
+            return values
+        mapping = self.env['shopify.connector.location.mapping'].browse(
+            self.env.context.get('active_id'),
+        )
+        preview = self.env[
+            'shopify.connector.inventory.service'
+        ].first_push_withdrawal_preview(mapping)
+        values.update({
+            'mapping_id': mapping.id,
+            'shopify_location': preview['shopify_location'],
+            'odoo_location': preview['odoo_location'],
+            'total_pairs': preview['total_pairs'],
+            'affected_pairs': preview['affected_pairs'],
+            'previewed_pairs': preview['previewed_pairs'],
+            'confirmed_pairs': preview['confirmed_pairs'],
+            'pairs_live_on_shopify': preview['pairs_live_on_shopify'],
+            'expected_signature': preview['signature'],
+        })
+        return values
+
+    def action_confirm(self):
+        self.ensure_one()
+        self.env[
+            'shopify.connector.inventory.service'
+        ].withdraw_first_push_decisions_for_mapping(
+            self.mapping_id,
+            self.reason,
+            confirmed=self.confirmed,
+            expected_signature=self.expected_signature,
         )
         return {'type': 'ir.actions.act_window_close'}
 

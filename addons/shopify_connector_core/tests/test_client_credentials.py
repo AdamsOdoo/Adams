@@ -884,3 +884,188 @@ class TestVulnerableCacheUpgrade(ClientCredentialsCase):
             'the upgrade changed the configured credential; it may only '
             'remove unprovable cached tokens',
         )
+
+
+@tagged('post_install', '-at_install')
+class TestCacheProvenanceRefusals(ClientCredentialsCase):
+    """Every way a cached token can stop being provable, refused at the READ.
+
+    The write path is what the concurrency proofs cover. This class covers the
+    other half of the invariant, and it is the half that has to hold even if a
+    write path were ever to slip: `_get_access_token` must refuse a row whose
+    provenance no longer holds, so an obsolete token is unusable rather than
+    merely unlikely.
+
+    Every case mutates the COMMITTED state directly and then asks the production
+    accessor, so what is asserted is the predicate rather than the bookkeeping
+    that normally maintains it.
+    """
+
+    def _mint(self):
+        self._set_client_credentials()
+        with patch.object(
+            type(self.Client), '_send_token_exchange',
+            return_value=_token_response(),
+        ):
+            self.Credential._ensure_access_token(self.store, purpose='setup')
+        cached = self._cached()
+        self.assertTrue(cached)
+        self.assertEqual(
+            self.Credential._get_access_token(self.store),
+            DUMMY_EXCHANGED_TOKEN,
+            'the fixture must start from a SERVED token, or every refusal '
+            'below passes for the wrong reason',
+        )
+        return cached
+
+    def _sql(self, statement, params):
+        """Mutate committed state behind the ORM, then re-read as production."""
+        self.env.cr.execute(statement, params)
+        self.env['shopify.connector.store.access.token'].invalidate_model()
+        self.Credential.invalidate_model()
+
+    def test_a_stale_credential_epoch_is_refused(self):
+        cached = self._mint()
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            'SET credential_epoch = credential_epoch - 1 WHERE id = %s',
+            (cached.id,),
+        )
+        self.assertFalse(
+            self.Credential._get_access_token(self.store),
+            'a token minted from a superseded identity was served',
+        )
+        self.assertEqual(
+            self.Credential._committed_token_remaining_seconds(self.store), 0,
+            'the refresh decision and the read must agree; a row the reader '
+            'refuses must not look valid to the refresher',
+        )
+
+    def test_a_wrong_auth_mode_on_the_cache_row_is_refused(self):
+        cached = self._mint()
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            "SET auth_mode = 'offline_access_token' WHERE id = %s",
+            (cached.id,),
+        )
+        self.assertFalse(self.Credential._get_access_token(self.store))
+
+    def test_a_credential_switched_to_offline_refuses_its_old_token(self):
+        self._mint()
+        credential = self.Credential._credential_for(self.store)
+        self._sql(
+            'UPDATE shopify_connector_store_credential '
+            "SET auth_mode = 'offline_access_token' WHERE id = %s",
+            (credential.id,),
+        )
+        # `_get_access_token` now takes the offline branch and finds no stored
+        # token, which is the correct fail-closed answer either way.
+        self.assertFalse(self.Credential._get_access_token(self.store))
+
+    def test_an_invalid_or_absent_credential_state_is_refused(self):
+        cached = self._mint()
+        credential = self.Credential._credential_for(self.store)
+        for state in ('invalid', 'absent'):
+            self._sql(
+                'UPDATE shopify_connector_store_credential '
+                'SET credential_state = %s WHERE id = %s',
+                (state, credential.id),
+            )
+            self.assertFalse(
+                self.Credential._get_access_token(self.store),
+                'a token was served for a %r credential' % (state,),
+            )
+        self.assertTrue(cached.exists())
+
+    def test_an_emptied_client_pair_refuses_the_token_it_minted(self):
+        self._mint()
+        credential = self.Credential._credential_for(self.store)
+        self._sql(
+            'UPDATE shopify_connector_store_credential '
+            'SET client_secret = NULL WHERE id = %s',
+            (credential.id,),
+        )
+        self.assertFalse(self.Credential._get_access_token(self.store))
+
+    def test_a_quarantined_cache_row_never_authenticates(self):
+        """SEC-3's quarantine holds on the raw-SQL path too.
+
+        The record rules hide a quarantined row from every ORM reader, and this
+        read is deliberately raw SQL (it must see a side transaction's commit),
+        so the rule does not apply to it. The predicate carries the exclusion
+        itself -- otherwise the one path that authenticates would be the one
+        path quarantine does not reach.
+        """
+        cached = self._mint()
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            'SET sec3_scope_quarantined = TRUE WHERE id = %s',
+            (cached.id,),
+        )
+        self.assertFalse(
+            self.Credential._get_access_token(self.store),
+            'a quarantined cache row authenticated a Shopify call',
+        )
+
+    def test_a_cross_store_cache_row_never_authenticates(self):
+        """A row whose credential belongs to ANOTHER store is refused."""
+        cached = self._mint()
+        other_store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Cache provenance other store',
+            'shop_domain': 'cache-provenance-other.myshopify.com',
+            'api_version': self.store.api_version,
+        })
+        other_credential = self.Credential.sudo()._credential_surface(
+            '_mutate_token',
+        ).create({
+            'store_id': other_store.id,
+            'auth_mode': credential_module.AUTH_MODE_CLIENT_CREDENTIALS,
+            'client_id': 'other-client-id',
+            'client_secret': 'other-client-secret',
+            'client_credentials_present': True,
+            'credential_state': 'present',
+            'credential_epoch': self._cached().credential_epoch,
+        })
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            'SET credential_id = %s WHERE id = %s',
+            (other_credential.id, cached.id),
+        )
+        self.assertFalse(
+            self.Credential._get_access_token(self.store),
+            "a token vouched for by another store's credential was served",
+        )
+
+    def test_a_cross_company_cache_row_never_authenticates(self):
+        cached = self._mint()
+        company_b = self.env['res.company'].sudo().create({
+            'name': 'Cache provenance company B',
+        })
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            'SET company_id = %s WHERE id = %s',
+            (company_b.id, cached.id),
+        )
+        self.assertFalse(
+            self.Credential._get_access_token(self.store),
+            'a cache row disagreeing with its store about the company was '
+            'served',
+        )
+
+    def test_an_expired_row_is_refused(self):
+        cached = self._mint()
+        self._sql(
+            'UPDATE shopify_connector_store_access_token '
+            "SET expires_at = now() - interval '1 minute' WHERE id = %s",
+            (cached.id,),
+        )
+        self.assertFalse(self.Credential._get_access_token(self.store))
+
+    def test_no_group_reads_the_cache_even_when_it_is_provable(self):
+        """The token stays unreachable over RPC in the healthy case too."""
+        self._mint()
+        Cache = self.env['shopify.connector.store.access.token']
+        with self.assertRaises(AccessError):
+            Cache.with_user(self.user_admin).search([])
+        with self.assertRaises(AccessError):
+            Cache.with_user(self.user_admin).search_count([])

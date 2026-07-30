@@ -324,4 +324,83 @@
         <field name="view_mode">form</field>
         <field name="target">new</field>
     </record>
+
+        <!-- Wave 5 / Batch 1 correction: the mapping-level first-push
+             withdrawal. The single-pair route stays for focused recovery; this
+             is the route for the case TD-020 was raised about, where a
+             warehouse moved and every pair under one Shopify location has to
+             return to Pending before the remap guard will allow a re-point. -->
+        <record id="view_shopify_connector_location_withdraw_all_wizard_form"
+                model="ir.ui.view">
+            <field name="name">shopify.connector.location.withdraw.all.wizard.form</field>
+            <field name="model">shopify.connector.location.withdraw.all.wizard</field>
+            <field name="arch" type="xml">
+                <form string="Withdraw every first-push decision for this location"
+                      role="dialog" aria-modal="true">
+                    <div class="alert alert-warning" role="alert">
+                        <strong>This withdraws the first-push decision of every
+                        pair under this Shopify location.</strong>
+                        Each affected pair returns to Pending: no stock can be
+                        pushed for it until a new preview is run and explicitly
+                        confirmed, and the old confirmation is never reused.
+                        Administrator only, and the reason below is recorded on
+                        the audit trail against this location and against every
+                        pair it touches.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="not pairs_live_on_shopify">
+                        <strong>Shopify is not changed by this.</strong>
+                        <field name="pairs_live_on_shopify" readonly="1"
+                               class="oe_inline"/> of the affected pairs have a
+                        quantity this connector pushed that is live on the
+                        storefront right now. Those quantities STAY as they are
+                        until a new first push is previewed, confirmed and
+                        applied. Nothing here removes or zeroes them, and no
+                        Shopify request is made.
+                    </div>
+                    <div class="alert alert-info" role="status">
+                        Once every pair of this Shopify location is back to
+                        Pending, the Administrator remap on its location mapping
+                        becomes possible. The remap guard itself is unchanged:
+                        this is the governed route to the state it requires, not
+                        a way around it.
+                    </div>
+                    <group>
+                        <group string="Location">
+                            <field name="mapping_id" invisible="1"/>
+                            <field name="expected_signature" invisible="1"/>
+                            <field name="shopify_location" readonly="1"/>
+                            <field name="odoo_location" readonly="1"/>
+                        </group>
+                        <group string="Pairs affected">
+                            <field name="total_pairs" readonly="1"/>
+                            <field name="affected_pairs" readonly="1"/>
+                            <field name="previewed_pairs" readonly="1"/>
+                            <field name="confirmed_pairs" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="reason"
+                               placeholder="Why is every first-push decision for this location being withdrawn?"/>
+                        <field name="confirmed"/>
+                    </group>
+                    <footer>
+                        <button name="action_confirm" type="object"
+                                string="Withdraw all first-push decisions"
+                                class="btn-primary" data-hotkey="q"/>
+                        <button string="Cancel" class="btn-secondary"
+                                special="cancel" data-hotkey="x"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <record id="action_shopify_connector_location_withdraw_all_wizard"
+                model="ir.actions.act_window">
+            <field name="name">Withdraw every first-push decision</field>
+            <field name="res_model">shopify.connector.location.withdraw.all.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
 </odoo>

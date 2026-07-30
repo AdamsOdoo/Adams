@@ -129,6 +129,19 @@
                             type="action" string="Remap"
                             groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
+                        The route TO a remappable state, beside the remap
+                        itself, because that is where an operator meets the
+                        refusal. Withdrawing pair by pair is correct for one
+                        pair and a dead end for a moved warehouse: one dialog,
+                        one reason and one confirmation per product variant,
+                        with no atomicity, so an interruption left the location
+                        half withdrawn and still un-remappable. Administrator
+                        only, exactly like the remap it prepares for.
+                    -->
+                    <button name="%(action_shopify_connector_location_withdraw_all_wizard)d"
+                            type="action" string="Withdraw First Pushes"
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    <!--
                         Refresh, on the form as well as on the menu, because
                         an operator who has just discovered a mapping is
                         stale is already here.

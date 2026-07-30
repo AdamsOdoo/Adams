@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from lxml import etree
 
 from odoo import fields
@@ -1182,3 +1184,273 @@ class TestFirstPushWithdrawal(TransactionCase):
         wizard.action_confirm()
         binding.invalidate_recordset()
         self.assertEqual(binding.first_push_state, 'pending')
+
+
+# Issue #193 / #157 -- Odoo 19 test-phase contract; see the note at the top.
+@tagged('post_install', '-at_install')
+class TestMappingLevelFirstPushWithdrawal(TestFirstPushWithdrawal):
+    """TD-020's operability half: the whole location, in one governed decision.
+
+    The single-pair route closed the DECISION dead end. It left an operational
+    one: `_assert_remap_is_safe` scans every pair under a Shopify location, so a
+    moved warehouse needed every one of them back to `pending` before the remap
+    would be allowed -- one dialog, one typed reason and one confirmation per
+    product variant, with no atomicity, so an interruption left the location
+    half withdrawn and still un-remappable.
+
+    Everything the single-pair route refuses, this refuses too. Nothing here
+    weakens the remap guard: it is the governed route TO the state that guard
+    requires.
+    """
+
+    def _pairs(self, count, first_push_state='confirmed', pushed=False):
+        bindings = self.env['shopify.connector.inventory.level.binding']
+        for index in range(count):
+            binding = self._pair(
+                first_push_state=first_push_state,
+            )
+            if pushed:
+                binding.sudo().write({
+                    'last_pushed_available': 3.0,
+                    'last_pushed_at': fields.Datetime.now(),
+                })
+            bindings |= binding
+        return bindings
+
+    def _preview(self, user=None):
+        return self.Service.with_user(
+            user or self.user_admin
+        ).first_push_withdrawal_preview(self.mapping)
+
+    def _withdraw_all(self, user=None, reason='Warehouse physically moved',
+                      confirmed=True, signature='__current__'):
+        if signature == '__current__':
+            signature = self._preview()['signature']
+        return self.Service.with_user(
+            user or self.user_admin
+        ).withdraw_first_push_decisions_for_mapping(
+            self.mapping, reason, confirmed=confirmed,
+            expected_signature=signature,
+        )
+
+    def test_every_pair_under_the_location_returns_to_pending_at_once(self):
+        bindings = self._pairs(5)
+        withdrawn = self._withdraw_all()
+        self.assertEqual(withdrawn, 5)
+        bindings.invalidate_recordset()
+        for binding in bindings:
+            self.assertEqual(binding.first_push_state, 'pending')
+            self.assertFalse(binding.first_push_preview_qty)
+            self.assertFalse(binding.first_push_confirmed_at)
+            self.assertFalse(binding.first_push_confirmed_by_uid)
+
+    def test_it_is_all_or_nothing(self):
+        """One unsafe pair refuses the WHOLE withdrawal, not just itself.
+
+        A partially withdrawn location is the state that makes the remap guard
+        look broken to the operator: some pairs pending, some not, the remap
+        still refused, and no single dialog to blame.
+        """
+        bindings = self._pairs(4)
+        blocked = bindings[2]
+        blocked.sudo().write({'status': 'review'})
+        with self.assertRaises(UserError):
+            self._withdraw_all()
+        bindings.invalidate_recordset()
+        self.assertEqual(
+            set(bindings.mapped('first_push_state')), {'confirmed'},
+            'a refusal must leave every pair exactly as it was',
+        )
+
+    def test_a_stale_dialog_loses(self):
+        """Two administrators, two snapshots: the second one is refused."""
+        bindings = self._pairs(3)
+        first_signature = self._preview()['signature']
+        # A second operator withdraws one pair through the single-pair route.
+        self._withdraw(bindings[0])
+        with self.assertRaises(UserError):
+            self._withdraw_all(signature=first_signature)
+        bindings.invalidate_recordset()
+        self.assertEqual(
+            bindings[1].first_push_state, 'confirmed',
+            'the stale bulk withdrawal must have changed nothing',
+        )
+        # Reopening the dialog against current state works.
+        self.assertEqual(self._withdraw_all(), 2)
+
+    def test_a_pair_appearing_after_the_dialog_opened_is_a_staleness(self):
+        """Not just changed states: a pair ADDED changes what was confirmed."""
+        self._pairs(2)
+        signature = self._preview()['signature']
+        self._pair(first_push_state='confirmed')
+        with self.assertRaises(UserError):
+            self._withdraw_all(signature=signature)
+
+    def test_the_signature_is_mandatory(self):
+        self._pairs(2)
+        for bad in (None, '', False):
+            with self.assertRaises(UserError):
+                self._withdraw_all(signature=bad)
+
+    def test_confirmation_and_reason_are_mandatory(self):
+        self._pairs(2)
+        with self.assertRaises(UserError):
+            self._withdraw_all(confirmed=False)
+        with self.assertRaises(UserError):
+            self._withdraw_all(reason='   ')
+
+    def test_only_an_administrator_may_do_it(self):
+        self._pairs(2)
+        with self.assertRaises(AccessError):
+            self._withdraw_all(user=self.user_reviewer)
+        # And the preview discloses nothing to them either -- a count is
+        # information about a store they may not act on.
+        with self.assertRaises(AccessError):
+            self._preview(user=self.user_reviewer)
+
+    def test_the_preview_discloses_the_remote_consequence_precisely(self):
+        pushed = self._pairs(2, pushed=True)
+        self._pairs(1, first_push_state='previewed')
+        self._pairs(1, first_push_state='pending')
+        preview = self._preview()
+        self.assertEqual(preview['total_pairs'], 4)
+        self.assertEqual(preview['affected_pairs'], 3)
+        self.assertEqual(preview['confirmed_pairs'], 2)
+        self.assertEqual(preview['previewed_pairs'], 1)
+        self.assertEqual(
+            preview['pairs_live_on_shopify'], len(pushed),
+            'the operator must be told exactly how many quantities stay live',
+        )
+        self.assertEqual(preview['mapping_id'], self.mapping.id)
+
+    def test_it_unblocks_the_remap_and_leaves_the_guard_intact(self):
+        bindings = self._pairs(3)
+        # The guard refuses while any pair holds a decision.
+        with self.assertRaises(UserError):
+            self.Service.with_user(self.user_admin).remap_location_mapping(
+                self.mapping, self.location_b, reason='Moved', confirmed=True,
+            )
+        self._withdraw_all()
+        self.Service.with_user(self.user_admin).remap_location_mapping(
+            self.mapping, self.location_b, reason='Moved', confirmed=True,
+        )
+        self.mapping.invalidate_recordset()
+        self.assertEqual(self.mapping.odoo_location_id, self.location_b)
+        # And the guard is still a guard: a fresh decision re-blocks it.
+        bindings[0].sudo().write({'first_push_state': 'confirmed'})
+        with self.assertRaises(UserError):
+            self.Service.with_user(self.user_admin).remap_location_mapping(
+                self.mapping, self.location_a, reason='Again', confirmed=True,
+            )
+
+    def test_the_old_confirmation_is_never_reused(self):
+        bindings = self._pairs(2)
+        self._withdraw_all()
+        bindings.invalidate_recordset()
+        for binding in bindings:
+            self.assertFalse(binding.first_push_confirmed_at)
+            self.assertFalse(binding.first_push_confirmed_by_uid)
+            self.assertFalse(binding.first_push_preview_qty)
+
+    def test_it_makes_no_shopify_call(self):
+        self._pairs(3)
+        Client = type(self.env['shopify.connector.api.client'])
+
+        def refuse(_self, *args, **kwargs):
+            raise AssertionError('the bulk withdrawal contacted Shopify')
+
+        with patch.object(Client, '_send', refuse), \
+             patch.object(Client, '_send_lifecycle', refuse):
+            self._withdraw_all()
+
+    def test_the_audit_trail_records_the_location_and_every_pair(self):
+        bindings = self._pairs(3)
+        before = self.env['shopify.connector.job.log'].sudo().search_count([])
+        self._withdraw_all(reason='Warehouse moved to Leeds')
+        logs = self.env['shopify.connector.job.log'].sudo().search([])
+        messages = ' | '.join(logs.mapped('message'))
+        self.assertGreater(len(logs), before)
+        self.assertIn('Warehouse moved to Leeds', messages)
+        # One record of the decision itself...
+        self.assertIn('First-push decisions withdrawn for Shopify location',
+                      messages)
+        # ...and one per pair, so the set acted on can be reconstructed.
+        for binding in bindings:
+            self.assertIn('inventory pair #%d' % binding.id, messages)
+
+    def test_a_foreign_company_administrator_is_refused(self):
+        self._pairs(2)
+        company_b = self.env['res.company'].sudo().create({
+            'name': 'Withdrawal foreign company',
+        })
+        foreign = self.env['res.users'].create({
+            'name': 'Foreign withdrawal admin',
+            'login': 'foreign_withdrawal_admin',
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
+        foreign.sudo().write({
+            'company_id': company_b.id, 'company_ids': [(6, 0, [company_b.id])],
+        })
+        # Written by hand rather than with a tuple: Odoo's `TransactionCase`
+        # override of `assertRaises` inspects its argument with `issubclass`,
+        # which a tuple is not. What matters is that nothing happened, not
+        # whether the record rule or the explicit company check got there first.
+        try:
+            self.Service.with_user(foreign).with_context(
+                allowed_company_ids=[company_b.id],
+            ).first_push_withdrawal_preview(self.mapping)
+        except (AccessError, UserError):
+            pass
+        else:
+            raise AssertionError(
+                'an administrator of another company previewed this store'
+            )
+
+    def test_the_single_pair_route_now_requires_the_expected_state(self):
+        """§11: mandatory at every public boundary, not merely available.
+
+        It was optional, and the wizard passed `self.expected_state or None` --
+        so a dialog that failed to snapshot silently disabled the protection it
+        exists to provide.
+        """
+        binding = self._pair(first_push_state='confirmed')
+        with self.assertRaises(UserError):
+            self.Service.with_user(
+                self.user_admin
+            ).withdraw_first_push_decision(
+                binding, 'No snapshot', confirmed=True,
+            )
+        with self.assertRaises(UserError):
+            self.Service.with_user(
+                self.user_admin
+            ).withdraw_first_push_decision(
+                binding, 'Empty snapshot', confirmed=True, expected_state='',
+            )
+        binding.invalidate_recordset()
+        self.assertEqual(binding.first_push_state, 'confirmed')
+
+    def test_the_wizard_delegates_with_the_snapshotted_signature(self):
+        self._pairs(2)
+        wizard = self.env[
+            'shopify.connector.location.withdraw.all.wizard'
+        ].with_user(self.user_admin).with_context(
+            active_model='shopify.connector.location.mapping',
+            active_id=self.mapping.id,
+        ).create({
+            'reason': 'Wizard route works',
+            'confirmed': True,
+        })
+        self.assertEqual(wizard.affected_pairs, 2)
+        self.assertTrue(wizard.expected_signature)
+        wizard.action_confirm()
+        self.assertEqual(
+            set(self.Service._first_push_bindings_of(
+                self.mapping,
+            ).mapped('first_push_state')),
+            {'pending'},
+        )

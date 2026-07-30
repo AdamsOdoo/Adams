@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import uuid
@@ -2615,6 +2616,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
 
     def withdraw_first_push_decision(
         self, binding, reason, confirmed=False, expected_state=None,
+        _locked_state_proof=None,
     ):
         """Withdraw a pair's previewed/confirmed first-push decision (TD-020).
 
@@ -2695,7 +2697,22 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         row = self.env.cr.fetchone()
         binding.invalidate_recordset(['first_push_state'])
         locked_state = row[0] if row else False
-        if expected_state is not None and locked_state != expected_state:
+        # `expected_state` is MANDATORY at every public boundary (Batch 1
+        # correction). It was optional, and the UI wizard passed
+        # `self.expected_state or None` -- so an empty string silently disabled
+        # the staleness check and a stale dialog could win a race it must lose.
+        # Only an internal caller that already holds the row lock and has
+        # compared the state itself may omit it, and it must say so explicitly
+        # by passing its own locked-state proof rather than by passing nothing.
+        if expected_state is None and _locked_state_proof is None:
+            raise UserError(
+                "Withdrawing a first-push decision requires the state the "
+                "dialog was opened against, so a decision made against stale "
+                "information cannot be applied."
+            )
+        if expected_state is None:
+            expected_state = _locked_state_proof
+        if locked_state != expected_state:
             raise UserError(
                 "This pair's first-push state changed while the dialog was "
                 "open (it is now '%s'). Nothing was withdrawn; reopen the "
@@ -2733,6 +2750,224 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         )
         self._mark_location_readiness_stale(store)
         return True
+
+    def first_push_withdrawal_preview(self, mapping):
+        """What withdrawing this Shopify location's first-push decisions costs.
+
+        Read-only, and the ONLY source the confirmation dialog renders from, so
+        the counts an operator confirms against and the rows the withdrawal acts
+        on are computed by one method. It returns a `signature` describing the
+        exact mapping/binding state it observed; the withdrawal requires that
+        signature back and refuses if anything moved meanwhile.
+
+        Administrator-only and store/company-structural, like every other
+        location action here -- a preview that disclosed pair counts to a caller
+        who may not act on them would be an enumeration surface.
+        """
+        mapping.ensure_one()
+        mapping = mapping.with_env(self.env)
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Administrator may withdraw a "
+                "location's first-push decisions."
+            )
+        try:
+            mapping.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError("This location mapping is not available.")
+        self._resolve_store_for_location_action(mapping.store_id.id)
+        bindings = self._first_push_bindings_of(mapping)
+        affected = bindings.filtered(
+            lambda b: b.first_push_state in ('previewed', 'confirmed')
+        )
+        pushed = affected.filtered(lambda b: b.last_pushed_at)
+        return {
+            'mapping_id': mapping.id,
+            'shopify_location': (
+                mapping.shopify_location_name_snapshot or mapping.shopify_gid
+            ),
+            'odoo_location': mapping.odoo_location_id.display_name,
+            'total_pairs': len(bindings),
+            'affected_pairs': len(affected),
+            'previewed_pairs': len(affected.filtered(
+                lambda b: b.first_push_state == 'previewed'
+            )),
+            'confirmed_pairs': len(affected.filtered(
+                lambda b: b.first_push_state == 'confirmed'
+            )),
+            'pairs_live_on_shopify': len(pushed),
+            'signature': self._first_push_withdrawal_signature(bindings),
+        }
+
+    @api.model
+    def _first_push_bindings_of(self, mapping):
+        """Every inventory pair under one Shopify location mapping, id-ordered.
+
+        `order='id asc'` is not cosmetic: it is the deterministic lock order the
+        bulk withdrawal takes its row locks in, so two administrators acting on
+        overlapping mappings queue behind one another instead of deadlocking.
+        """
+        return self.env[
+            'shopify.connector.inventory.level.binding'
+        ].sudo().search(
+            [('location_mapping_id', '=', mapping.id)], order='id asc',
+        )
+
+    @api.model
+    def _first_push_withdrawal_signature(self, bindings):
+        """A compact description of the exact state a decision was made against.
+
+        `expected_state` on the single-pair route is one value; a mapping-level
+        withdrawal spans many pairs, and "nothing moved" has to mean nothing
+        moved about ANY of them -- a pair added, removed, previewed or confirmed
+        between the dialog opening and the operator confirming all change what
+        the confirmation means. Hashed rather than listed so the token stays one
+        short field, and non-secret: it describes states, not data.
+        """
+        material = ';'.join(
+            '%d:%s:%s' % (
+                binding.id, binding.first_push_state,
+                '1' if binding.last_pushed_at else '0',
+            )
+            for binding in bindings
+        )
+        return hashlib.sha256(material.encode()).hexdigest()[:32]
+
+    def withdraw_first_push_decisions_for_mapping(
+        self, mapping, reason, confirmed=False, expected_signature=None,
+    ):
+        """Withdraw EVERY first-push decision under one Shopify location.
+
+        WHY THIS EXISTS BESIDE THE SINGLE-PAIR ROUTE (Batch 1 correction). The
+        single-pair withdrawal is the right instrument for focused recovery, and
+        it is the wrong one for the case TD-020 was actually raised about: a
+        merchant who physically moved a warehouse must clear EVERY pair under
+        that Shopify location before `_assert_remap_is_safe` will let them
+        re-point it, because that guard scans all of them. With one pair per
+        product variant, "withdraw them all" meant opening a dialog, typing a
+        reason and confirming a consequence once per variant -- hundreds of
+        times, with no atomicity, so an interruption left the location half
+        withdrawn and still un-remappable. That is a dead end with extra steps.
+
+        WHAT IT IS NOT. It is not a bulk action over arbitrary records: it takes
+        ONE mapping, never a recordset the caller assembled, so there is no
+        cross-mapping or cross-store selection to smuggle. It needs no developer
+        mode. It performs ZERO Shopify mutations -- nothing here contacts
+        Shopify, and the quantity already on the storefront is untouched, which
+        the dialog states. It does not weaken `_assert_remap_is_safe`: that
+        guard is unchanged and still refuses a remap until every pair is
+        `pending`; this is the governed route TO that state, not around it.
+
+        ATOMICITY is the transaction's, and deliberately so. Every safety check
+        runs against every affected pair BEFORE anything is written, and any
+        refusal raises -- so either all eligible pairs return to `pending` or
+        none do. A partially withdrawn location is exactly the state that makes
+        the remap guard look broken to the operator.
+
+        THE OLD CONFIRMATION IS NEVER REUSED. Each pair returns to `pending`
+        with its preview quantity, confirmation stamp and confirming user
+        cleared, so D-013-4's untouched gate forces the complete preview and
+        confirm ceremony again before any push.
+        """
+        mapping.ensure_one()
+        # Authorization, company and store, re-established as the CALLER --
+        # never trusting the environment a recordset arrived with.
+        preview = self.first_push_withdrawal_preview(mapping)
+        mapping = mapping.with_env(self.env)
+        if not confirmed:
+            raise UserError(
+                "Withdrawing this location's first-push decisions means no "
+                "stock can be pushed for any of its pairs until each is "
+                "previewed and confirmed again. Confirm that explicitly."
+            )
+        if not isinstance(reason, str) or not reason.strip():
+            raise UserError("A non-empty withdrawal reason is required.")
+        if not expected_signature:
+            raise UserError(
+                "Withdrawing this location's first-push decisions requires the "
+                "state the dialog was opened against, so a decision made "
+                "against stale information cannot be applied."
+            )
+        store = self._resolve_store_for_location_action(mapping.store_id.id)
+        # Lock the mapping first, then its pairs in ascending id order. Two
+        # administrators acting at once therefore queue rather than deadlock,
+        # and the states compared below cannot move under us.
+        mapping.flush_recordset()
+        self.env.cr.execute(
+            'SELECT id FROM shopify_connector_location_mapping '
+            'WHERE id = %s FOR UPDATE',
+            (mapping.id,),
+        )
+        if not self.env.cr.fetchone():
+            raise UserError("This location mapping is not available.")
+        bindings = self._first_push_bindings_of(mapping)
+        if bindings:
+            bindings.flush_recordset()
+            self.env.cr.execute(
+                'SELECT id FROM shopify_connector_inventory_level_binding '
+                'WHERE id IN %s ORDER BY id FOR UPDATE',
+                (tuple(bindings.ids),),
+            )
+            bindings.invalidate_recordset(['first_push_state'])
+            bindings = self._first_push_bindings_of(mapping)
+        # Staleness, under the locks. Not optional, and not a subset check: a
+        # pair added or removed since the dialog opened changes what the
+        # operator confirmed just as much as one whose state moved.
+        if self._first_push_withdrawal_signature(bindings) != expected_signature:
+            raise UserError(
+                "This location's pairs changed while the dialog was open. "
+                "Nothing was withdrawn; reopen it and decide against the "
+                "current state."
+            )
+        affected = bindings.filtered(
+            lambda b: b.first_push_state in ('previewed', 'confirmed')
+        )
+        if not affected:
+            raise UserError(
+                "This location has no previewed or confirmed first-push "
+                "decision to withdraw."
+            )
+        # EVERY check, on EVERY pair, before ANY write. All or nothing.
+        for binding in affected:
+            self._assert_first_push_withdrawal_is_safe(binding)
+        safe_reason = mapping._audit_safe_reason(reason)
+        withdrawn = []
+        for binding in affected:
+            previous = binding.first_push_state
+            binding.sudo().write({
+                'first_push_state': 'pending',
+                'first_push_preview_qty': False,
+                'first_push_confirmed_at': False,
+                'first_push_confirmed_by_uid': False,
+            })
+            withdrawn.append((binding, previous))
+        # An auditable trail at BOTH levels: one record of the decision, and one
+        # per pair, so the set acted on can be reconstructed exactly rather than
+        # inferred from a count.
+        store._create_lifecycle_audit_job(
+            "First-push decisions withdrawn for Shopify location '%s' "
+            '(mapping #%d, currently mapped to %s): %d of %d pair(s) returned '
+            'to pending, %d of which have a quantity live on Shopify that is '
+            'unchanged by this. A new preview and a new explicit confirmation '
+            'are required before any push. Reason: %s' % (
+                preview['shopify_location'], mapping.id,
+                preview['odoo_location'], len(withdrawn), preview['total_pairs'],
+                preview['pairs_live_on_shopify'], safe_reason,
+            )
+        )
+        for binding, previous in withdrawn:
+            store._create_lifecycle_audit_job(
+                'First-push decision withdrawn for inventory pair #%d '
+                '(%s) as part of the location-level withdrawal of mapping '
+                '#%d: state %s returned to pending. Reason: %s' % (
+                    binding.id, binding.shopify_inventory_item_gid,
+                    mapping.id, previous, safe_reason,
+                )
+            )
+        self._mark_location_readiness_stale(store)
+        return len(withdrawn)
 
     @api.model
     def _assert_first_push_withdrawal_is_safe(self, binding):

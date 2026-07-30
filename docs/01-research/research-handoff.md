@@ -1,3 +1,85 @@
+### Batch 1 consolidated security and operability correction (2026-07-30)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `0a15b176e60b77bf2f40195a9961591c788e14f8`. **Not self-reviewed, not
+  self-accepted, not ready-marked, not merged.** All commits additive; no
+  rebase, reset, amend, squash or force-push.
+- **Authorization:** the 2026-07-30 control-room instruction "CLAUDE OPUS 5
+  ULTRACODE — PR #204 BATCH 1 CONSOLIDATED SECURITY AND OPERABILITY
+  CORRECTION", correcting an independent-review failure of the starting head.
+  **The standing branch conflict is flagged again and again not resolved
+  unilaterally:** the harness designated `claude/prompt-attached-ttzs1v` while
+  the instruction authorises `fable/wave-5-completion` (PR #204's head) and
+  forbids pushing to any `claude/**` ref. Same reasoning and same choice as the
+  four prior cycles recorded in this file and in the PR body.
+- **Identity gate, before any edit.** Repository `AdamsOdoo/Adams`; local HEAD =
+  `origin/fable/wave-5-completion` = PR #204 head = `0a15b176`; PR open, draft,
+  unmerged, **unapproved** (zero reviews); base exact and the merge base;
+  head descends from the base (0 ahead / 95 behind, additive); `50b770a3` →
+  head is exactly the three-commit Batch 1 fast-forward; worktree clean; Odoo
+  pin `30bde9ff` verified against a real checkout; repository unshallowed to
+  prove ancestry; no other repository writer.
+- **The P0, reproduced before it was changed.** The refresh performed the read,
+  the network call and the cache write in ONE side transaction under REPEATABLE
+  READ, so a rotation committing during the exchange was invisible — and with
+  the cache row absent the write was a plain INSERT that conflicted with
+  nothing. `credential_id` proved nothing because a rotation updates that row in
+  place. `test_credential_provenance_race.py` is written to run unchanged on the
+  vulnerable head: **4 of its 5 tests fail at `0a15b17` and all pass here.** The
+  fifth passes there only because a present cache row makes the ORM update hit a
+  raw serialization failure the old code swallowed — the same escape §9.3
+  closes.
+- **The correction.** A monotonic `credential_epoch` bumped exactly once per
+  sanctioned mutation in the same statement as the mutation; epoch + auth_mode
+  written onto the cache row; one shared read predicate refusing stale
+  provenance, wrong mode, absent/invalid credential, quarantine, cross-store or
+  cross-company disagreement and expiry; and the refresh split into two
+  transactions so the post-network revalidation reads a FRESH snapshot under the
+  store-then-credential locks rather than its own stale one. Lifecycle
+  eligibility by purpose (`disconnecting` in no matrix), disconnect quiescence
+  made aware of an in-flight exchange through the same advisory lock, redirect
+  refusal on the client-secret POST, 40001 normalized, and a closed
+  credential-mutation surface guarded by a non-serializable sentinel.
+- **The false evidence, measured rather than argued.** A genuine `50b770a3` →
+  candidate upgrade shows `19.0.1.16.0` running and reporting **0 row(s)** — its
+  predicate cannot be true, because `_auto_init` backfills and constrains a
+  `required=True` field before any post-migrate runs. The runner now has real
+  version-to-version passes from `50b770a3` and `0a15b176`, each with an
+  idempotency re-run, and fails a migration pass that ran no script as well as a
+  warm pass that ran one.
+- **Evidence.** Baseline at the starting head: 0 failed, 0 errors of **2189**
+  tests (fresh install + standard suite), this environment, Python 3.12.3,
+  PostgreSQL 16.13, Chromium 141.0.7390.37, Odoo pin verified. Corrected head:
+  see the closure record. Genuine migration passes: 0/0 of **2196** from each
+  origin, with the migration markers present and the second update green with
+  zero markers.
+- **Lessons for the loop.**
+  1. **A lock that is re-grantable within a session cannot prove coalescing.**
+     `pg_try_advisory_xact_lock` always succeeds for the holder, so every
+     "coalescing" test on the shared in-test connection took the leader branch
+     and the waiter branch was dead code with a green tick beside it. Concurrency
+     claims need genuine `db_connect` sessions with asserted distinct backend
+     PIDs — the repository already had that pattern, and this file did not use
+     it.
+  2. **A migration predicate that cannot be true is not a statement.** Check a
+     migration's row count in a REAL version-to-version upgrade before citing it;
+     a same-version `-u` runs no scripts at all, so "the warm pass was green" and
+     "the migration executed" are unrelated facts.
+  3. **`:contains()` is a substring match.** `Mapped` matches `Not mapped`. A
+     state assertion needs an exact selector, and a browser assertion needs its
+     database consequence asserted beside it.
+  4. **A guard that cannot observe the thing it names is worse than no guard.**
+     `document.body.innerHTML` cannot contain a value set through the `.value`
+     property, so the secret-leak assertion was vacuous for the exact mechanism
+     in its own title. Assert the positive case first (the secret DID reach the
+     intended request), or the negatives pass for the wrong reason.
+  5. **Nested TestCursors are savepoints.** Two `registry.cursor()` transactions
+     that are independent in production nest in test mode, so rolling back the
+     outer one silently discards the inner one's committed work. Production
+     correctness and test-harness correctness are two checks, not one.
+
 ### Merchant-operability closure — authentication mode + TD-020/location search (2026-07-29)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft
