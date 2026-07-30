@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.4.0',
+    'version': '19.0.2.5.0',
     'summary': (
         'Shopify customer import and matching (Task 011): read-only '
         'Shopify customer import, a customer binding model, and the '
@@ -45,6 +45,9 @@ file.
         'views/shopify_connector_order_binding_views.xml',
         'views/shopify_connector_customer_binding_views.xml',
         'views/shopify_connector_sale_menus.xml',
+        # Batch 2 checkpoint 1: the order-import section of the canonical
+        # Store Settings form, contributed by inheritance.
+        'views/shopify_connector_store_settings_sale_views.xml',
     ],
     'installable': True,
     'application': False,

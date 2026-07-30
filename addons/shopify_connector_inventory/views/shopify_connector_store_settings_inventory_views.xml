@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 1: the inventory section of the canonical Store
+        Settings form.
+
+        Two fields, and the asymmetry between them is the point.
+        `inventory_scheduled_sync_enabled` is a decision — the inventory
+        service's cron selects on it, so switching it here genuinely starts
+        and stops scheduled stock scanning. `inventory_last_push_scan_at` is
+        an observation the service writes as it runs, so it is rendered
+        read-only: it reports what happened, and typing into it would only
+        make the report wrong.
+
+        The first-push guard, location mapping and the withdrawal routes are
+        NOT here. They are decisions about specific records rather than
+        per-store configuration, and they already have their own governed
+        surfaces under the Inventory menu.
+    -->
+
+    <record id="view_shopify_connector_store_settings_canonical_form_inventory"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.canonical.form.inventory</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_settings_canonical_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Inventory" name="canonical_inventory">
+                    <group name="canonical_inventory_schedule">
+                        <field name="inventory_scheduled_sync_enabled"/>
+                        <field name="inventory_last_push_scan_at" readonly="1"/>
+                    </group>
+                    <div class="text-muted" role="note">
+                        <p>
+                            <strong>Scheduled stock sync</strong> runs only
+                            while the Inventory domain above is enabled and the
+                            store is connected. A scan enqueues work; it does
+                            not send a quantity to Shopify on its own. The
+                            first push for a location still waits for the
+                            explicit confirmation the first-push guard asks
+                            for.
+                        </p>
+                        <p>
+                            <strong>Last stock scan</strong> is written by the
+                            inventory service when a scan runs, and is shown
+                            here read-only.
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

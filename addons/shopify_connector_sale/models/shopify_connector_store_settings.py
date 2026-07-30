@@ -9,18 +9,24 @@ _logger = logging.getLogger(__name__)
 
 
 class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
-    """Adds the inert fallback-partner configuration field (D5, Posture A).
+    """Adds the fallback-partner configuration field (D5, Posture A).
 
-    Task 011 defines this field as supporting substrate only -- zero
-    order-resolution behaviour, zero consumption within Task 011's own
-    import/matching flow (see shopify_connector_customer_importer.py,
-    which never reads this field), and zero coupling to order import.
-    When and how an order routes to this partner, and the order-level
-    audit marker that decision requires, are entirely Task 012's own
-    future, separately-authorized scope. No default, no auto-creation of
-    any partner record, no constraint requiring it, no compute/onchange,
-    ordinary write path -- contributed via the core settings extension
-    seam, no shopify_connector_core file edit.
+    HISTORY, CORRECTED (Batch 2 checkpoint 1). Task 011 introduced this
+    field as supporting substrate only, and this docstring said so: "zero
+    order-resolution behaviour", never read by the customer importer. That
+    stopped being true when Task 012 landed order import.
+    `ShopifyConnectorOrderImporter._resolve_customer` now reads it directly
+    -- an order carrying no usable customer email resolves to this partner
+    with resolution `fallback`, and raises `odoo_validation_configuration`
+    when it is unset. The description is corrected here rather than left
+    standing, because the canonical Store Settings form decides whether to
+    present a field as a real setting or as inert on exactly this question,
+    and a stale comment is how it would have been presented wrongly.
+
+    Still true: no default, no auto-creation of any partner record, no
+    constraint requiring it, no compute/onchange, ordinary write path --
+    contributed via the core settings extension seam, no
+    shopify_connector_core file edit.
     """
 
     _inherit = 'shopify.connector.store.settings'

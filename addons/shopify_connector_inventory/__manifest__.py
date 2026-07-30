@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Inventory',
-    'version': '19.0.1.5.0',
+    'version': '19.0.1.6.0',
     'summary': (
         'Shopify inventory synchronization (Task 013): explicit location '
         'mapping, per-pair inventory-level bindings, first-push guard, and '
@@ -62,6 +62,9 @@ inventoryAdjustQuantities call anywhere in this module.
         'views/shopify_connector_inventory_wizard_views.xml',
         'views/shopify_connector_inventory_views.xml',
         'views/shopify_connector_inventory_menus.xml',
+        # Batch 2 checkpoint 1: the inventory section of the canonical Store
+        # Settings form, contributed by inheritance.
+        'views/shopify_connector_store_settings_inventory_views.xml',
     ],
     'installable': True,
     'application': False,

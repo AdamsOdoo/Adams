@@ -12,3 +12,6 @@ from . import test_ui_u2_action_tours
 from . import test_inventory_first_push_reachability
 from . import test_location_refresh_action
 from . import test_setup_location_step
+
+# Batch 2 checkpoint 1: canonical Store Settings classification.
+from . import test_canonical_store_settings_inventory

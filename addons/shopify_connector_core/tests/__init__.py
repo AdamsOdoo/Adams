@@ -58,3 +58,8 @@ from . import test_vocabulary_reconciliation
 # browser traversal that proves it is reachable at all.
 from . import test_setup_wizard
 from . import test_ui_setup_tours
+# Batch 2 checkpoint 1: the canonical Store Settings surface. The
+# classification helper is imported by the domain modules' own tests, so it
+# lives beside the core test that first uses it.
+from . import canonical_settings_classification
+from . import test_canonical_store_settings

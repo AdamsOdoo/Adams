@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 1: the order-import section of the canonical Store
+        Settings form.
+
+        This is the block the merchant-reachability defect was mostly about.
+        Every field here already existed, already had a production consumer,
+        and already had constraints defending it — and none of it was
+        reachable after onboarding. `order_scheduled_sync_enabled` in
+        particular had no production writer at all, so the scheduled order
+        scan could not be turned on from anywhere in the product.
+
+        `customer_fallback_partner_id` IS rendered, and is rendered as a real
+        setting rather than a deprecated one, because the production order
+        importer genuinely consumes it: `_resolve_customer` returns it with
+        resolution `fallback` for an order carrying no usable customer email,
+        and raises `odoo_validation_configuration` when it is unset. The field
+        comment left over from the task that introduced it still described it
+        as inert substrate; that description stopped being true when order
+        import began consuming it, and the comment has been corrected rather
+        than the field being hidden on the strength of it.
+    -->
+
+    <record id="view_shopify_connector_store_settings_canonical_form_sale"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.canonical.form.sale</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_settings_canonical_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Orders" name="canonical_sale">
+                    <group>
+                        <group string="Discovery" name="canonical_sale_discovery">
+                            <field name="order_scheduled_sync_enabled"/>
+                            <field name="order_import_window"/>
+                            <field name="order_import_include_test"/>
+                            <field name="sale_order_last_import_checkpoint_at"
+                                   readonly="1"/>
+                        </group>
+                        <group string="Admission policy"
+                               name="canonical_sale_policy">
+                            <field name="order_confirmation_policy"/>
+                            <field name="manual_gateway_policy"/>
+                            <field name="approved_manual_gateways"
+                                   placeholder="One approved gateway per line"/>
+                            <field name="pending_wait_expiry"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Order defaults"
+                               name="canonical_sale_defaults">
+                            <field name="order_company_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                            <field name="order_pricelist_id"/>
+                            <field name="order_sales_team_id"/>
+                            <field name="order_payment_term_id"/>
+                            <field name="customer_fallback_partner_id"/>
+                        </group>
+                    </group>
+                    <div class="text-muted" role="note">
+                        <p>
+                            <strong>Scheduled order import</strong> runs only
+                            while the Sale domain above is enabled and the
+                            store is connected. Switching it off stops new
+                            scans being admitted; it does not cancel work that
+                            has already been queued.
+                        </p>
+                        <p>
+                            <strong>Order company</strong> is shown read-only.
+                            A store belongs to exactly one company, and its
+                            orders are created in that company; re-homing a
+                            store is not a settings edit.
+                        </p>
+                        <p>
+                            <strong>Fallback customer</strong> is used when an
+                            imported order carries no usable customer email.
+                            With none set, such an order stops for review
+                            instead of being attached to a guessed contact.
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

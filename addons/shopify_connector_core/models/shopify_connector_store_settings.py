@@ -1,4 +1,22 @@
-from odoo import fields, models
+import logging
+
+from psycopg2 import IntegrityError
+
+from odoo import api, fields, models
+from odoo.exceptions import AccessError
+
+_logger = logging.getLogger(__name__)
+
+# The canonical per-store configuration surface (Batch 2 checkpoint 1).
+# Referenced by XML id rather than rebuilt as a dict so the menu, the server
+# seam and any later caller can only ever open the SAME action -- a
+# hand-rolled `{'type': 'ir.actions.act_window', ...}` would silently drift
+# from the one the menu binds, and `view_ids` is exactly what makes this
+# action resolve its own views instead of falling back to name ordering
+# across the four surfaces that now share this model.
+CANONICAL_STORE_SETTINGS_ACTION = (
+    'shopify_connector_core.action_shopify_connector_store_settings_canonical'
+)
 
 
 class ShopifyConnectorStoreSettings(models.Model):
@@ -179,3 +197,187 @@ class ShopifyConnectorStoreSettings(models.Model):
         """
         self.sudo().write({'setup_readiness_stale_since': False})
         return True
+
+    # ------------------------------------------------------------------
+    # Batch 2 checkpoint 1: readiness-relevant writes
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _readiness_relevant_fields(self):
+        """The settings fields a readiness check actually consumes.
+
+        Core declares only what CORE's readiness checks read, and it reads
+        that from the registry those checks themselves evaluate --
+        `shopify.connector.readiness.check._accepted_domain_flags()` -- rather
+        than from a second hard-coded tuple beside it. The two would drift:
+        Product Export already extends that registry with
+        `product_export_domain_enabled`, and a copy here would have gone on
+        reporting a store as freshly-checked after a merchant enabled catalog
+        export. Deriving it means "what stales readiness" and "what readiness
+        is computed over" cannot disagree by construction.
+
+        A domain module extends this the same way it extends the registry:
+        override, call `super()`, and union in ONLY the fields its own
+        readiness checks consume. It must not add a field merely because it
+        owns it -- a watermark or a display-only observation that no check
+        reads is not readiness-relevant, and adding it would make every
+        ordinary scan advance look like a configuration change.
+        """
+        return set(
+            self.env['shopify.connector.readiness.check']
+            ._accepted_domain_flags()
+        )
+
+    def _readiness_relevant_change(self, vals):
+        """The subset of `self` whose readiness-relevant values genuinely move.
+
+        A no-op write is not a configuration change. Comparing the stored
+        value against the incoming one -- rather than trusting the presence
+        of a key in `vals` -- is what keeps a form save that touched nothing,
+        or a write that re-asserts the value already there, from marking
+        perfectly good readiness evidence stale.
+        """
+        relevant = self._readiness_relevant_fields() & set(vals)
+        if not relevant:
+            return self.browse()
+
+        def _scalar(value):
+            # A Many2one may arrive as a recordset (ORM caller) or as an id
+            # (RPC/`write` from the web client); normalise both to a
+            # comparable id so neither shape reports a phantom change.
+            if isinstance(value, models.BaseModel):
+                return value.id or False
+            return value
+
+        return self.filtered(lambda record: any(
+            _scalar(record[name]) != _scalar(vals[name]) for name in relevant
+        ))
+
+    def write(self, vals):
+        """Ordinary write path, plus readiness staleness for real changes.
+
+        Deliberately NOT recursive, and deliberately without a re-entrancy
+        flag. `_mark_setup_readiness_stale()` writes `setup_readiness_stale_
+        since`, which is not a readiness-relevant field, so the nested write
+        computes an empty `changed` set and stops. The termination is a
+        property of the field partition rather than of a guard somebody has
+        to remember to keep correct.
+        """
+        changed = self._readiness_relevant_change(vals)
+        result = super().write(vals)
+        if changed:
+            changed._mark_setup_readiness_stale()
+        return result
+
+    # ------------------------------------------------------------------
+    # Batch 2 checkpoint 1: the canonical Store Settings surface
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _assert_canonical_settings_administrator(self):
+        """UI visibility is not authorization (§11.1).
+
+        The menu is Administrator-gated and the action carries `group_ids`,
+        but both are chrome: a direct RPC call to this method reaches the
+        server regardless of whether any menu was rendered. This is the
+        control.
+        """
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may open Store '
+                'Settings.'
+            )
+
+    def _ensure_canonical_settings_rows(self, stores):
+        """Ensure one settings row for stores the CALLER already reached.
+
+        The elevation here is deliberately the narrowest possible: `stores`
+        is resolved in the caller's own environment before this is called,
+        and this method never searches for a store. It takes the ids it is
+        given and creates the missing structural rows for exactly those.
+
+        WHY THAT ORDER MATTERS, PRECISELY. `sudo()` does not "keep record
+        rules running" -- Odoo's elevation bypasses them outright
+        (`odoo/orm/models.py`, `_apply_ir_rules` is skipped when `env.su`).
+        So the safety property cannot be "the rules still apply under
+        elevation"; it has to be that the authorized set is FIXED before
+        elevation begins and can only shrink afterwards. That is what the
+        caller establishes and what this signature preserves: ids in, rows
+        for those ids out, no discovery in between.
+
+        Idempotent, and safe against a concurrent opener: `UNIQUE(store_id)`
+        is the arbiter, each create sits in its own savepoint, and losing the
+        race is a no-op rather than an error -- the winner's row is exactly
+        the row this call wanted to exist.
+        """
+        if not stores:
+            return True
+        Settings = self.env['shopify.connector.store.settings'].sudo()
+        existing = Settings.search([('store_id', 'in', stores.ids)])
+        missing_ids = set(stores.ids) - set(existing.mapped('store_id').ids)
+        for store_id in sorted(missing_ids):
+            try:
+                with self.env.cr.savepoint():
+                    Settings.create({'store_id': store_id})
+            except IntegrityError:
+                # A concurrent opener won `UNIQUE(store_id)`. Its row is the
+                # one we wanted; there is nothing to repair and nothing to
+                # report.
+                _logger.debug(
+                    'Canonical store-settings row for store_id=%s was '
+                    'created concurrently.', store_id,
+                )
+        return True
+
+    @api.model
+    def action_open_canonical_store_settings(self):
+        """The sanctioned menu-opening seam (§6.7).
+
+        Order is the whole security argument:
+
+        1. reassert the server-side role, so a hidden menu is not the control;
+        2. resolve the stores in the CALLER's ordinary environment, where the
+           SEC-3 record rules and the company rule are live, so a foreign
+           store is never even a candidate;
+        3. re-check read access, and REFUSE outright if anything outside the
+           caller's active companies made it through -- a tripwire for a
+           widened resolution, not a filter that would hide one;
+        4. only then elevate, and only to ensure rows for that fixed set.
+
+        Nothing between steps 2 and 4 can widen the set.
+        """
+        self._assert_canonical_settings_administrator()
+        stores = self.env['shopify.connector.store'].search([])
+        if stores:
+            stores.check_access('read')
+            # A REFUSAL, NOT A FILTER, AND THAT DISTINCTION IS THE POINT.
+            #
+            # `store_company_rule` is `[('company_id', 'in', company_ids)]` --
+            # fail-closed, and it already excluded every foreign and every
+            # company-less store from the search above. So on the ordinary
+            # path this can never fire, and a silent `filtered()` here would
+            # be indistinguishable from no check at all: quietly dropping
+            # records that were never in the set is a no-op that still passes
+            # every test.
+            #
+            # Raising makes it a tripwire instead. The only way to reach it is
+            # for the resolution above to have been widened -- elevated,
+            # context-forced, or re-pointed at a different model -- which is
+            # exactly the mistake §6.7 forbids and exactly the mistake a
+            # filter would absorb in silence.
+            allowed_company_ids = set(self.env.companies.ids)
+            outside = stores.filtered(
+                lambda store: store.company_id.id not in allowed_company_ids
+            )
+            if outside:
+                raise AccessError(
+                    'Store Settings resolved %d store(s) outside the active '
+                    'companies. Refusing to ensure configuration for them.'
+                    % len(outside)
+                )
+        self._ensure_canonical_settings_rows(stores)
+        return self.env['ir.actions.actions']._for_xml_id(
+            CANONICAL_STORE_SETTINGS_ACTION
+        )

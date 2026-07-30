@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.17.0',
+    'version': '19.0.1.18.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -82,6 +82,13 @@ later, separately authorized tasks.
         # caught it, which is exactly the failure family that pass exists for
         # (issue #193: fresh and warm are not interchangeable).
         'views/shopify_connector_setup_views.xml',
+        # Batch 2 checkpoint 1: the canonical Store Settings surface. LOADS
+        # AFTER the setup views for the same load-bearing reason they load
+        # after the menus -- its menu hangs off `menu_shopify_connector_
+        # configuration`, which the setup views file defines. Placed earlier
+        # this would be invisible on a warm `-u` of a database that already
+        # had that menu and a hard `ParseError` on a fresh install.
+        'views/shopify_connector_store_settings_views.xml',
     ],
     'assets': {
         'web.assets_backend': [

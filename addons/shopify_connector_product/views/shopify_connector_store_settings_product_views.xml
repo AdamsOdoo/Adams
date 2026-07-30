@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 checkpoint 1: the product-import section of the canonical
+        Store Settings form.
+
+        Contributed by inheritance rather than by editing the core form,
+        for the ordinary reason: these columns do not exist when only core
+        is installed, so a core form naming them would not parse.
+
+        WHAT IS DELIBERATELY ABSENT. The scheduled product-import switch and
+        the product-import checkpoint/last-success observation belong to the
+        product scan producer, which does not exist at this head: nothing in
+        production enqueues product enumeration work. Rendering a "run product
+        import on a schedule" toggle now would be a control that silently does
+        nothing, which is the same false-capability failure this surface exists
+        to end. They are recorded as owned by the product-admission checkpoint
+        and rendered only when the producer they configure is real.
+    -->
+
+    <record id="view_shopify_connector_store_settings_canonical_form_product"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.store.settings.canonical.form.product</field>
+        <field name="model">shopify.connector.store.settings</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_store_settings_canonical_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Product import" name="canonical_product">
+                    <group name="canonical_product_import">
+                        <field name="product_import_media_enabled"/>
+                        <field name="product_import_refresh_mode"/>
+                        <field name="product_import_attribute_conflict_mode"/>
+                    </group>
+                    <div class="text-muted" role="note">
+                        <p>
+                            <strong>Refresh mode</strong> decides what a later
+                            import may overwrite. Under "Snapshot Only" the
+                            fields a merchant edits in Odoo are written once,
+                            at first import, and a refresh never overwrites
+                            them.
+                        </p>
+                        <p>
+                            <strong>Attribute conflict mode</strong> decides
+                            what happens when a Shopify option collides with an
+                            existing Odoo attribute whose variant mode is
+                            incompatible. "Manual Review" stops the affected
+                            product for a person to look at; it never changes
+                            the merchant's existing attribute.
+                        </p>
+                        <p>
+                            These settings apply to product import only. What a
+                            store exports, and which side owns price and media,
+                            are set on the Export Settings screen.
+                        </p>
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

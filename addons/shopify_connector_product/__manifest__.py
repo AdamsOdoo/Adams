@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.4.0',
+    'version': '19.0.2.5.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '
@@ -43,6 +43,9 @@ logic. No UI, wizard, webhook, or OAuth file.
         # menu already exists when the menu record is created.
         'views/shopify_connector_product_binding_views.xml',
         'views/shopify_connector_product_menus.xml',
+        # Batch 2 checkpoint 1: the product-import section of the canonical
+        # Store Settings form, contributed by inheritance.
+        'views/shopify_connector_store_settings_product_views.xml',
     ],
     'installable': True,
     'application': False,
