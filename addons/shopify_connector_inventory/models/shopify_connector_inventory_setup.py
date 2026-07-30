@@ -24,6 +24,8 @@ delegates to the inventory service, which re-checks role, record visibility
 and company as the calling user before anything elevates.
 """
 
+import hashlib
+
 from odoo import _, api, models
 from odoo.exceptions import AccessError, UserError
 
@@ -178,15 +180,30 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         step's first page (Wave 5): every ELIGIBLE row -- active cached
         Shopify locations of THIS store, or internal Odoo locations the
         CALLING user may see in this store's company -- is reachable through
-        an indexed, paginated, case-insensitive name search. The store and
+        a bounded, paginated, case-insensitive name search. The store and
         company filters are structural on every page: `store_id` is a
         mandatory term on the cache query, and the Odoo side is searched as
         the calling user with the same company domain the payload uses, so
         no page and no query can ever widen scope.
+
+        NOT "INDEXED", AND THE WORD IS DELIBERATELY GONE (Batch 1 correction).
+        This previously claimed an indexed search. `shopify.connector.location`
+        indexes `store_id`, `company_id` and `shopify_location_gid`; it does NOT
+        index `name`, and no btree index can serve `ilike '%term%'` anyway --
+        that needs a trigram index, which needs the `pg_trgm` extension, which
+        needs privileges this connector does not assume it has on a customer
+        database. What actually bounds the work is the `store_id` index plus the
+        50-row page: PostgreSQL selects one store's cached locations by index
+        and scans only those. That is honest and it is sufficient at the scale
+        this surface exists for; claiming an index that is not there would make
+        a performance promise nothing in the schema keeps.
+
+        `stock.location.complete_name` is Odoo's own column and whatever index
+        it carries is Odoo's business; no claim is made about it here.
         """
+        empty = self._setup_search_empty_page(store, side, query, offset)
         if not store:
-            return {'items': [], 'total': 0, 'offset': 0,
-                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+            return dict(empty, empty_reason='no_store')
         if side == 'shopify':
             Location = self.env['shopify.connector.location']
             Mapping = self.env['shopify.connector.location.mapping']
@@ -227,8 +244,13 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
                         bool(mapping.push_enabled) if mapping else False
                     ),
                 })
-            return {'items': items, 'total': total, 'offset': offset,
-                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+            return self._setup_search_page(
+                store, side, query, offset, items, total,
+                empty_reason=(
+                    'no_results' if (query and not total)
+                    else ('no_cached_locations' if not total else False)
+                ),
+            )
         # side == 'odoo' -- searched as the calling user, deliberately, for
         # the same reason `_setup_eligible_odoo_locations` is: Odoo's own
         # `stock.location` access decides what this operator may see.
@@ -246,15 +268,79 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
                 limit=SETUP_LOCATION_SEARCH_PAGE, offset=offset,
             )
         except AccessError:
-            return {'items': [], 'total': 0, 'offset': 0,
-                    'limit': SETUP_LOCATION_SEARCH_PAGE}
+            # DISTINCT from "your search matched nothing". This operator cannot
+            # read `stock.location` at all, and the surface must say so rather
+            # than let them conclude their warehouse does not exist.
+            return dict(empty, empty_reason='no_inventory_permission')
+        return self._setup_search_page(
+            store, side, query, offset,
+            [{'id': row.id, 'name': row.display_name} for row in rows],
+            total,
+            empty_reason=(
+                'no_results' if (query and not total)
+                else ('no_eligible_odoo_locations' if not total else False)
+            ),
+        )
+
+    # ------------------------------------------------------------------
+    # The search page contract (Batch 1 correction, §10)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _setup_search_continuation(self, store, side, query):
+        """A token binding a continuation to the exact query it belongs to.
+
+        `offset` alone is not a continuation. Paging with a bare offset lets a
+        client carry position from one result set into another -- change the
+        query, or the side, or the store, and page 2 of the new set is fetched
+        at page 2 of the OLD one, which skips rows and can repeat them. The
+        client must send this token back with every `load more`, and a token
+        that does not describe the request it arrives with is refused.
+
+        Non-secret and non-guessable-is-not-the-point: this is an integrity
+        binding, not an authorisation. Authorisation is `_resolve_store`, which
+        runs on every request regardless of what token is presented.
+        """
+        return '%s|%s|%s|%s' % (
+            store.id if store else 0,
+            store.company_id.id if (store and store.company_id) else 0,
+            side,
+            hashlib.sha256((query or '').encode()).hexdigest()[:16],
+        )
+
+    @api.model
+    def _setup_search_page(self, store, side, query, offset, items, total,
+                           empty_reason=False):
+        """One page, with an explicit continuation the client must not compute.
+
+        `next_offset` is the server's own arithmetic and is `False` once the set
+        is exhausted. The client previously derived the next offset from the
+        LENGTH OF ITS OWN ACCUMULATED ARRAY, which is a different number the
+        moment the server returns a short page, a row is removed between pages,
+        or a response arrives out of order -- and the failure mode is silently
+        skipped or duplicated locations, in a list whose whole purpose is that
+        every eligible location is reachable.
+        """
+        shown = offset + len(items)
         return {
-            'items': [
-                {'id': row.id, 'name': row.display_name} for row in rows
-            ],
+            'items': items,
             'total': total,
             'offset': offset,
             'limit': SETUP_LOCATION_SEARCH_PAGE,
+            'next_offset': shown if (items and shown < total) else False,
+            'continuation': self._setup_search_continuation(store, side, query),
+            'empty_reason': empty_reason,
+        }
+
+    @api.model
+    def _setup_search_empty_page(self, store, side, query, offset):
+        """The fail-closed page. Position 0, no continuation to follow."""
+        return {
+            'items': [], 'total': 0, 'offset': 0,
+            'limit': SETUP_LOCATION_SEARCH_PAGE,
+            'next_offset': False,
+            'continuation': self._setup_search_continuation(store, side, query),
+            'empty_reason': False,
         }
 
     @api.model

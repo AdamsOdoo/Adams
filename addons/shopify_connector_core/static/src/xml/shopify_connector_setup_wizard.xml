@@ -612,7 +612,26 @@
                                     </button>
                                 </div>
 
-                                <div t-if="visibleShopifyLocations.length" class="sc_setup__map">
+                                <!--
+                                    A zero-result Shopify SEARCH used to hide
+                                    this whole block: the Odoo search box, the
+                                    Map button and the only visible route back,
+                                    because "no rows on screen" and "this store
+                                    has no locations" were the same condition.
+                                    They are not: with a search active the list
+                                    is empty because of the query, and the fix is
+                                    to clear it, which requires the controls to
+                                    still be there.
+                                -->
+                                <div t-if="!visibleShopifyLocations.length and locationEmptyReason('shopify')"
+                                     class="sc_setup__empty sc_setup__empty--shopify sc-band sc-band--info"
+                                     role="status">
+                                    <i class="fa fa-search sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text" t-esc="locationEmptyReason('shopify')"/>
+                                    </div>
+                                </div>
+                                <div t-if="visibleShopifyLocations.length or state.locationSearch.shopify.items !== null" class="sc_setup__map">
                                     <div class="sc_setup__field">
                                         <label for="sc_setup_map_shopify">Shopify location</label>
                                         <select id="sc_setup_map_shopify" class="o_input"
@@ -673,7 +692,24 @@
                                                 <span>Load more Odoo locations</span>
                                             </button>
                                         </div>
-                                        <small t-if="!visibleOdooLocations.length">
+                                        <!--
+                                            FOUR empty states, not one. This
+                                            single line was shown for all of
+                                            them, so an operator whose SEARCH
+                                            matched nothing was told they had no
+                                            Inventory access, and one who really
+                                            had no Inventory access was told to
+                                            create a warehouse they would not be
+                                            able to see. `locationEmptyReason`
+                                            returns the server's own reason.
+                                        -->
+                                        <small t-if="!visibleOdooLocations.length and locationEmptyReason('odoo')"
+                                               class="sc_setup__empty sc_setup__empty--odoo"
+                                               role="status"
+                                               t-esc="locationEmptyReason('odoo')"/>
+                                        <small t-elif="!visibleOdooLocations.length"
+                                               class="sc_setup__empty sc_setup__empty--odoo"
+                                               role="status">
                                             No internal Odoo locations are visible to you in this
                                             company. Ask an Odoo administrator for Inventory
                                             access, or create a warehouse first.

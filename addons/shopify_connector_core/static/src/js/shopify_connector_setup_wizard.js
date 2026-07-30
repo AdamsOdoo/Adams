@@ -109,8 +109,17 @@ export class ShopifyConnectorSetupWizard extends Component {
             // and mapping repeatedly. `items: null` means "no search active
             // — render the payload's first page".
             locationSearch: {
-                shopify: { query: "", items: null, total: 0, offset: 0 },
-                odoo: { query: "", items: null, total: 0, offset: 0 },
+                shopify: {
+                    query: "", items: null, total: 0, offset: 0,
+                    // The server's continuation, echoed back on every page
+                    // request. `nextOffset === false` means "exhausted", which
+                    // is a different statement from "offset 0".
+                    nextOffset: false, continuation: null, emptyReason: "",
+                },
+                odoo: {
+                    query: "", items: null, total: 0, offset: 0,
+                    nextOffset: false, continuation: null, emptyReason: "",
+                },
             },
         });
 
@@ -515,23 +524,51 @@ export class ShopifyConnectorSetupWizard extends Component {
             this.state.errorMessage = _t("Choose an Odoo location to map it to.");
             return;
         }
+        // A selection the operator can no longer SEE must never be submitted.
+        // `<select>` retains an assigned value after its `<option>` is gone, so
+        // searching away from a chosen location used to leave the identity in
+        // `state.form`, off screen, and send it on the next click.
+        this._revalidateLocationSelection("shopify");
+        this._revalidateLocationSelection("odoo");
+        if (!this.state.form.mapShopifyGid || !this.state.form.mapOdooLocationId) {
+            this.state.errorMessage = _t(
+                "The location you had chosen is no longer in the list on " +
+                "screen, so nothing was mapped. Choose from the current list."
+            );
+            return;
+        }
+        const mappedGid = this.state.form.mapShopifyGid;
+        const mappedOdooId = parseInt(this.state.form.mapOdooLocationId, 10);
+        const mappedOdooName = (
+            this.visibleOdooLocations.find(
+                (row) => row.id === mappedOdooId
+            ) || {}
+        ).name || "";
         const ok = await this._call("save_location_mapping", {
             store_id: this.store.id,
-            shopify_location_gid: this.state.form.mapShopifyGid,
-            odoo_location_id: parseInt(this.state.form.mapOdooLocationId, 10),
+            shopify_location_gid: mappedGid,
+            odoo_location_id: mappedOdooId,
         });
         if (ok) {
             this.state.form.mapShopifyGid = "";
             this.state.form.mapOdooLocationId = "";
-            // A mapping changes the rows an active search is showing (its
-            // Mapped badge, its target); re-run it so the operator watches
-            // their own progress instead of a snapshot.
-            for (const side of ["shopify", "odoo"]) {
-                if (this.state.locationSearch[side].items !== null) {
-                    await this._searchLocations(side, {
-                        offset: this.state.locationSearch[side].offset,
-                        append: false,
-                    });
+            // Update the affected row IN PLACE rather than re-running the
+            // search. Re-running it fetched a single page at the LAST requested
+            // offset and replaced the accumulated results with it, so an
+            // operator who had paged to row 150 and then mapped one location
+            // watched rows 0-150 vanish and be replaced by rows 100-150. The
+            // only thing a mapping changes about a row is its badge and its
+            // target, and both are known here.
+            for (const search of Object.values(this.state.locationSearch)) {
+                if (search.items === null) {
+                    continue;
+                }
+                for (const row of search.items) {
+                    if (row.shopify_gid === mappedGid) {
+                        row.mapped = true;
+                        row.odoo_location_id = mappedOdooId;
+                        row.odoo_location_name = mappedOdooName;
+                    }
                 }
             }
         }
@@ -574,6 +611,11 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     locationHasMore(side) {
+        const search = this.state.locationSearch[side];
+        if (search.items !== null) {
+            // The SERVER decides whether there is another page.
+            return Boolean(search.nextOffset);
+        }
         const showing = this.locationShowing(side);
         return showing.shown < showing.total;
     }
@@ -583,19 +625,31 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     /** Enter in a search box searches; nothing else is intercepted. */
-    onLocationSearchKeydown(ev, side) {
+    async onLocationSearchKeydown(ev, side) {
         if (ev.key === "Enter") {
             ev.preventDefault();
-            this.searchLocations(side);
+            // Awaited. Fire-and-forget meant an Enter-key search raced whatever
+            // the operator did next, and its rejection had nowhere to go.
+            await this.searchLocations(side);
         }
     }
 
     async loadMoreLocations(side) {
         const search = this.state.locationSearch[side];
-        // "Load more" without a query is a search for everything -- which is
-        // exactly what it should be: pagination over the full eligible set.
+        if (search.items !== null && !search.nextOffset) {
+            // The server said the set is exhausted. Asking again would fetch
+            // page 0 and append it to what is already shown.
+            return;
+        }
         await this._searchLocations(side, {
-            offset: search.items === null ? 0 : search.items.length,
+            // THE SERVER'S continuation, never the length of our own array.
+            // Deriving the next offset from `items.length` is the same number
+            // only while nothing else is true: a short page, a row removed
+            // between pages, or two responses arriving out of order all make it
+            // diverge, and the failure is silently skipped or duplicated
+            // locations in the one list whose purpose is that every eligible
+            // location is reachable.
+            offset: search.items === null ? 0 : search.nextOffset,
             append: search.items !== null,
         });
     }
@@ -606,29 +660,128 @@ export class ShopifyConnectorSetupWizard extends Component {
             items: null,
             total: 0,
             offset: 0,
+            nextOffset: false,
+            continuation: null,
         };
+        // Clearing changes what is on screen, so a selection made inside the
+        // cleared results may no longer be there.
+        this._revalidateLocationSelection(side);
+    }
+
+    /**
+     * Drop a selected identity the operator can no longer see.
+     *
+     * A `<select>` keeps whatever value was assigned to it even when the
+     * matching `<option>` is gone, so searching away from a chosen location
+     * left the GID (or the Odoo location id) sitting in `state.form`,
+     * invisible, and the next Create mapping submitted it. The server would
+     * still refuse an ineligible one -- the mapping service validates the GID
+     * against this store's active cache and the Odoo location against the
+     * caller's own rights -- but "the server catches it" is not the same as
+     * "the operator mapped the location they were looking at", and a refusal
+     * they cannot see the cause of is the worse outcome of the two.
+     */
+    _revalidateLocationSelection(side) {
+        if (side === "shopify") {
+            const gid = this.state.form.mapShopifyGid;
+            if (gid && !this.visibleShopifyLocations.some(
+                (row) => row.shopify_gid === gid
+            )) {
+                this.state.form.mapShopifyGid = "";
+            }
+            return;
+        }
+        const id = this.state.form.mapOdooLocationId;
+        if (id && !this.visibleOdooLocations.some(
+            (row) => String(row.id) === String(id)
+        )) {
+            this.state.form.mapOdooLocationId = "";
+        }
     }
 
     async _searchLocations(side, { offset, append }) {
         if (!this.store.id) {
             return;
         }
+        // The SAME serialization every other wizard operation uses. Search was
+        // the one call that bypassed `state.busy` entirely, so two searches
+        // could be in flight at once and the later-resolving response won
+        // regardless of which query it answered -- and the `disabled` bindings
+        // on the Search and Load more buttons were inert, because nothing ever
+        // set `busy` for them.
+        if (this.state.busy) {
+            return;
+        }
+        this.state.busy = true;
         try {
+            const search = this.state.locationSearch[side];
             const page = await this.orm.call(MODEL, "search_location_options", [], {
                 store_id: this.store.id,
                 side,
-                query: this.state.locationSearch[side].query || "",
+                query: search.query || "",
                 offset,
+                continuation: offset ? search.continuation : null,
             });
-            const search = this.state.locationSearch[side];
             search.total = page.total;
             search.offset = page.offset;
-            search.items = append && search.items !== null
-                ? search.items.concat(page.items)
-                : page.items;
+            search.nextOffset = page.next_offset;
+            search.continuation = page.continuation;
+            search.emptyReason = page.empty_reason || "";
+            if (append && search.items !== null) {
+                // Belt and braces against a duplicate row even if a page were
+                // ever served twice: identity, not position, decides.
+                const seen = new Set(
+                    search.items.map((row) => this._locationKey(side, row))
+                );
+                search.items = search.items.concat(
+                    page.items.filter(
+                        (row) => !seen.has(this._locationKey(side, row))
+                    )
+                );
+            } else {
+                search.items = page.items;
+            }
             this.state.errorMessage = "";
+            this._revalidateLocationSelection(side);
         } catch (error) {
             this.state.errorMessage = this._message(error);
+        } finally {
+            this.state.busy = false;
+        }
+    }
+
+    _locationKey(side, row) {
+        return side === "shopify" ? row.shopify_gid : String(row.id);
+    }
+
+    /** Why a list is empty, in the operator's words. Never one generic line. */
+    locationEmptyReason(side) {
+        const search = this.state.locationSearch[side];
+        const reason = search.items !== null ? search.emptyReason : "";
+        switch (reason) {
+            case "no_results":
+                return _t(
+                    "No location matches this search. Clear the search to see " +
+                    "the full list again, or try part of the name."
+                );
+            case "no_inventory_permission":
+                return _t(
+                    "You do not have access to Odoo's Inventory locations, so " +
+                    "none can be listed. Ask an Odoo administrator for " +
+                    "Inventory access."
+                );
+            case "no_cached_locations":
+                return _t(
+                    "No Shopify locations have been read for this store yet. " +
+                    "Press Refresh Shopify locations."
+                );
+            case "no_eligible_odoo_locations":
+                return _t(
+                    "There are no internal Odoo locations in this company yet. " +
+                    "Create a warehouse first."
+                );
+            default:
+                return "";
         }
     }
 

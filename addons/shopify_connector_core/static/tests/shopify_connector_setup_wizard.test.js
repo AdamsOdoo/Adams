@@ -333,10 +333,67 @@ describe("shopify connector setup wizard", () => {
         const sent = calls.find((c) => c.method === "save_client_credentials");
         expect(Boolean(sent)).toBe(true);
         expect(sent.kwargs.client_id).toBe("hoot-client-id");
-        // Neither value survives into state; the secret is gone from the DOM.
-        expect(JSON.stringify(component.state)).not.toInclude("LEAKCANARY");
-        expect(JSON.stringify(component.state)).not.toInclude("hoot-client-id");
+
+        // --- Batch 1 correction: this guard used to be able to pass while
+        //     leaking. `document.body.innerHTML` cannot contain a value set
+        //     through the `.value` PROPERTY at all -- the attribute is
+        //     untouched -- so that assertion was vacuous for the very
+        //     mechanism the test names. And `component.state` is one object;
+        //     a secret parked on any other component property, in any other
+        //     RPC payload, or in a DOM attribute went unnoticed.
+        //
+        //     ANTI-VACUITY FIRST. If the secret never reached the request, every
+        //     "not present" assertion below would pass for the wrong reason.
+        expect(sent.kwargs.client_secret).toBe("hoot-secret-LEAKCANARY-000");
+
+        // 1. No OTHER request carries it.
+        for (const call of calls) {
+            if (call === sent) {
+                continue;
+            }
+            expect(JSON.stringify(call)).not.toInclude("LEAKCANARY");
+        }
+
+        // 2. Nowhere on the component -- every own property, not just `state`.
+        const seen = new Set();
+        const walk = (value, depth) => {
+            if (depth > 6 || value === null || value === undefined) {
+                return false;
+            }
+            if (typeof value === "string") {
+                return value.includes("LEAKCANARY");
+            }
+            if (typeof value !== "object") {
+                return false;
+            }
+            if (seen.has(value)) {
+                return false;
+            }
+            seen.add(value);
+            return Object.values(value).some((v) => walk(v, depth + 1));
+        };
+        expect(walk(component, 0)).toBe(false);
+
+        // 3. Nowhere in the DOM -- markup, every attribute, and every input's
+        //    live value property, which is the one `innerHTML` cannot see.
         expect(document.body.innerHTML).not.toInclude("LEAKCANARY");
+        for (const el of queryAll("*")) {
+            for (const attr of el.attributes) {
+                expect(attr.value).not.toInclude("LEAKCANARY");
+            }
+            if ("value" in el && typeof el.value === "string") {
+                expect(el.value).not.toInclude("LEAKCANARY");
+            }
+        }
+
+        // 4. Not in anything the component surfaced to the operator.
+        expect(queryText(".sc_setup__panel")).not.toInclude("LEAKCANARY");
+        expect(String(component.state.errorMessage || "")).not.toInclude(
+            "LEAKCANARY"
+        );
+
+        // The client id is not a secret, but it is not retained either.
+        expect(JSON.stringify(component.state)).not.toInclude("hoot-client-id");
     });
 
     test("the token is never held in component state", async () => {

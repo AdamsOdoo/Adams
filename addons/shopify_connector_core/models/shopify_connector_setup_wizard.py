@@ -777,9 +777,10 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         but a bounded page whose tail is REACHABLE only through a different
         screen made every location past the cut effectively unmappable here.
         This seam is the reachability route: the inventory module overrides
-        it with an indexed, store-scoped, paginated search over ALL eligible
+        it with a bounded, store-scoped, paginated search over ALL eligible
         cached Shopify locations (`side='shopify'`) or internal Odoo
-        locations (`side='odoo'`).
+        locations (`side='odoo'`). ("Indexed" was claimed here and is gone --
+        see the override's own docstring for what actually bounds the work.)
         """
         raise UserError(_(
             'Location mapping needs the Shopify Connector Inventory module, '
@@ -787,7 +788,27 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         ))
 
     @api.model
-    def search_location_options(self, store_id, side, query='', offset=0):
+    def _setup_search_continuation(self, store, side, query):
+        """Seam: the continuation token binding a page to its query.
+
+        Declared in core beside the RPC that VALIDATES it, so the check exists
+        even in a database with no inventory addon -- where the search itself is
+        refused anyway, and a token check that silently passed would be a hole
+        waiting for the day it is not.
+        """
+        return False
+
+    #: The furthest a caller may page into one result set. 200 pages of 50 is
+    #: 10,000 rows, which is far past any real store's location count and far
+    #: short of a number that makes PostgreSQL's OFFSET scan expensive. It exists
+    #: so an absurd, overflowed or hand-edited offset is REFUSED rather than
+    #: quietly clamped: a clamp turns "page 10^9" into page 0, which the client
+    #: then appends to what it already has, silently duplicating every row.
+    SETUP_LOCATION_MAX_OFFSET = 10000
+
+    @api.model
+    def search_location_options(self, store_id, side, query='', offset=0,
+                                continuation=None):
         """The mapping step's search RPC: one bounded page of candidates.
 
         Same authorization funnel as every other setup entry point
@@ -795,17 +816,47 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         access and company consistency), then the domain seam. `side` is
         validated here so the seam only ever sees the two values it
         documents.
+
+        BATCH 1 CORRECTION -- the offset is validated, not coerced.
+
+        A non-numeric, negative or absurd offset used to become `0` silently.
+        That reads as forgiving and is the opposite: the client sends an offset
+        only when it is CONTINUING a set, and a continuation that silently
+        restarts at row 0 is appended to the rows already on screen, so the
+        operator sees every location twice and the page they were reaching for
+        not at all. All three shapes are now refused.
+
+        `continuation` binds a page request to the query it belongs to. It is
+        integrity, not authorization -- `_resolve_store` above is authorization,
+        and it runs on every call whatever token arrives. What the token
+        prevents is paging position leaking between result sets: search "north",
+        page to 100, search "south", press Load more, and a bare offset would
+        fetch rows 100-150 of the NEW set while the client believed it held rows
+        0-100 of it. `None` is accepted for a first page, which is the only
+        request that has nothing to continue.
         """
         store = self._resolve_store(store_id)
         if side not in ('shopify', 'odoo'):
             raise UserError(_('Unknown location search side.'))
         if not isinstance(query, str):
             query = ''
-        try:
-            offset = max(0, int(offset))
-        except (TypeError, ValueError):
-            offset = 0
-        return self._setup_search_locations(store, side, query.strip(), offset)
+        query = query.strip()
+        if isinstance(offset, bool) or not isinstance(offset, int):
+            # `bool` is an `int` in Python and `True` would otherwise page to
+            # row 1. Floats and numeric strings are refused too: an offset is a
+            # value this server produced, so anything else is a client that has
+            # stopped following the contract.
+            raise UserError(_('The location list position is not valid.'))
+        if offset < 0 or offset > self.SETUP_LOCATION_MAX_OFFSET:
+            raise UserError(_('The location list position is out of range.'))
+        if offset and continuation != self._setup_search_continuation(
+            store, side, query,
+        ):
+            raise UserError(_(
+                'The location list moved on while you were reading it. '
+                'Search again to start from the first page.'
+            ))
+        return self._setup_search_locations(store, side, query, offset)
 
     @api.model
     def _setup_create_location_mapping(

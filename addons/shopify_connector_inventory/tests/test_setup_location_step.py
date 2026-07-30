@@ -18,6 +18,11 @@ from odoo.tests.common import TransactionCase, tagged
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see
 # docs/05-qa/odoo19-test-phase-contract.md.
+
+#: Distinguishes "the caller passed no continuation" from "the caller
+#: deliberately passed None", which the refusal tests need to do.
+_UNSET = object()
+
 @tagged('post_install', '-at_install')
 class TestSetupLocationStep(TransactionCase):
 
@@ -442,9 +447,25 @@ class TestSetupLocationSearch(TestSetupLocationStep):
     including rows far past the first page's cut.
     """
 
-    def _search(self, side, query='', offset=0, user=None):
+    def _search(self, side, query='', offset=0, user=None,
+                continuation=_UNSET):
+        """One page, carrying the continuation the server itself issued.
+
+        Batch 1 correction: a page request past the first is bound to the query
+        it continues, so a caller that does not present the matching token is
+        refused. Tests that page therefore have to page the way the client does,
+        which is the point -- a helper that could skip the token would be testing
+        a contract nothing enforces.
+        """
+        if continuation is _UNSET:
+            continuation = (
+                self._as(user)._setup_search_continuation(
+                    self.store, side, (query or '').strip(),
+                ) if offset else None
+            )
         return self._as(user).search_location_options(
             self.store.id, side, query=query, offset=offset,
+            continuation=continuation,
         )
 
     # --- the shopify side ------------------------------------------------
@@ -583,8 +604,108 @@ class TestSetupLocationSearch(TestSetupLocationStep):
             self._search('shopify', query='No Contact')
             self._search('odoo', query='Location A')
 
-    def test_a_malformed_offset_is_clamped_not_an_error(self):
-        page = self._as().search_location_options(
-            self.store.id, 'shopify', query='', offset='not-a-number',
+    def test_a_malformed_offset_is_refused_not_clamped(self):
+        """Batch 1 correction: fail CLOSED on a position we did not issue.
+
+        This used to clamp a malformed offset to 0 and return the first page,
+        which reads as forgiving and is the opposite. The client sends an offset
+        only when it is CONTINUING a set, and the reply is APPENDED to what is
+        already on screen -- so a silent restart at row 0 duplicates every
+        visible row and never reaches the page the operator asked for.
+        """
+        for bad in ('not-a-number', -1, 10 ** 9, 3.5, True, None, [0]):
+            with self.assertRaises(
+                UserError,
+                msg='offset %r was accepted' % (bad,),
+            ):
+                self._as().search_location_options(
+                    self.store.id, 'shopify', query='', offset=bad,
+                    continuation=None,
+                )
+
+    def test_a_continuation_does_not_carry_between_queries(self):
+        """Paging position must not leak from one result set into another.
+
+        Search A, page into it, then search B and press Load more: with a bare
+        offset the server would serve rows 50-100 of B while the client believed
+        it held rows 0-50 of B, so 50 locations are silently unreachable and the
+        list's whole promise is broken.
+        """
+        for index in range(60):
+            self._cache(
+                'gid://shopify/Location/CONT%03d' % index,
+                'Continuation Depot %03d' % index,
+            )
+        first = self._search('shopify', query='Continuation')
+        self.assertTrue(first['next_offset'])
+        self.assertTrue(first['continuation'])
+        # The same query continues fine.
+        second = self._as().search_location_options(
+            self.store.id, 'shopify', query='Continuation',
+            offset=first['next_offset'], continuation=first['continuation'],
         )
-        self.assertEqual(page['offset'], 0)
+        self.assertTrue(second['items'])
+        # A DIFFERENT query with the old token is refused.
+        with self.assertRaises(UserError):
+            self._as().search_location_options(
+                self.store.id, 'shopify', query='Something Else',
+                offset=first['next_offset'],
+                continuation=first['continuation'],
+            )
+        # So is the other side with the same token.
+        with self.assertRaises(UserError):
+            self._as().search_location_options(
+                self.store.id, 'odoo', query='Continuation',
+                offset=first['next_offset'],
+                continuation=first['continuation'],
+            )
+        # And so is a missing one.
+        with self.assertRaises(UserError):
+            self._as().search_location_options(
+                self.store.id, 'shopify', query='Continuation',
+                offset=first['next_offset'], continuation=None,
+            )
+
+    def test_paging_covers_every_row_exactly_once(self):
+        """No skipped rows, no duplicates, across the whole eligible set."""
+        names = set()
+        for index in range(130):
+            name = 'Coverage Depot %03d' % index
+            names.add(name)
+            self._cache('gid://shopify/Location/COV%03d' % index, name)
+        seen, offset, continuation, pages = [], 0, None, 0
+        while True:
+            page = self._as().search_location_options(
+                self.store.id, 'shopify', query='Coverage Depot',
+                offset=offset, continuation=continuation,
+            )
+            seen.extend(row['name'] for row in page['items'])
+            pages += 1
+            self.assertLess(pages, 20, 'the pager did not terminate')
+            if not page['next_offset']:
+                break
+            offset, continuation = page['next_offset'], page['continuation']
+        self.assertEqual(
+            len(seen), len(set(seen)),
+            'a location was served on two different pages',
+        )
+        self.assertEqual(
+            set(seen), names,
+            'paging did not reach every eligible location exactly once',
+        )
+
+    def test_the_empty_states_are_distinguishable(self):
+        """Four different reasons for an empty list, four different answers."""
+        self._cache('gid://shopify/Location/EMPTY1', 'Empty State Depot')
+        no_match = self._search('shopify', query='zzz-nothing-matches-zzz')
+        self.assertEqual(no_match['items'], [])
+        self.assertEqual(no_match['empty_reason'], 'no_results')
+        # A store with nothing cached at all is a different statement.
+        other = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Empty Cache Store',
+            'shop_domain': 'empty-cache-store.myshopify.com',
+            'api_version': self.store.api_version,
+            'company_id': self.store.company_id.id,
+        })
+        empty = self._as().search_location_options(other.id, 'shopify')
+        self.assertEqual(empty['empty_reason'], 'no_cached_locations')

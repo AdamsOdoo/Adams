@@ -112,12 +112,24 @@ class ClientCredentialsCase(TransactionCase):
 @tagged('post_install', '-at_install')
 class TestExchangeRequestShape(ClientCredentialsCase):
 
-    def test_exchange_posts_the_documented_form_body(self):
-        """URL, form fields and headers exactly as Shopify documents them."""
+    def test_exchange_passes_the_credentials_through_and_parses_the_reply(self):
+        """What THIS seam actually decides: pass-through, and response parsing.
+
+        Batch 1 correction. This test used to assert an endpoint URL that the
+        test itself had just constructed inside its own stand-in -- so the
+        "expected" and the "observed" were the same line of test code and the
+        production endpoint was never involved. Asserting it proved only that
+        Python string formatting works.
+
+        The endpoint IS asserted, against the genuine production construction,
+        by `test_the_real_transport_builds_the_documented_request` below, which
+        patches `requests.post` and therefore observes the URL
+        `_send_token_exchange` really built. This one covers the layer above it.
+        """
         seen = {}
 
         def fake_send(store, client_id, client_secret):
-            seen['url'] = 'https://%s/admin/oauth/access_token' % store.shop_domain
+            seen['store'] = store
             seen['client_id'] = client_id
             seen['client_secret'] = client_secret
             return _token_response()
@@ -128,11 +140,7 @@ class TestExchangeRequestShape(ClientCredentialsCase):
             token, expires_at, scope = self.Client._exchange_client_credentials(
                 self.store, DUMMY_CLIENT_ID, DUMMY_CLIENT_SECRET,
             )
-        self.assertEqual(
-            seen['url'],
-            'https://client-credentials-test.myshopify.com'
-            '/admin/oauth/access_token',
-        )
+        self.assertEqual(seen['store'], self.store)
         self.assertEqual(seen['client_id'], DUMMY_CLIENT_ID)
         self.assertEqual(seen['client_secret'], DUMMY_CLIENT_SECRET)
         self.assertEqual(token, DUMMY_EXCHANGED_TOKEN)
