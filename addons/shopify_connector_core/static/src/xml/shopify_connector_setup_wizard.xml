@@ -199,7 +199,22 @@
                             </div>
 
                             <t t-if="state.form.credentialMode === 'dev_dashboard_client_credentials'">
-                                <div class="sc-band sc-band--info" role="note">
+                                <!--
+                                    `role="status"`, not `role="note"`. This band
+                                    is rendered conditionally on the selected
+                                    authentication mode, so its content CHANGES
+                                    while the step is open. `note` is a valid
+                                    ARIA role but a document-structure one, not a
+                                    live region (WAI-ARIA 1.2 lists alert, log,
+                                    marquee, status and timer), so a screen
+                                    reader announced nothing when the operator
+                                    switched paths and the guidance silently
+                                    became different guidance. `status` is the
+                                    polite live region for exactly this: it is
+                                    announced when it appears and does not
+                                    interrupt.
+                                -->
+                                <div class="sc-band sc-band--info" role="status">
                                     <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
                                         <div class="sc-band__text">Both values are on your app's Overview page in the Dev Dashboard</div>
@@ -252,7 +267,22 @@
                                     three, and saying plainly what the other two are
                                     for, is the whole fix.
                                 -->
-                                <div class="sc-band sc-band--info" role="note">
+                                <!--
+                                    `role="status"`, not `role="note"`. This band
+                                    is rendered conditionally on the selected
+                                    authentication mode, so its content CHANGES
+                                    while the step is open. `note` is a valid
+                                    ARIA role but a document-structure one, not a
+                                    live region (WAI-ARIA 1.2 lists alert, log,
+                                    marquee, status and timer), so a screen
+                                    reader announced nothing when the operator
+                                    switched paths and the guidance silently
+                                    became different guidance. `status` is the
+                                    polite live region for exactly this: it is
+                                    announced when it appears and does not
+                                    interrupt.
+                                -->
+                                <div class="sc-band sc-band--info" role="status">
                                     <i class="fa fa-key sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
                                         <div class="sc-band__text">This path needs the Admin API access token — not the Client ID, and not the Client Secret</div>
@@ -519,7 +549,18 @@
                                     </div>
                                 </div>
 
-                                <p class="sc_setup__showing" role="status" aria-live="polite">
+                                <!--
+                                    The counter carries its DOMAIN in a class and
+                                    a data attribute. Two elements sharing one
+                                    `.sc_setup__showing` class made every
+                                    assertion about "the count" ambiguous: a tour
+                                    matching `Showing 1 of 1` could not say
+                                    whether it had found the Shopify counter or
+                                    the Odoo one, and a change to either would
+                                    satisfy a test written about the other.
+                                -->
+                                <p class="sc_setup__showing sc_setup__showing--shopify"
+                                   data-showing="shopify" role="status" aria-live="polite">
                                     Showing <t t-esc="locationShowing('shopify').shown"/>
                                     of <t t-esc="locationShowing('shopify').total"/>
                                     Shopify locations<t t-if="state.locationSearch.shopify.items !== null"> matching the search</t>.
@@ -528,7 +569,23 @@
                                 <ul class="sc_setup__locations">
                                     <t t-foreach="visibleShopifyLocations" t-as="location"
                                        t-key="location.shopify_gid">
-                                        <li class="sc_setup__location">
+                                        <!--
+                                            `data-mapped` exists because the
+                                            BADGE TEXT is not a usable state
+                                            selector. hoot-dom's `:contains()`
+                                            matches case-insensitive substrings,
+                                            so `:contains('Mapped')` also matches
+                                            "Not mapped": a tour asserting a
+                                            location became mapped passed whether
+                                            or not it did, including when the
+                                            mapping call had failed. The
+                                            attribute is machine-readable and
+                                            exact; the badge stays the human
+                                            text.
+                                        -->
+                                        <li class="sc_setup__location"
+                                            t-att-data-mapped="location.mapped ? '1' : '0'"
+                                            t-att-data-shopify-gid="location.shopify_gid">
                                             <span class="sc_setup__location-name" t-esc="location.name"/>
                                             <span t-if="location.mapped"
                                                   class="sc-badge sc-badge--success">Mapped</span>
@@ -603,7 +660,8 @@
                                                         t-esc="odooLocation.name"/>
                                             </t>
                                         </select>
-                                        <p class="sc_setup__showing" role="status" aria-live="polite">
+                                        <p class="sc_setup__showing sc_setup__showing--odoo"
+                                           data-showing="odoo" role="status" aria-live="polite">
                                             Showing <t t-esc="locationShowing('odoo').shown"/>
                                             of <t t-esc="locationShowing('odoo').total"/>
                                             Odoo locations<t t-if="state.locationSearch.odoo.items !== null"> matching the search</t>.

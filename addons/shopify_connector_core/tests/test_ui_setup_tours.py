@@ -265,6 +265,21 @@ class TestUiSetupTours(HttpCase):
                 'usage': 'internal',
                 'location_id': warehouse.view_location_id.id,
             })
+            # A second internal location that is deliberately left UNMAPPED, so
+            # an eligible target provably exists on ANY database -- including a
+            # clean install with no demo data, where the only other internal
+            # locations belong to the warehouse itself. Without it the tour's
+            # "choose an Odoo location" step depended on whichever location the
+            # database happened to offer first, and on a clean install that was
+            # the one already mapped above: `UNIQUE(store_id, odoo_location_id)`
+            # refused the create, and the substring assertion in the tour passed
+            # anyway. Determinism here, exactness in the tour, and the database
+            # assertion below are the three halves of that one defect.
+            self.env['stock.location'].sudo().create({
+                'name': 'S1 Tour Spare Odoo Location',
+                'usage': 'internal',
+                'location_id': warehouse.view_location_id.id,
+            })
             self.env['shopify.connector.location.mapping'].sudo().create({
                 'store_id': store.id,
                 'shopify_gid': mapped_gid,
@@ -309,6 +324,21 @@ class TestUiSetupTours(HttpCase):
             'the name snapshot must come from the validated cache row',
         )
         self.assertEqual(created.match_key, 'manual')
+        # The mapping must point at a DIFFERENT Odoo location than the one
+        # already mapped. This is the assertion the previous version could not
+        # make: the tour chose the first offered option, which on a clean
+        # install is the location Warehouse A already occupies, and
+        # `UNIQUE(store_id, odoo_location_id)` then refused the create.
+        pre_existing = mappings.filtered(
+            lambda m: m.shopify_gid == 'gid://shopify/Location/TOURA'
+        )
+        self.assertTrue(pre_existing.odoo_location_id)
+        self.assertNotEqual(
+            created.odoo_location_id, pre_existing.odoo_location_id,
+            'the browser must have chosen an ELIGIBLE Odoo location, not the '
+            'one another Shopify location is already mapped to',
+        )
+        self.assertEqual(created.odoo_location_id.usage, 'internal')
 
     def test_a_blocking_readiness_row_deep_links_by_step_key(self):
         if 'shopify.connector.location.mapping' not in self.env:

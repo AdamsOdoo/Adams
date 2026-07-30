@@ -721,3 +721,158 @@ class TestOfflineCompatibility(ClientCredentialsCase):
             're-entering the identical token is a credential change and must '
             'advance the identity the probe compares',
         )
+
+
+@tagged('post_install', '-at_install')
+class TestVulnerableCacheUpgrade(ClientCredentialsCase):
+    """Migration 19.0.1.17.0: direct coverage of what it is actually for.
+
+    `19.0.1.16.0`'s own script is the cautionary example this class exists not to
+    repeat. Its predicate was `WHERE auth_mode IS NULL`, and `auth_mode` is
+    `required=True` with a default -- so Odoo's `_auto_init` had already
+    backfilled every row and applied `NOT NULL` before any `post-migrate` ran.
+    The predicate could not be true, the script reported "0 row(s)", and the
+    batch records nevertheless cited it as executed migration evidence. A
+    migration whose predicate cannot be true is not a statement about anything.
+
+    This script's predicate CAN be true, and the tests below make it true and
+    then check the consequence, rather than asserting that a file exists.
+    """
+
+    def _seed_vulnerable_cache_row(self):
+        """A cache row in the shape the VULNERABLE writer produced.
+
+        `credential_epoch = 0` is its fingerprint: `_auto_init` backfills the new
+        column with the field default, and the corrected `_write_token_cache`
+        never writes 0 -- the first sanctioned mutation of any credential moves
+        its epoch to 1, so every provable row carries 1 or more.
+        """
+        self._set_client_credentials()
+        credential = self.Credential._credential_for(self.store)
+        Cache = self.env['shopify.connector.store.access.token'].sudo()
+        row = Cache.create({
+            'store_id': self.store.id,
+            'credential_id': credential.id,
+            'credential_epoch': credential.credential_epoch,
+            'auth_mode': credential.auth_mode,
+            'access_token': DUMMY_EXCHANGED_TOKEN,
+            'obtained_at': fields.Datetime.now(),
+            'expires_at': fields.Datetime.now() + timedelta(hours=24),
+        })
+        # Then age it back to the pre-correction shape with raw SQL, because the
+        # ORM would refuse to write 0 into a column the service never writes 0
+        # into -- and the point is to reproduce a row the OLD code wrote.
+        self.env.cr.execute(
+            'UPDATE shopify_connector_store_access_token '
+            'SET credential_epoch = 0 WHERE id = %s', (row.id,),
+        )
+        row.invalidate_recordset()
+        return row
+
+    def _run_migration(self):
+        from ..migrations import __name__ as _unused  # noqa: F401
+        import importlib.util
+        import pathlib
+        path = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / 'migrations' / '19.0.1.17.0' / 'post-migrate.py'
+        )
+        spec = importlib.util.spec_from_file_location('sc_post_migrate', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        # A real `version` argument: the script returns early on a fresh install
+        # (`if not version`), which is correct and must not be what the test
+        # exercises.
+        module.migrate(self.env.cr, '19.0.1.16.0')
+        return module
+
+    def test_an_unprovable_cache_row_is_removed_not_blessed(self):
+        row = self._seed_vulnerable_cache_row()
+        self.assertTrue(row.exists())
+        self._run_migration()
+        row.invalidate_recordset()
+        self.assertFalse(
+            row.exists(),
+            'a cache row that cannot say which credential minted it was kept '
+            'and would be served as current for up to 24 hours',
+        )
+        # And no token is served for the store afterwards, so the next call
+        # mints a fresh one through the corrected path.
+        self.assertFalse(self.Credential._get_access_token(self.store))
+
+    def test_the_migration_is_idempotent(self):
+        self._seed_vulnerable_cache_row()
+        self._run_migration()
+        Cache = self.env['shopify.connector.store.access.token'].sudo()
+        after_first = Cache.search_count([('store_id', '=', self.store.id)])
+        self._run_migration()
+        self.assertEqual(
+            Cache.search_count([('store_id', '=', self.store.id)]),
+            after_first,
+            'a second update must change nothing',
+        )
+
+    def test_a_provable_cache_row_survives_the_upgrade(self):
+        """The predicate must be narrow: a good row is not collateral damage."""
+        self._set_client_credentials()
+        with patch.object(
+            type(self.Client), '_send_token_exchange',
+            return_value=_token_response(),
+        ):
+            self.Credential._ensure_access_token(self.store, purpose='setup')
+        cached = self._cached()
+        self.assertTrue(cached)
+        self.assertGreater(cached.credential_epoch, 0)
+        self._run_migration()
+        cached.invalidate_recordset()
+        self.assertTrue(
+            cached.exists(),
+            'a cache row WITH provable provenance was deleted by the upgrade',
+        )
+        self.assertEqual(
+            self.Credential._get_access_token(self.store),
+            DUMMY_EXCHANGED_TOKEN,
+        )
+
+    def test_offline_token_bytes_survive_the_upgrade(self):
+        """The offline path is untouched, byte for byte."""
+        self.Credential.with_user(self.user_admin).action_set_token(
+            self.store, DUMMY_OFFLINE_TOKEN,
+        )
+        credential = self.Credential._credential_for(self.store)
+        before_epoch = credential.credential_epoch
+        self._run_migration()
+        credential.invalidate_recordset()
+        self.assertEqual(
+            credential.access_token, DUMMY_OFFLINE_TOKEN,
+            'the stored offline access token must be byte-for-byte unchanged',
+        )
+        self.assertEqual(
+            credential.auth_mode, credential_module.AUTH_MODE_OFFLINE,
+        )
+        self.assertEqual(
+            credential.credential_epoch, before_epoch,
+            'an upgrade is not a credential mutation and must not advance the '
+            'identity epoch -- doing so would invalidate every store at once',
+        )
+        self.assertEqual(
+            self.Credential._get_access_token(self.store), DUMMY_OFFLINE_TOKEN,
+        )
+
+    def test_configured_client_credentials_survive_the_upgrade(self):
+        """The pair a merchant configured is preserved; only the cache goes."""
+        self._seed_vulnerable_cache_row()
+        credential = self.Credential._credential_for(self.store)
+        before = (
+            credential.client_id, credential.client_secret,
+            credential.credential_state, credential.credential_epoch,
+        )
+        self._run_migration()
+        credential.invalidate_recordset()
+        self.assertEqual(
+            (credential.client_id, credential.client_secret,
+             credential.credential_state, credential.credential_epoch),
+            before,
+            'the upgrade changed the configured credential; it may only '
+            'remove unprovable cached tokens',
+        )

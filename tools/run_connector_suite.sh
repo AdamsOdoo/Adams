@@ -180,13 +180,55 @@ RUN_WARM=1
 RUN_NONSTANDARD=1
 RUN_SELF_TEST=0
 TEST_TAGS=""
+# --- The migration passes (2026-07-30) ---------------------------------------
+#
+# WHY PASS 2 IS NOT A MIGRATION TEST, AND NEVER WAS.
+#
+# Pass 2 clones the database pass 1 installed and runs `-u` against the SAME
+# working tree. `ir_module_module.latest_version` therefore already equals the
+# manifest version, and Odoo's migration manager only runs a script when the
+# installed version is STRICTLY LOWER
+# (`odoo/modules/migration.py::migrate_module` -> `compare()`:
+# `parsed_installed_version < parse_version(full_version) <= current_version`).
+# So pass 2 executes ZERO `pre-migrate.py`/`post-migrate.py` files, by
+# construction, on every run.
+#
+# That is not a defect in pass 2 -- it exists to catch the issue #193 warm-update
+# registry family and it does. The defect was reporting it as migration
+# evidence: PR #204's batch-1 records state "warm `-u` update + standard suite
+# (migration 19.0.1.16.0 executed)" for a run in which that script provably did
+# not execute. This block is the correction. `MIGRATION_FROM_REFS` names commits
+# whose trees carry LOWER manifest versions, each is installed from its own
+# extracted tree, and the candidate tree is then upgraded onto it -- which is the
+# only shape in which a migration script runs at all.
+#
+# Proof, not inference: Odoo logs `module <addon>: Running upgrade <version>
+# <name>` for every script it executes (migration.py at the pin), and
+# `verify_migration_evidence` FAILS a migration pass that produced no such line
+# for a connector module. The warm pass asserts the opposite -- that no such
+# line appears -- so the two passes can never be confused for one another again.
+#
+#   50b770a3  the pre-client-credentials baseline this batch started from
+#   0a15b176  the vulnerable deployed shape this correction changes
+MIGRATION_FROM_REFS=(
+    "50b770a315b53f0c05f0b8867bb801d75c6476ef"
+    "0a15b176e60b77bf2f40195a9961591c788e14f8"
+)
+RUN_MIGRATION=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; shift ;;
-        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; shift ;;
+        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
+        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
+        # Same rule, same reason: opt-OUT only. A run that skips the genuine
+        # version-to-version upgrade must say so in the summary, which it does.
+        --skip-migration)   RUN_MIGRATION=0; shift ;;
+        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; shift ;;
+        # Override the upgrade origins (space-separated refs), for a one-off
+        # check against some other ancestor.
+        --migration-from)   read -r -a MIGRATION_FROM_REFS <<< "$2"; shift 2 ;;
         # Proves the fail-closed checks actually fail. No database, no browser,
         # no Odoo: runs against synthetic logs and exits. See `self_test`.
         --self-test)        RUN_SELF_TEST=1; shift ;;
@@ -357,6 +399,54 @@ verify_hoot_evidence() {  # verify_hoot_evidence <log> <label>
     done < <(tr '|' '\n' <<<"$REQUIRED_HOOT_SUITES")
 }
 
+# --- Migration evidence (2026-07-30) -----------------------------------------
+#
+# The one marker Odoo itself emits when it EXECUTES an upgrade script:
+#   `module <addon>: Running upgrade <fmt_version> <name>`
+# (`odoo/modules/migration.py` at the pin). Anything weaker -- "the pass was
+# green", "the version is right", "a migrations/ directory exists" -- is
+# compatible with zero scripts having run, which is exactly the false claim this
+# check exists to make impossible.
+MIGRATION_MARKER='Running upgrade'
+
+# Every connector-module `Running upgrade` line in a log, one per line.
+migration_lines() {  # migration_lines <log>
+    grep -oE "module (shopify_connector_[a-z_]+): ${MIGRATION_MARKER} [^ ]+ [^ ]+" \
+        "$1" 2>/dev/null || true
+}
+
+# A migration pass that ran no script proved nothing and must fail.
+verify_migration_evidence() {  # verify_migration_evidence <log> <label>
+    local logfile="$1" label="$2" lines count
+    lines="$(migration_lines "$logfile")"
+    count="$(printf '%s' "$lines" | grep -c . || true)"
+    if [[ "$count" -eq 0 ]]; then
+        evidence_fail "${label}: no connector migration script executed -- a \
+version-to-version upgrade that runs zero scripts is not migration evidence"
+        return 0
+    fi
+    log "${label}: ${count} connector migration script(s) executed"
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && log "${label}:   ${line}"
+    done <<<"$lines"
+    return 0
+}
+
+# The inverse assertion, for the same-version warm pass. If this ever finds a
+# marker, the warm pass has stopped being a same-version update and the summary's
+# description of it is wrong -- which is a reason to fail, not to relabel.
+verify_no_migration_ran() {  # verify_no_migration_ran <log> <label>
+    local logfile="$1" label="$2" lines
+    lines="$(migration_lines "$logfile")"
+    if [[ -n "$lines" ]]; then
+        evidence_fail "${label}: a migration script executed during a \
+SAME-VERSION update, so this pass is not the thing the summary calls it: ${lines}"
+    else
+        log "${label}: same-version update, zero migration scripts (expected)"
+    fi
+    return 0
+}
+
 # --- Fail-closed self-test (TD-010 regression verification) ------------------
 #
 # TD-010 is not closed by "the runner now checks"; it is closed by proving the
@@ -500,6 +590,41 @@ self_test() {
     hoot_count="$(printf '%s\n' "$REQUIRED_HOOT_SUITES" | tr '|' '\n' | grep -c .)"
     local want=$(( $(printf '%s' "$REQUIRED_TOUR_TESTS" | wc -w) + 1 + hoot_count ))
     _expect "$want" "an empty log fails for every required tour and every HOOT suite"
+
+    # 6b. Migration evidence. TD-010's rule applied to the false claim this
+    #     batch corrected: the checks are only worth anything if they FAIL when
+    #     they should, so both directions are asserted here.
+    local mig_ok="${tmp}/migration_ok.log" mig_none="${tmp}/migration_none.log"
+    printf 'INFO db odoo.modules.migration: module shopify_connector_core: %s 19.0.1.17.0 post-migrate.py\n' \
+        "$MIGRATION_MARKER" > "$mig_ok"
+    EVIDENCE_ERRORS=()
+    verify_migration_evidence "$mig_ok" self-test
+    _expect 0 "a log with a connector migration marker passes"
+
+    # A green pass that ran NO script is the exact shape the previous cycle
+    # published as "migration 19.0.1.16.0 executed". It must fail.
+    printf 'INFO db odoo.tests.result: 0 failed, 0 error(s) of 2189 tests\n' \
+        > "$mig_none"
+    EVIDENCE_ERRORS=()
+    verify_migration_evidence "$mig_none" self-test
+    _expect 1 "a green migration pass that executed no script is an evidence failure"
+
+    # An UPSTREAM module's upgrade is not this connector's evidence.
+    local mig_foreign="${tmp}/migration_foreign.log"
+    printf 'INFO db odoo.modules.migration: module account: %s 19.0.1.0 post-migrate.py\n' \
+        "$MIGRATION_MARKER" > "$mig_foreign"
+    EVIDENCE_ERRORS=()
+    verify_migration_evidence "$mig_foreign" self-test
+    _expect 1 "another module's upgrade is not connector migration evidence"
+
+    # And the inverse check: a SAME-VERSION pass that somehow ran a script must
+    # fail rather than be quietly relabelled.
+    EVIDENCE_ERRORS=()
+    verify_no_migration_ran "$mig_ok" self-test
+    _expect 1 "a migration script during a same-version update is an evidence failure"
+    EVIDENCE_ERRORS=()
+    verify_no_migration_ran "$mig_none" self-test
+    _expect 0 "a same-version update with no migration script passes"
 
     # 7. An unresolvable browser must abort the RUN, not warn. Checked in a
     #    subshell so the exit does not end the self-test.
@@ -744,6 +869,101 @@ if [[ $RUN_WARM -eq 1 ]]; then
     log "warm: ${WARM_STATUS} ${WARM_RESULT}"
     verify_no_unexpected_skips "${ARTIFACT_DIR}/warm.log" "warm"
     verify_tour_evidence "${ARTIFACT_DIR}/warm.log" "warm"
+    # This pass is a SAME-VERSION update and must never be quoted as migration
+    # evidence. Asserted, not assumed.
+    verify_no_migration_ran "${ARTIFACT_DIR}/warm.log" "warm"
+fi
+
+# --- Pass 2b: genuine version-to-version migrations --------------------------
+# Install from an OLDER tree, then upgrade the candidate onto it. This is the
+# only shape in which Odoo runs a migration script at all (see the
+# MIGRATION_FROM_REFS comment above), and each pass proves a script ran, that the
+# standard suite is green afterwards, and that a SECOND update is a no-op.
+MIGRATION_RESULTS=()
+MIGRATION_OVERALL="skipped"
+if [[ $RUN_MIGRATION -eq 1 ]]; then
+    MIGRATION_OVERALL="pass"
+    for ref in "${MIGRATION_FROM_REFS[@]}"; do
+        short="${ref:0:8}"
+        label="migration-${short}"
+        base_tree="${ARTIFACT_DIR}/base-${short}"
+        log "genuine migration pass from ${short}"
+        if ! git -C "$REPO_ROOT" cat-file -e "${ref}^{commit}" 2>/dev/null; then
+            log "FATAL: ${ref} is not present in this clone; unshallow it first."
+            MIGRATION_OVERALL="fail"; OVERALL=1
+            MIGRATION_RESULTS+=("{\"from\":\"${ref}\",\"status\":\"fail\",\"reason\":\"ref not in clone\"}")
+            continue
+        fi
+        # `git archive` rather than `git worktree`: it materialises the old
+        # `addons/` tree with no `.git` metadata and no repository mutation, so a
+        # failed run cannot leave a registered worktree behind for the next one
+        # to trip over.
+        rm -rf "$base_tree"; mkdir -p "$base_tree"
+        git -C "$REPO_ROOT" archive "$ref" addons | tar -x -C "$base_tree"
+        OLD_CONF="${ARTIFACT_DIR}/odoo-${label}.conf"
+        sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${base_tree}/addons|" \
+            "$CONF" > "$OLD_CONF"
+        DB="connector_${label//-/_}_$$"
+        dropdb --if-exists "$DB" 2>/dev/null || true
+        createdb "$DB"
+        # 1. install the OLD tree
+        if ! ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$OLD_CONF" \
+                -d "$DB" --stop-after-init --log-level=warn \
+                -i "${MODULES},${EXTRA_MODULES}" ) \
+                > "${ARTIFACT_DIR}/${label}-install.log" 2>&1; then
+            log "FATAL: installing ${short} failed; see ${label}-install.log"
+            MIGRATION_OVERALL="fail"; OVERALL=1
+            MIGRATION_RESULTS+=("{\"from\":\"${ref}\",\"status\":\"fail\",\"reason\":\"old-tree install failed\"}")
+            continue
+        fi
+        BEFORE_VERSIONS="$(psql -tAc \
+            "SELECT name || '=' || latest_version FROM ir_module_module \
+             WHERE name LIKE 'shopify_connector%' ORDER BY name" "$DB" \
+            | tr '\n' ' ')"
+        log "${label}: installed versions ${BEFORE_VERSIONS}"
+        # 2. upgrade the CANDIDATE tree onto it, with the standard suite
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}.log" -u "$MODULES" \
+                --test-enable "${STANDARD_TAG_ARGS[@]}"; then
+            MIG_STATUS="pass"
+        else
+            MIG_STATUS="fail"; MIGRATION_OVERALL="fail"; OVERALL=1
+        fi
+        MIG_RESULT="$(result_line "${ARTIFACT_DIR}/${label}.log")"
+        AFTER_VERSIONS="$(psql -tAc \
+            "SELECT name || '=' || latest_version FROM ir_module_module \
+             WHERE name LIKE 'shopify_connector%' ORDER BY name" "$DB" \
+            | tr '\n' ' ')"
+        log "${label}: ${MIG_STATUS} ${MIG_RESULT}"
+        log "${label}: upgraded versions ${AFTER_VERSIONS}"
+        verify_no_unexpected_skips "${ARTIFACT_DIR}/${label}.log" "$label"
+        verify_tour_evidence "${ARTIFACT_DIR}/${label}.log" "$label"
+        verify_migration_evidence "${ARTIFACT_DIR}/${label}.log" "$label"
+        if [[ "$BEFORE_VERSIONS" == "$AFTER_VERSIONS" ]]; then
+            evidence_fail "${label}: module versions did not change, so this \
+was not a version-to-version upgrade at all"
+        fi
+        # 3. idempotency: a SECOND update must be green and run nothing again
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}-again.log" -u "$MODULES" \
+                --test-enable "${STANDARD_TAG_ARGS[@]}"; then
+            MIG_AGAIN="pass"
+        else
+            MIG_AGAIN="fail"; MIGRATION_OVERALL="fail"; OVERALL=1
+        fi
+        MIG_AGAIN_RESULT="$(result_line "${ARTIFACT_DIR}/${label}-again.log")"
+        log "${label}: second update ${MIG_AGAIN} ${MIG_AGAIN_RESULT}"
+        verify_no_unexpected_skips "${ARTIFACT_DIR}/${label}-again.log" \
+            "${label}-again"
+        verify_no_migration_ran "${ARTIFACT_DIR}/${label}-again.log" \
+            "${label}-again"
+        MIGRATION_RESULTS+=("{\"from\":\"${ref}\",\"status\":\"${MIG_STATUS}\",\
+\"result\":\"${MIG_RESULT}\",\"second_update\":\"${MIG_AGAIN}\",\
+\"second_update_result\":\"${MIG_AGAIN_RESULT}\",\
+\"installed_versions_before\":\"${BEFORE_VERSIONS% }\",\
+\"installed_versions_after\":\"${AFTER_VERSIONS% }\",\
+\"migration_scripts\":$(migration_lines "${ARTIFACT_DIR}/${label}.log" \
+    | wc -l | tr -d ' '),\"log\":\"${label}.log\"}")
+        rm -rf "$base_tree"
+    done
 fi
 
 # --- Pass 3: the non-standard tag suite --------------------------------------
@@ -841,8 +1061,17 @@ cat > "$SUMMARY" <<EOF
   "nonstandard_tags": "${NONSTANDARD_TAGS}",
   "passes": {
     "fresh_install_standard": {"status": "${FRESH_STATUS}", "result": "${FRESH_RESULT}", "log": "fresh.log"},
-    "warm_update_standard":   {"status": "${WARM_STATUS}",  "result": "${WARM_RESULT}",  "log": "warm.log"},
+    "warm_update_standard":   {"status": "${WARM_STATUS}",  "result": "${WARM_RESULT}",  "log": "warm.log",
+                               "kind": "SAME-VERSION module update",
+                               "runs_migration_scripts": false,
+                               "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
     "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
+  },
+  "migration_passes": {
+    "status": "${MIGRATION_OVERALL}",
+    "kind": "VERSION-TO-VERSION upgrade: installed from an older tree, candidate upgraded onto it",
+    "evidence_marker": "module <addon>: ${MIGRATION_MARKER} <version> <script>",
+    "runs": [$(IFS=,; echo "${MIGRATION_RESULTS[*]:-}")]
   },
   "shopify_operations": "none",
   "evidence_class": "CI supporting evidence, NOT Odoo.sh exact-SHA acceptance (DEC-041 D8)"

@@ -303,9 +303,23 @@
             margin-block-start: var(--sc-space-1);
         }
 
+        // The selected-mode indicator, in LOGICAL direction.
+        //
+        // This was `box-shadow: inset 3px 0 0`, which is a PHYSICAL horizontal
+        // offset: under `dir="rtl"` the stripe stayed pinned to the left edge
+        // while every sibling indicator in this stylesheet mirrored, so the one
+        // element whose job is to say "this is the path you chose" pointed the
+        // wrong way in RTL. It was also the single physical-direction
+        // declaration in a file whose own header rule mandates logical
+        // properties.
+        //
+        // `border-inline-start` mirrors correctly, and it makes the surrounding
+        // comment true in a second way: it is a BORDER, which is what that
+        // comment claims conveys the selection alongside the radio. The same
+        // pattern the readiness rows already use.
         &.sc_setup__mode--selected {
             border-color: var(--sc-border-strong);
-            box-shadow: inset 3px 0 0 var(--sc-info-text);
+            border-inline-start: 3px solid var(--sc-info-text);
         }
 
         &:focus-within {

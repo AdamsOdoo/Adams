@@ -355,8 +355,19 @@
                         control to press; in `previewed` there is a quantity
                         on screen and a decision to make.
                     -->
+                    <!--
+                        "Nothing has been pushed" is only true for a pair that
+                        has NEVER pushed. TD-020's withdrawal returns a pair
+                        that HAS pushed to `pending`, and this band then told
+                        the operator nothing had been pushed for a product whose
+                        quantity is live on the storefront right now: the
+                        single most consequential thing they could be wrong
+                        about. Each waiting state now has two sentences, chosen
+                        by `last_pushed_at`, and the withdrawn-after-pushing one
+                        says what remains live and what to do next.
+                    -->
                     <div class="alert alert-warning" role="alert"
-                         invisible="first_push_state != 'pending'">
+                         invisible="first_push_state != 'pending' or last_pushed_at">
                         <strong>Waiting for a first-push preview.</strong>
                         Nothing has been pushed for this product and location
                         yet, and the quantity to send has not been computed.
@@ -364,10 +375,35 @@
                         confirmation control appears once it has.
                     </div>
                     <div class="alert alert-warning" role="alert"
-                         invisible="first_push_state != 'previewed'">
+                         invisible="first_push_state != 'pending' or not last_pushed_at">
+                        <strong>Waiting for a new first-push preview — the
+                        quantity already on Shopify stays live.</strong>
+                        This pair has pushed before, and its first-push
+                        decision has since been withdrawn. Shopify keeps the
+                        quantity this connector last pushed (shown below as
+                        <em>Last pushed</em>) until a new preview is computed,
+                        explicitly confirmed and applied — withdrawing changed
+                        nothing on the storefront. Next safe action: wait for
+                        the preview on the next scheduled pass, then review the
+                        quantities and confirm. If the quantity on Shopify is
+                        wrong in the meantime, correct it in Shopify — this
+                        connector will not overwrite it before a confirmed
+                        push.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="first_push_state != 'previewed' or last_pushed_at">
                         <strong>Waiting for a first-push confirmation.</strong>
                         Nothing has been pushed for this product and location
                         yet. Review the quantities below, then confirm.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="first_push_state != 'previewed' or not last_pushed_at">
+                        <strong>Waiting for a first-push confirmation — the
+                        quantity already on Shopify stays live.</strong>
+                        This pair has pushed before. Shopify keeps the quantity
+                        this connector last pushed until you confirm the
+                        previewed quantity below and it is applied. Review both
+                        numbers, then confirm.
                     </div>
                     <group>
                         <group string="Pair">

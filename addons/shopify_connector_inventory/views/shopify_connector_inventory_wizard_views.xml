@@ -282,7 +282,7 @@
                     pair that HAS pushed leaves its last pushed quantity live
                     on the storefront until the new ceremony completes.
                 -->
-                <div class="alert alert-info" role="note"
+                <div class="alert alert-info" role="status"
                      invisible="has_pushed_before">
                     Nothing has ever been pushed for this pair, so Shopify is
                     not affected by withdrawing the decision.

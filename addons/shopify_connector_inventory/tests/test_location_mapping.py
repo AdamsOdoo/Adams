@@ -1,3 +1,5 @@
+from lxml import etree
+
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
@@ -1105,6 +1107,64 @@ class TestFirstPushWithdrawal(TransactionCase):
         self._withdraw(binding)
         binding.invalidate_recordset()
         self.assertEqual(binding.first_push_state, 'pending')
+
+    def test_the_pair_form_never_claims_nothing_was_pushed_after_a_withdrawal(
+        self,
+    ):
+        """The withdrawn-after-pushing copy must not say Shopify is untouched.
+
+        Batch 1 correction. `withdraw_first_push_decision` returns the pair to
+        `pending`, and the pair form's `pending` band said "Nothing has been
+        pushed for this product and location yet" -- to an operator whose
+        product has a quantity live on the storefront at that very moment. It is
+        the most consequential thing that copy could be wrong about, and the
+        withdrawal is precisely what makes it wrong.
+
+        Asserted at the ARCH level deliberately. `invisible` is evaluated in the
+        browser, so no server-side render can tell which band a given record
+        shows; what a server test CAN prove is that no band making the
+        never-pushed claim is reachable without a `last_pushed_at` condition,
+        which is the invariant. The behavioural half is the U2 withdraw tour.
+        """
+        arch = self.env.ref(
+            'shopify_connector_inventory'
+            '.view_shopify_connector_inventory_level_binding_form'
+        ).arch_db
+        root = etree.fromstring(arch)
+        offenders = []
+        for node in root.iter('div'):
+            text = ' '.join(node.itertext())
+            if 'has been pushed' not in text and 'has ever been pushed' not in text:
+                continue
+            if 'Nothing has' not in text:
+                continue
+            condition = node.get('invisible') or ''
+            if 'last_pushed_at' not in condition:
+                offenders.append(condition or '<no invisible condition>')
+        self.assertEqual(
+            offenders, [],
+            'a band claiming nothing has been pushed is reachable without a '
+            'last_pushed_at condition, so a withdrawn pair that HAS pushed '
+            'would be told Shopify is unaffected: %r' % (offenders,),
+        )
+        # And the honest counterpart genuinely exists, conditioned the other way.
+        honest = [
+            node for node in root.iter('div')
+            if 'stays live' in ' '.join(node.itertext())
+            and 'not last_pushed_at' in (node.get('invisible') or '')
+        ]
+        self.assertTrue(
+            honest,
+            'no band states that the previously pushed quantity remains live '
+            'until a new confirmed push',
+        )
+        for node in honest:
+            text = ' '.join(node.itertext())
+            self.assertIn(
+                'Next safe action', text,
+                'the withdrawn-after-pushing band must give the next safe '
+                'action, not only the consequence',
+            ) if 'pending' in (node.get('invisible') or '') else None
 
     def test_the_wizard_delegates_with_the_snapshotted_state(self):
         """The display-and-delegate wizard sends the state it OPENED on."""

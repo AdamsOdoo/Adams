@@ -475,21 +475,33 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             trigger: heading(7, "Location mapping"),
             content: "The wizard resumes on the location step.",
         },
+        // --- Mapped state is asserted by EXACT attribute, never by substring.
+        //
+        //     hoot-dom's `:contains()` is a case-insensitive substring match, so
+        //     `:contains('Mapped')` also matches "Not mapped". Every assertion
+        //     here used to pass whichever badge was rendered -- including the
+        //     final one below, which is supposed to prove a mapping was created
+        //     and passed just as happily when the create had failed. The
+        //     `data-mapped` attribute the template now carries is exact.
         {
-            trigger: ".sc_setup__location:contains('Tour Warehouse A')" +
-                     ":contains('Mapped')",
+            trigger: ".sc_setup__location[data-mapped='1']:contains('Tour Warehouse A')",
             content: "An already-mapped location says so.",
         },
         {
-            trigger: ".sc_setup__location:contains('Tour Warehouse B')" +
-                     ":contains('Not mapped')",
+            trigger: ".sc_setup__location[data-mapped='0']:contains('Tour Warehouse B')",
             content:
                 "An unmapped location is never described as synchronised.",
         },
         {
-            trigger: ".sc_setup__location:contains('Tour Warehouse C')" +
-                     ":contains('Not mapped')",
+            trigger: ".sc_setup__location[data-mapped='0']:contains('Tour Warehouse C')",
             content: "Every cached location has a visible mapped state.",
+        },
+        {
+            // The human-readable badge is still checked, on the row the
+            // attribute has already identified -- so the copy cannot silently
+            // disagree with the state.
+            trigger: ".sc_setup__location[data-mapped='1'] .sc-badge--success",
+            content: "The mapped row's badge is the success badge.",
         },
         {
             trigger: ".sc_setup__location-gid:contains('gid://shopify/Location/')",
@@ -510,7 +522,10 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
         },
         { trigger: ".sc_setup_search_shopify_go", run: "click" },
         {
-            trigger: ".sc_setup__showing:contains('Showing 1 of 1')",
+            // The Shopify counter specifically. Two elements shared the
+            // `.sc_setup__showing` class, so this could previously have been
+            // satisfied by the Odoo counter instead.
+            trigger: ".sc_setup__showing--shopify:contains('Showing 1 of 1')",
             content: "The search narrowed the list, with an honest count.",
         },
         {
@@ -540,13 +555,35 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             // one can only ever time out -- it would be asserting that a
             // dropdown is open, which is not the claim.
             trigger: "#sc_setup_map_odoo",
-            content: "At least one eligible Odoo location is offered, and is "
-                     + "chosen.",
+            content: "At least one eligible Odoo location is offered, and a "
+                     + "location not already mapped elsewhere is chosen.",
             run() {
                 const select = document.querySelector("#sc_setup_map_odoo");
-                const option = Array.from(select.options).find((o) => o.value);
+                // Pick a location that is NOT already the target of another
+                // Shopify mapping. `UNIQUE(store_id, odoo_location_id)` refuses a
+                // second mapping onto the same Odoo location, so taking the
+                // first option with a value picked whichever row the fixture
+                // happened to order first -- on a clean install that is the
+                // location Warehouse A is already mapped to, the create was
+                // refused, and the substring assertion below passed anyway. The
+                // rows already on screen name their current Odoo targets, so the
+                // set to avoid is readable from the DOM.
+                const taken = new Set(
+                    Array.from(
+                        document.querySelectorAll(
+                            ".sc_setup__location[data-mapped='1'] " +
+                            ".sc_setup__location-target"
+                        )
+                    ).map((el) => el.textContent.replace(/^\s*Odoo location:\s*/, "").trim())
+                );
+                const option = Array.from(select.options).find(
+                    (o) => o.value && !taken.has(o.textContent.trim())
+                );
                 if (!option) {
-                    throw new Error("no eligible Odoo location is offered");
+                    throw new Error(
+                        "no ELIGIBLE Odoo location is offered: every option is " +
+                        "already mapped to another Shopify location"
+                    );
                 }
                 select.value = option.value;
                 select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -554,9 +591,16 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
         },
         { trigger: ".sc_setup_create_mapping", run: "click" },
         {
-            trigger: ".sc_setup__location:contains('Tour Warehouse B')" +
-                     ":contains('Mapped')",
+            // Exact state, not a substring that "Not mapped" also satisfies.
+            // The DATABASE consequence is asserted by the Python test that
+            // drives this tour; this proves the surface reflects it.
+            trigger: ".sc_setup__location[data-mapped='1']:contains('Tour Warehouse B')",
             content: "The mapping was created through the sanctioned service.",
+        },
+        {
+            // And no refusal was silently rendered instead.
+            trigger: ".o_sc_setup:not(:has(.sc_setup__error))",
+            content: "The mapping was created without a server refusal.",
         },
     ],
 });
