@@ -888,10 +888,33 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
         label="migration-${short}"
         base_tree="${ARTIFACT_DIR}/base-${short}"
         log "genuine migration pass from ${short}"
+        # FETCH IT IF IT IS MISSING, then fail closed only if that fails too.
+        #
+        # `actions/checkout` clones with `fetch-depth: 1` by default, so on CI
+        # the ancestors these passes upgrade FROM are simply not in the object
+        # store. Refusing outright was correct-but-useless there: it turned a
+        # missing object into a red run on every push, and the obvious "fix"
+        # would have been to weaken the guard.
+        #
+        # GitHub permits fetching a commit by its exact SHA, so the script
+        # fetches what it needs instead of depending on how the caller cloned.
+        # `--depth=1` keeps it cheap: these passes install from the tree at that
+        # commit and never walk its history.
         if ! git -C "$REPO_ROOT" cat-file -e "${ref}^{commit}" 2>/dev/null; then
-            log "FATAL: ${ref} is not present in this clone; unshallow it first."
+            log "${short} is not in this clone; fetching it"
+            git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin "$ref" \
+                >/dev/null 2>&1 \
+                || git -C "$REPO_ROOT" fetch --no-tags origin "$ref" \
+                >/dev/null 2>&1 || true
+        fi
+        if ! git -C "$REPO_ROOT" cat-file -e "${ref}^{commit}" 2>/dev/null; then
+            log "FATAL: ${ref} is not present in this clone and could not be"
+            log "       fetched, so the genuine upgrade from it cannot run."
+            log "       This is a REFUSAL, not a skip: a run that cannot"
+            log "       perform the migration passes must not report as though"
+            log "       it did."
             MIGRATION_OVERALL="fail"; OVERALL=1
-            MIGRATION_RESULTS+=("{\"from\":\"${ref}\",\"status\":\"fail\",\"reason\":\"ref not in clone\"}")
+            MIGRATION_RESULTS+=("{\"from\":\"${ref}\",\"status\":\"fail\",\"reason\":\"ref not in clone and could not be fetched\"}")
             continue
         fi
         # `git archive` rather than `git worktree`: it materialises the old
