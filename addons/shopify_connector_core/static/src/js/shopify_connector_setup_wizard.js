@@ -655,6 +655,18 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     clearLocationSearch(side) {
+        // The SAME serialization the search itself obeys, and for a sharper
+        // reason. Clearing is not a server call, so it looked safe to leave
+        // outside the discipline -- but a clear issued while a search is in
+        // flight is UNDONE by the response that arrives after it: the handler
+        // assigns `search.items` unconditionally, so the operator is left with
+        // an empty query box, the old query's results beneath it, and a
+        // continuation token belonging to a query that is no longer displayed.
+        // The next Load more then sends that token with an empty query and is
+        // refused by the server, which is a refusal with no visible cause.
+        if (this.state.busy) {
+            return;
+        }
         this.state.locationSearch[side] = {
             query: "",
             items: null,
@@ -662,6 +674,12 @@ export class ShopifyConnectorSetupWizard extends Component {
             offset: 0,
             nextOffset: false,
             continuation: null,
+            // Every key the initial state declares, so a cleared side and a
+            // never-searched side are the same SHAPE and not merely the same
+            // to look at. `emptyReason` was the one omission, and a state
+            // object that loses a key on a routine operator action is how a
+            // reader of `search.emptyReason` starts seeing `undefined`.
+            emptyReason: "",
         };
         // Clearing changes what is on screen, so a selection made inside the
         // cleared results may no longer be there.

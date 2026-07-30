@@ -16,7 +16,7 @@
 
 import { expect, test, describe, beforeEach } from "@odoo/hoot";
 import { queryAll, queryFirst, queryText } from "@odoo/hoot-dom";
-import { animationFrame } from "@odoo/hoot-mock";
+import { animationFrame, Deferred } from "@odoo/hoot-mock";
 import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
 import { ShopifyConnectorSetupWizard } from "@shopify_connector_core/js/shopify_connector_setup_wizard";
 
@@ -643,5 +643,661 @@ describe("shopify connector setup wizard", () => {
         expect(rows[0]).toInclude("WH/Stock");
         expect(rows[1]).toInclude("Not mapped");
         expect(rows[1]).toInclude("will not be synchronised");
+    });
+
+    // ======================================================================
+    // The location step's bounded search, driven through the MOUNTED
+    // component and the real RPC boundary.
+    //
+    // WHY THIS SECTION EXISTS. The Batch 1 correction rebuilt this client:
+    // server-issued continuation instead of a client-derived offset, the
+    // `state.busy` discipline the search had bypassed, per-identity
+    // deduplication, revalidation of a selection the operator can no longer
+    // see, an in-place row update after a mapping, and four distinguishable
+    // empty states. All of it was proved on the SERVER and by a tour that
+    // walks one happy path. Neither can see any of the properties above:
+    // a tour cannot hold a response open, cannot inspect what was sent, and
+    // cannot distinguish "the client asked for the right page" from "the
+    // client asked for the wrong page and the fixture made it look the same".
+    //
+    // The fake server below enforces the REAL contract rather than answering
+    // whatever it is asked. It refuses a continuation that does not belong to
+    // the (side, query) being paged, exactly as `search_location_options`
+    // does, and it issues a `next_offset` that is deliberately NOT the number
+    // of rows the client is holding -- so a client that derives its position
+    // from its own array length asks for the wrong rows and the assertion
+    // fails, rather than passing because the two numbers happened to agree.
+    // ======================================================================
+
+    /** One Shopify row, in the shape `_setup_search_locations` returns. */
+    function shopifyRow(index, overrides = {}) {
+        return Object.assign(
+            {
+                shopify_gid: `gid://shopify/Location/${index}`,
+                name: `Warehouse ${index}`,
+                mapped: false,
+                mapping_id: false,
+                odoo_location_id: false,
+                odoo_location_name: "",
+                push_enabled: false,
+            },
+            overrides
+        );
+    }
+
+    /** One Odoo row, in the same shape. */
+    function odooRow(index, overrides = {}) {
+        return Object.assign({ id: index, name: `WH${index}/Stock` }, overrides);
+    }
+
+    /**
+     * A server that behaves like `search_location_options`, not like a stub.
+     *
+     * `nextOffsetFor` is the whole point of the fixture: the position the
+     * server hands back is a number only the server knows, and here it is
+     * chosen so that it can never coincide with the length of the client's
+     * accumulated array. Deriving the offset locally is then observable
+     * rather than merely disapproved of.
+     */
+    function makeLocationServer({
+        shopify = [],
+        odoo = [],
+        pageSize = 2,
+        nextOffsetFor = null,
+        emptyReasonFor = null,
+    } = {}) {
+        const server = {
+            pageSize,
+            pending: null,
+            hold: false,
+            searchCalls: [],
+            token: (side, query) => `continuation:${side}:${query}`,
+            rowsFor(side, query) {
+                const all = side === "shopify" ? shopify : odoo;
+                if (!query) {
+                    return all;
+                }
+                return all.filter((row) =>
+                    row.name.toLowerCase().includes(query.toLowerCase())
+                );
+            },
+            /** The server's own validation, reproduced rather than assumed. */
+            page(kwargs) {
+                const { side, query = "", offset = 0, continuation = null } =
+                    kwargs;
+                if (!Number.isInteger(offset) || offset < 0) {
+                    throw new Error("The location list position is not valid.");
+                }
+                if (offset && continuation !== server.token(side, query)) {
+                    throw new Error(
+                        "The location list moved on while you were reading it. " +
+                            "Search again to start from the first page."
+                    );
+                }
+                const rows = server.rowsFor(side, query);
+                // The offsets the server issues are its own; the fixture maps
+                // them back to real slices so a wrong offset returns wrong
+                // rows instead of throwing.
+                const start = server.sliceStart(side, query, offset);
+                const items = rows.slice(start, start + pageSize);
+                const consumed = start + items.length;
+                const exhausted = consumed >= rows.length;
+                return {
+                    items,
+                    total: rows.length,
+                    offset,
+                    next_offset: exhausted
+                        ? false
+                        : nextOffsetFor
+                          ? nextOffsetFor(consumed)
+                          : consumed,
+                    continuation: server.token(side, query),
+                    empty_reason: rows.length
+                        ? ""
+                        : emptyReasonFor
+                          ? emptyReasonFor(side, query)
+                          : query
+                            ? "no_results"
+                            : side === "shopify"
+                              ? "no_cached_locations"
+                              : "no_eligible_odoo_locations",
+                };
+            },
+            sliceStart(side, query, offset) {
+                if (!offset || !nextOffsetFor) {
+                    return offset;
+                }
+                // Undo the deliberate skew so the fixture still serves the
+                // NEXT rows when the client echoes the server's number back.
+                const rows = server.rowsFor(side, query);
+                for (let real = 0; real <= rows.length; real++) {
+                    if (nextOffsetFor(real) === offset) {
+                        return real;
+                    }
+                }
+                throw new Error(
+                    "The location list position is out of range: " + offset
+                );
+            },
+        };
+        return server;
+    }
+
+    /** Mount the wizard on its location step against `server`. */
+    async function mountLocationStep(server, options = {}) {
+        const { storeId = 5, locationMapping = {}, onSaveMapping = null } =
+            options;
+        const state = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, {
+                id: storeId,
+                state: "connected",
+            }),
+            location_mapping: Object.assign(
+                {
+                    available: true,
+                    reason: "",
+                    locations: [],
+                    odoo_locations: [],
+                    refresh: { state: "succeeded", job_id: 7, reason: "" },
+                    mapped_count: 0,
+                    unmapped_count: 0,
+                    has_valid_mapping: false,
+                },
+                locationMapping
+            ),
+        });
+        mockService("orm", {
+            call: async (model, method, args, kwargs) => {
+                expect(model).toBe("shopify.connector.setup.wizard");
+                calls.push({ method, kwargs });
+                if (method === "search_location_options") {
+                    server.searchCalls.push(kwargs);
+                    if (server.hold) {
+                        const deferred = new Deferred();
+                        server.pending = { kwargs, deferred };
+                        return deferred;
+                    }
+                    return server.page(kwargs);
+                }
+                if (method === "save_location_mapping") {
+                    return onSaveMapping ? onSaveMapping(kwargs) : state;
+                }
+                return state;
+            },
+        });
+        return await mount();
+    }
+
+    /** Resolve the held response with the page the server would have sent. */
+    async function releaseSearch(server) {
+        const { kwargs, deferred } = server.pending;
+        server.pending = null;
+        try {
+            deferred.resolve(server.page(kwargs));
+        } catch (error) {
+            deferred.reject(error);
+        }
+        await animationFrame();
+    }
+
+    const gidsOnScreen = () =>
+        queryAll(".sc_setup__location").map((el) =>
+            el.getAttribute("data-shopify-gid")
+        );
+
+    test("the location search obeys the same busy discipline as every other call", async () => {
+        // Search was the ONE call that bypassed `state.busy`, which is why the
+        // `disabled` bindings on Search and Load more were inert: nothing ever
+        // set the flag they read. Held open, the flag and the controls it
+        // drives are both observable.
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1), shopifyRow(2), shopifyRow(3)],
+            odoo: [odooRow(9)],
+        });
+        const component = await mountLocationStep(server, {
+            locationMapping: {
+                locations: [shopifyRow(1)],
+                odoo_locations: [odooRow(9)],
+            },
+        });
+        server.hold = true;
+        const inFlight = component.searchLocations("shopify");
+        await animationFrame();
+
+        expect(component.state.busy).toBe(true);
+        expect(queryFirst(".sc_setup_search_shopify_go").disabled).toBe(true);
+        expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(true);
+
+        await releaseSearch(server);
+        await inFlight;
+        expect(component.state.busy).toBe(false);
+        expect(queryFirst(".sc_setup_search_shopify_go").disabled).toBe(false);
+        expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(false);
+        expect(server.searchCalls).toHaveLength(1);
+    });
+
+    test("no second search, load-more, clear or mapping is admitted while one is in flight", async () => {
+        // Every overlapping action, against ONE held response. Two searches in
+        // flight at once meant the later-resolving one won regardless of which
+        // query it answered; a clear during a search was overwritten by the
+        // response that arrived after it; a Load more during a search paged
+        // from a position that was about to change.
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1), shopifyRow(2), shopifyRow(3), shopifyRow(4)],
+            odoo: [odooRow(9)],
+        });
+        const component = await mountLocationStep(server, {
+            locationMapping: {
+                locations: [shopifyRow(1), shopifyRow(2)],
+                odoo_locations: [odooRow(9)],
+            },
+        });
+        component.state.form.mapShopifyGid = "gid://shopify/Location/1";
+        component.state.form.mapOdooLocationId = "9";
+        component.state.locationSearch.shopify.query = "warehouse";
+        server.hold = true;
+        const inFlight = component.searchLocations("shopify");
+        await animationFrame();
+        const held = server.pending.kwargs;
+
+        // Four overlapping actions, none of which may reach the server or
+        // move what is on screen while the first is unresolved.
+        await component.searchLocations("shopify");
+        await component.loadMoreLocations("shopify");
+        component.clearLocationSearch("shopify");
+        await component.createMapping();
+        await animationFrame();
+
+        expect(server.searchCalls).toHaveLength(1);
+        expect(server.pending.kwargs).toBe(held);
+        expect(
+            calls.filter((c) => c.method === "save_location_mapping")
+        ).toHaveLength(0);
+        // The mapping was stopped by the busy discipline, not by an empty
+        // form: both identities were chosen and still on screen.
+        expect(component.state.errorMessage).toBe("");
+        // The clear did not survive into the state the response then lands in.
+        expect(component.state.locationSearch.shopify.query).toBe("warehouse");
+
+        await releaseSearch(server);
+        await inFlight;
+        expect(gidsOnScreen()).toEqual([
+            "gid://shopify/Location/1",
+            "gid://shopify/Location/2",
+        ]);
+        expect(server.searchCalls).toHaveLength(1);
+    });
+
+    test("load more sends the server's own next_offset, never the length of the list on screen", async () => {
+        // The server's position here is `real + 100`, so a client deriving it
+        // from `items.length` sends 2 and this assertion fails. The fixture
+        // maps the skewed number back to the real slice, so the ONLY way to
+        // see rows 3 and 4 is to echo what the server sent.
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1), shopifyRow(2), shopifyRow(3), shopifyRow(4)],
+            odoo: [odooRow(9)],
+            nextOffsetFor: (real) => real + 100,
+        });
+        const component = await mountLocationStep(server);
+
+        await component.searchLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[0].offset).toBe(0);
+        expect(server.searchCalls[0].continuation).toBe(null);
+        expect(component.state.locationSearch.shopify.nextOffset).toBe(102);
+        expect(component.locationHasMore("shopify")).toBe(true);
+
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[1].offset).toBe(102);
+        expect(server.searchCalls[1].continuation).toBe(
+            "continuation:shopify:"
+        );
+        expect(gidsOnScreen()).toEqual([
+            "gid://shopify/Location/1",
+            "gid://shopify/Location/2",
+            "gid://shopify/Location/3",
+            "gid://shopify/Location/4",
+        ]);
+        // The server said the set is exhausted, so Load more is gone and a
+        // further request would restart at page 0 and duplicate everything.
+        expect(component.state.locationSearch.shopify.nextOffset).toBe(false);
+        expect(component.locationHasMore("shopify")).toBe(false);
+        await component.loadMoreLocations("shopify");
+        expect(server.searchCalls).toHaveLength(2);
+    });
+
+    test("a new query and a clear both invalidate the continuation the old set issued", async () => {
+        // The fixture REFUSES a continuation that does not belong to the
+        // (side, query) being paged, exactly as the server does. So a client
+        // that kept the old token does not merely offend a rule here -- it
+        // gets the refusal on screen, which is the assertion at the end.
+        const server = makeLocationServer({
+            shopify: [
+                shopifyRow(1, { name: "North depot A" }),
+                shopifyRow(2, { name: "North depot B" }),
+                shopifyRow(3, { name: "North depot C" }),
+                shopifyRow(4, { name: "South depot A" }),
+                shopifyRow(5, { name: "South depot B" }),
+                shopifyRow(6, { name: "South depot C" }),
+            ],
+            odoo: [odooRow(9)],
+        });
+        const component = await mountLocationStep(server);
+        const search = component.state.locationSearch.shopify;
+
+        search.query = "north";
+        await component.searchLocations("shopify");
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[1].continuation).toBe(
+            "continuation:shopify:north"
+        );
+
+        // A new query is a new set: position 0, nothing carried over.
+        search.query = "south";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[2].offset).toBe(0);
+        expect(server.searchCalls[2].query).toBe("south");
+        expect(server.searchCalls[2].continuation).toBe(null);
+        expect(search.continuation).toBe("continuation:shopify:south");
+
+        // And the next page of the NEW set carries the new set's token.
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[3].offset).toBe(2);
+        expect(server.searchCalls[3].continuation).toBe(
+            "continuation:shopify:south"
+        );
+        expect(component.state.errorMessage).toBe("");
+
+        // Clearing drops the whole continuation, so the next search starts
+        // over rather than resuming a set that is no longer displayed.
+        // `clearLocationSearch` REPLACES the side's state object, so the
+        // cleared state has to be read back rather than held from before.
+        component.clearLocationSearch("shopify");
+        const cleared = component.state.locationSearch.shopify;
+        expect(cleared).not.toBe(search);
+        expect(cleared.continuation).toBe(null);
+        expect(cleared.nextOffset).toBe(false);
+        expect(cleared.items).toBe(null);
+        expect(cleared.query).toBe("");
+        expect(cleared.emptyReason).toBe("");
+        cleared.query = "north";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        expect(server.searchCalls[4].offset).toBe(0);
+        expect(server.searchCalls[4].continuation).toBe(null);
+        expect(component.state.errorMessage).toBe("");
+    });
+
+    test("pages accumulate and are deduplicated by identity, not by position", async () => {
+        // A row inserted or removed between two page requests shifts every
+        // row after it, so the same location can be served on two pages. The
+        // list whose whole purpose is that every eligible location is
+        // reachable must not show one twice.
+        const rows = [shopifyRow(1), shopifyRow(2), shopifyRow(3), shopifyRow(4)];
+        const server = makeLocationServer({ shopify: rows, odoo: [odooRow(9)] });
+        const component = await mountLocationStep(server);
+
+        await component.searchLocations("shopify");
+        await animationFrame();
+        expect(gidsOnScreen()).toHaveLength(2);
+
+        // The set shifts under us: row 2 is served again on page 2.
+        rows.splice(2, 0, shopifyRow(2));
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+
+        const gids = gidsOnScreen();
+        expect(gids).toEqual([
+            "gid://shopify/Location/1",
+            "gid://shopify/Location/2",
+            "gid://shopify/Location/3",
+        ]);
+        expect(new Set(gids).size).toBe(gids.length);
+        // The count the operator reads is the count of rows they can see.
+        expect(component.locationShowing("shopify").shown).toBe(3);
+        expect(queryText(".sc_setup__showing--shopify")).toInclude("Showing 3");
+    });
+
+    test("mapping a location updates that row in place instead of collapsing the pages behind it", async () => {
+        // Re-running the search after a mapping fetched ONE page at the last
+        // requested offset and replaced everything with it, so an operator who
+        // had paged deep into the list watched every earlier row disappear.
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1), shopifyRow(2), shopifyRow(3), shopifyRow(4)],
+            odoo: [odooRow(9), odooRow(10)],
+        });
+        const component = await mountLocationStep(server, {
+            onSaveMapping: () => true,
+        });
+
+        await component.searchLocations("shopify");
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+        expect(gidsOnScreen()).toHaveLength(4);
+        await component.searchLocations("odoo");
+        await animationFrame();
+
+        component.state.form.mapShopifyGid = "gid://shopify/Location/3";
+        component.state.form.mapOdooLocationId = "10";
+        const searchesBefore = server.searchCalls.length;
+        await component.createMapping();
+        await animationFrame();
+
+        // The write happened, with both identities explicit.
+        expect(
+            calls.filter((c) => c.method === "save_location_mapping")
+        ).toHaveLength(1);
+        const written = calls.find(
+            (c) => c.method === "save_location_mapping"
+        ).kwargs;
+        expect(written.store_id).toBe(5);
+        expect(written.shopify_location_gid).toBe("gid://shopify/Location/3");
+        // An integer, not the string the `<select>` holds: the server refuses
+        // a non-integer location id outright.
+        expect(written.odoo_location_id).toBe(10);
+        // ...and cost no further paging.
+        expect(server.searchCalls).toHaveLength(searchesBefore);
+        // All four pages are still on screen, and exactly one row moved.
+        expect(gidsOnScreen()).toHaveLength(4);
+        const mapped = queryAll('.sc_setup__location[data-mapped="1"]');
+        expect(mapped).toHaveLength(1);
+        expect(mapped[0].getAttribute("data-shopify-gid")).toBe(
+            "gid://shopify/Location/3"
+        );
+        expect(mapped[0].textContent).toInclude("WH10/Stock");
+        // The selection is consumed, not left armed for a second click.
+        expect(component.state.form.mapShopifyGid).toBe("");
+        expect(component.state.form.mapOdooLocationId).toBe("");
+    });
+
+    test("a selection is revalidated after every search, clear and load more", async () => {
+        // `<select>` keeps an assigned value after its `<option>` is gone, so
+        // a chosen location that scrolls out of the result set stays in
+        // `state.form` -- invisible, and submitted on the next click.
+        const server = makeLocationServer({
+            shopify: [
+                shopifyRow(1, { name: "North depot" }),
+                shopifyRow(2, { name: "South depot" }),
+                shopifyRow(3, { name: "South annex" }),
+            ],
+            odoo: [odooRow(9, { name: "North/Stock" }), odooRow(10, { name: "South/Stock" })],
+            pageSize: 1,
+        });
+        const component = await mountLocationStep(server);
+        const shopify = component.state.locationSearch.shopify;
+
+        // Chosen from the results of one search...
+        shopify.query = "north";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        component.state.form.mapShopifyGid = "gid://shopify/Location/1";
+        await animationFrame();
+        expect(queryFirst("#sc_setup_map_shopify").value).toBe(
+            "gid://shopify/Location/1"
+        );
+
+        // ...and gone after the next one.
+        shopify.query = "south";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        expect(component.state.form.mapShopifyGid).toBe("");
+        expect(queryFirst("#sc_setup_map_shopify").value).toBe("");
+
+        // Load more keeps a selection that is still on screen...
+        component.state.form.mapShopifyGid = "gid://shopify/Location/2";
+        await component.loadMoreLocations("shopify");
+        await animationFrame();
+        expect(gidsOnScreen()).toHaveLength(2);
+        expect(component.state.form.mapShopifyGid).toBe(
+            "gid://shopify/Location/2"
+        );
+
+        // ...and clearing drops one the base list cannot show.
+        component.clearLocationSearch("shopify");
+        await animationFrame();
+        expect(component.state.form.mapShopifyGid).toBe("");
+
+        // The Odoo side is revalidated on its own searches, independently.
+        const odoo = component.state.locationSearch.odoo;
+        odoo.query = "north";
+        await component.searchLocations("odoo");
+        await animationFrame();
+        component.state.form.mapOdooLocationId = "9";
+        odoo.query = "south";
+        await component.searchLocations("odoo");
+        await animationFrame();
+        expect(component.state.form.mapOdooLocationId).toBe("");
+    });
+
+    test("a stale, off-screen or foreign location identity is refused at submit and never sent", async () => {
+        // The last line of defence, and the one that matters: the server would
+        // refuse an ineligible GID anyway, but a refusal whose cause the
+        // operator cannot see is the worse outcome of the two -- and a stale
+        // identity that is still ELIGIBLE would not be refused at all.
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1), shopifyRow(2)],
+            odoo: [odooRow(9)],
+        });
+        const component = await mountLocationStep(server, {
+            onSaveMapping: () => true,
+        });
+        await component.searchLocations("shopify");
+        await component.searchLocations("odoo");
+        await animationFrame();
+
+        for (const [gid, odooId, label] of [
+            ["gid://shopify/Location/999", "9", "never present"],
+            ["gid://shopify/Location/1", "999", "foreign Odoo location"],
+        ]) {
+            calls.length = 0;
+            component.state.errorMessage = "";
+            // Assigned behind the list's back, which is exactly the shape of
+            // the defect: a value the operator cannot see on screen.
+            component.state.form.mapShopifyGid = gid;
+            component.state.form.mapOdooLocationId = odooId;
+            await component.createMapping();
+            await animationFrame();
+            expect(
+                calls.filter((c) => c.method === "save_location_mapping")
+            ).toHaveLength(0, {
+                message: `a ${label} identity was submitted`,
+            });
+            expect(component.state.errorMessage).toInclude(
+                "no longer in the list on screen"
+            );
+        }
+
+        // And the row that WAS on screen a moment ago is refused too, once a
+        // later search has taken it away.
+        component.state.form.mapShopifyGid = "gid://shopify/Location/1";
+        component.state.form.mapOdooLocationId = "9";
+        component.state.locationSearch.shopify.items = [shopifyRow(2)];
+        calls.length = 0;
+        await component.createMapping();
+        await animationFrame();
+        expect(
+            calls.filter((c) => c.method === "save_location_mapping")
+        ).toHaveLength(0);
+        expect(component.state.errorMessage).toInclude(
+            "no longer in the list on screen"
+        );
+    });
+
+    test("an empty Shopify list says WHY, and a fruitless search keeps its way out", async () => {
+        // One line was shown for every empty state, so an operator whose
+        // SEARCH matched nothing was told their store had no locations. The
+        // two conditions need opposite actions -- clear the search, or press
+        // Refresh -- so one sentence could only ever be wrong for one of them.
+        let reason = "no_results";
+        const server = makeLocationServer({
+            shopify: [],
+            odoo: [],
+            emptyReasonFor: () => reason,
+        });
+        const component = await mountLocationStep(server);
+
+        component.state.locationSearch.shopify.query = "nothing matches this";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        const noResults = queryText(".sc_setup__empty--shopify");
+        expect(noResults).toInclude("No location matches this search");
+        // The controls that are the way OUT of a fruitless search must survive
+        // it: a zero-result search used to hide the search row, the Clear
+        // button and the Map control together, leaving no visible route back.
+        expect(queryAll(".sc_setup_search_shopify")).toHaveLength(1);
+        expect(queryAll(".sc_setup_search_shopify_clear")).toHaveLength(1);
+        expect(queryAll(".sc_setup_create_mapping")).toHaveLength(1);
+
+        reason = "no_cached_locations";
+        component.state.locationSearch.shopify.query = "";
+        await component.searchLocations("shopify");
+        await animationFrame();
+        const noCache = queryText(".sc_setup__empty--shopify");
+        expect(noCache).toInclude("No Shopify locations have been read");
+        expect(noCache).toInclude("Refresh Shopify locations");
+        expect(noCache).not.toBe(noResults);
+    });
+
+    test("an empty Odoo list distinguishes no match, no access and no warehouse", async () => {
+        // Three conditions with three different remedies. The one line that
+        // used to be shown for all of them told an operator with no Inventory
+        // access to create a warehouse they would not have been able to see.
+        let reason = "no_results";
+        const server = makeLocationServer({
+            shopify: [shopifyRow(1)],
+            odoo: [],
+            emptyReasonFor: () => reason,
+        });
+        const component = await mountLocationStep(server, {
+            locationMapping: {
+                locations: [shopifyRow(1)],
+                odoo_locations: [],
+            },
+        });
+
+        const rendered = [];
+        for (const [current, text] of [
+            ["no_results", "No location matches this search"],
+            ["no_inventory_permission", "You do not have access to Odoo's"],
+            [
+                "no_eligible_odoo_locations",
+                "There are no internal Odoo locations in this company yet",
+            ],
+        ]) {
+            reason = current;
+            await component.searchLocations("odoo");
+            await animationFrame();
+            const shown = queryText(".sc_setup__empty--odoo");
+            expect(shown).toInclude(text, {
+                message: `${current} rendered: ${shown}`,
+            });
+            rendered.push(shown);
+        }
+        expect(new Set(rendered).size).toBe(3);
     });
 });

@@ -543,6 +543,7 @@
                                         </button>
                                         <button t-if="state.locationSearch.shopify.items !== null"
                                                 class="sc-btn sc-btn--secondary sc_setup_search_shopify_clear"
+                                                t-att-disabled="state.busy"
                                                 t-on-click="() => this.clearLocationSearch('shopify')">
                                             <span>Clear</span>
                                         </button>
@@ -663,6 +664,7 @@
                                             </button>
                                             <button t-if="state.locationSearch.odoo.items !== null"
                                                     class="sc-btn sc-btn--secondary sc_setup_search_odoo_clear"
+                                                    t-att-disabled="state.busy"
                                                     t-on-click="() => this.clearLocationSearch('odoo')">
                                                 <span>Clear</span>
                                             </button>

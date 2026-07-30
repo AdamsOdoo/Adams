@@ -73,7 +73,13 @@ EXPECTED_SUITES = {
     # the Dev Dashboard default with its same-organization/24-hour copy, the
     # offline path's three-value disclosure, the stored-mode reopen, and the
     # client-secret never-in-state proof -- are each client-rendered too.
-    'shopify connector setup wizard': 20,
+    # The Batch 1 UI completion (2026-07-30) raises it to 30: the location
+    # step's bounded search is a CLIENT protocol -- busy discipline, the
+    # server-issued continuation and `next_offset`, per-identity
+    # deduplication, revalidation of an off-screen selection, the in-place
+    # row update after a mapping, and four distinct empty states -- and none
+    # of those properties is observable from the server or from a tour.
+    'shopify connector setup wizard': 30,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
