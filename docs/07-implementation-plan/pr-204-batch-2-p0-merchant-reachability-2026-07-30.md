@@ -42,10 +42,14 @@ touching only the three recorded documentation paths.
 | `5a020779029781868cde0e1c7fc7853e8f5b42dd` | the whole production correction and its tests — **the final executable/test/tooling head** |
 | `ad8763d2439baa93cda9f7eca84dc4fbd5b69985` | the records: this section, the handoff entry, TD-023/TD-024, the reproducer evidence README |
 | `0bfeb2dca2cd45cbe8c2dcf0a6ca4edbea61d656` | the definitive seven-pass result and the retained summary |
+| `24b921181d6ab12ec9e0c30a0435e5cdb2d11f82` | one COMMENT line in `shopify_connector_tax_mapping.py` naming the equivalence test correctly, plus this table |
 
-The two commits after `5a02077` change **only** `docs/**`; a changed-path
-comparison shows **zero** executable, test or tooling delta, which is why the
-seven-pass run at `5a02077` is validation of the head this branch ships.
+`ad8763d` and `0bfeb2d` change **only** `docs/**`. `24b9211` touches one
+executable file and changes **comment text only** — no behaviour, no signature,
+no test — which is why the local seven-pass run at `5a02077` remains valid
+evidence for what this branch ships, and why the exact-head CI below re-executes
+the whole suite on the final head rather than being asked to take that on
+trust.
 
 **The earlier exact-head CI evidence at `ccad8bf` is not relabelled here.** It
 remains valid for what it executed and is not acceptance evidence for this
