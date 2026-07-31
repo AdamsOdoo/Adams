@@ -51,6 +51,14 @@ repository or in the environment that produced this evidence.
 
 ## Definitive validation
 
-The seven-pass results, the environment, and the exact-head CI runs are
-recorded in §9 of the implementation record rather than duplicated here, so
-there is one place to correct if any of it is ever superseded.
+**All seven passes green at `153be2baa6b77801f508680bc8da12646a10244f`** —
+2373 standard tests and 59 non-standard, 36/36 tours on every standard pass,
+three HOOT suites verified, both migration passes genuine version-to-version
+upgrades with their idempotency re-runs asserting zero scripts,
+`connector_worktree_dirty: false`, Odoo pin verified, `shopify_operations:
+none`.
+
+The pass table, the environment, the deltas against the `b0dbba2` baseline and
+the account of the defect this validation found are in §9 of the implementation
+record rather than duplicated here, so there is one place to correct if any of
+it is ever superseded.

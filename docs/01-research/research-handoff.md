@@ -58,6 +58,21 @@
   remap is P1) and TD-022 (a pending match decision whose candidates all
   become ineligible has no in-product route out — P2). TD-004, TD-005 and
   TD-007 retained byte-for-byte.
+- **Definitive validation: all seven passes green** at
+  `153be2baa6b77801f508680bc8da12646a10244f` — 2373 standard tests, 59
+  non-standard, 36/36 tours on every standard pass, three HOOT suites verified,
+  both migration passes genuine version-to-version upgrades with idempotency
+  re-runs asserting zero scripts, `connector_worktree_dirty: false`, Odoo pin
+  verified, `shopify_operations: none`. Against the `b0dbba2` baseline:
+  **+144 standard tests, +8 tours**.
+- **The definitive run found a real defect, in the evidence itself.** The first
+  attempt at `68410fb` failed its `50b770a3` migration pass on `0 != 1`: no tax
+  mapping. The tour had reported success. It selected a Many2one by "first
+  autocomplete suggestion" — order-dependent on what the database holds — and
+  closed on an assertion the still-open dialog also satisfied, so a refused
+  confirm and a successful one were indistinguishable. Corrected at `153be2b`;
+  both routes now select by name, assert the value landed, and assert the
+  dialog is gone before asserting the result.
 - **Evidence class: local supporting evidence — NOT Odoo.sh exact-SHA
   acceptance (DEC-041 D8), NOT live-Shopify validation, NOT UAT, NOT
   independent review.** Zero live Shopify contact and zero Shopify mutation:

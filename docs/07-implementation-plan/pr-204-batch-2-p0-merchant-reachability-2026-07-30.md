@@ -36,7 +36,9 @@
 | `9af8b23` | Batch 2 records (the ones this section corrects) |
 | `cb4efcd` | restore the research handoff a prepend had truncated |
 | `be7cc43` | §8.2 durable match decisions, §8.3 tests, §9 journeys |
-| *(final)* | §10 browser/accessibility campaign and the final records |
+| `68410fb` | §10 browser/accessibility campaign, records, TD-021/TD-022, handoff |
+| `153be2b` | the tour-instrument correction the definitive run's migration pass found — **final executable/test/tooling head** |
+| *(final)* | this validation record — documentation only, zero executable/test/tooling delta against `153be2b` |
 
 ### The handoff truncation, and the fix-forward
 
@@ -66,7 +68,7 @@ same ruling protects.
 | **§8.3** | **Load-bearing product matching tests** | **Implemented (`be7cc43`)** |
 | **§9** | **Consolidated vertical journeys C, D-P0, I, J-P0, K-P0** | **Implemented (`be7cc43`)** |
 | **§10** | **Consolidated browser/responsive/accessibility campaign** | **Implemented (final head)** |
-| §15.2 | Definitive seven-pass validation | Run at the final head (§9 below) |
+| §15.2 | Definitive seven-pass validation | **All seven passes green at `153be2b`** (§9 below) |
 
 Checkpoints 1, 2 and §8.1 are described in §§3–5 of the retained record below.
 This section covers what the continuation added.
@@ -423,8 +425,91 @@ decision model, wizard, views, ACLs and company rules).
 
 ## 9. Definitive validation
 
-*(Filled in from the definitive run at the final head — see the validation
-section appended below.)*
+Run at `153be2baa6b77801f508680bc8da12646a10244f` with
+`tools/run_connector_suite.sh` and no arguments. The runner verified the
+checkout against the declared source head, verified the Odoo pin, and proved
+the browser and `websocket-client` before executing anything — so no browser
+test could skip its way to a green result.
+
+| Pass | Result | Tours | Migration scripts |
+| --- | --- | --- | --- |
+| Fresh install + standard suite | **0 failed, 0 error(s) of 2373 tests** | 36/36 | — |
+| Warm `-u` (SAME-VERSION) + standard suite | **0 failed, 0 error(s) of 2373 tests** | 36/36 | **0, asserted** |
+| Genuine migration `50b770a3` → candidate + standard suite | **0 failed, 0 error(s) of 2373 tests** | 36/36 | **2** (`19.0.1.16.0`, `19.0.1.17.0`) |
+| … second update (idempotency) | **0 failed, 0 error(s) of 2373 tests** | — | **0, asserted** |
+| Genuine migration `0a15b176` → candidate + standard suite | **0 failed, 0 error(s) of 2373 tests** | 36/36 | **1** (`19.0.1.17.0`) |
+| … second update (idempotency) | **0 failed, 0 error(s) of 2373 tests** | — | **0, asserted** |
+| Complete non-standard tag suite | **0 failed, 0 error(s) of 59 tests** | — | — |
+
+All three HOOT suites verified (`shopify connector dashboard`, `export diff`,
+`setup wizard`). The single sanctioned skip per standard pass remains
+`TestMutationRecovery.test_real_process_death_harness`, unchanged.
+
+**Both migration passes were genuine version-to-version upgrades.** The
+`50b770a3` tree installed at `core 19.0.1.15.0 / product 19.0.2.4.0 /
+sale 19.0.2.4.0 / inventory 19.0.1.4.0` and the `0a15b176` tree at
+`core 19.0.1.16.0 / inventory 19.0.1.5.0`; both were upgraded onto the
+candidate's `core 19.0.1.19.0 / product 19.0.2.7.0 / sale 19.0.2.6.0 /
+inventory 19.0.1.6.0`. Odoo runs an upgrade script only when the installed
+version is strictly lower, so those are real upgrades rather than
+same-version re-updates — and the runner fails a migration pass that ran no
+script.
+
+### Deltas against the Batch 2 baseline
+
+Measured in this same environment against `b0dbba2` (2229 standard / 59
+non-standard / 28 tours):
+
+| | Baseline `b0dbba2` | Final `153be2b` | Delta |
+| --- | --- | --- | --- |
+| Standard suite | 2229 | **2373** | **+144** |
+| Tours | 28 | **36** | **+8** |
+| Non-standard suite | 59 | 59 | 0 |
+
+### Recorded facts from `summary.json`
+
+`connector_worktree_dirty: false`; `source_head_verified: true`;
+`odoo_pin_verified: true` at `30bde9ff758834a4912c5ae55843d3a7dad849f1`;
+`browser_evidence: verified`; `required_tour_tests: 36`;
+`shopify_operations: none`.
+
+Environment: Python 3.12.3, PostgreSQL 16.13, Chromium 141.0.7390.37,
+`websocket-client` 1.9.0.
+
+**Evidence class: local supporting evidence — NOT Odoo.sh exact-SHA acceptance
+(DEC-041 D8), NOT live-Shopify validation, NOT UAT, NOT independent review.**
+
+### The defect this validation found, and why it matters
+
+The first definitive attempt, at `68410fb`, **failed its `50b770a3` migration
+pass**: `test_tax_decision_tour_creates_the_mapping_and_resumes` asserted
+`0 != 1` — no tax mapping existed. Fresh and warm had both been green.
+
+The tour had reported **success**, and had run in three seconds.
+
+Two weaknesses, and the second is why the first was invisible. The Many2one was
+chosen by clicking "the first autocomplete suggestion", and
+`.o-autocomplete--dropdown-menu li` resolves in document order across the whole
+page — so which row is first depends on what the database happens to hold. On a
+fresh database it was the tax the fixture created; on a migrated one it was
+not, and the confirm was refused for an empty required field. And the tour could
+not tell: its closing assertion was `.o_form_view .o_field_widget[name=
+'account_tax_id']`, but a refused confirm leaves the **dialog** open and the
+dialog contains an `account_tax_id` field too. The step meant to prove the
+mapping exists was satisfied by the exact failure it was meant to rule out.
+
+Corrected at `153be2b`: both decision routes type the record's name, click the
+row containing that name, and assert the field holds it; both then assert **the
+dialog is gone** before asserting anything about the result; the tax route's
+final assertion moved to `shopify_tax_evidence_key`, a field the mapping form
+has and the dialog does not; and the product route pins the exact candidate by
+name rather than accepting either of the two.
+
+Only the Python assertion after the tour caught this. That is the argument for
+verifying the database consequence after every tour rather than trusting a green
+marker — and it is the second time in this campaign that browser evidence failed
+honest-looking, after 8 of 9 tour tests silently **skipped** on an unresolvable
+Chromium while reporting `0 failed, 0 error(s)`.
 
 ## 10. Deferred, explicitly
 
