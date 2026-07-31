@@ -228,6 +228,14 @@ class TestUiB2ProductTours(HttpCase):
             decision.candidate_template_ids,
             'the browser recorded a choice that was never a candidate',
         )
+        # The EXACT record the tour named, not merely "one of the two". The
+        # tour now types the name and asserts the field holds it, so anything
+        # else here means the browser chose something the tour did not.
+        self.assertEqual(
+            decision.selected_template_id.name, 'Tour candidate A',
+            'the browser recorded a different candidate from the one the '
+            'tour selected by name',
+        )
         self.assertEqual(decision.resumed_job_state, 'queued')
         self.assertEqual(
             job.state, 'queued',

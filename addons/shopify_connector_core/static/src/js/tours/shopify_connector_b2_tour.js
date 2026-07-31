@@ -77,6 +77,45 @@ function focusStep(selector, content) {
     };
 }
 
+/**
+ * Choose a Many2one value BY NAME.
+ *
+ * WHY NOT "click the first suggestion". A bare
+ * `.o-autocomplete--dropdown-menu li` resolves in document order across the
+ * WHOLE page, so it can match a different dropdown entirely, and even within
+ * the right one the first row depends on how many similar records the database
+ * happens to hold. Measured: on a fresh database this picked the intended tax
+ * and on a migrated one it did not, the confirm was then refused for an empty
+ * required field, and the tour still reported success. Typing the name filters
+ * the list to the record the test created and the click targets that text.
+ *
+ * @param {string} fieldSelector the `[name=...]` wrapper of the Many2one
+ * @param {string} value the exact display name to select
+ */
+function selectByName(fieldSelector, value, content) {
+    return [
+        {
+            trigger: `${fieldSelector} input`,
+            content,
+            run: `edit ${value}`,
+        },
+        {
+            trigger: `.o-autocomplete--dropdown-menu li:contains(${JSON.stringify(
+                value
+            )})`,
+            content: `Pick "${value}" from the filtered suggestions.`,
+            run: "click",
+        },
+        {
+            // The value actually landed on the field. Without this, a click
+            // that missed leaves the field empty and every later step still
+            // matches the dialog that failed to close.
+            trigger: `${fieldSelector} input:value(${JSON.stringify(value)})`,
+            content: `The field now holds "${value}".`,
+        },
+    ];
+}
+
 /** Activate the focused control BY KEYBOARD, not by a synthetic click. */
 function keyboardActivateStep(selector, content) {
     return {
@@ -241,16 +280,11 @@ tours.add("shopify_connector_b2_tax_decision_tour", {
             trigger: `${DIALOG} div[name='rate_percentage']:contains('5')`,
             content: "The rate Shopify charged is read from its own field.",
         },
-        {
-            trigger: `${DIALOG} div[name='account_tax_id'] input`,
-            content: "Choose the Odoo tax it means.",
-            run: "click",
-        },
-        {
-            trigger: ".ui-autocomplete .ui-menu-item, .o-autocomplete--dropdown-menu li",
-            content: "Pick the offered tax.",
-            run: "click",
-        },
+        ...selectByName(
+            `${DIALOG} div[name='account_tax_id']`,
+            "B2 Tour VAT 5",
+            "Choose the Odoo tax it means."
+        ),
         focusStep(
             `${DIALOG} footer button[name='action_confirm']`,
             "The confirmation control takes keyboard focus."
@@ -260,8 +294,18 @@ tours.add("shopify_connector_b2_tax_decision_tour", {
             "Map the tax and resume the order, by keyboard."
         ),
         {
-            trigger: ".o_form_view .o_field_widget[name='account_tax_id']",
-            content: "The resulting mapping is shown.",
+            // THE DIALOG IS GONE. Asserted before anything about the result,
+            // because a refused confirm leaves the dialog open and the dialog
+            // ALSO contains an `account_tax_id` field -- so "the mapping is
+            // shown" was satisfiable by the very failure it was meant to rule
+            // out. This is the step that makes the next one mean something.
+            trigger: "body:not(:has(.modal:not(.o_inactive_modal)))",
+            content: "The dialog closed, so the confirmation was accepted.",
+        },
+        {
+            // A field the MAPPING form has and the dialog does not.
+            trigger: ".o_form_view div[name='shopify_tax_evidence_key']",
+            content: "The resulting mapping is shown, with its fingerprint.",
         },
     ],
 });
@@ -301,16 +345,11 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
                 "The consequence copy states that names are never matched on, " +
                 "and that a Shopify edit means being asked again.",
         },
-        {
-            trigger: `${DIALOG} div[name='selected_template_id'] input`,
-            content: "Choose the Odoo product this Shopify product means.",
-            run: "click",
-        },
-        {
-            trigger: ".ui-autocomplete .ui-menu-item, .o-autocomplete--dropdown-menu li",
-            content: "Pick one of the eligible candidates.",
-            run: "click",
-        },
+        ...selectByName(
+            `${DIALOG} div[name='selected_template_id']`,
+            "Tour candidate A",
+            "Choose the Odoo product this Shopify product means."
+        ),
         focusStep(
             `${DIALOG} footer button[name='action_confirm']`,
             "The confirmation control takes keyboard focus."
@@ -319,6 +358,14 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
             `${DIALOG} footer button[name='action_confirm']`,
             "Match and resume the import, by keyboard."
         ),
+        {
+            // The dialog closed, so the confirmation was accepted rather than
+            // refused. Same reasoning as the tax route: a refused confirm
+            // leaves the dialog open, and several of the assertions below
+            // would otherwise be satisfiable from inside it.
+            trigger: "body:not(:has(.modal:not(.o_inactive_modal)))",
+            content: "The dialog closed, so the decision was accepted.",
+        },
         {
             // 6. THE RESOLVED RESULT. The decision form the confirmation lands
             // on records who decided, what they chose, and what state the job
