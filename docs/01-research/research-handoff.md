@@ -1,3 +1,83 @@
+### Batch 2 real-data and company-isolation correction (2026-07-31)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `ccad8bf432868650abb80bfb2103bd8d397be549`. **Not self-reviewed, not
+  self-accepted, not ready-marked, not merged.** All commits additive; no
+  rebase, reset, amend, squash or force-push.
+- **Authorization:** the 2026-07-31 control-room instruction "CLAUDE OPUS 5 —
+  PR #204 UNIFIED BATCH 2 REAL-DATA AND COMPANY-ISOLATION CORRECTION", which
+  accepts the independent review verdict **CORRECTION REQUIRED** and names
+  F1–F7 and F9/F10 as mandatory corrections, F8 and F11 as adjudicated
+  limitations to be recorded rather than closed.
+- **Identity gate, before any edit.** All ten items passed. PR #204 open,
+  draft, unmerged, **zero reviews** (therefore unapproved); head, remote
+  branch head and local HEAD all exactly `ccad8bf`; base `87f1763a`
+  unchanged; `ccad8bf` exactly **10 ahead / 0 behind** `b0dbba2` with
+  `b0dbba2` the merge base; no commit after `ccad8bf` on the remote; clean
+  worktree; Odoo pin `30bde9ff` exact; the `b0dbba2..ccad8bf` comparison
+  exactly **58 paths, 11,121 additions, 55 deletions**; and `ccad8bf` itself
+  touching only the three recorded documentation paths.
+- **What was actually wrong, in one sentence.** `safe_match_preview` is a
+  DISPLAY scrubber whose phone pattern rewrites any run of seven or more
+  digits, and it was being applied to the Shopify Product GID, the
+  ProductVariant GID, the remote `updatedAt` and the exact SKU/barcode match
+  values — so every real Shopify identity was stored mangled, a confirmed
+  decision could never be consumed, two products could collapse into one
+  decision, and the reviewer was offered an empty list. The pre-correction
+  fixtures used `gid://shopify/Product/8201` and `DUP-TPL`, two of the very
+  few shapes that scrubber leaves alone, which is how a green suite sat on top
+  of a route no real store could use.
+- **What this session corrected.** F1/F2/F3 (opaque identity, keyed
+  fixed-length match digests, snapshot-bounded eligibility with live-identifier
+  digest comparison, `v2` schema/key, migration `19.0.2.8.0`); F4 (Odoo's
+  effective `price_include` posture, one shared rule across all four
+  authorities plus the analytic-unit conversion that depends on it); F5
+  (validated snapshots instead of elevated `related` fields, guarded
+  `create`/`write`, non-disclosing refusals, transient-ownership rules Odoo 19
+  no longer provides, for BOTH decision dialogs); F6 (fail-closed on any
+  uniqueness collision the existing row is not proved to satisfy); F7 (the
+  merchant-facing "scheduled" state consults the real `ir.cron`); F9 (the
+  record-rule comment, with the rule left as it was); F10 (access before the
+  raw row lock, lock unchanged).
+- **Proved against the starting head.** Three head-agnostic reproducer files
+  (two `*_at_any_head.py`, plus the `-standard` race class) drive public
+  routes only and import nothing `ccad8bf` lacks. Run in a CLEAN EXTERNAL
+  WORKTREE at `ccad8bf` with the correction branch untouched: **13 failed,
+  0 error(s) of 17**. The same 17 after the correction: **0 failed,
+  0 error(s)**. Both logs are durable under
+  `docs/05-qa/evidence/batch-2-real-data-correction-2026-07-31/`.
+- **Fixtures hardened, because the old ones were the reason none of this was
+  caught.** The product tour, the product journey and the browser evidence
+  seed now use realistic numeric GIDs and identifiers; the sale journey and
+  tour taxes no longer set `price_include_override` at all. The tour asserts
+  both treatments on one dialog in a real browser — the preview redacted, the
+  identity exact.
+- **Debt recorded, not absorbed.** TD-023 (the canonical Store Settings
+  classification guard covers four of the six contributing modules;
+  fulfillment and product export are uncovered — bounded TEST-hardening debt,
+  and neither module's production code was touched) and TD-024 (one product
+  scan covers at most 20,000 products and fails closed above it with no
+  progress on retry, so a larger catalog cannot complete an initial import;
+  **the controlled-Shopify/UAT preflight must verify the target store is under
+  that ceiling**). TD-004, TD-005 and TD-007 retained byte-for-byte; TD-021 and
+  TD-022 unchanged.
+- **Not claimed.** No independent review of the corrected head; the unfinished
+  independent browser/mutation review still has to be completed after this
+  correction; no Odoo.sh exact-SHA qualification; no controlled live-Shopify
+  validation; no business UAT. The earlier exact-head CI at `ccad8bf` is NOT
+  relabelled as evidence about this correction — it tested `ccad8bf`, and its
+  fixtures are the ones the review found unrepresentative.
+- **Learning feedback loop.** The lesson this cycle is not "sanitize less". It
+  is that a fixture chosen for convenience silently defines the shape of the
+  data the product is proved against, and that a scrubber written for display
+  will be reached for by anything that needs "a safe string" unless the code
+  says, at the definition site, what it must never be used on. Both are now
+  stated where the next reader will meet them: in the module docstring, in
+  `safe_match_preview`'s own docstring, and in a test that asserts the
+  scrubber really does rewrite every production shape the suite uses.
+
 ### Batch 2 continuation — §8.2 decisions, §9 journeys, §10 campaign (2026-07-31)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

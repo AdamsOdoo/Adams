@@ -2,6 +2,453 @@
 
 **`DRAFT — NOT ACCEPTED — NOT REVIEWED — NOT READY — NOT MERGED — NOT SELF-ACCEPTED`**
 
+---
+
+# UNIFIED BATCH 2 REAL-DATA AND COMPANY-ISOLATION CORRECTION (2026-07-31)
+
+> **This section is current and supersedes every head-SHA, test-count and
+> evidence statement below it.** It is an ADDITIVE correction to Unified
+> Batch 2 — not Batch 3, not a redesign, not an independent review, not an
+> Odoo.sh campaign, and not an authorization to reopen Batch 1. Everything
+> below this section is retained verbatim and remains accurate for the head it
+> describes.
+>
+> **Nothing here is acceptance.** The implementing session does not review,
+> accept, ready-mark or merge its own work.
+
+## C1. The ruling, and the head it was made against
+
+| | |
+| --- | --- |
+| Starting correction head (control-room verified) | `ccad8bf432868650abb80bfb2103bd8d397be549` |
+| Batch 2 baseline | `b0dbba2aa721d4b92799cbe71f9f5d06f4ad7d2e` |
+| Base | `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` (unchanged) |
+| Odoo pin | `30bde9ff758834a4912c5ae55843d3a7dad849f1`, verified on every run |
+| Independent review verdict | **CORRECTION REQUIRED** |
+| History | **additive only** — no amend, rebase, squash, reset or force-push |
+
+Identity gate, verified before any edit: PR #204 open, draft, unmerged, with
+**no reviews at all** (therefore unapproved); head exactly `ccad8bf`; base
+exactly `87f1763a`; `ccad8bf` exactly **10 ahead / 0 behind** `b0dbba2` with
+`b0dbba2` as merge base; no commit after `ccad8bf` on the remote; clean
+worktree; Odoo checkout verified at the pin; the `b0dbba2..ccad8bf` comparison
+exactly **58 paths, 11,121 additions, 55 deletions**; and `ccad8bf` itself
+touching only the three recorded documentation paths.
+
+**The earlier exact-head CI evidence at `ccad8bf` is not relabelled here.** It
+remains valid for what it executed and is not acceptance evidence for this
+correction: its fixtures did not represent the affected production data
+shapes, which is precisely what the review found.
+
+## C2. The seven mandatory corrections
+
+### F1/F2/F3 — product and variant decision identity, and matching evidence
+
+**Reproduced before correcting.** `safe_match_preview` is a DISPLAY scrubber
+whose phone pattern is `(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)` — a leading digit,
+six or more digit/separator characters, a trailing digit. `v1` ran the Shopify
+Product GID, the ProductVariant GID, the remote `updatedAt` and the exact
+SKU/barcode match values through it. Measured, on the shapes a real store
+issues:
+
+| Value | Stored by `v1` |
+| --- | --- |
+| `gid://shopify/Product/7346299043911` | `gid://shopify/Product/[redacted-phone]` |
+| `gid://shopify/Product/9876543210987` | `gid://shopify/Product/[redacted-phone]` |
+| `gid://shopify/ProductVariant/45123456789012` | `gid://shopify/ProductVariant/[redacted-phone]` |
+| `1234567890123` (numeric SKU) | `[redacted-phone]` |
+| `012-345-6789` (hyphenated numeric SKU) | `[redacted-phone]` |
+| `0123456789012` (UPC-A) / `4006381333931` (EAN-13) | `[redacted-phone]` |
+| `gid://shopify/Product/8201` (the OLD fixture) | **unchanged** |
+| `DUP-TPL` (the OLD fixture) | **unchanged** |
+
+The last two rows are why the suite was green: the pre-correction fixtures used
+the two shapes the scrubber does not touch.
+
+The consequences, each now covered by a named regression:
+
+1. **A confirmed decision could never be consumed.** `_persist_decision` keyed
+   on the sanitized identity; `_confirmed_for` computes its key from the RAW
+   payload the importer just fetched. The two keys could not be equal, so
+   confirming and resuming looped straight back to the same ambiguity.
+2. **Two distinct products collapsed to one identity.** Both GIDs above
+   sanitize identically, so with the same `updatedAt` they produced one
+   `decision_key`. `_persist_decision`'s re-point branch would then hand
+   product A's pending decision to product B's job — a reviewer deciding about
+   A resuming the import of B.
+3. **Supersession reached unrelated products.** `_supersede_stale_siblings`
+   searched `shopify_product_gid = 'gid://shopify/Product/[redacted-phone]'`,
+   which matched every product in the store whose suffix was long enough.
+4. **The eligible set was empty.** `eligible_candidates()` searched
+   `default_code in ['[redacted-phone]']`, which no Odoo record carries. The
+   reviewer was asked to choose from nothing.
+
+**The correction: identity, matching evidence and display evidence are three
+different things.**
+
+- `opaque_identity(value, limit)` — validates (string, non-empty, length-bounded,
+  no C0/C1/DEL control characters) and returns the value **byte for byte**. No
+  trim, no normalisation, no numeric-id extraction, no reconstruction. A value
+  that fails returns `''` and the caller fails closed: the job still blocks and
+  simply offers no decision.
+- `match_value_digest(env, value)` — a **keyed, fixed-length** digest of the
+  exact match value: `v2:` + HMAC-SHA256 under a domain-separated label and
+  Odoo's own per-database `database.secret`. Keyed rather than bare, because a
+  plain SHA-256 of a 12-digit UPC is not a redaction. The durable evidence and
+  the job-log row therefore carry no merchant SKU or barcode at all, and exact
+  matching is still exact.
+- `safe_match_preview` survives **for the four `*_preview` display fields and
+  nothing else**, and its docstring now says so.
+- `eligible_candidates()` no longer searches the product table. It evaluates
+  only the **bounded candidate snapshot the importer produced**, and membership
+  of that snapshot is not eligibility: every candidate's LIVE identifier is
+  digested and compared against the exact remote evidence, so a forged
+  same-company candidate id is refused on its own data. Company agreement, the
+  already-bound exclusion and (for variants) the resolved template are
+  unchanged.
+- `_supersede_stale_siblings` now carries `remote_updated_at <` beside the
+  opaque identity leaves, so it retires the same product at an **older** remote
+  identity and refuses to act where the byte order does not prove "older" —
+  leaving that decision pending and unconsumable rather than guessing.
+- Matching priority is unchanged (existing binding → exact SKU → exact barcode
+  → manual decision), there is still no name matching (RA-006), no protected
+  binding field became editable, and confirmation/resumption and
+  binding-creation/consumption remain inside their existing atomic boundaries.
+
+**Version and migration.** `MATCH_EVIDENCE_SCHEMA` is `product_match_decision.v2`,
+`decision_key_for` emits a `v2:` prefix, and digests carry `v2:`. A `v1` key is
+a different identity scheme and can never be consumed as this one.
+`shopify_connector_product` moves **19.0.2.7.0 → 19.0.2.8.0** with migration
+`19.0.2.8.0/post-migrate.py`, which:
+
+- **supersedes** every `pending`/`confirmed` `v1` row with a stated reason —
+  the transformation is not invertible, the original digits are nowhere in the
+  database, and two products could produce one stored identity, so
+  reinterpreting is a coin toss that can bind a catalog to the wrong master
+  data. Those rows could never have been consumed anyway, so no import outcome
+  changes; what changes is that an unactionable row stops looking actionable;
+- leaves every `consumed` row and its binding **exactly** as they are;
+- drops the obsolete `match_values` column so a display-sanitized copy cannot
+  survive as a second, wrong answer to "what did Shopify send?";
+- is idempotent and guarded against a missing table.
+
+### F4 — Odoo's effective tax-inclusion posture
+
+`account.tax.price_include_override` is an **override** and is legitimately
+empty on an ordinary tax. Odoo derives the real posture in
+`_compute_price_include` (`addons/account/models/account_tax.py` at pin
+`30bde9ff`): the override when set, otherwise the company default
+`res.company.account_price_include`, whose own default is `tax_excluded`. Four
+places compared the raw override, so on a default-configured company **no
+ordinary tax was eligible for an excluded Shopify tax** — the merchant was told
+to create the tax and come back, and creating it did not help because the new
+tax also carried no override.
+
+One rule now, in `shopify_connector_tax_mapping.py`:
+
+- `tax_posture_included(tax)` — the per-record predicate, reading
+  `tax.price_include`;
+- `eligible_sale_tax_domain(company, price_included, amount)` — the search form,
+  using the searchable `('price_include', '=', ...)` leaf. Odoo 19's boolean
+  domain optimisation (`odoo/orm/domains.py::_optimize_boolean_in`) rewrites
+  `in [False]` to `not in [True]`, which is the one shape
+  `_search_price_include` accepts, so both postures resolve in SQL to the same
+  override-or-company-default disjunction.
+
+Both are used by all four authorities: the decision wizard's candidate list,
+the mapping model's `_check_mapping_safety`, the importer's non-binding
+suggestions, and the importer's `_validate_resolved_tax`. The last of those was
+the one that mattered most — without it a mapping created through the corrected
+dialog would have been refused on the very next import, so the merchant would
+have mapped the tax and the order still would not have moved.
+`_analytic_unit_for_excluded` is corrected for the same reason: it decides
+whether to convert an inclusive figure, and reading the override there would
+have produced wrong totals for a tax the corrected dialog now admits.
+
+`test_the_wizard_and_the_constraint_share_one_effective_rule` puts every tax in
+the database to both predicates, for both postures, and requires them to agree —
+so the drift F4 found cannot recur silently. Eligibility is not broadened
+anywhere else: exact company, active, sale, leaf percentage, exact rate, not
+base-affecting and existing mapping uniqueness are all unchanged, and no tax is
+ever created.
+
+### F5 — tax-wizard company isolation
+
+`store_id`, `company_id` and `shopify_order_gid` were `related` fields reaching
+through `job_id`. Odoo 19 gives a related field `compute_sudo=True` by default
+(`odoo/orm/fields.py`: `related_sudo` → `compute_sudo`; `Field.compute_value`
+calls `records.sudo()`), so the chain answered as **superuser** whatever it was
+asked — and every server-side guard lived on `default_get`/`action_confirm`,
+which is the intended UI route and not what an RPC `create` takes.
+
+- The three fields are now **validated snapshots**, not related fields.
+- `create()` is overridden: capability assertion, job resolved in the caller's
+  own environment, the real `check_access` on job and store, the active-company
+  test, evidence validation, and then every identity value **re-derived** from
+  the validated job. Caller-supplied snapshots are discarded, never trusted.
+  The context fallback exists because `_add_missing_default_values` runs inside
+  `super().create`, so a legitimate UI save arrives with no `job_id` at all.
+- `write()` refuses every identity field outright; `account_tax_id` — the one
+  thing being decided — stays writable.
+- Both refusal paths raise **one opaque message**, so a cross-company probe
+  learns nothing: not the store id or name, not the company, not the order GID,
+  not the job's existence.
+- **Transient-record ownership, restated because Odoo 19 no longer provides
+  it.** `TransientModel`'s docstring still claims users may only access records
+  they created, but `odoo/orm/models_transient.py` at the pin carries no
+  `_check_access` override at all, and the ACL grants every Connector
+  Administrator full CRUD. A `create_uid` record rule is added for the tax
+  dialog **and** for the product match dialog, which carries the same class of
+  snapshot. `perm_create` is deliberately excluded — creation is guarded on the
+  server, the rule guards the row.
+
+Confirmation still re-reads and revalidates the durable job and evidence.
+
+### F6 — a uniqueness collision never substitutes a different choice
+
+`_create_mapping` used to catch the `IntegrityError`, search for whatever row
+held `UNIQUE(store_id, shopify_tax_evidence_key)`, and return it as the call's
+result — so `action_confirm` reported success and resumed the order under a tax
+the administrator had not chosen and was never shown.
+
+Three outcomes now, and only the first proceeds:
+
+1. a row exists **in this transaction's snapshot** and is **proved** to be the
+   same decision (store, fingerprint, fingerprint version, inclusion posture
+   and Odoo tax all equal) — the ordinary sequential case where a second order
+   was blocked on a fingerprint mapped moments earlier;
+2. a row exists and is a **different** choice — refused, always;
+3. `create` collided with a row this snapshot cannot see (Odoo cursors run
+   REPEATABLE READ, so a mapping committed after this transaction started is
+   refused by the index while invisible to `search`) — nothing to compare
+   against, so refused, with a sentence rather than a raw `IntegrityError`.
+
+A refusal raises before `_resume_blocked_job`, so it leaves no mapping, no
+resumed job and no audit entry claiming otherwise.
+
+### F7 — "scheduled" means the cron is really on
+
+Both projections read the store's scheduled-sync flag alone. That flag is an
+INTENTION; `_cron_enqueue_order_scans` / `_cron_enqueue_product_scans` only run
+while the cron this connector installed is active, and an administrator can
+disable it in Settings → Technical → Scheduled Actions. The surface then said
+"Scheduled import is on" while nothing would ever be enqueued.
+
+`shopify.connector.store._connector_scheduler_is_active(cron_xmlid)` resolves
+one **module-owned external id** through `env.ref` — elevation is never used to
+DISCOVER a record — and only then reads `active` on that one row under
+`sudo()`, because `ir.cron` is Administrator-only by ACL and an Operator
+reading their own store's page is not one. It returns `False` for an
+unresolvable id, a deleted row or anything that is not an `ir.cron`: an
+unprovable scheduler is indistinguishable from a disabled one. The new
+elevation is registered in the core sanctioned-`sudo()` inventory with its
+justification, which is why that guard failed until it was.
+
+Both merchant-facing copies now state that scheduled import needs **both** the
+store setting and the connector's scheduled action, and that turning only the
+store setting on would change nothing. Manual import, its role gate and the
+real cron execution route are untouched; no second scheduler exists, and no
+disabled cron is silently re-enabled.
+
+### F9 — the record-rule comment
+
+The comment claimed the decision model does not use the scope mixin and that
+its store rule carries no `sec3_scope_quarantined` leaf. Both were false about
+the rule standing beside it: the model inherits `shopify.connector.scope.mixin`,
+declares three connector parent relations, and the production rule does carry
+the leaf. The comment is corrected to describe the rule; **the rule was not
+weakened to match the comment.**
+
+### F10 — access before lock
+
+`action_confirm` took `SELECT ... FOR UPDATE` by primary key **before** any
+access check. That is raw SQL and answers to no ACL and no record rule, so a
+caller naming a foreign company's decision id took a genuine write lock on that
+row — blocking its legitimate reviewer for the life of the transaction — and
+only afterwards learned they were not allowed to be there.
+
+The order is now: capability assertion → `_validated_decision` in the caller's
+own environment (decision, store and job `check_access`, plus the
+active-company test) → the row lock → invalidate → the full revalidation again
+under the lock. The lock is not weakened: the one-winner/one-refusal
+concurrent-confirmation behaviour still rests on it, and generic optimistic
+locking was not substituted.
+
+## C3. The adjudicated limitations, recorded rather than closed
+
+**F8 — classification-guard coverage (TD-023, Low).** The canonical Store
+Settings classification guard covers `shopify_connector_core`,
+`shopify_connector_product`, `shopify_connector_sale` and
+`shopify_connector_inventory`. `shopify_connector_fulfillment` and
+`shopify_connector_product_export` also extend the settings model and have no
+classification test, so a field added to either is classified by nobody.
+Recorded as bounded **test-hardening** debt; **no fulfillment or
+product-export production code was modified.** The coverage is now asserted
+rather than described: `CLASSIFIED_MODULES` and
+`UNCLASSIFIED_CONTRIBUTING_MODULES` are checked against the live registry in
+both directions, so a module gaining a test, a module ceasing to contribute, or
+a seventh contributing module all fail a test.
+
+**F11 — the initial-scan ceiling (TD-024, Medium).** One product scan reads
+**100** products per page and refuses beyond **200** pages, so it covers at most
+**20,000** products in the window it is scanning. Above that it fails closed:
+no checkpoint advance, no partial success, no silent truncation — and **no
+progress either**, because the next run restarts the same window and stops in
+the same place. Since the first run has no lower bound at all (§8.1.8), the
+whole catalog is in the first window and the ceiling is met on the very first
+scan, so **a catalog above 20,000 products cannot complete an initial import at
+all.** The operator-visible refusal now states the page size, the page ceiling,
+the effective ceiling, that nothing was imported, that the checkpoint has not
+moved, and that retrying stops in the same place. **No new scan architecture,
+queue, dispatcher or cursor store was introduced.** The fix is bounded
+resumable enumeration through the existing job mechanism, recorded as debt.
+
+**UAT PREFLIGHT REQUIREMENT.** The controlled-Shopify/UAT preflight must verify
+the target store holds fewer than 20,000 products before that campaign runs; if
+it does not, the control room must adjudicate the scaling work first. A search
+of the repository at this head found **no fact stating the controlled-UAT
+catalog size**, so this is a preflight check rather than a known blocker — and
+therefore not a hard stop for this correction.
+
+**TD-004, TD-005 and TD-007 are retained byte-for-byte.** Nothing in this
+correction touches them.
+
+## C3b. Two scope readings, named rather than assumed
+
+Both are inside the authorized areas on the reading below, and both are called
+out here explicitly so the control room can reverse either without having to
+find it in a diff.
+
+**`shopify_connector_core/models/shopify_connector_store.py` gained one
+method.** `_connector_scheduler_is_active` is the cron-truth half of the
+scheduled-state projections that §11 authorizes for both the order and the
+product surfaces. It lives in core because `shopify.connector.store` is
+defined there and BOTH modules extend it; the alternative was two copies of
+one elevated read in two modules, which is a worse answer to a
+security-sensitive helper than one shared, registered, justified one. It is
+registered in both core sanctioned-`sudo()` inventories with its rationale —
+which is why those guards failed until it was.
+
+**`shopify_connector_sale/models/shopify_connector_order_importer.py` gained
+one correction beyond the two eligibility authorities.**
+`_tax_suggestions` and `_validate_resolved_tax` are tax-mapping validation and
+are squarely in scope. `_analytic_unit_for_excluded` is order-total
+computation, and it is corrected because it reads the same raw
+`price_include_override`: it decides whether to convert an inclusive figure,
+so leaving it would mean the corrected dialog admits a tax whose orders are
+then priced wrongly. Correcting the eligibility rule without it would have
+introduced a totals defect that did not exist before.
+
+## C4. The tests, and what makes them load-bearing
+
+### The reproducers run at BOTH heads, and 13 of 17 fail at the starting one
+
+Two files -- `shopify_connector_product/tests/test_batch2_correction_at_any_head.py`
+and `shopify_connector_sale/tests/test_batch2_correction_at_any_head.py` --
+drive PUBLIC production routes only and import nothing the starting head does
+not already have, so the same code is a genuine before/after reproducer rather
+than a description of one side. The `-standard` race class
+`test_tax_mapping_race.py` is head-agnostic for the same reason.
+
+Run against a CLEAN EXTERNAL WORKTREE at the unchanged `ccad8bf`, with only
+those three files and their `tests/__init__.py` registration added and the
+correction branch untouched: **13 failed, 0 error(s) of 17 tests.** The same
+17 at the corrected head: **0 failed, 0 error(s) of 17 tests.** Both logs are
+durable under
+`docs/05-qa/evidence/batch-2-real-data-correction-2026-07-31/`.
+
+Every failure names its defect rather than merely differing:
+
+| Reproducer | What `ccad8bf` actually did |
+| --- | --- |
+| `test_a_confirmed_decision_on_real_data_is_actually_consumed` | `40 not found in []` — the reviewer was offered nothing to choose |
+| `test_the_stored_identity_is_the_identity_shopify_sent` | `'gid://shopify/Product/[redacted-phone]' != 'gid://shopify/Product/7346299043911'` |
+| `test_two_real_products_never_share_or_repoint_one_decision` | `decision(6,) == decision(6,)` — two different Shopify products share one decision row |
+| `test_a_foreign_decision_is_refused_before_its_row_is_locked` | `['SELECT id FROM shopify_connector_product_match_decision WHERE id = %s FOR UPDATE'] is not false` — the refused caller locked the row first |
+| `test_an_ordinary_tax_is_eligible_for_an_excluded_shopify_tax` | `54 not found in []` — no ordinary tax was offered at all |
+| `test_the_whole_tax_route_completes_on_an_ordinary_tax` | `account.tax(56,) not found in account.tax()` |
+| `test_an_administrator_cannot_reach_a_foreign_job_through_the_dialog` | *"a company-A administrator created a tax decision dialog for a company-B job and can read store `'Any-head foreign store'`, company `'Any-head foreign co'` and order `'gid://shopify/Order/8800770066'` from it"* |
+| `test_one_administrator_cannot_read_another_open_dialog` | `True is not false` — another administrator can read this open dialog |
+| `test_a_different_choice_never_replaces_the_mapping_that_won` | `UserError not raised` — the substitution was reported as success |
+| `test_a_competing_choice_committed_elsewhere_refuses_and_never_resumes` | the same, across a real commit boundary on a second backend |
+| `test_scheduled_product_state_is_false_while_the_cron_is_disabled` | `True is not false` — the store claims scheduled import while the cron is off |
+| `test_scheduled_order_state_is_false_while_the_cron_is_disabled` | the same, for orders |
+| `test_the_scan_ceiling_refusal_states_the_limit_and_consequence` | `'100' not found in 'The product scan page ceiling was exceeded.'` |
+
+The four that pass at BOTH heads are there deliberately and say so: the
+display-scrubber measurement the rest of the file rests on, the two
+"manual import still works and is still role-gated" guards, and the
+supersession guard whose sharper twin is the re-point test.
+
+### The concurrency proof is a real transaction boundary, not a mock
+
+`test_tax_mapping_race.py` (`-standard`,
+tag `shopify_connector_tax_mapping_race`, registered in the runner's
+`NONSTANDARD_TAGS`) commits its fixture on its own connection, commits the
+competing administrator's mapping on a SECOND connection with an asserted
+distinct backend PID, then asserts that this transaction's REPEATABLE READ
+snapshot genuinely cannot see the winner before driving the production
+`action_confirm` into the real unique index. The final state is read on a
+THIRD connection, so it is the committed database rather than this
+transaction's opinion of it. Statement and lock timeouts are bounded, and the
+committed rows are removed with their absence asserted -- through
+`addClassCleanup`, because a cleanup registered inside a test body runs while
+the test transaction still holds its foreign-key share lock on the store.
+
+Patching `Mapping.create` to raise would have proved only that the `except`
+branch is reachable, and would have said nothing about the branch that
+mattered: the winner refused by the index while invisible to `search`.
+
+### Everything else the correction owes
+
+Product identity: real Product and ProductVariant GIDs stored and keyed
+exactly; two products at one `updatedAt`; numeric SKU; hyphenated numeric SKU;
+an EAN-13 barcode ambiguity built the only way Odoo 19's own per-company
+uniqueness permits one (two companies, which is also where company scoping
+matters most); the display preview asserted still sanitized on the same record
+whose identity is asserted intact; the raw identifier asserted absent from the
+job logs, the durable evidence, the job record and the digest column; a forged
+same-company candidate refused on its live identifier; both complete routes end
+to end; a changed `updatedAt` refusing the stale decision; one confirmation
+resuming one job; and the §8.2.14 generic-review refusal unchanged.
+
+Tax: both company-default postures with the override genuinely unset; a
+matching explicit override still eligible; both ways of mismatching refused by
+the dialog AND by the constraint; the shared-rule equivalence proof; the whole
+route through to the importer accepting the mapping on the next attempt;
+direct-create, write and read isolation; a non-disclosing refusal; and the
+competing-choice refusals.
+
+Migration: `test_product_match_decision_migration.py` builds rows shaped exactly
+as `v1` wrote them and asserts the retirement, the untouched consumed row and
+its identical `read()`, the untouched `v2` row, idempotency, the dropped column
+(including when it is present), and the missing-table guard.
+
+Fixture hardening: the product tour, the product journey and the browser
+evidence seed now carry realistic numeric GIDs and identifiers, and the sale
+journey and tour taxes no longer set `price_include_override` at all. The tour
+asserts BOTH treatments on one dialog in a real browser -- `sku_preview`
+showing `[redacted-phone]` and `shopify_product_gid` showing
+`gid://shopify/Product/7346299043911`.
+
+Zero live Shopify contact, and zero Shopify mutation: every test patches the
+transport seams, and no credential exists anywhere in the repository or this
+environment.
+
+---
+
+> **RETAINED IN FULL, AND STILL ACCURATE FOR ITS OWN HEAD.** Everything below
+> this line describes `ccad8bf` and its predecessors and is preserved verbatim
+> rather than rewritten. The correction section above supersedes its head-SHA,
+> test-count and evidence statements; its description of what Batch 2 built,
+> and why, is unchanged and still stands.
+
+---
+
+**`DRAFT — NOT ACCEPTED — NOT REVIEWED — NOT READY — NOT MERGED — NOT SELF-ACCEPTED`**
+
+# Batch 2 P0 merchant reachability (as recorded at `ccad8bf`)
+
 > **This record supersedes its own earlier text and says so explicitly.** The
 > version written at `9af8b23` stated that the commits were *"local only"* and
 > that *"the branch `fable/wave-5-completion` remains at `b0dbba2a`"*. Both
