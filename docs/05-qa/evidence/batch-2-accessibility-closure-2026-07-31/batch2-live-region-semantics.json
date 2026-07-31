@@ -1,0 +1,813 @@
+{
+  "criteria": [
+    "WAI-ARIA 1.2 \u00a75.3.2 live regions",
+    "WCAG 2.2 SC 4.1.3 Status Messages",
+    "WCAG 2.2 SC 3.3.1 Error Identification"
+  ],
+  "findings": {
+    "adjudications": [
+      {
+        "fragment": "This store's API health is degraded.",
+        "kind": "foreign",
+        "role": "alert",
+        "surface": "b2-store-form-controls",
+        "why": "S25 (shopify_connector_product_export) standing-condition banner. It is not an instruction: it is rendered only while `api_health_state` is `degraded`, it names a live system condition, and `alert` is the role its own view records as deliberate. It is NOT rendered in this campaign's fixture, which holds a healthy connected store, and the rendered half asserts that. Out of this correction's allowed files; adjudicated, not edited."
+      },
+      {
+        "fragment": "This store is not connected.",
+        "kind": "foreign",
+        "role": "alert",
+        "surface": "b2-store-form-controls",
+        "why": "S25 (shopify_connector_product_export) standing-condition banner, same ruling as above; rendered only while the store is not `connected`, and not rendered in this fixture."
+      }
+    ],
+    "declared": {
+      "b2-product-match-decision-dialog": [
+        {
+          "alert_classes": [
+            "alert-info"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-info",
+            "o_sc_match_decision_wizard"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "This import stopped because more than one Odoo record already carries the identifier Shopify sent. Choose the one this Shopify record means. Nothing is sent to Shopify, and no product is created for you. Once chosen, this import resumes automatically."
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Only records of this store's company that still carry the identifier Shopify sent, and are not already bound to this store, can be chosen. Product names are never matched on, which is why two records with the same SKU cannot be told apart automatically. If none of these is right, close this and correct the SKU or barcode in Odoo, then re-run the import. This decision applies to the version of the "
+        }
+      ],
+      "b2-product-match-decision-pending": [
+        {
+          "alert_classes": [
+            "alert-warning"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-warning"
+          ],
+          "invisible": "state != 'pending'",
+          "role": "note",
+          "tag": "div",
+          "text": "This import is waiting for a decision. Until one is made, re-queueing the job runs the same search and stops at the same ambiguity."
+        },
+        {
+          "alert_classes": [
+            "alert-secondary"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-secondary"
+          ],
+          "invisible": "state != 'superseded'",
+          "role": "note",
+          "tag": "div",
+          "text": "Superseded."
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed."
+        }
+      ],
+      "b2-product-match-decision-resolved": [
+        {
+          "alert_classes": [
+            "alert-warning"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-warning"
+          ],
+          "invisible": "state != 'pending'",
+          "role": "note",
+          "tag": "div",
+          "text": "This import is waiting for a decision. Until one is made, re-queueing the job runs the same search and stops at the same ambiguity."
+        },
+        {
+          "alert_classes": [
+            "alert-secondary"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-secondary"
+          ],
+          "invisible": "state != 'superseded'",
+          "role": "note",
+          "tag": "div",
+          "text": "Superseded."
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed."
+        }
+      ],
+      "b2-store-form-controls": [
+        {
+          "alert_classes": [
+            "alert-warning"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-warning"
+          ],
+          "invisible": "api_health_state != 'degraded'",
+          "role": "alert",
+          "tag": "div",
+          "text": "This store's API health is degraded. Exports stay reviewable, but a confirmation taken now may be refused at apply time. Open Export > Reconnect and Backfill to see what is waiting."
+        },
+        {
+          "alert_classes": [
+            "alert-info"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-info"
+          ],
+          "invisible": "state == 'connected'",
+          "role": "alert",
+          "tag": "div",
+          "text": "This store is not connected. No export can run, and every open preview was expired when the connection dropped \u2014 a stale confirmation can never authorise a write. Reconnect, then re-preview."
+        }
+      ],
+      "b2-store-settings-canonical": [
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Customer delivery notifications are shown here for reference only. Turning them on means Shopify emails your customers when a delivery is fulfilled, so opting in stays where the explicit confirmation lives \u2014 the guided Setup Wizard's notification step. This screen deliberately offers no second way to switch them on. First sync direction was decided during onboarding and is shown read-only. Changin"
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Refresh mode decides what a later import may overwrite. Under \"Snapshot Only\" the fields a merchant edits in Odoo are written once, at first import, and a refresh never overwrites them. Attribute conflict mode decides what happens when a Shopify option collides with an existing Odoo attribute whose variant mode is incompatible. \"Manual Review\" stops the affected product for a person to look at; it"
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Scheduled stock sync runs only while the Inventory domain above is enabled and the store is connected. A scan enqueues work; it does not send a quantity to Shopify on its own. The first push for a location still waits for the explicit confirmation the first-push guard asks for. Last stock scan is written by the inventory service when a scan runs, and is shown here read-only."
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Scheduled order import runs only while the Sale domain above is enabled and the store is connected. Switching it off stops new scans being admitted; it does not cancel work that has already been queued. Order company is shown read-only. A store belongs to exactly one company, and its orders are created in that company; re-homing a store is not a settings edit. Fallback customer is used when an imp"
+        }
+      ],
+      "b2-tax-decision-dialog": [
+        {
+          "alert_classes": [
+            "alert-info"
+          ],
+          "aria_live": null,
+          "classes": [
+            "alert",
+            "alert-info",
+            "o_sc_tax_decision"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "This order stopped because Shopify charged a tax the connector has not been told about. Choose the Odoo tax it means. Nothing is sent to Shopify, and no tax is created for you. Once mapped, this order resumes automatically."
+        },
+        {
+          "alert_classes": [],
+          "aria_live": null,
+          "classes": [
+            "text-muted"
+          ],
+          "invisible": null,
+          "role": "note",
+          "tag": "div",
+          "text": "Only active sale taxes of this store's order company, at the same rate and with the same tax-inclusion posture, can be chosen. Taxes matching on rate alone are not proof of equivalence, which is why the choice is yours rather than automatic. If the right tax does not exist yet, close this, create it in Accounting, and reopen."
+        }
+      ]
+    },
+    "rendered": {
+      "b2-product-match-decision-dialog:opened": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "This import stopped because more than one Odoo record already carries the identifier Shopify sent. Choose the one this Shopify record means. Nothing is sent to Shopify, and no product is created for you. Once chosen, this import resumes automatically.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "o-autocomplete--input",
+            "is_live_region": false,
+            "role": "combobox",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Only records of this store's company that still carry the identifier Shopify sent, and are not already bound to this store, can be chosen. Product names are never matched on, which is why two records with the same SKU cannot be told apart automatically. If none of these is right, close this and correct the SKU or barcode in Odoo, then re-run the import. This decision applies to the version of the ",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-product-match-decision-dialog:refused": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "This import stopped because more than one Odoo record already carries the identifier Shopify sent. Choose the one this Shopify record means. Nothing is sent to Shopify, and no product is created for you. Once chosen, this import resumes automatically.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "o-autocomplete--input",
+            "is_live_region": false,
+            "role": "combobox",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Only records of this store's company that still carry the identifier Shopify sent, and are not already bound to this store, can be chosen. Product names are never matched on, which is why two records with the same SKU cannot be told apart automatically. If none of these is right, close this and correct the SKU or barcode in Odoo, then re-run the import. This decision applies to the version of the ",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-product-match-decision-pending": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "o_statusbar_status",
+            "is_live_region": false,
+            "role": "radiogroup",
+            "text": "... AppliedDecided - import resumingWaiting for a decision ... Waiting for a decision",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Applied",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Decided - import resuming",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Waiting for a decision",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "This import is waiting for a decision. Until one is made, re-queueing the job runs the same search and stops at the same ambiguity.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed.",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-product-match-decision-resolved": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "o_statusbar_status",
+            "is_live_region": false,
+            "role": "radiogroup",
+            "text": "... AppliedDecided - import resumingWaiting for a decision ... Decided - import resuming",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Applied",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Decided - import resuming",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Waiting for a decision",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed.",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-store-form-controls": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "o_statusbar_status",
+            "is_live_region": false,
+            "role": "radiogroup",
+            "text": "... DisconnectedReconnect NeededConnectedSetup Incomplete ... Connected",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Disconnected",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Reconnect Needed",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Connected",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Setup Incomplete",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-store-settings-canonical:edited": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Core",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Product import",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Inventory",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Orders",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Customer delivery notifications are shown here for reference only. Turning them on means Shopify emails your customers when a delivery is fulfilled, so opting in stays where the explicit confirmation lives \u2014 the guided Setup Wizard's notification step. This screen deliberately offers no second way to switch them on. First sync direction was decided during onboarding and is shown read-only. Changin",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-store-settings-canonical:opened": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Core",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Product import",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Inventory",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "nav-link",
+            "is_live_region": false,
+            "role": "tab",
+            "text": "Orders",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Customer delivery notifications are shown here for reference only. Turning them on means Shopify emails your customers when a delivery is fulfilled, so opting in stays where the explicit confirmation lives \u2014 the guided Setup Wizard's notification step. This screen deliberately offers no second way to switch them on. First sync direction was decided during onboarding and is shown read-only. Changin",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-superseded": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "o_statusbar_status",
+            "is_live_region": false,
+            "role": "radiogroup",
+            "text": "... SupersededAppliedDecided - import resumingWaiting for a decision ... Superseded",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Superseded",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Applied",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Decided - import resuming",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "btn",
+            "is_live_region": false,
+            "role": "radio",
+            "text": "Waiting for a decision",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Superseded.The Shopify product changed after this decision was recorded, so it no longer describes what would be imported. A fresh decision was raised for the new version.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "fa",
+            "is_live_region": false,
+            "role": "img",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed.",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-tax-decision-dialog:opened": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "This order stopped because Shopify charged a tax the connector has not been told about. Choose the Odoo tax it means. Nothing is sent to Shopify, and no tax is created for you. Once mapped, this order resumes automatically.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "o-autocomplete--input",
+            "is_live_region": false,
+            "role": "combobox",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Only active sale taxes of this store's order company, at the same rate and with the same tax-inclusion posture, can be chosen. Taxes matching on rate alone are not proof of equivalence, which is why the choice is yours rather than automatic. If the right tax does not exist yet, close this, create it in Accounting, and reopen.",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      },
+      "b2-tax-decision-dialog:refused": {
+        "regions": [
+          {
+            "aria_live": null,
+            "cls": "alert",
+            "is_live_region": false,
+            "role": "note",
+            "text": "This order stopped because Shopify charged a tax the connector has not been told about. Choose the Odoo tax it means. Nothing is sent to Shopify, and no tax is created for you. Once mapped, this order resumes automatically.",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "o-autocomplete--input",
+            "is_live_region": false,
+            "role": "combobox",
+            "text": "",
+            "visible": true
+          },
+          {
+            "aria_live": null,
+            "cls": "text-muted",
+            "is_live_region": false,
+            "role": "note",
+            "text": "Only active sale taxes of this store's order company, at the same rate and with the same tax-inclusion posture, can be chosen. Taxes matching on rate alone are not proof of equivalence, which is why the choice is yours rather than automatic. If the right tax does not exist yet, close this, create it in Accounting, and reopen.",
+            "visible": true
+          }
+        ],
+        "roleless_alerts": []
+      }
+    },
+    "stale_adjudications": [],
+    "unadjudicated_live_regions": []
+  },
+  "host_framework_limitation": {
+    "consequence": "The refusal IS announced, assertively, by Odoo's own `role=\"alert\" aria-live=\"assertive\"` notification. The ATTRIBUTION is carried in the DOM instead: exactly one field is marked invalid, and it is the one the connector's arch declared required.",
+    "ownership": "Odoo chrome, not connector arch. Not fixable from this repository without patching core. Measured and disclosed here rather than asserted around, and the assertions above say only what is true: announced assertively, and attributed to exactly one named field.",
+    "what": "Odoo 19 at the pinned commit 30bde9ff announces a refused save as the bare string \"Missing required fields\" -- `Record._displayInvalidFieldNotification` in web/static/src/model/relational_model/record.js, which no form controller overrides. The announcement does not name the field."
+  },
+  "note_texts_before_and_after": {
+    "b2-product-match-decision-dialog": [
+      [
+        "Only records of this store's company that still carry the identifier Shopify sent, and are not already bound to this store, can be chosen. Product names are never matched on, which is why two records with the same SKU cannot be told apart automatically. If none of these is right, close this and correct the SKU or barcode in Odoo, then re-run the import. This decision applies to the version of the ",
+        "This import stopped because more than one Odoo record already carries the identifier Shopify sent. Choose the one this Shopify record means. Nothing is sent to Shopify, and no product is created for you. Once chosen, this import resumes automatically."
+      ],
+      [
+        "Only records of this store's company that still carry the identifier Shopify sent, and are not already bound to this store, can be chosen. Product names are never matched on, which is why two records with the same SKU cannot be told apart automatically. If none of these is right, close this and correct the SKU or barcode in Odoo, then re-run the import. This decision applies to the version of the ",
+        "This import stopped because more than one Odoo record already carries the identifier Shopify sent. Choose the one this Shopify record means. Nothing is sent to Shopify, and no product is created for you. Once chosen, this import resumes automatically."
+      ]
+    ],
+    "b2-product-match-decision-pending": [
+      [
+        "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed.",
+        "This import is waiting for a decision. Until one is made, re-queueing the job runs the same search and stops at the same ambiguity."
+      ],
+      [
+        "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed.",
+        "This import is waiting for a decision. Until one is made, re-queueing the job runs the same search and stops at the same ambiguity."
+      ]
+    ],
+    "b2-product-match-decision-resolved": [
+      [
+        "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed."
+      ],
+      [
+        "A decision belongs to one exact version of one Shopify record. If the product is edited on Shopify before the import resumes, this decision is superseded and a fresh one is raised, because the thing it was about has changed."
+      ]
+    ],
+    "b2-store-settings-canonical": [
+      [
+        "Customer delivery notifications are shown here for reference only. Turning them on means Shopify emails your customers when a delivery is fulfilled, so opting in stays where the explicit confirmation lives \u2014 the guided Setup Wizard's notification step. This screen deliberately offers no second way to switch them on. First sync direction was decided during onboarding and is shown read-only. Changin"
+      ],
+      [
+        "Customer delivery notifications are shown here for reference only. Turning them on means Shopify emails your customers when a delivery is fulfilled, so opting in stays where the explicit confirmation lives \u2014 the guided Setup Wizard's notification step. This screen deliberately offers no second way to switch them on. First sync direction was decided during onboarding and is shown read-only. Changin"
+      ]
+    ],
+    "b2-tax-decision-dialog": [
+      [
+        "Only active sale taxes of this store's order company, at the same rate and with the same tax-inclusion posture, can be chosen. Taxes matching on rate alone are not proof of equivalence, which is why the choice is yours rather than automatic. If the right tax does not exist yet, close this, create it in Accounting, and reopen.",
+        "This order stopped because Shopify charged a tax the connector has not been told about. Choose the Odoo tax it means. Nothing is sent to Shopify, and no tax is created for you. Once mapped, this order resumes automatically."
+      ],
+      [
+        "Only active sale taxes of this store's order company, at the same rate and with the same tax-inclusion posture, can be chosen. Taxes matching on rate alone are not proof of equivalence, which is why the choice is yours rather than automatic. If the right tax does not exist yet, close this, create it in Accounting, and reopen.",
+        "This order stopped because Shopify charged a tax the connector has not been told about. Choose the Odoo tax it means. Nothing is sent to Shopify, and no tax is created for you. Once mapped, this order resumes automatically."
+      ]
+    ]
+  },
+  "refusals": {
+    "b2-product-match-decision-dialog": {
+      "announced": [
+        {
+          "aria_live": "assertive",
+          "cls": "o_notification",
+          "role": "alert",
+          "text": "Missing required fields"
+        }
+      ],
+      "invalid_fields": [
+        {
+          "aria_invalid": false,
+          "cls": "o_form_label",
+          "field": null
+        },
+        {
+          "aria_invalid": false,
+          "cls": "o_field_widget",
+          "field": "selected_template_id"
+        }
+      ],
+      "invalid_shown": true
+    },
+    "b2-tax-decision-dialog": {
+      "announced": [
+        {
+          "aria_live": "assertive",
+          "cls": "o_notification",
+          "role": "alert",
+          "text": "Missing required fields"
+        }
+      ],
+      "invalid_fields": [
+        {
+          "aria_invalid": false,
+          "cls": "o_form_label",
+          "field": null
+        },
+        {
+          "aria_invalid": false,
+          "cls": "o_field_widget",
+          "field": "account_tax_id"
+        }
+      ],
+      "invalid_shown": true
+    }
+  },
+  "ruling": "A band that is on screen when the surface receives focus and cannot change while it is on screen is document structure, not a live region, whatever visual class it uses. `role=\"note\"` is the recorded answer; Odoo's `alert-*`-needs-a-live-role view warning is a presentational heuristic and is accepted rather than obeyed, because obeying it declares a region with nothing to announce.",
+  "surfaces": [
+    "b2-store-settings-canonical",
+    "b2-store-form-controls",
+    "b2-tax-decision-dialog",
+    "b2-product-match-decision-pending",
+    "b2-product-match-decision-dialog",
+    "b2-product-match-decision-resolved"
+  ]
+}

@@ -1,0 +1,124 @@
+# Screenshots retained in this directory: the SIX Batch 2 surfaces this
+# closure is about, at every viewport, direction, zoom and motion
+# setting the campaign ran, plus the new per-surface clipping captures.
+#
+# The run wrote 394 distinct screenshot files. The 284 not listed here are
+# the Batch 1 / U2 / U3 surfaces, whose pictures are already committed
+# under docs/05-qa/evidence/batch-1-ui-completion-2026-07-30/,
+# docs/05-qa/evidence/wave-5-u2-u3-2026-07-27/ and
+# docs/05-qa/evidence/wave-5-onboarding-2026-07-29/. Every one of them
+# was still MEASURED in this run -- the .json records here cover the
+# complete set, not only the retained pictures -- and all tests passed.
+# Nothing was dropped from the measurement; only from the pictures, and
+# only where an equivalent picture is already in the repository.
+
+b2-product-match-decision-dialog-clipping-1366px.png
+b2-product-match-decision-dialog-clipping-390px.png
+b2-product-match-decision-dialog-clipping-768px.png
+b2-product-match-decision-dialog-desktop-1366px.png
+b2-product-match-decision-dialog-focus-1366px.png
+b2-product-match-decision-dialog-ltr-zoom200-1366px-css683.png
+b2-product-match-decision-dialog-ltr-zoom200-390px-css320.png
+b2-product-match-decision-dialog-ltr-zoom200-768px-css384.png
+b2-product-match-decision-dialog-mobile-390px.png
+b2-product-match-decision-dialog-reduced-motion-1366px.png
+b2-product-match-decision-dialog-rtl-1366px.png
+b2-product-match-decision-dialog-rtl-390px.png
+b2-product-match-decision-dialog-rtl-768px.png
+b2-product-match-decision-dialog-rtl-zoom200-1366px-css683.png
+b2-product-match-decision-dialog-rtl-zoom200-390px-css320.png
+b2-product-match-decision-dialog-rtl-zoom200-768px-css384.png
+b2-product-match-decision-dialog-tablet-768px.png
+b2-product-match-decision-pending-clipping-1366px.png
+b2-product-match-decision-pending-clipping-390px.png
+b2-product-match-decision-pending-clipping-768px.png
+b2-product-match-decision-pending-desktop-1366px.png
+b2-product-match-decision-pending-focus-1366px.png
+b2-product-match-decision-pending-ltr-zoom200-1366px-css683.png
+b2-product-match-decision-pending-ltr-zoom200-390px-css320.png
+b2-product-match-decision-pending-ltr-zoom200-768px-css384.png
+b2-product-match-decision-pending-mobile-390px.png
+b2-product-match-decision-pending-reduced-motion-1366px.png
+b2-product-match-decision-pending-rtl-1366px.png
+b2-product-match-decision-pending-rtl-390px.png
+b2-product-match-decision-pending-rtl-768px.png
+b2-product-match-decision-pending-rtl-zoom200-1366px-css683.png
+b2-product-match-decision-pending-rtl-zoom200-390px-css320.png
+b2-product-match-decision-pending-rtl-zoom200-768px-css384.png
+b2-product-match-decision-pending-tablet-768px.png
+b2-product-match-decision-resolved-clipping-1366px.png
+b2-product-match-decision-resolved-clipping-390px.png
+b2-product-match-decision-resolved-clipping-768px.png
+b2-product-match-decision-resolved-desktop-1366px.png
+b2-product-match-decision-resolved-focus-1366px.png
+b2-product-match-decision-resolved-ltr-zoom200-1366px-css683.png
+b2-product-match-decision-resolved-ltr-zoom200-390px-css320.png
+b2-product-match-decision-resolved-ltr-zoom200-768px-css384.png
+b2-product-match-decision-resolved-mobile-390px.png
+b2-product-match-decision-resolved-reduced-motion-1366px.png
+b2-product-match-decision-resolved-rtl-1366px.png
+b2-product-match-decision-resolved-rtl-390px.png
+b2-product-match-decision-resolved-rtl-768px.png
+b2-product-match-decision-resolved-rtl-zoom200-1366px-css683.png
+b2-product-match-decision-resolved-rtl-zoom200-390px-css320.png
+b2-product-match-decision-resolved-rtl-zoom200-768px-css384.png
+b2-product-match-decision-resolved-tablet-768px.png
+b2-product-match-decisions-list-desktop-1366px.png
+b2-product-match-decisions-list-focus-1366px.png
+b2-product-match-decisions-list-mobile-390px.png
+b2-product-match-decisions-list-reduced-motion-1366px.png
+b2-product-match-decisions-list-rtl-1366px.png
+b2-product-match-decisions-list-rtl-390px.png
+b2-product-match-decisions-list-rtl-768px.png
+b2-product-match-decisions-list-tablet-768px.png
+b2-store-form-controls-clipping-1366px.png
+b2-store-form-controls-clipping-390px.png
+b2-store-form-controls-clipping-768px.png
+b2-store-form-controls-desktop-1366px.png
+b2-store-form-controls-focus-1366px.png
+b2-store-form-controls-ltr-zoom200-1366px-css683.png
+b2-store-form-controls-ltr-zoom200-390px-css320.png
+b2-store-form-controls-ltr-zoom200-768px-css384.png
+b2-store-form-controls-mobile-390px.png
+b2-store-form-controls-reduced-motion-1366px.png
+b2-store-form-controls-rtl-1366px.png
+b2-store-form-controls-rtl-390px.png
+b2-store-form-controls-rtl-768px.png
+b2-store-form-controls-rtl-zoom200-1366px-css683.png
+b2-store-form-controls-rtl-zoom200-390px-css320.png
+b2-store-form-controls-rtl-zoom200-768px-css384.png
+b2-store-form-controls-tablet-768px.png
+b2-store-settings-canonical-clipping-1366px.png
+b2-store-settings-canonical-clipping-390px.png
+b2-store-settings-canonical-clipping-768px.png
+b2-store-settings-canonical-desktop-1366px.png
+b2-store-settings-canonical-focus-1366px.png
+b2-store-settings-canonical-ltr-zoom200-1366px-css683.png
+b2-store-settings-canonical-ltr-zoom200-390px-css320.png
+b2-store-settings-canonical-ltr-zoom200-768px-css384.png
+b2-store-settings-canonical-mobile-390px.png
+b2-store-settings-canonical-reduced-motion-1366px.png
+b2-store-settings-canonical-rtl-1366px.png
+b2-store-settings-canonical-rtl-390px.png
+b2-store-settings-canonical-rtl-768px.png
+b2-store-settings-canonical-rtl-zoom200-1366px-css683.png
+b2-store-settings-canonical-rtl-zoom200-390px-css320.png
+b2-store-settings-canonical-rtl-zoom200-768px-css384.png
+b2-store-settings-canonical-tablet-768px.png
+b2-tax-decision-dialog-clipping-1366px.png
+b2-tax-decision-dialog-clipping-390px.png
+b2-tax-decision-dialog-clipping-768px.png
+b2-tax-decision-dialog-desktop-1366px.png
+b2-tax-decision-dialog-focus-1366px.png
+b2-tax-decision-dialog-ltr-zoom200-1366px-css683.png
+b2-tax-decision-dialog-ltr-zoom200-390px-css320.png
+b2-tax-decision-dialog-ltr-zoom200-768px-css384.png
+b2-tax-decision-dialog-mobile-390px.png
+b2-tax-decision-dialog-reduced-motion-1366px.png
+b2-tax-decision-dialog-rtl-1366px.png
+b2-tax-decision-dialog-rtl-390px.png
+b2-tax-decision-dialog-rtl-768px.png
+b2-tax-decision-dialog-rtl-zoom200-1366px-css683.png
+b2-tax-decision-dialog-rtl-zoom200-390px-css320.png
+b2-tax-decision-dialog-rtl-zoom200-768px-css384.png
+b2-tax-decision-dialog-tablet-768px.png

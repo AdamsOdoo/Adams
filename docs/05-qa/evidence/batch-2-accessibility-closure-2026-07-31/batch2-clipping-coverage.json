@@ -1,0 +1,1010 @@
+{
+  "expected_markers": {
+    "b2-product-match-decision-dialog": [
+      "o_sc_match_decision_wizard"
+    ],
+    "b2-product-match-decision-pending": [
+      "o_sc_match_decision"
+    ],
+    "b2-product-match-decision-resolved": [
+      "o_sc_match_decision"
+    ],
+    "b2-store-form-controls": [
+      "o_sc_store_form"
+    ],
+    "b2-store-settings-canonical": [
+      "o_sc_store_settings"
+    ],
+    "b2-tax-decision-dialog": [
+      "o_sc_tax_decision"
+    ]
+  },
+  "failures": [],
+  "rows": [
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_settings"
+          ],
+          "client_width": 1366,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_settings"
+          ],
+          "scroll_width": 1366
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_settings"
+      ],
+      "final_control": {
+        "control_count": 10,
+        "label": "0",
+        "reachable": true,
+        "rect": {
+          "bottom": 827.25,
+          "left": 207,
+          "right": 1325,
+          "top": 801.25
+        },
+        "selector": "input.o_input",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_settings",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-settings-canonical",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_form"
+          ],
+          "client_width": 1351,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_form"
+          ],
+          "scroll_width": 1351
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_form"
+      ],
+      "final_control": {
+        "control_count": 6,
+        "label": "Re-run Export Reconciliation",
+        "reachable": true,
+        "rect": {
+          "bottom": 899.59375,
+          "left": 41,
+          "right": 191,
+          "top": 845.59375
+        },
+        "selector": "button.btn[name='action_shopify_export_reconnect_reconciliation']",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_form",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-form-controls",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 978,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 978
+        },
+        {
+          "classes": [
+            "o_form_view",
+            "o_view_controller"
+          ],
+          "client_width": 978,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 978
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_tax_decision"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 760.59375,
+          "left": 399.703125,
+          "right": 465.296875,
+          "top": 727.59375
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_tax_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-tax-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 1351,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 1351
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 6,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 742.75,
+          "left": 57,
+          "right": 75.859375,
+          "top": 726.75
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-pending",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 978,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 978
+        },
+        {
+          "classes": [
+            "o_form_view",
+            "o_view_controller"
+          ],
+          "client_width": 978,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 978
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision_wizard"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 792.59375,
+          "left": 394.234375,
+          "right": 459.828125,
+          "top": 759.59375
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_match_decision_wizard",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 1351,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 1351
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 7,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 851.25,
+          "left": 57,
+          "right": 75.859375,
+          "top": 835.25
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 1366
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-resolved",
+      "verdict": "PASS",
+      "viewport": "desktop (1366px)",
+      "width": 1366
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_settings"
+          ],
+          "client_width": 753,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_settings"
+          ],
+          "scroll_width": 753
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_settings"
+      ],
+      "final_control": {
+        "control_count": 10,
+        "label": "0",
+        "reachable": true,
+        "rect": {
+          "bottom": 899.75,
+          "left": 199,
+          "right": 720,
+          "top": 873.75
+        },
+        "selector": "input.o_input",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_settings",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-settings-canonical",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_form"
+          ],
+          "client_width": 753,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_form"
+          ],
+          "scroll_width": 753
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_form"
+      ],
+      "final_control": {
+        "control_count": 6,
+        "label": "Re-run Export Reconciliation",
+        "reachable": true,
+        "rect": {
+          "bottom": 899.59375,
+          "left": 33,
+          "right": 183,
+          "top": 845.59375
+        },
+        "selector": "button.btn[name='action_shopify_export_reconnect_reconciliation']",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_form",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-form-controls",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 633,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 633
+        },
+        {
+          "classes": [
+            "o_form_view",
+            "o_view_controller"
+          ],
+          "client_width": 633,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 633
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_tax_decision"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 855.5,
+          "left": 265.703125,
+          "right": 331.296875,
+          "top": 822.5
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_tax_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-tax-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 753,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 753
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 6,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 900.25,
+          "left": 49,
+          "right": 67.859375,
+          "top": 884.25
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-pending",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 633,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 633
+        },
+        {
+          "classes": [
+            "o_form_view",
+            "o_view_controller"
+          ],
+          "client_width": 633,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_form_view",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 633
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision_wizard"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 855.5,
+          "left": 260.234375,
+          "right": 325.828125,
+          "top": 822.5
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_match_decision_wizard",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 753,
+          "clipped_by": "o_content",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 753
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 7,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 899.75,
+          "left": 49,
+          "right": 67.859375,
+          "top": 883.75
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 768
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-resolved",
+      "verdict": "PASS",
+      "viewport": "tablet (768px)",
+      "width": 768
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_settings"
+          ],
+          "client_width": 390,
+          "clipped_by": "o_form_view_container",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_settings"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_settings"
+      ],
+      "final_control": {
+        "control_count": 10,
+        "label": "0",
+        "reachable": true,
+        "rect": {
+          "bottom": 900.125,
+          "left": 16,
+          "right": 374,
+          "top": 874.125
+        },
+        "selector": "input.o_input",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_settings",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-settings-canonical",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_store_form"
+          ],
+          "client_width": 390,
+          "clipped_by": "o_form_view_container",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_store_form"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_store_form"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Re-run Export Reconciliation",
+        "reachable": true,
+        "rect": {
+          "bottom": 900.0625,
+          "left": 16,
+          "right": 216.203125,
+          "top": 867.0625
+        },
+        "selector": "button.btn[name='action_shopify_export_reconnect_reconciliation']",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_store_form",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-store-form-controls",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_xxs_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 390,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 390
+        },
+        {
+          "classes": [
+            "o_xxs_form_view",
+            "o_form_view",
+            "o_view_controller",
+            "o_field_highlight"
+          ],
+          "client_width": 390,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_xxs_form_view",
+          "markers": [
+            "o_sc_tax_decision"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_tax_decision"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 881.5,
+          "left": 204.953125,
+          "right": 366.046875,
+          "top": 848.5
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_tax_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-tax-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 390,
+          "clipped_by": "o_form_view_container",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 7,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 900.3125,
+          "left": 24,
+          "right": 42.859375,
+          "top": 883.3125
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-pending",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    },
+    {
+      "all_measured_roots": [
+        "modal-body",
+        "o_xxs_form_view"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "modal-body",
+            "p-0",
+            "o_act_window"
+          ],
+          "client_width": 390,
+          "clipped_by": "modal",
+          "clipped_silently": true,
+          "cls": "modal-body",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 390
+        },
+        {
+          "classes": [
+            "o_xxs_form_view",
+            "o_form_view",
+            "o_view_controller",
+            "o_field_highlight"
+          ],
+          "client_width": 390,
+          "clipped_by": "modal-body",
+          "clipped_silently": false,
+          "cls": "o_xxs_form_view",
+          "markers": [
+            "o_sc_match_decision_wizard"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision_wizard"
+      ],
+      "final_control": {
+        "control_count": 4,
+        "label": "Cancel",
+        "reachable": true,
+        "rect": {
+          "bottom": 881.5,
+          "left": 204.953125,
+          "right": 366.046875,
+          "top": 848.5
+        },
+        "selector": "button.btn",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".modal:not(.o_inactive_modal) .o_sc_match_decision_wizard",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-dialog",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    },
+    {
+      "all_measured_roots": [
+        "o_form_sheet_bg"
+      ],
+      "connector_owned_roots_measured": [
+        {
+          "classes": [
+            "o_form_sheet_bg",
+            "o_sc_match_decision"
+          ],
+          "client_width": 390,
+          "clipped_by": "o_form_view_container",
+          "clipped_silently": false,
+          "cls": "o_form_sheet_bg",
+          "markers": [
+            "o_sc_match_decision"
+          ],
+          "scroll_width": 390
+        }
+      ],
+      "defects": [],
+      "expected_markers": [
+        "o_sc_match_decision"
+      ],
+      "final_control": {
+        "control_count": 8,
+        "label": "",
+        "reachable": true,
+        "rect": {
+          "bottom": 899.5625,
+          "left": 24,
+          "right": 42.859375,
+          "top": 882.5625
+        },
+        "selector": "a.pe-none",
+        "viewport": {
+          "height": 900,
+          "width": 390
+        }
+      },
+      "intended_selector": ".o_form_view .o_sc_match_decision",
+      "intended_visible": 1,
+      "page_horizontal_overflow": 0,
+      "surface": "b2-product-match-decision-resolved",
+      "verdict": "PASS",
+      "viewport": "mobile (390px)",
+      "width": 390
+    }
+  ],
+  "selectors": {
+    "b2-product-match-decision-dialog": ".modal:not(.o_inactive_modal) .o_sc_match_decision_wizard",
+    "b2-product-match-decision-pending": ".o_form_view .o_sc_match_decision",
+    "b2-product-match-decision-resolved": ".o_form_view .o_sc_match_decision",
+    "b2-store-form-controls": ".o_form_view .o_sc_store_form",
+    "b2-store-settings-canonical": ".o_form_view .o_sc_store_settings",
+    "b2-tax-decision-dialog": ".modal:not(.o_inactive_modal) .o_sc_tax_decision"
+  },
+  "surfaces": [
+    "b2-store-settings-canonical",
+    "b2-store-form-controls",
+    "b2-tax-decision-dialog",
+    "b2-product-match-decision-pending",
+    "b2-product-match-decision-dialog",
+    "b2-product-match-decision-resolved"
+  ],
+  "widths": {
+    "desktop": 1366,
+    "mobile": 390,
+    "tablet": 768
+  }
+}
