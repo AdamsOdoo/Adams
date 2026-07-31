@@ -527,6 +527,7 @@ The observation, not an inference:
 | `0bfeb2d` | push ×2, pull_request | started 09:12–09:13, superseded by the next push |
 | `e8840a2` | push ×2, pull_request | **`failure` after 2–7 seconds** |
 | `e8840a2`, re-run | pull_request (attempt 2), push (attempt 2) | **`failure` after 2 seconds** |
+| `a7ab395` (final head) | push, pull_request — **two** runs, not three, because the duplicate push had already stopped | **`failure` after 2 seconds** |
 
 Every failed job reports `runner_id: 0`, an empty `runner_name`, an empty
 `runner_group_name`, **no steps at all**, and `HTTP 404` for its logs. The
@@ -542,7 +543,9 @@ a result about this code — a failing suite produces steps, logs and a red step
 this produces none of those. This session very likely contributed to it: pushing
 to both `fable/wave-5-completion` and the session's designated branch triggered
 **three** ~50-minute runs per commit instead of two. Pushing to the second
-branch has stopped.
+branch has stopped — and the final head shows that made no difference, which
+is itself informative: the condition is stable rather than a transient
+contention spike.
 
 **What this means for the evidence.** GitHub Actions was never the acceptance
 authority here — it is supporting evidence, and DEC-041 D8 reserves acceptance
