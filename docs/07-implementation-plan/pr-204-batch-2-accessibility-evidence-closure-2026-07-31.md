@@ -15,7 +15,8 @@
 | --- | --- |
 | Starting head (control-room verified) | `fc80cd8c881180c2c76843683672b1198ee9f0ee` |
 | Correction parent (merge base with the previous cycle) | `ccad8bf432868650abb80bfb2103bd8d397be549` |
-| Final head | `075cdef86aa8bfcdc60816d4476a52a68db435a4` |
+| Final executable / test / tooling head — the head every result below was measured at | `65cf84a1fe954423db8665896d3bba80c83bea4c` |
+| Final repository head | the documentation/evidence tail that follows `65cf84a`. **A commit cannot contain its own SHA**, so this record names the executable head it describes and the PR body names the repository head; the tail changes no executable, test or tooling file, which a changed-path comparison against `65cf84a` shows |
 | Base | `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` (unchanged, verified ancestor of the head) |
 | Odoo pin | `30bde9ff758834a4912c5ae55843d3a7dad849f1`, checked out and verified for every run |
 | History operation | **Additive only.** No rebase, reset, amend, squash or force-push |
