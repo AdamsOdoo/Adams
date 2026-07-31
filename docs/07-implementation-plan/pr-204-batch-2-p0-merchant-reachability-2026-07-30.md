@@ -35,6 +35,18 @@ worktree; Odoo checkout verified at the pin; the `b0dbba2..ccad8bf` comparison
 exactly **58 paths, 11,121 additions, 55 deletions**; and `ccad8bf` itself
 touching only the three recorded documentation paths.
 
+### The additive chain this correction adds
+
+| Commit | What it is |
+| --- | --- |
+| `5a020779029781868cde0e1c7fc7853e8f5b42dd` | the whole production correction and its tests — **the final executable/test/tooling head** |
+| `ad8763d2439baa93cda9f7eca84dc4fbd5b69985` | the records: this section, the handoff entry, TD-023/TD-024, the reproducer evidence README |
+| `0bfeb2dca2cd45cbe8c2dcf0a6ca4edbea61d656` | the definitive seven-pass result and the retained summary |
+
+The two commits after `5a02077` change **only** `docs/**`; a changed-path
+comparison shows **zero** executable, test or tooling delta, which is why the
+seven-pass run at `5a02077` is validation of the head this branch ships.
+
 **The earlier exact-head CI evidence at `ccad8bf` is not relabelled here.** It
 remains valid for what it executed and is not acceptance evidence for this
 correction: its fixtures did not represent the affected production data

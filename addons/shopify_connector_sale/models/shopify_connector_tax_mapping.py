@@ -102,8 +102,10 @@ def safe_tax_preview(value, limit):
 # the mapping model's own constraint, the decision wizard's candidate list, the
 # importer's non-binding suggestions, and the importer's validation of a
 # resolved tax. Four copies of this rule drifted once already and the drift is
-# what F4 found; `test_tax_posture_rule_is_shared` proves the search predicate
-# and the per-record predicate still agree on every tax in the database.
+# what F4 found;
+# `test_the_wizard_and_the_constraint_share_one_effective_rule` proves the
+# search predicate and the per-record predicate still agree on every tax in
+# the database, for both postures.
 # ----------------------------------------------------------------------
 
 def tax_posture_included(tax):
