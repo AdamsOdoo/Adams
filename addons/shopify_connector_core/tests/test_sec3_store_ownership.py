@@ -113,6 +113,10 @@ SEC3_MODELS = (
     # are in the matrix rather than trusted to be safe by resemblance.
     ('shopify.connector.product.export.preview', '_row_export_preview'),
     ('shopify.connector.product.media.binding', '_row_export_media_binding'),
+    # Batch 2 §8.2 (2026-07-31). A durable, store-scoped decision row that
+    # points at a job and (once applied) at a binding, so it is in the matrix
+    # rather than trusted to be safe by resemblance.
+    ('shopify.connector.product.match.decision', '_row_match_decision'),
 )
 
 # Models that deliberately carry NO `ir.model.access.csv` row, so no connector
@@ -144,6 +148,9 @@ SEC3_STORE_RELATIONS = (
     ('shopify.connector.product.export.preview', 'product_template_binding_id'),
     ('shopify.connector.product.media.binding', 'product_template_binding_id'),
     ('shopify.connector.product.media.binding', 'product_variant_binding_id'),
+    ('shopify.connector.product.match.decision', 'job_id'),
+    ('shopify.connector.product.match.decision', 'resulting_template_binding_id'),
+    ('shopify.connector.product.match.decision', 'resulting_variant_binding_id'),
 )
 
 # Relations whose scope disagreement is structurally impossible, because the
@@ -573,6 +580,33 @@ class Sec3Base(TransactionCase):
             'store_id': store.id,
             'shopify_tax_evidence_key': self._tax_evidence_key(store),
             'account_tax_id': self._tax(store.company_id).id,
+        })
+
+    def _row_match_decision(self, store):
+        # Built through the same key function production uses, so a change to
+        # the identity rule breaks this fixture rather than leaving it
+        # describing a key shape the product no longer writes.
+        from odoo.addons.shopify_connector_product.models.\
+            shopify_connector_product_match_decision import (
+                DECISION_LEVEL_TEMPLATE,
+                decision_key_for,
+            )
+        job = self._job(store)
+        gid = self._gid('Product', store)
+        stamp = '2026-07-30T09:15:00Z'
+        return self.env[
+            'shopify.connector.product.match.decision'
+        ].sudo().with_company(store.company_id).create({
+            'store_id': store.id,
+            'job_id': job.id,
+            'decision_level': DECISION_LEVEL_TEMPLATE,
+            'shopify_product_gid': gid,
+            'remote_updated_at': stamp,
+            'decision_key': decision_key_for(
+                DECISION_LEVEL_TEMPLATE, gid, '', stamp,
+            ),
+            'match_key': 'sku_reference',
+            'match_values': '["SEC3-MATRIX"]',
         })
 
     def _row_fulfillment_binding(self, store):

@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Batch 2 §8.2: the product match decision dialog, the route into it
+        from the stopped import, and the two workspaces that expose pending
+        decisions and their resulting bindings.
+
+        THE DIALOG SHOWS EVIDENCE AND COLLECTS ONE CHOICE. Everything above
+        the choice is `readonly` because it is evidence rather than input.
+        The Shopify GID and the identifier are what make this decision about
+        one product rather than another; an editable one would let a reviewer
+        match one product while believing they had matched another.
+
+        WHY THE DECISION IS NOT A BINDING FORM. A binding's protected fields
+        stay protected: this surface creates no binding, edits no binding
+        field, and offers no way to repoint one. It records which candidate a
+        human chose; the importer then does what it always does.
+    -->
+
+    <record id="view_shopify_connector_product_match_decision_wizard_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.match.decision.wizard.form</field>
+        <field name="model">shopify.connector.product.match.decision.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Choose the matching Odoo product">
+                <div class="alert alert-info" role="status">
+                    <strong>This import stopped because more than one Odoo
+                    record already carries the identifier Shopify sent.</strong>
+                    Choose the one this Shopify record means. Nothing is sent
+                    to Shopify, and no product is created for you. Once
+                    chosen, this import resumes automatically.
+                </div>
+                <group>
+                    <group string="What Shopify sent"
+                           name="match_decision_evidence">
+                        <field name="title_preview" readonly="1"
+                               string="Shopify title"
+                               invisible="not title_preview"/>
+                        <field name="match_key" readonly="1"
+                               string="Matched on"/>
+                        <field name="sku_preview" readonly="1"
+                               invisible="not sku_preview"/>
+                        <field name="barcode_preview" readonly="1"
+                               invisible="not barcode_preview"/>
+                        <field name="options_preview" readonly="1"
+                               invisible="not options_preview"/>
+                        <field name="candidate_total" readonly="1"
+                               string="Odoo records found"/>
+                    </group>
+                    <group string="Affected work" name="match_decision_work">
+                        <field name="store_id" readonly="1"
+                               options="{'no_open': True}"/>
+                        <field name="company_id" readonly="1"
+                               options="{'no_open': True}"/>
+                        <field name="shopify_product_gid" readonly="1"/>
+                        <field name="shopify_variant_gid" readonly="1"
+                               invisible="decision_level != 'variant'"/>
+                        <field name="resolved_template_id" readonly="1"
+                               options="{'no_open': True}"
+                               invisible="decision_level != 'variant'"/>
+                        <field name="job_id" readonly="1"
+                               options="{'no_open': True}"/>
+                    </group>
+                </group>
+                <group string="Your decision" name="match_decision_choice">
+                    <field name="decision_level" invisible="1"/>
+                    <field name="eligible_template_ids" invisible="1"/>
+                    <field name="eligible_variant_ids" invisible="1"/>
+                    <field name="selected_template_id"
+                           invisible="decision_level != 'template'"
+                           required="decision_level == 'template'"
+                           domain="[('id', 'in', eligible_template_ids)]"
+                           options="{'no_create': True, 'no_open': True}"/>
+                    <field name="selected_variant_id"
+                           invisible="decision_level != 'variant'"
+                           required="decision_level == 'variant'"
+                           domain="[('id', 'in', eligible_variant_ids)]"
+                           options="{'no_create': True, 'no_open': True}"/>
+                </group>
+                <div class="text-muted" role="note">
+                    <p>
+                        Only records of this store's company that still carry
+                        the identifier Shopify sent, and are not already bound
+                        to this store, can be chosen. Product names are never
+                        matched on, which is why two records with the same SKU
+                        cannot be told apart automatically.
+                    </p>
+                    <p>
+                        If none of these is right, close this and correct the
+                        SKU or barcode in Odoo, then re-run the import. This
+                        decision applies to the version of the Shopify product
+                        that stopped; if it is edited on Shopify before the
+                        import resumes, you will be asked again.
+                    </p>
+                </div>
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Match and resume import"
+                            class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!--
+        The route in, on the job that is actually waiting. The button appears
+        only when a `pending` decision row genuinely exists for this job,
+        which is a structural test rather than a guess from the error message.
+        Visibility is not the control: `action_open_product_match_decision`
+        reasserts Reviewer-or-Administrator on the server.
+    -->
+    <record id="view_shopify_connector_job_form_product_match_decision"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.job.form.product.match.decision</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_job_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_product_match_decision" type="object"
+                        string="Choose the matching Odoo product"
+                        class="btn-primary"
+                        groups="shopify_connector_core.group_shopify_connector_reviewer"
+                        invisible="not product_match_decision_pending"/>
+                <field name="product_match_decision_pending" invisible="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_match_decision_list"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.match.decision.list</field>
+        <field name="model">shopify.connector.product.match.decision</field>
+        <field name="arch" type="xml">
+            <!--
+                `decoration-*` is colour. The `state` column beside it is the
+                same information as words, because colour alone is not a
+                state (WCAG 1.4.1) and a reviewer filtering by eye should not
+                have to know what amber meant.
+            -->
+            <list string="Product Match Decisions" create="false"
+                  delete="false"
+                  decoration-warning="state == 'pending'"
+                  decoration-muted="state == 'superseded'">
+                <field name="decision_level"/>
+                <field name="title_preview" string="Shopify title"/>
+                <field name="sku_preview" optional="show"/>
+                <field name="barcode_preview" optional="hide"/>
+                <field name="candidate_total" string="Candidates"/>
+                <field name="state" widget="badge"
+                       decoration-warning="state == 'pending'"
+                       decoration-success="state == 'consumed'"
+                       decoration-info="state == 'confirmed'"/>
+                <field name="store_id" optional="show"/>
+                <field name="company_id" optional="hide"/>
+                <field name="selected_template_id" optional="hide"/>
+                <field name="selected_variant_id" optional="hide"/>
+                <field name="resolved_uid" optional="hide"/>
+                <field name="resolved_at" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_match_decision_form"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.match.decision.form</field>
+        <field name="model">shopify.connector.product.match.decision</field>
+        <field name="arch" type="xml">
+            <!--
+                Every field readonly. The decision is made in the dialog,
+                which revalidates the live database before it writes; a form
+                that let a reviewer type a different product in afterwards
+                would bypass every one of those checks and repoint a binding
+                that already exists.
+            -->
+            <form string="Product Match Decision" create="false" delete="false">
+                <header>
+                    <button name="action_open_decision"
+                            type="object"
+                            string="Choose the matching Odoo product"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_reviewer"
+                            invisible="state != 'pending'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="pending,confirmed,consumed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="status"
+                         invisible="state != 'pending'">
+                        <strong>This import is waiting for a decision.</strong>
+                        Until one is made, re-queueing the job runs the same
+                        search and stops at the same ambiguity.
+                    </div>
+                    <div class="alert alert-secondary" role="status"
+                         invisible="state != 'superseded'">
+                        <strong>Superseded.</strong>
+                        <field name="superseded_reason" readonly="1"
+                               nolabel="1" class="d-inline"/>
+                    </div>
+                    <group>
+                        <group string="What Shopify sent"
+                               name="match_decision_evidence">
+                            <field name="decision_level" readonly="1"/>
+                            <field name="title_preview" readonly="1"/>
+                            <field name="match_key" readonly="1"/>
+                            <field name="sku_preview" readonly="1"/>
+                            <field name="barcode_preview" readonly="1"/>
+                            <field name="options_preview" readonly="1"/>
+                            <field name="shopify_product_gid" readonly="1"/>
+                            <field name="shopify_variant_gid" readonly="1"
+                                   invisible="decision_level != 'variant'"/>
+                            <field name="remote_updated_at" readonly="1"
+                                   string="Shopify last updated"/>
+                        </group>
+                        <group string="Affected work" name="match_decision_work">
+                            <field name="store_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                            <field name="company_id" readonly="1"
+                                   options="{'no_open': True}"/>
+                            <field name="job_id" readonly="1"/>
+                            <field name="job_state" readonly="1"/>
+                            <field name="resolved_template_id" readonly="1"
+                                   invisible="decision_level != 'variant'"/>
+                            <field name="candidate_total" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="The decision" name="match_decision_outcome"
+                           invisible="state == 'pending'">
+                        <group>
+                            <field name="selected_template_id" readonly="1"
+                                   invisible="decision_level != 'template'"/>
+                            <field name="selected_variant_id" readonly="1"
+                                   invisible="decision_level != 'variant'"/>
+                            <field name="resolved_uid" readonly="1"/>
+                            <field name="resolved_at" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="resumed_job_state" readonly="1"/>
+                            <field name="resulting_template_binding_id"
+                                   readonly="1"
+                                   invisible="not resulting_template_binding_id"/>
+                            <field name="resulting_variant_binding_id"
+                                   readonly="1"
+                                   invisible="not resulting_variant_binding_id"/>
+                            <field name="consumed_at" readonly="1"
+                                   invisible="not consumed_at"/>
+                        </group>
+                    </group>
+                    <group string="Candidates the import found"
+                           name="match_decision_candidates">
+                        <field name="candidate_template_ids" readonly="1"
+                               nolabel="1" colspan="2"
+                               invisible="decision_level != 'template'"/>
+                        <field name="candidate_variant_ids" readonly="1"
+                               nolabel="1" colspan="2"
+                               invisible="decision_level != 'variant'"/>
+                    </group>
+                    <div class="text-muted" role="note">
+                        A decision belongs to one exact version of one Shopify
+                        record. If the product is edited on Shopify before the
+                        import resumes, this decision is superseded and a
+                        fresh one is raised, because the thing it was about
+                        has changed.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_product_match_decision_search"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.product.match.decision.search</field>
+        <field name="model">shopify.connector.product.match.decision</field>
+        <field name="arch" type="xml">
+            <search string="Product Match Decisions">
+                <field name="title_preview" string="Shopify title"/>
+                <field name="sku_preview"/>
+                <field name="barcode_preview"/>
+                <field name="shopify_product_gid"/>
+                <field name="store_id"/>
+                <filter name="filter_pending" string="Waiting for a decision"
+                        domain="[('state', '=', 'pending')]"/>
+                <separator/>
+                <filter name="filter_template" string="Products"
+                        domain="[('decision_level', '=', 'template')]"/>
+                <filter name="filter_variant" string="Variants"
+                        domain="[('decision_level', '=', 'variant')]"/>
+                <separator/>
+                <filter name="filter_applied" string="Applied"
+                        domain="[('state', '=', 'consumed')]"/>
+                <filter name="filter_superseded" string="Superseded"
+                        domain="[('state', '=', 'superseded')]"/>
+                <group>
+                    <filter name="group_store" string="Store"
+                            context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="State"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="group_level" string="Level"
+                            context="{'group_by': 'decision_level'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_product_match_decision"
+            model="ir.actions.act_window">
+        <field name="name">Match Decisions</field>
+        <field name="res_model">shopify.connector.product.match.decision</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+        <field name="search_view_id"
+               ref="view_shopify_connector_product_match_decision_search"/>
+        <!--
+            An explicit `view_ids` pair rather than the default-view fallback.
+            `default_view()` orders by `priority,name,id`, and every view here
+            sits at the default priority, so the tie would break on NAME —
+            which is how a list belonging to one model has rendered for
+            another before in this project.
+        -->
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_product_match_decision_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_product_match_decision_form')})]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Nothing is waiting on a match decision.
+            </p>
+            <p>
+                A product lands here when more than one Odoo record carries
+                the SKU or barcode Shopify sent. The connector will not guess
+                which one you meant, so it stops and asks.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_shopify_connector_product_match_decision"
+              name="Match Decisions"
+              parent="menu_shopify_connector_catalog"
+              action="action_shopify_connector_product_match_decision"
+              sequence="5"/>
+</odoo>

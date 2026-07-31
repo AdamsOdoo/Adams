@@ -3,5 +3,6 @@ from . import shopify_connector_store_settings
 from . import shopify_connector_product_product
 from . import shopify_connector_product_template_binding
 from . import shopify_connector_product_variant_binding
+from . import shopify_connector_product_match_decision
 from . import shopify_connector_product_importer
 from . import shopify_connector_product_scan

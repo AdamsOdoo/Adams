@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.6.0',
+    'version': '19.0.2.7.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '
@@ -52,6 +52,10 @@ logic. No UI, wizard, webhook, or OAuth file.
         # settings the producer makes real. Loads after the settings section
         # it extends by `inherit_id`.
         'views/shopify_connector_product_controls_views.xml',
+        # Batch 2 §8.2: the durable match decision, its dialog and its
+        # workspace. Loads after the menus file, whose Catalog & Matching
+        # branch it hangs the Match Decisions entry off.
+        'views/shopify_connector_product_match_decision_views.xml',
     ],
     'installable': True,
     'application': False,

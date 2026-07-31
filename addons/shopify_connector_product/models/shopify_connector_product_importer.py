@@ -18,6 +18,14 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     JobHandlerError,
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
+# Batch 2 §8.2. The importer builds the evidence and consumes the decision; it
+# never writes one. The write happens in the dispatcher seam, because this
+# module's own savepoint would roll it back -- see the module docstring there.
+from .shopify_connector_product_match_decision import (
+    DECISION_LEVEL_TEMPLATE,
+    DECISION_LEVEL_VARIANT,
+    build_match_evidence,
+)
 
 # Read-only GraphQL query only -- never a mutation (Task 010B remains
 # import-only; see test_product_import_matching.py's source-level guard).
@@ -906,11 +914,22 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         variants = payload.get('variants') or []
         candidate_ids, match_key = self._find_template_candidates(store, variants)
         if len(candidate_ids) > 1:
+            # Manual decision is LAST in the priority order (§8.2.4): it is
+            # consulted only once identifier matching has already produced an
+            # ambiguity, and only for this exact remote identity.
+            decided = self._consume_template_decision(
+                store, payload, snapshot_vals, candidate_ids,
+            )
+            if decided:
+                return decided, 'candidate_match', None
             raise JobHandlerError(
                 'ambiguous_match',
                 'Ambiguous product-template match for Shopify product '
                 '%s: %d candidate product.template record(s) found.' % (
                     shopify_gid, len(candidate_ids),
+                ),
+                self._template_match_evidence(
+                    payload, match_key, candidate_ids,
                 ),
             )
         if len(candidate_ids) == 1:
@@ -1257,15 +1276,26 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 ),
             )
         match_key = variant_payload.get('_match_key')
+        # §8.2: a variant bound from a human decision records who made it, on
+        # the binding's own existing `manual`/`matched_by_uid` vocabulary --
+        # no new binding field, and no protected field made editable.
+        decision = self.env[
+            'shopify.connector.product.match.decision'
+        ].sudo().browse(
+            variant_payload.get('_match_decision_id') or []
+        ).exists()
         binding = VariantBinding.sudo().create(dict(
             snapshot_vals,
             store_id=store.id, shopify_gid=shopify_gid,
             product_variant_id=product.id,
             product_template_binding_id=template_binding.id,
             match_key=match_key or False,
+            matched_by_uid=decision.resolved_uid.id if decision else False,
             matched_at=fields.Datetime.now(),
         ))
         binding = VariantBinding.browse(binding.id)
+        if decision:
+            decision._mark_consumed(variant_binding=binding)
         self._apply_variant_extras(
             product, variant_payload, binding, source, settings, media, notes,
         )
@@ -1311,7 +1341,8 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             variant_payload['_match_key'] = None
             return deterministic
         candidate_id, match_key = self._match_variant_candidate(
-            template.id, prefetch, variant_payload,
+            template_binding.store_id, payload, template.id, prefetch,
+            variant_payload,
         )
         if candidate_id:
             variant_payload['_match_key'] = match_key
@@ -1498,43 +1529,196 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         return ProductProduct.browse()
 
     @api.model
-    def _match_variant_candidate(self, template_id, prefetch, variant_payload):
+    def _match_variant_candidate(
+        self, store, payload, template_id, prefetch, variant_payload,
+    ):
         """SKU-then-barcode candidate match for a variant, scoped to its
         resolved template, using the prefetched candidate sets and the
         prefetched bound-id exclusion (no per-variant full-table scan,
-        D-010B-9). Returns `(product_id or None, match_key or None)`."""
+        D-010B-9). Returns `(product_id or None, match_key or None)`.
+
+        `store` and `payload` are here only so an ambiguity can identify
+        itself: a variant decision is keyed on its parent product's GID and
+        remote `updatedAt`, neither of which the variant payload carries.
+        """
         bound_ids = prefetch['bound_variant_ids']
-        sku = variant_payload.get('sku')
-        if sku:
-            matches = prefetch['sku_candidates'].filtered(
-                lambda product: product.default_code == sku
+        for match_key, field_name, candidate_key in (
+            ('sku_reference', 'sku', 'sku_candidates'),
+            ('barcode', 'barcode', 'barcode_candidates'),
+        ):
+            value = variant_payload.get(field_name)
+            if not value:
+                continue
+            odoo_field = 'default_code' if field_name == 'sku' else 'barcode'
+            matches = prefetch[candidate_key].filtered(
+                lambda product: product[odoo_field] == value
                 and product.product_tmpl_id.id == template_id
                 and product.id not in bound_ids
             )
             if len(matches) > 1:
+                # Manual decision is LAST (§8.2.4), and only for this exact
+                # remote identity.
+                decided = self._consume_variant_decision(
+                    store, payload, template_id, variant_payload, matches.ids,
+                )
+                if decided:
+                    return decided, 'manual'
                 raise JobHandlerError(
                     'ambiguous_match',
-                    'Ambiguous product-variant SKU match for Shopify '
-                    'variant %s.' % (variant_payload.get('gid'),),
+                    'Ambiguous product-variant %s match for Shopify '
+                    'variant %s.' % (
+                        'SKU' if field_name == 'sku' else 'barcode',
+                        variant_payload.get('gid'),
+                    ),
+                    self._variant_match_evidence(
+                        payload, template_id, variant_payload, match_key,
+                        matches.ids,
+                    ),
                 )
             if matches:
-                return matches.id, 'sku_reference'
-        barcode = variant_payload.get('barcode')
-        if barcode:
-            matches = prefetch['barcode_candidates'].filtered(
-                lambda product: product.barcode == barcode
-                and product.product_tmpl_id.id == template_id
-                and product.id not in bound_ids
-            )
-            if len(matches) > 1:
-                raise JobHandlerError(
-                    'ambiguous_match',
-                    'Ambiguous product-variant barcode match for Shopify '
-                    'variant %s.' % (variant_payload.get('gid'),),
-                )
-            if matches:
-                return matches.id, 'barcode'
+                return matches.id, match_key
         return None, None
+
+    # ------------------------------------------------------------------
+    # Manual match decisions (§8.2): evidence out, decisions in.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _identifier_values(self, variants, match_key):
+        """The exact identifier set `_find_template_candidates` searched on.
+
+        Recomputed from the same payload with the same expression rather than
+        threaded out of the search, so the evidence can never describe a
+        different set from the one that produced the candidates.
+        """
+        field = 'sku' if match_key == 'sku_reference' else 'barcode'
+        return sorted({
+            variant[field] for variant in variants if variant.get(field)
+        })
+
+    @api.model
+    def _template_match_evidence(self, payload, match_key, candidate_ids):
+        variants = payload.get('variants') or []
+        first_sku = next(
+            (v['sku'] for v in variants if v.get('sku')), '',
+        )
+        first_barcode = next(
+            (v['barcode'] for v in variants if v.get('barcode')), '',
+        )
+        options = ', '.join(
+            option.get('name') or ''
+            for option in (payload.get('options') or [])
+        )
+        return build_match_evidence(
+            level=DECISION_LEVEL_TEMPLATE,
+            shopify_product_gid=payload.get('gid') or '',
+            remote_updated_at=payload.get('updated_at') or '',
+            match_key=match_key,
+            match_values=self._identifier_values(variants, match_key),
+            candidate_ids=candidate_ids,
+            candidate_total=len(candidate_ids),
+            title_preview=payload.get('title') or '',
+            sku_preview=first_sku,
+            barcode_preview=first_barcode,
+            options_preview=options,
+        )
+
+    @api.model
+    def _variant_match_evidence(
+        self, payload, template_id, variant_payload, match_key, candidate_ids,
+    ):
+        value = variant_payload.get(
+            'sku' if match_key == 'sku_reference' else 'barcode'
+        )
+        return build_match_evidence(
+            level=DECISION_LEVEL_VARIANT,
+            shopify_product_gid=payload.get('gid') or '',
+            shopify_variant_gid=variant_payload.get('gid') or '',
+            remote_updated_at=payload.get('updated_at') or '',
+            match_key=match_key,
+            match_values=[value] if value else [],
+            resolved_template_id=template_id,
+            candidate_ids=candidate_ids,
+            candidate_total=len(candidate_ids),
+            title_preview=payload.get('title') or '',
+            sku_preview=variant_payload.get('sku') or '',
+            barcode_preview=variant_payload.get('barcode') or '',
+            options_preview=variant_payload.get('option_values') or '',
+        )
+
+    @api.model
+    def _consume_template_decision(
+        self, store, payload, snapshot_vals, candidate_ids,
+    ):
+        """Bind the template a human already chose, or return empty.
+
+        Three things must all hold, and each closes a different hole:
+
+        * the decision is `confirmed` for THIS store and THIS exact remote
+          `updatedAt` -- so a product edited on Shopify after the decision
+          was made is never imported against it (§8.2.11);
+        * the chosen template is still among the candidates THIS import just
+          computed -- so a template archived, re-companied, bound elsewhere or
+          renamed since is refused rather than bound;
+        * the binding create and the decision's consumption stamp happen in
+          the same statement sequence inside the importer's own savepoint --
+          so a later variant failure rolls back both and the decision is still
+          there, still confirmed, for the retry (§8.2.10).
+        """
+        Decision = self.env['shopify.connector.product.match.decision']
+        decision = Decision._confirmed_for(
+            store, DECISION_LEVEL_TEMPLATE, payload.get('gid'), '',
+            payload.get('updated_at'),
+        )
+        if not decision:
+            return False
+        chosen = decision.selected_template_id
+        if not chosen or chosen.id not in candidate_ids:
+            return False
+        TemplateBinding = self.env[
+            'shopify.connector.product.template.binding'
+        ]
+        binding = TemplateBinding.sudo().create(dict(
+            snapshot_vals,
+            store_id=store.id,
+            shopify_gid=payload.get('gid'),
+            product_template_id=chosen.id,
+            match_key='manual',
+            matched_by_uid=decision.resolved_uid.id or False,
+            matched_at=fields.Datetime.now(),
+        ))
+        binding = TemplateBinding.browse(binding.id)
+        decision._mark_consumed(template_binding=binding)
+        return binding
+
+    @api.model
+    def _consume_variant_decision(
+        self, store, payload, template_id, variant_payload, candidate_ids,
+    ):
+        """The variant equivalent. Returns the chosen id, or ``None``.
+
+        The binding itself is created by `_resolve_one_variant`, which owns
+        the conflicting-binding refusal every variant path goes through. The
+        decision id rides along on the payload dict the same way `_match_key`
+        already does, so the consumption stamp lands on the binding that was
+        actually created rather than on one this method assumed.
+        """
+        Decision = self.env['shopify.connector.product.match.decision']
+        decision = Decision._confirmed_for(
+            store, DECISION_LEVEL_VARIANT, payload.get('gid'),
+            variant_payload.get('gid'), payload.get('updated_at'),
+        )
+        if not decision:
+            return None
+        chosen = decision.selected_variant_id
+        if (
+            not chosen
+            or chosen.id not in candidate_ids
+            or chosen.product_tmpl_id.id != template_id
+        ):
+            return None
+        variant_payload['_match_decision_id'] = decision.id
+        return chosen.id
 
     @api.model
     def _find_template_candidates(self, store, variants):
