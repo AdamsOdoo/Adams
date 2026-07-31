@@ -90,5 +90,33 @@
             <field name="domain_force">[('company_id', 'in', company_ids)]</field>
         </record>
 
+        <!--
+            Batch 2 correction (F5): transient-record OWNERSHIP, restated
+            because Odoo 19 no longer provides it.
+
+            `TransientModel`'s own docstring still says users "may only access
+            the records they created", but at pin `30bde9ff`
+            `odoo/orm/models_transient.py` carries no `_check_access` override
+            at all, and `BaseModel._check_access` applies nothing but the ACL
+            and the `ir.rule` set. The ACL grants every Connector Administrator
+            full CRUD on this wizard, so without this rule an administrator of
+            company A could read a dialog row an administrator of company B had
+            opened; and that row now carries a validated snapshot of company
+            B's store, company, order GID and tax evidence, which is precisely
+            what the snapshot design exists to keep out of their reach.
+
+            `perm_create` is deliberately absent: the rule constrains reading,
+            writing and unlinking an EXISTING row. Creation is guarded on the
+            server by `create()`, which re-derives every identity value from a
+            job the caller proved they may read.
+        -->
+        <record id="tax_decision_wizard_owner_rule" model="ir.rule">
+            <field name="name">Shopify Tax Decision Dialog: only its own opener</field>
+            <field name="model_id" ref="model_shopify_connector_tax_decision_wizard"/>
+            <field name="global" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
+        </record>
+
     </data>
 </odoo>

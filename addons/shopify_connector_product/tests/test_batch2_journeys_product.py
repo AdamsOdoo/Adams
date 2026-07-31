@@ -497,9 +497,15 @@ class TestBatch2ProductJourneys(TransactionCase):
             'product_domain_enabled': True,
             'product_first_sync_source': 'shopify_source',
         })
-        first = self._make_product('K Dup A', sku='K-DUP')
-        self._make_product('K Dup B', sku='K-DUP')
-        gid = 'gid://shopify/Product/K-DUP'
+        # Batch 2 correction (F1/F2/F3): the complete journey runs on
+        # PRODUCTION-SHAPED identity. A real Product GID carries a 13-digit
+        # suffix and a real SKU is routinely all digits -- both rewritten by
+        # the display scrubber, which is what made this journey's decision
+        # unconsumable. `K-DUP` and `gid://shopify/Product/K-DUP` were two of
+        # the few shapes that survived it.
+        first = self._make_product('K Dup A', sku='1234567890123')
+        self._make_product('K Dup B', sku='1234567890123')
+        gid = 'gid://shopify/Product/7346299043911'
         job = self.Job.create({
             'store_id': store.id,
             'job_source': 'scheduled_sync',
@@ -509,7 +515,11 @@ class TestBatch2ProductJourneys(TransactionCase):
             'shopify_target_gid': gid,
         })
         body = self._product_body(
-            gid, [self._variant('%s-v' % gid, sku='K-DUP')],
+            gid,
+            [self._variant(
+                'gid://shopify/ProductVariant/45123456789012',
+                sku='1234567890123',
+            )],
         )
         self._drain(products={gid: body})
         job.invalidate_recordset()

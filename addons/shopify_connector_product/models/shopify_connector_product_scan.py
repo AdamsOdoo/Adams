@@ -29,6 +29,18 @@ every status unless asked otherwise, so omitting the clause enumerates the
 whole catalog. §8.1.8 forbids a default that silently omits old or unchanged
 products, and the surest way to honour it is to ask for no narrowing at all
 and let the checkpoint -- not a status guess -- decide what is new work.
+
+THE BOUND, STATED RATHER THAN DISCOVERED (TD-024). One scan reads
+`PRODUCT_SCAN_PAGE_SIZE` (100) products per page and refuses beyond
+`PRODUCT_SCAN_PAGE_LIMIT` (200) pages, so a single run covers at most
+`PRODUCT_SCAN_MAX_PRODUCTS` (20,000) products in the window it is scanning.
+Above that it FAILS CLOSED: no checkpoint advance, no partial success, no
+silent truncation -- and no progress either, because the next run restarts the
+same window and stops in the same place. A catalog larger than the ceiling
+therefore cannot complete an initial import at all. The fix is bounded
+RESUMABLE enumeration through the existing job mechanism, which is recorded as
+technical debt rather than built here; the controlled-Shopify/UAT preflight
+must confirm the target store is under the ceiling before that campaign runs.
 """
 
 import hashlib
@@ -55,6 +67,15 @@ _logger = logging.getLogger(__name__)
 PRODUCT_SCAN_TARGET = 'scan:product'
 PRODUCT_SCAN_PAGE_SIZE = 100
 PRODUCT_SCAN_PAGE_LIMIT = 200
+# The single scan's hard ceiling, stated once so the operator-facing refusal
+# and the technical-debt register cannot drift from the code.
+PRODUCT_SCAN_MAX_PRODUCTS = PRODUCT_SCAN_PAGE_SIZE * PRODUCT_SCAN_PAGE_LIMIT
+
+# The exact cron this module installs. Named as a constant so the truthful
+# scheduled-state projection resolves one known record rather than searching.
+PRODUCT_SCAN_CRON_XMLID = (
+    'shopify_connector_product.ir_cron_shopify_connector_product_scan'
+)
 
 # The incremental window deliberately reaches slightly BEHIND the checkpoint.
 # Shopify's `updated_at` has second resolution and a write landing in the same
@@ -200,9 +221,34 @@ class ShopifyConnectorProductScan(models.AbstractModel):
                 # §8.1.15: visible, never a silent truncation. Stopping here
                 # and reporting success would advance the checkpoint past
                 # products this scan never looked at.
+                #
+                # Batch 2 correction (F11): the refusal now STATES the
+                # limitation and its consequence. "The product scan page
+                # ceiling was exceeded" told an operator nothing about what
+                # they had hit, whether their catalog had been imported, or
+                # what to do -- and this is not a transient fault they can
+                # retry away: every subsequent run enumerates the same
+                # unbounded first window and stops in the same place. The
+                # bounded resumable enumeration that would fix it is recorded
+                # as debt (TD-024) and is deliberately not built here.
                 raise JobHandlerError(
                     'data_shape_schema_mismatch',
-                    'The product scan page ceiling was exceeded.',
+                    'This catalog is larger than one product scan can '
+                    'enumerate. A scan reads %d products per page and stops '
+                    'at %d pages, so it covers at most %d products in a '
+                    'single run, and this store has more than that in the '
+                    'window being scanned. NOTHING WAS IMPORTED and the '
+                    'catalog checkpoint has NOT moved, so no product has been '
+                    'silently skipped -- but retrying will stop at exactly '
+                    'the same place, because the scan restarts from the same '
+                    'window every time. Resumable enumeration for catalogs '
+                    'above this size is not implemented yet; until it is, '
+                    'this store cannot complete an initial product import.'
+                    % (
+                        PRODUCT_SCAN_PAGE_SIZE,
+                        PRODUCT_SCAN_PAGE_LIMIT,
+                        PRODUCT_SCAN_MAX_PRODUCTS,
+                    ),
                 )
             try:
                 with client.execute_business(
@@ -424,6 +470,13 @@ class ShopifyConnectorStoreProductScanExtension(models.Model):
     def _compute_product_sync_state(self):
         Settings = self.env['shopify.connector.store.settings']
         Job = self.env['shopify.connector.job']
+        # Batch 2 correction (F7): the store flag is an INTENTION; the cron is
+        # what actually runs. Read once for the whole recordset -- it is one
+        # `ir.model.data` resolution and one field read, and it is the same
+        # answer for every store in the database.
+        scheduler_live = self._connector_scheduler_is_active(
+            PRODUCT_SCAN_CRON_XMLID,
+        )
         for store in self:
             settings = Settings.search(
                 [('store_id', '=', store.id)], limit=1,
@@ -431,7 +484,9 @@ class ShopifyConnectorStoreProductScanExtension(models.Model):
             enabled = bool(settings and settings.product_domain_enabled)
             store.product_sync_domain_enabled = enabled
             store.product_sync_scheduled = bool(
-                enabled and settings.product_scheduled_sync_enabled
+                enabled
+                and settings.product_scheduled_sync_enabled
+                and scheduler_live
             )
             store.product_sync_last_checkpoint_at = (
                 settings.product_last_import_checkpoint_at

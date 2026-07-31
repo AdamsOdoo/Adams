@@ -50,17 +50,22 @@
                     <field name="order_sync_active_scan_count" readonly="1"/>
                     <div class="text-muted" colspan="2"
                          invisible="order_sync_scheduled">
-                        <strong>Scheduled order import is off.</strong>
+                        <strong>Scheduled order import is not running.</strong>
                         Orders are discovered only when somebody presses
-                        <em>Import orders now</em>. Turn scheduling on in
-                        Configuration → Store Settings if this store should
-                        keep itself up to date.
+                        <em>Import orders now</em>. Scheduled import needs BOTH
+                        this store's scheduling setting (Configuration → Store
+                        Settings) AND the connector's <em>Enqueue Order
+                        Scans</em> scheduled action to be active — this says
+                        "not running" if either one is off, because turning
+                        only the store setting on would change nothing.
                     </div>
                     <div class="text-muted" colspan="2"
                          invisible="not order_sync_scheduled">
-                        Scheduled order import is on: the connector looks for
-                        new orders on its own. <em>Import orders now</em> asks
-                        it to look immediately instead of waiting.
+                        Scheduled order import is running: this store is
+                        enabled for it and the connector's scheduled action is
+                        active, so it looks for new orders on its own.
+                        <em>Import orders now</em> asks it to look immediately
+                        instead of waiting.
                     </div>
                     <div class="text-muted" colspan="2"
                          invisible="order_sync_active_scan_count == 0">

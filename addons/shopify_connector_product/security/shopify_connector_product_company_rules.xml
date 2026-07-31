@@ -80,10 +80,21 @@
             sanitized Shopify title, SKU and barcode readable by any connector
             role in any company — which is exactly the disclosure §7 forbids.
 
-            No `sec3_scope_quarantined` leaf: a decision's only connector
-            parent is its own store, so it has no connector peer to disagree
-            with and the scope mixin does not apply to it (same reasoning as
-            the sale module's tax mapping).
+            THE STORE RULE CARRIES THE `sec3_scope_quarantined` LEAF, and it
+            has to. Unlike the sale module's tax mapping, whose only parent
+            is its own store, a decision points at THREE other connector
+            rows: the job it blocks and the two bindings it can result in
+            (`_sec3_parent_scope_relations`). It therefore does use
+            `shopify.connector.scope.mixin`, does have connector peers that can
+            disagree with it, and a historic row whose peers disagree is
+            quarantined rather than re-homed. The leaf below is what makes a
+            quarantined row invisible instead of merely flagged, exactly as it
+            is for the two bindings above.
+
+            (An earlier version of this comment claimed the opposite: that
+            the model does not use the scope mixin and that the rule carries no
+            such leaf. It was wrong on both counts about the rule standing
+            beside it, and the rule is the authority.)
 
             The second rule is defence in depth over the SELECTION. The write
             side is already Odoo's native `_check_company` (opted into on the
@@ -115,6 +126,29 @@
                 '|', ('selected_template_id.company_id', '=', False), ('selected_template_id.company_id', 'in', company_ids),
                 '|', ('selected_variant_id', '=', False),
                 '|', ('selected_variant_id.company_id', '=', False), ('selected_variant_id.company_id', 'in', company_ids)]</field>
+        </record>
+
+        <!--
+            Batch 2 correction (F5, applied here for the same reason): the
+            decision dialog is a `TransientModel`, and Odoo 19 no longer
+            restricts a transient row to the user who created it. At pin
+            `30bde9ff`, `odoo/orm/models_transient.py` has no `_check_access`
+            override despite its docstring, so the ACL below (which grants
+            every Reviewer and Administrator full CRUD) was the whole of the
+            protection. This dialog carries a snapshot of the store, company,
+            Shopify identity and match previews it was opened for, so a
+            reviewer of another company reading somebody else's open dialog is
+            the same disclosure the store rule above exists to prevent.
+
+            `perm_create` is absent for the same reason as its sale-module
+            twin: creation is guarded on the server, this rule guards the row.
+        -->
+        <record id="product_match_decision_wizard_owner_rule" model="ir.rule">
+            <field name="name">Shopify Product Match Dialog: only its own opener</field>
+            <field name="model_id" ref="model_shopify_connector_product_match_decision_wizard"/>
+            <field name="global" eval="True"/>
+            <field name="perm_create" eval="False"/>
+            <field name="domain_force">[('create_uid', '=', user.id)]</field>
         </record>
 
         <!--

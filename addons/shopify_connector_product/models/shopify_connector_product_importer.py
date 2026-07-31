@@ -742,7 +742,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             media = self._prepare_media(store, payload, settings, notes, media_stack)
             with self.env.cr.savepoint():
                 result = self._apply_within_savepoint(
-                    store, payload, settings, media, notes,
+                    store, payload, settings, media, notes, job,
                 )
         self._emit_notes(job, notes)
         result['notes'] = notes
@@ -845,17 +845,19 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         }
 
     @api.model
-    def _apply_within_savepoint(self, store, payload, settings, media, notes):
+    def _apply_within_savepoint(
+        self, store, payload, settings, media, notes, job=None,
+    ):
         """All database writes for one non-archived product (inside the
         savepoint). An ARCHIVED product never reaches here -- it is routed to
         `_handle_archived_product` before any media download (review
         `4950339305` item 4)."""
         template_binding, source, option_specs = self._resolve_template(
-            store, payload, settings, notes,
+            store, payload, settings, notes, job,
         )
         variant_bindings = self._resolve_variants(
             store, payload, template_binding, source, option_specs,
-            settings, media, notes,
+            settings, media, notes, job,
         )
         product_by_gid = {
             binding.shopify_gid: binding.product_variant_id
@@ -886,7 +888,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _resolve_template(self, store, payload, settings, notes):
+    def _resolve_template(self, store, payload, settings, notes, job=None):
         """Returns `(binding, source, option_specs)`.
 
         `source` is one of `'existing_binding'`, `'candidate_match'`,
@@ -918,7 +920,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             # consulted only once identifier matching has already produced an
             # ambiguity, and only for this exact remote identity.
             decided = self._consume_template_decision(
-                store, payload, snapshot_vals, candidate_ids,
+                store, payload, snapshot_vals, candidate_ids, job,
             )
             if decided:
                 return decided, 'candidate_match', None
@@ -1170,7 +1172,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     @api.model
     def _resolve_variants(
         self, store, payload, template_binding, source, option_specs,
-        settings, media, notes,
+        settings, media, notes, job=None,
     ):
         """Resolve/create and bind every Shopify variant.
 
@@ -1194,7 +1196,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             binding = self._resolve_one_variant(
                 store, payload, template_binding, source, option_specs,
                 ptav_lookup, prefetch, variant_payload, index, len(variants),
-                settings, media, notes,
+                settings, media, notes, job,
             )
             variant_bindings |= binding
         return variant_bindings
@@ -1243,7 +1245,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     def _resolve_one_variant(
         self, store, payload, template_binding, source, option_specs,
         ptav_lookup, prefetch, variant_payload, index, variant_count,
-        settings, media, notes,
+        settings, media, notes, job=None,
     ):
         VariantBinding = self.env['shopify.connector.product.variant.binding']
         shopify_gid = variant_payload.get('gid')
@@ -1260,7 +1262,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
         product = self._resolve_variant_product(
             payload, template_binding, source, option_specs, ptav_lookup,
-            prefetch, variant_payload, index, variant_count, notes,
+            prefetch, variant_payload, index, variant_count, notes, job,
         )
         conflicting = VariantBinding.search([
             ('store_id', '=', store.id),
@@ -1316,7 +1318,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     @api.model
     def _resolve_variant_product(
         self, payload, template_binding, source, option_specs, ptav_lookup,
-        prefetch, variant_payload, index, variant_count, notes,
+        prefetch, variant_payload, index, variant_count, notes, job=None,
     ):
         """Resolve the exact `product.product` a new Shopify variant binds
         to. Structured create/refresh instantiate the precise combination
@@ -1342,7 +1344,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             return deterministic
         candidate_id, match_key = self._match_variant_candidate(
             template_binding.store_id, payload, template.id, prefetch,
-            variant_payload,
+            variant_payload, job,
         )
         if candidate_id:
             variant_payload['_match_key'] = match_key
@@ -1531,6 +1533,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     @api.model
     def _match_variant_candidate(
         self, store, payload, template_id, prefetch, variant_payload,
+        job=None,
     ):
         """SKU-then-barcode candidate match for a variant, scoped to its
         resolved template, using the prefetched candidate sets and the
@@ -1560,6 +1563,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 # remote identity.
                 decided = self._consume_variant_decision(
                     store, payload, template_id, variant_payload, matches.ids,
+                    job,
                 )
                 if decided:
                     return decided, 'manual'
@@ -1610,6 +1614,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             for option in (payload.get('options') or [])
         )
         return build_match_evidence(
+            self.env,
             level=DECISION_LEVEL_TEMPLATE,
             shopify_product_gid=payload.get('gid') or '',
             remote_updated_at=payload.get('updated_at') or '',
@@ -1631,6 +1636,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             'sku' if match_key == 'sku_reference' else 'barcode'
         )
         return build_match_evidence(
+            self.env,
             level=DECISION_LEVEL_VARIANT,
             shopify_product_gid=payload.get('gid') or '',
             shopify_variant_gid=variant_payload.get('gid') or '',
@@ -1648,7 +1654,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _consume_template_decision(
-        self, store, payload, snapshot_vals, candidate_ids,
+        self, store, payload, snapshot_vals, candidate_ids, job=None,
     ):
         """Bind the template a human already chose, or return empty.
 
@@ -1668,7 +1674,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         Decision = self.env['shopify.connector.product.match.decision']
         decision = Decision._confirmed_for(
             store, DECISION_LEVEL_TEMPLATE, payload.get('gid'), '',
-            payload.get('updated_at'),
+            payload.get('updated_at'), job=job,
         )
         if not decision:
             return False
@@ -1694,6 +1700,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     @api.model
     def _consume_variant_decision(
         self, store, payload, template_id, variant_payload, candidate_ids,
+        job=None,
     ):
         """The variant equivalent. Returns the chosen id, or ``None``.
 
@@ -1706,7 +1713,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         Decision = self.env['shopify.connector.product.match.decision']
         decision = Decision._confirmed_for(
             store, DECISION_LEVEL_VARIANT, payload.get('gid'),
-            variant_payload.get('gid'), payload.get('updated_at'),
+            variant_payload.get('gid'), payload.get('updated_at'), job=job,
         )
         if not decision:
             return None

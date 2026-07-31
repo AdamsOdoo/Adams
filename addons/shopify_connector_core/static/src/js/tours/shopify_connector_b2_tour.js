@@ -330,8 +330,29 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
                 "The dialog says why the import stopped before asking anything.",
         },
         {
-            trigger: `${DIALOG} div[name='sku_preview']:contains('TOUR-DUP')`,
-            content: "The identifier Shopify sent is read from its own field.",
+            // BATCH 2 CORRECTION (F1/F2/F3), measured in the real browser.
+            //
+            // The seed SKU is `1234567890123` -- the shape a real merchant
+            // actually uses, and the shape the DISPLAY scrubber rewrites. So
+            // the preview must show the redaction, from its own field...
+            trigger:
+                `${DIALOG} div[name='sku_preview']:contains('[redacted-phone]')`,
+            content:
+                "The merchant-controlled identifier is shown redacted, " +
+                "because a display preview is all it is.",
+        },
+        {
+            // ...while the IDENTITY beside it is intact, byte for byte. These
+            // two assertions on one dialog are the whole separation: the same
+            // scrubber applied to this field is what made a confirmed decision
+            // unconsumable, because the key it produced could never equal the
+            // key the raw payload produces.
+            trigger:
+                `${DIALOG} div[name='shopify_product_gid']` +
+                `:contains('gid://shopify/Product/7346299043911')`,
+            content:
+                "The Shopify identity is shown exactly as received, and is " +
+                "never passed through the display scrubber.",
         },
         {
             trigger: `${DIALOG} div[name='candidate_total']:contains('2')`,

@@ -19,11 +19,15 @@ from odoo.addons.shopify_connector_core.tests.canonical_settings_classification 
     CANONICAL_FORM_XMLID,
     CANONICAL_LIST_XMLID,
     CANONICAL_READONLY,
+    CLASSIFIED_MODULES,
     INTERNAL_PROTECTED,
     OWNED_BY_SURFACE,
     SETTINGS_MODEL,
+    UNCLASSIFIED_CONTRIBUTING_MODULES,
     assert_module_classification,
     canonical_form_field_nodes,
+    contributing_modules,
+    fields_contributed_by,
 )
 
 MODULE = 'shopify_connector_core'
@@ -151,6 +155,48 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
 
     def test_every_core_settings_field_is_classified(self):
         assert_module_classification(self, MODULE, CORE_CLASSIFICATION)
+
+    def test_the_classification_guard_states_its_own_coverage(self):
+        """TD-023, asserted rather than assumed.
+
+        A shared helper that four modules call reads as "every module is
+        covered". Two installed modules extend the settings model and have no
+        classification test at all, so a field added to either of them is
+        classified by nobody -- and the honest thing is to say so in a test
+        that fails the day the picture changes, in either direction.
+
+        This is bounded TEST-hardening debt: no production code in either
+        module is wrong, and the Batch 2 correction deliberately did not touch
+        them.
+        """
+        live = contributing_modules(self.env)
+        self.assertEqual(
+            live & CLASSIFIED_MODULES, CLASSIFIED_MODULES,
+            'a module with a classification test no longer contributes '
+            'settings fields; the guard has drifted from the registry',
+        )
+        self.assertEqual(
+            live & UNCLASSIFIED_CONTRIBUTING_MODULES,
+            UNCLASSIFIED_CONTRIBUTING_MODULES,
+            'the recorded uncovered set no longer matches the registry',
+        )
+        unaccounted = live - CLASSIFIED_MODULES \
+            - UNCLASSIFIED_CONTRIBUTING_MODULES
+        self.assertFalse(
+            unaccounted,
+            'these modules contribute settings fields and are named neither '
+            'as covered nor as known-uncovered: %s. Classify them or record '
+            'them as debt; silence is the one thing that is not allowed.'
+            % (sorted(unaccounted),),
+        )
+        # And the uncovered ones really do carry fields, so this is a live gap
+        # rather than a note about nothing.
+        for module in sorted(UNCLASSIFIED_CONTRIBUTING_MODULES):
+            self.assertTrue(
+                fields_contributed_by(self.env, module),
+                '%s is recorded as an uncovered contributor but contributes '
+                'no settings field' % (module,),
+            )
 
     def test_price_source_of_truth_is_not_on_the_canonical_form(self):
         """§6.2: Export Settings is already authoritative for it.

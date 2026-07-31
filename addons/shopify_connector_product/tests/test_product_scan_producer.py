@@ -19,8 +19,11 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     JobHandlerError,
 )
 from ..models.shopify_connector_product_scan import (
+    PRODUCT_SCAN_CRON_XMLID,
+    PRODUCT_SCAN_MAX_PRODUCTS,
     PRODUCT_SCAN_OVERLAP,
     PRODUCT_SCAN_PAGE_LIMIT,
+    PRODUCT_SCAN_PAGE_SIZE,
     PRODUCT_SCAN_TARGET,
 )
 
@@ -346,7 +349,103 @@ class TestProductScanProducer(TransactionCase):
         ]
         with self.assertRaises(JobHandlerError) as ceiling:
             self._run_scan(pages)
-        self.assertIn('ceiling', ceiling.exception.reason.lower())
+        reason = ceiling.exception.reason
+        # Batch 2 correction (F11): the refusal must state the LIMIT, its
+        # CONSEQUENCE and the fact that retrying will not help. "The product
+        # scan page ceiling was exceeded" told an operator none of those, and
+        # the honest answer is not obtainable from anywhere else on screen.
+        self.assertIn(str(PRODUCT_SCAN_PAGE_SIZE), reason)
+        self.assertIn(str(PRODUCT_SCAN_PAGE_LIMIT), reason)
+        self.assertIn(str(PRODUCT_SCAN_MAX_PRODUCTS), reason)
+        self.assertIn('NOTHING WAS IMPORTED', reason)
+        self.assertIn('has NOT moved', reason)
+        self.assertIn('same place', reason)
+        self.assertEqual(
+            PRODUCT_SCAN_MAX_PRODUCTS,
+            PRODUCT_SCAN_PAGE_SIZE * PRODUCT_SCAN_PAGE_LIMIT,
+        )
+        self.assertEqual(PRODUCT_SCAN_MAX_PRODUCTS, 20000)
+        # ...and it really is a fail-closed refusal: no checkpoint moved.
+        self.settings.invalidate_recordset()
+        self.assertFalse(self.settings.product_last_import_checkpoint_at)
+        self.assertFalse(self.settings.product_last_import_success_at)
+
+    # ------------------------------------------------------------------
+    # Batch 2 correction (F7): "scheduled" means the real cron is on.
+    # ------------------------------------------------------------------
+
+    def test_scheduled_state_is_false_while_the_real_cron_is_disabled(self):
+        """The store flag is an INTENTION; `ir.cron.active` is the fact.
+
+        `_cron_enqueue_product_scans` is the only thing that ever admits a
+        scheduled scan, and it runs only while the cron this module installed
+        is active. An administrator can disable that cron in Settings ->
+        Technical -> Scheduled Actions, and the store page went on saying
+        "Scheduled product import" was on -- which reads as "the catalog is
+        being kept current" while nothing is enqueued at all.
+        """
+        cron = self.env.ref(PRODUCT_SCAN_CRON_XMLID)
+        self.settings.write({'product_scheduled_sync_enabled': True})
+        self.store.invalidate_recordset()
+        self.assertTrue(cron.active)
+        self.assertTrue(self.store.product_sync_scheduled)
+
+        cron.sudo().write({'active': False})
+        self.store.invalidate_recordset()
+        self.assertFalse(
+            self.store.product_sync_scheduled,
+            'the store still claims scheduled product import while the cron '
+            'that would perform it is disabled',
+        )
+        self.assertTrue(
+            self.store.product_sync_domain_enabled,
+            'the domain is still enabled; only the schedule claim changed',
+        )
+
+        cron.sudo().write({'active': True})
+        self.store.invalidate_recordset()
+        self.assertTrue(self.store.product_sync_scheduled)
+
+    def test_the_domain_flag_still_governs_the_scheduled_claim(self):
+        self.settings.write({
+            'product_domain_enabled': False,
+            'product_scheduled_sync_enabled': True,
+        })
+        self.store.invalidate_recordset()
+        self.assertFalse(self.store.product_sync_scheduled)
+
+    def test_manual_import_survives_a_disabled_cron_and_stays_role_gated(self):
+        """Truthfulness must not remove the manual route, or its guard."""
+        self.env.ref(PRODUCT_SCAN_CRON_XMLID).sudo().write({'active': False})
+        self.settings.write({'product_scheduled_sync_enabled': True})
+        self.store.invalidate_recordset()
+        self.assertFalse(self.store.product_sync_scheduled)
+        job = self.store.with_user(
+            self.roles['operator']
+        ).action_sync_products_now()
+        self.assertTrue(job)
+        self.assertEqual(job.job_type, 'product_import_scan')
+        with self.assertRaises(AccessError):
+            self.store.with_user(
+                self.roles['auditor']
+            ).action_sync_products_now()
+
+    def test_an_absent_cron_reads_as_not_scheduled_rather_than_as_scheduled(self):
+        """Fail closed. An unprovable scheduler is a disabled one."""
+        Store = self.env['shopify.connector.store']
+        self.assertFalse(
+            Store._connector_scheduler_is_active(
+                'shopify_connector_product.ir_cron_that_does_not_exist',
+            ),
+        )
+        # A resolvable external id that is not a cron at all is also refused,
+        # rather than read for an `active` field that would mean something
+        # else entirely.
+        self.assertFalse(
+            Store._connector_scheduler_is_active(
+                'shopify_connector_core.model_shopify_connector_store',
+            ),
+        )
 
     # ------------------------------------------------------------------
     # §8.1 -- child admission and checkpoint coherence

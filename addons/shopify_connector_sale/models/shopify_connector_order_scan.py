@@ -24,6 +24,11 @@ ORDER_SCAN_PAGE_SIZE = 100
 ORDER_SCAN_PAGE_LIMIT = 100
 ORDER_SCAN_OVERLAP_MINUTES = 30
 ORDER_SCAN_TARGET = 'scan:order'
+# The exact cron this module installs. Named as a constant so the truthful
+# scheduled-state projection resolves one known record rather than searching.
+ORDER_SCAN_CRON_XMLID = (
+    'shopify_connector_sale.ir_cron_shopify_connector_order_scan'
+)
 
 ORDER_SCAN_QUERY = """
 query ConnectorOrderScan($first: Int!, $after: String, $query: String!) {
@@ -570,6 +575,15 @@ class ShopifyConnectorStoreOrderScanExtension(models.Model):
     def _compute_order_sync_state(self):
         Settings = self.env['shopify.connector.store.settings']
         Job = self.env['shopify.connector.job']
+        # Batch 2 correction (F7): the store flag records what the merchant
+        # asked for; `_cron_enqueue_order_scans` only runs if the cron this
+        # module installed is still active. An administrator who disabled it in
+        # Settings -> Technical -> Scheduled Actions has stopped scheduled
+        # import, and this surface must say so rather than keep reporting the
+        # flag. Read once for the whole recordset.
+        scheduler_live = self._connector_scheduler_is_active(
+            ORDER_SCAN_CRON_XMLID,
+        )
         for store in self:
             settings = Settings.search(
                 [('store_id', '=', store.id)], limit=1,
@@ -580,6 +594,7 @@ class ShopifyConnectorStoreOrderScanExtension(models.Model):
             store.order_sync_scheduled = bool(
                 settings and settings.sale_domain_enabled
                 and settings.order_scheduled_sync_enabled
+                and scheduler_live
             )
             store.order_sync_last_checkpoint_at = (
                 settings.sale_order_last_import_checkpoint_at

@@ -205,6 +205,8 @@ CORE_SUDO_SITES = [
     ('shopify_connector_store.py', '_backfill_company',
      "self.env['res.company']", 1),
     ('shopify_connector_store.py', 'action_assign_company', 'self', 1),
+    ('shopify_connector_store.py', '_connector_scheduler_is_active',
+     'cron', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
      'Job', 1),
     ('shopify_connector_store.py', '_create_lifecycle_audit_job',
@@ -384,6 +386,19 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      'action_assign_company'): 'SEC-3 administrative ownership remediation.',
     ('shopify_connector_store.py',
      '_create_lifecycle_audit_job'): 'Lifecycle audit carrier.',
+    # Batch 2 correction (F7). `ir.cron` is Administrator-only by ACL, and an
+    # Operator reading their own store's page is not one -- but the merchant-
+    # facing "scheduled import" state is a lie unless it consults the cron that
+    # would actually perform it. The elevation is the narrowest available: the
+    # record is resolved from a module-owned external id through `env.ref`
+    # BEFORE anything elevates, so `sudo()` is never used to DISCOVER a record,
+    # only to read `active` on the one this module installed. It reads one
+    # Boolean, writes nothing, and returns False for anything that is not a
+    # live `ir.cron`.
+    ('shopify_connector_store.py',
+     '_connector_scheduler_is_active'):
+        'Truthful scheduled-state projection: reads `active` on the '
+        'module-owned cron already resolved by external id.',
     ('shopify_connector_store.py',
      '_run_connection_probe'): 'Probe audit job lifecycle.',
     ('shopify_connector_store.py',

@@ -40,6 +40,7 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 
 from odoo.addons.shopify_connector_sale.models.shopify_connector_tax_mapping import (
     SHOPIFY_TAX_FINGERPRINT_VERSION,
+    eligible_sale_tax_domain,
 )
 
 # The EXACT key set `_resolve_tax_ids` serialises. Exact, not "at least":
@@ -70,6 +71,31 @@ TAX_DECISION_JOB_TYPES = frozenset({'order_import_sync'})
 # and a guard that never matches.
 TAX_DECISION_JOB_STATE = 'failed_retryable'
 TAX_DECISION_ERROR_CLASS = 'odoo_validation_configuration'
+
+# One refusal, for every reason a caller may not have this job: it does not
+# belong to a company they work in, a record rule hides it, or the ACL refuses
+# the model outright. Distinguishing them in the message is itself a disclosure
+# -- "you may not read THAT store's job" confirms the job exists and is
+# somebody else's -- so they are deliberately indistinguishable.
+FOREIGN_JOB_REFUSAL = (
+    'That job is not available to you. Open the tax mapping decision from a '
+    'stopped order in a company you are working in.'
+)
+
+# Everything on this dialog that says WHICH decision it is. All of it is
+# derived from the validated job on create and refused on write.
+IDENTITY_SNAPSHOT_FIELDS = frozenset({
+    'job_id',
+    'store_id',
+    'company_id',
+    'shopify_order_gid',
+    'shopify_tax_evidence_key',
+    'rate_percentage',
+    'price_included',
+    'title_preview',
+    'source_preview',
+    'candidate_tax_ids',
+})
 
 
 def parse_tax_evidence(raw):
@@ -180,6 +206,24 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
     _name = 'shopify.connector.tax.decision.wizard'
     _description = 'Shopify Connector Tax Mapping Decision'
 
+    # EVERY FIELD BELOW IS A VALIDATED SNAPSHOT. NOT ONE IS A `related`.
+    #
+    # THE DEFECT THIS CLOSES (F5). `store_id`, `company_id` and
+    # `shopify_order_gid` used to be `related` fields reaching through
+    # `job_id`. Odoo 19 gives a related field `compute_sudo=True` by default
+    # (`odoo/orm/fields.py`, `related_sudo` -> `compute_sudo`, and
+    # `Field.compute_value` does `records.sudo()`), so the chain was walked as
+    # SUPERUSER: it answered whatever it was asked. The server-side guards all
+    # lived on `default_get` and `action_confirm`, which is the intended UI
+    # route -- and an ordinary `create({'job_id': <foreign job>})` over RPC is
+    # not that route. A company-A Connector Administrator could name a
+    # company-B job and read back that store's id and name, its company, and
+    # the Shopify order GID, none of which any record rule would have shown
+    # them directly.
+    #
+    # Snapshots cannot do that. They hold what `create` put there, `create`
+    # puts there only what the caller's OWN access to the job proved they may
+    # see, and `write` refuses to move any of them afterwards.
     job_id = fields.Many2one(
         comodel_name='shopify.connector.job',
         required=True,
@@ -187,14 +231,13 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         ondelete='cascade',
     )
     store_id = fields.Many2one(
-        related='job_id.store_id', readonly=True,
+        comodel_name='shopify.connector.store', readonly=True,
     )
     company_id = fields.Many2one(
-        related='job_id.store_id.company_id', readonly=True,
+        comodel_name='res.company', readonly=True,
     )
     shopify_order_gid = fields.Char(
-        related='job_id.shopify_target_gid', readonly=True,
-        string='Shopify order',
+        readonly=True, string='Shopify order',
     )
     # Readonly and never rendered as an input. §7.2.5: the administrator is
     # never asked to type or edit a fingerprint -- it identifies the evidence,
@@ -236,11 +279,65 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         job_id = self.env.context.get('default_job_id')
         if not job_id:
             return result
-        self._assert_tax_decision_administrator()
-        job = self.env['shopify.connector.job'].browse(job_id)
+        job = self._authorized_job(job_id)
         evidence = self._validated_evidence(job)
-        result.update({
+        result.update(self._identity_snapshot(job, evidence))
+        return result
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """ORDINARY ORM CREATE IS IN SCOPE, AND IS GUARDED HERE.
+
+        `default_get` is the UI route; `create` is what an RPC client calls,
+        and it is the route F5 was reachable through. Every identity value on
+        the new row is (re)derived here from a job the CALLER proved they may
+        read -- caller-supplied `store_id`, `company_id`, `shopify_order_gid`,
+        fingerprint, rate, posture, previews and candidate list are discarded
+        rather than trusted, so a forged snapshot cannot become the record's
+        answer to "what is this decision about?".
+
+        `_add_missing_default_values` runs inside `super().create`, i.e. AFTER
+        this override, so a UI save that legitimately omits every readonly
+        field arrives here with no `job_id` at all. That case resolves the job
+        from `default_job_id` in the context -- and then validates it exactly
+        as it validates an explicitly supplied one.
+        """
+        prepared = []
+        for vals in vals_list:
+            vals = dict(vals)
+            job = self._authorized_job(
+                vals.get('job_id') or self.env.context.get('default_job_id')
+            )
+            evidence = self._validated_evidence(job)
+            vals.update(self._identity_snapshot(job, evidence))
+            prepared.append(vals)
+        return super().create(prepared)
+
+    def write(self, vals):
+        """The identity of an open decision is immutable.
+
+        Re-pointing a validated wizard at a different job is indistinguishable
+        from creating one for that job without the checks, so it is refused
+        outright rather than re-validated. `account_tax_id` -- the one thing
+        the administrator is actually deciding -- stays writable.
+        """
+        moved = sorted(set(vals) & IDENTITY_SNAPSHOT_FIELDS)
+        if moved:
+            raise UserError(
+                'The job and tax evidence a mapping decision is about cannot '
+                'be changed once the dialog is open (%s). Close it and open '
+                'the decision from the order you mean.' % (', '.join(moved),)
+            )
+        return super().write(vals)
+
+    @api.model
+    def _identity_snapshot(self, job, evidence):
+        """The only values that may ever populate the identity fields."""
+        return {
             'job_id': job.id,
+            'store_id': job.store_id.id,
+            'company_id': job.store_id.company_id.id,
+            'shopify_order_gid': job.shopify_target_gid or False,
             'shopify_tax_evidence_key': evidence['fingerprint'],
             'rate_percentage': evidence['rate_percentage'],
             'price_included': evidence['included'],
@@ -249,8 +346,39 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
             'candidate_tax_ids': [
                 (6, 0, self._eligible_tax_ids(job, evidence))
             ],
-        })
-        return result
+        }
+
+    @api.model
+    def _authorized_job(self, job_id):
+        """Resolve a job this caller may actually see, or refuse telling them
+        nothing about it.
+
+        The refusal is deliberately one sentence with no record in it. Odoo's
+        own access errors name the records they refuse, which for a
+        cross-company probe is the disclosure the check exists to prevent, so
+        both the ACL/record-rule refusal and the active-company refusal are
+        re-raised as the same opaque message.
+        """
+        self._assert_tax_decision_administrator()
+        try:
+            job_id = int(job_id or 0)
+        except (TypeError, ValueError):
+            job_id = 0
+        if not job_id:
+            raise UserError(
+                'A tax mapping decision must name the job it is about.'
+            )
+        job = self.env['shopify.connector.job'].browse(job_id)
+        if not job.exists():
+            raise UserError('That job no longer exists.')
+        try:
+            job.check_access('read')
+            job.store_id.check_access('read')
+            if job.store_id.company_id.id not in self.env.companies.ids:
+                raise AccessError(FOREIGN_JOB_REFUSAL)
+        except AccessError as exc:
+            raise AccessError(FOREIGN_JOB_REFUSAL) from exc
+        return job
 
     @api.model
     def _validated_evidence(self, job):
@@ -260,12 +388,13 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         # ORIGINAL CALLER ACCESS, not the wizard's. Reading the job under
         # elevation here would disclose a foreign store's tax evidence to an
         # administrator of a different company.
-        job.check_access('read')
-        job.store_id.check_access('read')
-        if job.store_id.company_id.id not in self.env.companies.ids:
-            raise AccessError(
-                'That store belongs to a company you are not working in.'
-            )
+        try:
+            job.check_access('read')
+            job.store_id.check_access('read')
+            if job.store_id.company_id.id not in self.env.companies.ids:
+                raise AccessError(FOREIGN_JOB_REFUSAL)
+        except AccessError as exc:
+            raise AccessError(FOREIGN_JOB_REFUSAL) from exc
         evidence = job._tax_decision_evidence()
         if not evidence:
             raise UserError(
@@ -302,20 +431,24 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         )
         if not settings or not settings.order_company_id:
             return []
-        expected = 'tax_included' if evidence['included'] else 'tax_excluded'
         try:
             amount = float(evidence['rate_percentage'])
         except (TypeError, ValueError):
             return []
-        return self.env['account.tax'].search([
-            ('company_id', '=', settings.order_company_id.id),
-            ('active', '=', True),
-            ('type_tax_use', '=', 'sale'),
-            ('amount_type', '=', 'percent'),
-            ('amount', '=', amount),
-            ('include_base_amount', '=', False),
-            ('price_include_override', '=', expected),
-        ], order='id', limit=20).ids
+        # ONE RULE, SHARED WITH THE CONSTRAINT. `eligible_sale_tax_domain` is
+        # the search form of exactly what `_check_mapping_safety` enforces per
+        # record, so a tax offered here cannot be refused there. It reads
+        # Odoo's EFFECTIVE inclusion posture (`account.tax.price_include`)
+        # rather than requiring an explicit `price_include_override`, which is
+        # F4: on a company using Odoo's own `tax_excluded` default, no ordinary
+        # tax carries an override and this list came back empty for every
+        # excluded Shopify tax in existence.
+        return self.env['account.tax'].search(
+            eligible_sale_tax_domain(
+                settings.order_company_id, evidence['included'], amount,
+            ),
+            order='id', limit=20,
+        ).ids
 
     def action_confirm(self):
         """Create the mapping and resume the exact job, once."""
@@ -351,12 +484,44 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         }
 
     def _create_mapping(self, job, evidence, tax):
-        """Atomic, with the concurrent winner contained.
+        """Atomic, and FAIL-CLOSED on every collision it cannot account for.
 
-        `UNIQUE(store_id, shopify_tax_evidence_key)` is the arbiter. A second
-        administrator confirming the same decision must not raise and must not
-        create a second mapping -- their intent is already satisfied by the
-        row that won.
+        `UNIQUE(store_id, shopify_tax_evidence_key)` is the arbiter, and losing
+        to it means somebody else decided what this Shopify tax means.
+
+        THE DEFECT THIS CLOSES (F6). The previous version caught the
+        `IntegrityError`, searched for whatever row held the key, and returned
+        it as this call's result. `action_confirm` then reported success and
+        resumed the order -- against a tax the administrator had not chosen and
+        was never shown. An administrator who deliberately picked "VAT 20%
+        (services)" could be told their decision was applied while the order
+        was in fact resumed under "VAT 20% (goods)", and the audit trail would
+        record the confirmation as having succeeded.
+
+        THREE OUTCOMES, AND ONLY THE FIRST PROCEEDS.
+
+        *A row exists in this transaction's own snapshot and IS the same
+        choice.* This is the ordinary sequential case -- a second order hitting
+        a fingerprint that was mapped earlier -- and it is the only branch that
+        may return a row it did not create, because it has PROVED that row is
+        the decision in front of it: same store, same fingerprint, same
+        fingerprint version, same inclusion posture, same Odoo tax.
+
+        *A row exists and is a DIFFERENT choice.* Refused, always. The
+        administrator's decision was not applied and must not be reported as
+        though it had been.
+
+        *`create` collided with a row this snapshot cannot see.* Odoo cursors
+        run REPEATABLE READ, so a mapping committed after this transaction
+        started raises the unique violation from the index while remaining
+        invisible to `search`. There is nothing to compare against, so there is
+        nothing to prove, so this refuses -- rather than re-raising a raw
+        `IntegrityError` at the administrator, which says nothing about what
+        happened or what to do next.
+
+        Refusing raises out of `action_confirm` before `_resume_blocked_job`,
+        so a refused decision leaves no mapping, no resumed job and no audit
+        entry claiming otherwise.
         """
         Mapping = self.env['shopify.connector.tax.mapping']
         values = {
@@ -371,20 +536,52 @@ class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
         try:
             with self.env.cr.savepoint():
                 return Mapping.create(values)
-        except IntegrityError:
+        except IntegrityError as exc:
             existing = Mapping.search([
                 ('store_id', '=', job.store_id.id),
                 ('shopify_tax_evidence_key', '=', evidence['fingerprint']),
             ], limit=1)
-            if not existing:
-                raise
-            return existing
+            if existing and self._is_same_tax_choice(existing, evidence, tax):
+                return existing
+            if existing:
+                raise UserError(
+                    'This Shopify tax is already mapped to a different Odoo '
+                    'tax for this store, so your choice was not applied and '
+                    'this order has not been resumed. Review the existing '
+                    'mapping in the Tax Mappings workspace and retry the '
+                    'order once it says what you mean.'
+                ) from exc
+            raise UserError(
+                'Another administrator mapped this Shopify tax while you were '
+                'deciding. Your choice was NOT applied and this order has not '
+                'been resumed. Reopen the stopped order to see which mapping '
+                'won and whether it is the one you meant.'
+            ) from exc
         except ValidationError:
             # The mapping model's own safety constraint refused. Surface it
             # rather than translating it: it is the authority on what a valid
             # mapping is, and this route deliberately does not restate its
             # rules in a second place.
             raise
+
+    @api.model
+    def _is_same_tax_choice(self, existing, evidence, tax):
+        """Is this existing row the exact decision the administrator made?
+
+        Every component of the mapping's identity, not just the tax. A row
+        agreeing on the tax but recording a different inclusion posture or a
+        different fingerprint version is a different decision, and returning it
+        would resume the order under a mapping nobody in this dialog chose.
+        """
+        return (
+            existing.account_tax_id == tax
+            and existing.shopify_tax_evidence_key == evidence['fingerprint']
+            and existing.shopify_tax_fingerprint_version
+            == SHOPIFY_TAX_FINGERPRINT_VERSION
+            and bool(existing.shopify_price_included) == bool(
+                evidence['included']
+            )
+        )
 
     def _resume_blocked_job(self, job):
         """Resume the EXACT job, once, through the existing governed path.

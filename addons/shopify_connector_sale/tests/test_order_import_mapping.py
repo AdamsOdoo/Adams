@@ -363,7 +363,12 @@ class TestOrderImportMappingStatic(TransactionCase):
         # Store Settings form; checkpoint 2 added the order controls, the tax
         # decision wizard model and its least-privilege ACL row. One patch
         # bump each, recorded rather than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.6.0')
+        # The Batch 2 correction added the tax decision dialog's
+        # transient-ownership record rule and replaced its three elevated
+        # `related` identity fields with stored snapshots -- a security-rule
+        # change and a schema change, both of which must reach an existing
+        # database on update. One further patch bump, recorded here.
+        self.assertEqual(manifest['version'], '19.0.2.7.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

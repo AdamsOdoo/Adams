@@ -66,6 +66,7 @@ No Shopify store, credential, request or mutation occurs anywhere in this file.
 """
 
 import hashlib
+import json
 import uuid
 
 from odoo import fields
@@ -590,6 +591,7 @@ class Sec3Base(TransactionCase):
             shopify_connector_product_match_decision import (
                 DECISION_LEVEL_TEMPLATE,
                 decision_key_for,
+                match_value_digest,
             )
         job = self._job(store)
         gid = self._gid('Product', store)
@@ -606,7 +608,9 @@ class Sec3Base(TransactionCase):
                 DECISION_LEVEL_TEMPLATE, gid, '', stamp,
             ),
             'match_key': 'sku_reference',
-            'match_values': '["SEC3-MATRIX"]',
+            'match_value_digests': json.dumps(
+                [match_value_digest(self.env, 'SEC3-MATRIX')],
+            ),
         })
 
     def _row_fulfillment_binding(self, store):

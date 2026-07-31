@@ -95,7 +95,15 @@ class TestBatch2SaleJourneys(OrderImportCase):
             'company_id': company.id,
             'country_id': country.id,
             'tax_group_id': group.id,
-            'price_include_override': 'tax_excluded',
+            # Batch 2 correction (F4): NO `price_include_override`.
+            #
+            # An override is an override, and an ordinary sale tax created in
+            # the Odoo UI carries none -- Odoo derives the real posture from
+            # `res.company.account_price_include`, whose own default is
+            # `tax_excluded`. Setting the override here made this fixture the
+            # one shape the defective eligibility rule accepted, so the whole
+            # journey/tour was green against a route no real merchant could
+            # use. It is now left genuinely unset.
             'include_base_amount': False,
         })
 

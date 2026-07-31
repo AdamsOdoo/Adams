@@ -34,6 +34,33 @@ THREE RULES THAT SHAPE EVERYTHING BELOW.
 payload after exact-key schema validation. Recovering "which product" from a
 translated or reworded sentence would repoint a binding on a wording change.
 
+*Identity is OPAQUE, and display evidence is SANITIZED. They are never the
+same value.* This is the correction that produced schema `v2`. `v1` passed the
+Shopify Product GID, the ProductVariant GID, the remote `updatedAt` and the
+exact SKU/barcode match values through `safe_match_preview` -- a DISPLAY
+scrubber whose phone-number pattern (`\\d` then six or more digits/separators
+then `\\d`) matches the numeric suffix of every real Shopify GID and every
+numeric SKU, UPC-A and EAN-13. `gid://shopify/Product/7346299043911` was stored
+as `gid://shopify/Product/[redacted-phone]`, so:
+
+* the persisted `decision_key` could never equal the key `_confirmed_for`
+  computes from the raw importer payload -- a confirmed decision was
+  unconsumable and the job looped back to the same ambiguity;
+* two different products whose GIDs both end in a long digit run collapsed to
+  ONE identity, so `_persist_decision` could re-point product A's pending
+  decision at product B's job and `_supersede_stale_siblings` could supersede
+  an unrelated product;
+* a numeric SKU became the literal string `[redacted-phone]`, so
+  `eligible_candidates()` searched for a value no Odoo record carries and
+  offered a reviewer nothing to choose.
+
+So identity values are now retained BYTE-FOR-BYTE -- validated for type,
+emptiness, length and control characters, and otherwise never touched -- and
+the exact match values are carried as keyed fixed-length DIGESTS. The digest is
+what makes exact-match eligibility provable without writing a merchant's SKU or
+barcode into a job log. `safe_match_preview` survives, and is now used for
+nothing but the four `*_preview` display fields.
+
 *A decision belongs to one exact remote identity.* The key includes the
 verbatim remote `updatedAt`. A merchant who edits the product on Shopify while
 the decision is pending has changed the thing the decision was about; the old
@@ -56,6 +83,7 @@ touches attribute-structure conflict handling (which stays governed by
 """
 
 import hashlib
+import hmac
 import json
 import logging
 import re
@@ -73,7 +101,15 @@ from odoo.addons.shopify_connector_core.tools.redaction import redact
 
 _logger = logging.getLogger(__name__)
 
-MATCH_EVIDENCE_SCHEMA = 'product_match_decision.v1'
+MATCH_EVIDENCE_SCHEMA = 'product_match_decision.v2'
+
+# The identity version. It appears in the schema name, in the `decision_key`
+# prefix and in the match-value digest prefix, so a row written under the
+# corrupted `v1` identity rules can never be read, keyed or matched as though
+# it had been written under these ones. Migration `19.0.2.8.0` supersedes the
+# undecided `v1` rows fail-closed rather than reinterpreting them.
+MATCH_IDENTITY_VERSION = 2
+MATCH_VERSION_PREFIX = 'v%d:' % MATCH_IDENTITY_VERSION
 
 # Size bounds. Every one of these is a bound on something a merchant controls
 # from the Shopify side, so "it will be short in practice" is not an argument.
@@ -84,6 +120,18 @@ MATCH_GID_MAX_LEN = 128
 MATCH_UPDATED_AT_MAX_LEN = 64
 MATCH_VALUES_LIMIT = 20
 MATCH_CANDIDATE_LIMIT = 20
+
+# The bound on a value we will DIGEST. Deliberately generous and deliberately
+# not a truncation: Shopify allows a 255-character SKU, and hashing a truncated
+# copy would produce a digest that no live Odoo record could ever reproduce --
+# an eligibility failure with no visible cause. A value longer than this
+# produces no digest at all, which fails closed.
+MATCH_VALUE_MAX_LEN = 512
+# `v2:` + a SHA-256 hex digest.
+MATCH_DIGEST_LEN = len(MATCH_VERSION_PREFIX) + 64
+# Domain separation, so a digest from this route can never be confused with a
+# digest computed elsewhere against the same database secret.
+MATCH_DIGEST_LABEL = b'shopify.connector.product.match.decision/match_value/v2'
 
 DECISION_LEVEL_TEMPLATE = 'template'
 DECISION_LEVEL_VARIANT = 'variant'
@@ -119,7 +167,7 @@ MATCH_EVIDENCE_KEYS = frozenset({
     'shopify_variant_gid',
     'remote_updated_at',
     'match_key',
-    'match_values',
+    'match_value_digests',
     'resolved_template_id',
     'title_preview',
     'sku_preview',
@@ -132,14 +180,26 @@ MATCH_EVIDENCE_KEYS = frozenset({
 _EMAIL_RE = re.compile(r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b')
 _PHONE_RE = re.compile(r'(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)')
 
+# Anything a remote identity may not contain. C0 controls, DEL, and the C1
+# range: none of them appear in a Shopify GID or an ISO-8601 timestamp, and all
+# of them are the shapes that make a value dangerous to log, render or compare.
+_UNSAFE_IDENTITY_RE = re.compile(r'[\x00-\x1f\x7f-\x9f]')
+
 
 def safe_match_preview(value, limit):
-    """Redact, scrub and bound one merchant-controlled string.
+    """Redact, scrub and bound one merchant-controlled string FOR DISPLAY.
 
     Same discipline as `safe_tax_preview`: secret patterns first (a SKU is a
     free-text field and nothing stops a merchant pasting a token into one),
     then the two PII shapes a product title realistically carries, then the
     length bound. Never raises; a non-string becomes an empty string.
+
+    THIS IS A DISPLAY FUNCTION AND NOTHING ELSE. It is lossy by design -- its
+    phone pattern rewrites any run of seven or more digits, which is what every
+    real Shopify GID suffix, every numeric SKU and every UPC-A/EAN-13 barcode
+    is. Using it on an identity or on a match value is the `v1` defect: see the
+    module docstring. Identity goes through `opaque_identity`; exact match
+    values go through `match_value_digest`.
     """
     if not isinstance(value, str):
         value = '' if value in (None, False) else str(value)
@@ -153,38 +213,113 @@ def _bounded_identifier(value):
     return safe_match_preview(value, MATCH_IDENTIFIER_MAX_LEN)
 
 
+def opaque_identity(value, limit):
+    """One remote identity value, EXACTLY as received, or ``''``.
+
+    Validated and never transformed. There is deliberately no `strip()`, no
+    normalisation, no numeric-id extraction and no reconstruction: the value's
+    only job is to be equal to itself across the importer, the durable
+    decision, the uniqueness key, the supersession search and consumption, and
+    every one of those operations is byte comparison. A value that fails any
+    check returns ``''``, which every caller treats as "this ambiguity cannot
+    be identified durably" and fails closed on.
+    """
+    if not isinstance(value, str):
+        return ''
+    if not value or len(value) > limit:
+        return ''
+    if _UNSAFE_IDENTITY_RE.search(value):
+        return ''
+    return value
+
+
+def match_value_digest(env, value):
+    """A keyed, fixed-length digest of ONE exact match value, or ``''``.
+
+    WHY A DIGEST AND NOT THE VALUE. The evidence this appears in travels out on
+    an exception and is written to a job-log row, so it must not carry a
+    merchant's SKU or barcode. But eligibility is an EXACT-match question, and
+    a display-sanitized copy cannot answer it (`[redacted-phone]` equals
+    `[redacted-phone]` for two different barcodes). A digest answers exactly the
+    question that is asked -- "is this live record's identifier the one Shopify
+    sent?" -- and answers nothing else.
+
+    WHY IT IS KEYED. A bare SHA-256 of a 12-digit UPC is not a redaction: the
+    whole space is enumerable in seconds. `database.secret` is Odoo's own
+    per-database secret (`odoo/addons/base/models/ir_config_parameter.py` at the
+    pin seeds it on first use), so the digest is meaningless outside this
+    database and unrecoverable inside it. Both sides of every comparison are
+    computed in the same database, which is the only place a comparison ever
+    happens.
+
+    Returns ``''`` -- never a partial or unkeyed digest -- when the value is
+    unusable or the secret is absent.
+    """
+    if not isinstance(value, str) or not value:
+        return ''
+    if len(value) > MATCH_VALUE_MAX_LEN:
+        return ''
+    secret = env['ir.config_parameter'].sudo().get_param('database.secret')
+    if not secret:
+        return ''
+    return '%s%s' % (MATCH_VERSION_PREFIX, hmac.new(
+        MATCH_DIGEST_LABEL + secret.encode('utf-8'),
+        value.encode('utf-8'),
+        hashlib.sha256,
+    ).hexdigest())
+
+
+def _is_match_digest(value):
+    return (
+        isinstance(value, str)
+        and len(value) == MATCH_DIGEST_LEN
+        and value.startswith(MATCH_VERSION_PREFIX)
+        and all(
+            character in '0123456789abcdef'
+            for character in value[len(MATCH_VERSION_PREFIX):]
+        )
+    )
+
+
 def build_match_evidence(
-    level, shopify_product_gid, remote_updated_at, match_key, match_values,
+    env, level, shopify_product_gid, remote_updated_at, match_key, match_values,
     candidate_ids, candidate_total, title_preview='', sku_preview='',
     barcode_preview='', options_preview='', shopify_variant_gid='',
     resolved_template_id=0,
 ):
-    """The serialised, sanitized, bounded evidence one ambiguity produces.
+    """The serialised, bounded evidence one ambiguity produces.
+
+    Identity in, verbatim; exact match values in, as keyed digests; merchant
+    prose in, sanitized for display. Those three treatments are different on
+    purpose and the module docstring says why.
 
     Returns a JSON string, or ``''`` when the ambiguity cannot be identified
-    durably -- which happens when the remote payload carries no `updatedAt`,
-    or the product GID is missing. Fail closed: a decision whose remote
-    identity cannot be pinned could be consumed against a product that has
-    since changed, which is precisely the failure the identity rule exists to
-    prevent. The job still blocks; it simply offers no decision.
+    durably -- which happens when the remote payload carries no `updatedAt`, no
+    product GID, an identity that fails validation, or no digestible match
+    value. Fail closed: a decision whose remote identity cannot be pinned could
+    be consumed against a product that has since changed, which is precisely
+    the failure the identity rule exists to prevent. The job still blocks; it
+    simply offers no decision.
     """
-    product_gid = _bounded_identifier(shopify_product_gid)
-    updated_at = safe_match_preview(remote_updated_at, MATCH_UPDATED_AT_MAX_LEN)
+    product_gid = opaque_identity(shopify_product_gid, MATCH_GID_MAX_LEN)
+    updated_at = opaque_identity(remote_updated_at, MATCH_UPDATED_AT_MAX_LEN)
     if not product_gid or not updated_at or level not in DECISION_LEVELS:
         return ''
     if match_key not in MATCH_KEYS:
         return ''
-    variant_gid = _bounded_identifier(shopify_variant_gid)
+    variant_gid = opaque_identity(shopify_variant_gid, MATCH_GID_MAX_LEN)
     if level == DECISION_LEVEL_VARIANT and not variant_gid:
         return ''
-    values = []
+    if level == DECISION_LEVEL_TEMPLATE and variant_gid:
+        return ''
+    digests = []
     for raw in match_values or ():
-        bounded = _bounded_identifier(raw)
-        if bounded and bounded not in values:
-            values.append(bounded)
-        if len(values) >= MATCH_VALUES_LIMIT:
+        digest = match_value_digest(env, raw)
+        if digest and digest not in digests:
+            digests.append(digest)
+        if len(digests) >= MATCH_VALUES_LIMIT:
             break
-    if not values:
+    if not digests:
         return ''
     ids = [
         int(candidate)
@@ -198,7 +333,7 @@ def build_match_evidence(
         'shopify_variant_gid': variant_gid,
         'remote_updated_at': updated_at,
         'match_key': match_key,
-        'match_values': values,
+        'match_value_digests': sorted(digests),
         'resolved_template_id': int(resolved_template_id or 0),
         'title_preview': safe_match_preview(title_preview, MATCH_TITLE_MAX_LEN),
         'sku_preview': _bounded_identifier(sku_preview),
@@ -235,15 +370,29 @@ def parse_match_evidence(raw):
         return None
     if payload.get('match_key') not in MATCH_KEYS:
         return None
+    # Identity is re-validated on the way IN with the same function that
+    # produced it, and compared for exact equality. `opaque_identity` returning
+    # the value unchanged is the proof that nothing between the two ends
+    # trimmed, normalised or rewrote it.
     for key, limit in (
         ('shopify_product_gid', MATCH_GID_MAX_LEN),
         ('remote_updated_at', MATCH_UPDATED_AT_MAX_LEN),
     ):
         value = payload.get(key)
-        if not isinstance(value, str) or not value or len(value) > limit:
+        # Non-empty FIRST. `opaque_identity('')` is `''`, which equals itself,
+        # so the round-trip test alone would let an empty required identity
+        # through -- and an empty `remote_updated_at` is exactly the
+        # unpinnable-version case the whole identity rule exists to refuse.
+        if not isinstance(value, str) or not value:
             return None
+        if opaque_identity(value, limit) != value:
+            return None
+    variant_gid = payload.get('shopify_variant_gid')
+    if not isinstance(variant_gid, str):
+        return None
+    if variant_gid and opaque_identity(variant_gid, MATCH_GID_MAX_LEN) != variant_gid:
+        return None
     for key, limit in (
-        ('shopify_variant_gid', MATCH_GID_MAX_LEN),
         ('title_preview', MATCH_TITLE_MAX_LEN),
         ('sku_preview', MATCH_IDENTIFIER_MAX_LEN),
         ('barcode_preview', MATCH_IDENTIFIER_MAX_LEN),
@@ -266,16 +415,13 @@ def parse_match_evidence(raw):
             return None
         if payload.get('resolved_template_id') != 0:
             return None
-    values = payload.get('match_values')
+    digests = payload.get('match_value_digests')
     if (
-        not isinstance(values, list)
-        or not values
-        or len(values) > MATCH_VALUES_LIMIT
-        or not all(
-            isinstance(value, str) and value
-            and len(value) <= MATCH_IDENTIFIER_MAX_LEN
-            for value in values
-        )
+        not isinstance(digests, list)
+        or not digests
+        or len(digests) > MATCH_VALUES_LIMIT
+        or len(set(digests)) != len(digests)
+        or not all(_is_match_digest(value) for value in digests)
     ):
         return None
     ids = payload.get('candidate_ids')
@@ -301,10 +447,20 @@ def decision_key_for(level, product_gid, variant_gid, remote_updated_at):
     sends, and length-prefixed so no combination of components can collide by
     running into one another. The human-readable components are separate
     fields on the record; this is the arbiter, not the display.
+
+    THE COMPONENTS ARE THE RAW OPAQUE IDENTITIES. Under `v1` they were the
+    display-sanitized copies, which is why two distinct products could produce
+    one key and why the key computed at consumption time (from the raw payload)
+    never equalled the key stored at persistence time (from the sanitized one).
+    The `v2:` prefix is not decoration: a `v1` key is a different identity
+    scheme and must never be consumed as though it were this one.
     """
     parts = (level, product_gid, variant_gid or '', remote_updated_at)
     canonical = '|'.join('%d:%s' % (len(part), part) for part in parts)
-    return 'v1:%s' % hashlib.sha256(canonical.encode('utf-8')).hexdigest()
+    return '%s%s' % (
+        MATCH_VERSION_PREFIX,
+        hashlib.sha256(canonical.encode('utf-8')).hexdigest(),
+    )
 
 
 class ShopifyConnectorProductMatchDecision(models.Model):
@@ -363,6 +519,12 @@ class ShopifyConnectorProductMatchDecision(models.Model):
         ],
         required=True, readonly=True, index=True,
     )
+    # THE THREE OPAQUE IDENTITY COLUMNS. Verbatim remote values, never
+    # sanitized, never normalised, never parsed. Every one of them is compared
+    # for byte equality by `decision_key_for`, `_supersede_stale_siblings` and
+    # `_confirmed_for`, so any transformation applied on the way in is a
+    # transformation the importer's raw payload cannot reproduce on the way
+    # out. That is exactly what went wrong in `v1`.
     shopify_product_gid = fields.Char(required=True, index=True, readonly=True)
     shopify_variant_gid = fields.Char(readonly=True)
     # The verbatim remote `updatedAt` of the payload the ambiguity was found
@@ -384,7 +546,13 @@ class ShopifyConnectorProductMatchDecision(models.Model):
         help='Which identifier produced the ambiguous candidates. Product '
              'names are never matched on.',
     )
-    match_values = fields.Text(readonly=True)
+    # The exact identifier values the importer matched on, as keyed digests --
+    # NEVER the values themselves. This column is durable evidence that also
+    # reaches a job-log row, and a merchant's SKU or barcode does not belong in
+    # either. Eligibility is decided by recomputing each live candidate's
+    # digest and comparing digest to digest, which is exact-match semantics
+    # with nothing disclosed. See `match_value_digest`.
+    match_value_digests = fields.Text(readonly=True)
     resolved_template_id = fields.Many2one(
         comodel_name='product.template', readonly=True, ondelete='restrict',
         string='Under product',
@@ -610,6 +778,14 @@ class ShopifyConnectorProductMatchDecision(models.Model):
             # have been re-queued and re-failed. Re-point it at the job that
             # is blocked NOW, so confirming resumes work that is actually
             # waiting, and leave any decision already made alone.
+            #
+            # SAFE ONLY BECAUSE THE KEY IS OPAQUE IDENTITY. `key` now covers
+            # the verbatim level, product GID, variant GID and remote
+            # `updatedAt`, so "same key" means "same Shopify product at the
+            # same remote version" and nothing else. Under `v1` two unrelated
+            # products could share a key, and this branch would then re-point
+            # product A's pending decision at product B's job -- a reviewer
+            # deciding about A would resume the import of B.
             if existing.state == 'pending' and existing.job_id != job:
                 existing.write({
                     'job_id': job.id,
@@ -631,7 +807,9 @@ class ShopifyConnectorProductMatchDecision(models.Model):
             'remote_updated_at': evidence['remote_updated_at'],
             'decision_key': key,
             'match_key': evidence['match_key'],
-            'match_values': json.dumps(evidence['match_values']),
+            'match_value_digests': json.dumps(
+                sorted(evidence['match_value_digests']),
+            ),
             'resolved_template_id': evidence['resolved_template_id'] or False,
             'title_preview': evidence['title_preview'] or False,
             'sku_preview': evidence['sku_preview'] or False,
@@ -665,6 +843,23 @@ class ShopifyConnectorProductMatchDecision(models.Model):
 
     @api.model
     def _supersede_stale_siblings(self, store, evidence, key):
+        """Supersede this EXACT product/variant at an OLDER remote identity.
+
+        Every leaf is opaque identity, so the search reaches the same Shopify
+        product or variant and no other. Under `v1` these were the sanitized
+        copies, and `shopify_product_gid = 'gid://shopify/Product/[redacted-
+        phone]'` matched every product in the catalog whose numeric suffix was
+        long enough -- so one new ambiguity superseded unrelated merchants'
+        pending decisions wholesale.
+
+        `remote_updated_at <` is the "older" half, and it is a deliberate
+        BYTE comparison of an opaque value rather than a parsed timestamp. For
+        Shopify's ISO-8601 UTC stamps the two orders coincide; where they would
+        not, this refuses to act rather than guessing, which leaves the other
+        decision pending and unconsumable for this identity (`_confirmed_for`
+        keys on the exact identity) instead of silently retiring something that
+        may describe a NEWER version than the payload in hand.
+        """
         stale = self.sudo().search([
             ('store_id', '=', store.id),
             ('decision_level', '=', evidence['level']),
@@ -674,6 +869,7 @@ class ShopifyConnectorProductMatchDecision(models.Model):
                 evidence['shopify_variant_gid'] or False,
             ),
             ('decision_key', '!=', key),
+            ('remote_updated_at', '<', evidence['remote_updated_at']),
             ('state', 'in', ('pending', 'confirmed')),
         ])
         if stale:
@@ -691,26 +887,54 @@ class ShopifyConnectorProductMatchDecision(models.Model):
     # Eligibility (recomputed, never replayed)
     # ------------------------------------------------------------------
 
-    def _match_value_list(self):
+    def _match_value_digest_set(self):
         self.ensure_one()
         try:
-            values = json.loads(self.match_values or '[]')
+            values = json.loads(self.match_value_digests or '[]')
         except (TypeError, ValueError):
-            return []
+            return frozenset()
         if not isinstance(values, list):
-            return []
-        return [
-            value for value in values
-            if isinstance(value, str) and value
-        ][:MATCH_VALUES_LIMIT]
+            return frozenset()
+        return frozenset(
+            value for value in list(values)[:MATCH_VALUES_LIMIT]
+            if _is_match_digest(value)
+        )
+
+    def _identifier_matches(self, record, field_name, digests):
+        """Does this LIVE record still carry an identifier Shopify sent?
+
+        Digest to digest, recomputed from the record in front of us. Nothing
+        here reads the remote value, and nothing here trusts the payload's
+        opinion of which records matched.
+        """
+        value = record[field_name]
+        if not value:
+            return False
+        return match_value_digest(self.env, value) in digests
 
     def eligible_candidates(self):
         """The candidates a decision could legitimately select, right now.
 
-        Deliberately the SAME predicate the importer matches on -- identifier
-        equality, the store's already-bound exclusion, and company agreement
-        -- so the list on screen is a list the importer would accept and the
-        binding's own `check_company` would not refuse.
+        TWO CHANGES FROM `v1`, AND BOTH ARE THE CORRECTION.
+
+        *The search is gone.* `v1` re-searched the whole product table for the
+        stored match values -- which were display-sanitized, so a numeric SKU
+        searched for the literal string `[redacted-phone]` and matched nothing.
+        Evaluation is now confined to the BOUNDED CANDIDATE SNAPSHOT the
+        importer actually produced, which is also the only set the reviewer was
+        ever shown evidence about.
+
+        *Membership of that snapshot is not eligibility.* A candidate id is
+        merchant-influenced data that arrived on an exception payload, so a
+        forged id that happens to belong to the right company must not become
+        selectable. Every candidate's LIVE identifier is digested here and
+        compared against the exact remote evidence; one that does not carry the
+        identifier Shopify sent is refused, whatever the payload claimed.
+
+        The rest of the predicate is unchanged and is deliberately the one the
+        importer matches on -- the store's already-bound exclusion and company
+        agreement -- so the list on screen is a list the importer would accept
+        and the binding's own `check_company` would not refuse.
 
         The already-bound exclusion is read under `sudo()` on purpose. It is
         an exclusion set: elevating it can only ever REMOVE a candidate, never
@@ -720,43 +944,44 @@ class ShopifyConnectorProductMatchDecision(models.Model):
         candidate through that the importer would then refuse.
         """
         self.ensure_one()
-        values = self._match_value_list()
-        if not values or self.match_key not in MATCH_KEY_FIELD:
-            return self.env['product.template'].browse() \
-                if self.decision_level == DECISION_LEVEL_TEMPLATE \
-                else self.env['product.product'].browse()
+        is_template = self.decision_level == DECISION_LEVEL_TEMPLATE
+        empty = (
+            self.env['product.template'].browse() if is_template
+            else self.env['product.product'].browse()
+        )
+        digests = self._match_value_digest_set()
+        if not digests or self.match_key not in MATCH_KEY_FIELD:
+            return empty
         field_name = MATCH_KEY_FIELD[self.match_key]
         company = self.store_id.company_id
-        Product = self.env['product.product']
-        if self.decision_level == DECISION_LEVEL_TEMPLATE:
+        if is_template:
             bound_ids = set(self.env[
                 'shopify.connector.product.template.binding'
             ].sudo().search(
                 [('store_id', '=', self.store_id.id)]
             ).mapped('product_template_id').ids)
-            templates = Product.search(
-                [(field_name, 'in', values)]
-            ).mapped('product_tmpl_id')
-            return templates.filtered(
+            return self.candidate_template_ids.exists().filtered(
                 lambda template: template.id not in bound_ids
                 and (
                     not template.company_id or template.company_id == company
                 )
+                and any(
+                    self._identifier_matches(variant, field_name, digests)
+                    for variant in template.product_variant_ids
+                )
             )
+        if not self.resolved_template_id:
+            return empty
         bound_ids = set(self.env[
             'shopify.connector.product.variant.binding'
         ].sudo().search(
             [('store_id', '=', self.store_id.id)]
         ).mapped('product_variant_id').ids)
-        if not self.resolved_template_id:
-            return Product.browse()
-        products = Product.search([
-            (field_name, 'in', values),
-            ('product_tmpl_id', '=', self.resolved_template_id.id),
-        ])
-        return products.filtered(
+        return self.candidate_variant_ids.exists().filtered(
             lambda product: product.id not in bound_ids
             and (not product.company_id or product.company_id == company)
+            and product.product_tmpl_id == self.resolved_template_id
+            and self._identifier_matches(product, field_name, digests)
         )
 
     # ------------------------------------------------------------------
@@ -766,6 +991,7 @@ class ShopifyConnectorProductMatchDecision(models.Model):
     @api.model
     def _confirmed_for(
         self, store, level, product_gid, variant_gid, remote_updated_at,
+        job=None,
     ):
         """The confirmed decision for this EXACT remote identity, or empty.
 
@@ -774,17 +1000,47 @@ class ShopifyConnectorProductMatchDecision(models.Model):
         `updatedAt`, produces a different key, and therefore finds nothing
         here -- the ambiguity is raised again and reviewed again against what
         is there now.
+
+        THE VALUES ARRIVE RAW AND ARE USED RAW. They come straight off the
+        payload the importer just fetched, and they are validated by exactly
+        the function that validated them when the decision was written, so
+        either both ends agree byte for byte or this returns nothing. `v1`
+        sanitized one end and not the other, which made every confirmed
+        decision unconsumable and sent the merchant back to the same ambiguity.
         """
-        if not remote_updated_at:
+        product_gid = opaque_identity(product_gid or '', MATCH_GID_MAX_LEN)
+        updated_at = opaque_identity(
+            remote_updated_at or '', MATCH_UPDATED_AT_MAX_LEN,
+        )
+        if not product_gid or not updated_at or level not in DECISION_LEVELS:
+            return self.browse()
+        variant_gid = opaque_identity(variant_gid or '', MATCH_GID_MAX_LEN)
+        if level == DECISION_LEVEL_VARIANT and not variant_gid:
+            return self.browse()
+        if level == DECISION_LEVEL_TEMPLATE and variant_gid:
             return self.browse()
         key = decision_key_for(
-            level, product_gid or '', variant_gid or '', remote_updated_at,
+            level, product_gid, variant_gid, updated_at,
         )
-        return self.sudo().search([
+        decision = self.sudo().search([
             ('store_id', '=', store.id),
             ('decision_key', '=', key),
             ('state', '=', 'confirmed'),
         ], limit=1)
+        if not decision:
+            return decision
+        # THE JOB'S OWN ENQUEUED IDENTITY, checked at CONSUMPTION and not only
+        # at confirmation. `_validated_decision` compares `payload_hash` when
+        # the reviewer presses the button; this is the other end of the same
+        # guarantee, and it is the one that runs while a binding is about to be
+        # created. A decision recorded against one enqueued payload must not be
+        # applied by work admitted under a different one.
+        if job is not None and (
+            (job.payload_hash or False)
+            != (decision.job_payload_hash or False)
+        ):
+            return self.browse()
+        return decision
 
     def action_open_decision(self):
         """Open the dialog from the decision itself, via the blocked job.

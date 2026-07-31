@@ -23,5 +23,7 @@ from . import test_ui_u2_action_tours
 # Batch 2 checkpoint 1: canonical Store Settings classification.
 from . import test_canonical_store_settings_sale
 from . import test_tax_decision_route
+from . import test_tax_mapping_race
+from . import test_batch2_correction_at_any_head
 from . import test_batch2_journeys_sale
 from . import test_ui_b2_sale_tours

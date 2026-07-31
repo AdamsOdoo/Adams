@@ -50,6 +50,51 @@ _MAGIC_FIELDS = frozenset({
     'write_date',
 })
 
+# ----------------------------------------------------------------------
+# THE EXACT COVERAGE OF THIS GUARD, WRITTEN DOWN (TD-023).
+#
+# Batch 2 shipped a per-module classification test for the four modules that
+# contributed settings fields IN Batch 2. Two other installed modules also
+# extend ``shopify.connector.store.settings`` and have no classification test:
+# `shopify_connector_fulfillment` and `shopify_connector_product_export`. Their
+# fields are therefore NOT covered -- adding one to either module today fails
+# nothing and appears on no canonical surface by accident rather than by
+# decision.
+#
+# This is stated here, beside the machinery, rather than left to be discovered:
+# a shared helper that four modules call reads as "every module is covered"
+# unless it says otherwise. `test_the_classification_guard_states_its_own_
+# coverage` asserts these two sets against the live registry, so the day either
+# module gains a classification test -- or a fifth module starts contributing
+# fields -- this constant is wrong and a test says so.
+#
+# Closing it is bounded test-hardening debt, not a production change, and the
+# Batch 2 correction deliberately did not touch either module's production
+# code. See docs/05-qa/technical-debt-register.md (TD-023).
+# ----------------------------------------------------------------------
+CLASSIFIED_MODULES = frozenset({
+    'shopify_connector_core',
+    'shopify_connector_product',
+    'shopify_connector_sale',
+    'shopify_connector_inventory',
+})
+
+UNCLASSIFIED_CONTRIBUTING_MODULES = frozenset({
+    'shopify_connector_fulfillment',
+    'shopify_connector_product_export',
+})
+
+
+def contributing_modules(env):
+    """Every module that declares or extends a settings field, live."""
+    model = env[SETTINGS_MODEL]
+    modules = set()
+    for name, field in model._fields.items():
+        if name in _MAGIC_FIELDS:
+            continue
+        modules.update(field._modules or ())
+    return {module for module in modules if module.startswith('shopify_')}
+
 
 def fields_contributed_by(env, module):
     """The settings fields `module` declares, from the live registry.

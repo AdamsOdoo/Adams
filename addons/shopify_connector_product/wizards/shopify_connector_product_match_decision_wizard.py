@@ -219,23 +219,46 @@ class ShopifyConnectorProductMatchDecisionWizard(models.TransientModel):
         return decision
 
     def action_confirm(self):
-        """Record the decision and resume the exact job, once, atomically."""
+        """Record the decision and resume the exact job, once, atomically.
+
+        THE ORDER OF THE NEXT FOUR STEPS IS THE SECURITY PROPERTY.
+
+        Capability, then the caller's own access to this exact decision and its
+        scoped store and company, THEN the raw row lock, then everything
+        revalidated again underneath it. Locking first was the defect: a
+        `SELECT ... FOR UPDATE` by primary key is raw SQL and answers to no ACL
+        and no record rule, so a caller naming a foreign company's decision id
+        took a genuine write lock on that row -- blocking its legitimate
+        reviewer for as long as the transaction lived -- and only afterwards
+        learned they were not allowed to be there. An unauthorized id is now
+        refused before it can reach the row.
+
+        The lock is not weakened to compensate. Two reviewers confirming the
+        same decision at once would otherwise both read `pending`, both write,
+        and both resume -- admitting the same import twice. The loser still
+        waits at the lock, then reads the state the winner committed and is
+        refused by the revalidation below. Generic optimistic locking would not
+        give that one-winner/one-refusal shape.
+        """
         self.ensure_one()
         self._assert_match_decision_reviewer()
         decision = self.decision_id
-        # A REAL ROW LOCK, taken before the state it guards is read. Two
-        # reviewers confirming the same decision at once would otherwise both
-        # read `pending`, both write, and both resume -- admitting the same
-        # import twice. The loser waits here, then reads the state the winner
-        # committed and is refused by the revalidation below.
+        # ACCESS BEFORE LOCK. `_validated_decision` runs entirely in the
+        # caller's own environment -- `check_access` on the decision, on its
+        # store and on its job, plus the active-company test -- so a decision
+        # this caller may not reach raises here, with no row locked and nothing
+        # disclosed about it.
+        self._validated_decision(decision)
         self.env.cr.execute(
             'SELECT id FROM shopify_connector_product_match_decision '
             'WHERE id = %s FOR UPDATE',
             (decision.id,),
         )
         decision.invalidate_recordset()
-        # REVALIDATED, not trusted. Everything checked when the dialog opened
-        # is checked again against the live database.
+        # REVALIDATED UNDER THE LOCK, not trusted. Everything checked when the
+        # dialog opened -- and everything checked a moment ago without the lock
+        # -- is checked again against the state the lock now guarantees is
+        # stable: guarded state, job, payload identity and company.
         self._validated_decision(decision)
         chosen = self._validated_choice(decision)
         self._assert_no_conflicting_binding(decision, chosen)

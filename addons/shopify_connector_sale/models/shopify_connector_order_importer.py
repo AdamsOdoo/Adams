@@ -22,7 +22,9 @@ from odoo.addons.shopify_connector_core.tools.redaction import redact
 from .shopify_connector_tax_mapping import (
     build_tax_fingerprint,
     canonical_tax_rate,
+    eligible_sale_tax_domain,
     safe_tax_preview,
+    tax_posture_included,
     TAX_SOURCE_PREVIEW_MAX_LEN,
     TAX_TITLE_PREVIEW_MAX_LEN,
 )
@@ -1507,9 +1509,13 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
 
     @api.model
     def _analytic_unit_for_excluded(self, order, taxes, target):
-        if not taxes or not all(
-            tax.price_include_override == 'tax_included' for tax in taxes
-        ):
+        # EFFECTIVE posture, for the same reason as the two eligibility
+        # authorities: an included tax on a company whose default is
+        # `tax_included` carries no override, and reading the override would
+        # skip this conversion and seed the line from a tax-inclusive figure as
+        # though it were exclusive. Left uncorrected, admitting such a tax
+        # through the corrected dialog would have produced wrong order totals.
+        if not taxes or not all(tax_posture_included(tax) for tax in taxes):
             return target
         result = taxes._get_tax_details(
             price_unit=float(target),
@@ -1796,28 +1802,33 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
 
     @api.model
     def _tax_suggestions(self, settings, rate_key, price_included):
-        expected = 'tax_included' if price_included else 'tax_excluded'
-        candidates = self.env['account.tax'].search([
-            ('company_id', '=', settings.order_company_id.id),
-            ('active', '=', True),
-            ('type_tax_use', '=', 'sale'),
-            ('amount_type', '=', 'percent'),
-            ('amount', '=', float(Decimal(rate_key))),
-            ('include_base_amount', '=', False),
-            ('price_include_override', '=', expected),
-        ], order='id', limit=20)
+        # The SHARED eligibility rule, so the non-binding suggestions the
+        # merchant sees on the blocked job are the same set the decision dialog
+        # will offer and the mapping constraint will accept.
+        candidates = self.env['account.tax'].search(
+            eligible_sale_tax_domain(
+                settings.order_company_id, price_included,
+                float(Decimal(rate_key)),
+            ),
+            order='id', limit=20,
+        )
         return candidates.ids
 
     @api.model
     def _validate_resolved_tax(self, tax, settings, price_included, rate_key):
-        expected_inclusion = 'tax_included' if price_included else 'tax_excluded'
+        # `tax_posture_included` reads Odoo's EFFECTIVE posture. Reading the
+        # raw `price_include_override` here was the third copy of F4, and the
+        # one that mattered most: a mapping created through the corrected
+        # dialog would have been refused by this check on the very next import,
+        # so the merchant would have mapped the tax and the order would still
+        # not have moved.
         if (
             tax.company_id != settings.order_company_id
             or not tax.active
             or tax.type_tax_use != 'sale'
             or tax.amount_type != 'percent'
             or tax.include_base_amount
-            or getattr(tax, 'price_include_override', False) != expected_inclusion
+            or tax_posture_included(tax) != bool(price_included)
         ):
             raise JobHandlerError(
                 'odoo_validation_configuration',

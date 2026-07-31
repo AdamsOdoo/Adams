@@ -582,6 +582,20 @@ class TestReadinessSlotClosure(TransactionCase):
                  'SEC-3 ownership backfill probe.'),
                 ('shopify_connector_store.py', 'action_assign_company',
                  'self', 1, 'SEC-3 administrative ownership remediation.'),
+                # Batch 2 correction (F7). The merchant-facing "scheduled
+                # import" state is a lie unless it consults the cron that
+                # would actually perform it, and `ir.cron` is Administrator-
+                # only by ACL -- an Operator reading their own store's page is
+                # not one. The elevation is the narrowest available: `env.ref`
+                # resolves a module-owned external id BEFORE anything
+                # elevates, so `sudo()` is never used to DISCOVER a record,
+                # only to read `active` on the one this connector installed.
+                # One Boolean read, no write, and False for anything that is
+                # not a live `ir.cron`.
+                ('shopify_connector_store.py',
+                 '_connector_scheduler_is_active', 'cron', 1,
+                 'Truthful scheduled-state projection: reads `active` on the '
+                 'module-owned cron already resolved by external id.'),
                 ('shopify_connector_store.py',
                  '_create_lifecycle_audit_job', 'Job', 1,
                  'Lifecycle audit carrier.'),

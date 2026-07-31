@@ -456,6 +456,39 @@ class ShopifyConnectorStore(models.Model):
         return recovered
 
     @api.model
+    def _connector_scheduler_is_active(self, cron_xmlid):
+        """Is the named connector cron present AND active, right now?
+
+        Batch 2 correction (F7). A per-store "scheduled sync" flag says what
+        the merchant ASKED FOR. It does not say whether anything will actually
+        run: an administrator can disable the cron in Settings -> Technical ->
+        Scheduled Actions, or a deployment can ship with crons off, and the
+        flag knows nothing about either. A domain surface that answers "yes,
+        scheduled import is on" from the flag alone tells a merchant the
+        connector is keeping their catalog or order book current when no job
+        will ever be enqueued -- the exact false-capability claim this batch
+        exists to remove.
+
+        MINIMAL ELEVATION, AND ONLY AFTER THE RECORD IS ALREADY NAMED. The
+        external id is a module-owned constant supplied by the caller, and
+        `env.ref` resolves it through `ir.model.data` without ever searching
+        for anything. Only then, on that one already-identified record, is
+        `sudo()` used -- because `ir.cron` is administrator-only by ACL and an
+        operator reading their own store's page is not one. Elevation is never
+        used to DISCOVER a cron, only to read `active` on the one this module
+        installed.
+
+        Returns ``False`` -- never ``True`` -- when the external id resolves to
+        nothing, to a deleted row, or to something that is not an `ir.cron`.
+        An unprovable scheduler is indistinguishable from a disabled one.
+        """
+        cron = self.env.ref(cron_xmlid, raise_if_not_found=False)
+        if cron is None or cron._name != 'ir.cron':
+            return False
+        cron = cron.sudo().exists()
+        return bool(cron) and bool(cron.active)
+
+    @api.model
     def _backfill_company(self):
         """Deterministically assign a company to historic stores, or fail closed.
 

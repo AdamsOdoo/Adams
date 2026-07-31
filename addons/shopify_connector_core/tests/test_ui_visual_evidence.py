@@ -1369,6 +1369,7 @@ class TestUiVisualEvidence(HttpCase):
                 'shopify_target_gid': gid,
             })
             evidence = build_match_evidence(
+                self.env,
                 level=DECISION_LEVEL_TEMPLATE,
                 shopify_product_gid=gid,
                 remote_updated_at=stamp,
@@ -1391,9 +1392,9 @@ class TestUiVisualEvidence(HttpCase):
             ].sudo().search([('job_id', '=', job.id)], limit=1)
 
         pending_job, pending = blocked(
-            'gid://shopify/Product/VISPEND', '2026-07-30T09:15:00Z')
+            'gid://shopify/Product/7346299043911', '2026-07-30T09:15:00Z')
         resolved_job, resolved = blocked(
-            'gid://shopify/Product/VISDONE', '2026-07-30T09:16:00Z')
+            'gid://shopify/Product/7346299043928', '2026-07-30T09:16:00Z')
         if resolved:
             resolved.sudo().write({
                 'state': 'confirmed',

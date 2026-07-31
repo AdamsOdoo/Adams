@@ -22,8 +22,10 @@ eligibility recomputation, write the decision inside the importer's savepoint
 """
 
 import copy
+import hashlib
 import json
 import uuid
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from odoo.exceptions import AccessError, UserError, ValidationError
@@ -40,11 +42,16 @@ from ..models.shopify_connector_product_match_decision import (
     DECISION_LEVEL_TEMPLATE,
     DECISION_LEVEL_VARIANT,
     MATCH_CANDIDATE_LIMIT,
+    MATCH_DIGEST_LEN,
     MATCH_EVIDENCE_KEYS,
+    MATCH_GID_MAX_LEN,
     MATCH_IDENTIFIER_MAX_LEN,
     MATCH_TITLE_MAX_LEN,
+    MATCH_VALUES_LIMIT,
     build_match_evidence,
     decision_key_for,
+    match_value_digest,
+    opaque_identity,
     parse_match_evidence,
     safe_match_preview,
 )
@@ -439,7 +446,7 @@ class TestProductMatchDecision(TransactionCase):
         original = type(self.Importer)._resolve_template
 
         def resolve_inside_savepoint(importer_self, store, payload, settings,
-                                     notes):
+                                     notes, dispatched_job=None):
             self.env['shopify.connector.product.match.decision'].sudo().create({
                 'store_id': store.id,
                 'job_id': job.id,
@@ -448,9 +455,13 @@ class TestProductMatchDecision(TransactionCase):
                 'remote_updated_at': REMOTE_STAMP,
                 'decision_key': marker,
                 'match_key': 'sku_reference',
-                'match_values': json.dumps(['SAVEPOINT-DUP']),
+                'match_value_digests': json.dumps([
+                    match_value_digest(self.env, 'SAVEPOINT-DUP'),
+                ]),
             })
-            return original(importer_self, store, payload, settings, notes)
+            return original(
+                importer_self, store, payload, settings, notes, job,
+            )
 
         with patch.object(
             type(self.Importer), '_resolve_template', resolve_inside_savepoint,
@@ -1074,6 +1085,7 @@ class TestProductMatchDecision(TransactionCase):
     def test_evidence_is_bounded_and_scrubbed(self):
         long_title = 'A' * 500
         evidence = build_match_evidence(
+            self.env,
             level=DECISION_LEVEL_TEMPLATE,
             shopify_product_gid='gid://shopify/Product/1',
             remote_updated_at=REMOTE_STAMP,
@@ -1086,10 +1098,17 @@ class TestProductMatchDecision(TransactionCase):
         parsed = parse_match_evidence(evidence)
         self.assertTrue(parsed)
         self.assertEqual(len(parsed['title_preview']), MATCH_TITLE_MAX_LEN)
+        # Every match value is carried as a FIXED-LENGTH keyed digest, so the
+        # payload is bounded by construction rather than by truncating the
+        # merchant's identifiers -- and none of them appears in it.
+        self.assertLessEqual(len(parsed['match_value_digests']),
+                             MATCH_VALUES_LIMIT)
         self.assertTrue(all(
-            len(value) <= MATCH_IDENTIFIER_MAX_LEN
-            for value in parsed['match_values']
+            len(value) == MATCH_DIGEST_LEN
+            for value in parsed['match_value_digests']
         ))
+        self.assertNotIn('B' * 500, evidence)
+        self.assertNotIn('S1', evidence)
         self.assertLessEqual(len(parsed['candidate_ids']),
                              MATCH_CANDIDATE_LIMIT)
         self.assertEqual(parsed['candidate_total'], 59)
@@ -1114,6 +1133,7 @@ class TestProductMatchDecision(TransactionCase):
 
     def test_malformed_evidence_is_never_a_decision(self):
         good = json.loads(build_match_evidence(
+            self.env,
             level=DECISION_LEVEL_TEMPLATE,
             shopify_product_gid='gid://shopify/Product/1',
             remote_updated_at=REMOTE_STAMP,
@@ -1125,7 +1145,9 @@ class TestProductMatchDecision(TransactionCase):
             lambda p: p.update({'schema': 'something.else'}),
             lambda p: p.update({'level': 'neither'}),
             lambda p: p.update({'match_key': 'name'}),
-            lambda p: p.update({'match_values': []}),
+            lambda p: p.update({'match_value_digests': []}),
+            lambda p: p.update({'match_value_digests': ['not-a-digest']}),
+            lambda p: p.update({'shopify_product_gid': 'bad\x00gid'}),
             lambda p: p.update({'remote_updated_at': ''}),
             lambda p: p.update({'candidate_ids': ['1']}),
             lambda p: p.update({'extra_key': 1}),
@@ -1149,9 +1171,12 @@ class TestProductMatchDecision(TransactionCase):
         job = self._import_job(gid)
         original = type(self.Importer)._resolve_template
 
-        def reworded(importer_self, store, payload, settings, notes):
+        def reworded(importer_self, store, payload, settings, notes,
+                     job=None):
             try:
-                return original(importer_self, store, payload, settings, notes)
+                return original(
+                    importer_self, store, payload, settings, notes, job,
+                )
             except JobHandlerError as exc:
                 if exc.error_class != 'ambiguous_match':
                     raise
@@ -1175,6 +1200,7 @@ class TestProductMatchDecision(TransactionCase):
     def test_the_evidence_schema_is_exact_not_a_minimum(self):
         self.assertEqual(
             set(json.loads(build_match_evidence(
+                self.env,
                 level=DECISION_LEVEL_TEMPLATE,
                 shopify_product_gid='gid://shopify/Product/1',
                 remote_updated_at=REMOTE_STAMP,
@@ -1230,3 +1256,625 @@ class TestProductMatchDecision(TransactionCase):
             binding.with_user(self.roles['admin']).write({
                 'product_template_id': first.id,
             })
+
+    # ==================================================================
+    # J. THE BATCH 2 CORRECTION (F1/F2/F3): identity is opaque, display is
+    #    sanitized, and exact matching survives both.
+    #
+    #    EVERY TEST IN THIS SECTION USES PRODUCTION-SHAPED DATA, AND THAT
+    #    IS THE POINT. The pre-correction suite used `gid://shopify/
+    #    Product/8201` and `DUP-TPL`. A four-digit suffix and an alphabetic
+    #    SKU are the two shapes `safe_match_preview`'s phone pattern does
+    #    NOT rewrite (it needs a leading digit, six or more digit/separator
+    #    characters, and a trailing digit), so a green suite proved the
+    #    route worked for identities no Shopify store issues. Real GIDs
+    #    carry a 13-to-14-digit suffix; real SKUs and barcodes are
+    #    routinely all digits. Those are the values below.
+    # ==================================================================
+
+    # Shapes a real store actually produces.
+    REAL_PRODUCT_GID = 'gid://shopify/Product/7346299043911'
+    REAL_PRODUCT_GID_2 = 'gid://shopify/Product/9876543210987'
+    REAL_VARIANT_GID = 'gid://shopify/ProductVariant/45123456789012'
+    NUMERIC_SKU = '1234567890123'
+    HYPHENATED_NUMERIC_SKU = '012-345-6789'
+    EAN13_BARCODE = '4006381333931'
+
+    def test_the_display_scrubber_really_does_rewrite_every_real_shape(self):
+        """The measurement the whole section rests on.
+
+        If this ever stops being true, `safe_match_preview` has changed and
+        the separation below can be re-examined. While it IS true, using it
+        on an identity destroys the identity.
+        """
+        for shape in (
+            self.REAL_PRODUCT_GID, self.REAL_PRODUCT_GID_2,
+            self.REAL_VARIANT_GID, self.NUMERIC_SKU,
+            self.HYPHENATED_NUMERIC_SKU, self.EAN13_BARCODE,
+        ):
+            self.assertNotEqual(
+                safe_match_preview(shape, 200), shape,
+                '%r survives the display scrubber, so it is not a shape that '
+                'demonstrates the defect' % (shape,),
+            )
+        # ...and the two shapes the old fixtures used do NOT, which is why
+        # the old suite was green against the defect.
+        for survivor in ('gid://shopify/Product/8201', 'DUP-TPL'):
+            self.assertEqual(safe_match_preview(survivor, 200), survivor)
+
+    def test_a_real_product_gid_is_stored_and_keyed_exactly(self):
+        """§10.1/§10.8. Identity in, identity out, byte for byte."""
+        job, first, second, sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        self.assertTrue(sent, 'the importer never ran')
+        self.assertEqual(job.state, 'blocked_manual_review')
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(len(decision), 1)
+        self.assertEqual(decision.shopify_product_gid, self.REAL_PRODUCT_GID)
+        self.assertEqual(decision.remote_updated_at, REMOTE_STAMP)
+        # The durable key is the one the raw payload reproduces.
+        self.assertEqual(
+            decision.decision_key,
+            decision_key_for(
+                DECISION_LEVEL_TEMPLATE, self.REAL_PRODUCT_GID, '',
+                REMOTE_STAMP,
+            ),
+        )
+        # And that is exactly what consumption looks for.
+        self.assertEqual(
+            self.Decision._confirmed_for(
+                self.store, DECISION_LEVEL_TEMPLATE, self.REAL_PRODUCT_GID,
+                '', REMOTE_STAMP,
+            ),
+            self.Decision.browse(),
+            'nothing is confirmed yet',
+        )
+        self._confirm(decision, first)
+        decision.invalidate_recordset()
+        self.assertEqual(
+            self.Decision._confirmed_for(
+                self.store, DECISION_LEVEL_TEMPLATE, self.REAL_PRODUCT_GID,
+                '', REMOTE_STAMP,
+            ),
+            decision,
+            'the key computed from the RAW payload must find the decision '
+            'the raw payload produced',
+        )
+        self.assertTrue(second)
+
+    def test_a_real_variant_gid_is_stored_and_keyed_exactly(self):
+        """§10.2, at the variant level."""
+        gid = self.REAL_PRODUCT_GID
+        variant_gid = self.REAL_VARIANT_GID
+        template, variants = self._ambiguous_variant_fixture(
+            sku=self.NUMERIC_SKU,
+        )
+        job = self._import_job(gid)
+        self._drain(self._graphql_product(
+            gid,
+            [self._graphql_variant(variant_gid, sku=self.NUMERIC_SKU)],
+        ))
+        job.invalidate_recordset()
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(len(decision), 1)
+        self.assertEqual(decision.decision_level, DECISION_LEVEL_VARIANT)
+        self.assertEqual(decision.shopify_product_gid, gid)
+        self.assertEqual(decision.shopify_variant_gid, variant_gid)
+        self.assertEqual(
+            decision.decision_key,
+            decision_key_for(
+                DECISION_LEVEL_VARIANT, gid, variant_gid, REMOTE_STAMP,
+            ),
+        )
+        self.assertEqual(decision.resolved_template_id, template)
+        self.assertEqual(
+            set(decision.candidate_variant_ids.ids), set(variants.ids),
+        )
+
+    def test_two_real_products_sharing_an_updated_at_stay_two_decisions(self):
+        """§10.3/§10.15, and the sharpest form of the identity defect.
+
+        Both GIDs end in a long digit run, so the display scrubber collapses
+        both to `gid://shopify/Product/[redacted-phone]`. With the same
+        `updatedAt` they produced ONE key -- so the second product's failure
+        found the first product's pending decision, re-pointed it at the
+        second product's job, and a reviewer deciding about product A
+        resumed the import of product B.
+        """
+        self.assertEqual(
+            safe_match_preview(self.REAL_PRODUCT_GID, 200),
+            safe_match_preview(self.REAL_PRODUCT_GID_2, 200),
+            'the two GIDs must be indistinguishable AFTER sanitization for '
+            'this test to be about the defect',
+        )
+        first_job, first_a, _first_b, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        second_job, second_a, _second_b, _sent2 = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID_2, sku=self.HYPHENATED_NUMERIC_SKU,
+        )
+        first = self.Decision.search([('job_id', '=', first_job.id)])
+        second = self.Decision.search([('job_id', '=', second_job.id)])
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 1)
+        self.assertNotEqual(first, second)
+        self.assertNotEqual(first.decision_key, second.decision_key)
+        self.assertEqual(first.remote_updated_at, second.remote_updated_at)
+        # Neither was re-pointed: each decision still belongs to its own job,
+        # and each job still has exactly one.
+        self.assertEqual(first.job_id, first_job)
+        self.assertEqual(second.job_id, second_job)
+        self.assertEqual(first.state, 'pending')
+        self.assertEqual(second.state, 'pending')
+        # Deciding one resumes ONE job and leaves the other exactly alone.
+        self._confirm(first, first_a)
+        first_job.invalidate_recordset()
+        second_job.invalidate_recordset()
+        second.invalidate_recordset()
+        self.assertEqual(first_job.state, 'queued')
+        self.assertEqual(second_job.state, 'blocked_manual_review')
+        self.assertEqual(second.state, 'pending')
+        self.assertTrue(second_a)
+
+    def test_a_numeric_sku_still_finds_its_candidates(self):
+        """§10.4/§10.10. The eligible set is the reviewer's whole dialog.
+
+        Under the defect the stored match value was the literal string
+        `[redacted-phone]`, and `eligible_candidates()` searched
+        `default_code in ['[redacted-phone]']` -- which no Odoo record
+        carries. The reviewer was asked to choose from an empty list.
+        """
+        job, first, second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        eligible = decision.eligible_candidates()
+        self.assertEqual(set(eligible.ids), {first.id, second.id})
+
+    def test_a_hyphenated_numeric_sku_still_finds_its_candidates(self):
+        """§10.5. Same shape, with separators the scrubber also swallows."""
+        job, first, second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.HYPHENATED_NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(decision.match_key, 'sku_reference')
+        self.assertEqual(
+            set(decision.eligible_candidates().ids), {first.id, second.id},
+        )
+
+    def test_an_ean13_barcode_ambiguity_matches_and_stays_company_scoped(self):
+        """§10.6, within what Odoo's own uniqueness rules actually permit.
+
+        Odoo 19 enforces barcode uniqueness WITHIN a company
+        (`product.product._check_barcode_uniqueness`, pin `30bde9ff`), so two
+        same-company products cannot share an EAN-13 and a same-company
+        barcode ambiguity is not a state the database can hold. Two products
+        in DIFFERENT companies can, and `_find_template_candidates` searches
+        with no company filter -- so this is the real, reachable barcode
+        ambiguity, and it is also the one where company scoping matters most.
+        """
+        mine, _mine_variant = self._make_product(
+            'EAN mine', barcode=self.EAN13_BARCODE, company=self.company,
+        )
+        theirs, _theirs_variant = self._make_product(
+            'EAN theirs', barcode=self.EAN13_BARCODE,
+            company=self.other_company,
+        )
+        gid = self.REAL_PRODUCT_GID
+        job = self._import_job(gid)
+        sent = self._drain(self._graphql_product(
+            gid,
+            [self._graphql_variant(
+                self.REAL_VARIANT_GID, barcode=self.EAN13_BARCODE,
+            )],
+        ))
+        job.invalidate_recordset()
+        self.assertTrue(sent)
+        self.assertEqual(job.state, 'blocked_manual_review')
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(len(decision), 1)
+        self.assertEqual(decision.match_key, 'barcode')
+        self.assertEqual(decision.candidate_total, 2)
+        # The snapshot already dropped the foreign-company candidate...
+        self.assertEqual(set(decision.candidate_template_ids.ids), {mine.id})
+        # ...and the digest comparison confirms the surviving one really does
+        # carry the barcode Shopify sent.
+        self.assertEqual(set(decision.eligible_candidates().ids), {mine.id})
+        self.assertTrue(theirs)
+        # And the whole route completes on it.
+        self._confirm(decision, mine)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'queued')
+
+    def test_the_display_preview_stays_sanitized_while_identity_does_not(self):
+        """§10.7. The two treatments, on the same record, at the same time."""
+        job, _first, _second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(decision.sku_preview, '[redacted-phone]')
+        self.assertEqual(decision.shopify_product_gid, self.REAL_PRODUCT_GID)
+
+    def test_no_raw_identifier_reaches_a_log_a_payload_or_a_ui_field(self):
+        """§10.9. The exact match value is nowhere a human or a DOM can read.
+
+        The identifier is carried as a keyed digest, so the durable evidence,
+        the job-log rows the dispatcher wrote, the exception text and every
+        readable field of the decision can all be searched for it directly.
+        """
+        job, _first, _second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        logs = self.env['shopify.connector.job.log'].sudo().search(
+            [('job_id', '=', job.id)],
+        )
+        self.assertTrue(logs, 'the dispatcher wrote no log to inspect')
+        haystacks = [
+            json.dumps(logs.read(), default=str),
+            json.dumps(decision.sudo().read(), default=str),
+            decision.match_value_digests or '',
+            json.dumps(job.sudo().read(), default=str),
+        ]
+        for haystack in haystacks:
+            self.assertNotIn(self.NUMERIC_SKU, haystack)
+        # The digest IS there, and it is the thing that does the matching.
+        self.assertIn(
+            match_value_digest(self.env, self.NUMERIC_SKU),
+            decision.match_value_digests,
+        )
+
+    def test_a_forged_candidate_id_is_refused_on_its_live_identifier(self):
+        """§10.11. Same company is not enough, and never was.
+
+        `candidate_ids` arrives on an exception payload. The persistence step
+        drops foreign-company ids, but a SAME-company id costs an attacker or
+        a bug nothing -- so eligibility is decided by recomputing the live
+        record's identifier digest, not by membership of the payload's list.
+        """
+        job, first, second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        innocent, _variant = self._make_product(
+            'Never carried the identifier', sku='SOMETHING-ELSE-ENTIRELY',
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        # Forge it straight into the stored snapshot, which is the strongest
+        # form of the attack: it is already past every parse-time check.
+        decision.sudo().write({
+            'candidate_template_ids': [(4, innocent.id)],
+        })
+        decision.invalidate_recordset()
+        self.assertIn(innocent.id, decision.candidate_template_ids.ids)
+        self.assertEqual(
+            set(decision.eligible_candidates().ids), {first.id, second.id},
+            'a same-company record that never carried the identifier was '
+            'offered as an eligible match',
+        )
+        with self.assertRaises(UserError):
+            self._confirm(decision, innocent)
+        decision.invalidate_recordset()
+        self.assertEqual(decision.state, 'pending')
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'blocked_manual_review')
+
+    def test_the_whole_template_route_completes_on_production_shaped_data(self):
+        """§10.12. Dispatcher -> importer -> block -> decide -> resume ->
+        consume -> binding, with nothing in it a real store would not send."""
+        job, first, second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self._confirm(decision, first)
+        job.invalidate_recordset()
+        decision.invalidate_recordset()
+        self.assertEqual(decision.state, 'confirmed')
+        self.assertEqual(decision.selected_template_id, first)
+        self.assertEqual(job.state, 'queued')
+        # The resumed import runs for real and consumes the decision.
+        sent = self._drain(self._graphql_product(
+            self.REAL_PRODUCT_GID,
+            [self._graphql_variant(
+                self.REAL_VARIANT_GID, sku=self.NUMERIC_SKU,
+            )],
+        ))
+        self.assertTrue(sent, 'the resumed import never issued a read')
+        job.invalidate_recordset()
+        decision.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(decision.state, 'consumed')
+        binding = self.TemplateBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', self.REAL_PRODUCT_GID),
+        ])
+        self.assertEqual(len(binding), 1)
+        self.assertEqual(binding.product_template_id, first)
+        self.assertEqual(binding.match_key, 'manual')
+        self.assertEqual(decision.resulting_template_binding_id, binding)
+        self.assertNotEqual(binding.product_template_id, second)
+
+    def test_the_whole_variant_route_completes_on_production_shaped_data(self):
+        """§10.13, the variant equivalent, end to end."""
+        gid = self.REAL_PRODUCT_GID_2
+        variant_gid = self.REAL_VARIANT_GID
+        template, variants = self._ambiguous_variant_fixture(
+            sku=self.NUMERIC_SKU,
+        )
+        job = self._import_job(gid)
+        self._drain(self._graphql_product(
+            gid, [self._graphql_variant(variant_gid, sku=self.NUMERIC_SKU)],
+        ))
+        job.invalidate_recordset()
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertEqual(len(decision), 1)
+        chosen = variants[0]
+        self.assertIn(chosen.id, decision.eligible_candidates().ids)
+        self._confirm(decision, chosen)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'queued')
+        sent = self._drain(self._graphql_product(
+            gid, [self._graphql_variant(variant_gid, sku=self.NUMERIC_SKU)],
+        ))
+        self.assertTrue(sent)
+        job.invalidate_recordset()
+        decision.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        self.assertEqual(decision.state, 'consumed')
+        variant_binding = self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', variant_gid),
+        ])
+        self.assertEqual(len(variant_binding), 1)
+        self.assertEqual(variant_binding.product_variant_id, chosen)
+        self.assertEqual(
+            decision.resulting_variant_binding_id, variant_binding,
+        )
+        self.assertEqual(variant_binding.product_variant_id.product_tmpl_id,
+                         template)
+
+    def test_a_changed_updated_at_refuses_the_confirmed_decision(self):
+        """§10.14, on production-shaped identity.
+
+        The product moved on Shopify after the decision was made, so the
+        decision describes something that is no longer what would be
+        imported. It is not consumed, and a fresh ambiguity is raised.
+        """
+        job, first, _second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self._confirm(decision, first)
+        # The merchant edits the product; the payload now carries a new stamp.
+        self._drain(self._graphql_product(
+            self.REAL_PRODUCT_GID,
+            [self._graphql_variant(
+                self.REAL_VARIANT_GID, sku=self.NUMERIC_SKU,
+            )],
+            updated_at=LATER_STAMP,
+        ))
+        job.invalidate_recordset()
+        decision.invalidate_recordset()
+        self.assertEqual(job.state, 'blocked_manual_review')
+        self.assertEqual(
+            decision.state, 'superseded',
+            'the decision for the OLD remote version must be retired, not '
+            'applied to the new one',
+        )
+        self.assertFalse(self.TemplateBinding.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', self.REAL_PRODUCT_GID),
+        ]))
+        fresh = self.Decision.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_product_gid', '=', self.REAL_PRODUCT_GID),
+            ('state', '=', 'pending'),
+        ])
+        self.assertEqual(len(fresh), 1)
+        self.assertEqual(fresh.remote_updated_at, LATER_STAMP)
+
+    def test_supersession_never_reaches_an_unrelated_product(self):
+        """§10.15 again, from the supersession side.
+
+        Under the defect `shopify_product_gid` was
+        `gid://shopify/Product/[redacted-phone]` for every product with a long
+        numeric suffix, so recording ONE new ambiguity superseded every other
+        merchant decision in the store that happened to share that shape.
+        """
+        neighbour_job, _a, _b, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID_2, sku=self.HYPHENATED_NUMERIC_SKU,
+        )
+        neighbour = self.Decision.search([('job_id', '=', neighbour_job.id)])
+        self.assertEqual(neighbour.state, 'pending')
+        # A completely different product now raises, twice, at two versions.
+        self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        self._drain(self._graphql_product(
+            self.REAL_PRODUCT_GID,
+            [self._graphql_variant(
+                self.REAL_VARIANT_GID, sku=self.NUMERIC_SKU,
+            )],
+            updated_at=LATER_STAMP,
+        ))
+        neighbour.invalidate_recordset()
+        self.assertEqual(
+            neighbour.state, 'pending',
+            'an unrelated product superseded this decision',
+        )
+
+    def test_one_confirmation_resumes_exactly_one_job(self):
+        """§10.16, with two production-shaped decisions live at once."""
+        job_a, first_a, _b, _s = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        job_b, _first_b, _b2, _s2 = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID_2, sku=self.HYPHENATED_NUMERIC_SKU,
+        )
+        decision_a = self.Decision.search([('job_id', '=', job_a.id)])
+        self._confirm(decision_a, first_a)
+        job_a.invalidate_recordset()
+        job_b.invalidate_recordset()
+        self.assertEqual(job_a.state, 'queued')
+        self.assertEqual(job_b.state, 'blocked_manual_review')
+
+    def test_generic_review_still_refuses_on_production_shaped_data(self):
+        """§10.17. The §8.2.14 refusal is unchanged by the correction."""
+        job, _first, _second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        with self.assertRaises(UserError) as ctx:
+            job.with_user(
+                self.roles['reviewer']
+            ).action_resolve_manual_review()
+        self.assertIn('match decision', str(ctx.exception))
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'blocked_manual_review')
+
+    def test_identity_validation_refuses_shapes_it_cannot_carry(self):
+        """`opaque_identity` validates and NEVER transforms."""
+        for value in (
+            self.REAL_PRODUCT_GID, self.REAL_VARIANT_GID, REMOTE_STAMP,
+            ' leading and trailing ',
+        ):
+            self.assertEqual(
+                opaque_identity(value, MATCH_GID_MAX_LEN), value,
+                'identity validation altered %r' % (value,),
+            )
+        for refused in (
+            '', None, False, 123, b'bytes', 'has\x00a null',
+            'has\na newline', 'x' * (MATCH_GID_MAX_LEN + 1),
+        ):
+            self.assertEqual(opaque_identity(refused, MATCH_GID_MAX_LEN), '')
+
+    def test_an_unusable_identity_records_no_decision_at_all(self):
+        """Fail closed, not fail sanitized.
+
+        A GID carrying a control character cannot be carried verbatim, and
+        the correction refuses to invent a cleaned-up substitute for it. The
+        job still blocks and simply offers no decision.
+        """
+        evidence = build_match_evidence(
+            self.env,
+            level=DECISION_LEVEL_TEMPLATE,
+            shopify_product_gid='gid://shopify/Product/73462\x0099043911',
+            remote_updated_at=REMOTE_STAMP,
+            match_key='sku_reference',
+            match_values=[self.NUMERIC_SKU],
+            candidate_ids=[1, 2], candidate_total=2,
+        )
+        self.assertEqual(evidence, '')
+
+    def test_a_digest_is_keyed_bounded_and_not_the_value(self):
+        digest = match_value_digest(self.env, self.NUMERIC_SKU)
+        self.assertEqual(len(digest), MATCH_DIGEST_LEN)
+        self.assertNotIn(self.NUMERIC_SKU, digest)
+        self.assertEqual(
+            digest, match_value_digest(self.env, self.NUMERIC_SKU),
+            'the digest must be stable within one database',
+        )
+        self.assertNotEqual(
+            digest, match_value_digest(self.env, self.HYPHENATED_NUMERIC_SKU),
+        )
+        # Keyed on this database's own secret, so it is not a lookup table
+        # entry for a 13-digit number.
+        secret = self.env['ir.config_parameter'].sudo().get_param(
+            'database.secret',
+        )
+        self.assertTrue(secret)
+        self.assertNotEqual(
+            digest,
+            'v2:' + hashlib.sha256(
+                self.NUMERIC_SKU.encode('utf-8')
+            ).hexdigest(),
+        )
+        self.assertEqual(match_value_digest(self.env, ''), '')
+        self.assertEqual(match_value_digest(self.env, None), '')
+
+    # ==================================================================
+    # K. THE BATCH 2 CORRECTION (F10): access is checked BEFORE the row
+    #    lock, and the lock is still a real one.
+    # ==================================================================
+
+    def test_a_foreign_decision_is_refused_before_its_row_is_locked(self):
+        """Proved by OBSERVING the database and the statements, not the source.
+
+        `SELECT ... FOR UPDATE` by primary key is raw SQL and answers to no ACL
+        and no record rule, so with the lock taken first a caller who names
+        another company's decision id acquires a genuine write lock on that row
+        -- blocking its legitimate reviewer for the life of the transaction --
+        and only afterwards learns they were not allowed to be there.
+
+        THE MEASUREMENT IS THE STATEMENTS ACTUALLY ISSUED, and it is not a
+        source-string assertion: the cursor is wrapped for the duration of each
+        call and every statement recorded, so this asserts what the code
+        EXECUTED at runtime.
+
+        Two alternatives were tried and rejected as instruments that cannot
+        attribute a lock. `pg_locks` at relation level: `TransactionCase` shares
+        one transaction across the whole class, so a lock taken by an earlier
+        test is still held and PostgreSQL coalesces a second identical
+        (relation, mode) entry into the first. The tuple's own `xmax`: the
+        candidate m2m rows carry a foreign key to the decision, so inserting
+        them takes `FOR KEY SHARE` on it and sets `xmax` before any caller has
+        done anything at all.
+        """
+        job, first, _second, _sent = self._ambiguous_template_run(
+            gid=self.REAL_PRODUCT_GID, sku=self.NUMERIC_SKU,
+        )
+        decision = self.Decision.search([('job_id', '=', job.id)])
+        self.assertTrue(first)
+        self.env.flush_all()
+
+        def locking_statements(recorded):
+            return [
+                text for text in recorded
+                if 'FOR UPDATE' in text.upper()
+                and 'shopify_connector_product_match_decision' in text
+            ]
+
+        @contextmanager
+        def recording():
+            recorded = []
+            cursor_type = type(self.env.cr)
+            original = cursor_type.execute
+
+            def spy(cr_self, query, params=None, log_exceptions=True):
+                recorded.append(
+                    query if isinstance(query, str)
+                    else str(getattr(query, 'code', query))
+                )
+                return original(cr_self, query, params, log_exceptions)
+
+            with patch.object(cursor_type, 'execute', spy):
+                yield recorded
+
+        wizard = self.Wizard.with_user(self.foreign_admin).with_context(
+            default_decision_id=False,
+        ).sudo().create({'decision_id': decision.id})
+
+        with recording() as refused_statements:
+            with self.assertRaises(Exception) as refusal:
+                wizard.with_user(self.foreign_admin).action_confirm()
+        self.assertIsInstance(refusal.exception, (AccessError, UserError))
+        self.assertTrue(
+            refused_statements,
+            'no statement was recorded at all, so the instrument is not '
+            'measuring the call it claims to measure',
+        )
+        self.assertFalse(
+            locking_statements(refused_statements),
+            'the refused caller issued a FOR UPDATE against the decision '
+            'table before being refused',
+        )
+
+        # The lock itself is unchanged for a caller who IS allowed: the confirm
+        # path still takes it, which is what the one-winner/one-refusal
+        # concurrent-confirmation behaviour proved in section F rests on.
+        with recording() as allowed_statements:
+            self._confirm(decision, first)
+        self.assertTrue(
+            locking_statements(allowed_statements),
+            'the authorized confirmation no longer takes a row lock, so the '
+            'concurrent-confirmation refusal has lost its mechanism',
+        )

@@ -39,11 +39,14 @@
                     <field name="product_sync_active_scan_count" readonly="1"/>
                     <div class="text-muted" colspan="2"
                          invisible="product_sync_scheduled">
-                        <strong>Scheduled product import is off.</strong>
+                        <strong>Scheduled product import is not running.</strong>
                         The catalog is scanned only when somebody presses
-                        <em>Import products now</em>. Turn scheduling on in
-                        Configuration → Store Settings to keep it current on
-                        its own.
+                        <em>Import products now</em>. Scheduled import needs
+                        BOTH this store's scheduling setting (Configuration →
+                        Store Settings) AND the connector's <em>Enqueue
+                        Product Scans</em> scheduled action to be active — this
+                        says "not running" if either one is off, because
+                        turning only the store setting on would change nothing.
                     </div>
                     <div class="text-muted" colspan="2"
                          invisible="product_sync_last_checkpoint_at">

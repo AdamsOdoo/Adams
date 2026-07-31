@@ -31,6 +31,21 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
 
 DUMMY_TOKEN = 'shpat_DUMMYDUMMYDUMMY0000000000000000'
 STAMP = '2026-07-30T10:00:00Z'
+
+# Batch 2 correction (F1/F2/F3): PRODUCTION-SHAPED identity in the browser.
+#
+# These seeds used to be `gid://shopify/Product/TOUR` and `TOUR-DUP` -- two of
+# the very few shapes `safe_match_preview`'s phone pattern does NOT rewrite, so
+# the browser evidence proved the route worked for identities no Shopify store
+# issues. A real Product GID carries a 13-digit suffix and a real SKU is
+# routinely all digits; both are rewritten by that scrubber, which is what made
+# the decision unconsumable. The tour now drives those shapes end to end, and
+# asserts on screen that the display preview IS sanitized while the identity
+# beside it is NOT.
+TOUR_PRODUCT_GID = 'gid://shopify/Product/7346299043911'
+TOUR_DONE_GID = 'gid://shopify/Product/7346299043928'
+TOUR_NUMERIC_SKU = '1234567890123'
+TOUR_REDACTED_SKU_PREVIEW = '[redacted-phone]'
 STORE_ACTION = 'shopify_connector_core.action_shopify_connector_store'
 JOB_ACTION = 'shopify_connector_core.action_shopify_connector_error_center'
 BINDING_ACTION = (
@@ -147,7 +162,7 @@ class TestUiB2ProductTours(HttpCase):
         with patch.object(type(Client), '_send', fake_send):
             self.env['shopify.connector.job.dispatch'].run_drain(10)
 
-    def _blocked_job(self, gid='gid://shopify/Product/TOUR', sku='TOUR-DUP'):
+    def _blocked_job(self, gid=TOUR_PRODUCT_GID, sku=TOUR_NUMERIC_SKU):
         """A genuinely blocked import, with a genuinely recorded decision."""
         self._product('Tour candidate A', sku)
         self._product('Tour candidate B', sku)
@@ -246,7 +261,7 @@ class TestUiB2ProductTours(HttpCase):
     def test_match_decision_control_is_absent_for_an_operator(self):
         """An Operator may START an import and may not decide a match."""
         job, decision = self._blocked_job(
-            gid='gid://shopify/Product/TOURDENY', sku='TOUR-DENY-DUP',
+            gid='gid://shopify/Product/7346299043935', sku='0123456789012',
         )
         self.env.flush_all()
         self.start_tour(
@@ -262,7 +277,7 @@ class TestUiB2ProductTours(HttpCase):
 
     def test_resolved_binding_tour_shows_a_human_made_match(self):
         job, decision = self._blocked_job(
-            gid='gid://shopify/Product/TOURDONE', sku='TOUR-DONE-DUP',
+            gid=TOUR_DONE_GID, sku='4006381333931',
         )
         chosen = decision.candidate_template_ids[0]
         self.env[
@@ -271,13 +286,13 @@ class TestUiB2ProductTours(HttpCase):
             default_decision_id=decision.id,
         ).create({'selected_template_id': chosen.id}).action_confirm()
         self._drain(self._body(
-            'gid://shopify/Product/TOURDONE', 'TOUR-DONE-DUP',
+            TOUR_DONE_GID, '4006381333931',
         ))
         job.invalidate_recordset()
         self.assertEqual(job.state, 'succeeded')
         binding = self.TemplateBinding.search([
             ('store_id', '=', self.store.id),
-            ('shopify_gid', '=', 'gid://shopify/Product/TOURDONE'),
+            ('shopify_gid', '=', TOUR_DONE_GID),
         ])
         self.assertEqual(len(binding), 1)
         self.assertEqual(binding.match_key, 'manual')

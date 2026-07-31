@@ -96,6 +96,64 @@ def safe_tax_preview(value, limit):
     return value[:limit]
 
 
+# ----------------------------------------------------------------------
+# THE ONE ELIGIBILITY RULE. There is exactly one, and everything that has an
+# opinion about whether an Odoo tax may stand for a Shopify tax asks it here:
+# the mapping model's own constraint, the decision wizard's candidate list, the
+# importer's non-binding suggestions, and the importer's validation of a
+# resolved tax. Four copies of this rule drifted once already and the drift is
+# what F4 found; `test_tax_posture_rule_is_shared` proves the search predicate
+# and the per-record predicate still agree on every tax in the database.
+# ----------------------------------------------------------------------
+
+def tax_posture_included(tax):
+    """Odoo's EFFECTIVE tax-inclusion posture for one tax.
+
+    `account.tax.price_include` (Odoo 19, `addons/account/models/account_tax.py`
+    at pin `30bde9ff`, `_compute_price_include`) is:
+
+        price_include_override == 'tax_included'
+        or (company_price_include == 'tax_included' and not
+            price_include_override)
+
+    -- that is, the override when one is set, and the COMPANY DEFAULT
+    (`res.company.account_price_include`) when one is not. `price_include_override`
+    is an override and is legitimately empty on an ordinary tax.
+
+    Reading the raw override instead of this was F4. On a company whose default
+    is `tax_excluded` -- Odoo's own default -- every ordinary tax has
+    `price_include_override = False`, so `override == 'tax_excluded'` was false
+    for all of them and NO tax in the database was eligible for an excluded
+    Shopify tax. The merchant was told to "create the tax first and come back",
+    and creating it did not help.
+    """
+    return bool(tax.price_include)
+
+
+def eligible_sale_tax_domain(company, price_included, amount):
+    """The search form of the same rule.
+
+    `('price_include', '=', ...)` is a real searchable leaf: the field declares
+    `search='_search_price_include'`, and Odoo 19's boolean domain optimisation
+    (`odoo/orm/domains.py::_optimize_boolean_in`) rewrites `in [False]` to
+    `not in [True]`, which is the one shape that search method accepts. So both
+    postures resolve, in SQL, to the same override-or-company-default
+    disjunction `tax_posture_included` computes in Python.
+
+    Every other leaf is unchanged and deliberately narrow: exact company, active,
+    sale, leaf percentage, exact rate, and not base-affecting.
+    """
+    return [
+        ('company_id', '=', company.id),
+        ('active', '=', True),
+        ('type_tax_use', '=', 'sale'),
+        ('amount_type', '=', 'percent'),
+        ('amount', '=', amount),
+        ('include_base_amount', '=', False),
+        ('price_include', '=', bool(price_included)),
+    ]
+
+
 class ShopifyConnectorTaxMapping(models.Model):
     """Admin-maintained explicit mapping from Shopify evidence to Odoo tax."""
 
@@ -210,11 +268,11 @@ class ShopifyConnectorTaxMapping(models.Model):
                 raise ValidationError(
                     'Base-affecting compound taxes are not supported.'
                 )
-            expected = (
-                'tax_included' if mapping.shopify_price_included
-                else 'tax_excluded'
-            )
-            if getattr(tax, 'price_include_override', False) != expected:
+            # THE EFFECTIVE POSTURE, not the override. See
+            # `tax_posture_included`: an ordinary tax on a company whose
+            # default is `tax_excluded` carries no override at all, and reading
+            # the override made every such tax permanently unmappable.
+            if tax_posture_included(tax) != bool(mapping.shopify_price_included):
                 raise ValidationError(
                     'The mapped tax inclusion posture does not match Shopify.'
                 )
