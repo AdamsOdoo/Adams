@@ -515,6 +515,45 @@ Environment: Python 3.12.3, PostgreSQL 16.13, Chromium 141.0.7390.37, Odoo pin
 **Evidence class: local/CI-grade supporting evidence — NOT Odoo.sh exact-SHA
 acceptance (DEC-041 D8), NOT live-Shopify validation, NOT UAT.**
 
+### Exact-head CI: NOT OBTAINED, and why — stated rather than omitted
+
+**There is no green exact-head GitHub Actions run for this correction, and none
+is claimed.** Every run triggered on the correction's heads failed to start.
+The observation, not an inference:
+
+| Head | Runs | Outcome |
+| --- | --- | --- |
+| `ad8763d` | push ×2, pull_request | `cancelled` (superseded by the next push — ordinary concurrency-group behaviour) |
+| `0bfeb2d` | push ×2, pull_request | started 09:12–09:13, superseded by the next push |
+| `e8840a2` | push ×2, pull_request | **`failure` after 2–7 seconds** |
+| `e8840a2`, re-run | pull_request (attempt 2), push (attempt 2) | **`failure` after 2 seconds** |
+
+Every failed job reports `runner_id: 0`, an empty `runner_name`, an empty
+`runner_group_name`, **no steps at all**, and `HTTP 404` for its logs. The
+workflow's first step never executed: no runner was ever assigned. Re-running
+reproduced it identically on a second attempt. The same workflow, with the same
+`ubuntu-24.04` label and the same file, ran to **success** on `ccad8bf` at
+04:17 the same day
+([30603786322](https://github.com/AdamsOdoo/Adams/actions/runs/30603786322),
+[30603788886](https://github.com/AdamsOdoo/Adams/actions/runs/30603788886)).
+
+That is an Actions **capacity or entitlement** condition on the repository, not
+a result about this code — a failing suite produces steps, logs and a red step;
+this produces none of those. This session very likely contributed to it: pushing
+to both `fable/wave-5-completion` and the session's designated branch triggered
+**three** ~50-minute runs per commit instead of two. Pushing to the second
+branch has stopped.
+
+**What this means for the evidence.** GitHub Actions was never the acceptance
+authority here — it is supporting evidence, and DEC-041 D8 reserves acceptance
+for an exact-SHA Odoo.sh run that this instruction forbids. The definitive
+seven-pass validation above ran to completion **locally, at the pin, on a clean
+worktree**, and the before/after reproducer evidence is durable in the
+repository. What is missing is an independent second execution of the same
+script on a clean runner. It should be re-triggered when the repository's
+Actions capacity allows, and **until it is green nobody should read this
+correction as CI-confirmed.**
+
 ## C6. Gates that remain
 
 - **Independent review of this exact corrected head.** The implementing session

@@ -80,6 +80,19 @@
   the record says so rather than glossing it. Deltas against `ccad8bf`:
   standard **2373 → 2436 (+63)**, non-standard **59 → 60 (+1)**, tours
   **36 → 36 (0)**.
+- **Exact-head CI was NOT obtained, and no green run is claimed.** Every
+  workflow run on the correction's heads failed to START: `runner_id: 0`, empty
+  runner name, **no steps**, logs `404`, completing in 2–7 seconds, reproduced
+  on a second re-run attempt. The same workflow with the same runner label
+  succeeded on `ccad8bf` at 04:17 the same day, so this is an Actions capacity
+  or entitlement condition on the repository, not a result about this code — a
+  failing suite produces steps and logs; this produced none. This session
+  probably contributed: pushing to both `fable/wave-5-completion` and the
+  session's designated branch triggered three ~50-minute runs per commit
+  instead of two. Pushing to the second branch has stopped. **Re-trigger when
+  capacity allows; until it is green this correction is not CI-confirmed.**
+  The definitive seven-pass run above is local, complete and at the pin, and
+  the before/after reproducer logs are durable in the repository.
 - **Not claimed.** No independent review of the corrected head; the unfinished
   independent browser/mutation review still has to be completed after this
   correction; no Odoo.sh exact-SHA qualification; no controlled live-Shopify
