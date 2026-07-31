@@ -843,12 +843,87 @@ class TestSetupWizardActivation(SetupWizardCase):
         store.invalidate_recordset()
         return store
 
-    def test_activation_is_refused_before_readiness_has_run(self):
+    def test_activation_re_runs_readiness_when_the_step_was_not_run(self):
+        """PR #204 Odoo.sh qualification correction, 2026-07-31.
+
+        The test this replaces asserted `activate()` refuses before the
+        `final_readiness` step has run. That held locally only because a
+        bare test server's default `web.base.url` is plain HTTP, which the
+        essential `web_base_url` check fails on its own -- the refusal it
+        observed was an unrelated essential failure, not proof that
+        skipping the step blocks activation. On genuine Odoo.sh
+        `web.base.url` is a real HTTPS address, that essential check
+        passes, and `activate()`'s own server-side rerun (`if store.
+        credential_present: run_for_store(...)`, below) then produces a
+        genuine pass -- so the old assertion failed three times with
+        `UserError not raised`. What is actually true, and load-bearing, is
+        the opposite of what that test asserted: activation is safe
+        precisely because it always re-proves readiness itself from real
+        stored evidence, rather than trusting that an operator ran the step
+        first.
+        """
+        self._make_readiness_passable()
         store = self._ready_store()
-        with self.assertRaises(UserError):
+        Job = self.env['shopify.connector.job'].sudo()
+        jobs_before = Job.search_count([
+            ('store_id', '=', store.id),
+            ('state', 'in', ('queued', 'running')),
+        ])
+        readiness_runs_before = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+        # Real stored state, not a fabricated payload: the final-readiness
+        # step's own progress key has never been written, and no readiness
+        # evidence of any kind exists yet.
+        self.assertNotEqual(
+            self._settings(store).setup_wizard_step_key, 'final_readiness',
+            'the final-readiness step must not already have run',
+        )
+        self.assertFalse(
+            store.last_readiness_at,
+            'no readiness evidence may exist before activation reruns it',
+        )
+
+        Client = type(self.env['shopify.connector.api.client'])
+
+        def refuse(_self, _store, request, token=None, mutation_context=None):
+            raise AssertionError('activation contacted Shopify')
+
+        # If activate()'s server-side rerun were ever removed, this call
+        # raises UserError ("Run the readiness checks before activating
+        # this store.") right here, because last_readiness_at is still
+        # falsy -- failing this test at this line rather than downstream.
+        with patch.object(Client, '_send', refuse):
             self._as(self.admin_a).activate(store.id)
         store.invalidate_recordset()
-        self.assertNotEqual(store.state, 'connected')
+
+        # Genuine evidence, produced through the real run_for_store route.
+        self.assertTrue(
+            store.last_readiness_at,
+            'activation must produce its own readiness evidence',
+        )
+        self.assertEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('job_type', '=', 'core_readiness_check'),
+            ]),
+            readiness_runs_before + 1,
+            'activation must run readiness through the real job route',
+        )
+        # Connected only because the resulting checks passed: a blocking or
+        # not-yet-run result would have raised UserError above instead of
+        # reaching this line.
+        self.assertIn(store.last_readiness_result, ('pass', 'warning'))
+        self.assertEqual(store.state, 'connected')
+        self.assertEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('state', 'in', ('queued', 'running')),
+            ]),
+            jobs_before,
+            'activation must enqueue no domain job',
+        )
 
     def test_activation_is_refused_while_an_essential_check_fails(self):
         """A genuine essential failure, produced rather than simulated.
