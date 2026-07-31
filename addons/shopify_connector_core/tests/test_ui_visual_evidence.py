@@ -111,6 +111,40 @@ BATCH1_CHANGED_SURFACES = (
     'u2-location-withdraw-all-dialog',
 )
 
+#: The surfaces Batch 2 P0 merchant reachability created. Same rule as above:
+#: named, not derived, so adding one and forgetting this tuple is a visible
+#: omission rather than a quietly smaller matrix. Every one of them is a
+#: surface that DID NOT EXIST before this batch -- which is exactly the
+#: category the previous campaign could not have covered.
+BATCH2_CHANGED_SURFACES = (
+    'b2-store-settings-canonical',
+    # ONE store form, and it carries BOTH control groups. They are rendered
+    # side by side on the same record, so capturing two stores to photograph
+    # them separately would produce two rows measuring the same layout -- and,
+    # measured, a second store also breaks the guided-setup captures, because
+    # the setup surface auto-selects a store only while there is exactly one.
+    'b2-store-form-controls',
+    'b2-tax-decision-dialog',
+    'b2-product-match-decision-pending',
+    'b2-product-match-decision-dialog',
+    'b2-product-match-decision-resolved',
+)
+
+# NOT in the tuple above, and measured rather than assumed: the Match
+# Decisions LIST. The enlargement and keyboard matrices measure a
+# CONNECTOR-OWNED surface region and its final actionable control, and a bare
+# Odoo list view has neither -- the instrument reports `no connector surface on
+# screen` for it, exactly as it does for every other list in the capture set.
+# The list is still captured, and is still measured for responsive layout,
+# RTL, reduced motion and contrast in the ordinary surface set below; it is
+# excluded from these two matrices because they do not apply to it, not
+# because it failed them.
+
+#: Every surface the enlargement, keyboard-traversal and live-region campaigns
+#: cover. Batch 2 joins Batch 1 rather than replacing it: a surface does not
+#: stop needing to reflow because a later batch shipped.
+CHANGED_SURFACES = BATCH1_CHANGED_SURFACES + BATCH2_CHANGED_SURFACES
+
 #: WCAG 2.2 thresholds. SC 1.4.3 for text, SC 1.4.11 for components.
 CONTRAST_TEXT = 4.5
 CONTRAST_LARGE_TEXT = 3.0
@@ -1264,12 +1298,176 @@ class TestUiVisualEvidence(HttpCase):
                 'pending_target_available': 12.0,
             })
         preview = self._seed_export_preview(store, template, tbinding)
+        batch2 = self._seed_batch2(store)
         self.env.flush_all()
-        return {
+        return dict({
             'store': store, 'mapping': mapping, 'level': level,
             'template_binding': tbinding, 'variant_binding': vbinding,
             'preview': preview,
+        }, **batch2)
+
+    def _seed_batch2(self, store):
+        """The Batch 2 P0 surfaces, in the states worth photographing.
+
+        ONE STORE, AND THAT IS MEASURED RATHER THAN ASSUMED. The first version
+        of this seed created a second store so the order controls and the
+        product controls could be photographed separately. It broke four
+        guided-setup captures with `no offline path on the credential chooser`:
+        the setup surface is opened by action with no id and auto-selects a
+        store only while there is exactly one, so a second store replaced the
+        credential step with a picker. Both control groups live on the same
+        form anyway, so one capture measures both.
+
+        The decision rows below are produced through PRODUCTION code -- the
+        importer's own evidence builder, the tax importer's own refusal, and
+        the dispatcher's own `_route_failure` seam -- rather than hand-written,
+        so a change to either evidence schema or to the routing breaks this
+        fixture instead of leaving it photographing a shape the product no
+        longer produces.
+        """
+        settings = self.env['shopify.connector.store.settings'].sudo().search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        values = {
+            'product_domain_enabled': True,
+            'product_first_sync_source': 'shopify_source',
+            'sale_domain_enabled': True,
         }
+        for optional in (
+            'product_scheduled_sync_enabled', 'order_scheduled_sync_enabled',
+        ):
+            if optional in settings._fields:
+                values[optional] = True
+        settings.sudo().write(values)
+        out = {'settings': settings}
+        out.update(self._seed_batch2_match(store))
+        out.update(self._seed_batch2_tax(store))
+        return out
+
+    def _seed_batch2_match(self, store):
+        if 'shopify.connector.product.match.decision' not in self.env:
+            return {}
+        from odoo.addons.shopify_connector_product.models.\
+            shopify_connector_product_match_decision import (
+                DECISION_LEVEL_TEMPLATE,
+                build_match_evidence,
+            )
+        first = self.env['product.template'].sudo().create(
+            {'name': 'Visual evidence candidate A'})
+        second = self.env['product.template'].sudo().create(
+            {'name': 'Visual evidence candidate B'})
+        (first | second).product_variant_ids.sudo().write(
+            {'default_code': 'VIS-DUP'})
+
+        def blocked(gid, stamp):
+            job = self.env['shopify.connector.job'].sudo().create({
+                'store_id': store.id,
+                'job_source': 'scheduled_sync',
+                'job_type': 'product_import_sync',
+                'state': 'queued',
+                'payload_hash': stamp,
+                'shopify_target_gid': gid,
+            })
+            evidence = build_match_evidence(
+                level=DECISION_LEVEL_TEMPLATE,
+                shopify_product_gid=gid,
+                remote_updated_at=stamp,
+                match_key='sku_reference',
+                match_values=['VIS-DUP'],
+                candidate_ids=[first.id, second.id],
+                candidate_total=2,
+                title_preview='Visual evidence ambiguous product',
+                sku_preview='VIS-DUP',
+            )
+            self.env['shopify.connector.job.dispatch']._route_failure(
+                job, 'ambiguous_match',
+                'Ambiguous product-template match for Shopify product %s: 2 '
+                'candidate product.template record(s) found.' % gid,
+                evidence,
+            )
+            job.invalidate_recordset()
+            return job, self.env[
+                'shopify.connector.product.match.decision'
+            ].sudo().search([('job_id', '=', job.id)], limit=1)
+
+        pending_job, pending = blocked(
+            'gid://shopify/Product/VISPEND', '2026-07-30T09:15:00Z')
+        resolved_job, resolved = blocked(
+            'gid://shopify/Product/VISDONE', '2026-07-30T09:16:00Z')
+        if resolved:
+            resolved.sudo().write({
+                'state': 'confirmed',
+                'selected_template_id': first.id,
+                'resolved_uid': self.env.user.id,
+                'resolved_at': fields.Datetime.now(),
+                'resumed_job_state': 'queued',
+            })
+        return {
+            'match_job': pending_job,
+            'match_decision': pending,
+            'match_decision_resolved': resolved,
+            'match_candidate': first,
+        }
+
+    def _seed_batch2_tax(self, store):
+        """One order stopped on a tax fingerprint the connector does not know.
+
+        Produced by the importer's own refusal, so the evidence on screen is
+        the evidence production writes -- never a hand-built job-log row.
+        """
+        if 'shopify.connector.tax.mapping' not in self.env:
+            return {}
+        settings = self.env['shopify.connector.store.settings'].sudo().search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if not settings.order_company_id:
+            return {}
+        company = settings.order_company_id
+        partner = self.env['res.partner'].sudo().create(
+            {'name': 'Visual evidence tax customer'})
+        order = self.env['sale.order'].sudo().create({
+            'partner_id': partner.id,
+            'company_id': company.id,
+        })
+        evidence = {
+            'title': 'Visual evidence VAT',
+            'source': 'Shopify',
+            'rate': 0.05,
+            'ratePercentage': 5.0,
+            'channelLiable': None,
+            'priceSet': {
+                'shopMoney': {'amount': '5.00'},
+                'presentmentMoney': {'amount': '5.00'},
+            },
+        }
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'order_import_sync',
+            'state': 'queued',
+            'payload_hash': 'visual-evidence-tax',
+            'shopify_target_gid': 'gid://shopify/Order/VISTAX',
+        })
+        try:
+            self.env['shopify.connector.order.importer']._resolve_taxes(
+                order, store, [evidence], False, settings,
+            )
+        except Exception as exc:  # the importer's own classified refusal
+            error_class = getattr(exc, 'error_class', None)
+            if not error_class:
+                job.sudo().unlink()
+                return {}
+            self.env['shopify.connector.job.dispatch']._route_failure(
+                job, error_class, getattr(exc, 'reason', str(exc)),
+                getattr(exc, 'technical_detail', False),
+            )
+        else:
+            job.sudo().unlink()
+            return {}
+        job.invalidate_recordset()
+        if not job.tax_decision_pending:
+            return {}
+        return {'tax_job': job}
 
     def _seed_setup_states(self, store):
         """Put the guided setup into the three states worth photographing.
@@ -1553,6 +1751,60 @@ class TestUiVisualEvidence(HttpCase):
             # It is not reachable by URL: it is a client action opened by the
             # preview form's "Review Export" button, so the button is pressed.
         ] + ([
+            # BATCH 2 P0 MERCHANT REACHABILITY (2026-07-31). Six surfaces that
+            # DID NOT EXIST before this batch, which is exactly the category
+            # the earlier campaigns could not have covered.
+            ('b2-store-settings-canonical',
+             (act % 'shopify_connector_core.'
+                    'action_shopify_connector_store_settings_canonical')
+             + '/%d' % seeded['settings'].id,
+             '.o_form_view',
+             'Batch 2 canonical Store Settings; the surface that did not exist',
+             ),
+            ('b2-store-form-controls',
+             (act % 'shopify_connector_core.action_shopify_connector_store')
+             + '/%d' % seeded['store'].id,
+             '.o_form_view',
+             'Batch 2 order AND product import controls, with the '
+             'scheduled-position copy beside each'),
+        ] if seeded.get('settings') else []) + ([
+            ('b2-tax-decision-dialog',
+             (act % 'shopify_connector_core.'
+                    'action_shopify_connector_error_center')
+             + '/%d' % seeded['tax_job'].id,
+             '.o_form_view',
+             'Batch 2 tax decision dialog; what Shopify charged, above the '
+             'choice',
+             (_open_dialog_js('Map tax'),
+              '.modal:not(.o_inactive_modal) .o_form_view')),
+        ] if seeded.get('tax_job') else []) + ([
+            ('b2-product-match-decisions-list',
+             act % 'shopify_connector_product.'
+                   'action_shopify_connector_product_match_decision',
+             '.o_list_view, .o_view_nocontent',
+             'Batch 2 Match Decisions workspace; state as text and colour'),
+            ('b2-product-match-decision-pending',
+             (act % 'shopify_connector_product.'
+                    'action_shopify_connector_product_match_decision')
+             + '/%d' % seeded['match_decision'].id,
+             '.o_form_view',
+             'Batch 2 pending product match decision; evidence + candidates'),
+            ('b2-product-match-decision-dialog',
+             (act % 'shopify_connector_core.'
+                    'action_shopify_connector_error_center')
+             + '/%d' % seeded['match_job'].id,
+             '.o_form_view',
+             'Batch 2 match decision dialog; consequence copy above the choice',
+             (_open_dialog_js('Choose the matching Odoo product'),
+              '.modal:not(.o_inactive_modal) .o_form_view')),
+            ('b2-product-match-decision-resolved',
+             (act % 'shopify_connector_product.'
+                    'action_shopify_connector_product_match_decision')
+             + '/%d' % seeded['match_decision_resolved'].id,
+             '.o_form_view',
+             'Batch 2 resolved decision; actor, choice and resumed job state'),
+        ] if seeded.get('match_decision')
+             and seeded.get('match_decision_resolved') else []) + ([
             ('u3-export-diff-refusal-and-tag-removal',
              (act % 'shopify_connector_product_export.'
                     'action_shopify_connector_product_export_preview')
@@ -2560,14 +2812,14 @@ class TestUiVisualEvidence(HttpCase):
             entry[0]: entry for entry in self._reachable_surfaces(seeded)
         }
         missing = [
-            name for name in BATCH1_CHANGED_SURFACES if name not in reachable
+            name for name in CHANGED_SURFACES if name not in reachable
         ]
         self.assertFalse(
             missing,
-            'these Batch 1 surfaces are not in the capture set, so the '
+            'these changed surfaces are not in the capture set, so the '
             'campaign would silently cover less than it claims: %s' % missing,
         )
-        return [reachable[name] for name in BATCH1_CHANGED_SURFACES]
+        return [reachable[name] for name in CHANGED_SURFACES]
 
     def _zoom_viewport(self, browser, css_width, height=900):
         """Emulate browser zoom the way a browser does it.
@@ -2736,19 +2988,22 @@ class TestUiVisualEvidence(HttpCase):
         self.user.sudo().write({'lang': 'en_US'})
         self.env.flush_all()
         self._record(
-            'batch1-zoom-matrix',
+            'changed-surfaces-zoom-matrix',
             {'zoom': '%d%%' % (ZOOM_FACTOR * 100),
              'reflow_floor_px': REFLOW_FLOOR_PX,
              'device_widths': WIDTHS,
-             'surfaces': list(BATCH1_CHANGED_SURFACES),
+             'surfaces': list(CHANGED_SURFACES),
+             'batch1_surfaces': list(BATCH1_CHANGED_SURFACES),
+             'batch2_surfaces': list(BATCH2_CHANGED_SURFACES),
              'criteria': ['WCAG 2.2 SC 1.4.4 Resize Text',
                           'WCAG 2.2 SC 1.4.10 Reflow',
                           'DESIGN SYSTEM §10 responsive'],
              'rows': rows, 'failures': failures},
-            'Batch 1 surfaces at 200% zoom, LTR and RTL; SC 1.4.4 / 1.4.10')
+            'Batch 1 and Batch 2 surfaces at 200% zoom, LTR and RTL; '
+            'SC 1.4.4 / 1.4.10')
         self.assertEqual(
             len(rows),
-            len(BATCH1_CHANGED_SURFACES) * len(WIDTHS) * 3,
+            len(CHANGED_SURFACES) * len(WIDTHS) * 3,
             'the zoom matrix did not measure every planned combination',
         )
         # An RTL row that cannot show the page was in RTL is a label, not
@@ -2774,7 +3029,7 @@ class TestUiVisualEvidence(HttpCase):
             % json.dumps(unproved, indent=2)[:3000])
         self.assertFalse(
             failures,
-            'these Batch 1 surfaces are not usable at 200%% zoom:\n%s'
+            'these changed surfaces are not usable at 200%% zoom:\n%s'
             % json.dumps(failures, indent=2)[:6000])
 
     def test_keyboard_alone_reaches_the_final_control_on_every_changed_surface(self):
@@ -2856,18 +3111,21 @@ class TestUiVisualEvidence(HttpCase):
                     row['verdict'] = 'FAIL'
                     failures.append(row)
         self._record(
-            'batch1-keyboard-traversal',
+            'changed-surfaces-keyboard-traversal',
             {'max_presses': MAX_TAB_PRESSES,
              'method': 'CDP Input.dispatchKeyEvent Tab; real sequential focus '
                        'navigation, not a DOM-order walk',
              'criteria': ['WCAG 2.2 SC 2.1.1 Keyboard',
                           'WCAG 2.2 SC 2.4.3 Focus Order',
                           'WCAG 2.2 SC 2.4.11 Focus Not Obscured'],
-             'surfaces': list(BATCH1_CHANGED_SURFACES),
+             'surfaces': list(CHANGED_SURFACES),
+             'batch1_surfaces': list(BATCH1_CHANGED_SURFACES),
+             'batch2_surfaces': list(BATCH2_CHANGED_SURFACES),
              'rows': rows, 'failures': failures},
-            'Batch 1 surfaces traversed by keyboard alone; SC 2.1.1 / 2.4.3')
+            'Batch 1 and Batch 2 surfaces traversed by keyboard alone; '
+            'SC 2.1.1 / 2.4.3')
         self.assertEqual(
-            len(rows), len(BATCH1_CHANGED_SURFACES),
+            len(rows), len(CHANGED_SURFACES),
             'the keyboard traversal did not cover every changed surface',
         )
         self.assertFalse(

@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.18.0',
+    'version': '19.0.1.19.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -136,6 +136,12 @@ later, separately authorized tasks.
             # S1 guided setup: the 11-step traversal, the three entry routes
             # and the keyboard walkthrough.
             'shopify_connector_core/static/src/js/tours/shopify_connector_s1_setup_tour.js',
+            # Batch 2 P0 merchant reachability: canonical Store Settings, the
+            # order and product controls, and the two decision dialogs. Here
+            # for the same reason as U2 -- the surfaces belong to core,
+            # `shopify_connector_sale` and `shopify_connector_product`, and a
+            # tour can only be registered once.
+            'shopify_connector_core/static/src/js/tours/shopify_connector_b2_tour.js',
         ],
         'web.assets_unit_tests': [
             'shopify_connector_core/static/tests/shopify_connector_dashboard.test.js',

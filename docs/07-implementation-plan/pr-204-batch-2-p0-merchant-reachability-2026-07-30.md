@@ -2,6 +2,473 @@
 
 **`DRAFT — NOT ACCEPTED — NOT REVIEWED — NOT READY — NOT MERGED — NOT SELF-ACCEPTED`**
 
+> **This record supersedes its own earlier text and says so explicitly.** The
+> version written at `9af8b23` stated that the commits were *"local only"* and
+> that *"the branch `fable/wave-5-completion` remains at `b0dbba2a`"*. Both
+> were true when they were written and became stale the moment the control
+> room ruled that the durability recovery is accepted as preservation of
+> provisional work. They are corrected below rather than deleted: the
+> historical fact that the chain was unpushed at `9af8b23` is part of this
+> campaign's record, and rewriting it away would be the same kind of quiet
+> revision this project exists to avoid.
+>
+> **Nothing here is acceptance.** Every push described below is a preservation
+> checkpoint. The work remains provisional until independent review.
+
+## 1. Heads and history
+
+| | |
+| --- | --- |
+| Batch 2 starting baseline | `b0dbba2aa721d4b92799cbe71f9f5d06f4ad7d2e` |
+| Durability-recovery head (control-room verified) | `cb4efcde13792920275f0fd8edc0c06226b94fe9` |
+| Base | `mvp/program-integration@87f1763a1ca699947d665c92bef614bd1fc3168d` (unchanged) |
+| Odoo pin | `30bde9ff758834a4912c5ae55843d3a7dad849f1`, verified on every run |
+| History | **additive only** — no amend, rebase, squash, reset or force-push |
+
+### The additive chain
+
+| Commit | What it is |
+| --- | --- |
+| `9a70682` | checkpoint 1 — canonical Store Settings |
+| `f5f3668` | checkpoint 1 — the guards the new surface had to answer to |
+| `39e5113` | checkpoint 2 — order controls and tax decisions |
+| `2c5d190` | checkpoint 3 §8.1 — product enumeration producer |
+| `9af8b23` | Batch 2 records (the ones this section corrects) |
+| `cb4efcd` | restore the research handoff a prepend had truncated |
+| `be7cc43` | §8.2 durable match decisions, §8.3 tests, §9 journeys |
+| *(final)* | §10 browser/accessibility campaign and the final records |
+
+### The handoff truncation, and the fix-forward
+
+`cb4efcd` exists because a prepend to `docs/01-research/research-handoff.md`
+replaced the file instead of extending it. The correction is **additive**: the
+truncated content was restored forward as a new commit rather than by amending
+the commit that lost it. The net delta of that file against `b0dbba2` is
+**+104 / −0**, which is the check that the restoration put back exactly what
+was lost and nothing else.
+
+### Commit signing
+
+Unavailable in this environment: the configured signing key is empty. Unsigned
+additive commits are the accepted implementation deviation for this campaign,
+per the control-room ruling. **No commit was amended, rebased or recreated to
+obtain a signature** — doing so would have destroyed the additive history the
+same ruling protects.
+
+## 2. What Batch 2 set out to close, and where each part stands
+
+| § | Deliverable | State |
+| --- | --- | --- |
+| Checkpoint 1 | Canonical Store Settings | Implemented (`9a70682`, `f5f3668`) |
+| Checkpoint 2 | Order controls and the tax decision route | Implemented (`39e5113`) |
+| §8.1 | Product enumeration producer | Implemented (`2c5d190`) |
+| **§8.2** | **Durable product/variant match decisions** | **Implemented (`be7cc43`)** |
+| **§8.3** | **Load-bearing product matching tests** | **Implemented (`be7cc43`)** |
+| **§9** | **Consolidated vertical journeys C, D-P0, I, J-P0, K-P0** | **Implemented (`be7cc43`)** |
+| **§10** | **Consolidated browser/responsive/accessibility campaign** | **Implemented (final head)** |
+| §15.2 | Definitive seven-pass validation | Run at the final head (§9 below) |
+
+Checkpoints 1, 2 and §8.1 are described in §§3–5 of the retained record below.
+This section covers what the continuation added.
+
+## 3. §8.2 — the decision an ambiguous match never recorded
+
+### The defect
+
+When two Odoo products carry the SKU a Shopify product claims, the importer
+refuses. That is correct: silently picking one binds a store's catalog to the
+wrong master data. But refusing was the whole of it.
+
+* `ambiguous_match` is a `MANUAL_REVIEW` class, so the dispatcher routes the
+  job to `blocked_manual_review` — asserted against the dispatcher's real
+  taxonomy, not against the phrase "blocked work".
+* Both raise sites carried a human sentence and **no structured
+  `technical_detail`**, so nothing downstream could tell which product, which
+  variant, or which candidates the importer had seen.
+* The only offered control was the generic `action_resolve_manual_review`,
+  which re-queues the identical job so the identical search finds the identical
+  two candidates and stops again. A merchant could press it forever.
+
+### Why the decision cannot be written where the ambiguity is found
+
+Both raise sites (`_resolve_template`, `_match_variant_candidate`) run inside
+`import_product_sync`'s single `self.env.cr.savepoint()` block — the block that
+exists so a failure half-way through a product leaves no partial product
+behind. A decision created there is discarded by the same `ROLLBACK TO
+SAVEPOINT` that discards the partial writes.
+
+That is **measured, not assumed**:
+`test_a_decision_written_inside_the_importer_savepoint_would_not_survive`
+patches `_resolve_template` to create a decision immediately before the raise,
+drives the real drain, and asserts the row is gone — while the production seam
+records its own in the same run. If that ever stops being true the seam can be
+simplified; while it is true, the seam is the only correct place.
+
+So the evidence travels out on the exception — structured, sanitized and
+size-bounded on `JobHandlerError.technical_detail` — and the decision is
+written by a **product-owned override of `_route_failure`**, in the same
+transaction that durably records the blocked job. `super()` is called first, so
+the job is transitioned before anything is linked to it and a failure to record
+can never leave the job un-routed. No second queue, no second dispatcher, no
+side channel.
+
+### The invariants, and what enforces each
+
+| §8.2 requirement | What enforces it |
+| --- | --- |
+| 1. linkage (store, company, job, product GID, variant GID, remote identity, level, evidence, candidates, state) | Model fields on `shopify.connector.product.match.decision`, all `readonly=True` |
+| 2. no secret or unnecessary PII | `safe_match_preview` — secret patterns, then email/phone, then a length bound, on every merchant-controlled string |
+| 3. company-aware candidates, bound records excluded | `eligible_candidates()`; the exclusion set is read under `sudo()` **on purpose** — elevating an exclusion can only ever remove a candidate |
+| 4. priority: binding → SKU → barcode → manual | The decision is consulted only where identifier matching has already produced an ambiguity |
+| 5. never match by name | Unchanged (RA-006); `MATCH_KEYS` admits only `sku_reference` and `barcode` |
+| 6. Reviewer or Administrator resolve; Operator may start, not decide | `_assert_match_decision_reviewer` — the same two groups `action_manual_retry` admits from `blocked_manual_review`, so the dialog cannot offer a consequence its caller would then be refused |
+| 7. same-company eligible record only | Odoo's own `_check_company` (`_check_company_auto` + `check_company=True`), which holds under `sudo()` |
+| 8. no "create new" | Not added |
+| 9. confirm-time revalidation | `_validated_decision` + `_validated_choice` + `_assert_no_conflicting_binding`, all re-run at confirm |
+| 10. atomic decision + consequence | The decision write and the resume share one savepoint |
+| 11. exact remote identity only | The decision key carries the verbatim `updatedAt`; a changed product supersedes it and raises a fresh one |
+| 12. row locks and uniqueness | `SELECT … FOR UPDATE` before the state is read; `UNIQUE(store_id, decision_key)` |
+| 13. resume the exact work once | `action_manual_retry` on the source job — never a fresh scan |
+| 14. generic Resolve Review refuses | `action_resolve_manual_review` override, naming the route that does work |
+| 15. actor, time, evidence, choice, binding, job state | `resolved_uid`, `resolved_at`, the evidence fields, `selected_*`, `resulting_*_binding_id`, `resumed_job_state` + live `job_state` |
+| 16. real surfaces expose it | Match Decisions workspace + the control on the blocked job; **no binding field made generically editable** |
+| 17. attribute conflicts unchanged | `product_import_attribute_conflict_mode` untouched |
+
+### Three design choices worth reading twice
+
+**The key is hashed and length-prefixed.** `decision_key_for` joins
+`(level, product GID, variant GID, updatedAt)` with each component's length in
+front of it, then hashes. Without the length prefix, `('ab', 'c')` and
+`('a', 'bc')` would collide — a test asserts they do not.
+
+**The record-rule escape hatch is load-bearing, not defensive noise.** A domain
+leaf across a Many2one compiles to `field IN (SELECT …)`, and a NULL `field`
+matches no `IN` subquery. The selection rule's `('selected_template_id', '=',
+False)` leaf is what stops it hiding every decision that has not been decided
+yet — which is every decision a reviewer needs to see. This was found by the
+rule hiding exactly those rows, not by inspection.
+
+**SEC-3 is joined rather than resembled.** The decision points at a job and at
+the bindings it produces, and one company may own several stores, so it
+inherits `shopify.connector.scope.mixin`, declares all three relations, and is
+registered in the SEC-3 ownership matrix. The matrix's own completeness test
+(`test_no_durable_store_scoped_model_escapes_this_matrix`) is what caught the
+omission — a red suite rather than a quiet gap.
+
+### ACLs
+
+Read-only for **every** connector role — Auditor, Operator, Reviewer,
+Administrator. Nothing may create, write or unlink a decision over RPC. Every
+production write goes through the dispatcher seam or the revalidated confirm
+path, both under `sudo()`. Asserted per role rather than assumed.
+
+## 4. §8.3 — the tests, and what makes them load-bearing
+
+**42 new decision tests**, plus the checkpoint-3 producer tests that already
+covered §8.3's enumeration half (routes, pagination, checkpointing, gates,
+fail-closed page validation, coalescing). Every end-to-end test drives the real
+drain loop with the transport patched at `_send`, and asserts **that work was
+admitted** — the transport ran and the job moved — before asserting what the
+database holds. A test that only asserts "no binding was created" passes
+brilliantly against a run in which the importer was never invoked.
+
+### Proved against their own absence
+
+Each central control was removed or neutered and the test that claims it was
+required to fail:
+
+| Mutation | Caught by | Result |
+| --- | --- | --- |
+| M1 — the `_route_failure` override removed | `test_an_ambiguous_template_persists_a_durable_decision` | **CAUGHT** |
+| M2 — the remote-identity check neutered in `_confirmed_for` | `test_the_importer_consumes_only_the_matching_remote_identity` | **CAUGHT** |
+| M3 — eligibility recomputation removed at confirm | `test_an_ineligible_candidate_refuses` | **CAUGHT** |
+| M4 — the company filter removed from `eligible_candidates` | `test_candidates_never_include_a_foreign_company_record` | **CAUGHT** |
+| M5 — the generic-resolve refusal removed | `test_generic_resolve_review_refuses_while_a_decision_is_pending` | **CAUGHT** |
+| M6 — the candidate-membership check removed at consumption | `test_a_decision_selecting_a_candidate_that_vanished_is_not_consumed` | **CAUGHT** |
+| M7 — the row lock and pending revalidation removed at confirm | `test_a_second_confirmation_of_the_same_decision_refuses` | **CAUGHT** |
+| M8 — stale-sibling supersession removed | `test_the_importer_consumes_only_the_matching_remote_identity` | **CAUGHT** |
+
+**8 of 8 caught, 0 missed.** Each mutation was applied to the production file,
+the named test run against it, and the file restored byte-for-byte — the
+worktree is clean afterwards, so none of this is in the diff. M4 is the one
+worth reading twice: the company filter in `eligible_candidates` looks
+redundant beside Odoo's own product record rules, and it is not — the test runs
+as an administrator with *both* companies active, so the record rule lets the
+foreign product through and the connector's own filter is the only thing left.
+
+### Two fixture defects found by writing them
+
+**A variant-ambiguity test that was exercising template matching.**
+`_resolve_variant_product` reaches `_match_variant_candidate` only when the
+template was resolved by *candidate match*: an `existing_binding` template with
+attribute lines is routed to `_instantiate_refresh_variant` and never performs
+variant candidate search at all. The first fixture built the obvious shape — a
+bound template with two same-SKU variants — and produced no variant ambiguity
+whatsoever, so the test failed rather than passing vacuously. The corrected
+fixture makes exactly one template carry the SKU (unambiguous template match)
+and gives that template two variants that both carry it.
+
+**A shared payload dict that one job's parse corrupted for the next.** A real
+transport returns a freshly parsed body every time; the importer normalises in
+place. Handing every call the same dict produced a bogus
+`data_shape_schema_mismatch` several tests downstream. Every fixture body is
+now deep-copied per call.
+
+**A multi-company test that was measuring its own fixture.** A product with no
+company is correctly shared by every company, so a "foreign candidate" test
+built on company-less products proves nothing. Both sides now carry explicit
+companies.
+
+## 5. §9 — the consolidated vertical journeys
+
+Each journey starts from a store an operator has just configured and ends at a
+database consequence a merchant could see, with every step performed by the
+code the UI invokes. Where a step must fail, it is made to fail **by real
+data**, never by an injected exception.
+
+**Journey C — product import.** Configure through Store Settings → press
+`Import products now` → scan job → two children → dispatcher → importer. One
+product completes unambiguously and binds on `sku_reference`; the other stops
+with a durable decision. The scan's checkpoint advances (the *enumeration*
+finished; the blocked child is separate work with its own state, which is the
+honest reading and the one the store form shows). The decision is opened from
+the job, the eligible set is the two candidates and nothing else, the choice is
+confirmed, the exact job resumes — **no second scan** — and the final binding
+carries `match_key = manual` and the reviewer's uid. The cron route is proved
+to reach the same place.
+
+**Journey D-P0 — orders and tax.** Configure sale prerequisites and scheduling
+through Store Settings → press `Import orders now` → scan → enqueue →
+dispatcher → importer meets a `TaxLine` with no mapping. The job stops at
+`failed_retryable` / `odoo_validation_configuration` — the state the dispatcher
+really produces for that class — and **no order is created from a payload the
+connector could not price**. It is mapped through an explicit same-company
+choice, the exact order job resumes without a fresh scan, the order is created,
+and the mapped tax is on its line. A second, different fingerprint stops again
+rather than being absorbed by the first mapping.
+
+**Journey I — administrator settings.** Reopened through the Configuration
+menu's own action, not by URL. A readiness-irrelevant change does not
+invalidate readiness; a domain change does; a no-op write does not; unrelated
+domain settings survive both. The refusals are stated **precisely**: the one
+that genuinely exists on this surface is the ACL, and the two read-only fields
+are asserted as what they really are — `readonly` on the model, rendered
+readonly or not rendered at all. `readonly=True` on an Odoo field is a UI
+contract, not a server refusal, and claiming otherwise would have been a claim
+this surface does not support.
+
+**Journey J-P0 — multi-store/company.** Two companies, the same SKU on both
+sides, one decision each. Each candidate set is its own company's and nothing
+else; each administrator's `search`, `search_count` and direct `read` return
+their own and only their own; an action aimed at the other company's job is
+refused. Separately, two stores **in the same company** are shown not to share
+decisions, so the isolation is proved to be store-scoping rather than a company
+check doing the work.
+
+**Journey K-P0 — failure/recovery.** The generic resolution refuses and names
+the route that works; a blunt manual retry is permitted and provably cannot
+loop (the same block, the same single decision row); stale, ineligible,
+concurrent and competing decisions each refuse; a failed enumeration leaves the
+checkpoint exactly where it was and admits no children.
+
+## 6. §10 — the browser, responsive and accessibility campaign
+
+### Tours
+
+Seven tour tests over the six Batch 2 surfaces, registered in the runner's
+fail-closed inventory (`REQUIRED_TOUR_TESTS`), whose guard test asserts that
+inventory equals the set of test methods that actually call `start_tour` — so
+adding a tour without listing it, or dropping one, fails a test rather than
+silently shrinking browser coverage.
+
+| Surface | Tour test | Database consequence verified in Python |
+| --- | --- | --- |
+| Canonical Store Settings | `TestUiB2SettingsTours.test_store_settings_tour_changes_a_setting_through_the_menu_route` | the setting is saved **and** the readiness marker moved |
+| Product controls | `TestUiB2ProductTours.test_product_controls_tour_starts_a_real_scan` | exactly one `product_import_scan`, `manual_sync`, `queued` |
+| Product controls, denied role | `…test_product_controls_are_absent_for_a_role_the_server_refuses` | no scan enqueued at all |
+| Pending match decision | `…test_match_decision_tour_records_the_choice_and_resumes` | decision `confirmed`, actor recorded, choice was a real candidate, exact job re-queued |
+| Match decision, denied role | `…test_match_decision_control_is_absent_for_an_operator` | decision still `pending`, job still blocked |
+| Resolved binding | `…test_resolved_binding_tour_shows_a_human_made_match` | binding still points where the human said |
+| Order controls | `TestUiB2SaleTours.test_order_controls_tour_starts_a_real_scan` | exactly one `order_import_scan` |
+| Tax decision | `…test_tax_decision_tour_creates_the_mapping_and_resumes` | mapping carries the **importer's** fingerprint; exact job resumed; no fresh scan |
+
+The fixtures are produced by production code: the pending decision comes from
+the real importer meeting two same-SKU products and the real dispatcher routing
+the failure; the tax block comes from the real `_resolve_taxes` raising its own
+structured evidence.
+
+**Selector discipline.** Every value assertion is anchored to the field that
+owns it (`div[name='candidate_total']:contains('2')`), because a bare
+`:contains('2')` is satisfied by any 2 on screen. Absence is asserted against
+real attribute selectors, never `:contains()` inside `:not(:has())` —
+`:contains()` is a hoot-dom extension and is not valid CSS.
+
+**Keyboard.** Every actionable control is focused, proved to become
+`document.activeElement`, proved to be in the tab order (`tabIndex >= 0`), and
+activated by a dispatched `Enter` rather than a bare click. The focus
+*indicator* is deliberately not asserted in the tours — in headless Chromium a
+script-focused element never matches `:focus-visible` — and is measured instead
+in the CDP campaign through `CSS.forcePseudoState`.
+
+### Responsive, RTL, zoom, reduced motion
+
+Six Batch 2 surfaces join the existing changed-surface campaign rather than
+forming a second one: `CHANGED_SURFACES = BATCH1 + BATCH2`, and every matrix
+that iterated Batch 1 now iterates both — **16 surfaces**, measured, with
+`0 failed, 0 error(s) of 14 tests` in the visual/accessibility suite.
+
+| Batch 2 surface | What it is |
+| --- | --- |
+| `b2-store-settings-canonical` | the canonical Store Settings form |
+| `b2-store-form-controls` | the order **and** product controls, with the scheduled-position copy beside each |
+| `b2-tax-decision-dialog` | the tax decision dialog, opened by pressing the control |
+| `b2-product-match-decision-pending` | a pending decision with its evidence and candidates |
+| `b2-product-match-decision-dialog` | the match decision dialog, opened by pressing the control |
+| `b2-product-match-decision-resolved` | a resolved decision: actor, choice, resumed job state |
+
+The **Match Decisions list** is captured and measured for responsive layout,
+RTL, reduced motion and contrast, and is deliberately **not** in the two
+matrices above: they measure a connector-owned surface region and its final
+actionable control, and a bare Odoo list view has neither — the instrument
+reports `no connector surface on screen` for it, exactly as it does for every
+other list in the capture set. It is excluded because those matrices do not
+apply to it, not because it failed them, and it is recorded that way rather
+than quietly dropped.
+
+Per changed surface the campaign covers:
+
+* desktop / tablet / mobile, with the mobile row measured at **320 CSS px** —
+  SC 1.4.10's reflow width;
+* LTR and RTL, with an RTL row required to *show* it rendered right-to-left;
+* real 200% zoom (the CSS viewport narrows **and** the type grows), and 200%
+  zoom under `prefers-reduced-motion: reduce`;
+* keyboard-only traversal to the final actionable control, driven by real
+  `Input.dispatchKeyEvent` Tab presses;
+* connector-owned clipping and horizontal overflow, per surface and for the
+  page;
+* measured contrast against WCAG 2.2 AA;
+* live-region versus static-note semantics.
+
+**One store, and that is measured rather than assumed.** The first version of
+this seed created a *second* store so the order controls and the product
+controls could be photographed separately. It broke four guided-setup captures
+with `no offline path on the credential chooser`: the setup surface is opened
+by action with no id and auto-selects a store only while there is exactly one,
+so a second store replaced the credential step with a picker. Both control
+groups live on the same form anyway, so one capture measures both — and the
+regression is recorded here because a seed that quietly disturbs another
+batch's evidence is exactly the kind of thing a campaign should not discover
+after the fact.
+
+**No production CSS changed.** No connector-owned visual defect was reproduced
+on any new Batch 2 surface, so none was "fixed".
+
+### Proved against their own absence, in the browser too
+
+The server-side mutation table above proves the model's controls. These three
+prove the *rendered* ones, by mutating the view and requiring the tour that
+claims each to fail:
+
+| Mutation | Caught by | Result |
+| --- | --- | --- |
+| B1 — the role gate removed from the decision control | `test_match_decision_control_is_absent_for_an_operator` | **CAUGHT** |
+| B2 — the role gate removed from the catalog-import control | `test_product_controls_are_absent_for_a_role_the_server_refuses` | **CAUGHT** |
+| B3 — `role="note"` removed from the dialog's consequence copy | `test_match_decision_tour_records_the_choice_and_resumes` | **CAUGHT** |
+
+**3 of 3 caught, 0 missed**, and the view files are restored byte-for-byte.
+
+## 7. Security and company boundaries
+
+1. **UI visibility is never the control.** Every production action reasserts
+   its role on the server: `_assert_product_sync_operator`,
+   `_assert_match_decision_reviewer`, `_assert_tax_decision_administrator`,
+   `_assert_canonical_settings_administrator`. Each is proved by a denied
+   caller with zero side effects.
+2. **Store/company scope is established before elevation.** The canonical
+   settings seam resolves stores in the caller's ordinary environment and
+   **refuses** — never filters — anything outside the caller's active
+   companies; only then does it elevate, and only to ensure rows for that fixed
+   set.
+3. **Elevation is minimal and never used to discover targets.**
+   `eligible_candidates()` elevates one exclusion query, which can only remove
+   candidates.
+4. **No foreign-company record, candidate, count or identity is disclosed.**
+   Proved for `search`, `search_count` and direct `read`, per role.
+5. **Existing constraints stay load-bearing.** Nothing was weakened to make a
+   form save or a decision apply; the binding uniqueness constraints remain the
+   final arbiter and the confirm path handles their `IntegrityError` as a
+   sentence rather than a traceback.
+6. **No protected payload, credential, token, secret or unnecessary PII**
+   reaches RPC, DOM, evidence, logs or exception text. Asserted against the
+   rendered decision record and against `safe_match_preview` directly.
+7. **No generic context flag bypasses protected binding fields.** The decision
+   route creates bindings through the importer's existing sanctioned writers
+   and adds no editable binding field anywhere.
+8. **The new durable model has explicit least-privilege ACLs** (read-only for
+   every role) **and two company rules**, one fail-closed on the owning store
+   and one on the selection relations.
+9. **Stale and concurrent decisions fail closed** at both the confirm boundary
+   and the consumption boundary.
+
+## 8. Migrations
+
+**None.** §8.2 adds a new model and new columns, which `_auto_init` creates;
+there is no data to move, no existing row to reinterpret, and no behaviour that
+changes for a database that already has data. No empty migration script was
+created to satisfy a counter, and the genuine-upgrade runner was not weakened.
+
+Module versions moved by coherent patch bumps: `core 19.0.1.18.0 →
+19.0.1.19.0` (the tour asset) and `product 19.0.2.6.0 → 19.0.2.7.0` (the
+decision model, wizard, views, ACLs and company rules).
+
+## 9. Definitive validation
+
+*(Filled in from the definitive run at the final head — see the validation
+section appended below.)*
+
+## 10. Deferred, explicitly
+
+**Deferred beyond Batch 2, per §17 and unchanged:** standalone customer import
+and refresh; ambiguous-customer matching decisions; bulk `Prepare changed
+products`; feature-derived scope narrowing; per-domain operating-mode
+declarations; per-store/per-domain dashboard liveness; the consolidated
+attention/recovery centre; Fulfillment Settings residuals; reconnect
+discoverability; journey families F, G and H; governed tax remap (recorded as
+P1 debt when checkpoint 2 declined to offer the unsafe version).
+
+**Not added, by instruction:** a standalone customer import, an ambiguous
+customer UI, a tax-remap state machine, webhooks, any Shopify mutation, a
+second setup wizard, a second queue or dispatcher, direct UI-to-importer
+execution, and generic global optimistic locking.
+
+TD-004, TD-005 and TD-007 are retained byte-for-byte.
+
+## 11. Gates that remain
+
+Independent Claude review of the exact final head (the implementing session
+does not review, accept, ready-mark or merge); exact-head Odoo.sh
+qualification; controlled live-Shopify validation; business UAT; control-room
+acceptance and merge authorization. PR #204 stays draft.
+
+---
+
+> **RETAINED, AND STILL ACCURATE FOR WHAT IT DESCRIBES.** Everything below this
+> line is the record written at `9af8b23` for checkpoints 1, 2 and §8.1. Two of
+> its statements are corrected above and are named here so no reader takes them
+> from the archive by accident:
+> 1. *"Nothing has been pushed … the four commits below are local only"* — true
+>    at `9af8b23`, superseded by the durability ruling. The chain is pushed.
+> 2. *"§8.2 … not implemented"*, and the §5c list of what is not done — all of
+>    it is implemented above.
+> Its checkpoint-1/2/§8.1 content, its field classification and its own
+> mutation table are unchanged and remain the description of those commits.
+
+---
+
+# (retained) Batch 2 record as written at `9af8b23`
+
+**`DRAFT — NOT ACCEPTED — NOT REVIEWED — NOT READY — NOT MERGED — NOT SELF-ACCEPTED`**
+
 > **Scope of this record, and its limits.** The unified Batch 2 campaign
 > specified three checkpoints plus consolidated journeys, a browser campaign
 > and one definitive validation. This record covers what is **implemented and

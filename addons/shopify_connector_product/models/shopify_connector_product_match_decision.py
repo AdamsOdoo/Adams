@@ -65,6 +65,10 @@ from psycopg2 import IntegrityError
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
+# The canonical source, the same one `shopify_connector_job_dispatch` imports
+# from -- not its re-export, so this cannot start meaning something else.
+from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
+
 from odoo.addons.shopify_connector_core.tools.redaction import redact
 
 _logger = logging.getLogger(__name__)
@@ -575,6 +579,15 @@ class ShopifyConnectorProductMatchDecision(models.Model):
                 )),
             ], limit=1)
             return existing or False
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            # NEVER swallowed. A genuine 40001/40P01/55P03 aborts the WHOLE
+            # transaction, not just the savepoint, so absorbing it here would
+            # leave the dispatcher's own `cr.flush()` to raise
+            # `InFailedSqlTransaction` -- an error outside the set it knows how
+            # to recover from, escaping the drain loop. Re-raised unchanged so
+            # the dispatcher's existing per-job recovery handles it, exactly as
+            # `_invoke_handler` re-raises it for the same reason.
+            raise
         except Exception:  # pragma: no cover - defensive dispatcher boundary
             _logger.exception(
                 "Could not record the product match decision for job %s; the "

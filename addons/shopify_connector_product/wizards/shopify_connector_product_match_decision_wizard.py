@@ -37,46 +37,49 @@ class ShopifyConnectorProductMatchDecisionWizard(models.TransientModel):
         comodel_name='shopify.connector.product.match.decision',
         required=True, readonly=True, ondelete='cascade',
     )
+    # SNAPSHOT FIELDS, NOT RELATED ONES, AND THAT IS DELIBERATE.
+    #
+    # A `related` field on a brand-new transient record has nothing to render
+    # from until the record is saved -- the dialog is built from `default_get`,
+    # and the client has no stored row to resolve the chain against. Measured
+    # in the browser: the evidence group came up EMPTY, which is a dialog that
+    # asks a reviewer to choose while showing them nothing to choose on.
+    #
+    # So the evidence is copied in `default_get`, exactly as the tax decision
+    # dialog already does. It is a snapshot by nature anyway: it describes what
+    # the importer saw, and `action_confirm` revalidates against the durable
+    # record rather than trusting anything on this form.
     job_id = fields.Many2one(
-        related='decision_id.job_id', readonly=True, string='Source job',
+        comodel_name='shopify.connector.job', readonly=True,
+        string='Source job',
     )
     store_id = fields.Many2one(
-        related='decision_id.store_id', readonly=True,
+        comodel_name='shopify.connector.store', readonly=True,
     )
     company_id = fields.Many2one(
-        related='decision_id.company_id', readonly=True,
+        comodel_name='res.company', readonly=True,
     )
     decision_level = fields.Selection(
-        related='decision_id.decision_level', readonly=True,
+        selection=[('template', 'Product'), ('variant', 'Variant')],
+        readonly=True,
     )
     shopify_product_gid = fields.Char(
-        related='decision_id.shopify_product_gid', readonly=True,
-        string='Shopify product',
+        readonly=True, string='Shopify product',
     )
     shopify_variant_gid = fields.Char(
-        related='decision_id.shopify_variant_gid', readonly=True,
-        string='Shopify variant',
+        readonly=True, string='Shopify variant',
     )
     match_key = fields.Selection(
-        related='decision_id.match_key', readonly=True,
+        selection=[('sku_reference', 'SKU'), ('barcode', 'Barcode')],
+        readonly=True,
     )
-    title_preview = fields.Char(
-        related='decision_id.title_preview', readonly=True,
-    )
-    sku_preview = fields.Char(
-        related='decision_id.sku_preview', readonly=True,
-    )
-    barcode_preview = fields.Char(
-        related='decision_id.barcode_preview', readonly=True,
-    )
-    options_preview = fields.Char(
-        related='decision_id.options_preview', readonly=True,
-    )
-    candidate_total = fields.Integer(
-        related='decision_id.candidate_total', readonly=True,
-    )
+    title_preview = fields.Char(readonly=True, string='Shopify title')
+    sku_preview = fields.Char(readonly=True, string='Shopify SKU')
+    barcode_preview = fields.Char(readonly=True, string='Shopify barcode')
+    options_preview = fields.Char(readonly=True, string='Shopify options')
+    candidate_total = fields.Integer(readonly=True)
     resolved_template_id = fields.Many2one(
-        related='decision_id.resolved_template_id', readonly=True,
+        comodel_name='product.template', readonly=True, string='Under product',
     )
 
     # The eligible sets, recomputed for THIS dialog. They are not the stored
@@ -144,7 +147,22 @@ class ShopifyConnectorProductMatchDecisionWizard(models.TransientModel):
         ].browse(decision_id)
         self._validated_decision(decision)
         eligible = decision.eligible_candidates()
-        result['decision_id'] = decision.id
+        result.update({
+            'decision_id': decision.id,
+            'job_id': decision.job_id.id,
+            'store_id': decision.store_id.id,
+            'company_id': decision.company_id.id,
+            'decision_level': decision.decision_level,
+            'shopify_product_gid': decision.shopify_product_gid,
+            'shopify_variant_gid': decision.shopify_variant_gid,
+            'match_key': decision.match_key,
+            'title_preview': decision.title_preview,
+            'sku_preview': decision.sku_preview,
+            'barcode_preview': decision.barcode_preview,
+            'options_preview': decision.options_preview,
+            'candidate_total': decision.candidate_total,
+            'resolved_template_id': decision.resolved_template_id.id,
+        })
         if decision.decision_level == DECISION_LEVEL_TEMPLATE:
             result['eligible_template_ids'] = [(6, 0, eligible.ids)]
         else:

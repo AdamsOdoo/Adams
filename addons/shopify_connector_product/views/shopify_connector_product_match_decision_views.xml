@@ -38,10 +38,12 @@
                                invisible="not title_preview"/>
                         <field name="match_key" readonly="1"
                                string="Matched on"/>
-                        <field name="sku_preview" readonly="1"
-                               invisible="not sku_preview"/>
-                        <field name="barcode_preview" readonly="1"
-                               invisible="not barcode_preview"/>
+                        <!-- Always rendered, never conditionally hidden.
+                             These two ARE what the dialog is asking about,
+                             and an empty one is information ("Shopify sent no
+                             barcode") rather than clutter. -->
+                        <field name="sku_preview" readonly="1"/>
+                        <field name="barcode_preview" readonly="1"/>
                         <field name="options_preview" readonly="1"
                                invisible="not options_preview"/>
                         <field name="candidate_total" readonly="1"

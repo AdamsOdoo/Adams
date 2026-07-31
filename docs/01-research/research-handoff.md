@@ -1,3 +1,97 @@
+### Batch 2 continuation — §8.2 decisions, §9 journeys, §10 campaign (2026-07-31)
+
+- **Branch / PR:** `fable/wave-5-completion`, continuing draft
+  [PR #204](https://github.com/AdamsOdoo/Adams/pull/204) from the bound base
+  `mvp/program-integration@87f1763a`, required starting head
+  `cb4efcde13792920275f0fd8edc0c06226b94fe9`. **Not self-reviewed, not
+  self-accepted, not ready-marked, not merged.** All commits additive; no
+  rebase, reset, amend, squash or force-push.
+- **Authorization:** the 2026-07-31 control-room instruction "CLAUDE OPUS 5 —
+  PR #204 UNIFIED BATCH 2 CONTINUATION FROM DURABLE HEAD", which accepts the
+  durability recovery as preservation of provisional work, keeps checkpoints
+  1/2/§8.1 provisional rather than accepted, and requires §8.2, §8.3, §9, §10,
+  §15.2, §16 and the final push.
+- **The previous entry's "nothing pushed / branch remains at `b0dbba2a`" is
+  now stale, and is corrected here rather than edited there.** It was true
+  when written. The durability ruling superseded it; the chain is pushed and
+  the branch has moved. The implementation record
+  (`docs/07-implementation-plan/pr-204-batch-2-p0-merchant-reachability-2026-07-30.md`)
+  carries the same correction at the top of its own text.
+- **Identity gate, before any edit.** All ten items passed. PR #204 open,
+  draft, unmerged, **zero reviews**; head, remote branch head and local HEAD
+  all exactly `cb4efcd`; base `87f1763a` unchanged; `cb4efcd` exactly six
+  commits ahead of `b0dbba2` and zero behind, with `b0dbba2` the merge base;
+  the exact additive sequence `9a70682 → f5f3668 → 39e5113 → 2c5d190 →
+  9af8b23 → cb4efcd`; clean worktree; Odoo pin `30bde9ff` exact; the delta
+  `b0dbba2..cb4efcd` exactly 37 paths, all inside the authorized Batch 2
+  scope; `research-handoff.md` +104/−0; reflog showing checkout only — no
+  amend, rebase, squash, reset or force-push.
+- **What this session implemented.** §8.2 durable product and variant match
+  decisions (a new store-scoped model, a product-owned `_route_failure`
+  extension, a revalidating confirm wizard, views, menus, least-privilege
+  ACLs and two company rules); §8.3's 42 load-bearing tests; §9's consolidated
+  journeys C, D-P0, I, J-P0 and K-P0; §10's seven tours over six surfaces plus
+  the enlargement, keyboard, RTL, reduced-motion and contrast campaign
+  extended to 16 changed surfaces.
+- **The seam, in one sentence, because it is the whole design.** Both
+  ambiguity raise sites run inside the importer's savepoint, so a decision
+  written there is rolled back with the partial product — measured by a test
+  that does exactly that — and the decision is therefore written by a
+  product-owned override of `_route_failure`, in the same transaction that
+  durably records the blocked job.
+- **Three defects found by writing the evidence, and fixed.** A record rule
+  whose Many2one leaf hid every undecided decision (a NULL m2o matches no `IN`
+  subquery); a variant-ambiguity fixture that was silently exercising template
+  matching; and a visual seed whose second store broke four guided-setup
+  captures because the setup surface auto-selects a store only while there is
+  exactly one. Each is recorded in the implementation record rather than
+  quietly corrected.
+- **Load-bearing proof.** Eight production controls were removed or neutered
+  one at a time and the test that claims each was required to fail: 8 of 8
+  caught, 0 missed. The production files are restored byte-for-byte, so none
+  of it is in the diff.
+- **Commit signing remains unavailable** (the configured key is a 0-byte
+  file). Unsigned additive commits are the accepted deviation for this
+  campaign; nothing was amended, rebased or recreated to obtain a signature.
+- **Debt recorded, not absorbed.** TD-021 (a tax mapping cannot be changed
+  once it exists — the read-only `account_tax_id` is deliberate, a governed
+  remap is P1) and TD-022 (a pending match decision whose candidates all
+  become ineligible has no in-product route out — P2). TD-004, TD-005 and
+  TD-007 retained byte-for-byte.
+- **Evidence class: local supporting evidence — NOT Odoo.sh exact-SHA
+  acceptance (DEC-041 D8), NOT live-Shopify validation, NOT UAT, NOT
+  independent review.** Zero live Shopify contact and zero Shopify mutation:
+  every test patches the one transport seam and no real credential exists in
+  the repository or the environment.
+
+- **Learning-feedback loop.** Three lessons, each paid for by a failing run
+  rather than inferred. (1) A record rule that traverses a Many2one needs an
+  explicit `('field', '=', False)` leaf, or it hides exactly the rows the
+  surface exists to show — the failure looked like an ACL problem and was not.
+  (2) A denied-role fixture must carry EXACTLY the role under test:
+  `group_shopify_connector_user` implies both Operator and Reviewer, so adding
+  it "so the menus work" makes a denial test grant what it was written to
+  refuse. (3) A seed that adds a record to a shared fixture can break another
+  batch's evidence from a distance — the extra store here changed what the
+  guided setup rendered — so a new seed should be run against the FULL
+  existing campaign, not only against its own new assertions.
+
+- **Next-session prompt.** Perform an independent, memoryless Batch 2 review
+  of the exact final head of `fable/wave-5-completion` (PR #204), reading the
+  complete `b0dbba2..HEAD` diff, the governing instruction's §§1–10, the
+  implementation record, `CLAUDE.md` §13 and DEC-039/DEC-040/DEC-041, and the
+  Odoo 19 source at pin `30bde9ff758834a4912c5ae55843d3a7dad849f1`. Verify —
+  do not accept from the record — that: the ambiguity evidence cannot be
+  recovered from prose; a decision is consumable only for its exact remote
+  identity; the confirm path revalidates and locks before it writes; no
+  foreign-company record, candidate, count or identity is disclosed to any
+  role; the new model's ACLs admit no RPC write; the eight mutation proofs
+  reproduce; every registered tour runs in a real browser rather than
+  skipping; and the seven-pass definitive suite is green at the exact head
+  with the sanctioned skip unchanged and `connector_worktree_dirty: false`.
+  Post the complete report verbatim to PR #204 stating the exact reviewed SHA.
+  The implementing session does not review, accept, ready-mark or merge.
+
 ### Batch 2 — canonical Store Settings, order/tax route, product producer (2026-07-30)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

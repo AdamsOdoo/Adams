@@ -24,3 +24,4 @@ from . import test_ui_u2_action_tours
 from . import test_canonical_store_settings_sale
 from . import test_tax_decision_route
 from . import test_batch2_journeys_sale
+from . import test_ui_b2_sale_tours
