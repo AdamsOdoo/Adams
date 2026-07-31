@@ -1,0 +1,997 @@
+Running as user 'root' is a security risk.
+2026-07-31 08:09:29,293 29381 WARNING ? odoo.tools.config: missing --http-interface/http_interface, using 0.0.0.0 by default, will change to 127.0.0.1 in 20.0 
+2026-07-31 08:09:29,293 29381 INFO ? odoo: Odoo version 19.0 
+2026-07-31 08:09:29,294 29381 INFO ? odoo: Using configuration file at /home/user/Adams/ci-artifacts/odoo.conf 
+2026-07-31 08:09:29,294 29381 INFO ? odoo: addons paths: _NamespacePath(['/home/user/Adams/.odoo-src/odoo/addons', '/home/user/Adams/ci-artifacts/odoo-data/addons/19.0', '/home/user/Adams/.odoo-src/addons', '/home/user/Adams/addons']) 
+2026-07-31 08:09:29,294 29381 INFO ? odoo: database: root@/tmp:5432 
+2026-07-31 08:09:29,633 29381 INFO ? odoo.service.server: HTTP service (werkzeug) running on localhost:8172 
+2026-07-31 08:09:29,657 29381 INFO cx_t7 odoo.tests.common: Importing test framework 
+2026-07-31 08:09:29,688 29381 INFO cx_t7 odoo.modules.loading: loading 1 modules... 
+2026-07-31 08:09:29,693 29381 INFO cx_t7 odoo.modules.loading: 1 modules loaded in 0.00s, 0 queries (+0 extra) 
+2026-07-31 08:09:29,728 29381 INFO cx_t7 odoo.modules.loading: updating modules list 
+2026-07-31 08:09:29,732 29381 INFO cx_t7 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on [] to user __system__ #1 via n/a 
+2026-07-31 08:09:31,028 29381 INFO cx_t7 odoo.addons.base.models.ir_module: ALLOW access to module.button_upgrade on ['Shopify Connector Product', 'Shopify Connector Sale'] to user __system__ #1 via n/a 
+2026-07-31 08:09:31,028 29381 INFO cx_t7 odoo.addons.base.models.ir_module: ALLOW access to module.update_list on ['Shopify Connector Product', 'Shopify Connector Sale'] to user __system__ #1 via n/a 
+2026-07-31 08:09:32,029 29381 INFO cx_t7 odoo.addons.base.models.ir_module: ALLOW access to module.button_install on [] to user __system__ #1 via n/a 
+2026-07-31 08:09:32,083 29381 INFO cx_t7 odoo.modules.loading: loading 74 modules... 
+2026-07-31 08:09:32,419 29381 INFO cx_t7 odoo.modules.loading: Loading module shopify_connector_product (40/74) 
+2026-07-31 08:09:32,541 29381 INFO cx_t7 odoo.registry: module shopify_connector_product: creating or updating database tables 
+2026-07-31 08:09:32,689 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/security/ir.model.access.csv 
+2026-07-31 08:09:32,711 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/security/shopify_connector_product_company_rules.xml 
+2026-07-31 08:09:32,747 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/data/shopify_connector_attribute_lock.xml 
+2026-07-31 08:09:32,749 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/data/shopify_connector_product_cron.xml 
+2026-07-31 08:09:32,751 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/views/shopify_connector_product_binding_views.xml 
+2026-07-31 08:09:32,821 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/views/shopify_connector_product_menus.xml 
+2026-07-31 08:09:32,836 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/views/shopify_connector_store_settings_product_views.xml 
+2026-07-31 08:09:32,857 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/views/shopify_connector_product_controls_views.xml 
+2026-07-31 08:09:32,893 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product/views/shopify_connector_product_match_decision_views.xml 
+2026-07-31 08:09:32,961 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [33, 34] 
+2026-07-31 08:09:33,030 29381 INFO cx_t7 odoo.modules.loading: Module shopify_connector_product loaded in 0.61s, 482 queries (+482 other) 
+2026-07-31 08:09:33,134 29381 INFO cx_t7 odoo.modules.loading: Loading module shopify_connector_product_export (47/74) 
+2026-07-31 08:09:33,268 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 52, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 52, in <module>
+    'too_many_options': _('More Shopify options than Shopify allows'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,269 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 53, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 53, in <module>
+    'too_many_variants': _('More variants than one export job carries'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,270 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 54, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 54, in <module>
+    'remote_option_divergence': _('Shopify option structure differs'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,270 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 55, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 55, in <module>
+    'variant_create_withheld': _('New variants withheld'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,271 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 56, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 56, in <module>
+    'bound_product_missing_remotely': _('Bound Shopify product is gone'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,271 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 57, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 57, in <module>
+    'bound_variant_missing_remotely': _('A bound Shopify variant is gone'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,272 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 58, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 58, in <module>
+    'unowned_remote_variant': _('Shopify variant this connector does not own'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,272 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 59, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 59, in <module>
+    'custom_id_already_bound_remotely': _('Already exported to this store'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,273 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 60, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 60, in <module>
+    'duplicate_sku_on_shopify': _('SKU already exists on Shopify'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,273 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 66, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 66, in <module>
+    'product_export_binding_namespace': _('Establish the connector binding id'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,274 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 67, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 67, in <module>
+    'product_export_create': _('Create the product on Shopify'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,274 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 68, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 68, in <module>
+    'product_export_update': _('Update product details'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,275 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 69, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 69, in <module>
+    'product_export_variants_update': _('Update variants'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,275 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 70, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 70, in <module>
+    'product_export_variants_create': _('Add new variants'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,276 29381 WARNING cx_t7 odoo.tools.translate: no translation language detected, skipping translation <frame at 0x7f2dcaf8a340, file '/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py', line 71, code <module>> 
+Stack (most recent call last):
+  File "/home/user/Adams/.odoo-src/odoo-bin", line 6, in <module>
+    odoo.cli.main()
+  File "/home/user/Adams/.odoo-src/odoo/cli/command.py", line 133, in main
+    command().run(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 127, in run
+    main(args)
+  File "/home/user/Adams/.odoo-src/odoo/cli/server.py", line 118, in main
+    rc = server.start(preload=config['db_name'], stop=stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1668, in start
+    rc = server.run(preload, stop)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 708, in run
+    rc = preload_registries(preload)
+  File "/home/user/Adams/.odoo-src/odoo/service/server.py", line 1582, in preload_registries
+    registry = Registry.new(dbname, update_module=update_module, install_modules=config['init'], upgrade_modules=config['update'], reinit_modules=config['reinit'])
+  File "/home/user/Adams/.odoo-src/odoo/tools/func.py", line 88, in locked
+    return func(inst, *args, **kwargs)
+  File "/home/user/Adams/.odoo-src/odoo/orm/registry.py", line 183, in new
+    load_modules(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 464, in load_modules
+    load_module_graph(
+  File "/home/user/Adams/.odoo-src/odoo/modules/loading.py", line 178, in load_module_graph
+    load_openerp_module(package.name)
+  File "/home/user/Adams/.odoo-src/odoo/modules/module.py", line 506, in load_openerp_module
+    __import__(qualname)
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/__init__.py", line 1, in <module>
+    from . import models
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/__init__.py", line 9, in <module>
+    from . import shopify_connector_product_export_ui
+  File "<frozen importlib._bootstrap>", line 1415, in _handle_fromlist
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "/home/user/Adams/addons/shopify_connector_product_export/models/shopify_connector_product_export_ui.py", line 71, in <module>
+    'product_export_media_stage': _('Append an image'),
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 580, in get_text_alias
+    module, lang = _get_translation_source(1)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 569, in _get_translation_source
+    lang = lang or _get_lang(frame, default_lang)
+  File "/home/user/Adams/.odoo-src/odoo/tools/translate.py", line 560, in _get_lang
+    _logger.log(log_level, 'no translation language detected, skipping translation %s', frame, stack_info=True)
+2026-07-31 08:09:33,300 29381 INFO cx_t7 odoo.registry: module shopify_connector_product_export: creating or updating database tables 
+2026-07-31 08:09:33,449 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/security/ir.model.access.csv 
+2026-07-31 08:09:33,469 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/security/shopify_connector_product_export_company_rules.xml 
+2026-07-31 08:09:33,494 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/data/shopify_connector_product_export_cron.xml 
+2026-07-31 08:09:33,497 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/views/shopify_connector_product_export_wizard_views.xml 
+2026-07-31 08:09:33,544 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/views/shopify_connector_export_diff_views.xml 
+2026-07-31 08:09:33,547 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/views/shopify_connector_product_export_views.xml 
+2026-07-31 08:09:33,611 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [35, 36] 
+2026-07-31 08:09:33,712 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [37, 38] 
+2026-07-31 08:09:33,719 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/views/shopify_connector_product_export_diagnostics_views.xml 
+2026-07-31 08:09:33,776 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_product_export/views/shopify_connector_product_export_menus.xml 
+2026-07-31 08:09:33,843 29381 INFO cx_t7 odoo.modules.loading: Module shopify_connector_product_export loaded in 0.71s, 581 queries (+581 other) 
+2026-07-31 08:09:33,976 29381 INFO cx_t7 odoo.modules.loading: Loading module shopify_connector_inventory (57/74) 
+2026-07-31 08:09:34,109 29381 INFO cx_t7 odoo.registry: module shopify_connector_inventory: creating or updating database tables 
+2026-07-31 08:09:34,273 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/security/ir.model.access.csv 
+2026-07-31 08:09:34,297 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/security/shopify_connector_inventory_company_rules.xml 
+2026-07-31 08:09:34,319 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/data/shopify_connector_inventory_cron.xml 
+2026-07-31 08:09:34,322 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/views/shopify_connector_inventory_wizard_views.xml 
+2026-07-31 08:09:34,402 29381 WARNING cx_t7 odoo.addons.base.models.ir_ui_view: An alert (class alert-*) must have an alert, alertdialog or status role or an alert-link class. Please use alert and alertdialog only for what expects to stop any activity to be read immediately.
+View error context:
+{'file': '/home/user/Adams/addons/shopify_connector_inventory/views/shopify_connector_inventory_wizard_views.xml',
+ 'line': 11,
+ 'name': 'shopify.connector.first.push.withdraw.wizard.form',
+ 'view': ir.ui.view(1158,),
+ 'view.model': 'shopify.connector.first.push.withdraw.wizard',
+ 'view.parent': ir.ui.view(),
+ 'xmlid': 'view_shopify_connector_first_push_withdraw_wizard_form'} 
+2026-07-31 08:09:34,419 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/views/shopify_connector_inventory_views.xml 
+2026-07-31 08:09:34,488 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/views/shopify_connector_inventory_menus.xml 
+2026-07-31 08:09:34,516 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_inventory/views/shopify_connector_store_settings_inventory_views.xml 
+2026-07-31 08:09:34,568 29381 INFO cx_t7 odoo.modules.loading: Module shopify_connector_inventory loaded in 0.59s, 501 queries (+501 other) 
+2026-07-31 08:09:34,613 29381 INFO cx_t7 odoo.modules.loading: Loading module shopify_connector_sale (70/74) 
+2026-07-31 08:09:34,746 29381 INFO cx_t7 odoo.registry: module shopify_connector_sale: creating or updating database tables 
+2026-07-31 08:09:34,939 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/security/ir.model.access.csv 
+2026-07-31 08:09:34,958 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/security/shopify_connector_sale_company_rules.xml 
+2026-07-31 08:09:34,995 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/data/shopify_connector_sale_cron.xml 
+2026-07-31 08:09:34,997 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_sale_wizard_views.xml 
+2026-07-31 08:09:35,023 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_order_binding_views.xml 
+2026-07-31 08:09:35,082 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [85, 86] 
+2026-07-31 08:09:35,088 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_customer_binding_views.xml 
+2026-07-31 08:09:35,120 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_sale_menus.xml 
+2026-07-31 08:09:35,141 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_store_settings_sale_views.xml 
+2026-07-31 08:09:35,165 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_order_controls_views.xml 
+2026-07-31 08:09:35,214 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_sale/views/shopify_connector_tax_decision_views.xml 
+2026-07-31 08:09:35,278 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [87, 88] 
+2026-07-31 08:09:35,339 29381 INFO cx_t7 odoo.modules.loading: Module shopify_connector_sale loaded in 0.73s, 603 queries (+603 other) 
+2026-07-31 08:09:35,347 29381 INFO cx_t7 odoo.modules.loading: Loading module shopify_connector_fulfillment (74/74) 
+2026-07-31 08:09:35,423 29381 INFO cx_t7 odoo.registry: module shopify_connector_fulfillment: creating or updating database tables 
+2026-07-31 08:09:35,561 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/security/shopify_connector_fulfillment_security.xml 
+2026-07-31 08:09:35,565 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/security/ir.model.access.csv 
+2026-07-31 08:09:35,586 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/security/shopify_connector_fulfillment_company_rules.xml 
+2026-07-31 08:09:35,601 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/data/shopify_connector_fulfillment_cron.xml 
+2026-07-31 08:09:35,604 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/wizards/shopify_connector_fulfillment_mode_switch_wizard_views.xml 
+2026-07-31 08:09:35,639 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/views/shopify_connector_store_settings_fulfillment_views.xml 
+2026-07-31 08:09:35,673 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted ir.actions.act_window.view records with IDs: [89, 90] 
+2026-07-31 08:09:35,678 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/views/shopify_connector_fulfillment_review_views.xml 
+2026-07-31 08:09:35,717 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/views/shopify_connector_fulfillment_binding_views.xml 
+2026-07-31 08:09:35,748 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/views/shopify_connector_job_fulfillment_views.xml 
+2026-07-31 08:09:35,764 29381 INFO cx_t7 odoo.modules.loading: loading shopify_connector_fulfillment/views/shopify_connector_fulfillment_menus.xml 
+2026-07-31 08:09:35,819 29381 INFO cx_t7 odoo.modules.loading: Module shopify_connector_fulfillment loaded in 0.47s, 394 queries (+394 other) 
+2026-07-31 08:09:35,820 29381 INFO cx_t7 odoo.modules.loading: 74 modules loaded in 3.74s, 2561 queries (+2561 extra) 
+2026-07-31 08:09:36,242 29381 INFO cx_t7 odoo.registry: verifying fields for every extended model 
+2026-07-31 08:09:36,944 29381 INFO cx_t7 odoo.modules.loading: Modules loaded. 
+2026-07-31 08:09:36,965 29381 INFO cx_t7 odoo.registry: Registry changed, signaling through the database 
+2026-07-31 08:09:36,967 29381 INFO cx_t7 odoo.registry: Registry loaded in 7.333s 
+2026-07-31 08:09:36,968 29381 INFO cx_t7 odoo.service.server: Starting post tests 
+2026-07-31 08:09:37,910 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_a_confirmed_decision_on_real_data_is_actually_consumed ... 
+2026-07-31 08:09:38,070 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [1] 
+2026-07-31 08:09:38,179 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [2] 
+2026-07-31 08:09:38,188 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_a_foreign_decision_is_refused_before_its_row_is_locked ... 
+2026-07-31 08:09:38,327 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [3] 
+2026-07-31 08:09:38,361 29381 INFO cx_t7 odoo.addons.base.models.ir_rule: Access Denied by record rules for operation: read on record ids: [2], uid: 10, model: shopify.connector.product.match.decision 
+2026-07-31 08:09:38,372 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_manual_product_import_survives_a_disabled_cron ... 
+2026-07-31 08:09:38,436 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_recording_one_ambiguity_does_not_supersede_an_unrelated_one ... 
+2026-07-31 08:09:38,582 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [4] 
+2026-07-31 08:09:38,710 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [5] 
+2026-07-31 08:09:38,729 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_scheduled_product_state_is_false_while_the_cron_is_disabled ... 
+2026-07-31 08:09:38,744 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_the_display_scrubber_rewrites_every_shape_used_here ... 
+2026-07-31 08:09:38,933 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [6] 
+2026-07-31 08:09:38,949 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_the_scan_ceiling_refusal_states_the_limit_and_consequence ... 
+2026-07-31 08:09:39,465 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_the_stored_identity_is_the_identity_shopify_sent ... 
+2026-07-31 08:09:39,590 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [7] 
+2026-07-31 08:09:39,606 29381 INFO cx_t7 odoo.addons.shopify_connector_product.tests.test_batch2_correction_at_any_head: Starting TestProductMatchRealDataAtAnyHead.test_two_real_products_never_share_or_repoint_one_decision ... 
+2026-07-31 08:09:39,726 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [8] 
+2026-07-31 08:09:39,838 29381 INFO cx_t7 odoo.models.unlink: User #1 deleted shopify.connector.call.lease records with IDs: [9] 
+2026-07-31 08:09:39,918 29381 INFO cx_t7 odoo.addons.base.models.ir_attachment: filestore gc 663 checked, 4 removed 
+2026-07-31 08:09:40,411 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_a_different_choice_never_replaces_the_mapping_that_won ... 
+2026-07-31 08:09:40,630 29381 ERROR cx_t7 odoo.sql_db: bad query: b'INSERT INTO "shopify_connector_tax_mapping" ("account_tax_id", "create_date", "create_uid", "shopify_price_included", "shopify_tax_evidence_key", "shopify_tax_fingerprint_version", "source_preview", "store_id", "title_preview", "write_date", "write_uid") VALUES (52, \'2026-07-31T08:09:39.922431\'::timestamp, 14, false, \'v1:1d68e333ec1cd906f209cca0fdb1214497819bdc37e85eb5a882b646b4b35c86\', 1, \'Shopify\', 2, \'VAT\', \'2026-07-31T08:09:39.922431\'::timestamp, 14) RETURNING "id"'
+ERROR: duplicate key value violates unique constraint "shopify_connector_tax_mapping_store_evidence_key_uniq"
+DETAIL:  Key (store_id, shopify_tax_evidence_key)=(2, v1:1d68e333ec1cd906f209cca0fdb1214497819bdc37e85eb5a882b646b4b35c86) already exists.
+ 
+2026-07-31 08:09:40,640 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_an_administrator_cannot_reach_a_foreign_job_through_the_dialog ... 
+2026-07-31 08:09:41,064 29381 INFO cx_t7 odoo.addons.base.models.ir_rule: Access Denied by record rules for operation: read on record ids: [213], uid: 14, model: shopify.connector.job 
+2026-07-31 08:09:41,075 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_an_ordinary_tax_is_eligible_for_an_excluded_shopify_tax ... 
+2026-07-31 08:09:41,154 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_manual_order_import_survives_a_disabled_cron ... 
+2026-07-31 08:09:41,205 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_one_administrator_cannot_read_another_open_dialog ... 
+2026-07-31 08:09:41,429 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_scheduled_order_state_is_false_while_the_cron_is_disabled ... 
+2026-07-31 08:09:41,441 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_batch2_correction_at_any_head: Starting TestBatch2SaleCorrectionAtAnyHead.test_the_whole_tax_route_completes_on_an_ordinary_tax ... 
+2026-07-31 08:09:41,597 29381 INFO cx_t7 odoo.addons.base.models.ir_attachment: filestore gc 5 checked, 5 removed 
+2026-07-31 08:09:41,599 29381 INFO cx_t7 odoo.addons.shopify_connector_sale.tests.test_tax_mapping_race: Starting TestTaxMappingCompetingChoiceRace.test_a_competing_choice_committed_elsewhere_refuses_and_never_resumes ... 
+2026-07-31 08:09:41,909 29381 ERROR cx_t7 odoo.sql_db: bad query: b'INSERT INTO "shopify_connector_tax_mapping" ("account_tax_id", "create_date", "create_uid", "shopify_price_included", "shopify_tax_evidence_key", "shopify_tax_fingerprint_version", "source_preview", "store_id", "title_preview", "write_date", "write_uid") VALUES (57, \'2026-07-31T08:09:41.599798\'::timestamp, 16, false, \'v1:1d68e333ec1cd906f209cca0fdb1214497819bdc37e85eb5a882b646b4b35c86\', 1, \'Shopify\', 4, \'VAT\', \'2026-07-31T08:09:41.599798\'::timestamp, 16) RETURNING "id"'
+ERROR: duplicate key value violates unique constraint "shopify_connector_tax_mapping_store_evidence_key_uniq"
+DETAIL:  Key (store_id, shopify_tax_evidence_key)=(4, v1:1d68e333ec1cd906f209cca0fdb1214497819bdc37e85eb5a882b646b4b35c86) already exists.
+ 
+2026-07-31 08:09:41,957 29381 INFO cx_t7 odoo.addons.base.models.ir_attachment: filestore gc 1 checked, 1 removed 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.service.server: 17 post-tests in 4.99s, 5466 queries 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.tests.stats: shopify_connector_product: 11 tests 2.93s 3439 queries 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.tests.stats: shopify_connector_sale: 12 tests 2.04s 2027 queries 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.tests.result: 0 failed, 0 error(s) of 17 tests when loading database 'cx_t7' 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.service.server: Initiating shutdown 
+2026-07-31 08:09:41,959 29381 INFO cx_t7 odoo.service.server: Hit CTRL-C again or send a second signal to force the shutdown. 
+2026-07-31 08:09:42,159 29381 INFO cx_t7 odoo.sql_db: ConnectionPool(read/write;used=0/count=0/max=64): Closed 2 connections  

@@ -5,12 +5,18 @@
 This directory holds the two runs that make the correction's reproducers
 load-bearing rather than descriptive.
 
+> **Extension note.** These are Odoo test-runner logs, stored with a `.txt`
+> extension because the repository's `.gitignore` excludes `*.log` — so a `.log`
+> file here would be silently absent from the repository while this README
+> claimed it was present. Every other retained log in `docs/05-qa/evidence/`
+> uses `.txt` for the same reason.
+
 ## What is here
 
 | File | What it is |
 | --- | --- |
-| `reproducers-at-ccad8bf.log` | The three head-agnostic reproducer classes run against the **unchanged starting head** `ccad8bf432868650abb80bfb2103bd8d397be549`, in a clean external `git worktree`, with only those files and their `tests/__init__.py` registration added. **13 failed, 0 error(s) of 17 tests.** |
-| `reproducers-after-correction.log` | The same 17 tests at the corrected head. **0 failed, 0 error(s) of 17 tests.** |
+| `reproducers-at-ccad8bf.txt` | The three head-agnostic reproducer classes run against the **unchanged starting head** `ccad8bf432868650abb80bfb2103bd8d397be549`, in a clean external `git worktree`, with only those files and their `tests/__init__.py` registration added. **13 failed, 0 error(s) of 17 tests.** |
+| `reproducers-after-correction.txt` | The same 17 tests at the corrected head. **0 failed, 0 error(s) of 17 tests.** |
 
 ## Why the reproducers are separate files
 

@@ -63,6 +63,23 @@
   **the controlled-Shopify/UAT preflight must verify the target store is under
   that ceiling**). TD-004, TD-005 and TD-007 retained byte-for-byte; TD-021 and
   TD-022 unchanged.
+- **Definitive validation, at the final executable/test/tooling head
+  `5a020779029781868cde0e1c7fc7853e8f5b42dd`** (`tools/run_connector_suite.sh`,
+  no arguments; the two later commits are documentation/evidence only, with
+  zero executable delta). All seven passes green: fresh **0 failed, 0 error(s)
+  of 2436**, warm **2436** with zero migration scripts asserted, both genuine
+  version-to-version upgrades **2436** with **3** and **2** scripts
+  respectively — including the correction's own `product 19.0.2.8.0` in both —
+  both idempotency re-runs **2436** with zero scripts asserted, and the
+  non-standard suite **0 failed, 0 error(s) of 60**. 36/36 tours on every
+  standard pass; all three HOOT suites verified; the sanctioned skip unchanged.
+  `connector_worktree_dirty: false`, `odoo_pin_verified: true`,
+  `browser_evidence: verified`, `shopify_operations: none`.
+  `source_head_verified: false` because a local invocation sets no
+  `SOURCE_HEAD_SHA` — the exact-head CI is what performs that comparison, and
+  the record says so rather than glossing it. Deltas against `ccad8bf`:
+  standard **2373 → 2436 (+63)**, non-standard **59 → 60 (+1)**, tours
+  **36 → 36 (0)**.
 - **Not claimed.** No independent review of the corrected head; the unfinished
   independent browser/mutation review still has to be completed after this
   correction; no Odoo.sh exact-SHA qualification; no controlled live-Shopify

@@ -355,7 +355,10 @@ those three files and their `tests/__init__.py` registration added and the
 correction branch untouched: **13 failed, 0 error(s) of 17 tests.** The same
 17 at the corrected head: **0 failed, 0 error(s) of 17 tests.** Both logs are
 durable under
-`docs/05-qa/evidence/batch-2-real-data-correction-2026-07-31/`.
+`docs/05-qa/evidence/batch-2-real-data-correction-2026-07-31/`, stored with a
+`.txt` extension because the repository's `.gitignore` excludes `*.log` — a
+`.log` file there would have been silently absent from the repository while its
+README claimed it was present.
 
 Every failure names its defect rather than merely differing:
 
@@ -434,6 +437,85 @@ showing `[redacted-phone]` and `shopify_product_gid` showing
 Zero live Shopify contact, and zero Shopify mutation: every test patches the
 transport seams, and no credential exists anywhere in the repository or this
 environment.
+
+## C5. Definitive validation
+
+Run with `tools/run_connector_suite.sh` and **no arguments**, at
+`5a020779029781868cde0e1c7fc7853e8f5b42dd` — the final executable/test/tooling
+head. The two commits after it change **only** documentation and evidence: a
+changed-path comparison of `5a02077..ad8763d` and of the records tail shows
+**zero** executable, test or tooling delta.
+
+| Pass | Result | Tours | Migration scripts |
+| --- | --- | --- | --- |
+| Fresh install + standard suite | **0 failed, 0 error(s) of 2436 tests** | 36/36 | — |
+| Warm `-u` (SAME-VERSION) + standard suite | **0 failed, 0 error(s) of 2436 tests** | 36/36 | **0, asserted** |
+| Genuine migration `50b770a3` → candidate + standard suite | **0 failed, 0 error(s) of 2436 tests** | 36/36 | **3** (`core 19.0.1.16.0`, `core 19.0.1.17.0`, **`product 19.0.2.8.0`**) |
+| … second update (idempotency) | **0 failed, 0 error(s) of 2436 tests** | — | **0, asserted** |
+| Genuine migration `0a15b176` → candidate + standard suite | **0 failed, 0 error(s) of 2436 tests** | 36/36 | **2** (`core 19.0.1.17.0`, **`product 19.0.2.8.0`**) |
+| … second update (idempotency) | **0 failed, 0 error(s) of 2436 tests** | — | **0, asserted** |
+| Complete non-standard tag suite | **0 failed, 0 error(s) of 60 tests** | — | — |
+
+**The correction's own migration executed for real in both upgrade passes.**
+`shopify_connector_product` upgraded `19.0.2.4.0 → 19.0.2.8.0` and
+`shopify_connector_sale` `19.0.2.4.0 → 19.0.2.7.0` from both older trees, so
+these are genuine version-to-version upgrades rather than same-version
+re-updates — Odoo runs an upgrade script only when the installed version is
+strictly lower, and the runner FAILS a migration pass that ran no script.
+
+All three HOOT suites verified (`shopify connector dashboard`,
+`export diff`, `setup wizard`). The single sanctioned skip per standard pass
+remains `TestMutationRecovery.test_real_process_death_harness`, unchanged in
+identity and reason.
+
+### Deltas against the correction's own baseline
+
+Measured against `153be2b`/`ccad8bf` (2373 standard / 59 non-standard / 36
+tours) in this same environment:
+
+| | Baseline | This head | Delta |
+| --- | --- | --- | --- |
+| Standard suite | 2373 | **2436** | **+63** |
+| Non-standard suite | 59 | **60** | **+1** (the genuine-connection tax-mapping race) |
+| Tours | 36 | **36** | 0 — no tour was added; the existing product tour now drives production-shaped identity and asserts both treatments on one dialog |
+
+### Recorded facts from `summary.json`
+
+`connector_worktree_dirty: false`; `odoo_pin_verified: true` at
+`30bde9ff758834a4912c5ae55843d3a7dad849f1`; `browser_evidence: verified`;
+`required_tour_tests: 36`; `hoot_suites_executed: true`;
+`shopify_operations: none`.
+
+`source_head_verified: false` **and that is stated rather than glossed**: this
+local invocation was made without `SOURCE_HEAD_SHA`, which only CI sets, so the
+runner recorded the checkout SHA (`tested_checkout_sha`,
+`connector_sha` = `5a02077`) without a declared head to compare it against. The
+exact-head CI below is the run that performs that comparison.
+
+Environment: Python 3.12.3, PostgreSQL 16.13, Chromium 141.0.7390.37, Odoo pin
+`30bde9ff` verified on every pass, clean worktree. The summary is retained at
+`docs/05-qa/evidence/batch-2-real-data-correction-2026-07-31/definitive-summary.json`.
+
+**Evidence class: local/CI-grade supporting evidence — NOT Odoo.sh exact-SHA
+acceptance (DEC-041 D8), NOT live-Shopify validation, NOT UAT.**
+
+## C6. Gates that remain
+
+- **Independent review of this exact corrected head.** The implementing session
+  does not review, accept, ready-mark or merge its own work, and has not.
+- **The unfinished independent browser/mutation review** that the previous
+  cycle left open still has to be completed **after** this correction, against
+  this head rather than against `ccad8bf`.
+- Exact-head **Odoo.sh** qualification. Not run here; this instruction forbids
+  it, and nothing below is offered in its place.
+- **Controlled live-Shopify validation**, whose preflight must now also verify
+  the target store is under TD-024's 20,000-product ceiling.
+- **Business UAT.**
+- Control-room acceptance and merge authorization.
+
+This PR stays draft. The PR body was not edited, no comment was posted, no
+review was submitted or requested, nothing was approved, ready-marked or
+merged, no Shopify request of any kind was made, and no credential was used.
 
 ---
 
