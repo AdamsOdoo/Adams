@@ -269,7 +269,13 @@ tours.add("shopify_connector_b2_tax_decision_tour", {
             run: "click",
         },
         {
-            trigger: `${DIALOG} .alert-info[role='status']`,
+            // `role='note'`, and the role is part of the assertion rather than
+            // incidental to it (2026-07-31). This band was `role='status'` --
+            // a live region -- on a sentence that is the same for every
+            // stopped order and that nothing in this dialog can change. The
+            // selector states the corrected semantics, so a revert to `status`
+            // fails the tour rather than passing on the class alone.
+            trigger: `${DIALOG} .alert-info[role='note']`,
             content:
                 "The dialog says why the order stopped, and that nothing is " +
                 "sent to Shopify.",
@@ -325,7 +331,11 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
             run: "click",
         },
         {
-            trigger: `${DIALOG} .alert-info[role='status']`,
+            // `role='note'`, for the same reason and with the same intent as
+            // the tax dialog above (2026-07-31): static instructional copy is
+            // document structure, and the tour asserts the role so the ruling
+            // cannot be reverted quietly.
+            trigger: `${DIALOG} .alert-info[role='note']`,
             content:
                 "The dialog says why the import stopped before asking anything.",
         },

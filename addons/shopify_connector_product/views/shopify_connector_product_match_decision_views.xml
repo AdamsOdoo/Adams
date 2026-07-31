@@ -23,7 +23,28 @@
         <field name="model">shopify.connector.product.match.decision.wizard</field>
         <field name="arch" type="xml">
             <form string="Choose the matching Odoo product">
-                <div class="alert alert-info" role="status">
+                <!--
+                    `role="note"`, NOT `role="status"` (corrected
+                    2026-07-31). Same ruling as the tax decision dialog,
+                    for the same reason: this sentence is on screen the
+                    instant the dialog opens, it is identical for every
+                    ambiguous import, and nothing a reviewer does in this
+                    dialog changes it. `status` is a live-region role and
+                    promises to announce a change; there is no change.
+                    The `alert-info` class is presentational and stays,
+                    and Odoo's `alert-*`-needs-a-live-role view warning is
+                    accepted rather than obeyed — see the tax decision
+                    dialog for the full reasoning.
+
+                    `o_sc_match_decision_wizard` is an INERT surface
+                    marker on this same band, for the same reason and with
+                    the same constraint as the tax dialog's: it adds no
+                    element to the rendered dialog, because a wizard form
+                    has no `<sheet>` and interposing a wrapper box around
+                    the body changes what an overflow instrument measures
+                    without changing a pixel.
+                -->
+                <div class="alert alert-info o_sc_match_decision_wizard" role="note">
                     <strong>This import stopped because more than one Odoo
                     record already carries the identifier Shopify sent.</strong>
                     Choose the one this Shopify record means. Nothing is sent
@@ -176,6 +197,14 @@
                 that let a reviewer type a different product in afterwards
                 would bypass every one of those checks and repoint a binding
                 that already exists.
+
+                `o_sc_match_decision` on the sheet (2026-07-31) IS INERT. No
+                connector stylesheet selects it and none is added for it; it
+                exists so the rendered-clipping instrument has a stable,
+                surface-specific root for THIS record surface. Without it the
+                instrument found no connector-owned root here at all, and both
+                the pending and the resolved decision surfaces produced zero
+                measurements while the campaign reported them as covered.
             -->
             <form string="Product Match Decision" create="false" delete="false">
                 <header>
@@ -188,14 +217,38 @@
                     <field name="state" widget="statusbar"
                            statusbar_visible="pending,confirmed,consumed"/>
                 </header>
-                <sheet>
-                    <div class="alert alert-warning" role="status"
+                <sheet class="o_sc_match_decision">
+                    <!--
+                        BOTH BANDS ARE `role="note"`, NOT `role="status"`
+                        (corrected 2026-07-31).
+
+                        `invisible` on a record form is not a live update. It
+                        is evaluated against the record that was LOADED, so
+                        whichever of these two bands applies is already on
+                        screen when the form receives focus, and neither one
+                        can replace the other while the reviewer is looking at
+                        it: `pending` becomes `confirmed` only through the
+                        dialog above, which moves focus into a modal, and the
+                        form is re-read afterwards. A `status` region that only
+                        ever changes across a reload announces nothing at the
+                        moment it changes, and announces a standing condition
+                        at the moment the form arrives — which is what a
+                        document role already conveys, in order, without
+                        interrupting.
+
+                        The `alert-warning`/`alert-secondary` classes stay: the
+                        distinction between "waiting" and "superseded" is
+                        carried by the words in each band, and the colour is
+                        the same information a second time (WCAG 1.4.1), not
+                        the only carrier of it.
+                    -->
+                    <div class="alert alert-warning" role="note"
                          invisible="state != 'pending'">
                         <strong>This import is waiting for a decision.</strong>
                         Until one is made, re-queueing the job runs the same
                         search and stops at the same ambiguity.
                     </div>
-                    <div class="alert alert-secondary" role="status"
+                    <div class="alert alert-secondary" role="note"
                          invisible="state != 'superseded'">
                         <strong>Superseded.</strong>
                         <field name="superseded_reason" readonly="1"

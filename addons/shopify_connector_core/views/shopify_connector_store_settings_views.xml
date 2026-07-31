@@ -64,7 +64,18 @@
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
             <form string="Store Settings" create="false" delete="false">
-                <sheet>
+                <!--
+                    `o_sc_store_settings` (2026-07-31) IS INERT and exists to
+                    be MEASURED. No connector stylesheet selects it and none
+                    is added for it. The rendered clipping/RTL instrument
+                    names its measured roots explicitly rather than by class
+                    prefix, and before this class it knew only the three Owl
+                    surfaces and a generic modal body — so this form, which
+                    is the canonical per-store configuration screen, produced
+                    no connector-owned measurement at any width or in either
+                    direction while the campaign counted it as covered.
+                -->
+                <sheet class="o_sc_store_settings">
                     <group>
                         <group string="Store" name="canonical_store">
                             <field name="store_id" readonly="1"

@@ -368,7 +368,15 @@ class TestOrderImportMappingStatic(TransactionCase):
         # `related` identity fields with stored snapshots -- a security-rule
         # change and a schema change, both of which must reach an existing
         # database on update. One further patch bump, recorded here.
-        self.assertEqual(manifest['version'], '19.0.2.7.0')
+        # The Batch 2 accessibility/evidence closure (2026-07-31) changed the
+        # tax decision dialog's arch: the leading instruction band moved from
+        # `role="status"` to `role="note"`, and it gained the inert
+        # `o_sc_tax_decision` surface marker. Loaded XML changed, so the
+        # module version moves with it. No model, service, security rule or
+        # schema changed, and no migration script was added -- there is
+        # nothing to migrate. One further patch bump, recorded here rather
+        # than the guard being relaxed.
+        self.assertEqual(manifest['version'], '19.0.2.8.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.8.0',
+    'version': '19.0.2.9.0',
     'summary': (
         'Shopify product import completeness (Task 010/010B): read-only '
         'Shopify product/variant import with attributes, variants, '

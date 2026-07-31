@@ -145,6 +145,158 @@ BATCH2_CHANGED_SURFACES = (
 #: stop needing to reflow because a later batch shipped.
 CHANGED_SURFACES = BATCH1_CHANGED_SURFACES + BATCH2_CHANGED_SURFACES
 
+# --- Batch 2 evidence closure (2026-07-31) -----------------------------------
+#
+# The independent review found the Batch 2 half of this campaign covered on
+# paper and hollow in three places, and all three are here rather than in a
+# comment: the surfaces that produced no connector-owned clipping measurement
+# at all, the surfaces whose RTL row was satisfied by a signal measured
+# somewhere else in the run, and the bands whose ARIA role claimed a live
+# region that could never change.
+
+#: The connector-owned MARKER each Batch 2 surface must produce a measurement
+#: for. Matched against the `markers` the overflow instrument reports for each
+#: measured root, not against `cls`: Odoo puts its own class first, so four
+#: different screens all report `o_form_sheet_bg` and a matrix keyed on that
+#: cannot say which surface a row is about. Named per surface, not derived, so
+#: a surface that stops rendering its marker is a failing row rather than a
+#: quietly missing one.
+BATCH2_SURFACE_ROOTS = {
+    'b2-store-settings-canonical': ('o_sc_store_settings',),
+    'b2-store-form-controls': ('o_sc_store_form',),
+    'b2-tax-decision-dialog': ('o_sc_tax_decision',),
+    'b2-product-match-decision-pending': ('o_sc_match_decision',),
+    'b2-product-match-decision-dialog': ('o_sc_match_decision_wizard',),
+    'b2-product-match-decision-resolved': ('o_sc_match_decision',),
+}
+
+#: The selector that proves the INTENDED surface is the one on screen, used
+#: while it is visible rather than aggregated over the run. `.o_form_view`
+#: is true of every form in the product and proves nothing about which one.
+BATCH2_SURFACE_SELECTORS = {
+    'b2-store-settings-canonical': '.o_form_view .o_sc_store_settings',
+    'b2-store-form-controls': '.o_form_view .o_sc_store_form',
+    'b2-tax-decision-dialog':
+        '.modal:not(.o_inactive_modal) .o_sc_tax_decision',
+    'b2-product-match-decision-pending': '.o_form_view .o_sc_match_decision',
+    'b2-product-match-decision-dialog':
+        '.modal:not(.o_inactive_modal) .o_sc_match_decision_wizard',
+    'b2-product-match-decision-resolved': '.o_form_view .o_sc_match_decision',
+}
+
+#: The root the RENDERED region inventory is taken inside, per surface. It is
+#: not always the identity selector above: on the two dialogs the marker is
+#: declared ON a band (adding a wrapper box would change what the overflow
+#: instrument measures -- see `OVERFLOW_JS`), and a band cannot be the scope
+#: for an inventory that has to include that band's siblings. `:has()` keeps
+#: the scope surface-specific rather than "whatever dialog is open".
+BATCH2_LIVE_REGION_ROOTS = {
+    'b2-store-settings-canonical': '.o_sc_store_settings',
+    'b2-store-form-controls': '.o_sc_store_form',
+    'b2-tax-decision-dialog':
+        '.modal:not(.o_inactive_modal) .o_form_view:has(.o_sc_tax_decision)',
+    'b2-product-match-decision-pending': '.o_sc_match_decision',
+    'b2-product-match-decision-dialog':
+        '.modal:not(.o_inactive_modal) '
+        '.o_form_view:has(.o_sc_match_decision_wizard)',
+    'b2-product-match-decision-resolved': '.o_sc_match_decision',
+}
+
+#: WAI-ARIA 1.2 §5.3.2: the live-region roles, in full. `note` is deliberately
+#: not among them, which is the whole of the semantic ruling below.
+ARIA_LIVE_REGION_ROLES = ('alert', 'log', 'marquee', 'status', 'timer')
+
+#: The view whose arch each Batch 2 surface is rendered from, as
+#: (model, xmlid). The rendered inventory can only see what the fixture put on
+#: screen -- an inactive notebook page, or a band whose `invisible` is false
+#: for this record, is simply not in the DOM. The ARCH is the complete
+#: declaration, inherited views included, so it is read as well and the two
+#: halves are asserted against each other.
+BATCH2_SURFACE_VIEWS = {
+    'b2-store-settings-canonical': (
+        'shopify.connector.store.settings',
+        'shopify_connector_core.'
+        'view_shopify_connector_store_settings_canonical_form',
+    ),
+    'b2-store-form-controls': (
+        'shopify.connector.store',
+        'shopify_connector_core.view_shopify_connector_store_form',
+    ),
+    'b2-tax-decision-dialog': (
+        'shopify.connector.tax.decision.wizard',
+        'shopify_connector_sale.view_shopify_connector_tax_decision_wizard_form',
+    ),
+    'b2-product-match-decision-pending': (
+        'shopify.connector.product.match.decision',
+        'shopify_connector_product.'
+        'view_shopify_connector_product_match_decision_form',
+    ),
+    'b2-product-match-decision-dialog': (
+        'shopify.connector.product.match.decision.wizard',
+        'shopify_connector_product.'
+        'view_shopify_connector_product_match_decision_wizard_form',
+    ),
+    'b2-product-match-decision-resolved': (
+        'shopify.connector.product.match.decision',
+        'shopify_connector_product.'
+        'view_shopify_connector_product_match_decision_form',
+    ),
+}
+
+#: THE FOUR BANDS THIS CORRECTION RE-RULED, pinned by a fragment of the
+#: sentence each one actually says. Each was `role="status"` -- a polite live
+#: region -- on content that is already on screen when the dialog or the record
+#: surface receives focus and that no interaction with that surface can change.
+#: Pinning the text as well as the role means a future edit that keeps the role
+#: and rewrites the band, or keeps the band and restores the role, fails here.
+BATCH2_STATIC_NOTE_BANDS = (
+    ('b2-tax-decision-dialog',
+     'This order stopped because Shopify charged a tax'),
+    ('b2-product-match-decision-dialog',
+     'This import stopped because more than one Odoo'),
+    ('b2-product-match-decision-pending',
+     'This import is waiting for a decision.'),
+    ('b2-product-match-decision-pending',
+     'Superseded.'),
+)
+
+#: Live regions RETAINED on a Batch 2 surface, adjudicated one by one. Each
+#: entry is (surface, role, a fragment of what it says, why it is a live
+#: region). The list is asserted for EQUALITY against what the arch declares,
+#: so a band that gains `role="status"` in any of these views fails until
+#: somebody rules on it -- and an entry that stops matching anything fails too,
+#: so this cannot rot into a list of things that used to be true.
+#:
+#: It is empty, and that IS the ruling: no connector-owned band on any of the
+#: six Batch 2 surfaces announces a change, because none of them has a change
+#: to announce. Refusals on these surfaces are announced by Odoo's own
+#: notification, which is `role="alert" aria-live="assertive"` and names the
+#: field it refused -- measured by `test_batch2_live_regions_are_truthful`
+#: rather than assumed.
+BATCH2_RETAINED_LIVE_REGIONS = ()
+
+#: Live regions on a Batch 2 surface that are declared by a module OUTSIDE
+#: this correction's allowed files, adjudicated and left exactly as they are.
+#: They are recorded here so the equality assertion above stays honest about
+#: what is on these surfaces without this session editing another batch's
+#: production view.
+BATCH2_FOREIGN_LIVE_REGIONS = (
+    ('b2-store-form-controls', 'alert',
+     "This store's API health is degraded.",
+     'S25 (shopify_connector_product_export) standing-condition banner. It is '
+     'not an instruction: it is rendered only while `api_health_state` is '
+     '`degraded`, it names a live system condition, and `alert` is the role '
+     'its own view records as deliberate. It is NOT rendered in this '
+     "campaign's fixture, which holds a healthy connected store, and the "
+     'rendered half asserts that. Out of this correction\'s allowed files; '
+     'adjudicated, not edited.'),
+    ('b2-store-form-controls', 'alert',
+     'This store is not connected.',
+     'S25 (shopify_connector_product_export) standing-condition banner, same '
+     'ruling as above; rendered only while the store is not `connected`, and '
+     'not rendered in this fixture.'),
+)
+
 #: WCAG 2.2 thresholds. SC 1.4.3 for text, SC 1.4.11 for components.
 CONTRAST_TEXT = 4.5
 CONTRAST_LARGE_TEXT = 3.0
@@ -593,14 +745,22 @@ LIVE_REGION_JS = r"""
   const LIVE_ROLES = ["alert", "log", "marquee", "status", "timer"];
   const regions = Array.from(
     root.querySelectorAll("[role], [aria-live]")
-  ).map((el) => ({
-    role: el.getAttribute("role"),
-    aria_live: el.getAttribute("aria-live"),
-    is_live_region: LIVE_ROLES.includes(el.getAttribute("role")) ||
-                    Boolean(el.getAttribute("aria-live")),
-    cls: String(el.className || "").split(/\s+/)[0],
-    text: text(el).slice(0, 400),
-  }));
+  ).map((el) => {
+    const r = el.getBoundingClientRect();
+    return {
+      role: el.getAttribute("role"),
+      aria_live: el.getAttribute("aria-live"),
+      is_live_region: LIVE_ROLES.includes(el.getAttribute("role")) ||
+                      Boolean(el.getAttribute("aria-live")),
+      cls: String(el.className || "").split(/\s+/)[0],
+      // A band nobody can see is not readable, and "the note is static" is
+      // worth nothing if the note was not on screen (Batch 2 closure).
+      visible: r.width > 0 && r.height > 0 &&
+               getComputedStyle(el).visibility !== "hidden" &&
+               getComputedStyle(el).display !== "none",
+      text: text(el).slice(0, 400),
+    };
+  });
   // An `alert-*` band with no role at all: styled to look urgent and
   // carrying nothing that tells a screen reader to read it.
   const rolelessAlerts = Array.from(
@@ -609,6 +769,31 @@ LIVE_REGION_JS = r"""
                    !String(el.className).includes("alert-link"))
    .map((el) => ({cls: String(el.className), text: text(el).slice(0, 200)}));
   return JSON.stringify({regions: regions, roleless_alerts: rolelessAlerts});
+})()
+"""
+
+#: Is the INTENDED surface on screen, and can it be seen? `%s` is the
+#: surface-specific selector. Batch 2 evidence closure (2026-07-31): an RTL row
+#: recorded against `.o_form_view` says a form was rendered, not WHICH form,
+#: and a row that names a surface has to be able to show that surface was the
+#: one measured.
+SURFACE_PRESENT_JS = r"""
+(() => {
+  const nodes = Array.from(document.querySelectorAll(%s));
+  const visible = nodes.filter((el) => {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" &&
+           cs.display !== "none";
+  });
+  return JSON.stringify({
+    matched: nodes.length,
+    visible: visible.length,
+    rects: visible.slice(0, 4).map((el) => {
+      const r = el.getBoundingClientRect();
+      return {width: Math.round(r.width), height: Math.round(r.height)};
+    }),
+  });
 })()
 """
 
@@ -734,6 +919,32 @@ def _open_dialog_js(label):
 })()
 """ % (_DRIVE_PRELUDE, json.dumps(label), json.dumps(label))
 
+def _toggle_boolean_js(selector):
+    """Flip one boolean field, the way an operator flips it.
+
+    Batch 2 evidence closure (2026-07-31). "The note band is static" is only
+    worth asserting against a REAL production state change on the same visible
+    surface, and the canonical Store Settings form is a record form whose
+    changes are field edits. A click on the checkbox is that change: Odoo
+    records it on the model and marks the form dirty, which is waited for
+    rather than assumed -- a click that landed on nothing would otherwise
+    leave the comparison measuring the same screen twice and passing.
+    """
+    return r"""
+(async () => {
+%s
+  const box = document.querySelector(%s);
+  if (!box) { throw new Error("no boolean control matched " + %s); }
+  if (box.disabled) { throw new Error(%s + " is disabled"); }
+  box.click();
+  await waitFor("the form to record the edit",
+                () => document.querySelector(".o_form_dirty"));
+  return true;
+})()
+""" % (_DRIVE_PRELUDE, json.dumps(selector), json.dumps(selector),
+       json.dumps(selector))
+
+
 OVERFLOW_JS = r"""
 (() => {
   // WHERE "DIRECTION" HAS TO BE READ, AND WHY NOT ON <html>.
@@ -751,9 +962,19 @@ OVERFLOW_JS = r"""
   // CONNECTOR SURFACE ROOT, which the components now bind to the user's
   // locale. Asserting on `documentElement` would be asserting against Odoo's
   // design, and would fail forever for a reason this repository cannot fix.
-  const root = document.querySelector(
-    ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup"
-  );
+  //
+  // BATCH 2 EVIDENCE CLOSURE (2026-07-31). `OWL_ROOT_SELECTOR` stays exactly
+  // what it was: the three surfaces the connector renders with its OWN
+  // stylesheet, whose logical properties resolve against `direction` and which
+  // therefore bind it. The Batch 2 surfaces are ordinary Odoo form views whose
+  // arch the connector owns and whose CHROME it does not -- Odoo mirrors those
+  // through its rtlcss bundle and never touches `direction` -- so promoting
+  // them into this probe would assert a property no layer of this repository
+  // sets. They are measured for direction all the same, reported separately in
+  // `connector_roots`, and the RTL test asserts the signal that actually
+  // carries RTL for each surface rather than the one that reads best.
+  const OWL_ROOT_SELECTOR = ".o_sc_dashboard, .o_sc_export_diff, .o_sc_setup";
+  const root = document.querySelector(OWL_ROOT_SELECTOR);
 
   // TD-016. WHY THE DOCUMENT TOTAL IS NOT ENOUGH.
   //
@@ -793,6 +1014,53 @@ OVERFLOW_JS = r"""
     // a connector wizard.
     ".modal:not(.o_inactive_modal) .modal-body",
     ".modal:not(.o_inactive_modal) .modal-body .o_form_view",
+    // BATCH 2 EVIDENCE CLOSURE (2026-07-31). Four of the six Batch 2 surfaces
+    // produced NO connector-owned measurement at all, at any width, in either
+    // direction, while the campaign counted them as covered: the canonical
+    // Store Settings form, the store form carrying both import control
+    // groups, and the pending and resolved match-decision record surfaces are
+    // ordinary Odoo form views, and nothing above matched them. The two that
+    // did match matched only through `.modal-body`, which is Odoo's chrome
+    // and is the same string for every dialog -- so the tax decision and the
+    // product match decision were indistinguishable in the matrix, and any
+    // dialog at all would have satisfied either row.
+    //
+    // These marker classes are declared in the connector's own view arch,
+    // carry no styling anywhere, and exist only to identify a surface.
+    // `test_the_overflow_instrument_covers_every_connector_surface` reads
+    // them out of `views/` and `wizards/` as well as `static/src/`, so a
+    // future surface that declares one and forgets this instrument fails
+    // rather than going unmeasured.
+    //
+    // The three RECORD-form markers are listed here because a `class` on
+    // `<sheet>` lands on Odoo's `.o_form_sheet_bg`, which is the box the
+    // form's content is actually laid out in and already behaves like the
+    // measured roots above.
+    //
+    // The two DIALOG markers are deliberately NOT listed, and the reason is
+    // measured rather than assumed. A wizard form has no `<sheet>`, so the
+    // only way to mark the dialog body AS A BOX was to interpose a plain
+    // block `<div>` -- and `<group>` compiles to a Bootstrap `.row`, whose
+    // negative gutter margins put its children 8px outside any intermediate
+    // block box on each side. Measured, that div reported a 16px
+    // `unhandled_self_overflow` at every width on content that is not
+    // clipped and never was: the form's own horizontal padding absorbs the
+    // gutters, exactly as before. Rather than add a box and then argue its
+    // measurement away, the dialog markers are declared on a band that is
+    // already there, no element is added to either dialog, and the roots
+    // Batch 1 measured -- the modal BODY and the wizard's own form root --
+    // are kept. `markers` below attributes each measured root to the surface
+    // that owns it, which is what the per-surface matrix actually needs.
+    ".o_sc_store_settings",
+    ".o_sc_store_form",
+    ".o_sc_match_decision",
+  ].join(", ");
+
+  //: Every connector-owned root, marked or Owl, that is actually on screen.
+  const CONNECTOR_ROOT_SELECTOR = [
+    OWL_ROOT_SELECTOR,
+    ".o_sc_store_settings", ".o_sc_store_form", ".o_sc_match_decision",
+    ".o_sc_tax_decision", ".o_sc_match_decision_wizard",
   ].join(", ");
 
   const box = (el) => {
@@ -898,9 +1166,28 @@ OVERFLOW_JS = r"""
     }
     const verticalOverflow = el.scrollHeight - el.clientHeight;
 
+    // WHICH SURFACE THIS MEASURED ROOT BELONGS TO (Batch 2 closure).
+    // `cls` is the element's FIRST class, and Odoo puts its own there:
+    // a `<sheet class="o_sc_store_settings">` renders as
+    // `class="o_form_sheet_bg o_sc_store_settings"`, so a matrix keyed on
+    // `cls` alone reports `o_form_sheet_bg` for four different screens. The
+    // connector's markers, on the root or anywhere inside it, are what say
+    // which one this row is about.
+    const markerSet = new Set();
+    for (const klass of String(el.className || "").split(/\s+/)) {
+      if (klass.startsWith("o_sc_")) { markerSet.add(klass); }
+    }
+    for (const node of el.querySelectorAll("[class*='o_sc_']")) {
+      for (const klass of String(node.className || "").split(/\s+/)) {
+        if (klass.startsWith("o_sc_")) { markerSet.add(klass); }
+      }
+    }
+
     const ownRect = own ? own.node.getBoundingClientRect() : null;
     surfaces.push({
       cls: name(el),
+      classes: String(el.className || "").split(/\s+/).filter(Boolean),
+      markers: Array.from(markerSet).sort(),
       // How far this surface's own content extends past its box, and
       // whether ANY ancestor can actually scroll to it.
       vertical_overflow: verticalOverflow,
@@ -932,6 +1219,28 @@ OVERFLOW_JS = r"""
     });
   }
 
+  // Every connector-owned root on screen, with the direction it actually
+  // computes and whether the connector owns the STYLESHEET behind it. The
+  // RTL matrix needs both: an Owl root that does not resolve `rtl` is a
+  // defect in this repository, and a marked form root that does not is Odoo
+  // mirroring through rtlcss exactly as it is designed to.
+  const connectorRoots = [];
+  for (const el of document.querySelectorAll(CONNECTOR_ROOT_SELECTOR)) {
+    const r = el.getBoundingClientRect();
+    connectorRoots.push({
+      cls: name(el),
+      // The marker, not just the first class: an RTL row that says it
+      // measured `alert` or `o_form_sheet_bg` does not say WHICH surface,
+      // and four different screens report the same first class.
+      markers: String(el.className || "").split(/\s+/)
+        .filter((klass) => klass.startsWith("o_sc_")).sort(),
+      owl: el.matches(OWL_ROOT_SELECTOR),
+      visible: r.width > 0 && r.height > 0 &&
+               getComputedStyle(el).visibility !== "hidden",
+      direction: getComputedStyle(el).direction,
+    });
+  }
+
   return JSON.stringify({
     doc_scroll_width: document.documentElement.scrollWidth,
     inner_width: window.innerWidth,
@@ -942,6 +1251,7 @@ OVERFLOW_JS = r"""
       .map((s) => s.href).filter((h) => h && h.includes(".rtl.")).length,
     connector_root: root ? root.className.split(/\s+/)[0] : null,
     connector_direction: root ? getComputedStyle(root).direction : null,
+    connector_roots: connectorRoots,
     surfaces: surfaces,
   });
 })()
@@ -1344,52 +1654,66 @@ class TestUiVisualEvidence(HttpCase):
         out.update(self._seed_batch2_tax(store))
         return out
 
-    def _seed_batch2_match(self, store):
-        if 'shopify.connector.product.match.decision' not in self.env:
-            return {}
+    def _block_match_import(self, store, candidates, gid, stamp):
+        """One ambiguous product import, stopped by PRODUCTION code.
+
+        Extracted from `_seed_batch2_match` (Batch 2 evidence closure,
+        2026-07-31) so the live-region test can raise a SECOND, NEWER
+        ambiguity for the same Shopify product and let the model's own
+        `_supersede_stale_siblings` retire the first one -- which is the only
+        honest way to render the `superseded` band, and is what makes that
+        band's semantics measurable rather than argued.
+        """
         from odoo.addons.shopify_connector_product.models.\
             shopify_connector_product_match_decision import (
                 DECISION_LEVEL_TEMPLATE,
                 build_match_evidence,
             )
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'product_import_sync',
+            'state': 'queued',
+            'payload_hash': stamp,
+            'shopify_target_gid': gid,
+        })
+        evidence = build_match_evidence(
+            self.env,
+            level=DECISION_LEVEL_TEMPLATE,
+            shopify_product_gid=gid,
+            remote_updated_at=stamp,
+            match_key='sku_reference',
+            match_values=['VIS-DUP'],
+            candidate_ids=candidates.ids,
+            candidate_total=len(candidates),
+            title_preview='Visual evidence ambiguous product',
+            sku_preview='VIS-DUP',
+        )
+        self.env['shopify.connector.job.dispatch']._route_failure(
+            job, 'ambiguous_match',
+            'Ambiguous product-template match for Shopify product %s: %d '
+            'candidate product.template record(s) found.'
+            % (gid, len(candidates)),
+            evidence,
+        )
+        job.invalidate_recordset()
+        return job, self.env[
+            'shopify.connector.product.match.decision'
+        ].sudo().search([('job_id', '=', job.id)], limit=1)
+
+    def _seed_batch2_match(self, store):
+        if 'shopify.connector.product.match.decision' not in self.env:
+            return {}
         first = self.env['product.template'].sudo().create(
             {'name': 'Visual evidence candidate A'})
         second = self.env['product.template'].sudo().create(
             {'name': 'Visual evidence candidate B'})
         (first | second).product_variant_ids.sudo().write(
             {'default_code': 'VIS-DUP'})
+        candidates = first | second
 
         def blocked(gid, stamp):
-            job = self.env['shopify.connector.job'].sudo().create({
-                'store_id': store.id,
-                'job_source': 'scheduled_sync',
-                'job_type': 'product_import_sync',
-                'state': 'queued',
-                'payload_hash': stamp,
-                'shopify_target_gid': gid,
-            })
-            evidence = build_match_evidence(
-                self.env,
-                level=DECISION_LEVEL_TEMPLATE,
-                shopify_product_gid=gid,
-                remote_updated_at=stamp,
-                match_key='sku_reference',
-                match_values=['VIS-DUP'],
-                candidate_ids=[first.id, second.id],
-                candidate_total=2,
-                title_preview='Visual evidence ambiguous product',
-                sku_preview='VIS-DUP',
-            )
-            self.env['shopify.connector.job.dispatch']._route_failure(
-                job, 'ambiguous_match',
-                'Ambiguous product-template match for Shopify product %s: 2 '
-                'candidate product.template record(s) found.' % gid,
-                evidence,
-            )
-            job.invalidate_recordset()
-            return job, self.env[
-                'shopify.connector.product.match.decision'
-            ].sudo().search([('job_id', '=', job.id)], limit=1)
+            return self._block_match_import(store, candidates, gid, stamp)
 
         pending_job, pending = blocked(
             'gid://shopify/Product/7346299043911', '2026-07-30T09:15:00Z')
@@ -1407,7 +1731,9 @@ class TestUiVisualEvidence(HttpCase):
             'match_job': pending_job,
             'match_decision': pending,
             'match_decision_resolved': resolved,
+            'match_resolved_job': resolved_job,
             'match_candidate': first,
+            'match_candidates': candidates,
         }
 
     def _seed_batch2_tax(self, store):
@@ -1989,13 +2315,24 @@ class TestUiVisualEvidence(HttpCase):
         stylesheets and fails if one of them is not measured — so the cost
         of adding a surface is one line here, and the cost of forgetting is
         a failing test rather than an unmeasured screen.
+
+        BATCH 2 EVIDENCE CLOSURE (2026-07-31): `views/` and `wizards/` are
+        read too. Until this correction every connector surface root lived in
+        an Owl template under `static/src/`, so globbing only there was
+        complete; the Batch 2 surfaces are ordinary form views and declare
+        their measured roots in the view arch, which this guard could not see
+        at all. A marker class added to a form arch and left out of the
+        instrument would have been exactly the omission this test exists to
+        prevent, going unnoticed by the test that prevents it.
         """
         import re
 
         addons = pathlib.Path(__file__).resolve().parents[2]
         found = set()
         for pattern in ('shopify_connector_*/static/src/**/*.xml',
-                        'shopify_connector_*/static/src/**/*.scss'):
+                        'shopify_connector_*/static/src/**/*.scss',
+                        'shopify_connector_*/views/**/*.xml',
+                        'shopify_connector_*/wizards/**/*.xml'):
             for path in addons.glob(pattern):
                 found.update(re.findall(r'\bo_sc_[a-z0-9_]+', path.read_text()))
         self.assertTrue(
@@ -2530,6 +2867,23 @@ class TestUiVisualEvidence(HttpCase):
         The stylesheets use logical properties throughout, which is the right
         implementation. This proves the result: `direction: rtl` actually
         reaches the document, and the surfaces still fit.
+
+        BATCH 2 EVIDENCE CLOSURE (2026-07-31): PER SURFACE, PER WIDTH. This
+        used to accept the campaign on `any(...)`: one row anywhere in the run
+        showing Odoo's flipped bundle, and one row anywhere showing `.o_rtl`,
+        satisfied the whole matrix. Every individual surface could therefore
+        have been photographed in a session that was not in RTL at all and the
+        test would have passed on its neighbours' evidence. Each row now
+        carries its own proof, taken while that exact surface was on screen:
+
+          * the INTENDED surface is present and visible -- not `.o_form_view`,
+            which is true of every form in the product;
+          * Odoo's own `.o_rtl` class is applied to this page;
+          * Odoo served at least one rtlcss bundle for this page;
+          * where the connector owns a root with its own stylesheet, that root
+            computes `direction: rtl`. Where it does not -- the Batch 2 form
+            surfaces and both dialogs -- the row says so explicitly rather
+            than borrowing an Owl surface's direction from another row.
         """
         seeded = self._seed()
         lang = self.env['res.lang'].sudo()._activate_lang('ar_001') \
@@ -2543,6 +2897,7 @@ class TestUiVisualEvidence(HttpCase):
 
         overflows, measured, connector_roots = [], {}, {}
         clipping = []
+        rows, unproved = [], []
         with self._browser() as browser:
             # TD-016: RTL is measured at every required width, not only at
             # desktop. A mirrored layout fails by pushing content off the
@@ -2563,40 +2918,128 @@ class TestUiVisualEvidence(HttpCase):
                     measured['%s@%dpx' % (name, width)] = metrics
                     if metrics['connector_direction']:
                         connector_roots[name] = metrics['connector_direction']
-                    if metrics['doc_scroll_width'] > metrics['inner_width'] + 1:
+                    surface_overflow = max(
+                        0,
+                        metrics['doc_scroll_width'] - metrics['inner_width'] - 1,
+                    )
+                    if surface_overflow:
                         overflows.append({
                             'surface': name, 'width': width,
                             'doc_scroll_width': metrics['doc_scroll_width'],
                             'inner_width': metrics['inner_width']})
-                    clipping.extend(
-                        self._clipping_defects(name, width, metrics)
-                    )
+                    row_clipping = self._clipping_defects(name, width, metrics)
+                    clipping.extend(row_clipping)
+
+                    # The intended surface, proved present while it is the one
+                    # on screen. Batch 2 surfaces have a surface-specific
+                    # marker; everything else is proved by the selector the
+                    # capture itself waited for -- and where a post-open
+                    # ACTION was run, that action's own wait selector is the
+                    # honest one. Four surfaces in this set are reached by
+                    # pressing a control, and one of them (the S7 diff)
+                    # replaces the form it was opened from, so `wait` names a
+                    # screen that is deliberately no longer there.
+                    intended = BATCH2_SURFACE_SELECTORS.get(name) or (
+                        after[1] if after else wait)
+                    presence = json.loads(self._eval(
+                        browser, SURFACE_PRESENT_JS % json.dumps(intended)))
+                    owl_roots = [
+                        entry for entry in metrics.get('connector_roots') or []
+                        if entry['owl'] and entry['visible']
+                    ]
+                    marked_roots = [
+                        entry for entry in metrics.get('connector_roots') or []
+                        if not entry['owl'] and entry['visible']
+                    ]
+                    row = {
+                        'surface': name,
+                        'width': width,
+                        'viewport': '%s (%dpx)' % (label, width),
+                        'intended_selector': intended,
+                        'intended_visible': presence['visible'],
+                        'odoo_rtl_class': metrics['odoo_rtl_class'],
+                        'rtl_stylesheets': metrics['rtl_stylesheets'],
+                        'owl_roots': owl_roots,
+                        'marked_roots': marked_roots,
+                        'connector_owns_a_directional_root': bool(owl_roots),
+                        'page_horizontal_overflow': surface_overflow,
+                        'measured_surface_count': len(metrics['surfaces']),
+                        'clipping': row_clipping,
+                    }
+                    reasons = []
+                    if not presence['visible']:
+                        reasons.append(
+                            'the intended surface %r is not visible, so this '
+                            'row is about some other screen' % intended)
+                    if not metrics['odoo_rtl_class']:
+                        reasons.append(
+                            'Odoo applied no `.o_rtl` class on this page')
+                    if not metrics['rtl_stylesheets']:
+                        reasons.append(
+                            'Odoo served no rtlcss bundle for this page')
+                    wrong_owl = [
+                        entry for entry in owl_roots
+                        if entry['direction'] != 'rtl'
+                    ]
+                    if wrong_owl:
+                        reasons.append(
+                            'connector Owl root(s) did not resolve '
+                            'right-to-left: %s' % json.dumps(wrong_owl))
+                    row['verdict'] = 'PASS' if not reasons else 'FAIL'
+                    row['unproved_because'] = reasons
+                    rows.append(row)
+                    if reasons:
+                        unproved.append(row)
         self._record(
             'rtl',
             {'lang': lang.code,
              'note': 'Odoo 19 backend sets no `dir` on <html>/<body>; its RTL '
                      'mechanism is rtlcss bundle flipping. The connector '
                      'stylesheets use logical properties, which resolve '
-                     'against `direction`, so the meaningful measurement is '
-                     'the connector surface root.',
+                     'against `direction`, so the meaningful measurement on '
+                     'an Owl surface is the connector surface root. The '
+                     'Batch 2 surfaces are ordinary Odoo form views: the '
+                     'connector owns their arch and not their chrome, Odoo '
+                     'mirrors them through the flipped bundle, and no layer '
+                     'of this repository sets `direction` on them. Their '
+                     'marked roots are measured for direction and RECORDED; '
+                     'what is ASSERTED for those rows is the signal that '
+                     'actually carries RTL for them -- `.o_rtl`, a served '
+                     'rtlcss bundle, and a mirrored layout that clips '
+                     'nothing -- taken while that exact surface was visible.',
              'widths': WIDTHS,
+             'per_surface_rows': rows,
+             'per_surface_unproved': unproved,
+             'batch2_surfaces': list(BATCH2_CHANGED_SURFACES),
              'measured': measured, 'overflows': overflows,
              'clipping': clipping},
-            'DESIGN SYSTEM §10 RTL check at every required width (V-8); '
-            'TD-016 per-surface clipping')
+            'DESIGN SYSTEM §10 RTL check at every required width (V-8), '
+            'proved per surface row; TD-016 per-surface clipping')
 
         self.assertTrue(measured, 'no surface was measured')
-        # Odoo really did switch to RTL: its own flipped bundles were served.
-        self.assertTrue(
-            any(m['rtl_stylesheets'] for m in measured.values()),
-            'Odoo served no rtlcss bundle, so the session was not actually in '
-            'an RTL locale and this measured nothing',
-        )
-        self.assertTrue(
-            any(m['odoo_rtl_class'] for m in measured.values()),
-            'Odoo did not apply its own `.o_rtl` class, so the locale did not '
-            'reach the web client',
-        )
+        # EVERY ROW CARRIES ITS OWN PROOF. `any(...)` over the run used to
+        # stand in for this, which let one surface's evidence acquit another's.
+        self.assertFalse(
+            unproved,
+            'these RTL rows are recorded against a surface with nothing '
+            'measured, while that surface was on screen, to show the page was '
+            'actually right-to-left:\n%s'
+            % json.dumps(unproved, indent=2)[:6000])
+        # The Batch 2 surfaces are named explicitly: a row that silently
+        # stopped being produced would otherwise pass by being absent.
+        for surface in BATCH2_CHANGED_SURFACES:
+            surface_rows = [row for row in rows if row['surface'] == surface]
+            self.assertEqual(
+                len(surface_rows), len(WIDTHS),
+                'the RTL matrix produced %d rows for %s, not one per required '
+                'width' % (len(surface_rows), surface))
+            for row in surface_rows:
+                self.assertGreaterEqual(
+                    len(row['marked_roots']), 1,
+                    'no connector-owned root was visible on %s at %dpx in '
+                    'RTL, so the mirrored layout of the surface this row '
+                    'names was never measured: %s'
+                    % (surface, row['width'], json.dumps(row)[:1500]))
         # And the connector's own Owl surfaces mirror, which is the part this
         # repository owns and the part logical properties depend on.
         self.assertTrue(
@@ -3310,6 +3753,617 @@ class TestUiVisualEvidence(HttpCase):
             'the announcement does not name the field that was refused, so '
             'it says only that something was wrong: %s'
             % json.dumps(announced))
+
+    # ------------------------------------------------------------------
+    # Batch 2 evidence closure (2026-07-31)
+    # ------------------------------------------------------------------
+
+    def _batch2_surfaces(self, seeded):
+        """The six Batch 2 surfaces, resolved, with the set proved complete."""
+        reachable = {
+            entry[0]: entry for entry in self._reachable_surfaces(seeded)
+        }
+        missing = [
+            name for name in BATCH2_CHANGED_SURFACES if name not in reachable
+        ]
+        self.assertFalse(
+            missing,
+            'these Batch 2 surfaces are not in the capture set, so this '
+            'evidence would cover less than it names: %s' % missing,
+        )
+        return [reachable[name] for name in BATCH2_CHANGED_SURFACES]
+
+    def test_every_batch2_surface_yields_a_connector_owned_measurement(self):
+        """No Batch 2 surface may be counted as covered while measuring zero.
+
+        THE DEFECT THIS CLOSES. The overflow instrument names its measured
+        roots explicitly, and until this correction it knew three Owl surfaces
+        and a generic `.modal-body`. Four of the six Batch 2 surfaces are
+        ordinary Odoo form views and matched none of them, so they produced NO
+        connector-owned measurement at any width -- and both dialogs matched
+        only through Odoo's own modal chrome, which is the same string for
+        every dialog, so their rows could not say which screen they were
+        about. Nothing failed, because nothing was measured; the campaign
+        reported six covered surfaces and had evidence for two of them.
+
+        So every named surface must yield at least one VISIBLE measured root
+        that belongs to it, at every required width. A surface that renders
+        nothing, renders somebody else's form, or loses its marker class is a
+        failing row here rather than a quietly absent one.
+
+        The page-level rule (§10) and the dialog's own reachability are kept
+        rather than replaced: the document must not scroll sideways, the modal
+        BODY is still measured for the two dialogs, and the final actionable
+        control -- which for a dialog lives in the FOOTER, outside the body --
+        must still be reachable.
+        """
+        seeded = self._seed()
+        rows, failures = [], []
+        with self._browser() as browser:
+            for label, width in WIDTHS.items():
+                self._viewport(browser, width)
+                for (name, path, wait, criterion, after,
+                     setup_step) in self._batch2_surfaces(seeded):
+                    if setup_step:
+                        self._set_setup_step(seeded['store'], setup_step)
+                    self._open(browser, path, wait, after)
+                    intended = BATCH2_SURFACE_SELECTORS[name]
+                    presence = json.loads(self._eval(
+                        browser, SURFACE_PRESENT_JS % json.dumps(intended)))
+                    metrics = json.loads(self._eval(browser, OVERFLOW_JS))
+                    last = json.loads(self._eval(browser, LAST_CONTROL_JS))
+
+                    expected = set(BATCH2_SURFACE_ROOTS[name])
+                    measured = [
+                        surface['cls'] for surface in metrics['surfaces']
+                    ]
+                    own = [
+                        {'cls': surface['cls'],
+                         'classes': surface['classes'],
+                         'markers': surface['markers'],
+                         'scroll_width': surface['scroll_width'],
+                         'client_width': surface['client_width'],
+                         'clipped_by': surface['clipped_by'],
+                         'clipped_silently': surface['clipped_silently']}
+                        for surface in metrics['surfaces']
+                        if expected & set(surface['markers'])
+                    ]
+                    page_overflow = max(
+                        0,
+                        metrics['doc_scroll_width']
+                        - metrics['inner_width'] - 1,
+                    )
+                    defects = self._clipping_defects(name, width, metrics)
+                    if not own:
+                        defects.append({
+                            'kind': 'no_connector_owned_measurement',
+                            'surface': name, 'width': width,
+                            'expected_markers': sorted(expected),
+                            'measured_roots': measured,
+                            'measured_markers': sorted({
+                                marker
+                                for surface in metrics['surfaces']
+                                for marker in surface['markers']
+                            }),
+                        })
+                    if not presence['visible']:
+                        defects.append({
+                            'kind': 'intended_surface_not_visible',
+                            'surface': name, 'width': width,
+                            'selector': intended, 'presence': presence,
+                        })
+                    if page_overflow:
+                        defects.append({
+                            'kind': 'page_scrolls_horizontally',
+                            'surface': name, 'width': width,
+                            'overflow': page_overflow,
+                        })
+                    if name.endswith('-dialog') and 'modal-body' not in measured:
+                        defects.append({
+                            'kind': 'modal_body_not_measured',
+                            'surface': name, 'width': width,
+                            'measured_roots': measured,
+                        })
+                    if last.get('error'):
+                        defects.append({
+                            'kind': 'no_actionable_control',
+                            'surface': name, 'width': width,
+                            'why': last['error'],
+                        })
+                    elif not last['reachable']:
+                        defects.append({
+                            'kind': 'final_control_unreachable',
+                            'surface': name, 'width': width,
+                            'control': last['selector'], 'rect': last['rect'],
+                            'viewport': last['viewport'],
+                        })
+                    row = {
+                        'surface': name,
+                        'viewport': '%s (%dpx)' % (label, width),
+                        'width': width,
+                        'intended_selector': intended,
+                        'intended_visible': presence['visible'],
+                        'expected_markers': sorted(expected),
+                        'connector_owned_roots_measured': own,
+                        'all_measured_roots': measured,
+                        'page_horizontal_overflow': page_overflow,
+                        'final_control': last,
+                        'defects': defects,
+                        'verdict': 'PASS' if not defects else 'FAIL',
+                    }
+                    rows.append(row)
+                    if defects:
+                        failures.append(row)
+                    self._shoot(
+                        browser, '%s-clipping-%dpx' % (name, width),
+                        criterion + ' (connector-owned clipping coverage; '
+                                    'TD-016)')
+        self._record(
+            'batch2-clipping-coverage',
+            {'surfaces': list(BATCH2_CHANGED_SURFACES),
+             'expected_markers': BATCH2_SURFACE_ROOTS,
+             'selectors': BATCH2_SURFACE_SELECTORS,
+             'widths': WIDTHS,
+             'rows': rows, 'failures': failures},
+            'TD-016 connector-owned clipping measured on every Batch 2 '
+            'surface, at every required width')
+        self.assertEqual(
+            len(rows), len(BATCH2_CHANGED_SURFACES) * len(WIDTHS),
+            'the coverage matrix did not measure every planned combination')
+        self.assertFalse(
+            failures,
+            'these Batch 2 surfaces produced no connector-owned clipping '
+            'measurement, or clipped their own content:\n%s'
+            % json.dumps(failures, indent=2)[:6000])
+
+    def _arch_regions(self, model, xmlid):
+        """Every ARIA/alert declaration in one surface's REAL arch.
+
+        `get_view` returns the combined arch -- inherited views included --
+        which is the complete declaration for a surface, including bands whose
+        `invisible` is true for the fixture's record and notebook pages the
+        browser has not rendered yet. The rendered inventory can only see what
+        is on screen; this sees what was declared, and the two are asserted
+        against each other rather than one standing in for the other.
+        """
+        from lxml import etree  # noqa: PLC0415
+
+        view = self.env.ref(xmlid)
+        arch = self.env[model].with_user(self.user).get_view(
+            view.id, 'form')['arch']
+        out = []
+        for node in etree.fromstring(arch).iter():
+            if not isinstance(node.tag, str):
+                continue  # comments and processing instructions
+            classes = (node.get('class') or '').split()
+            alert_classes = [
+                klass for klass in classes
+                if klass.startswith('alert-') and klass != 'alert-link'
+            ]
+            role = node.get('role')
+            live = node.get('aria-live')
+            if not (role or live or alert_classes):
+                continue
+            out.append({
+                'tag': node.tag,
+                'role': role,
+                'aria_live': live,
+                'classes': classes,
+                'alert_classes': alert_classes,
+                'invisible': node.get('invisible'),
+                'text': ' '.join(''.join(node.itertext()).split())[:400],
+            })
+        return out
+
+    def test_batch2_live_regions_are_truthful(self):
+        """What each Batch 2 band CLAIMS to be, against what it does.
+
+        THE DEFECT THIS CLOSES. Four bands on three Batch 2 surfaces carried
+        `role="status"` -- a polite ARIA live region, which promises a screen
+        reader that this region will speak when its content CHANGES. All four
+        were static instructional copy: the same sentence for every record,
+        already on screen when the dialog or the record surface received
+        focus, and unchanged by anything done on that surface. They had the
+        role because they use an `alert-*` VISUAL class and Odoo's view
+        validator asks for a live role when it sees one -- a presentational
+        heuristic standing in for a semantic decision.
+
+        WHAT IS ASSERTED, IN BOTH HALVES.
+
+        Declared (the arch, inherited views included):
+          * no band on any of the six surfaces claims a live-region role or
+            `aria-live` unless it is adjudicated by name here, and every
+            adjudication still matches something, so this cannot rot into a
+            list of exemptions for bands that no longer exist;
+          * every `alert-*` band carries SOME role, so none is styled urgent
+            and left silent;
+          * no `role="note"` carries `aria-live`, which would contradict it;
+          * the four re-ruled bands are present, as `note`, with the sentence
+            each one actually says -- so restoring the role, or keeping the
+            role and rewriting the band, fails here.
+
+        Rendered (a real browser, the real surfaces):
+          * every surface renders its adjudicated bands, visible and
+            non-empty -- a static note nobody can see is not readable;
+          * no live region is rendered inside any connector-owned Batch 2
+            root, which is the ruling made observable;
+          * the notes survive a REAL production state change on the same
+            visible surface: both dialogs are submitted with their mandatory
+            choice empty, and the note text must be identical before and
+            after while the REFUSAL reaches Odoo's own assertive live region
+            and marks exactly one field -- the one the arch declared required
+            (SC 3.3.1 / SC 4.1.3). Odoo 19 at the pin announces only
+            "Missing required fields" and names no field; that is host
+            chrome this repository does not own, so it is measured and
+            disclosed in the artifact rather than asserted around;
+          * the pending and superseded bands are proved to be a function of
+            the LOADED RECORD and not of a live update: the pending band
+            renders on a pending decision and is absent from a resolved one,
+            and the superseded band appears only after the model's own
+            `_supersede_stale_siblings` has actually retired the decision.
+        """
+        seeded = self._seed()
+        findings = {'declared': {}, 'rendered': {}}
+
+        # --- Declared -------------------------------------------------
+        declared_live, roleless, live_note = [], [], []
+        for surface in BATCH2_CHANGED_SURFACES:
+            model, xmlid = BATCH2_SURFACE_VIEWS[surface]
+            regions = self._arch_regions(model, xmlid)
+            findings['declared'][surface] = regions
+            for region in regions:
+                if (region['role'] in ARIA_LIVE_REGION_ROLES
+                        or region['aria_live']):
+                    declared_live.append(dict(region, surface=surface))
+                if region['alert_classes'] and not region['role']:
+                    roleless.append(dict(region, surface=surface))
+                if region['role'] == 'note' and region['aria_live']:
+                    live_note.append(dict(region, surface=surface))
+
+        adjudications = [
+            {'surface': surface, 'role': role, 'fragment': fragment,
+             'why': why, 'kind': kind}
+            for kind, table in (
+                ('retained', BATCH2_RETAINED_LIVE_REGIONS),
+                ('foreign', BATCH2_FOREIGN_LIVE_REGIONS),
+            )
+            for surface, role, fragment, why in table
+        ]
+
+        def matches(entry, region):
+            return (entry['surface'] == region['surface']
+                    and entry['role'] == region['role']
+                    and entry['fragment'] in region['text'])
+
+        unadjudicated = [
+            region for region in declared_live
+            if not any(matches(entry, region) for entry in adjudications)
+        ]
+        stale = [
+            entry for entry in adjudications
+            if not any(matches(entry, region) for region in declared_live)
+        ]
+        findings['adjudications'] = adjudications
+        findings['unadjudicated_live_regions'] = unadjudicated
+        findings['stale_adjudications'] = stale
+
+        # --- Rendered -------------------------------------------------
+        note_texts, refusals = {}, {}
+        dialog_surfaces = (
+            'b2-tax-decision-dialog', 'b2-product-match-decision-dialog',
+        )
+
+        def inventory(browser, surface):
+            root = BATCH2_LIVE_REGION_ROOTS[surface]
+            payload = json.loads(
+                self._eval(browser, LIVE_REGION_JS % json.dumps(root)))
+            self.assertNotIn(
+                'error', payload,
+                'the connector-owned root %r was not on screen for %s, so '
+                'nothing about that surface was inventoried'
+                % (root, surface))
+            return payload
+
+        def notes(payload):
+            return sorted(
+                region['text'] for region in payload['regions']
+                if region['role'] == 'note'
+            )
+
+        reachable = {
+            entry[0]: entry for entry in self._reachable_surfaces(seeded)
+        }
+        with self._browser() as browser:
+            self._viewport(browser, WIDTHS['desktop'])
+
+            # The two dialogs, each driven to its own production refusal.
+            for surface in dialog_surfaces:
+                _n, path, wait, _c, after, _s = reachable[surface]
+                self._open(browser, path, wait, after)
+                before = inventory(browser, surface)
+                findings['rendered']['%s:opened' % surface] = before
+                refusal = json.loads(
+                    self._eval(browser, INVALID_SUBMIT_JS, timeout=90.0))
+                refusals[surface] = refusal
+                after_refusal = inventory(browser, surface)
+                findings['rendered']['%s:refused' % surface] = after_refusal
+                note_texts[surface] = (notes(before), notes(after_refusal))
+                self._dismiss_dialogs(browser)
+
+            # The pending decision, and the same form on a decision that is
+            # no longer pending: the band's presence is a property of the
+            # RECORD, which is exactly why it is not a live region.
+            for surface in ('b2-product-match-decision-pending',
+                            'b2-product-match-decision-resolved'):
+                _n, path, wait, _c, after, _s = reachable[surface]
+                self._open(browser, path, wait, after)
+                payload = inventory(browser, surface)
+                findings['rendered'][surface] = payload
+                note_texts[surface] = (notes(payload), notes(payload))
+
+            # The superseded band, reached by actually superseding the
+            # decision through the model's own path rather than by writing
+            # the state this test wants to photograph.
+            resolved = seeded.get('match_decision_resolved')
+            self._block_match_import(
+                seeded['store'], seeded['match_candidates'],
+                resolved.shopify_product_gid, '2026-07-30T09:17:00Z')
+            resolved.invalidate_recordset()
+            self.env.flush_all()
+            self.assertEqual(
+                resolved.state, 'superseded',
+                'the production supersession path did not retire the '
+                'decision, so the superseded band cannot be measured here')
+            _n, path, wait, _c, after, _s = (
+                reachable['b2-product-match-decision-resolved'])
+            self._open(browser, path, wait, after)
+            superseded = inventory(browser, 'b2-product-match-decision-resolved')
+            findings['rendered']['b2-superseded'] = superseded
+
+            # The store form: inventory only. Nothing on it is editable, and
+            # its only declared live regions belong to another module and are
+            # not rendered for a healthy connected store.
+            _n, path, wait, _c, after, _s = reachable['b2-store-form-controls']
+            self._open(browser, path, wait, after)
+            findings['rendered']['b2-store-form-controls'] = inventory(
+                browser, 'b2-store-form-controls')
+
+            # Store Settings LAST, because the drive here is a real field
+            # edit: the form is left dirty on purpose, and navigating away
+            # from a dirty form raises Odoo's own unsaved-changes dialog,
+            # which would measure a confirmation prompt instead of a surface.
+            surface = 'b2-store-settings-canonical'
+            _n, path, wait, _c, after, _s = reachable[surface]
+            self._open(browser, path, wait, after)
+            before = inventory(browser, surface)
+            findings['rendered']['%s:opened' % surface] = before
+            toggled = self._eval(
+                browser,
+                _toggle_boolean_js(
+                    ".o_field_widget[name='product_domain_enabled'] "
+                    "input[type='checkbox']"),
+                timeout=90.0)
+            self.assertTrue(toggled, toggled)
+            after_edit = inventory(browser, surface)
+            findings['rendered']['%s:edited' % surface] = after_edit
+            note_texts[surface] = (notes(before), notes(after_edit))
+
+        self._record(
+            'batch2-live-region-semantics',
+            {'criteria': ['WAI-ARIA 1.2 §5.3.2 live regions',
+                          'WCAG 2.2 SC 4.1.3 Status Messages',
+                          'WCAG 2.2 SC 3.3.1 Error Identification'],
+             'ruling': (
+                 'A band that is on screen when the surface receives focus '
+                 'and cannot change while it is on screen is document '
+                 'structure, not a live region, whatever visual class it '
+                 'uses. `role="note"` is the recorded answer; Odoo\'s '
+                 '`alert-*`-needs-a-live-role view warning is a '
+                 'presentational heuristic and is accepted rather than '
+                 'obeyed, because obeying it declares a region with nothing '
+                 'to announce.'),
+             'host_framework_limitation': {
+                 'what': 'Odoo 19 at the pinned commit 30bde9ff announces a '
+                         'refused save as the bare string "Missing required '
+                         'fields" -- `Record._displayInvalidFieldNotification` '
+                         'in web/static/src/model/relational_model/record.js, '
+                         'which no form controller overrides. The '
+                         'announcement does not name the field.',
+                 'consequence': 'The refusal IS announced, assertively, by '
+                                'Odoo\'s own `role="alert" '
+                                'aria-live="assertive"` notification. The '
+                                'ATTRIBUTION is carried in the DOM instead: '
+                                'exactly one field is marked invalid, and it '
+                                'is the one the connector\'s arch declared '
+                                'required.',
+                 'ownership': 'Odoo chrome, not connector arch. Not fixable '
+                              'from this repository without patching core. '
+                              'Measured and disclosed here rather than '
+                              'asserted around, and the assertions above say '
+                              'only what is true: announced assertively, and '
+                              'attributed to exactly one named field.',
+             },
+             'surfaces': list(BATCH2_CHANGED_SURFACES),
+             'findings': findings,
+             'note_texts_before_and_after': note_texts,
+             'refusals': refusals},
+            'Batch 2 status/note/alert inventory and semantic adjudication')
+
+        # --- Declared assertions --------------------------------------
+        self.assertTrue(
+            findings['declared'],
+            'no Batch 2 arch was read at all, so this proves nothing')
+        self.assertFalse(
+            unadjudicated,
+            'these Batch 2 bands declare a live region that nobody has ruled '
+            'on. A live region must be able to say what changes it '
+            'announces:\n%s' % json.dumps(unadjudicated, indent=2)[:4000])
+        self.assertFalse(
+            stale,
+            'these live-region adjudications match nothing in the arch any '
+            'more, so this list has stopped describing the product:\n%s'
+            % json.dumps(stale, indent=2)[:2000])
+        self.assertFalse(
+            roleless,
+            'these Batch 2 bands are styled as alerts and carry no role, so '
+            'a screen reader is given no reason to read them:\n%s'
+            % json.dumps(roleless, indent=2)[:2000])
+        self.assertFalse(
+            live_note,
+            'these `role="note"` bands declare `aria-live`, which contradicts '
+            'the document role they were given:\n%s'
+            % json.dumps(live_note, indent=2)[:2000])
+        for surface, fragment in BATCH2_STATIC_NOTE_BANDS:
+            hits = [
+                region for region in findings['declared'][surface]
+                if fragment in region['text']
+            ]
+            self.assertTrue(
+                hits,
+                'the re-ruled band %r is not declared on %s any more, so the '
+                'ruling this test exists to hold has nothing to hold'
+                % (fragment, surface))
+            self.assertTrue(
+                all(region['role'] == 'note' for region in hits),
+                'the band %r on %s is not `role="note"`: %s'
+                % (fragment, surface,
+                   json.dumps([region['role'] for region in hits])))
+
+        # --- Rendered assertions --------------------------------------
+        rendered_live = []
+        for key, payload in findings['rendered'].items():
+            for region in payload['regions']:
+                if (region['role'] in ARIA_LIVE_REGION_ROLES
+                        or region['aria_live']):
+                    rendered_live.append(dict(region, where=key))
+            self.assertFalse(
+                payload['roleless_alerts'],
+                'alert bands with no role rendered on %s: %s'
+                % (key, json.dumps(payload['roleless_alerts'])[:1000]))
+        self.assertFalse(
+            rendered_live,
+            'these live regions rendered inside a connector-owned Batch 2 '
+            'root. Every band on these surfaces is static, so any of them '
+            'announcing itself is announcing nothing:\n%s'
+            % json.dumps(rendered_live, indent=2)[:4000])
+
+        # Every surface actually showed the reader something.
+        for surface in BATCH2_CHANGED_SURFACES:
+            if surface == 'b2-store-form-controls':
+                # No note band is declared on it; the assertion above already
+                # proves it renders no live region, and inventing one here
+                # would be a test asserting a band that does not exist.
+                continue
+            keys = [
+                key for key in findings['rendered']
+                if key == surface or key.startswith('%s:' % surface)
+            ]
+            self.assertTrue(keys, 'no rendered inventory for %s' % surface)
+            visible_notes = [
+                region
+                for key in keys
+                for region in findings['rendered'][key]['regions']
+                if region['role'] == 'note' and region['visible']
+                and region['text']
+            ]
+            self.assertTrue(
+                visible_notes,
+                'no visible, non-empty `role="note"` band rendered on %s, so '
+                '"the note stays static and readable" is measuring nothing'
+                % surface)
+
+        # The notes did not move while a real state change happened.
+        for surface, (before_notes, after_notes) in note_texts.items():
+            self.assertEqual(
+                before_notes, after_notes,
+                'the static bands on %s changed while a real production state '
+                'change was driven on that same visible surface, so they ARE '
+                'live regions and a document role silences them' % surface)
+
+        # The pending band belongs to the record, not to a live update.
+        pending_notes = [
+            region['text'] for region in
+            findings['rendered']['b2-product-match-decision-pending']['regions']
+            if region['role'] == 'note'
+        ]
+        resolved_notes = [
+            region['text'] for region in
+            findings['rendered']['b2-product-match-decision-resolved']['regions']
+            if region['role'] == 'note'
+        ]
+        superseded_notes = [
+            region['text'] for region in
+            findings['rendered']['b2-superseded']['regions']
+            if region['role'] == 'note'
+        ]
+        self.assertTrue(
+            any('waiting for a decision' in text for text in pending_notes),
+            'the pending decision surface did not render its waiting band: %s'
+            % json.dumps(pending_notes))
+        self.assertFalse(
+            any('waiting for a decision' in text for text in resolved_notes),
+            'a decision that is no longer pending still renders the waiting '
+            'band, so the band is not a function of the record after all: %s'
+            % json.dumps(resolved_notes))
+        self.assertTrue(
+            any('Superseded' in text for text in superseded_notes),
+            'the superseded band did not render on a genuinely superseded '
+            'decision, so its semantics were never measured: %s'
+            % json.dumps(superseded_notes))
+
+        # And the refusals are still announced, and still attributed.
+        for surface in dialog_surfaces:
+            refusal = refusals[surface]
+            self.assertTrue(
+                refusal.get('invalid_shown'),
+                'submitting %s with its mandatory choice empty marked no '
+                'field invalid, so the operator is not told what is wrong: %s'
+                % (surface, json.dumps(refusal)[:1000]))
+            announced = [
+                region for region in refusal['announced']
+                if region['role'] in ('alert', 'status') or region['aria_live']
+            ]
+            self.assertTrue(
+                announced,
+                'the refusal on %s reached no live region: %s'
+                % (surface, json.dumps(refusal)[:1000]))
+            expected_field = {
+                'b2-tax-decision-dialog': 'account_tax_id',
+                'b2-product-match-decision-dialog': 'selected_template_id',
+            }[surface]
+            named = [
+                field for field in refusal['invalid_fields']
+                if field['field'] == expected_field
+            ]
+            self.assertTrue(
+                named,
+                'the refusal on %s did not attribute itself to %r: %s'
+                % (surface, expected_field,
+                   json.dumps(refusal['invalid_fields'])))
+            # ATTRIBUTION IS PRECISE, not blanket. A form that marked every
+            # field invalid would satisfy the assertion above while telling
+            # the operator nothing about which one to fill in.
+            #
+            # Odoo marks the field WIDGET and its LABEL, and the label
+            # carries no `name` of its own, so the raw list holds one unnamed
+            # entry per refused field. That is host chrome; it stays in the
+            # artifact rather than being filtered out of the record, and what
+            # is asserted is that exactly one NAMED field is refused.
+            named_fields = sorted({
+                field['field'] for field in refusal['invalid_fields']
+                if field['field']
+            })
+            self.assertEqual(
+                named_fields, [expected_field],
+                'the refusal on %s marked named fields other than the one it '
+                'refused, so the attribution does not point anywhere: %s'
+                % (surface, json.dumps(refusal['invalid_fields'])))
+            self.assertTrue(
+                any(region['aria_live'] == 'assertive'
+                    or region['role'] == 'alert' for region in announced),
+                'the refusal on %s was announced politely or not at all; a '
+                'refused submission is not a status update: %s'
+                % (surface, json.dumps(announced)[:1500]))
 
 
 def odoo_http_port():

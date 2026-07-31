@@ -10,6 +10,26 @@
         fingerprint would let an administrator map one tax while believing
         they had mapped another. The rate and inclusion posture are shown
         because they are the two facts that make a candidate eligible at all.
+
+        `o_sc_tax_decision` (2026-07-31) IS AN INERT SURFACE MARKER. It carries
+        no styling in any connector stylesheet and none is added for it, and
+        it deliberately adds NO element to the rendered dialog: it is declared
+        on a band that is already there. Before it, the rendered-evidence
+        instrument reached this dialog only through `.modal-body`, which is
+        Odoo's chrome and matches whatever dialog happens to be open — so the
+        tax dialog and the product-match dialog produced measurements that
+        were indistinguishable from each other, and a surface that failed to
+        open would still have been measured as *something*. This class is what
+        lets a clipping or RTL row say which screen it is about.
+
+        WHY IT IS NOT A WRAPPER. A wizard form has no `<sheet>`, so marking
+        the surface as a whole meant interposing a plain block `<div>` around
+        the dialog body — and `<group>` compiles to a Bootstrap `.row`, whose
+        negative gutter margins put its children 8px outside any intermediate
+        block box on each side. Measured, that reported a 16px overflow at
+        every width on content that is not clipped and never was (the form's
+        own horizontal padding absorbs the gutters, exactly as before). Rather
+        than add a box and then argue its measurement away, no box is added.
     -->
 
     <record id="view_shopify_connector_tax_decision_wizard_form"
@@ -18,7 +38,33 @@
         <field name="model">shopify.connector.tax.decision.wizard</field>
         <field name="arch" type="xml">
             <form string="Map this Shopify tax">
-                <div class="alert alert-info" role="status">
+                <!--
+                    `role="note"`, NOT `role="status"` (corrected
+                    2026-07-31).
+
+                    This band is on screen the instant the dialog opens and
+                    its wording never varies: it is the same sentence for
+                    every stopped order, and nothing an administrator does
+                    inside this dialog changes a word of it. WAI-ARIA 1.2
+                    lists the live-region roles as alert, log, marquee,
+                    status and timer; `status` promises a screen-reader
+                    user that this region will tell them when something
+                    CHANGES. A region that can never change spends that
+                    promise on nothing, and the announcement competes with
+                    the dialog's own arrival for the same attention.
+
+                    The `alert-info` class stays because it is
+                    PRESENTATIONAL — it is why this reads as the reason
+                    the dialog opened rather than as one more paragraph.
+                    Odoo's view validator warns on an `alert-*` class whose
+                    role is not alert/alertdialog/status; that warning
+                    encodes a visual heuristic, and it is accepted here
+                    rather than obeyed, because obeying it means declaring
+                    a live region that has nothing to announce. The same
+                    answer was already recorded for the withdrawal
+                    dialog's note band in Batch 1.
+                -->
+                <div class="alert alert-info o_sc_tax_decision" role="note">
                     <strong>This order stopped because Shopify charged a tax
                     the connector has not been told about.</strong>
                     Choose the Odoo tax it means. Nothing is sent to Shopify,
