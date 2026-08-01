@@ -565,8 +565,12 @@ Three concepts are kept separate and labelled so they cannot be confused:
 ### 9.1 Refresh contract
 
 Manual Refresh button + auto-refresh ≥30 s, paused in hidden tabs (existing
-`PB-12` behaviour, `shopify_connector_dashboard.js:84-134`). Header shows
-"Updated HH:MM" from `generated_at`. Nothing is labelled live.
+`PB-12` behaviour, `shopify_connector_dashboard.js:84-134`). The header
+separates **page generation time** ("Page updated HH:MM", from `generated_at`)
+from **Shopify-source freshness** ("Shopify order data synchronized through
+HH:MM", from the applicable completed order checkpoint/evidence timestamp).
+Refreshing the page must never advance or visually replace the Shopify-source
+timestamp. Nothing is labelled live.
 
 ### 9.2 Severity model
 
@@ -584,12 +588,17 @@ have caught up. It does **not** claim Shopify Analytics parity, and it does
 never imported, so "complete" means "all discoverable importable orders have
 landed", nothing more). The bridge caption carries this scope.
 
-| State | Truthful condition (all fields stored today) |
+| State | Truthful condition |
 | --- | --- |
-| **Complete & current** | `order_sync_scheduled` true · G2 = 0 · G3 = 0 · checkpoint age ≤ 45 min (3× the 15-min scan cron) |
-| **Processing** | G2 > 0, G3 = 0, checkpoint age ≤ 45 min — figures may rise shortly; no alarm |
-| **Stale** | checkpoint age > 45 min with scheduling on, or scheduling off with import history present |
-| **Incomplete — action needed** | G3 > 0, or store `reconnect_needed/disconnected`, or sale domain disabled while other flows run → region B renders the critical band naming the commercial consequence |
+| **Complete & current** | `order_sync_scheduled` true · store connected · G2 = 0 · G3 = 0 · checkpoint age ≤ 45 min (3× the 15-min scan cron) · the last complete order catch-up is stamped for the current `connection_generation`; when fulfillment-derived L4 data is shown, its completed reconciliation generation must also match |
+| **Processing** | G3 = 0 and either G2 > 0 or current-generation reconnect catch-up is running — figures may rise shortly; no alarm |
+| **Stale** | checkpoint age > 45 min with scheduling on, scheduling off with import history present, or a reconnect succeeded but no complete catch-up is stamped for the current generation |
+| **Incomplete — action needed** | G3 > 0, catch-up failed/partially traversed, store `reconnect_needed/disconnected`, or sale domain disabled while other flows run → region B renders the critical band naming the commercial consequence |
+
+The generation-bound completion stamps are a **backend prerequisite** for this
+UI contract; checkpoint age alone can never return a reconnected store to
+"Complete & current". A failed or partial traversal does not advance the
+relevant completion stamp or watermark.
 
 ### 9.4 Empty states (three distinguishable variants, correction §7)
 
@@ -613,6 +622,46 @@ landed", nothing more). The bridge caption carries this scope.
    Separately, when the caller lacks `sale.order` read access: "Your role
    can't read sales amounts — connector health is unaffected", detected by
    catching the ACL refusal server-side. Never rendered as `0.00`.
+
+### 9.5 Disconnect / reconnect source-and-freshness experience
+
+The dashboard reads stored Odoo data; it does not issue live Shopify queries.
+The presentation must make that architecture understandable without exposing
+implementation jargon:
+
+- **While disconnected:** preserve historical/last-known Shopify-derived
+  figures; never replace them with zero. Region B says: "Shopify connection
+  unavailable — figures are last known and may be incomplete · synchronized
+  through *timestamp*." Odoo-native operational values (for example Delivery
+  Order dispatch state and connector job state) may continue changing and are
+  labelled as Odoo activity, not Shopify freshness.
+- **Immediately after reconnect:** show "Reconciliation in progress" and retain
+  the original Shopify synchronization timestamp. A successful connection
+  probe or a young pre-disconnect checkpoint is not enough to show green.
+- **After complete current-generation catch-up:** advance the relevant Shopify
+  source timestamp and allow "Complete & current" only when §9.3 also passes.
+- **After partial or failed catch-up:** remain Stale/Incomplete, name the failed
+  domain (orders, payment evidence or fulfillment), and provide a direct Review
+  route. Never stamp a partial traversal as complete.
+- **Source clarity:** commercial KPIs are labelled "Imported Shopify sales
+  (stored in Odoo)"; payment/fulfillment strips say "Shopify status observed
+  through *timestamp*"; warehouse dispatch says "Odoo delivery status · page
+  updated *timestamp*". The page timestamp and every Shopify-source timestamp
+  remain visually distinct.
+- **Long gaps:** when complete coverage cannot be proven, including a gap beyond
+  Shopify's ordinary 60-day order-access window without `read_all_orders`,
+  show a visible coverage warning rather than a green/current state.
+
+Acceptance is the live campaign's reconnect source/freshness case
+`R-4`: baseline → disconnect → synthetic Shopify order/payment/fulfillment
+changes plus an Odoo delivery change → disconnected capture → reconnect capture
+before catch-up → terminal catch-up reconciliation → forced partial-failure
+capture. Every displayed count must still equal its drill-down population and
+no Shopify GID, binding or Odoo order may duplicate.
+
+This requirement is an improvement for the future Store 360 implementation.
+It is not a claim that PR #204 already ships Store 360, and its absence is not
+retroactively treated as a PR #204 UAT failure.
 
 ## 10. Visual direction
 
