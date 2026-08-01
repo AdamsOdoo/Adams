@@ -153,11 +153,24 @@ body {
 }
 
 /* State switching: an element tagged data-states is visible only in the
- * page states its space-separated list names. */
-[data-state="healthy"]   .sc360 [data-states]:not([data-states~="healthy"]),
-[data-state="attention"] .sc360 [data-states]:not([data-states~="attention"]),
-[data-state="empty"]     .sc360 [data-states]:not([data-states~="empty"]) {
+ * page states its space-separated list names. attention-rtl is the
+ * representative Arabic rendering of the attention state (correction §8A). */
+[data-state="healthy"]       .sc360 [data-states]:not([data-states~="healthy"]),
+[data-state="attention"]     .sc360 [data-states]:not([data-states~="attention"]),
+[data-state="attention-rtl"] .sc360 [data-states]:not([data-states~="attention-rtl"]),
+[data-state="empty"]         .sc360 [data-states]:not([data-states~="empty"]) {
     display: none !important;
+}
+
+/* Visually hidden, available to assistive technology. */
+.sr-only {
+    position: absolute;
+    inline-size: 1px; block-size: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* ---------- A. Header ---------- */
@@ -544,6 +557,57 @@ table.sc-table {
 .sc-badge--warning { background: var(--sc-warning-bg); color: var(--sc-warning-text); }
 .sc-badge--neutral { background: var(--sc-neutral-bg); color: var(--sc-neutral-text); }
 
+/* ---------- L. Order lifecycle ---------- */
+.sc-h3 {
+    margin: 0 0 var(--sc-space-2);
+    font-size: var(--sc-fs-secondary);
+    font-weight: var(--sc-fw-label);
+    color: var(--sc-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.sc-life-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sc-space-3);
+    margin-block-start: var(--sc-space-3);
+}
+.sc-life-col {
+    border: 1px solid var(--sc-border);
+    border-radius: var(--sc-radius);
+    padding: var(--sc-space-3);
+    background: var(--sc-surface-1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sc-space-2);
+}
+.sc-dist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+.sc-dist li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sc-space-3);
+    padding-block: 6px;
+    border-block-end: 1px solid var(--sc-border);
+    font-size: var(--sc-fs-secondary);
+}
+.sc-dist li:last-child { border-block-end: 0; }
+.sc-dist__val {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sc-space-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+.sc-dist__val b { font-weight: var(--sc-fw-dominant); }
+.sc-life-col .sc-note { margin-block-start: auto; }
+
 /* ---------- H. Multi-store ---------- */
 .sc-stores .sc-state { margin-inline-end: 0; }
 
@@ -626,12 +690,71 @@ table.sc-table {
         letter-spacing: 0.04em;
     }
 }
+@media (max-width: 1023px) {
+    .sc-life-grid { grid-template-columns: minmax(0, 1fr); }
+}
 @media (max-width: 640px) {
     .sc360 { padding: var(--sc-space-3); }
     .sc-kpis { grid-template-columns: minmax(0, 1fr); }
     .sc-counters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sc-head__controls { inline-size: 100%; }
     .sc-critical { flex-wrap: wrap; }
+
+    /* Correction §8B: the Stores table becomes stacked store cards on
+     * mobile — every essential field and the primary Open action visible
+     * with NO horizontal scrolling. (Other, secondary tables keep their
+     * sanctioned scroll container.) */
+    .sc-stores .sc-table-wrap { overflow-x: visible; }
+    .sc-stores table, .sc-stores tbody, .sc-stores tr, .sc-stores td {
+        display: block;
+        inline-size: 100%;
+    }
+    .sc-stores caption { display: block; }
+    .sc-stores thead { display: none; }
+    .sc-stores tr {
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-1);
+        padding: var(--sc-space-3);
+        margin-block-end: var(--sc-space-3);
+    }
+    .sc-stores tr:last-child { margin-block-end: 0; }
+    .sc-stores td {
+        border: 0;
+        padding-block: 3px;
+        padding-inline: 0;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--sc-space-3);
+    }
+    .sc-stores td.num { text-align: end; }
+    .sc-stores td[data-label]::before {
+        content: attr(data-label);
+        color: var(--sc-text-secondary);
+        font-size: var(--sc-fs-caption);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        flex: 0 0 auto;
+    }
+    .sc-stores td.cell-store {
+        font-weight: var(--sc-fw-dominant);
+        font-size: var(--sc-fs-body);
+    }
+    .sc-stores td.cell-store::before { content: none; }
+    .sc-stores td.cell-open { justify-content: flex-end; }
+
+    /* Correction §8C: keep the chart's axis labels, legend and the final
+     * hatched (incomplete-period) bar legible at 390 px. The SVG scales
+     * with the viewBox, so the label font is raised to compensate
+     * (19 viewBox-px ≈ 10.5 rendered px at 390 px). CSS wins over the
+     * SVG presentation attributes. */
+    .sc-chart-svg text { font-size: 19px; }
+}
+@media (max-width: 380px) {
+    /* 320 px reflow: single-column counters, tighter page padding. */
+    .sc-counters { grid-template-columns: minmax(0, 1fr); }
+    .sc360 { padding: var(--sc-space-2); }
 }
 
 /* ---------- Reduced motion ---------- */

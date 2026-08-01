@@ -1,3 +1,86 @@
+### Shopify Store 360 design concept + control-room correction (2026-08-01)
+
+- **Branch / PR:** `fable/ui-operations-360-concept` (isolated concept branch
+  from the exact PR #204 head `a1c5931`); **no PR opened**. PR #204 untouched
+  (open, draft, head `a1c5931`, base `mvp/program-integration@87f1763a`).
+  Two additive commits total: `c8189e9` (the concept: benchmark, spec,
+  prototype + 6 screenshots, implementation handoff) and this session's
+  single correction commit (see git log; documentation/prototype only).
+- **Files changed (correction):**
+  `docs/02-product/ui-operations-360-dashboard-spec-2026-08-01.md`,
+  `docs/07-implementation-plan/ui-operations-360-dashboard-handoff-2026-08-01.md`,
+  `docs/02-product/prototypes/shopify-operations-360-dashboard.{html,css}`,
+  8 PNGs under `docs/02-product/prototypes/operations-360-dashboard-2026-08-01/`
+  (6 regenerated + 2 new lifecycle captures), this file. Benchmark unchanged
+  (verified: its only related passage, the "Net sales" rejection, stays
+  correct).
+- **What changed / residue fixed:** (1) the handoff's raw-SQL aggregate
+  recommendation was **withdrawn** — official Odoo 19 guidance says raw SQL
+  bypasses ORM security, and mirrored predicates cannot reproduce arbitrary
+  `sale.order` record rules; replaced by connector-owned stored projection
+  fields on the sale documents + rule-respecting `formatted_read_group`
+  aggregation as the current user, with mandatory adversarial
+  record-rule tests and an honest migration/backfill reclassification;
+  (2) Shopify Sales Analysis got a feasible source (`sale.report`
+  `_auto=False` view extension via its documented seams) and is reclassified
+  "include with dashboard — requires reporting backend enhancement";
+  (3) metric truth: exact historical-coverage claims removed (no stored
+  boundary exists; earliest imported order proves nothing), dynamic
+  test-order disclosure added (`order_import_include_test`), top-product
+  share renamed "Share of goods subtotal" with a same-basis denominator,
+  bridge scoped to import completeness; (4) an Order lifecycle region (L)
+  was designed on exact-head fields only — payment snapshot buckets, COD
+  approval/commercial/collection states, order-fulfillment snapshot +
+  Odoo dispatch — with carrier delivery, COD amounts (Char), COD
+  dispatch/delivery lifecycle and discrepancy alerts all proven unsupported
+  at `a1c5931` and classified as backend enhancements (spec §7.3–§7.5,
+  workflow matrix §14, gap registers handoff §15); (5) prototype fixtures
+  reconciled arithmetically (healthy 7-day failures 2→0; needs-review
+  decomposition 6 = 2+2+1+1; backlog 27 = 26 flows + 1 disclosed control
+  job) and now machine-checked from the rendered DOM; (6) RTL baseline is a
+  representative Arabic state with bdi isolation; mobile Stores became
+  stacked cards with the Open action measured on-screen; 320 px reflow and
+  200 % zoom verified.
+- **Items deferred:** carrier-delivery reporting, COD numeric amounts,
+  COD lifecycle writers, discrepancy detection, gateway dimension, exact
+  coverage boundary, "Net sales", cross-currency totals — each with reasons
+  in spec §7–§8 and handoff §15.
+- **Learning feedback loop:** *New issues:* a security architecture can pass
+  a design review while silently narrowing "record rules apply" to "the
+  rules I mirrored" — countered by requiring the queried model to BE the
+  ruled model; demonstration fixtures can encode impossible states (healthy
+  "2 failed") unless machine-reconciled against the displayed definitions —
+  the harness now recomputes every fixture sum from the DOM. *Repeated
+  patterns:* dormant selection values/fields (delivered_inconsistency,
+  cod_fulfillment_state, `discrepancy`, `cancelled` COD state) keep
+  tempting UI claims; the "no writer at head" check is now a standing gate
+  column. *Rules/checklists updated:* spec gate gained lifecycle rows + a
+  writer-existence requirement; verification checklist gained 320 px / 200 %
+  zoom / fixture-arithmetic / RTL-language checks. *New rejected
+  approaches:* raw-SQL commercial aggregation (revisit condition: an
+  ORM-generated-clause mechanism that provably injects every applicable
+  rule) and binding-side commercial aggregation (rejected: sale rules would
+  not apply) — recorded in handoff §6/§15 G-T1; **adding them to
+  `rejected-approaches-log.md` is deferred** because that path was not in
+  this correction's allowed list. *Technical debt:* none accepted (design
+  docs only). *Architecture concerns:* the slice-1 projection puts
+  connector columns on `sale.order` — flagged for control-room review in
+  handoff §6. *Tests/gates needed:* the §8 adversarial record-rule suite is
+  mandatory for slice 1. *Future prompts:* Yes — implementation packets for
+  Store 360 should carry the projection-protection and record-rule tests as
+  named acceptance criteria.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked
+  YES · learning captured YES (this block + handoff §15 registers) ·
+  rejected approach logged — recorded in the design handoff; dedicated log
+  entry deferred (path not authorized) · technical debt logged n/a ·
+  repeated-issue escalation applied YES (writer-existence gate column).
+- **Next recommended session:** control-room review of the corrected
+  concept (security architecture §6, lifecycle scope §7.3–§7.5, slices §13)
+  — the concept remains NOT accepted and NOT implemented.
+- **Stop condition:** documentation/prototype-only correction on the
+  isolated concept branch; no production code, no PR, no acceptance; stopped
+  after one additive commit and this handoff.
+
 ### Batch 2 real-data and company-isolation correction (2026-07-31)
 
 - **Branch / PR:** `fable/wave-5-completion`, continuing draft

@@ -11,6 +11,8 @@
 <!-- ============================================================
      PROTOTYPE CHROME — not part of the proposed product surface.
      Switches the static demonstration states. No network, no timers.
+     The RTL state is a representative Arabic rendering of the
+     attention state (same fixture numbers), per correction §8A.
      ============================================================ -->
 <div class="proto-bar">
   <span class="proto-bar__label">DESIGN PROTOTYPE — NOT LIVE DATA</span>
@@ -20,8 +22,8 @@
     <button type="button" data-set-state="empty" aria-pressed="false">Empty</button>
   </div>
   <div class="proto-bar__group" role="group" aria-label="Reading direction">
-    <button type="button" data-set-dir="ltr" aria-pressed="true">LTR</button>
-    <button type="button" data-set-dir="rtl" aria-pressed="false">RTL</button>
+    <button type="button" data-set-dir="ltr" aria-pressed="true">English (LTR)</button>
+    <button type="button" data-set-dir="rtl" aria-pressed="false">العربية (RTL)</button>
   </div>
 </div>
 
@@ -38,8 +40,8 @@
 <div class="sc360" id="surface" dir="ltr">
   <div class="sc360__inner">
 
-    <!-- ================= A. SHARED HEADER ================= -->
-    <header class="sc-head">
+    <!-- ================= A. SHARED HEADER (English states) ================= -->
+    <header class="sc-head" data-states="healthy attention empty">
       <div class="sc-head__id">
         <h1>Shopify Store 360</h1>
         <p class="sc-head__sub">Sales performance and connector health</p>
@@ -76,8 +78,46 @@
         <span data-states="empty">Sales data not synchronized yet</span>
         <span class="sep" aria-hidden="true">·</span>
         <span>Scheduled sync: <b data-states="healthy attention">on</b><b data-states="empty">off</b></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span data-states="healthy empty">Shopify test orders excluded</span>
+        <span data-states="attention">Includes Shopify test orders — Aurora Outlet</span>
       </p>
       <span id="proto-static-note" hidden>Prototype control — the demonstration data is static.</span>
+    </header>
+
+    <!-- ================= A. SHARED HEADER (Arabic attention state) ================= -->
+    <header class="sc-head" data-states="attention-rtl" lang="ar">
+      <div class="sc-head__id">
+        <h1><bdi>Shopify Store 360</bdi></h1>
+        <p class="sc-head__sub">أداء المبيعات وسلامة الموصل</p>
+      </div>
+      <div class="sc-head__controls">
+        <label class="sc-note" for="store-sel-ar">المتجر</label>
+        <select class="sc-select" id="store-sel-ar" aria-describedby="proto-static-note-ar">
+          <option><bdi>Aurora Home Goods</bdi></option>
+          <option><bdi>Aurora Outlet</bdi></option>
+          <option selected>كل المتاجر</option>
+        </select>
+        <div class="sc-seg" role="group" aria-label="فترة التقرير">
+          <button type="button" aria-pressed="false" aria-describedby="proto-static-note-ar">24 ساعة</button>
+          <button type="button" aria-pressed="true" aria-describedby="proto-static-note-ar">7 أيام</button>
+          <button type="button" aria-pressed="false" aria-describedby="proto-static-note-ar">30 يومًا</button>
+        </div>
+        <button type="button" class="sc-btn" aria-describedby="proto-static-note-ar">
+          <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
+          <span>تحديث</span>
+        </button>
+      </div>
+      <p class="sc-head__meta">
+        <span>آخر تحديث <bdi>09:14</bdi></span><span class="sep" aria-hidden="true">·</span>
+        <span>مقارنة بالأيام السبعة السابقة</span><span class="sep" aria-hidden="true">·</span>
+        <span>بيانات المبيعات مُزامنة حتى <b><bdi>09:12</bdi></b></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span>المزامنة المجدولة: <b>مفعّلة</b></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span>تشمل طلبات شوبيفاي التجريبية — <bdi>Aurora Outlet</bdi></span>
+      </p>
+      <span id="proto-static-note-ar" hidden>عنصر تحكم خاص بالنموذج — البيانات ثابتة.</span>
     </header>
 
     <!-- ================= B. CRITICAL STATUS (attention only) ================= -->
@@ -92,6 +132,22 @@
         </div>
         <button type="button" class="sc-btn">
           <span>Review</span>
+          <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <section aria-label="حالة حرجة" data-states="attention-rtl" lang="ar">
+      <div class="sc-critical" role="note">
+        <svg class="ic ic--lg" aria-hidden="true"><use href="#i-plug"/></svg>
+        <div class="sc-critical__body">
+          <div class="sc-critical__title">يحتاج متجر <bdi>Aurora Outlet</bdi> إلى إعادة الربط — قد تكون أرقام المبيعات أدناه غير مكتملة.</div>
+          <div class="sc-critical__why">لم يعد شوبيفاي يقبل بيانات الاعتماد المحفوظة. هناك 12 طلبًا بانتظار
+            الاستيراد وتوقف استيراد 3 طلبات بعد إخفاقات متكررة، لذلك تُظهر هذه الصفحة مبيعات أقل من الواقع
+            لمتجر <bdi>Aurora Outlet</bdi>.</div>
+        </div>
+        <button type="button" class="sc-btn">
+          <span>مراجعة</span>
           <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
         </button>
       </div>
@@ -163,6 +219,40 @@
       </div>
     </section>
 
+    <!-- ================= C. STORE PERFORMANCE — Arabic attention ================= -->
+    <section aria-label="أداء المتجر" data-states="attention-rtl" lang="ar">
+      <div class="sc-kpis">
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">مبيعات شوبيفاي المستوردة</span>
+          <span class="sc-kpi__value"><bdi>€24,910.80</bdi></span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ <bdi>+4.1%</bdi> مقارنة بالأيام السبعة السابقة</span>
+          <span class="sc-kpi__flag"><span class="sc-dot" aria-hidden="true"></span> قد تكون غير مكتملة — انظر التنبيه أعلاه</span>
+          <span class="sc-kpi__def">كل المتاجر (يورو) · شاملة الضرائب والشحن · باستثناء الطلبات الملغاة.
+            <button type="button" class="sc-lnk">عرض الطلبات</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">الطلبات المستوردة</span>
+          <span class="sc-kpi__value"><bdi>289</bdi></span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ <bdi>+3.2%</bdi> مقارنة بالأيام السبعة السابقة</span>
+          <span class="sc-kpi__flag"><span class="sc-dot" aria-hidden="true"></span> 12 طلبًا إضافيًا بانتظار الاستيراد</span>
+          <span class="sc-kpi__def">طلبات شوبيفاي المستوردة إلى أودو خلال الفترة.
+            <button type="button" class="sc-lnk">عرض الطلبات</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">متوسط قيمة الطلب المستورد</span>
+          <span class="sc-kpi__value"><bdi>€86.20</bdi></span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ <bdi>+0.9%</bdi> مقارنة بالأيام السبعة السابقة</span>
+          <span class="sc-kpi__def">المبيعات المستوردة ÷ الطلبات المستوردة. تظهر «—» عند عدم وجود طلبات.</span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">الوحدات المباعة</span>
+          <span class="sc-kpi__value"><bdi>683</bdi></span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ <bdi>+2.8%</bdi> مقارنة بالأيام السبعة السابقة</span>
+          <span class="sc-kpi__def">وحدات المنتجات في الطلبات المستوردة. أسطر الشحن والتسويات مستثناة.</span>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= G. DATA-COMPLETENESS BRIDGE ================= -->
     <section aria-label="Sales data completeness" data-states="healthy">
       <p class="sc-bridge">
@@ -170,7 +260,8 @@
           <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Complete &amp; current
         </span>
         <span class="sc-bridge__text">Sales data synchronized through <b>today 09:12</b> ·
-          0 orders awaiting import · 0 order imports need attention.</span>
+          0 orders awaiting import · 0 order imports need attention.
+          Measures connector import completeness — not Shopify Analytics parity.</span>
       </p>
     </section>
     <section aria-label="Sales data completeness" data-states="attention">
@@ -180,7 +271,19 @@
         </span>
         <span class="sc-bridge__text">Sales data synchronized through <b>today 07:41</b> ·
           <button type="button" class="sc-lnk">12 orders awaiting import</button> ·
-          <button type="button" class="sc-lnk">3 order imports need attention</button>.</span>
+          <button type="button" class="sc-lnk">3 order imports need attention</button>.
+          Measures connector import completeness — not Shopify Analytics parity.</span>
+      </p>
+    </section>
+    <section aria-label="اكتمال بيانات المبيعات" data-states="attention-rtl" lang="ar">
+      <p class="sc-bridge">
+        <span class="sc-bridge__state sc-bridge__state--bad">
+          <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> غير مكتملة — مطلوب إجراء
+        </span>
+        <span class="sc-bridge__text">بيانات المبيعات مُزامنة حتى <b>اليوم <bdi>07:41</bdi></b> ·
+          <button type="button" class="sc-lnk">12 طلبًا بانتظار الاستيراد</button> ·
+          <button type="button" class="sc-lnk">3 عمليات استيراد تحتاج انتباهًا</button>.
+          يقيس هذا المؤشر اكتمال الاستيراد في الموصل — وليس مطابقة تحليلات شوبيفاي.</span>
       </p>
     </section>
 
@@ -200,7 +303,7 @@
             <line x1="40" y1="78"  x2="632" y2="78"/>
             <line x1="40" y1="28"  x2="632" y2="28"/>
           </g>
-          <g fill="#475467" font-size="11" text-anchor="end">
+          <g class="axis" fill="#475467" font-size="11" text-anchor="end">
             <text x="34" y="181">€0</text>
             <text x="34" y="131">€1k</text>
             <text x="34" y="81">€2k</text>
@@ -215,10 +318,10 @@
             <rect x="484" y="32.3" width="40" height="145.7" rx="3"/>
             <rect x="568" y="60.6" width="40" height="117.4" rx="3"/>
           </g>
-          <text x="335" y="12" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€3,187.90</text>
+          <text class="peak" x="335" y="12" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€3,187.90</text>
           <polyline fill="none" stroke="var(--sc-chart-reference)" stroke-width="2" stroke-dasharray="6 4"
                     points="82,69 166,60.5 251,63.5 335,52.25 419,67.75 504,57.5 588,55.6"/>
-          <g fill="#475467" font-size="11" text-anchor="middle">
+          <g class="axis" fill="#475467" font-size="11" text-anchor="middle">
             <text x="82"  y="196">26</text><text x="166" y="196">27</text><text x="251" y="196">28</text>
             <text x="335" y="196">29</text><text x="419" y="196">30</text><text x="504" y="196">31</text>
             <text x="588" y="196">1 Aug</text>
@@ -251,9 +354,10 @@
         <h2 class="sc-h2">Top products</h2>
         <div class="sc-table-wrap">
           <table class="sc-table">
-            <caption>Top 5 by imported product sales (excl. tax &amp; shipping), share of €17,290.00.</caption>
+            <caption>Top 5 by goods-line subtotal (excl. tax &amp; shipping). Shares are of the period’s
+              €17,290.00 goods subtotal — not of the tax-inclusive sales headline.</caption>
             <thead><tr><th scope="col">Product</th><th scope="col" class="num">Units</th>
-              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share</th></tr></thead>
+              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share of goods subtotal</th></tr></thead>
             <tbody>
               <tr><td><button type="button" class="sc-lnk">Linen Cushion Cover</button></td><td class="num">84</td><td class="num">€2,436.00</td><td class="num">14.1%</td></tr>
               <tr><td><button type="button" class="sc-lnk">Oak Serving Board</button></td><td class="num">46</td><td class="num">€1,978.00</td><td class="num">11.4%</td></tr>
@@ -283,7 +387,7 @@
             <line x1="40" y1="68.9" x2="632" y2="68.9"/>
             <line x1="40" y1="32.5" x2="632" y2="32.5"/>
           </g>
-          <g fill="#475467" font-size="11" text-anchor="end">
+          <g class="axis" fill="#475467" font-size="11" text-anchor="end">
             <text x="34" y="181">€0</text>
             <text x="34" y="144.6">€1k</text>
             <text x="34" y="108.3">€2k</text>
@@ -301,10 +405,10 @@
           <rect x="568" y="55.6" width="40" height="122.4" rx="3"
                 fill="var(--sc-chart-current)" fill-opacity="0.55"
                 stroke="var(--sc-chart-current)" stroke-width="1.5" stroke-dasharray="4 3"/>
-          <text x="335" y="16" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€4,270.20</text>
+          <text class="peak" x="335" y="16" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€4,270.20</text>
           <polyline fill="none" stroke="var(--sc-chart-reference)" stroke-width="2" stroke-dasharray="6 4"
                     points="82,58 166,54.7 251,54 335,52.2 419,54.2 504,51.5 588,51.3"/>
-          <g fill="#475467" font-size="11" text-anchor="middle">
+          <g class="axis" fill="#475467" font-size="11" text-anchor="middle">
             <text x="82"  y="196">26</text><text x="166" y="196">27</text><text x="251" y="196">28</text>
             <text x="335" y="196">29</text><text x="419" y="196">30</text><text x="504" y="196">31</text>
             <text x="588" y="196">1 Aug</text>
@@ -337,15 +441,103 @@
         <h2 class="sc-h2">Top products</h2>
         <div class="sc-table-wrap">
           <table class="sc-table">
-            <caption>Top 5 by imported product sales (excl. tax &amp; shipping), all stores, share of €23,400.00.</caption>
+            <caption>Top 5 by goods-line subtotal (excl. tax &amp; shipping), all stores. Shares are of the
+              period’s €23,400.00 goods subtotal — not of the tax-inclusive sales headline.</caption>
             <thead><tr><th scope="col">Product</th><th scope="col" class="num">Units</th>
-              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share</th></tr></thead>
+              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share of goods subtotal</th></tr></thead>
             <tbody>
               <tr><td><button type="button" class="sc-lnk">Linen Cushion Cover</button></td><td class="num">112</td><td class="num">€3,248.00</td><td class="num">13.9%</td></tr>
               <tr><td><button type="button" class="sc-lnk">Oak Serving Board</button></td><td class="num">61</td><td class="num">€2,623.00</td><td class="num">11.2%</td></tr>
               <tr><td><button type="button" class="sc-lnk">Ceramic Vase “Mist”</button></td><td class="num">54</td><td class="num">€2,322.00</td><td class="num">9.9%</td></tr>
               <tr><td><button type="button" class="sc-lnk">Wool Throw Blanket</button></td><td class="num">30</td><td class="num">€2,070.00</td><td class="num">8.8%</td></tr>
               <tr><td><button type="button" class="sc-lnk">Glass Carafe Set</button></td><td class="num">40</td><td class="num">€1,480.00</td><td class="num">6.3%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= D + E. SALES TREND + TOP PRODUCTS — Arabic attention ================= -->
+    <div class="sc-salesrow" data-states="attention-rtl" lang="ar">
+      <section class="sc-card sc-chart" aria-label="اتجاه أداء المبيعات">
+        <h2 class="sc-h2">اتجاه المبيعات</h2>
+        <div class="sc-chart__legend">
+          <span class="item"><span class="sc-chart__swatch" aria-hidden="true"></span> هذه الفترة (مبيعات يومية مستوردة)</span>
+          <span class="item"><span class="sc-chart__swatch sc-chart__swatch--line" aria-hidden="true"></span> الأيام السبعة السابقة</span>
+        </div>
+        <svg class="sc-chart-svg" viewBox="0 0 640 230" role="img"
+             aria-label="المبيعات اليومية المستوردة لكل المتاجر من 26 يوليو إلى 1 أغسطس: الإجمالي €24,910.80 والذروة €4,270.20 في 29 يوليو؛ الأيام السبعة السابقة €23,929.68. قد يرتفع يوم 1 أغسطس: 12 طلبًا بانتظار الاستيراد. الأرقام الكاملة في الجدول أدناه.">
+          <g stroke="#E4E7EC" stroke-width="1">
+            <line x1="40" y1="178" x2="632" y2="178"/>
+            <line x1="40" y1="141.6" x2="632" y2="141.6"/>
+            <line x1="40" y1="105.3" x2="632" y2="105.3"/>
+            <line x1="40" y1="68.9" x2="632" y2="68.9"/>
+            <line x1="40" y1="32.5" x2="632" y2="32.5"/>
+          </g>
+          <g class="axis" fill="#475467" font-size="11" text-anchor="end">
+            <text x="34" y="181">€0</text>
+            <text x="34" y="144.6">€1k</text>
+            <text x="34" y="108.3">€2k</text>
+            <text x="34" y="71.9">€3k</text>
+            <text x="34" y="35.5">€4k</text>
+          </g>
+          <g fill="var(--sc-chart-current)">
+            <rect x="62"  y="70.7" width="40" height="107.3" rx="3"/>
+            <rect x="146" y="46.0" width="40" height="132.0" rx="3"/>
+            <rect x="231" y="61.3" width="40" height="116.7" rx="3"/>
+            <rect x="315" y="22.7" width="40" height="155.3" rx="3"/>
+            <rect x="399" y="48.7" width="40" height="129.3" rx="3"/>
+            <rect x="484" y="35.3" width="40" height="142.7" rx="3"/>
+          </g>
+          <rect x="568" y="55.6" width="40" height="122.4" rx="3"
+                fill="var(--sc-chart-current)" fill-opacity="0.55"
+                stroke="var(--sc-chart-current)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text class="peak" x="335" y="16" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€4,270.20</text>
+          <polyline fill="none" stroke="var(--sc-chart-reference)" stroke-width="2" stroke-dasharray="6 4"
+                    points="82,58 166,54.7 251,54 335,52.2 419,54.2 504,51.5 588,51.3"/>
+          <g class="axis" fill="#475467" font-size="11" text-anchor="middle">
+            <text x="82"  y="196">26</text><text x="166" y="196">27</text><text x="251" y="196">28</text>
+            <text x="335" y="196">29</text><text x="419" y="196">30</text><text x="504" y="196">31</text>
+            <text x="588" y="196">1 أغس</text>
+          </g>
+        </svg>
+        <p class="sc-note sc-chart__caption">قد يرتفع العمود المُظلَّل ليوم 1 أغسطس — 12 طلبًا بانتظار الاستيراد.
+          تُحسب الأيام حسب منطقتك الزمنية في أودو.</p>
+        <details>
+          <summary>عرض كجدول</summary>
+          <div class="sc-table-wrap">
+            <table class="sc-table">
+              <caption>المبيعات والطلبات اليومية المستوردة (كل المتاجر)، 26 يوليو – 1 أغسطس، مع الفترة السابقة.</caption>
+              <thead><tr><th scope="col">اليوم</th><th scope="col" class="num">المبيعات</th>
+                <th scope="col" class="num">الطلبات</th><th scope="col" class="num">الفترة السابقة</th></tr></thead>
+              <tbody>
+                <tr><td>الأحد 26 يوليو</td><td class="num"><bdi>€2,950.10</bdi></td><td class="num">35</td><td class="num"><bdi>€3,300.00</bdi></td></tr>
+                <tr><td>الاثنين 27 يوليو</td><td class="num"><bdi>€3,630.90</bdi></td><td class="num">41</td><td class="num"><bdi>€3,390.00</bdi></td></tr>
+                <tr><td>الثلاثاء 28 يوليو</td><td class="num"><bdi>€3,210.40</bdi></td><td class="num">39</td><td class="num"><bdi>€3,410.00</bdi></td></tr>
+                <tr><td>الأربعاء 29 يوليو</td><td class="num"><bdi>€4,270.20</bdi></td><td class="num">52</td><td class="num"><bdi>€3,460.00</bdi></td></tr>
+                <tr><td>الخميس 30 يوليو</td><td class="num"><bdi>€3,556.80</bdi></td><td class="num">43</td><td class="num"><bdi>€3,405.00</bdi></td></tr>
+                <tr><td>الجمعة 31 يوليو</td><td class="num"><bdi>€3,925.30</bdi></td><td class="num">45</td><td class="num"><bdi>€3,480.00</bdi></td></tr>
+                <tr><td>السبت 1 أغسطس (غير مكتمل)</td><td class="num"><bdi>€3,367.10</bdi></td><td class="num">34</td><td class="num"><bdi>€3,484.68</bdi></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="sc-card" aria-label="أفضل المنتجات">
+        <h2 class="sc-h2">أفضل المنتجات</h2>
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <caption>أفضل 5 حسب المجموع الفرعي لأسطر السلع (بدون ضرائب وشحن)، كل المتاجر. الحصص من المجموع
+              الفرعي للسلع للفترة <bdi>€23,400.00</bdi> — وليس من إجمالي المبيعات الشامل للضرائب.</caption>
+            <thead><tr><th scope="col">المنتج</th><th scope="col" class="num">الوحدات</th>
+              <th scope="col" class="num">المبيعات</th><th scope="col" class="num">الحصة من المجموع الفرعي للسلع</th></tr></thead>
+            <tbody>
+              <tr><td><button type="button" class="sc-lnk"><bdi>Linen Cushion Cover</bdi></button></td><td class="num">112</td><td class="num"><bdi>€3,248.00</bdi></td><td class="num"><bdi>13.9%</bdi></td></tr>
+              <tr><td><button type="button" class="sc-lnk"><bdi>Oak Serving Board</bdi></button></td><td class="num">61</td><td class="num"><bdi>€2,623.00</bdi></td><td class="num"><bdi>11.2%</bdi></td></tr>
+              <tr><td><button type="button" class="sc-lnk"><bdi>Ceramic Vase “Mist”</bdi></button></td><td class="num">54</td><td class="num"><bdi>€2,322.00</bdi></td><td class="num"><bdi>9.9%</bdi></td></tr>
+              <tr><td><button type="button" class="sc-lnk"><bdi>Wool Throw Blanket</bdi></button></td><td class="num">30</td><td class="num"><bdi>€2,070.00</bdi></td><td class="num"><bdi>8.8%</bdi></td></tr>
+              <tr><td><button type="button" class="sc-lnk"><bdi>Glass Carafe Set</bdi></button></td><td class="num">40</td><td class="num"><bdi>€1,480.00</bdi></td><td class="num"><bdi>6.3%</bdi></td></tr>
             </tbody>
           </table>
         </div>
@@ -360,8 +552,8 @@
           this store’s order import simply isn’t enabled yet.</p>
         <ol>
           <li>An administrator enables order import in Store Settings.</li>
-          <li>The first scan discovers orders from the last 30 days. Older history needs an
-            administrator-run backfill.</li>
+          <li>The first scan discovers orders inside the configured import window (30 days by default; Shopify
+            grants access to orders older than 60 days only with the <code>read_all_orders</code> scope).</li>
           <li>Sales figures and the trend appear here as orders land.</li>
         </ol>
         <button type="button" class="sc-btn">
@@ -386,10 +578,279 @@
           while connector health below stays fully visible.
         </div>
         <div class="variant">
-          <b>3 · History or permissions limit</b>
-          Period older than the imported history: “Orders before 2 July were not imported (import window 30 days —
-          administrators can run a backfill).” If the viewer’s role cannot read sales amounts:
+          <b>3 · Historical coverage uncertain, or a permissions limit</b>
+          When the selected period reaches further back than the connector can vouch for:
+          “The selected period may include dates earlier than the connector’s available imported history
+          (import window 30 days; orders older than 60 days need Shopify’s <code>read_all_orders</code> approval).”
+          No cutoff date is ever shown — the earliest imported order proves nothing about coverage, and no stored
+          boundary exists today (exact boundary detection is a recorded backend enhancement).
+          If the viewer’s role cannot read sales amounts:
           “Your role can’t read sales amounts — connector health is unaffected.” Never rendered as €0.00.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= L. ORDER LIFECYCLE — healthy ================= -->
+    <section class="sc-card sc-life" aria-label="Order lifecycle" data-states="healthy">
+      <h2 class="sc-h2">Order lifecycle</h2>
+      <p class="sc-note">Imported orders in the selected period. Shopify orders that were skipped or are still
+        waiting never appear here — they are counted in the completeness line above.</p>
+      <div class="sc-life-grid">
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Payment</h3>
+          <ul class="sc-dist">
+            <li><span>Paid</span><span class="sc-dist__val"><b>205</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Authorized — capture pending</span><span class="sc-dist__val"><b>6</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Cash on delivery</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Needs review</span><span class="sc-dist__val"><b>0</b></span></li>
+          </ul>
+          <p class="sc-note">Payment evidence refreshed through 09:12 · oldest evidence 38 min.</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Cash on delivery</h3>
+          <ul class="sc-dist">
+            <li><span>Awaiting approval</span><span class="sc-dist__val"><b>0</b></span></li>
+            <li><span>Confirmed</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Nothing collected</span><span class="sc-dist__val"><b>2</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Fully collected</span><span class="sc-dist__val"><b>1</b> <button type="button" class="sc-lnk">Open</button></span></li>
+          </ul>
+          <p class="sc-note">Counts only — collected-amount totals are not available (see spec §7.4).</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Fulfillment &amp; dispatch</h3>
+          <ul class="sc-dist">
+            <li><span>Fulfilled</span><span class="sc-dist__val"><b>198</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Partially fulfilled</span><span class="sc-dist__val"><b>4</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Unfulfilled</span><span class="sc-dist__val"><b>12</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Odoo deliveries to dispatch</span><span class="sc-dist__val"><b>9</b> <button type="button" class="sc-lnk">Open</button></span></li>
+          </ul>
+          <p class="sc-note">Fulfillment status as recorded at the last evidence refresh — not a live carrier
+            feed. 7 of 9 deliveries are ready. Oldest paid order awaiting fulfillment: 1.2 days.</p>
+        </div>
+      </div>
+      <p class="sc-affirm" style="margin-block-start: var(--sc-space-3);">
+        <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>
+        No order lifecycle exceptions.
+      </p>
+    </section>
+
+    <!-- ================= L. ORDER LIFECYCLE — attention ================= -->
+    <section class="sc-card sc-life" aria-label="Order lifecycle" data-states="attention">
+      <h2 class="sc-h2">Order lifecycle</h2>
+      <p class="sc-note">Imported orders in the selected period (289). Shopify orders that were skipped or are
+        still waiting never appear here — they are counted in the completeness line above. “Needs review” counts
+        orders flagged on the order record; connector queue decisions are counted under Connector health.</p>
+      <div class="sc-life-grid">
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Payment</h3>
+          <ul class="sc-dist">
+            <li><span>Paid</span><span class="sc-dist__val"><b>261</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Authorized — capture pending</span><span class="sc-dist__val"><b>8</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Payment pending — non-COD</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Cash on delivery</span><span class="sc-dist__val"><b>14</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Needs review</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+          </ul>
+          <p class="sc-note">Payment evidence refreshed through 09:11 · oldest evidence 3 h 05 min
+            (Aurora Outlet is frozen until reconnected).</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Cash on delivery</h3>
+          <ul class="sc-dist">
+            <li><span>Awaiting approval</span><span class="sc-dist__val"><b>1</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Quotations</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Confirmed</span><span class="sc-dist__val"><b>10</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Nothing collected</span><span class="sc-dist__val"><b>6</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Partially collected</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Fully collected</span><span class="sc-dist__val"><b>5</b> <button type="button" class="sc-lnk">Open</button></span></li>
+          </ul>
+          <p class="sc-note">Counts only — collected-amount totals are not available (see the annotation below).</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">Fulfillment &amp; dispatch</h3>
+          <ul class="sc-dist">
+            <li><span>Fulfilled</span><span class="sc-dist__val"><b>240</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Partially fulfilled</span><span class="sc-dist__val"><b>11</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Unfulfilled</span><span class="sc-dist__val"><b>38</b> <button type="button" class="sc-lnk">Open</button></span></li>
+            <li><span>Odoo deliveries to dispatch</span><span class="sc-dist__val"><b>21</b> <button type="button" class="sc-lnk">Open</button></span></li>
+          </ul>
+          <p class="sc-note">Fulfillment status as recorded at the last evidence refresh — not a live carrier
+            feed. 14 of 21 deliveries are ready. Oldest paid order awaiting fulfillment: 3.4 days (elapsed age —
+            no lateness threshold is configured).</p>
+        </div>
+      </div>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">Lifecycle exceptions</h3>
+      <div class="sc-attn">
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Cash-on-delivery order awaits approval</div>
+            <div class="sc-exception__why">A pending manual-gateway order needs a reviewer’s approval before it can
+              be confirmed. After approval the connector re-checks Shopify payment evidence before confirming.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">Human decision</span>
+              <span class="sc-owner-chip">Owner: Reviewer</span>
+              <span>Evidence updated 26 min ago</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Payment status changed after import</div>
+            <div class="sc-exception__why">Shopify now reports PARTIALLY_REFUNDED for an order imported as PAID.
+              Odoo amounts stay frozen and the order is flagged for review — the connector reports this change;
+              resolving it happens on the order.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">Human decision</span>
+              <span class="sc-owner-chip">Owner: Reviewer</span>
+              <span>Changed 2 h ago</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Fulfillments recorded outside Odoo</div>
+            <div class="sc-exception__why">Recorded directly in Shopify; Odoo stock was not changed. Review to
+              reconcile — the connector observes and reports external fulfillments, it never applies them
+              automatically in this mode.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">2</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">Human decision</span>
+              <span class="sc-owner-chip">Owner: Operator</span>
+              <span>Observed 41 min ago</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+
+      <div class="proto-annotation" style="margin-block-start: var(--sc-space-3);">
+        <span class="proto-annotation__tag">PROTOTYPE ANNOTATION — requires backend enhancement</span>
+        <div class="variant">
+          <b>Not shown as data, by design</b>
+          Carrier delivery progress (delivered / in transit / not delivered), COD collected-amount totals and
+          COD collection-discrepancy alerts are absent above: at the current head the connector stores no
+          delivery events, COD money snapshots are text fields, and no discrepancy writer exists
+          (spec §7.4–§7.5). They appear only when those backend enhancements land.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= L. ORDER LIFECYCLE — Arabic attention ================= -->
+    <section class="sc-card sc-life" aria-label="دورة حياة الطلبات" data-states="attention-rtl" lang="ar">
+      <h2 class="sc-h2">دورة حياة الطلبات</h2>
+      <p class="sc-note">الطلبات المستوردة خلال الفترة المحددة (289). طلبات شوبيفاي التي تم تخطّيها أو ما تزال
+        بالانتظار لا تظهر هنا — بل تُحتسب في سطر الاكتمال أعلاه. «يحتاج مراجعة» يعدّ الطلبات المُعلَّمة على سجل
+        الطلب نفسه؛ قرارات قائمة عمل الموصل تُعدّ ضمن «سلامة الموصل».</p>
+      <div class="sc-life-grid">
+        <div class="sc-life-col">
+          <h3 class="sc-h3">الدفع</h3>
+          <ul class="sc-dist">
+            <li><span>مدفوع</span><span class="sc-dist__val"><b>261</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>مفوَّض — بانتظار التحصيل</span><span class="sc-dist__val"><b>8</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>دفع معلّق — غير الدفع عند الاستلام</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>الدفع عند الاستلام</span><span class="sc-dist__val"><b>14</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>يحتاج مراجعة</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+          </ul>
+          <p class="sc-note">أدلة الدفع محدَّثة حتى <bdi>09:11</bdi> · أقدم دليل <bdi>3</bdi> س <bdi>05</bdi> د
+            (متجر <bdi>Aurora Outlet</bdi> مجمَّد حتى تُعاد وصلته).</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">الدفع عند الاستلام</h3>
+          <ul class="sc-dist">
+            <li><span>بانتظار الموافقة</span><span class="sc-dist__val"><b>1</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>عروض أسعار</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>مؤكَّدة</span><span class="sc-dist__val"><b>10</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>لم يُحصَّل شيء</span><span class="sc-dist__val"><b>6</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>محصَّلة جزئيًا</span><span class="sc-dist__val"><b>3</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>محصَّلة كاملة</span><span class="sc-dist__val"><b>5</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+          </ul>
+          <p class="sc-note">أعداد فقط — إجماليات المبالغ المحصَّلة غير متاحة (انظر الملاحظة أدناه).</p>
+        </div>
+        <div class="sc-life-col">
+          <h3 class="sc-h3">التنفيذ والإرسال</h3>
+          <ul class="sc-dist">
+            <li><span>منفَّذة</span><span class="sc-dist__val"><b>240</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>منفَّذة جزئيًا</span><span class="sc-dist__val"><b>11</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>غير منفَّذة</span><span class="sc-dist__val"><b>38</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+            <li><span>أوامر تسليم أودو للإرسال</span><span class="sc-dist__val"><b>21</b> <button type="button" class="sc-lnk">فتح</button></span></li>
+          </ul>
+          <p class="sc-note">حالة التنفيذ كما سُجِّلت عند آخر تحديث للأدلة — وليست تغذية مباشرة من شركة الشحن.
+            <bdi>14</bdi> من <bdi>21</bdi> أمر تسليم جاهز. أقدم طلب مدفوع بانتظار التنفيذ: <bdi>3.4</bdi> يوم
+            (عمر منقضٍ — لا يوجد حدّ تأخير معرَّف).</p>
+        </div>
+      </div>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">استثناءات دورة الحياة</h3>
+      <div class="sc-attn">
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">طلب دفع عند الاستلام بانتظار الموافقة</div>
+            <div class="sc-exception__why">طلب ببوابة دفع يدوية معلّق يحتاج موافقة مراجع قبل تأكيده. بعد الموافقة
+              يعيد الموصل التحقق من أدلة الدفع في شوبيفاي قبل التأكيد.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">قرار بشري</span>
+              <span class="sc-owner-chip">المسؤول: المراجع</span>
+              <span>آخر تحديث للأدلة قبل 26 دقيقة</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">تغيّرت حالة الدفع بعد الاستيراد</div>
+            <div class="sc-exception__why">يُبلغ شوبيفاي الآن عن <bdi>PARTIALLY_REFUNDED</bdi> لطلب استُورد بحالة
+              <bdi>PAID</bdi>. تبقى مبالغ أودو مجمَّدة ويُعلَّم الطلب للمراجعة — الموصل يُبلغ عن التغيير؛
+              أما الحل فيتم على الطلب نفسه.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">قرار بشري</span>
+              <span class="sc-owner-chip">المسؤول: المراجع</span>
+              <span>تغيّر قبل ساعتين</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">عمليات تنفيذ سُجِّلت خارج أودو</div>
+            <div class="sc-exception__why">سُجِّلت مباشرة في شوبيفاي؛ ولم يتغيّر مخزون أودو. راجِعها للمطابقة —
+              الموصل يرصد عمليات التنفيذ الخارجية ويُبلغ عنها، ولا يطبّقها تلقائيًا في هذا الوضع.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">2</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">قرار بشري</span>
+              <span class="sc-owner-chip">المسؤول: المشغّل</span>
+              <span>رُصدت قبل 41 دقيقة</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+
+      <div class="proto-annotation" style="margin-block-start: var(--sc-space-3);">
+        <span class="proto-annotation__tag">ملاحظة النموذج — يتطلب تحسينًا في الخادم</span>
+        <div class="variant">
+          <b>لا يُعرض كبيانات، عن قصد</b>
+          تقدّم التسليم لدى شركة الشحن (تم التسليم / في الطريق / لم يُسلَّم)، وإجماليات مبالغ الدفع عند الاستلام
+          المحصَّلة، وتنبيهات فروق التحصيل — غائبة أعلاه: في الإصدار الحالي لا يخزّن الموصل أحداث تسليم،
+          ولقطات مبالغ الدفع عند الاستلام حقول نصية، ولا يوجد مسار يكتب حالة الفروق
+          (المواصفة §7.4–§7.5). تظهر هذه العناصر فقط عندما تُنجَز تلك التحسينات.
         </div>
       </div>
     </section>
@@ -457,6 +918,8 @@
           <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
         </div>
       </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-1);">
+        The five flows account for the whole backlog (1 + 0 + 2 + 0 + 0 = 3).</p>
 
       <p class="sc-affirm" style="margin-block-start: var(--sc-space-3);">
         <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>
@@ -485,14 +948,14 @@
           <span class="sc-activity__meta">9 h ago</span></div>
       </div>
       <p class="sc-note" style="margin-block-start: var(--sc-space-2);">
-        Last 7 days: 1,284 succeeded, 2 failed. Automatic checks run on a schedule — last activity 2 min ago.</p>
+        Last 7 days: 1,284 succeeded, 0 failed. Automatic checks run on a schedule — last activity 2 min ago.</p>
     </section>
 
     <!-- ================= F. CONNECTOR HEALTH — attention ================= -->
     <section class="sc-card" aria-label="Connector health" data-states="attention">
       <h2 class="sc-h2">Connector health</h2>
       <p class="sc-ops__lead">
-        <span class="state state--bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> 8 items need your attention</span>
+        <span class="state state--bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> 9 items need your attention</span>
         <span class="quiet">API: normal · Last successful processing 09:11 · Scheduled sync on · 1 of 2 stores connected</span>
       </p>
       <div class="sc-counters">
@@ -501,7 +964,7 @@
         <div class="sc-counter sc-counter--warn"><span class="sc-counter__label">Oldest waiting item</span>
           <span class="sc-counter__value">3 h 12 min</span><span class="sc-note">queue is delayed</span></div>
         <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">Needs review</span>
-          <span class="sc-counter__value">4</span><span class="sc-note">2 match decisions · 2 uncertain changes</span></div>
+          <span class="sc-counter__value">6</span><span class="sc-note">2 blocked catalog imports · 2 match decisions · 1 uncertain change · 1 COD approval</span></div>
         <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">Final failures</span>
           <span class="sc-counter__value">3</span><span class="sc-note">stopped after repeated failures</span></div>
       </div>
@@ -551,6 +1014,9 @@
           <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
         </div>
       </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-1);">
+        Backlog total (27) = the five flows (14 + 2 + 9 + 0 + 1 = 26) + 1 connector control job
+        (connection health check) outside these flows.</p>
 
       <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">Needs your attention</h3>
       <div class="sc-attn">
@@ -588,10 +1054,10 @@
           <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
           <div class="sc-exception__main">
             <div class="sc-exception__title">Waiting on a decision</div>
-            <div class="sc-exception__why">2 product match decisions and 2 uncertain changes need a human ruling.
-              These are decisions for a reviewer — not a system failure.</div>
+            <div class="sc-exception__why">2 blocked catalog imports, 2 product match decisions, 1 uncertain change
+              and 1 COD approval need a human ruling. These are decisions for a reviewer — not a system failure.</div>
             <div class="sc-exception__meta">
-              <span class="sc-exception__count">4</span><span>·</span>
+              <span class="sc-exception__count">6</span><span>·</span>
               <span class="sc-kind-chip sc-kind-chip--decision">Human decision</span>
               <span class="sc-owner-chip">Owner: Reviewer / Administrator</span>
             </div>
@@ -626,7 +1092,151 @@
           <span class="sc-activity__meta">3 h ago</span></div>
       </div>
       <p class="sc-note" style="margin-block-start: var(--sc-space-2);">
-        Last 7 days: 1,231 succeeded, 9 failed. Automatic checks run on a schedule — last activity 3 min ago.</p>
+        Last 7 days: 1,231 succeeded, 3 failed. Automatic checks run on a schedule — last activity 3 min ago.</p>
+    </section>
+
+    <!-- ================= F. CONNECTOR HEALTH — Arabic attention ================= -->
+    <section class="sc-card" aria-label="سلامة الموصل" data-states="attention-rtl" lang="ar">
+      <h2 class="sc-h2">سلامة الموصل</h2>
+      <p class="sc-ops__lead">
+        <span class="state state--bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> 9 عناصر تحتاج انتباهك</span>
+        <span class="quiet">واجهة API: طبيعية · آخر معالجة ناجحة <bdi>09:11</bdi> · المزامنة المجدولة مفعّلة · متجر واحد من 2 متصل</span>
+      </p>
+      <div class="sc-counters">
+        <div class="sc-counter"><span class="sc-counter__label">الأعمال المتراكمة</span>
+          <span class="sc-counter__value">27</span><span class="sc-note">بالانتظار أو بإعادة محاولة</span></div>
+        <div class="sc-counter sc-counter--warn"><span class="sc-counter__label">أقدم عنصر منتظر</span>
+          <span class="sc-counter__value"><bdi>3</bdi> س <bdi>12</bdi> د</span><span class="sc-note">الطابور متأخر</span></div>
+        <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">يحتاج مراجعة</span>
+          <span class="sc-counter__value">6</span><span class="sc-note">2 استيراد كتالوج محجوب · 2 قرارا مطابقة · تغيير واحد غير مؤكد · موافقة دفع عند الاستلام واحدة</span></div>
+        <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">إخفاقات نهائية</span>
+          <span class="sc-counter__value">3</span><span class="sc-note">توقفت بعد إخفاقات متكررة</span></div>
+      </div>
+
+      <div class="sc-flows" role="table" aria-label="سلامة المسارات">
+        <div class="sc-flow sc-flow__head" role="row" aria-hidden="true">
+          <span>المسار</span><span>الحالة</span><span>آخر نجاح</span><span>المتراكم</span><span>فشل / محجوب</span><span></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">الطلبات</span>
+          <span class="sc-state sc-state--bad" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> يفشل</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="آخر نجاح">استُوردت حتى <bdi>07:41</bdi></span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="المتراكم"><b>14</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="فشل / محجوب"><b>3</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">فتح</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">الكتالوج</span>
+          <span class="sc-state sc-state--decide" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-hand"/></svg> بحاجة لقرار</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="آخر نجاح">اليوم <bdi>06:58</bdi></span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="المتراكم"><b>2</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="فشل / محجوب"><b>2</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">فتح</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">المخزون</span>
+          <span class="sc-state sc-state--warn" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> متأخر</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="آخر نجاح">فحص الدفع <bdi>05:12</bdi></span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="المتراكم"><b>9</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="فشل / محجوب"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">فتح</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">تصدير المنتجات</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> على المسار</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="آخر نجاح">طُبِّق الثلاثاء <bdi>14:05</bdi></span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="المتراكم"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="فشل / محجوب"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">فتح</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">التنفيذ</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> على المسار</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="آخر نجاح">توفيق <bdi>08:32</bdi></span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="المتراكم"><b>1</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="فشل / محجوب"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">فتح</button></span>
+        </div>
+      </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-1);">
+        إجمالي المتراكم (27) = المسارات الخمسة (<bdi>14 + 2 + 9 + 0 + 1 = 26</bdi>) + مهمة تحكم واحدة
+        في الموصل (فحص سلامة الاتصال) خارج هذه المسارات.</p>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">يحتاج انتباهك</h3>
+      <div class="sc-attn">
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-plug"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">يحتاج متجر <bdi>Aurora Outlet</bdi> إلى إعادة الربط</div>
+            <div class="sc-exception__why">لم يعد شوبيفاي يقبل بيانات الاعتماد المحفوظة — أعِد الربط لاستئناف
+              الاستيراد. حتى ذلك الحين تبقى طلبات هذا المتجر ومخزونه وتنفيذه مجمَّدة.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--technical">اتصال</span>
+              <span class="sc-owner-chip">المسؤول: مدير النظام</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--danger">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">توقف استيراد طلبات بعد إخفاقات متكررة</div>
+            <div class="sc-exception__why">توقفت هذه عن إعادة المحاولة — راجع السبب لإعادتها للعمل. كل واحدة منها
+              طلب شوبيفاي ناقص من أرقام المبيعات أعلاه.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">3</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--technical">عطل تقني</span>
+              <span class="sc-owner-chip">المسؤول: المشغّل</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--danger">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">بانتظار قرار</div>
+            <div class="sc-exception__why">استيرادا كتالوج محجوبان، وقرارا مطابقة منتجات، وتغيير واحد غير مؤكد،
+              وموافقة دفع عند الاستلام واحدة — كلها تحتاج حكمًا بشريًا. هذه قرارات لمراجع — وليست عطلًا في النظام.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">6</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">قرار بشري</span>
+              <span class="sc-owner-chip">المسؤول: المراجع / مدير النظام</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>مراجعة</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">النشاط الأخير</h3>
+      <div class="sc-activity">
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">تم</span>
+          <span class="sc-activity__text">استيراد طلبات · <bdi>Aurora Home Goods</bdi> · مزامنة مجدولة</span>
+          <span class="sc-activity__meta">قبل 3 دقائق</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">تم</span>
+          <span class="sc-activity__text">فحص طلبات · <bdi>Aurora Home Goods</bdi> · مزامنة مجدولة</span>
+          <span class="sc-activity__meta">قبل 8 دقائق</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">فشل</span>
+          <span class="sc-activity__text">استيراد طلبات · <bdi>Aurora Outlet</bdi> · مزامنة مجدولة</span>
+          <span class="sc-activity__meta">قبل 12 دقيقة</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">فشل</span>
+          <span class="sc-activity__text">استيراد طلبات · <bdi>Aurora Outlet</bdi> · مزامنة مجدولة</span>
+          <span class="sc-activity__meta">قبل 26 دقيقة</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">تم</span>
+          <span class="sc-activity__text">دفع مخزون · <bdi>Aurora Home Goods</bdi> · حدث أودو</span>
+          <span class="sc-activity__meta">قبل 31 دقيقة</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--neutral">أُلغي</span>
+          <span class="sc-activity__text">تطبيق تصدير منتجات · <bdi>Aurora Outlet</bdi> · مزامنة يدوية</span>
+          <span class="sc-activity__meta">قبل ساعتين</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">فشل</span>
+          <span class="sc-activity__text">استيراد طلبات · <bdi>Aurora Outlet</bdi> · مزامنة مجدولة</span>
+          <span class="sc-activity__meta">قبل 3 ساعات</span></div>
+      </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-2);">
+        آخر 7 أيام: <bdi>1,231</bdi> نجحت و<bdi>3</bdi> فشلت. تعمل الفحوصات التلقائية وفق جدول — آخر نشاط قبل 3 دقائق.</p>
     </section>
 
     <!-- ================= F. CONNECTOR HEALTH — empty ================= -->
@@ -694,33 +1304,68 @@
           <thead>
             <tr><th scope="col">Store</th><th scope="col">Connection</th><th scope="col">Last successful activity</th>
               <th scope="col" class="num">Backlog</th><th scope="col" class="num">Attention</th>
-              <th scope="col" class="num">Sales (7 days)</th><th scope="col"></th></tr>
+              <th scope="col" class="num">Sales (7 days)</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
           </thead>
           <tbody>
             <tr>
-              <td>Aurora Home Goods</td>
-              <td><span class="sc-state sc-state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Connected</span></td>
-              <td>Today 09:12</td>
-              <td class="num">6</td>
-              <td class="num">0</td>
-              <td class="num">€18,432.50</td>
-              <td><button type="button" class="sc-lnk">Open</button></td>
+              <td data-label="Store" class="cell-store">Aurora Home Goods</td>
+              <td data-label="Connection"><span class="sc-state sc-state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Connected</span></td>
+              <td data-label="Last successful activity">Today 09:12</td>
+              <td data-label="Backlog" class="num">6</td>
+              <td data-label="Attention" class="num">2</td>
+              <td data-label="Sales (7 days)" class="num">€18,432.50</td>
+              <td class="cell-open"><button type="button" class="sc-lnk">Open</button></td>
             </tr>
             <tr>
-              <td>Aurora Outlet</td>
-              <td><span class="sc-state sc-state--bad"><svg class="ic" aria-hidden="true"><use href="#i-plug"/></svg> Reconnect needed</span></td>
-              <td>Today 07:41</td>
-              <td class="num">21</td>
-              <td class="num">7</td>
-              <td class="num">€6,478.30</td>
-              <td><button type="button" class="sc-lnk">Open</button></td>
+              <td data-label="Store" class="cell-store">Aurora Outlet</td>
+              <td data-label="Connection"><span class="sc-state sc-state--bad"><svg class="ic" aria-hidden="true"><use href="#i-plug"/></svg> Reconnect needed</span></td>
+              <td data-label="Last successful activity">Today 07:41</td>
+              <td data-label="Backlog" class="num">21</td>
+              <td data-label="Attention" class="num">7</td>
+              <td data-label="Sales (7 days)" class="num">€6,478.30</td>
+              <td class="cell-open"><button type="button" class="sc-lnk">Open</button></td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- ================= FOOTER ================= -->
+    <!-- ================= H. MULTI-STORE — Arabic attention ================= -->
+    <section class="sc-card sc-stores" aria-label="سلامة المتاجر" data-states="attention-rtl" lang="ar">
+      <h2 class="sc-h2">المتاجر</h2>
+      <div class="sc-table-wrap">
+        <table class="sc-table">
+          <caption>السلامة والمبيعات لكل متجر خلال الفترة المحددة. كلا المتجرين يبيع باليورو.</caption>
+          <thead>
+            <tr><th scope="col">المتجر</th><th scope="col">الاتصال</th><th scope="col">آخر نشاط ناجح</th>
+              <th scope="col" class="num">المتراكم</th><th scope="col" class="num">انتباه</th>
+              <th scope="col" class="num">المبيعات (7 أيام)</th><th scope="col"><span class="sr-only">إجراءات</span></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-label="المتجر" class="cell-store"><bdi>Aurora Home Goods</bdi></td>
+              <td data-label="الاتصال"><span class="sc-state sc-state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> متصل</span></td>
+              <td data-label="آخر نشاط ناجح">اليوم <bdi>09:12</bdi></td>
+              <td data-label="المتراكم" class="num">6</td>
+              <td data-label="انتباه" class="num">2</td>
+              <td data-label="المبيعات (7 أيام)" class="num"><bdi>€18,432.50</bdi></td>
+              <td class="cell-open"><button type="button" class="sc-lnk">فتح</button></td>
+            </tr>
+            <tr>
+              <td data-label="المتجر" class="cell-store"><bdi>Aurora Outlet</bdi></td>
+              <td data-label="الاتصال"><span class="sc-state sc-state--bad"><svg class="ic" aria-hidden="true"><use href="#i-plug"/></svg> يلزم إعادة الربط</span></td>
+              <td data-label="آخر نشاط ناجح">اليوم <bdi>07:41</bdi></td>
+              <td data-label="المتراكم" class="num">21</td>
+              <td data-label="انتباه" class="num">7</td>
+              <td data-label="المبيعات (7 أيام)" class="num"><bdi>€6,478.30</bdi></td>
+              <td class="cell-open"><button type="button" class="sc-lnk">فتح</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= FOOTER (prototype chrome) ================= -->
     <footer class="sc-foot">
       <span>DESIGN PROTOTYPE — NOT LIVE DATA</span>
       <span>Static demonstration data · no network requests · no external assets</span>
@@ -734,37 +1379,46 @@
 // Prototype-only state switcher. Deterministic: no network, no timers, no
 // randomness. Reads an optional location hash once at load so screenshot
 // automation can address a state directly (#healthy, #attention, #empty,
-// each optionally suffixed with -rtl).
+// #attention-rtl). The RTL button shows the representative ARABIC rendering
+// of the attention state (correction §8A); on healthy/empty it only flips
+// direction (a development aid, not a deliverable state).
 (function () {
     "use strict";
     var surface = document.getElementById("surface");
 
-    function setState(name) {
-        document.body.dataset.state = name;
+    function baseOf(state) { return state === "attention-rtl" ? "attention" : state; }
+
+    function apply(base, rtl) {
+        var state = (base === "attention" && rtl) ? "attention-rtl" : base;
+        document.body.dataset.state = state;
+        surface.setAttribute("dir", rtl ? "rtl" : "ltr");
         document.querySelectorAll("[data-set-state]").forEach(function (b) {
-            b.setAttribute("aria-pressed", String(b.dataset.setState === name));
+            b.setAttribute("aria-pressed", String(b.dataset.setState === base));
         });
-    }
-    function setDir(dir) {
-        surface.setAttribute("dir", dir);
         document.querySelectorAll("[data-set-dir]").forEach(function (b) {
-            b.setAttribute("aria-pressed", String(b.dataset.setDir === dir));
+            b.setAttribute("aria-pressed",
+                String((b.dataset.setDir === "rtl") === rtl));
         });
     }
 
     document.querySelectorAll("[data-set-state]").forEach(function (b) {
-        b.addEventListener("click", function () { setState(b.dataset.setState); });
+        b.addEventListener("click", function () {
+            apply(b.dataset.setState, surface.getAttribute("dir") === "rtl");
+        });
     });
     document.querySelectorAll("[data-set-dir]").forEach(function (b) {
-        b.addEventListener("click", function () { setDir(b.dataset.setDir); });
+        b.addEventListener("click", function () {
+            apply(baseOf(document.body.dataset.state), b.dataset.setDir === "rtl");
+        });
     });
 
     var hash = (location.hash || "").replace("#", "");
     if (hash) {
         var rtl = /-rtl$/.test(hash);
-        var state = hash.replace(/-rtl$/, "");
-        if (["healthy", "attention", "empty"].indexOf(state) !== -1) { setState(state); }
-        if (rtl) { setDir("rtl"); }
+        var base = hash.replace(/-rtl$/, "");
+        if (["healthy", "attention", "empty"].indexOf(base) !== -1) {
+            apply(base, rtl);
+        }
     }
 }());
 </script>

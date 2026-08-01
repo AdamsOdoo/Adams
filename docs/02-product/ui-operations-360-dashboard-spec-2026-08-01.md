@@ -62,9 +62,17 @@ combined total.
   redaction discipline, native drill-down mechanism, refresh contract, token
   layer, logical-property/RTL discipline.
 
+> **Correction revision (control room, 2026-08-01).** This document was
+> corrected in place on the concept branch: security-preserving aggregation
+> (§6 intro, handoff §6), native sales-report feasibility (handoff §14),
+> historical-coverage language (§9.4), dynamic test-order disclosure (§7.1),
+> top-product denominator renamed (§6 E2), completeness-bridge language
+> (§9.3), the Order lifecycle region (§3 L, §7.3–§7.5), the workflow
+> traceability matrix (§14), and re-verified prototype evidence (§12–§13).
+
 ## 3. Information architecture (decision order)
 
-One page, eight regions, in this order. No tabs, no second dashboard.
+One page, nine regions, in this order. No tabs, no second dashboard.
 
 | # | Region | Contents |
 | --- | --- | --- |
@@ -72,7 +80,8 @@ One page, eight regions, in this order. No tabs, no second dashboard.
 | B | **Critical status** (conditional) | One concise band shown **only** when a connector problem makes commercial figures materially incomplete or stale (§9.3). Names the cause, states the commercial consequence ("figures below may be incomplete"), one Review drill-down. Routine all-clear text never occupies this slot. |
 | C | **Store performance** | Four KPI cards (max five allowed; the truthful set is four): Imported Shopify sales · Imported orders · Average imported order value · Units sold. Each: value, period, delta vs previous equivalent period, currency where applicable, definition line, native drill-down. |
 | D | **Sales trend** | The page's only chart: daily (hourly for 24 h) imported-sales bars for the current period + dashed neutral line for the previous equivalent period. Accessible summary sentence + full table equivalent (`<details>`). Order counts live in the table, not on a second axis. |
-| E | **Top products** | ≤5 rows: product, units, imported sales value, share of the period's imported sales, drill-down. No chart. |
+| E | **Top products** | ≤5 rows: product, units, imported sales value, **share of goods subtotal** (denominator = the same eligible goods-line `price_subtotal` basis as the numerator — never the tax-and-shipping-inclusive headline), drill-down. No chart. |
+| L | **Order lifecycle** (correction addendum §A) | Compact, exception-led block between top products and connector health, scoped to **imported Odoo orders in the selected period** (skipped Shopify states never appear as zeros — the caption says so). Three status strips + one exception list: **Payment** (Paid · Authorized — capture pending · Payment pending — non-COD · COD, with a needs-review remainder), **COD** (awaiting approval / quotation / confirmed; collection: nothing / partially / fully collected), **Fulfillment & dispatch** (Shopify order fulfillment progress from the stored snapshot + Odoo delivery-order dispatch states + oldest paid-unfulfilled age, elapsed time only, no invented SLA). Carrier delivery is **not** shown (unsupported at this head — §7.5). ≤3 lifecycle exceptions, each with what/why/who/freshness/drill-down. Every count opens the exact native record set with the same domain. Payment-evidence freshness caption from `shopify_last_evidence_refresh_at`. The full order population belongs to the (recommended) Order Operations Analysis workspace — this region summarizes and routes. |
 | F | **Connector health** | Compact operational block: overall state line with quiet metadata (API health, last successful processing, scheduled-sync posture); four operational counters (active backlog, oldest waiting item, needs review, final failures); **five flow rows** (Orders, Catalog, Inventory, Product export, Fulfillment) each with plain-language state, last success, backlog, failures, drill-down; needs-attention list (≤3, severity+owner+reason+Review, decision items visually distinct from technical failures by icon+label, never colour alone); recent activity (≤8); "Last 7 days: N succeeded, M failed" as text, not a chart. |
 | G | **Data-completeness bridge** | The explicit link between C–E and F: "Sales data synchronized through *timestamp* · *N* orders awaiting import · *M* order imports need attention", with one of four states — **Complete & current / Processing (within normal delay) / Stale / Incomplete — action needed** — and direct drill-downs to the pending/failed records. Rendered adjacent to the sales cards on every breakpoint. |
 | H | **Multi-store health** (conditional) | Only when >1 store in scope: compact table — store, connection state, last successful activity, backlog, attention count, sales in period (per-store currency), drill-down. Single-store screens never render it. |
@@ -142,6 +151,69 @@ totals." Combined totals across currencies are never shown (§7 truth rules).
   configuration failures (jobs `failed_retryable` +
   `error_class='odoo_validation_configuration'` — the existing
   "Awaiting Configuration" action).
+- **Payment / COD evidence on the order binding** (order_binding.py:31-111):
+  raw `shopify_financial_status_snapshot` +
+  `shopify_previous_financial_status_snapshot` (Char — raw enum value
+  preserved), `financial_status_changed_at` + `financial_status_trigger_source`,
+  `shopify_last_evidence_refresh_at` (payment-evidence freshness),
+  `manual_gateway_name` / `manual_gateway_evidence_state`
+  (`not_manual|unambiguous|mixed`) / `manual_gateway_approval_state`
+  (`not_required|pending|approved|superseded`) + approver/uid/at fields,
+  `is_cod` (Boolean), `cod_commercial_state`
+  (`imported|quotation|confirmed|review|cancelled`), `cod_fulfillment_state`
+  (**selection contains only `not_dispatched`**), `cod_collection_state`
+  (`nothing_collected|partially_collected|fully_collected|discrepancy`), and
+  the five `cod_*_value_amount` **Char** snapshots. Import policy machine:
+  `_confirmation_outcome` (importer:2178-2230) — PAID/AUTHORIZED confirm per
+  `order_confirmation_policy`; PENDING is COD **only** with an unambiguous
+  approved manual gateway (never inferred from PENDING alone); PENDING
+  non-manual waits (`retry_waiting`, recheck loop) until
+  `pending_wait_expiry`, then the job is **skipped**
+  (`payment_pending_expired`, importer:2745-2773); PARTIALLY_PAID imports
+  only under `quotations_only` and then as a review binding; unknown enum
+  values fail closed (`data_shape_schema_mismatch`, importer:676-686 and
+  refresh path 828-842). Dormant at this head (selection values with **no
+  production writer**): `cod_collection_state='discrepancy'`,
+  `cod_commercial_state='cancelled'`, the entire `cod_fulfillment_state`
+  lifecycle beyond `not_dispatched`; `cod_refunded_value_amount` /
+  `cod_cancelled_value_amount` / `cod_fulfilled_value_amount` are written as
+  literal `'0'`.
+- **Fulfillment / delivery evidence** (fulfillment module): per created
+  fulfillment a binding (`shopify.connector.fulfillment.binding`:
+  `picking_id` UNIQUE per store, `shopify_status_snapshot` +
+  `shopify_status_normalized` + `shopify_last_synced_at`, tracking
+  snapshots); per **observed** fulfillment an evidence row
+  (`shopify.connector.fulfillment.inbound.evidence`: A4
+  `fulfillment_status_raw/normalized/is_success` with the fail-closed
+  unknown-value contract `schema_warning`, A7 `display_status_raw` /
+  `display_status_normalized` — **display only, never an automation
+  input**, `first_observed_at`/`last_observed_at`, `origin_class`
+  connector/external_*, `reconciled_state`
+  observed/review/acknowledged/applied/superseded, named `review_reason`
+  vocabulary). Order-level fulfillment progress:
+  `binding.shopify_fulfillment_status_snapshot` (raw Shopify
+  `displayFulfillmentStatus`, refreshed at import + evidence refresh).
+  **Carrier delivery is not tracked at this head**: the production GraphQL
+  readers fetch only `status` + `displayStatus` + `trackingInfo`
+  (fulfillment_reader.py:60, fulfillment_tracking_strategy.py:37) — A5
+  `FulfillmentEvent` records are never queried; `delivered_inconsistency`
+  (inbound_evidence.py:142) and the `delivered_not_validated` /
+  `unknown_status_value` review reasons have **no production writer**;
+  `cancelled_after_validation` **is** written
+  (fulfillment_scans.py:187-202). Mode 1 routes external fulfillments to
+  review (`external_fulfillment_observed` / `origin_unconfirmed`,
+  fulfillment_inbound.py:183-193); Mode 2 (16-condition engine) applies via
+  `picking._action_done()` or opens a named review case
+  (fulfillment_mode2.py:623,705).
+- Store settings policy fields read by region L captions:
+  `order_confirmation_policy` (`paid_only|paid_or_authorized|quotations_only`),
+  `manual_gateway_policy` (`confirm_auto|quotation|require_approval`),
+  `approved_manual_gateways`, `order_import_window` (default 30 days; >60
+  requires the granted `read_all_orders` scope — store_settings.py:184-198),
+  `pending_wait_expiry`, `order_import_include_test` (Boolean, default
+  False — the test-order disclosure source, enforced at scan
+  (`test:false` clause, order_scan.py:202-203) **and** import
+  (importer:602)).
 
 ## 6. Metric traceability table (the gate)
 
@@ -154,6 +226,33 @@ the §7 truth rules. Company isolation for every row: record rules on
 connector models + an explicit `company_id in allowed_companies` term +
 `sec3_scope_quarantined = False`; the endpoint never uses `sudo()`.
 
+**Security-preserving aggregation (correction A — supersedes the earlier
+raw-SQL recommendation):** commercial rows (C1–E2, H1 sales cell, region L
+order buckets) are aggregated **on `sale.order` / `sale.order.line`
+themselves with ORM grouped reads (`formatted_read_group` / `_read_group`,
+plus `search_count`/`search`), as the current user, with the native
+sale ACLs and record rules left fully active** — never raw SQL, never
+`sudo()`. The store dimension comes from connector-owned, protected, stored,
+indexed projection fields contributed by `shopify_connector_sale` (handoff
+§6 defines them); binding-side exclusions (Shopify-cancelled-after-import,
+SEC-3 quarantine) are mirrored by the same sanctioned writers into stored
+projection flags so every predicate is expressible in the rule-respecting
+ORM domain. Consequence, by construction: a user whose record rule restricts
+`sale.order` sees aggregates over exactly the records their drill-down list
+shows — the count/domain-agreement invariant extends to restrictive-rule
+users instead of breaking for them. `[Fact]` The repository already proves
+Odoo 19 grouped reads are rule-scoped: `test_grouped_read_does_not_leak_foreign_rows`
+(`addons/shopify_connector_sale/tests/test_sec3_company_isolation.py:144-158`,
+"`formatted_read_group` is the Odoo 19 replacement for the deprecated
+`read_group`"). `[Fact]` Official Odoo guidance: record rules "are
+*conditions* which must be satisfied in order for an operation to be
+allowed… evaluated record-by-record, following access rights", and using
+the cursor directly bypasses "the automated behaviours like translations,
+invalidation of fields, `active`, access rights and so on"
+(odoo/documentation@19.0 `content/developer/reference/backend/security.rst`,
+accessed 2026-08-01). Operational rows (G/F/H counts) stay on connector
+models exactly as before.
+
 | # | Displayed label | Operator question | Source model · stored fields | Domain / filter | Aggregation | Time window | Store isolation | Zero/empty behaviour | Stale-data behaviour | Native drill-down | Supported at `a1c5931`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C1 | Imported Shopify sales | What value of Shopify orders landed in Odoo this period? | `sale.order.amount_total`, `currency_id` joined via `shopify.connector.order.binding.sale_order_id` | binding: `store_id=?`, `sec3_scope_quarantined=False`, `shopify_cancelled_at=False`; order: `state != 'cancel'`, `date_order` in window | SUM | `date_order` (= Shopify `processedAt`) in selected window, user-TZ boundaries | `binding.store_id` | Show `0.00 CUR`; if orders=0 and bridge healthy → region-D/E empty state "No sales in this period" | Card carries completeness dot + caption bound to region G state | Orders Workspace `shopify_connector_sale.action_shopify_connector_order_workspace` + same domain | **Yes** (data); endpoint = slice 1 |
@@ -163,7 +262,7 @@ connector models + an explicit `company_id in allowed_companies` term +
 | C∆ | "vs previous period" delta on C1/C2/C3/C4 | Better or worse than the preceding equivalent period? | same as each card | same, window shifted back by its own length | same | previous equivalent window | same | When previous value is 0 → "no prior-period data", never a % | inherits card state | n/a (caption) | **Yes** (derived) |
 | D1 | Sales trend (bars + previous-period line) | How did imported sales move across the period? | as C1 | as C1 | SUM per bucket (day; hour for 24 h) | buckets in user TZ, stated on chart caption | as C1 | Honest empty state (one of the three §9.4 variants) | chart caption inherits G | table rows link to Orders Workspace day-filtered | **Yes**; endpoint = slice 1 |
 | E1 | Top products (≤5) | Which products drove imported sales? | `sale.order.line`: `product_id`, `product_uom_qty`, `price_subtotal` (untaxed) | as C4 | GROUP BY product, SUM value+units, ORDER value DESC LIMIT 5 | as C1 | via binding join | Section hidden behind "No product sales in this period" line | inherits G | Product form (`product.template`) + Orders Workspace period filter; exact per-store *line* list needs server-built domain (slice 2 note) | **Yes** (display); drill-down exactness = slice 2 |
-| E2 | Share of imported sales (per top product) | How concentrated were sales? | derived E1 value / C1-untaxed-basis | as E1; denominator = SUM `price_subtotal` over all C4 lines | ratio | as C1 | as C1 | Hidden when denominator 0 | inherits G | n/a (cell) | **Yes** (derived; same-basis numerator/denominator) |
+| E2 | **Share of goods subtotal** (per top product) | How concentrated were product sales? | derived: E1 `price_subtotal` value ÷ SUM `price_subtotal` over **all** eligible goods lines (the C4 population) | as E1; denominator = the same eligible goods-line basis as the numerator — **never** C1 (C1 includes tax + shipping; this ratio must not imply it divides the headline) | ratio | as C1 | as C1 | Hidden when denominator 0 | inherits G | n/a (cell; the goods-subtotal basis is printed under the table) | **Yes** (derived; same-basis numerator/denominator, correction §6C) |
 | G1 | Sales data synchronized through | Up to when has Shopify order discovery landed? | `shopify.connector.store.order_sync_last_checkpoint_at` (compute over `settings.sale_order_last_import_checkpoint_at`, `shopify_connector_sale/models/shopify_connector_order_scan.py:566`) | store row | latest value | point-in-time | per store | "Not synchronized yet" empty variant | drives the G state machine (§9.3) | Store form | **Yes** |
 | G2 | Orders awaiting import | How many discovered orders haven't landed? | `shopify.connector.job` | `job_type='order_import_sync'`, `state in (draft,queued,running,retry_waiting)`, `store_id=?` | COUNT | point-in-time | `job.store_id` | `0` → contributes to "Complete & current" | n/a (is itself the freshness signal) | Sync Center `action_shopify_connector_sync_center` + domain | **Yes** |
 | G3 | Order imports needing attention | Is commercial completeness blocked on a human/failure? | `shopify.connector.job` | `job_type in (order_import_scan, order_import_sync)`, `state in (failed_retryable, failed_final, blocked_manual_review)` | COUNT | point-in-time | `job.store_id` | `0` | n/a | Error & Review Center `action_shopify_connector_error_center` + domain | **Yes** |
@@ -179,15 +278,36 @@ connector models + an explicit `company_id in allowed_companies` term +
 | F10 | Quiet metadata: API health · next scheduled posture | Anything throttled? Is automation on? | `store.api_health_state (normal/throttled/degraded)`, `api_throttle_observed_at`; `order_sync_scheduled` etc. (cron-verified computes) | store row | latest values | point-in-time | per store | omitted when normal | n/a | Store form | **Yes** ("next scheduled check" timestamp itself = deferred, §8: reading `ir.cron.nextcall` needs a deliberate, security-reviewed sudo read) |
 | H1 | Multi-store table | Which store needs me? | per-store: `store.state`, latest terminal `finished_at`, F2/F4+F5 counts, C1 per store currency | grouped by `store_id` (single `read_group` per measure — no N+1) | per-store COUNT/SUM/MAX | point-in-time + selected window for sales | inherent | Region hidden when ≤1 store | sales cell inherits per-store G | Store form; counts → Sync/Error Center store-filtered | **Yes**; endpoint = slice 1 |
 | B1 | Critical status band | Does a connector problem make the money numbers wrong? | derived: G state ∈ {Stale, Incomplete} or store `reconnect_needed/disconnected` or sale domain disabled with history present | §9.3 conditions | boolean + worst cause | point-in-time | selected store | absent when conditions false | is itself the stale surface | cause-specific action (Error Center / Store form) | **Yes** (derived) |
+| L1 | Payment strip: Paid · Authorized — capture pending · Payment pending (non-COD) · COD · needs review | Which imported orders are actually paid? | `binding.shopify_financial_status_snapshot` (raw), `is_cod`, `binding.status` — counted over the C1 population (imported orders only, caption says so) | C1 exclusions + snapshot buckets: `PAID` / `AUTHORIZED` / `PENDING & is_cod=False` / `is_cod=True` / `status='review'` (payment-caused review incl. PARTIALLY_PAID-as-quotation imports and post-import divergence) | COUNT per bucket | as C1 | as C1 | Strip hidden when C2=0 | caption shows oldest `shopify_last_evidence_refresh_at` in the set | Orders Workspace with the same bucket domain | **Yes** (fields stored; buckets are raw-snapshot equality, fail-closed upstream) |
+| L2 | Payment-evidence freshness caption | How fresh is the payment evidence? | `binding.shopify_last_evidence_refresh_at`, `financial_status_changed_at` | C1 population | MIN (oldest) + latest change | point-in-time | as C1 | omitted when C2=0 | is itself the freshness surface | Orders Workspace sorted by evidence age | **Yes** |
+| L3 | COD block: awaiting approval / quotation / confirmed; collection nothing / partially / fully | Where does each COD order stand commercially? | `manual_gateway_approval_state`, `cod_commercial_state`, `cod_collection_state` | `is_cod=True` + C1 exclusions; approval='pending' / commercial ∈ (quotation, confirmed) / collection ∈ (nothing_collected, partially_collected, fully_collected) | COUNT per state | as C1 | as C1 | Block hidden when COD count = 0 | inherits L2 | Orders Workspace COD filter; approvals → the binding list `manual_gateway_approval_state='pending'` | **Yes** (states written at import/refresh/approval — importer:2241-2247, 2290-2296, 2361-2384) |
+| L4 | Order fulfillment progress: Fulfilled · Partially fulfilled · Unfulfilled | How far along is Shopify order fulfillment? | `binding.shopify_fulfillment_status_snapshot` (raw `displayFulfillmentStatus` — Shopify's own order-level rollup, so multi-fulfillment orders are never double-counted) | C1 population; raw-value buckets, any other/NULL value shown as "Not yet observed" | COUNT per bucket | as C1 | as C1 | hidden when C2=0 | caption: snapshot refreshed at import + evidence refresh (`shopify_last_evidence_refresh_at`) — **not** a live carrier feed | Orders Workspace bucket domain | **Yes** (display-only snapshot with stated freshness) |
+| L5 | Odoo dispatch: to dispatch / ready / dispatched | What does the warehouse still owe? | native `stock.picking.state` for outgoing pickings of bound orders (`sale_id` join — the same join production uses, fulfillment_inbound.py:87-89) | pickings of C1 orders: `state not in (done, cancel)` = to dispatch; `state='assigned'` = ready; `state='done'` = dispatched | COUNT | as C1 | via order join | `0` | n/a (Odoo-side truth) | native Delivery Orders list, same domain | **Yes** (native fields; picking ACLs apply to the caller) |
+| L6 | Oldest paid-unfulfilled age | Is anything paid but sitting? | derived: MIN `date_order` where snapshot `PAID` + fulfillment snapshot `UNFULFILLED` | C1 exclusions | MIN age | as C1 | as C1 | omitted when none | elapsed age only — **no SLA claimed** (correction §E: no invented threshold; age is displayed, lateness is not declared) | Orders Workspace same domain, oldest first | **Yes** (derived) |
+| L7 | Lifecycle exceptions (≤3): COD awaiting approval · external fulfillment recorded in Shopify · payment status changed after import · Shopify cancelled a validated fulfillment · fulfilled while payment still pending · unknown fulfillment status observed | What lifecycle event needs a human? | approvals `manual_gateway_approval_state='pending'`; evidence `reconciled_state='review'` with `review_reason ∈ (external_fulfillment_observed, origin_unconfirmed)`; binding `status='review'` + `financial_status_changed_at` + previous≠current snapshot; evidence `review_reason='cancelled_after_validation'`; derived snapshot pair (`displayFulfillmentStatus ∈ (FULFILLED, PARTIALLY_FULFILLED)` + financial `PENDING/AUTHORIZED` + `is_cod=False`); evidence `schema_warning=True` | per candidate, store term, count = drill-down domain count (existing invariant) | COUNT per candidate, ranked | point-in-time | native store term on each model | section replaced by one affirmative line | each item names its evidence timestamp (`last_observed_at` / `financial_status_changed_at`) | binding list / fulfillment review list (`action` per source) with the same domain | **Yes** — every named source has a production writer at `a1c5931` (§5); each item states what/why/who/freshness/whether the connector can resolve it (report-only for external events) |
 
-**Rejected at the gate** (must not appear; recorded per prompt §10): refunds
-/ returned value (no refund records exist anywhere — §8.1), "Net sales"
-(label unreproducible — §7.1), success-rate percentage for flows (denominator
-ambiguity between scans/syncs within a family made the number misleading;
-replaced by absolute backlog+failure counts, which drill down exactly),
-"next scheduled check" clock time (needs `ir.cron` sudo read — deferred),
-delivered-inconsistency fulfillment counter (field exists but no code ever
-writes it — would always read 0; recorded caveat from module inventory).
+**Rejected at the gate** (must not appear; recorded per prompt §10 and
+correction addendum §C/§D): refunds / returned value (no refund records
+exist anywhere — §8.1), "Net sales" (label unreproducible — §7.1),
+success-rate percentage for flows (denominator ambiguity between scans/syncs
+within a family made the number misleading; replaced by absolute
+backlog+failure counts, which drill down exactly), "next scheduled check"
+clock time (needs `ir.cron` sudo read — deferred),
+delivered-inconsistency fulfillment counter (field exists but **no code ever
+writes it** — would always read 0), **Delivered / Not delivered / In transit
+/ carrier-progress counts** (A5 FulfillmentEvents never queried; no rollup
+writer; §7.5 ruling — "not delivered" must never be shown for merely
+unfulfilled orders), **COD dispatched/delivered lifecycle**
+(`cod_fulfillment_state` exposes only `not_dispatched`; no writer beyond
+it), **COD collection discrepancy counter** (`discrepancy` selection value
+has no production writer), **COD monetary aggregates** (all five
+`cod_*_value_amount` snapshots are `Char`; refunded/cancelled/fulfilled are
+literal `'0'` — never aggregable, never summed), **general payment-gateway
+dimension** (only unambiguous manual gateway names are persisted
+(`manual_gateway_name`); non-manual gateway names are not stored as a
+reporting dimension), **exact historical-coverage boundary** ("orders
+before *date* were not imported" — no authoritative stored boundary exists;
+the earliest imported order proves nothing about coverage — §9.4).
 
 ## 7. Commercial metric truth rules
 
@@ -210,7 +330,7 @@ Basis, per the correction's §3 checklist:
 | Company isolation | explicit company domain + record rules; no `sudo()` |
 | Included states | every imported (bound) order, draft or confirmed — confirmation policy (`paid_only` etc.) decides Odoo state, not commercial existence |
 | Excluded | Odoo `state='cancel'`; `binding.shopify_cancelled_at` set (cancelled on Shopify after import — excluded and disclosed in G); quarantined bindings |
-| Cancelled / test orders | pre-cancelled and (by default) test orders never imported; if `order_import_include_test` is on, test orders are indistinguishable — the settings surface, not the dashboard, owns that disclosure |
+| Cancelled / test orders | pre-cancelled and (by default) test orders never imported. **Dynamic disclosure (correction §6B):** the dashboard renders an accessible caption bound to `shopify.connector.store.settings.order_import_include_test` — off: "Shopify test orders excluded"; on: "Includes Shopify test orders" (multi-store scope: names the stores where it is on). The aggregate and its drill-down use the same rule by construction — the setting acts at scan (`test:false`) and import time, so imported test orders are ordinary bindings in both |
 | Discounts | line-level discounts are inside `amount_total` (converted to line discount % at import; residual as a negative adjustment line) |
 | Taxes / shipping / duties / fees | taxes+shipping included (stated on the card); duties/tips/fees orders are never imported at all |
 | Refunds / returns / edits | never imported; REFUNDED/VOIDED/EXPIRED never imported; PARTIALLY_REFUNDED blocked at review; post-import refresh never changes amounts — hence no reversal treatment exists to display |
@@ -239,6 +359,97 @@ Basis, per the correction's §3 checklist:
 | Taxes / shipping decomposition | **Defer** (to native Shopify Sales Analysis report, slice 3) | Data exists (`amount_tax`; `SHOPIFY-SHIPPING` lines) but KPI-strip restraint wins; report is the right surface |
 | Discount value given | **Defer** (same report) | Reconstructable from goods lines (`price_unit·qty − price_subtotal`); not a headline |
 | Cross-currency combined totals | **Requires backend enhancement** | Needs an approved conversion method; until then per-store only (H) |
+| Payment-status distribution (imported orders) | **Include now** | Raw snapshot buckets over stored fields; fail-closed upstream; L1 |
+| COD approval / commercial / collection counts | **Include now** | All three state machines have production writers (L3) |
+| COD amount reporting (order/collected/outstanding value) | **Requires backend enhancement** | The five `cod_*_value_amount` snapshots are `Char` and three are literal `'0'`; needs protected currency-aware numeric fields + migration/backfill + reconciliation tests — never aggregate the Char snapshots |
+| COD dispatched / delivered lifecycle | **Requires backend enhancement (lifecycle writer)** | `cod_fulfillment_state` exposes only `not_dispatched`; no writer beyond it — no dispatch/delivery stage may be invented from it |
+| COD collection discrepancy alert | **Requires backend enhancement (lifecycle writer)** | `discrepancy` selection value has no production writer at `a1c5931` |
+| Order fulfillment progress (Fulfilled / Partially / Unfulfilled) | **Include with truthful freshness caption** | Stored order-level snapshot (Shopify's own rollup); refreshed at import + evidence refresh, stated on the strip (L4) |
+| Odoo dispatch states | **Include now** | Native `stock.picking` truth; caller's ACLs apply (L5) |
+| Carrier delivery (Delivered / In transit / Not delivered / attempted / delayed) | **Requires backend enhancement** | A5 FulfillmentEvents never queried; `delivered_inconsistency` and `delivered_not_validated` never written; no rollup, no freshness contract — §7.5 ruling |
+| General payment-gateway dimension | **Defer** | Non-manual gateway names are not persisted as a reporting dimension; only unambiguous manual gateway identity is stored |
+
+### 7.3 Payment-status support matrix (correction addendum §B)
+
+`[Fact]` Shopify's `OrderDisplayFinancialStatus` enum (all 8 values verified
+at https://shopify.dev/docs/api/admin-graphql/latest/enums/OrderDisplayFinancialStatus,
+accessed 2026-08-01, Accessible) mapped against the exact-head import policy
+(`shopify_connector_order_importer.py`). **Counts on the dashboard are counts
+of imported Odoo orders — never the entire Shopify order population.**
+Skipped states are never rendered as zeros implying store-wide coverage; the
+region caption states the population, and the job-side complement (waiting /
+skipped / failed imports) lives in regions G and F.
+
+| Shopify value | Policy at `a1c5931` (citation) | Can exist on an imported binding? | Store 360 treatment |
+| --- | --- | --- | --- |
+| `PAID` | Imported; confirmed under `paid_only` / `paid_or_authorized` (importer:2194-2197) | Yes | Bucket **Paid** |
+| `AUTHORIZED` | Imported; confirmed only under `paid_or_authorized`, else quotation (2198-2199); refresh auto-confirms draft on →PAID transition (2386-2399) | Yes | Bucket **Authorized — capture pending** |
+| `PENDING` (unambiguous approved manual gateway) | Imported as COD (`is_cod=True`, 2200-2229); approval per `manual_gateway_policy` | Yes | **COD** block (L3) |
+| `PENDING` (non-manual / unapproved) | Not imported while waiting: job `retry_waiting` recheck loop until `pending_wait_expiry`, then **skipped** `payment_pending_expired` (2218-2221, 2745-2773). Under `quotations_only`: imported as quotation | Only under `quotations_only` | Bucket **Payment pending — non-COD** (exists only under that policy; otherwise visible as waiting/skipped jobs in G/F, not as orders) |
+| `PARTIALLY_PAID` | Fails to review unless `quotations_only`; then imported with binding `status='review'` (importer:699-707, 2187-2192) | Only under `quotations_only`, as review | Bucket **Partially paid / needs review** |
+| `PARTIALLY_REFUNDED` | Never imported (`financial_total_mismatch` review, importer:694-698); post-import transition routes binding to review | Post-import only (as review + previous snapshot) | Lifecycle exception **payment status changed after import** |
+| `REFUNDED` / `VOIDED` / `EXPIRED` | Skipped (`unsupported_financial_state`, importer:687-693); approval path also rejects reversed evidence (order_binding.py:232-237) | No (post-import transition → review) | Never a bucket; post-import transitions surface as the change exception |
+| Unknown future value | **Fail closed** at import and refresh (`data_shape_schema_mismatch`, importer:676-686, 828-842); raw value preserved in the job evidence | No | Job-side failure in G3/F5 — an imported binding can never carry an unknown value, so no "unknown" bucket can silently absorb orders |
+
+Freshness: every bucket caption carries the oldest
+`shopify_last_evidence_refresh_at` in the displayed set; a status change is
+timestamped (`financial_status_changed_at`) with its trigger source. Every
+count opens the exact native record set with the same domain.
+
+### 7.4 Payment-method / COD support matrix (correction addendum §C)
+
+`[Fact]` COD classification is **never inferred from `PENDING` alone**: it
+requires `manual_gateway_evidence_state='unambiguous'` **and** the gateway
+name in the store's approved list (importer:2200-2229; transaction
+classifier 2137-2176 marks mixed names/malformed evidence as `mixed`).
+
+| Desired metric / state | Classification | Evidence |
+| --- | --- | --- |
+| Unambiguous approved COD identity (`is_cod`, `manual_gateway_name`) | **Truthful with current fields** | Written at import; protected binding fields |
+| Mixed / ambiguous gateway evidence | **Truthful** (`manual_gateway_evidence_state='mixed'` → binding review; never COD, never paid) | importer:2164-2175, 2336-2340 |
+| COD awaiting approval / quotation / confirmed | **Truthful** (`manual_gateway_approval_state`, `cod_commercial_state`; approval action gated Reviewer/Admin with reason + company + draft + evidence checks) | order_binding.py:175-260; importer:2361-2384 |
+| COD collection: nothing / partially / fully collected | **Truthful** (computed from manual SUCCESS transactions at import/refresh) | importer:2240-2247 |
+| COD collection discrepancy | **Requires a lifecycle writer** — selection value never written | grep evidence, §5 |
+| COD dispatched / delivered | **Requires a lifecycle writer** — `cod_fulfillment_state` = `not_dispatched` only, written as a literal (importer:2295) | §5 |
+| COD amounts (order / collected / outstanding value) | **Requires a stored numeric/reporting projection** — `Char` snapshots must never be aggregated; needs currency-aware numeric fields, migration/backfill, reconciliation tests | order_binding.py:107-111 |
+| General online-gateway reporting dimension | **Deferred** — non-manual gateway names not persisted | §5 |
+
+### 7.5 Fulfillment ≠ dispatch ≠ delivery (semantic ruling, addendum §D)
+
+Three concepts are kept separate and labelled so they cannot be confused:
+
+1. **Order fulfillment** (Shopify): Unfulfilled / Partially fulfilled /
+   Fulfilled — from the stored order-level `displayFulfillmentStatus`
+   snapshot (Shopify's own rollup across multiple fulfillments, so one order
+   is counted once regardless of how many fulfillments/locations it spans).
+2. **Warehouse dispatch** (Odoo): native `stock.picking` states (to
+   dispatch / ready / dispatched-validated), including partial/backorder
+   chains as separate pickings.
+3. **Carrier delivery** (parcel reached the customer): **not shown at this
+   head.** `[Fact]` Neither `stock.picking.state='done'`, nor Shopify
+   `Fulfillment.status='SUCCESS'` (A4), nor `displayFulfillmentStatus='FULFILLED'`
+   proves customer delivery — Shopify models delivery as
+   `FulfillmentDisplayStatus`/`FulfillmentEventStatus` values (`DELIVERED`,
+   `IN_TRANSIT`, `OUT_FOR_DELIVERY`, `ATTEMPTED_DELIVERY`, `FAILURE`, …;
+   https://shopify.dev/docs/api/admin-graphql/latest/enums/FulfillmentDisplayStatus,
+   https://shopify.dev/docs/api/admin-graphql/latest/enums/FulfillmentEventStatus,
+   https://shopify.dev/docs/api/admin-graphql/latest/enums/FulfillmentStatus,
+   all accessed 2026-08-01, Accessible). The addendum's seven proof
+   conditions fail at `a1c5931`: A5 events are never queried (readers fetch
+   `status`/`displayStatus`/`trackingInfo` only), no refresh path is
+   dedicated to delivery milestones, external-fulfillment coverage depends
+   on scan observation, no stale-display contract exists, no multi-fulfillment
+   delivery rollup exists, and `delivered_inconsistency` /
+   `delivered_not_validated` are never written. **Ruling: customer-delivery
+   reporting (Delivered / Not delivered) is a backend enhancement** (A5
+   FulfillmentEvent ingestion + per-order rollup writer + freshness
+   contract + coverage for external fulfillments). Until then the dashboard
+   shows only concepts 1 and 2, and "not delivered" wording is banned —
+   an unfulfilled or not-yet-shipped order must never be labelled "not
+   delivered". `[Fact]` Odoo's own e-commerce flow separates order
+   confirmation, delivery-order generation and validation the same way
+   (https://www.odoo.com/documentation/19.0/applications/websites/ecommerce/order_handling.html,
+   accessed 2026-08-01, Accessible).
 
 ## 8. Deferred, with reasons (recorded so they are not forgotten)
 
@@ -261,6 +472,27 @@ Basis, per the correction's §3 checklist:
    with elevated rights; a deliberate, security-reviewed backend decision.
    The dashboard shows the *posture* ("Scheduled sync on/off", cron-verified)
    instead, which is stored and readable today.
+9. Carrier-delivery reporting (Delivered / Not delivered / In transit /
+   attempted / delayed) — backend enhancement per the §7.5 ruling: A5
+   FulfillmentEvent ingestion, a per-order delivery rollup writer with
+   observation timestamps and staleness display, and coverage for
+   externally-created fulfillments.
+10. COD monetary reporting — backend enhancement: protected currency-aware
+    numeric fields (never the `Char` snapshots), migration/backfill for
+    existing bindings, reconciliation tests against the totals solver.
+11. COD dispatch/delivery lifecycle and collection-discrepancy detection —
+    backend enhancement: lifecycle writers for `cod_fulfillment_state`
+    (today a `not_dispatched` literal) and `cod_collection_state='discrepancy'`
+    (today never assigned).
+12. Exact historical-coverage boundary ("orders before *date* were not
+    imported") — unsupported at `a1c5931`: no authoritative stored boundary
+    exists, and the earliest imported order proves nothing (the store may
+    simply have had no earlier orders). Backend enhancement if wanted: a
+    per-store stored coverage-boundary field/event written at scan time from
+    the actually-used window start (`order_import_window`, plus Shopify's
+    60-day default order access without `read_all_orders` —
+    store_settings.py:184-198). Until then only the cautious §9.4 copy is
+    allowed, and no date is ever invented from the first imported order.
 
 ## 9. States and behaviour
 
@@ -279,6 +511,13 @@ by icon + owner label + wording, never colour alone.
 
 ### 9.3 Data-completeness bridge states (region G, drives region B)
 
+**What the bridge measures (correction §6D):** connector **import
+completeness and freshness** — whether Shopify order discovery and import
+have caught up. It does **not** claim Shopify Analytics parity, and it does
+**not** claim refund-adjusted net-sales completeness (refunds/edits are
+never imported, so "complete" means "all discoverable importable orders have
+landed", nothing more). The bridge caption carries this scope.
+
 | State | Truthful condition (all fields stored today) |
 | --- | --- |
 | **Complete & current** | `order_sync_scheduled` true · G2 = 0 · G3 = 0 · checkpoint age ≤ 45 min (3× the 15-min scan cron) |
@@ -294,13 +533,20 @@ by icon + owner label + wording, never colour alone.
    checkpoint/no bindings: C–E collapse to one guided card ("Order import
    hasn't run for this store — an administrator can enable it in Store
    Settings"), no fake zeros; F renders fully.
-3. **Period predates imported history / insufficient permissions** — window
-   start earlier than the earliest imported order with the 30-day default
-   import window disclosed ("Orders before *date* were not imported; import
-   window 30 days; administrators can run a historical backfill"), or the
-   caller lacks `sale.order` read access ("Your role can't read sales
-   amounts — connector health is unaffected"), detected by catching the
-   ACL refusal server-side. Never rendered as `0.00`.
+3. **Historical coverage uncertain / insufficient permissions** (corrected
+   per §6A of the correction — the earlier draft inferred a coverage
+   boundary from the earliest imported order, which proves nothing: a store
+   may simply have had no earlier orders). Copy is deliberately cautious:
+   "**The selected period may include dates earlier than the connector's
+   available imported history.** Import coverage is bounded by the store's
+   configured import window (currently *N* days); Shopify grants access to
+   orders older than 60 days only with the `read_all_orders` scope." Both
+   cited facts are stored/policy facts (`order_import_window`,
+   `_check_order_window_policy`); **no cutoff date is ever displayed** —
+   exact-boundary detection is a recorded backend enhancement (§8.12).
+   Separately, when the caller lacks `sale.order` read access: "Your role
+   can't read sales amounts — connector health is unaffected", detected by
+   catching the ACL refusal server-side. Never rendered as `0.00`.
 
 ## 10. Visual direction
 
@@ -342,12 +588,21 @@ by icon + owner label + wording, never colour alone.
   ~1/3) · F · H. Max content width 1180 px.
 - **Tablet (768 px):** KPI cards 2×2; D above E full-width; F counters wrap
   2×2; flow rows become stacked cards.
-- **Mobile (390 px):** sections stack in decision order A→B→C→G→D→E→F→H; KPI
-  cards full-width (no horizontal card scrolling); the freshness/completeness
-  line stays adjacent to the sales cards; every drill-down remains reachable;
-  tables (top products, multi-store, chart equivalent) scroll inside their
-  own `overflow-x: auto` container — the page itself never scrolls
-  horizontally.
+- **Mobile (390 px, and reflow down to 320 px):** sections stack in decision
+  order A→B→C→G→D→E→L→F→H; KPI cards full-width (no horizontal card
+  scrolling); the freshness/completeness line stays adjacent to the sales
+  cards; every drill-down remains reachable. **Multi-store presentation
+  (correction §8B): at ≤640 px the Stores table becomes stacked store cards**
+  — each store's connection state, backlog, attention, sales and the primary
+  **Open** action are fully visible without any horizontal scrolling; a
+  primary operational action is never hidden off-screen. Secondary tabular
+  detail (top products, chart equivalent) may still scroll inside its own
+  sanctioned `overflow-x: auto` container — the page itself never scrolls
+  horizontally, at 390 px, at 320 px, and at 200 % zoom (683 px effective).
+  **Mobile chart legibility (correction §8C):** axis labels keep ≥11 px
+  with alternate-label thinning at narrow widths, the legend wraps, and the
+  final incomplete-period hatching stays visible; the accessible table
+  equivalent is unchanged.
 - Healthy screens are commercially useful (sales content fills them);
   attention screens state explicitly whether the connector problem affects
   the displayed sales figures (region B copy + card completeness dots).
@@ -360,67 +615,245 @@ by icon + owner label + wording, never colour alone.
 - Self-contained except the one adjacent stylesheet; no network requests, no
   external assets/fonts/CDNs/chart libraries; sanitized static demonstration
   data only; permanently labelled **"DESIGN PROTOTYPE — NOT LIVE DATA"**.
-- Three states (healthy / attention / empty variants) + LTR/RTL, switched by
-  a small deterministic inline script (state toggles set `data-state`/`dir`;
-  no timers, no fetch, no randomness). The switcher is prototype chrome only
-  and is excluded from the design surface.
+- Four states (healthy / attention / attention-rtl / empty variants),
+  switched by a small deterministic inline script (state toggles set
+  `data-state`/`dir`; no timers, no fetch, no randomness). The switcher is
+  prototype chrome only and is excluded from the design surface.
+- **RTL state (correction §8A):** `#attention-rtl` is a representative
+  **Arabic-language** rendering of the attention state (same fixture
+  numbers), not merely mirrored English. Technique recorded: prototype-only
+  Modern Standard Arabic strings for all visible labels (production
+  translations come from Odoo i18n and are **not** claimed to exist);
+  Latin-script identifiers (store domains, SKUs, order names) and composite
+  numeric tokens (currency amounts, percentages with sign, timestamps)
+  wrapped in `<bdi>` / `dir="ltr"` spans so numbers, currency, percentage
+  sign order and arrows read in the intended order under `dir="rtl"`;
+  directional arrow glyphs mirror via the existing `[dir="rtl"] .ic--arrow`
+  rule; the exception accent border and header geometry mirror via logical
+  properties.
 - Focus styles are real and demonstrable by keyboard; the attention state is
-  understandable with colour removed (icons + owner labels + wording).
+  understandable with colour removed (icons + kind chips + owner labels +
+  wording).
+- The attention state demonstrates the Order lifecycle region with a
+  truthful COD scenario (fixture reconciliation in §12.1); values that
+  would require a backend enhancement are **not rendered as data** — they
+  appear only as annotated "requires backend enhancement" markers inside
+  the prototype-annotation block, so nothing unsupported reads as a live
+  metric.
 
-## 13. Prototype verification record (real browser, this session)
+### 12.1 Fixture arithmetic reconciliation (correction §7)
+
+Every demonstration value is internally consistent with the documented
+production formulas. Reconciliation (also machine-checked in the browser
+harness — §13):
+
+**Healthy state (store "Aurora Home Goods", EUR):**
+- KPIs: €18,432.50 / 214 orders / AOV €86.13 = 18,432.50 ÷ 214 (= 86.133…)
+  / 507 units.
+- Trend bars sum exactly to €18,432.50 (2,210.40 + 2,725.10 + 2,402.30 +
+  3,187.90 + 2,646.00 + 2,913.60 + 2,347.20); daily orders sum to 214;
+  previous-period column sums to €16,398.71; delta +12.4 % = 18,432.50 ÷
+  16,398.71 − 1 (= 0.12402…).
+- Top products: shares are value ÷ €17,290.00 (the goods-subtotal
+  denominator printed in the caption, E2 basis): 2,436→14.1 %,
+  1,978→11.4 %, 1,634→9.5 %, 1,518→8.8 %, 1,147→6.6 %.
+- Health: **"Last 7 days: 1,284 succeeded, 0 failed"** — corrected from the
+  earlier fixture's "2 failed": under the documented job-state queries a
+  nonzero 7-day failure count implies live `failed_final`/`failed_retryable`
+  rows, contradicting "0 final failures / needs review 0 / all clear"; no
+  separate stored historical-event source exists at `a1c5931`, so the
+  healthy fixture must show 0 (correction §7.1).
+- Backlog 3 = Orders 1 + Catalog 0 + Inventory 2 + Export 0 + Fulfillment 0
+  — stated on the flow block ("the five flows account for the whole
+  backlog"). The Orders backlog job is a scan, so "0 orders awaiting
+  import" (G2 counts `order_import_sync` only) stays consistent.
+- Lifecycle: payment 205 Paid + 6 Authorized + 3 COD + 0 review = 214;
+  COD 3 = 3 confirmed, 0 awaiting approval (anything else would contradict
+  "Needs review 0"); collection 2 nothing + 1 fully = 3; fulfillment
+  198 + 4 + 12 = 214; 9 deliveries to dispatch (7 ready); oldest
+  paid-unfulfilled age 1.2 days (age only).
+- Header disclosure: "Shopify test orders excluded" (default).
+
+**Attention state (two stores, both EUR — stated in the Stores caption):**
+- KPIs: €24,910.80 / 289 orders / AOV €86.20 (24,910.80 ÷ 289 = 86.196…)
+  / 683 units; store rows sum: €18,432.50 (Aurora Home Goods) + €6,478.30
+  (Aurora Outlet) = €24,910.80.
+- Trend bars sum exactly to €24,910.80 (2,950.10 + 3,630.90 + 3,210.40 +
+  4,270.20 + 3,556.80 + 3,925.30 + 3,367.10); daily orders sum to 289;
+  previous-period column sums to €23,929.68 (delta +4.1 %); final bucket
+  hatched ("may still rise — 12 orders awaiting import" = G2).
+- Top products: shares are value ÷ €23,400.00 goods subtotal: 3,248→13.9 %,
+  2,623→11.2 %, 2,322→9.9 %, 2,070→8.8 %, 1,480→6.3 %.
+- **Backlog 27 = Orders 14 + Catalog 2 + Inventory 9 + Export 0 +
+  Fulfillment 1 (= 26) + 1 disclosed connector control job** (connection
+  health check — a core `job_type` outside the five flows; the remainder
+  is disclosed on the flow block instead of leaving an unexplained
+  disagreement, correction §7.2). Store backlog rows 6 + 21 = 27 (store
+  rows count every job, including the control job). Bridge "12 orders
+  awaiting import" ⊂ Orders-flow backlog 14 (the other 2 are scan/customer
+  jobs).
+- Needs review 6 = 2 blocked catalog imports (`blocked_manual_review`) +
+  2 pending match decisions + 1 uncertain mutation attempt + 1
+  manual-gateway (COD) approval — the counter note and the "Waiting on a
+  decision" exception (count 6) carry the same decomposition. Lead line
+  "9 items need your attention" = needs review 6 + final failures 3. Flow
+  failed/blocked cells: Orders 3 (the 3 `failed_final`) + Catalog 2 (the
+  blocked imports) = 5. "Last 7 days: 1,231 succeeded, **3** failed" — the
+  three final failures, all within the window; blocked/review items are
+  not "failed" under the F9 definition. Store attention rows 2 (Aurora
+  Home Goods: the 2 match decisions) + 7 (Aurora Outlet: 3 final failures
+  + 2 blocked + 1 uncertain + 1 COD approval) = 9. Order bindings in
+  `status='review'` are surfaced in the lifecycle region (3), not
+  double-counted here.
+- Lifecycle: payment 261 Paid + 8 Authorized + 3 Pending non-COD
+  (quotations-only policy) + 14 COD + 3 needs review = 289; COD 14 =
+  1 awaiting approval + 3 quotations + 10 confirmed; collection 6 nothing
+  + 3 partially + 5 fully = 14; fulfillment 240 Fulfilled + 11 Partially +
+  38 Unfulfilled = 289; 21 deliveries to dispatch (14 ready); oldest
+  paid-unfulfilled age 3.4 days (elapsed age, explicitly "no lateness
+  threshold is configured").
+- Test-order disclosure demonstrated dynamically: "Includes Shopify test
+  orders — Aurora Outlet" (that store's fixture has
+  `order_import_include_test` on); the healthy state shows the default
+  "Shopify test orders excluded".
+- The Arabic `attention-rtl` state renders the same numbers (verified in
+  the harness by DOM extraction from both states).
+
+## 13. Prototype verification record (real browser, correction session)
 
 Chromium (Playwright, `/opt/pw-browsers/chromium`), file:// load. The numbers
 below are measured DOM facts from the runs that produced the committed
-screenshots; screenshots alone are not treated as proof.
+screenshots; screenshots alone are not treated as proof. **This is static
+prototype verification only — no Odoo browser test, tour, or production UI
+acceptance is claimed.**
 
 Environment: Chromium **141.0.7390.37** (Playwright 1.56.1), viewports at
 `deviceScaleFactor: 1`. Each run loaded the committed prototype from disk
-with a state hash and captured a full-page screenshot after verifying the
-state and direction had genuinely applied (`document.body.dataset.state`,
-computed `direction` on the surface root).
+with a state hash and verified the state and direction genuinely applied
+(`document.body.dataset.state`, computed `direction` on the surface root).
+Eleven runs: the six full-page screenshot runs, the two lifecycle
+element-capture runs, plus three check-only runs (320 px reflow; 200 % zoom
+≙ 683 CSS px at both attention and healthy).
 
-| Run (committed screenshot) | Viewport | State/dir applied | `scrollWidth` vs `innerWidth` | Clipped text outside sanctioned scroll containers | Flow drill-downs visible | Keyboard: Tab presses to the LAST flow-row "Open" | Focus indicator (first focused control) | Requests |
+| Run | Viewport | State/dir | Page overflow (`scrollWidth` vs `innerWidth`) | Clipped text outside sanctioned containers | Flow drill-downs | Tabs to LAST flow "Open" (real key presses) | Focus | Requests | Fixture arithmetic |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `healthy-desktop-1366px.png` | 1366×900 | healthy / ltr | 1366 = 1366 | 0 | 5/5 | 33 | 2 px solid `#175CD3` | 2 × `file://` | **all 8 checks pass** |
+| `attention-desktop-1366px.png` | 1366×900 | attention / ltr | 1366 = 1366 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | **all 12 checks pass** |
+| `attention-tablet-768px.png` | 768×1024 | attention / ltr | 768 = 768 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | — |
+| `attention-mobile-390px.png` | 390×844 | attention / ltr | 390 = 390 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | store cards + chart below |
+| `attention-rtl-desktop-1366px.png` | 1366×900 | **attention-rtl / rtl (Arabic)** | 1366 = 1366 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | **all 12 checks pass on the Arabic DOM** (same numbers as English) |
+| `empty-desktop-1366px.png` | 1366×900 | empty / ltr | 1366 = 1366 | 0 | 5/5 | 16 | 2 px solid | 2 × `file://` | — |
+| `attention-cod-lifecycle-desktop-1366px.png` (element capture, region L) | 1366×900 | attention / ltr | 1366 = 1366 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | — |
+| `attention-cod-lifecycle-mobile-390px.png` (element capture, region L) | 390×844 | attention / ltr | 390 = 390 | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | — |
+| 320 px reflow (check-only) | 320×844 | attention / ltr | **320 = 320** | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | store cards pass |
+| 200 % zoom ≙ 683 px (check-only) | 683×450 | attention / ltr | **683 = 683** | 0 | 5/5 | 44 | 2 px solid | 2 × `file://` | — |
+| 200 % zoom ≙ 683 px (check-only) | 683×450 | healthy / ltr | 683 = 683 | 0 | 5/5 | 33 | 2 px solid | 2 × `file://` | — |
+
+**Fixture arithmetic reconciliation, machine-checked from the rendered DOM**
+(the §12.1 sums, recomputed by the harness from the visible page, not from
+the source): trend-table sales/orders sums equal the KPI values (18,432.50 /
+214 healthy; 24,910.80 / 289 attention); every top-product share matches the
+printed goods-subtotal denominator within rounding (largest deviation
+0.05 pp); flow-backlog sum reconciles with the backlog counter (healthy
+remainder 0; attention remainder exactly the 1 disclosed control job); lead
+"9 items" = needs review 6 + final failures 3; lifecycle payment buckets
+(261+8+3+14+3) and fulfillment buckets (240+11+38) each sum to 289 (healthy:
+205+6+3+0 and 198+4+12 = 214); COD commercial states (1+3+10) and collection
+states (6+3+5) each equal the COD bucket (14); store rows sum to the
+combined KPIs (sales 24,910.80; backlog 27; attention 9). The identical
+checks pass against the **Arabic** DOM, proving the RTL state renders the
+same numbers.
+
+**Mobile presentation (correction §8B/§8C), measured at 390 px:** the Stores
+region renders as stacked cards; both cards and both primary **Open**
+actions lie fully inside the viewport (`left ≥ 0`, `right ≤ 390`); the
+stores wrapper has no horizontal scroll (`scrollWidth ≤ clientWidth`). The
+chart at 390 px: axis labels compute to an effective **9.9 px** (19 SVG-px ×
+the 332/640 scale — ≥ the 9.5 px target), all axis labels lie inside the
+SVG bounds (no clipping), the hatched incomplete-period bar is present and
+visible, and the legend fits the viewport. At 320 px the gate is reflow —
+no page overflow, no clipped text, store cards and actions still fully
+visible; the axis size computes to 8.0 px there (recorded openly; the §8C
+legibility target is defined at 390 px, and the accessible table equivalent
+is always available).
+
+**RTL language evidence (correction §8A), measured on the Arabic state:**
+`document.body.dataset.state = 'attention-rtl'`, surface `direction: rtl`,
+content sections carry `lang="ar"`; the exception accent edge computes
+`border-right-width: 4px` / `border-left-width: 1px` (mirror of LTR); the
+header identity block sits at x≈1087 with controls at x≈93
+(`header_mirrored: true`); in the flow rows the name cell lies to the right
+of the action cell; directional arrows flip via `[dir="rtl"] .ic--arrow`.
+Bidi isolation is real, not asserted: the KPI delta's `<bdi>` yields exactly
+`+4.1%` (sign leading the number) inside Arabic copy; Latin identifiers
+(store names) render inside `<bdi>`. Sample Arabic label recorded from the
+DOM: «مبيعات شوبيفاي المستوردة». The translations are prototype-only
+representative strings — production translations come from Odoo i18n and
+are not claimed to exist.
+
+**Other measured facts:** every run issued exactly 2 requests (the HTML +
+adjacent CSS, both `file://`) — zero network; reduced-motion emulation
+collapses every transition to 0.000001 s; each lifecycle and health
+exception carries icon + kind chip + owner + freshness text (readable
+without colour, DOM-measured); the visible-section inventory differs
+materially per state (healthy: commercial + lifecycle + calm health;
+attention: critical band + flagged KPIs + lifecycle with exceptions +
+degraded health + stores; empty: guided card + annotation + simplified
+health, no KPI/bridge/sales/lifecycle regions).
+
+**Prototype workflow walk (addendum §H, performed on the prototype):**
+overview → lifecycle status → filtered orders → individual order evidence
+is reachable for every lifecycle count (each count has an "Open" control
+whose production target is the exact same-domain native list, per §6 L
+rows); payment and fulfillment labels use disjoint vocabularies
+("Paid/Authorized/Pending/COD/review" vs
+"Fulfilled/Partially fulfilled/Unfulfilled" vs "deliveries to dispatch"),
+so an order carries both a payment and a fulfillment state simultaneously
+without either overwriting the other (fixture: 289 orders distribute
+independently across both axes); healthy / processing / attention / stale /
+incomplete are demonstrated across the bridge states and the two main
+states; no unsupported metric or lifecycle state renders as data anywhere —
+the unsupported set appears only inside the dashed "requires backend
+enhancement" annotation.
+
+## 14. Workflow-to-UI-to-data traceability matrix (correction addendum §F)
+
+Twelve order-lifecycle workflows traced end to end at exact head `a1c5931`.
+Columns: the operator/merchant action and system event; the production entry
+point; stored evidence before → after; the expected Store 360 surface and
+order-workspace state; drill-down + acting role; the failure/review route;
+and known gaps. "OW" = Orders Workspace (binding list/form), "FR" =
+Fulfillment Review list. Every dashboard count named here opens a native
+list with the identical domain (count/domain invariant).
+
+| # | Workflow / transition (action → event) | Production entry point | Stored evidence (before → after) | Store 360 surface | OW / workspace state | Drill-down · role | Failure/review route | Gaps |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `healthy-desktop-1366px.png` | 1366×900 | healthy / ltr | 1366 = 1366 — none | 0 elements | 5/5 rows | 23 | 2px solid `#175CD3`, offset 2px | 2, both `file://` |
-| `attention-desktop-1366px.png` | 1366×900 | attention / ltr | 1366 = 1366 — none | 0 elements | 5/5 rows | 26 | 2px solid `#175CD3` | 2, both `file://` |
-| `attention-tablet-768px.png` | 768×1024 | attention / ltr | 768 = 768 — none | 0 elements | 5/5 rows | 26 | 2px solid `#175CD3` | 2, both `file://` |
-| `attention-mobile-390px.png` | 390×844 | attention / ltr | 390 = 390 — none | 0 elements | 5/5 rows | 26 | 2px solid `#175CD3` | 2, both `file://` |
-| `attention-rtl-desktop-1366px.png` | 1366×900 | attention / **rtl** | 1366 = 1366 — none | 0 elements | 5/5 rows | 26 | 2px solid `#175CD3` | 2, both `file://` |
-| `empty-desktop-1366px.png` | 1366×900 | empty / ltr | 1366 = 1366 — none | 0 elements | 5/5 rows | 16 | 2px solid `#175CD3` | 2, both `file://` |
+| 1a | **Paid online order** — customer pays in Shopify → scan discovers | 15-min cron → `order_import_scan` (order_scan.py; `test:false` unless included; `order_import_window`) | none → scan checkpoint advances; `order_import_sync` job queued | G2 +1 (awaiting import); bridge Processing | not yet visible | Sync Center · Operator | scan failure → job `failed_retryable` → G3/F5 | window-bounded discovery (§8.12) |
+| 1b | → import lands | `import_order_sync` (importer; totals solver `_solve_and_assert_totals`) | binding created `status='active'`, snapshot `PAID`, `financial_status_trigger_source='initial_import'`; `sale.order` confirmed under paid policy | C1–C4 +1; L1 Paid +1; bridge toward Complete | OW row Paid/confirmed | OW · Sales/Operator | `financial_total_mismatch` → failed job (G3) — order never half-imports | — |
+| 1c | → warehouse dispatches | native picking flow; validation → fulfillment admission → `fulfillment_create` job | picking `assigned→done`; fulfillment binding created (UNIQUE store+picking), `notify_customer_sent` frozen at enqueue | L5 dispatched +1; F fulfillment flow activity | OW order links picking | Delivery Orders · Warehouse | create failure → mutation-attempt evidence; uncertain outcome → F4 | — |
+| 1d | → Shopify confirms fulfillment; carrier moves parcel | reconciliation scan refreshes snapshots (`fulfillment_reconciliation` → `_refresh_binding_snapshot`) | `shopify_status_snapshot='SUCCESS'`, `shopify_last_synced_at`; order snapshot `FULFILLED` on next evidence refresh | L4 Fulfilled +1 (freshness caption) | OW fulfilled | FR/OW · Operator | read failure → watermark **not** stamped (fail-closed, scans.py:148-162) | **carrier progress/delivery: not tracked (§7.5)** |
+| 2 | **Authorized order** — authorization → import → capture → paid | importer `_confirmation_outcome` (AUTHORIZED); refresh `transition_to_paid` (2386-2399) | snapshot `AUTHORIZED`, quotation (unless `paid_or_authorized`) → on PAID evidence: draft order auto-confirmed, `financial_status_changed_at` + trigger | L1 Authorized → Paid; C unchanged (order already counted) | OW quotation → confirmed | OW · Sales | evidence mismatch at refresh → binding review (L1 review) | capture deadline (EXPIRED) surfaces only as post-import change exception |
+| 3 | **Pending non-manual payment** — provider processing | importer `OrderPendingWait` → `retry_waiting` recheck loop (2745-2773) | job `retry_waiting`, `next_retry_at`; **no order, no binding** | G2/F2 backlog (waiting job); never an L1 bucket | not in OW (correct) | Sync Center · Operator | expiry → job **skipped** `payment_pending_expired`; never misclassified COD (`is_cod` needs approved manual gateway) | skipped-after-expiry orders need manual re-import decision (functional gap, register G-F3) |
+| 4a | **Unambiguous COD** — order placed with approved manual gateway | importer gateway classifier (2137-2176) + `_confirmation_outcome` PENDING branch | binding `is_cod=True`, `manual_gateway_name`, evidence `unambiguous`; per `manual_gateway_policy`: confirmed / quotation / `approval_state='pending'` | L3 (+F4 when approval pending) | OW COD quotation/confirmed | OW COD filter · Reviewer | mixed evidence → review (wf 6) | — |
+| 4b | → reviewer approves | `action_approve_manual_gateway_order` (order_binding.py:175-260: role, reason, company, draft, evidence, reversal checks) → enqueued refresh confirms (importer:2361-2370) | `approved_at/by` stamped → refresh: `approval_state='approved'`, `cod_commercial_state='confirmed'`, order confirmed | F4 −1; L3 confirmed +1 | OW confirmed | OW · Reviewer/Admin | evidence changed since approval → `superseded` + review (2379-2384) | — |
+| 4c | → dispatch → collection → delivery | dispatch = wf 1c; collection recomputed at evidence refresh (2240-2247) | `cod_collection_state` nothing→partially→fully (from manual SUCCESS transactions); `cod_fulfillment_state` stays `not_dispatched` (literal) | L3 collection counts; L5 dispatch | OW COD states | OW · Finance | — | **COD dispatch/delivery lifecycle + discrepancy: no writer; COD amounts: Char (§7.4)** |
+| 5 | **COD partially → fully collected** | evidence refresh triggers (scan-driven within window, manual refresh, approval refresh) | `cod_collected_value_amount` Char snapshot + `cod_collection_state` transitions | L3 partially→fully | OW collection badge | OW · Finance | discrepancy detection: none (no writer) | refresh cadence bounded by scan window — stale collection evidence possible (register G-T5) |
+| 6 | **Mixed/ambiguous gateways** | gateway classifier `mixed` (2164-2175); refresh keeps forcing review (2336-2340) | `manual_gateway_evidence_state='mixed'`, binding `status='review'`, `cod_commercial_state='review'`, `is_cod=False` | L1 needs-review; L7 exception | OW review, reason visible | OW · Reviewer | stays review until human resolution | — |
+| 7 | **Partially paid order** | importer:699-707 + 2187-2192 | `quotations_only`: binding review + snapshot `PARTIALLY_PAID`; else failed job `financial_total_mismatch` | L1 Partially-paid/review, or G3 | OW review / not present | OW or Error Center · Reviewer | as stated | — |
+| 8 | **Partial fulfillment / backorder** | native backorder picking → second `fulfillment_create` per picking | order snapshot `PARTIALLY_FULFILLED`; second fulfillment binding (one per picking) | L4 Partially fulfilled; L5 split pickings | OW partial | Delivery Orders · Warehouse | quantity mismatch cases → FR named reasons (`quantity_overrun` etc.) | — |
+| 9 | **Multiple fulfillments / locations** | one fulfillment per picking; a fulfillment may span >1 FO at one location (`shopify_fulfillment_order_gids` JSON) | N bindings ↔ 1 order binding; order-level rollup = Shopify's own `displayFulfillmentStatus` | L4 counts each **order** once (rollup snapshot — no double-count by construction) | OW one row | OW · Operator | ambiguous mapping → FR `line_mapping_ambiguous`/`picking_ambiguous` | per-fulfillment delivery rollup: n/a until §7.5 enhancement |
+| 10 | **External Shopify fulfillment** (merchant/app fulfilled outside Odoo) | inbound observation (`_observe_fulfillment` → `_route_observation`); origin from own-GID ledger | evidence row (A4/A7 raw, origin class); **Mode 1**: `reconciled_state='review'`, reason `external_fulfillment_observed` / `origin_unconfirmed` — zero stock change; **Mode 2** (origin confirmed): 16-condition evaluation → `applied` + `picking._action_done()` or named review reason | L7 external-fulfillment exception; F fulfillment flow | FR case listing reason + evidence | FR · Operator/Warehouse | every non-pass condition = named review reason; unknown A4 value → `schema_warning`, never success | — |
+| 11 | **Post-import divergence** (payment change, cancellation, refund) | scan detects `updatedAt` change within window → evidence refresh (`_refresh_existing`) | snapshots updated + previous preserved + `financial_status_changed_at` + trigger source; cancellation: `shopify_cancelled_at` + binding review; **amounts frozen** (lines never touched); validated-fulfillment cancellation → FR `cancelled_after_validation` (scans.py:187-202) | L7 change exception; C1 excludes Shopify-cancelled (disclosed in G); B if material | OW review with before/after | OW/FR · Reviewer | evidence mismatch → review (fail-closed) | refunds are never imported — value impact not quantified (§7.2 defer) |
+| 12 | **Stale / unknown evidence** | freshness anchors: `shopify_last_evidence_refresh_at`, `last_observed_at`, flow watermarks (fail-closed stamping) | unknown financial value → import/refresh **fails** (`data_shape_schema_mismatch`); unknown A4 fulfillment value → `schema_warning=True`, preserved raw, never success | L2 freshness caption; bridge Stale; L7 unknown-status exception (schema_warning count) | OW/FR with raw value visible | Error Center/FR · Operator | fail-closed by construction | A7 display values have no known-set normalization (display-only by design) |
 
-Additional measured facts:
+**Simultaneous payment × fulfillment states:** the two axes live in
+different stored fields (`shopify_financial_status_snapshot` vs
+`shopify_fulfillment_status_snapshot` + picking states), so an order is
+simultaneously "Authorized" and "Partially fulfilled" without either
+overwriting the other — verified in the prototype walk (§13) and required
+of the production implementation (handoff test plan).
 
-- **Network isolation:** every run issued exactly 2 requests — the HTML file
-  and its adjacent CSS file, both `file://`. Zero external requests of any
-  kind.
-- **RTL is a real mirror, not a claim:** with `dir="rtl"`, the attention
-  exception's accent edge computes `border-right-width: 4px` /
-  `border-left-width: 1px` (the LTR render shows the reverse), and the
-  header identity block moves from x≈93 to x≈1021 while the controls cross
-  to the opposite side (`header_mirrored: true`). Directional arrow icons
-  flip via `[dir="rtl"] .ic--arrow`. Expected bidi artefact recorded
-  honestly: untranslated English copy in an RTL context reorders neutral
-  punctuation ("+4.1%" renders as "4.1%+"), exactly as Odoo renders
-  untranslated strings under an RTL locale; translated production copy does
-  not exhibit it.
-- **Reduced motion:** under emulated `prefers-reduced-motion: reduce`,
-  button `transition-duration` computes to 0.000001 s in every run; no
-  animation carries meaning anywhere.
-- **Attention state without colour:** each of the three attention items
-  carries an icon, a kind chip ("Connection" / "Technical failure" /
-  "Human decision") and an owner label ("Owner: Administrator" / "Owner:
-  Operator" / "Owner: Reviewer / Administrator") — measured from the DOM,
-  not asserted from the stylesheet.
-- **States are materially distinct:** the visible-section inventory differs
-  per state (healthy: KPI row + bridge-ok + sales row + full health block;
-  attention: critical band + flagged KPI row + bridge-bad + sales row +
-  degraded health + needs-attention + stores table; empty: guided card +
-  annotation + simplified health, no KPI/bridge/sales row).
-- The keyboard walk uses real `Tab` key dispatches; the first surface
-  control receives focus on press 6 in every run and shows the 2 px solid
-  outline (`outline-color: rgb(23, 92, 211)`).
-
-## 14. Sources
+## 15. Sources
 
 Repository: exact head `a1c593183f6aaa1238e87486ca518717cefc53a9` — files
 cited inline (§2, §5, §6). External: the competitor/platform pages listed
