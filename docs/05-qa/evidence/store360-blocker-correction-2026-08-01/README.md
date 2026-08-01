@@ -17,7 +17,8 @@ Odoo.sh exact-SHA acceptance (DEC-041 D8), **NOT** live-Shopify validation,
 | --- | --- |
 | `counterfactual-oldhead.md` | The new/changed tests run against the pre-correction production code (old head `53d6a74`): **7 failed, 4 errors of 41** — the RPC spoof succeeds, the forged context key authorises a write, and both cancelled descendants advance the freshness stamp. Proves the tests measure the defects, not fixtures. |
 | `focused-candidate-head.md` | The touched classes at the candidate head (fix applied): **0 failed, 0 errors of 63** — including the HttpCase RPC boundary, both cancelled-descendant regressions, and the aggregate/security/import-mapping regressions. |
-| `connector-suite-summary.json` | The single full-campaign verdict at the tested SHA (`tools/run_connector_suite.sh`): fresh, warm, both genuine migrations + idempotent second updates, and the non-standard pass (HOOT ×3, visual, concurrency, races). Verbatim harness `summary.json`. |
+| `full-campaign.md` | The single full-campaign verdict at the tested SHA `7e49a51`: fresh, warm, both genuine migrations + idempotent second updates all **0/0 of 2508**; HOOT dashboard **8**; the ONE non-standard failure is the known P2-3 nondeterministic RTL row (`u2-inventory-workspace`), which no touched path owns and which the prompt directs be recorded under P2-3 without change — every deterministic pass and every blocker-focused test is green. |
+| `connector-suite-summary.json` | Verbatim harness `summary.json` (`tested_checkout_sha` = `7e49a51`, clean worktree, pin verified, `shopify_operations: none`). Its `nonstandard_tags: fail` is the P2-3 flaky row alone. |
 | `suite-result-lines.txt` | Distilled per-pass `odoo.tests.result` lines + HOOT evidence lines from the same campaign. |
 
 ## Scope reminder

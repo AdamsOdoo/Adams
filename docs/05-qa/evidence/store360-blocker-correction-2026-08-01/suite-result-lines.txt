@@ -1,0 +1,50 @@
+[connector-suite] testing 7e49a511c408db723e121a903cb169059017211f (event: local)
+[connector-suite] odoo pinned and verified @ 30bde9ff758834a4912c5ae55843d3a7dad849f1
+[connector-suite] browser preflight
+[connector-suite] browser: /opt/pw-browsers/chromium-1194/chrome-linux/chrome (Chromium 141.0.7390.37 )
+[connector-suite] websocket-client: 1.9.0
+[connector-suite] fresh install + tests -> connector_fresh_24306
+[connector-suite] fresh: pass 2026-08-01 17:24:04,375 24459 INFO connector_fresh_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_fresh_24306' 
+[connector-suite] fresh: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] fresh: 37 tour success markers, 36 required tours
+[connector-suite] warm update + tests -> connector_warm_24306
+[connector-suite] warm: pass 2026-08-01 17:31:16,414 31015 INFO connector_warm_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_warm_24306' 
+[connector-suite] warm: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] warm: 37 tour success markers, 36 required tours
+[connector-suite] warm: same-version update, zero migration scripts (expected)
+[connector-suite] genuine migration pass from 50b770a3
+[connector-suite] migration-50b770a3: installed versions shopify_connector_core=19.0.1.15.0 shopify_connector_fulfillment=19.0.1.3.0 shopify_connector_inventory=19.0.1.4.0 shopify_connector_product=19.0.2.4.0 shopify_connector_product_export=19.0.1.0.0 shopify_connector_sale=19.0.2.4.0 
+[connector-suite] migration-50b770a3: pass 2026-08-01 17:40:35,301 4062 INFO connector_migration_50b770a3_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_migration_50b770a3_24306' 
+[connector-suite] migration-50b770a3: upgraded versions shopify_connector_core=19.0.1.21.0 shopify_connector_fulfillment=19.0.1.4.0 shopify_connector_inventory=19.0.1.6.0 shopify_connector_product=19.0.2.9.0 shopify_connector_product_export=19.0.1.0.0 shopify_connector_sale=19.0.2.9.0 
+[connector-suite] migration-50b770a3: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] migration-50b770a3: 37 tour success markers, 36 required tours
+[connector-suite] migration-50b770a3: 4 connector migration script(s) executed
+[connector-suite] migration-50b770a3:   module shopify_connector_core: Running upgrade [19.0.1.16.0>] post-migrate
+[connector-suite] migration-50b770a3:   module shopify_connector_core: Running upgrade [19.0.1.17.0>] post-migrate
+[connector-suite] migration-50b770a3:   module shopify_connector_product: Running upgrade [19.0.2.8.0>] post-migrate
+[connector-suite] migration-50b770a3:   module shopify_connector_sale: Running upgrade [19.0.2.9.0>] post-migrate
+[connector-suite] migration-50b770a3: second update pass 2026-08-01 17:47:44,677 9459 INFO connector_migration_50b770a3_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_migration_50b770a3_24306' 
+[connector-suite] migration-50b770a3-again: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] migration-50b770a3-again: same-version update, zero migration scripts (expected)
+[connector-suite] genuine migration pass from 0a15b176
+[connector-suite] migration-0a15b176: installed versions shopify_connector_core=19.0.1.16.0 shopify_connector_fulfillment=19.0.1.3.0 shopify_connector_inventory=19.0.1.5.0 shopify_connector_product=19.0.2.4.0 shopify_connector_product_export=19.0.1.0.0 shopify_connector_sale=19.0.2.4.0 
+[connector-suite] migration-0a15b176: pass 2026-08-01 17:56:44,118 15647 INFO connector_migration_0a15b176_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_migration_0a15b176_24306' 
+[connector-suite] migration-0a15b176: upgraded versions shopify_connector_core=19.0.1.21.0 shopify_connector_fulfillment=19.0.1.4.0 shopify_connector_inventory=19.0.1.6.0 shopify_connector_product=19.0.2.9.0 shopify_connector_product_export=19.0.1.0.0 shopify_connector_sale=19.0.2.9.0 
+[connector-suite] migration-0a15b176: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] migration-0a15b176: 37 tour success markers, 36 required tours
+[connector-suite] migration-0a15b176: 3 connector migration script(s) executed
+[connector-suite] migration-0a15b176:   module shopify_connector_core: Running upgrade [19.0.1.17.0>] post-migrate
+[connector-suite] migration-0a15b176:   module shopify_connector_product: Running upgrade [19.0.2.8.0>] post-migrate
+[connector-suite] migration-0a15b176:   module shopify_connector_sale: Running upgrade [19.0.2.9.0>] post-migrate
+[connector-suite] migration-0a15b176: second update pass 2026-08-01 18:03:46,178 21462 INFO connector_migration_0a15b176_24306 odoo.tests.result: 0 failed, 0 error(s) of 2508 tests when loading database 'connector_migration_0a15b176_24306' 
+[connector-suite] migration-0a15b176-again: sanctioned skip TestMutationRecovery.test_real_process_death_harness
+[connector-suite] migration-0a15b176-again: same-version update, zero migration scripts (expected)
+[connector-suite] non-standard tag suite -> connector_nonstandard_24306
+[connector-suite] non-standard: fail 2026-08-01 18:14:19,580 26859 ERROR connector_nonstandard_24306 odoo.tests.result: 1 failed, 0 error(s) of 62 tests when loading database 'connector_nonstandard_24306' 
+[connector-suite] non-standard: HOOT suite 'shopify connector dashboard' verified
+[connector-suite] non-standard: HOOT suite 'shopify connector export diff' verified
+[connector-suite] non-standard: HOOT suite 'shopify connector setup wizard' verified
+[connector-suite] summary written to /home/user/Adams/ci-artifacts/summary.json
+CONNECTOR-HOOT-EVIDENCE suite="shopify connector setup wizard" passed=30 marker=ok 
+CONNECTOR-HOOT-EVIDENCE suite="shopify connector dashboard" passed=8 marker=ok 
+CONNECTOR-HOOT-EVIDENCE suite="shopify connector export diff" passed=11 marker=ok 
