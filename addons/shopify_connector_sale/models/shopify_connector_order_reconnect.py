@@ -37,14 +37,26 @@ _logger = logging.getLogger(__name__)
 
 ORDER_CATCHUP_JOB_TYPES = ('order_import_scan', 'order_import_sync')
 
-# States that leave order coverage provably complete for a finished job.
-# `failed_final` is terminal but BLOCKING (a permanently failed import is a
-# coverage hole, spec §9.3 G3); `cancelled` records an explicit operator or
-# quiesce decision not to run the work — the resume path in
-# `_enqueue_order` re-admits that work at the next scan, and until it lands
-# the order simply is not counted imported anywhere, so a cancelled row is
-# not itself a standing coverage claim.
-_NON_BLOCKING_TERMINAL_STATES = ('succeeded', 'skipped', 'cancelled')
+# States in which a FINISHED job leaves order coverage provably complete with
+# no further proof required: `succeeded` did the work; `skipped` is a recorded
+# policy decision that the work was not required. `failed_final`,
+# `failed_retryable` and `blocked_manual_review` are coverage holes and block.
+#
+# `cancelled` is deliberately NOT here (PR #204 P1-1 correction, 2026-08-01).
+# A cancelled descendant is required work that was NOT done — treating it as
+# coverage-complete let the durable freshness stamp advance and the bridge
+# claim "Complete & current" while an order had provably never landed. A
+# cancelled job now BLOCKS promotion unless its exact target is demonstrably
+# covered (see `_order_catchup_cancelled_job_is_covered`), and a transition
+# TO `cancelled` never itself triggers promotion (only `succeeded`/`skipped`
+# do), so promotion is reconsidered when the replacement succeeds, never when
+# the predecessor is cancelled.
+_COVERAGE_COMPLETE_TERMINAL_STATES = ('succeeded', 'skipped')
+
+# The transitions that may make promotion newly possible. A cancel can only
+# add a blocker (or leave one), never remove the last one, so it is excluded:
+# promotion after a cancel waits for the replacement's own success.
+_PROMOTION_TRIGGER_STATES = ('succeeded', 'skipped')
 
 
 class ShopifyConnectorStoreOrderReconnect(models.Model):
@@ -166,7 +178,7 @@ class ShopifyConnectorJobOrderCatchupHook(models.Model):
 
     def write(self, vals):
         result = super().write(vals)
-        if vals.get('state') in _NON_BLOCKING_TERMINAL_STATES:
+        if vals.get('state') in _PROMOTION_TRIGGER_STATES:
             stores = self.filtered(
                 lambda job: job.job_type in ORDER_CATCHUP_JOB_TYPES
             ).mapped('store_id')
@@ -189,11 +201,15 @@ class ShopifyConnectorStoreSettingsOrderCatchup(models.Model):
           * a pending lineage exists and its scan job succeeded;
           * the pending generation equals the store's CURRENT generation —
             an older lineage never stamps a newer generation (§8.5/§8.12);
-          * zero current-generation order jobs are non-terminal or in a
-            blocking failure state (`failed_retryable`, `failed_final`,
-            `blocked_manual_review` — §8.8's enumeration; `retry_waiting`,
-            `queued`, `running`, `draft` are non-terminal and block by
-            construction).
+          * NO current-generation order job leaves a coverage hole. A job
+            that is non-terminal (`draft`/`queued`/`running`/`retry_waiting`)
+            or in a blocking failure state (`failed_retryable`/`failed_final`/
+            `blocked_manual_review`) blocks unconditionally. A `cancelled`
+            job blocks too UNLESS its exact target is demonstrably covered
+            (P1-1 correction): a cancelled scan never qualifies, and a
+            cancelled import qualifies only when the exact order provably
+            landed at this generation. `succeeded`/`skipped` are the only
+            states that leave coverage complete with no further proof.
 
         Steady state promotes too: every completed 15-minute scan cycle
         whose imports settle re-stamps the current generation and advances
@@ -227,14 +243,33 @@ class ShopifyConnectorStoreSettingsOrderCatchup(models.Model):
         ):
             return True  # already promoted
         Job = self.env['shopify.connector.job'].sudo()
-        blocking = Job.search_count([
+        # Unconditionally blocking: any current-generation order job that is
+        # neither coverage-complete (succeeded/skipped) nor cancelled — i.e.
+        # every non-terminal state and every failure state.
+        hard_blocking = Job.search_count([
             ('store_id', '=', store.id),
             ('job_type', 'in', list(ORDER_CATCHUP_JOB_TYPES)),
             ('expected_connection_generation', '=', current_generation),
-            ('state', 'not in', list(_NON_BLOCKING_TERMINAL_STATES)),
+            (
+                'state', 'not in',
+                list(_COVERAGE_COMPLETE_TERMINAL_STATES) + ['cancelled'],
+            ),
         ])
-        if blocking:
+        if hard_blocking:
             return False
+        # Cancelled current-generation jobs block unless their exact target
+        # is demonstrably covered.
+        cancelled_jobs = Job.search([
+            ('store_id', '=', store.id),
+            ('job_type', 'in', list(ORDER_CATCHUP_JOB_TYPES)),
+            ('expected_connection_generation', '=', current_generation),
+            ('state', '=', 'cancelled'),
+        ])
+        for job in cancelled_jobs:
+            if not self._order_catchup_cancelled_job_is_covered(
+                store, job, current_generation,
+            ):
+                return False
         settings.sudo().write({
             'sale_order_catchup_generation': current_generation,
             'sale_order_catchup_synced_through_at': pending_upper,
@@ -245,3 +280,77 @@ class ShopifyConnectorStoreSettingsOrderCatchup(models.Model):
             store.id, current_generation, pending_upper,
         )
         return True
+
+    @api.model
+    def _order_catchup_cancelled_job_is_covered(
+        self, store, job, current_generation,
+    ):
+        """Whether a cancelled current-generation order job left NO hole.
+
+        A cancelled job is required work that was not done by that job, so it
+        is a coverage hole by default. It is exonerated only when its exact
+        target provably landed anyway (task §Order-lineage 2/3/9):
+
+          * a cancelled SCAN job never qualifies — an incomplete enumeration
+            is a store-wide hole, not a single-target one;
+          * a cancelled IMPORT job qualifies when EITHER
+              (a) a same-store, same-target, CURRENT-generation
+                  `order_import_sync` job has succeeded — the exact order was
+                  re-imported this generation (the deterministic resume
+                  replacement, linked via `superseded_by_job_id`, is exactly
+                  such a job); OR
+              (b) authoritative binding evidence for the target GID is
+                  already at least as new as the version the cancelled job
+                  was to import — the order had already landed.
+
+        A different-store, different-target or older-generation successor
+        never satisfies coverage. A queued/running/failed/cancelled
+        replacement never satisfies it either: (a) requires `succeeded`, and
+        until then the binding evidence in (b) is not advanced.
+        """
+        if job.job_type != 'order_import_sync':
+            return False
+        gid = job.shopify_target_gid
+        if not gid:
+            return False
+        Job = self.env['shopify.connector.job'].sudo()
+        replacement = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'order_import_sync'),
+            ('shopify_target_gid', '=', gid),
+            ('expected_connection_generation', '=', current_generation),
+            ('state', '=', 'succeeded'),
+        ])
+        if replacement:
+            return True
+        binding = self.env['shopify.connector.order.binding'].sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', '=', gid),
+        ], limit=1)
+        intended = self._order_job_intended_version(job)
+        return bool(
+            binding
+            and binding.shopify_updated_at_snapshot
+            and intended
+            and binding.shopify_updated_at_snapshot >= intended
+        )
+
+    @api.model
+    def _order_job_intended_version(self, job):
+        """The Shopify `updatedAt` an order-import job was to bring in.
+
+        `_enqueue_order` sets `payload_hash` to the node's `updatedAt`; a
+        deterministic resume sets `'<updatedAt>#resume:<prior id>'`. Both
+        encode the intended version as the leading ISO instant, so splitting
+        on the resume marker recovers it regardless of which form the
+        cancelled job carried. Returns a naive UTC datetime, or False when
+        the hash is not a parseable instant (fail-closed: no version, no
+        coverage-by-evidence).
+        """
+        raw = (job.payload_hash or '').split('#resume:')[0]
+        if not raw:
+            return False
+        try:
+            return self.env['shopify.connector.order.scan']._as_datetime(raw)
+        except (TypeError, ValueError):
+            return False

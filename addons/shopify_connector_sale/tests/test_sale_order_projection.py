@@ -1,9 +1,11 @@
 # Part of the Shopify Connector (Store 360 slice 1).
 #
-# The eleven protected sale-order projection columns: sanctioned writers,
-# fail-closed refusal of every unsanctioned write (ordinary, RPC-shaped and
-# elevated), company consistency, quarantine propagation, replay
-# convergence, copy() hygiene, and the idempotent backfill migration.
+# The eleven protected sale-order projection columns: the one non-forgeable
+# private writer, fail-closed refusal of every unsanctioned write (ordinary,
+# elevated, and — proven at the real request boundary — RPC with a forged
+# context key or a private-method name), company + binding-store consistency,
+# quarantine propagation, replay convergence, copy() hygiene, and the
+# idempotent backfill migration.
 #
 # COUNTERFACTUAL PROPERTY: none of these fields exist at a1c5931 (there is
 # no `sale.order` extension anywhere in the connector at that head), so
@@ -15,11 +17,15 @@ import os
 from odoo import fields
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.tests import tagged
+from odoo.tests.common import HttpCase, JsonRpcException
 
 from odoo.addons.shopify_connector_sale.models.shopify_connector_sale_order_projection import (
-    PROJECTION_SANCTION_KEY,
     SALE_ORDER_PROJECTION_FIELDS,
 )
+
+# The context key removed by the PR #204 P0-1 correction. The RPC regression
+# below forges exactly this key to prove it no longer authorises anything.
+_REMOVED_SANCTION_KEY = 'shopify_connector_projection_sanctioned_write'
 
 from .test_order_import_mapping import OrderImportCase
 
@@ -153,6 +159,30 @@ class TestSaleOrderProjection(OrderImportCase):
                 'shopify_connector_store_id': self.store.id,
             })
 
+    def test_no_context_key_authorises_a_projection_write(self):
+        """The removed sanction key must not re-authorise anything, even
+        supplied through `with_context` on a sudo recordset — the exact shape
+        the P0-1 spoof used."""
+        order = self._order()
+        self._bind(order, 'Proj5b')
+        with self.assertRaises(AccessError):
+            order.sudo().with_context(
+                **{_REMOVED_SANCTION_KEY: True}
+            ).write({'shopify_connector_review': True})
+
+    def test_private_writer_rejects_non_projection_fields(self):
+        """The one sanctioned writer accepts only projection fields, so it can
+        never be turned into a general back-door write."""
+        order = self._order()
+        self._bind(order, 'Proj5c')
+        with self.assertRaises(ValueError):
+            order.sudo()._shopify_connector_write_projection({'name': 'X'})
+        with self.assertRaises(ValueError):
+            order.sudo()._shopify_connector_write_projection({
+                'shopify_connector_review': True,  # legitimate...
+                'client_order_ref': 'X',           # ...smuggled alongside
+            })
+
     def test_unsanctioned_write_leaves_no_side_effect(self):
         order = self._order()
         self._bind(order, 'Proj6',
@@ -177,20 +207,48 @@ class TestSaleOrderProjection(OrderImportCase):
         })
         # sale.order._check_company_auto is True at the pin
         # (sale/models/sale_order.py:39), so check_company refuses the
-        # cross-company store even through the sanctioned path. (Odoo's
-        # assertRaises helper takes a single class; UserError is the
-        # documented check_company refusal and ValidationError subclasses
-        # nothing that would slip past it here.)
+        # cross-company store even through the one sanctioned writer.
+        # (Odoo's assertRaises helper takes a single class; AccessError and
+        # ValidationError both subclass UserError, so UserError catches the
+        # check_company refusal and the order-side agreement constraint
+        # alike — whichever fires first.)
         with self.assertRaises(UserError):
-            other_order.sudo().with_context(
-                **{PROJECTION_SANCTION_KEY: True}
-            ).write({'shopify_connector_store_id': self.store.id})
+            other_order.sudo()._shopify_connector_write_projection(
+                {'shopify_connector_store_id': self.store.id})
+            other_order.flush_recordset()
 
     def test_projection_store_must_agree_with_the_binding_store(self):
         order = self._order()
         self._bind(order, 'Proj7')
         order.invalidate_recordset()
         self.assertEqual(order.shopify_connector_store_id, self.store)
+
+    def test_same_company_store_drift_is_refused_by_the_order_side(self):
+        """P2-1: a same-company store that is NOT the order's binding store is
+        refused by the sale.order-side agreement constraint, so drift cannot
+        survive even through the one sanctioned writer."""
+        order = self._order()
+        self._bind(order, 'Proj7b')
+        other_store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Projection Same-Co Other Store',
+            'shop_domain': 'proj-sameco-other.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+            'company_id': self.env.company.id,
+        })
+        with self.assertRaises(ValidationError):
+            order.sudo()._shopify_connector_write_projection(
+                {'shopify_connector_store_id': other_store.id})
+            order.flush_recordset()
+
+    def test_a_bindingless_order_cannot_carry_a_store_projection(self):
+        """The order-side constraint also refuses a projected store on an
+        order that has no Shopify binding at all."""
+        order = self._order()
+        with self.assertRaises(ValidationError):
+            order.sudo()._shopify_connector_write_projection(
+                {'shopify_connector_store_id': self.store.id})
+            order.flush_recordset()
 
     # ------------------------------------------------------------------
     # quarantine propagation (both the ORM path and the SQL sweep hook)
@@ -277,3 +335,171 @@ class TestSaleOrderProjection(OrderImportCase):
         self._run_backfill()
         self.assertEqual(self.env.cr.rowcount, 0)
         self.assertGreaterEqual(first_pass, 1)
+
+
+@tagged('post_install', '-at_install')
+class TestSaleOrderProjectionRpc(HttpCase):
+    """P0-1 request-level regression — the defect and its fix, at the real
+    boundary.
+
+    Drives `/web/dataset/call_kw` as an ordinary user who may write sale
+    orders (salesman) and read the connector as an Auditor, but holds NO
+    connector role that may mutate binding evidence. Every attempt to reach a
+    projection column — including one that forges the removed sanction context
+    key and one that names the private writer directly — must be refused at
+    the wire, with no projection value, binding, order/binding population or
+    Store 360 count changing.
+
+    COUNTERFACTUAL: at a1c5931 the projection columns and the private writer
+    do not exist, so `write`/`create` accept the forged context key and set
+    the columns (the reproduced P0-1), violating every assertion below.
+    """
+
+    def setUp(self):
+        super().setUp()
+        company = self.env.company
+        self.store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Projection RPC Store',
+            'shop_domain': 'projection-rpc.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+            'company_id': company.id,
+        })
+        self.other_store = self.env['shopify.connector.store'].sudo().create({
+            'name': 'Projection RPC Other Store',
+            'shop_domain': 'projection-rpc-other.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+            'company_id': company.id,
+        })
+        self.partner = self.env['res.partner'].sudo().create(
+            {'name': 'Projection RPC Partner'})
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': self.store.id,
+            'sale_domain_enabled': True,
+        })
+        self.order = self.env['sale.order'].sudo().create({
+            'partner_id': self.partner.id,
+            'company_id': company.id,
+        })
+        now = fields.Datetime.now()
+        self.binding = self.env[
+            'shopify.connector.order.binding'
+        ].sudo().create({
+            'store_id': self.store.id,
+            'sale_order_id': self.order.id,
+            'shopify_gid': 'gid://shopify/Order/ProjRpc',
+            'shopify_order_name': '#ProjRpc',
+            'shopify_financial_status_snapshot': 'PAID',
+            'shopify_fulfillment_status_snapshot': 'UNFULFILLED',
+            'shopify_updated_at_snapshot': now,
+            'shopify_last_evidence_refresh_at': now,
+        })
+        self.user = self.env['res.users'].sudo().create({
+            'name': 'Projection RPC User',
+            'login': 'projection_rpc_user',
+            'password': 'projection_rpc_user',
+            'company_id': company.id,
+            'company_ids': [(6, 0, [company.id])],
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'sales_team.group_sale_salesman_all_leads').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_auditor'
+                ).id,
+            ])],
+        })
+        self.env.flush_all()
+
+    def _call_kw(self, model, method, args, kwargs=None):
+        return self.make_jsonrpc_request('/web/dataset/call_kw', {
+            'model': model,
+            'method': method,
+            'args': args,
+            'kwargs': kwargs or {},
+        })
+
+    def _orders_total(self):
+        data = self.env['shopify.connector.ui.dashboard'].with_user(
+            self.user
+        ).get_store_360_data(self.store.id, '30d')
+        return (data.get('commercial') or {}).get('orders_total')
+
+    def test_no_client_input_reaches_the_projection_over_rpc(self):
+        self.authenticate('projection_rpc_user', 'projection_rpc_user')
+        Order = self.env['sale.order'].sudo()
+        Binding = self.env['shopify.connector.order.binding'].sudo()
+
+        projection_before = self.order.read(SALE_ORDER_PROJECTION_FIELDS)[0]
+        binding_before = self.binding.read([
+            'store_id', 'sale_order_id', 'shopify_financial_status_snapshot',
+            'sec3_scope_quarantined',
+        ])[0]
+        orders_total_before = self._orders_total()
+        order_count_before = Order.search_count([])
+        binding_count_before = Binding.search_count([])
+
+        # 1. lifecycle mirror, forging the removed sanction context key
+        with self.assertRaises(JsonRpcException):
+            self._call_kw(
+                'sale.order', 'write',
+                [[self.order.id],
+                 {'shopify_connector_financial_status': 'VOIDED'}],
+                {'context': {_REMOVED_SANCTION_KEY: True}},
+            )
+        # 2. the SEC-3 quarantine mirror
+        with self.assertRaises(JsonRpcException):
+            self._call_kw(
+                'sale.order', 'write',
+                [[self.order.id], {'shopify_connector_quarantined': True}],
+            )
+        # 3. reproject onto another SAME-COMPANY store
+        with self.assertRaises(JsonRpcException):
+            self._call_kw(
+                'sale.order', 'write',
+                [[self.order.id],
+                 {'shopify_connector_store_id': self.other_store.id}],
+            )
+        # 4. create a sale order carrying projection fields
+        with self.assertRaises(JsonRpcException):
+            self._call_kw(
+                'sale.order', 'create',
+                [{'partner_id': self.partner.id,
+                  'shopify_connector_store_id': self.store.id,
+                  'shopify_connector_financial_status': 'PAID'}],
+            )
+        # 5. name the private synchronisation writer directly over RPC
+        with self.assertRaises(JsonRpcException):
+            self._call_kw(
+                'sale.order', '_shopify_connector_write_projection',
+                [[self.order.id], {'shopify_connector_review': True}],
+            )
+
+        self.order.invalidate_recordset()
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            self.order.read(SALE_ORDER_PROJECTION_FIELDS)[0],
+            projection_before,
+            'no projection value may change over RPC',
+        )
+        self.assertEqual(
+            self.binding.read([
+                'store_id', 'sale_order_id',
+                'shopify_financial_status_snapshot', 'sec3_scope_quarantined',
+            ])[0],
+            binding_before,
+            'no binding evidence may change',
+        )
+        self.assertEqual(
+            self._orders_total(), orders_total_before,
+            'Store 360 orders_total must be unchanged',
+        )
+        self.assertEqual(
+            Order.search_count([]), order_count_before,
+            'no sale order (fake Shopify order) may be created',
+        )
+        self.assertEqual(
+            Binding.search_count([]), binding_count_before,
+            'no order binding may be created',
+        )

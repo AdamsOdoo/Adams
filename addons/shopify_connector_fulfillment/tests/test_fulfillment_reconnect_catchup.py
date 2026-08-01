@@ -263,6 +263,159 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
             self.settings.fulfillment_catchup_generation, generation + 1)
 
     # ------------------------------------------------------------------
+    # P1-1: a cancelled current-generation fulfillment descendant is a hole
+    # ------------------------------------------------------------------
+    def _operator(self):
+        return new_test_user(
+            self.env, login='fc_operator',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_operator',
+        )
+
+    def _auditor(self):
+        return new_test_user(
+            self.env, login='fc_auditor',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_auditor',
+        )
+
+    def _make_order_side_complete(self, generation):
+        """Everything the sale-side bridge needs for `complete_current`
+        EXCEPT the fulfillment stamp, so the bridge assertion turns only on
+        fulfillment coverage."""
+        now = fields.Datetime.now()
+        self.settings.sudo().write({
+            'sale_domain_enabled': True,
+            'order_scheduled_sync_enabled': True,
+            'sale_order_last_import_checkpoint_at': now,
+            'sale_order_catchup_generation': generation,
+            'sale_order_catchup_synced_through_at': now,
+        })
+        self.store.invalidate_recordset()
+
+    def _seed_fulfillment_pending(self, generation):
+        recording = self._catchup_job(state='succeeded')
+        recording.sudo().write({'finished_at': fields.Datetime.now()})
+        self.settings.sudo().write({
+            'fulfillment_catchup_pending_generation': generation,
+            'fulfillment_catchup_pending_observed_through_at':
+                fields.Datetime.now(),
+            'fulfillment_catchup_pending_job_id': recording.id,
+        })
+        return recording
+
+    def _bridge_state(self, user):
+        data = self.env['shopify.connector.ui.dashboard'].with_user(
+            user).get_store_360_data(self.store.id, '30d')
+        return (data.get('bridge') or {}).get('state')
+
+    def test_cancelled_fulfillment_descendant_blocks_the_stamp(self):
+        self.store.sudo().write({'connection_generation': 7})
+        generation = self.store.connection_generation
+        self._make_order_side_complete(generation)
+        self._seed_fulfillment_pending(generation)
+        descendant = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'reconciliation',
+            'job_type': 'fulfillment_inbound_observation',
+            'state': 'queued',
+            'payload_hash': 'fc-outstanding',
+            'expected_connection_generation': generation,
+            'res_model': 'shopify.connector.order.binding',
+            'res_id': 1,
+        })
+
+        # Cancel the outstanding fulfillment work through the operator route.
+        descendant.with_user(self._operator()).action_cancel(
+            'operator cancels the outstanding fulfillment observation')
+        descendant.invalidate_recordset()
+        self.assertEqual(descendant.state, 'cancelled')
+
+        self.settings.invalidate_recordset()
+        self.assertNotEqual(
+            self.settings.fulfillment_catchup_generation, generation,
+            'a cancelled fulfillment descendant must not advance the stamp',
+        )
+        self.assertNotEqual(
+            self._bridge_state(self._auditor()), 'complete_current',
+            'the bridge must not claim complete/current with an open '
+            'fulfillment hole',
+        )
+
+        # There is NO fulfillment resume route: a later, UNRELATED success at
+        # the same generation must not close the cancelled hole.
+        other = self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'reconciliation',
+            'job_type': 'fulfillment_inbound_observation',
+            'state': 'queued',
+            'payload_hash': 'fc-unrelated',
+            'expected_connection_generation': generation,
+            'res_model': 'shopify.connector.order.binding',
+            'res_id': 2,
+        })
+        other.sudo().write({'state': 'running'})
+        other.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        self.settings.invalidate_recordset()
+        self.assertNotEqual(
+            self.settings.fulfillment_catchup_generation, generation,
+            'with no resume route, an unrelated success cannot cover a '
+            'cancelled fulfillment descendant',
+        )
+
+    def test_a_new_generation_recovers_and_stale_work_cannot_stamp_it(self):
+        self.store.sudo().write({'connection_generation': 7})
+        old_generation = self.store.connection_generation
+        # A cancelled descendant left over from the old generation.
+        self.Job.create({
+            'store_id': self.store.id,
+            'job_source': 'reconciliation',
+            'job_type': 'fulfillment_inbound_observation',
+            'state': 'cancelled',
+            'payload_hash': 'fc-old-cancelled',
+            'expected_connection_generation': old_generation,
+            'res_model': 'shopify.connector.order.binding',
+            'res_id': 1,
+            'finished_at': fields.Datetime.now(),
+        })
+        Settings = self.env['shopify.connector.store.settings']
+
+        # A later reconnect starts a NEW generation; its own complete pass
+        # then settles with no current-generation hole.
+        self.store.sudo().write({'connection_generation': 8})
+        new_generation = self.store.connection_generation
+        self._seed_fulfillment_pending(new_generation)
+        Settings._shopify_connector_promote_fulfillment_catchup(self.store)
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.fulfillment_catchup_generation, new_generation,
+            'the old-generation cancelled lineage is fenced by generation and '
+            'must not block the new generation',
+        )
+
+        # Stale-generation work can never stamp the new generation: a pending
+        # claim recorded for the OLD generation is refused.
+        stale_recording = self._catchup_job(state='succeeded')
+        stale_recording.sudo().write({'finished_at': fields.Datetime.now()})
+        self.settings.sudo().write({
+            'fulfillment_catchup_generation': 0,
+            'fulfillment_catchup_observed_through_at': False,
+            'fulfillment_catchup_pending_generation': old_generation,
+            'fulfillment_catchup_pending_observed_through_at':
+                fields.Datetime.now(),
+            'fulfillment_catchup_pending_job_id': stale_recording.id,
+        })
+        Settings._shopify_connector_promote_fulfillment_catchup(self.store)
+        self.settings.invalidate_recordset()
+        self.assertNotEqual(
+            self.settings.fulfillment_catchup_generation, new_generation,
+            'a pending claim from an older generation must never stamp the '
+            'current one',
+        )
+
+    # ------------------------------------------------------------------
     # ruling D: dispatch is the rule-visible picking population
     # ------------------------------------------------------------------
     def test_dispatch_counts_are_governed_by_picking_rules(self):

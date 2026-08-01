@@ -1,3 +1,60 @@
+### Shopify Store 360 — CONSOLIDATED BLOCKER CORRECTION (2026-08-01)
+
+- **Branch / PR:** `fable/wave-5-completion` (PR #204, draft). Started at the
+  required head `53d6a74`; additive commits only (no rebase/amend/squash/
+  force-push); base `mvp/program-integration@87f1763a…` unchanged; PR stays
+  draft, unaccepted, unmerged.
+- **Why:** the authoritative independent review
+  ([`#issuecomment-5152212340`](https://github.com/AdamsOdoo/Adams/pull/204#issuecomment-5152212340))
+  returned REVISE — CONSOLIDATED BLOCKER with two reproduced blockers.
+- **P0-1 (fixed) — non-forgeable projection.** A client-supplied context key
+  authorised every protected `sale.order` projection write over real RPC
+  (`call_kw` copies the client context verbatim). Removed the sanction key;
+  the public `create()`/`write()` now refuse all eleven fields
+  unconditionally (no context, no `sudo()`); the sole writer is the private,
+  non-RPC `_shopify_connector_write_projection()` (RPC-name-guarded,
+  projection-fields-only, reaches the next MRO write directly). Added a
+  `sale.order`-side store-agreement `@api.constrains` (P2-1) refusing
+  same-company as well as cross-company drift.
+- **P1-1 (fixed) — cancelled ≠ covered.** A cancelled current-generation
+  descendant advanced the durable freshness stamp and the bridge claimed
+  "Complete & current" over an order that never landed. `cancelled` is no
+  longer coverage-complete and never triggers promotion: order-side, a
+  cancelled job blocks until its exact target is demonstrably covered (a
+  same-store/same-target/current-generation import succeeded, or binding
+  evidence proves the version landed), the resume now links the predecessor
+  via `superseded_by_job_id`; fulfillment-side (no resume route) a cancelled
+  descendant is unconditionally blocking until a new reconnect generation
+  fences it.
+- **Learning feedback loop:** *New issues found:* (1) an authorisation that
+  lives in `env.context` is not an authorisation — `call_kw` hands the client
+  context to the ORM verbatim, so the boundary must be a Python reference
+  (a private method), never a dict key; the earlier design mistook
+  "elevated-but-unsanctioned fails closed" for "unforgeable" and tested only
+  the ORM path, never the wire. (2) A terminal state is not a coverage proof:
+  `cancelled` conflated "work not required" (`skipped`) with "required work
+  not done", and promoting on the cancelling write itself stamped completion
+  before any replacement existed — completion must ride the replacement's
+  SUCCESS, never the predecessor's cancel. *What worked:* driving the
+  regressions through the REAL boundaries (`/web/dataset/call_kw`, the
+  operator `action_cancel`) is what made the counterfactual meaningful — the
+  same tests fail 7/4-of-41 against the old production and pass against the
+  fix. *Repeated pattern:* a security claim in prose ("RPC writes fail
+  closed") that no test exercised at the claimed layer; the fix adds the
+  request-level test the claim always needed.
+- **Verification (this environment — CI supporting evidence, NOT Odoo.sh;
+  DEC-041 D8):** focused touched-class run 0 failed/0 errors of 63 at the
+  candidate head; counterfactual 7 failed + 4 errors of 41 at the old head
+  (`53d6a74`); one full `tools/run_connector_suite.sh` campaign (fresh, warm,
+  both genuine migrations + idempotent second updates, non-standard incl.
+  HOOT ×3 / visual / concurrency). Evidence under
+  `docs/05-qa/evidence/store360-blocker-correction-2026-08-01/`; correction
+  record `docs/05-qa/pr-204-store360-blocker-correction-2026-08-01.md`. No
+  Shopify credential/request/mutation; no Odoo.sh run this session. P2-3 and
+  the P3 items are retained unchanged.
+
+---
+
 ### Shopify Store 360 — FINAL PRE-UAT IMPLEMENTATION AND PR #204 INTEGRATION (2026-08-01)
 
 - **Branch / PR:** `fable/wave-5-completion` (PR #204, draft). Started at

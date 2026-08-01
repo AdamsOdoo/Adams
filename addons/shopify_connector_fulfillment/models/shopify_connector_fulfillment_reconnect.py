@@ -44,7 +44,22 @@ _RETIRE_ON_RECONNECT_JOB_TYPES = (
     JOB_TYPE_INBOUND_OBSERVATION,
 )
 
-_NON_BLOCKING_TERMINAL_STATES = ('succeeded', 'skipped', 'cancelled')
+# States in which a FINISHED fulfillment job leaves coverage complete with no
+# further proof: `succeeded` did the work; `skipped` is a recorded policy
+# decision that the work was not required.
+#
+# `cancelled` is deliberately NOT here (PR #204 P1-1 correction, 2026-08-01).
+# There is no accepted fulfillment resume route in this correction, so a
+# cancelled current-generation fulfillment descendant is an unresolved
+# coverage hole and BLOCKS the durable stamp. It is cleared only when a later
+# reconnect starts a NEW generation and fences the older cancelled lineage
+# under the existing generation rules — never by promoting over the cancel. A
+# transition TO `cancelled` never itself triggers promotion.
+_COVERAGE_COMPLETE_TERMINAL_STATES = ('succeeded', 'skipped')
+
+# A cancel can only add or leave a blocker, never remove the last one, so it
+# does not trigger a promotion re-check; only clean completions do.
+_PROMOTION_TRIGGER_STATES = ('succeeded', 'skipped')
 
 
 class ShopifyConnectorStoreFulfillmentReconnect(models.Model):
@@ -140,7 +155,7 @@ class ShopifyConnectorJobFulfillmentCatchupHook(models.Model):
 
     def write(self, vals):
         result = super().write(vals)
-        if vals.get('state') in _NON_BLOCKING_TERMINAL_STATES:
+        if vals.get('state') in _PROMOTION_TRIGGER_STATES:
             stores = self.filtered(
                 lambda job: job.job_type in FULFILLMENT_JOB_TYPES
             ).mapped('store_id')
@@ -158,15 +173,19 @@ class ShopifyConnectorStoreSettingsFulfillmentCatchup(models.Model):
     def _shopify_connector_promote_fulfillment_catchup(self, store):
         """Promote the pending fulfillment lineage to the durable stamp.
 
-        Identical contract to the order-side promotion
+        Same contract as the order-side promotion
         (`_shopify_connector_promote_order_catchup`): current-generation
-        pending claim, its recording job succeeded, and zero fulfillment
-        jobs at the current generation in a non-terminal or blocking state.
-        Because the check spans EVERY fulfillment job type, descendant
-        reconciliation work (inbound observations and Mode 2 evaluations
-        the pass enqueued) must settle before the stamp advances
-        (task §8.9); a stale-generation lineage never stamps a newer
-        generation (§8.5/§8.12).
+        pending claim, its recording job succeeded, and NO fulfillment job at
+        the current generation left in a coverage-holing state. Because the
+        check spans EVERY fulfillment job type, descendant reconciliation
+        work (inbound observations and Mode 2 evaluations the pass enqueued)
+        must settle before the stamp advances (task §8.9); a stale-generation
+        lineage never stamps a newer generation (§8.5/§8.12).
+
+        Unlike the order side, `cancelled` is UNCONDITIONALLY blocking here:
+        there is no fulfillment resume route, so a cancelled current-
+        generation fulfillment descendant is an unresolved hole until a later
+        reconnect fences it under a new generation (P1-1 correction).
         """
         settings = self.sudo().search(
             [('store_id', '=', store.id)], limit=1,
@@ -194,11 +213,15 @@ class ShopifyConnectorStoreSettingsFulfillmentCatchup(models.Model):
         ):
             return True
         Job = self.env['shopify.connector.job'].sudo()
+        # Any current-generation fulfillment job that is not coverage-complete
+        # blocks — including `cancelled`, which has no resume route to close
+        # its hole (P1-1). Stale-generation cancelled jobs are excluded by the
+        # generation filter, so a reconnect's own retirement never self-blocks.
         blocking = Job.search_count([
             ('store_id', '=', store.id),
             ('job_type', 'in', list(FULFILLMENT_JOB_TYPES)),
             ('expected_connection_generation', '=', current_generation),
-            ('state', 'not in', list(_NON_BLOCKING_TERMINAL_STATES)),
+            ('state', 'not in', list(_COVERAGE_COMPLETE_TERMINAL_STATES)),
         ])
         if blocking:
             return False

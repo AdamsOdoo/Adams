@@ -27,9 +27,17 @@
   `shopify_connector_fulfillment_status` (Char, raw snapshot),
   `shopify_connector_review` (Boolean),
   `shopify_connector_evidence_refreshed_at` (Datetime). All `copy=False`,
-  readonly; an unsanctioned write — ordinary, RPC or `sudo()` without the
-  sanction context — fails closed
+  readonly. Write protection is **non-forgeable** (PR #204 P0-1 correction,
+  2026-08-01): the public `create()`/`write()` refuse any of the eleven
+  fields UNCONDITIONALLY — no `env.context` value and no `sudo()` lifts the
+  refusal, because a context value is client-forgeable (`call_kw` copies the
+  raw client context verbatim). The sole writer is the private, non-RPC
+  `_shopify_connector_write_projection()` (name-guarded from RPC, accepts
+  only the eleven fields, reaches the next MRO `write()` directly)
   (`shopify_connector_sale/models/shopify_connector_sale_order_projection.py`).
+  A sale.order-side `@api.constrains('shopify_connector_store_id')` keeps the
+  projected store in agreement with the order's binding (unset when there is
+  no binding), refusing same-company as well as cross-company drift.
 - **Authoritative writers.** The order-binding `create()`/`write()` choke
   point synchronises the projection in the SAME transaction as every
   sanctioned binding writer (importer create `_apply_import`, refresh
@@ -61,14 +69,23 @@
   `run_scan` records the pending lineage
   (`sale_order_catchup_pending_*`), the job-terminal hook promotes
   `sale_order_catchup_generation` / `sale_order_catchup_synced_through_at`
-  only when every current-generation order job is terminal and
-  non-blocking; `action_reconnect` retires stale-generation order jobs
-  and admits exactly one catch-up scan; a cancelled import resumes
-  exactly once via a deterministic `#resume:<job id>` key. Fulfillment
-  side: the previously dead-end `fulfillment_reconnect_catchup` route is
-  genuinely admitted from `action_reconnect`, scope-key-prefixed
-  (`FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES`), with
-  `fulfillment_catchup_*` stamps mirroring the order contract.
+  only when every current-generation order job leaves no coverage hole;
+  `action_reconnect` retires stale-generation order jobs and admits exactly
+  one catch-up scan; a cancelled import resumes exactly once via a
+  deterministic `#resume:<job id>` key, and the cancelled predecessor is
+  linked to that one replacement via `superseded_by_job_id`. **A `cancelled`
+  descendant is NOT coverage-complete (PR #204 P1-1 correction):** a
+  transition to `cancelled` never itself promotes; a cancelled current-
+  generation order job blocks until its exact target is demonstrably covered
+  (a same-store/same-target/current-generation import has succeeded, or
+  binding evidence already proves the version landed), and a cancelled scan
+  always blocks. Fulfillment side: the previously dead-end
+  `fulfillment_reconnect_catchup` route is genuinely admitted from
+  `action_reconnect`, scope-key-prefixed
+  (`FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES`), with `fulfillment_catchup_*`
+  stamps mirroring the order contract — but with **no resume route**, so a
+  cancelled current-generation fulfillment descendant is unconditionally
+  blocking until a later reconnect generation fences it.
 - **UI.** The Store 360 Owl screen ships under the ORIGINAL
   `shopify_connector_dashboard` client-action tag (navigation, S1 setup
   entry and `.o_sc_dashboard` roots preserved): filters, the two distinct

@@ -475,6 +475,13 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
           * with a payload deterministic in the prior attempt's id, so a
             second scan pass collides on the SAME resume key instead of
             growing a job per pass — exactly-once per superseded attempt.
+
+        The cancelled predecessor is linked to its one replacement through
+        `superseded_by_job_id` (PR #204 P1-1): the freshness promotion treats
+        the cancelled import as a coverage hole until that exact replacement
+        SUCCEEDS, so the link makes the "reconsider on the replacement's
+        success" contract explicit and one-to-one — whether the replacement
+        was just enqueued here or already exists from a prior scan pass.
         """
         Job = self.env['shopify.connector.job'].sudo()
         prior = Job.search([
@@ -495,22 +502,40 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
             >= self._as_datetime(node.get('updatedAt'))
         ):
             return False
+        resume_key = '%s#resume:%d' % (node['updatedAt'], prior.id)
+        replacement = False
         try:
             with self.env.cr.savepoint():
-                self.env['shopify.connector.job.enqueue'].enqueue(
+                replacement = self.env[
+                    'shopify.connector.job.enqueue'
+                ].enqueue(
                     store,
                     job_source=job_source,
                     job_type='order_import_sync',
-                    payload_hash='%s#resume:%d' % (
-                        node['updatedAt'], prior.id,
-                    ),
+                    payload_hash=resume_key,
                     res_model='shopify.connector.store',
                     res_id=store.id,
                     shopify_target_gid=node['id'],
                 )
-            return True
         except IntegrityError:
+            # A prior scan pass already admitted the one deterministic
+            # replacement for this cancelled attempt; link to that exact job
+            # rather than making a second one (exactly-once per superseded
+            # attempt, task §Order-lineage 5/6).
+            replacement = Job.search([
+                ('store_id', '=', store.id),
+                ('job_type', '=', 'order_import_sync'),
+                ('shopify_target_gid', '=', node['id']),
+                ('payload_hash', '=', resume_key),
+            ], limit=1)
+        if not replacement:
             return False
+        if prior.superseded_by_job_id.id != replacement.id:
+            # superseded_by_job_id is a PROTECTED_JOB_FIELDS entry, writable
+            # only under sudo — `prior` is already sudo. Not a state field,
+            # so no legal-transition check applies.
+            prior.write({'superseded_by_job_id': replacement.id})
+        return True
 
     @api.model
     def _preview_token(
