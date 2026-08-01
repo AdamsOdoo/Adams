@@ -297,6 +297,70 @@ documentation** and is called out rather than assumed.
 | R-1 | Disconnect, change data in Shopify, reconnect | Catch-up reconciles; no duplicate | Job trace, counts |
 | R-2 | Reconnect against a **different** store | Store-identity mismatch refuses fail-closed | Refusal record |
 | R-3 | Reconciliation scan watermark | Second scan does not re-process settled work | Scan trace |
+| R-4 | Disconnected-period order/payment/fulfillment change plus Odoo dispatch change; reconnect and prove source, freshness and catch-up | Last-known Shopify-derived Odoo state is preserved while disconnected; Odoo-native change remains observable; reconnect alone is not classified as caught up; current-generation catch-up reconciles the eligible Shopify set and stored snapshots with no duplicate or false-current interval | Generation/checkpoint/watermark trace, request ledger, Shopify↔Odoo reconciliation, UI/payload capture |
+
+#### R-4 executable protocol — reconnect accuracy, timeliness and truthful display
+
+Purpose: prove what the user sees is sourced and timestamped truthfully across a
+disconnect gap. This extends R-1; it does not replace R-1 or R-3.
+
+1. **Baseline.** Record the store identity, `connection_generation`, order
+   checkpoint, fulfillment watermark, relevant queue counts, dashboard/operator
+   payload, and the exact synthetic Shopify order/payment/fulfillment set with
+   sanitized IDs and `updatedAt` values. Reconcile those records to Odoo orders,
+   bindings, pickings and stored Shopify snapshots.
+2. **Create the gap.** Disconnect through the supported connector path. While the
+   connector is disconnected, using synthetic fixtures only:
+   - create one Shopify order;
+   - change one existing order's payment state;
+   - create or change one fulfillment;
+   - advance one dedicated Odoo delivery order through an Odoo-native state change.
+3. **While disconnected.** Prove zero successful connector Shopify requests.
+   Previously stored Shopify-derived values must remain last-known values; they
+   must not be cleared or replaced by zero. Their Shopify-source timestamps must
+   not advance. The Odoo-native delivery change must remain observable in Odoo.
+   Any current surface that displays affected values must not claim that the
+   Shopify-derived values are live/current.
+4. **Reconnect, before catch-up.** Record the new `connection_generation`.
+   Successful credential/identity probing alone is not proof that order or
+   fulfillment data is current. Until a complete catch-up for the current
+   generation finishes, classify the affected data as reconciling, stale or
+   incomplete; an old checkpoint that is still younger than its ordinary age
+   threshold is insufficient.
+5. **Complete catch-up.** Run the sanctioned order and fulfillment reconciliation
+   paths to a terminal result. Reconcile mechanically:
+   - the eligible Shopify order set to Odoo orders and bindings;
+   - payment and fulfillment snapshots to current Shopify GraphQL values;
+   - imported-sales/order/unit figures to their documented Odoo domains;
+   - every displayed count to the records opened by its drill-down;
+   - request counts, checkpoints and watermarks to the completed traversal;
+   - zero duplicate Shopify GIDs, bindings, Odoo orders or remote mutations.
+6. **Partial/failure proof.** Force one bounded failure after at least one page or
+   item is observed. The relevant completion marker/watermark must fail closed,
+   the affected data must remain non-current, and retry must resume/reconcile
+   without duplication. A second reconnect during reconciliation must not let
+   the older generation mark the newer generation current.
+7. **Long-gap policy.** If the tested gap can exceed Shopify's ordinary
+   60-day order-access window, verify visible fail-closed handling unless the
+   credential has `read_all_orders`; do not infer complete historical coverage.
+
+Required evidence: sanitized Shopify IDs/`updatedAt`, Odoo record IDs and counts,
+generation/checkpoint/watermark before and after, request ledger, job lineage and
+terminal states, duplicate query results, dashboard/RPC payloads and screenshots
+for disconnected, reconciling, complete and forced-failure states.
+
+**Current-vs-future UI classification.** PR #204 does not implement the separate
+Shopify Store 360 concept. Absence of that future page or its future commercial
+cards is not an R-4 failure. For any current surface that already displays an
+affected state/value, a false green/current claim, silent zeroing, or a page
+timestamp presented as Shopify synchronization time is misleading operator
+behaviour and is recorded under §9. The Store 360 source/freshness presentation
+is a separately tracked UI requirement, not retroactively claimed as PR #204
+scope.
+
+Immediate stop: duplicate record/mutation, wrong-store data, cross-company leak,
+watermark stamped after partial traversal, stale data represented as current, or
+credential disclosure.
 
 ### 4.5 Security / privacy — `S-*`
 
