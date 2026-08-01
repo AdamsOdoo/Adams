@@ -48,6 +48,39 @@ class ShopifyConnectorStoreSettingsFulfillment(models.Model):
     fulfillment_notification_confirmed = fields.Boolean(default=False)
     # Reconciliation-scan watermark (D-014-8) + Mode-2 switch-scan boundary.
     fulfillment_last_reconciliation_at = fields.Datetime()
+    # --- Store 360 / R-4: generation-bound fulfillment catch-up stamps ---
+    # Same contract as the sale-side order stamps: a successful connection
+    # probe never marks fulfillment-derived data current; only a COMPLETE
+    # traversal (reconnect catch-up over every order binding, or the
+    # reconciliation check over the known fulfillment population) admitted
+    # at the CURRENT connection generation, whose fulfillment jobs then all
+    # settle terminal and non-blocking, does. Pending fields are written by
+    # the two scan handlers (only on a zero-failure pass); the durable pair
+    # is promoted by the job-terminal hook in
+    # `shopify_connector_fulfillment_reconnect.py`. All readonly connector
+    # system state, never caller input.
+    fulfillment_catchup_pending_generation = fields.Integer(
+        default=0, readonly=True,
+    )
+    fulfillment_catchup_pending_observed_through_at = fields.Datetime(
+        readonly=True,
+    )
+    fulfillment_catchup_pending_job_id = fields.Many2one(
+        comodel_name='shopify.connector.job',
+        readonly=True,
+        ondelete='set null',
+    )
+    fulfillment_catchup_generation = fields.Integer(
+        default=0, readonly=True,
+        help='Connection generation for which the last complete '
+             'fulfillment traversal (catch-up or reconciliation check) '
+             'settled with its descendant work terminal and non-blocking.',
+    )
+    fulfillment_catchup_observed_through_at = fields.Datetime(
+        readonly=True,
+        help='Shopify fulfillment evidence observed through this instant '
+             'by the last complete, current-generation pass.',
+    )
 
     def _fulfillment_notification_allowed(self):
         """True only when the store has both enabled the default notification

@@ -225,7 +225,21 @@ class ShopifyConnectorScopeMixin(models.AbstractModel):
                 (tuple(quarantined.ids),),
             )
             self.invalidate_model(['sec3_scope_quarantined'])
+            self._sec3_after_quarantine_flag_update(quarantined.ids, True)
         return len(quarantined)
+
+    @api.model
+    def _sec3_after_quarantine_flag_update(self, ids, quarantined):
+        """Hook: the quarantine flag of ``ids`` was just set to ``quarantined``.
+
+        Both quarantine writers (the sweep above and the release below) run
+        in SQL by design, so a model whose flag is mirrored onto another
+        table cannot rely on ``write()`` to propagate it. A concrete model
+        that maintains such a mirror (e.g. the sale-order projection of the
+        order binding) extends this hook and updates its mirror in the SAME
+        transaction. Default: nothing to propagate.
+        """
+        return None
 
     def action_sec3_release_scope_quarantine(self):
         """Administrative remediation: clear the quarantine once resolved.
@@ -255,4 +269,5 @@ class ShopifyConnectorScopeMixin(models.AbstractModel):
             (tuple(self.ids),),
         )
         self.invalidate_model(['sec3_scope_quarantined'])
+        self._sec3_after_quarantine_flag_update(self.ids, False)
         return True

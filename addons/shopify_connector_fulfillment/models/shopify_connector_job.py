@@ -42,16 +42,19 @@ FULFILLMENT_MUTATION_JOB_TYPES = (
     MUTATION_DOMAIN_TRACKING,
 )
 
-# Theme A correction: the two whole-store scan job types (both keyed on
+# Theme A correction: the whole-store scan job types (each keyed on
 # `(store, 'shopify.connector.store', store.id)` with no target GID) that
 # would otherwise collide with each other under core's generic, job-type-
 # agnostic default `_compute_operation_scope_key` formula. Job-type-prefixed
 # below exactly like the two mutation domains, so an in-flight reconciliation
-# check can never collide with an in-flight mode-switch scan for the same
-# store. `fulfillment_reconnect_catchup` is registered but never enqueued by
-# this addon today, so it is intentionally not included here.
+# check can never collide with an in-flight mode-switch scan — or, since the
+# Store 360 / R-4 slice wired its enqueue (`action_reconnect` override in
+# `shopify_connector_fulfillment_reconnect.py`), an in-flight reconnect
+# catch-up — for the same store. `fulfillment_reconnect_catchup` is included
+# now that it is genuinely enqueued.
 FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES = FULFILLMENT_MUTATION_JOB_TYPES + (
     JOB_TYPE_RECONCILIATION_CHECK,
+    JOB_TYPE_RECONNECT_CATCHUP,
     JOB_TYPE_MODE_SWITCH_SCAN,
 )
 
@@ -170,15 +173,16 @@ class ShopifyConnectorJobFulfillmentExtension(models.Model):
     )
     def _compute_operation_scope_key(self):
         """Override the operation-scope key for the two mutation types and the
-        two whole-store scan types (the Q1 literals, widened by the Theme A
-        correction); every other job_type — including the shared
+        whole-store scan types (the Q1 literals, widened by the Theme A
+        correction and by the Store 360 / R-4 reconnect catch-up wiring);
+        every other job_type — including the shared
         `fulfillment_mutation_reconcile` and the two per-record admission/
         observation types (already uniquely scoped by their own distinct
         res_model) — keeps core's default behaviour, so the reconcile job
         owns/inherits no remote-effect scope. Same non-terminal/terminal
         lifecycle rule as core; only a different literal for the prefixed
         types. The two mutation types additionally require a non-empty
-        `shopify_target_gid` (their Q1 identity component); the two scan
+        `shopify_target_gid` (their Q1 identity component); the scan
         types never carry one, so that requirement is scoped to the mutation
         types only — a scan job's scope key must not be forced empty merely
         because it has no target GID."""

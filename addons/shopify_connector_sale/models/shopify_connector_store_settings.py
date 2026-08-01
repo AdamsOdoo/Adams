@@ -93,6 +93,47 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
         comodel_name='account.payment.term', ondelete='restrict',
     )
     sale_order_last_import_checkpoint_at = fields.Datetime()
+    # --- Store 360 / R-4: generation-bound order catch-up stamps ---------
+    # A successful connection probe alone must never mark Shopify-derived
+    # order data current (spec §9.3/§9.5, R-4). These stamps record the one
+    # thing that may: a COMPLETE order traversal for the CURRENT
+    # `connection_generation` whose descendant import work all reached a
+    # terminal, non-blocking state. `run_scan` records the pending lineage
+    # (in the same savepoint as its enumeration and checkpoint advance);
+    # the job-terminal promotion hook in
+    # `shopify_connector_order_reconnect.py` promotes it. All five fields
+    # are connector system state: readonly, written only by those two
+    # sanctioned paths, never caller input.
+    sale_order_catchup_pending_generation = fields.Integer(
+        default=0, readonly=True,
+        help='Connection generation of the most recent completed order '
+             'scan traversal whose descendant imports are being tracked.',
+    )
+    sale_order_catchup_pending_upper_bound_at = fields.Datetime(
+        readonly=True,
+        help='Upper bound (scan start wall clock) of the traversal window '
+             'the pending lineage enumerated through.',
+    )
+    sale_order_catchup_pending_scan_job_id = fields.Many2one(
+        comodel_name='shopify.connector.job',
+        readonly=True,
+        ondelete='set null',
+        help='The order scan job that recorded the pending lineage.',
+    )
+    sale_order_catchup_generation = fields.Integer(
+        default=0, readonly=True,
+        help='Connection generation for which the last COMPLETE order '
+             'catch-up (traversal + all descendant imports terminal and '
+             'non-blocking) is proven. Order data is only "current" when '
+             'this equals the store\'s connection_generation.',
+    )
+    sale_order_catchup_synced_through_at = fields.Datetime(
+        readonly=True,
+        help='Shopify order data is synchronized through this instant: the '
+             'upper bound of the last complete, current-generation catch-up '
+             'traversal. Advanced only at complete catch-up; a page refresh '
+             'or connection probe never moves it.',
+    )
 
     def init(self):
         """Supply the sale module's share of the SEC-3 ownership backfill.

@@ -113,6 +113,10 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     @api.model
     def _handle_fulfillment_reconciliation_check(self, job):
         store = job.store_id
+        # Coverage instant for the generation-bound completion stamp: the
+        # pass proves fulfillment evidence observed through the moment the
+        # traversal STARTED (a conservative claim — reads happen after it).
+        observed_through = fields.Datetime.now()
         Binding = self.env['shopify.connector.fulfillment.binding'].sudo()
         # Theme E: paginate the COMPLETE current population every run (never a
         # fixed 200-row window) so a store's reconciliation coverage never
@@ -159,6 +163,19 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             )
         self._settings(store).sudo().write({
             'fulfillment_last_reconciliation_at': fields.Datetime.now(),
+            # Store 360 / R-4 pending catch-up lineage: a genuinely complete
+            # pass over the known fulfillment population, admitted at this
+            # job's captured generation. Promoted to the durable completion
+            # stamp by the job-terminal hook once every fulfillment job at
+            # the current generation is terminal and non-blocking
+            # (shopify_connector_fulfillment_reconnect.py). Only reached
+            # with zero read failures — the raise above keeps a partial
+            # pass from ever recording a pending claim (fail-closed).
+            'fulfillment_catchup_pending_generation':
+                job.expected_connection_generation,
+            'fulfillment_catchup_pending_observed_through_at':
+                observed_through,
+            'fulfillment_catchup_pending_job_id': job.id,
         })
 
     @api.model
@@ -209,6 +226,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
     @api.model
     def _handle_fulfillment_reconnect_catchup(self, job):
         store = job.store_id
+        observed_through = fields.Datetime.now()
         Binding = self.env['shopify.connector.order.binding'].sudo()
         # Theme E: the complete current population every run, never a fixed
         # 200-row window -- a gap-period external must never be permanently
@@ -246,6 +264,20 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                 'catch-up and the affected orders are retried, never '
                 'permanently skipped.' % (read_failures, len(order_bindings)),
             )
+        # Store 360 / R-4: this traversal covered EVERY order binding of the
+        # store (a superset of the known-fulfillment population, so it also
+        # discovers gap-period externals) with zero read failures. Record
+        # the pending claim under this job's captured generation; the
+        # job-terminal hook promotes it once the store's fulfillment work is
+        # quiescent at the current generation. A partial traversal raised
+        # above and records nothing (fail-closed, R-4 §6).
+        self._settings(store).sudo().write({
+            'fulfillment_catchup_pending_generation':
+                job.expected_connection_generation,
+            'fulfillment_catchup_pending_observed_through_at':
+                observed_through,
+            'fulfillment_catchup_pending_job_id': job.id,
+        })
 
     # ------------------------------------------------------------------
     # fulfillment_mode_switch_scan — the Mode 1 -> Mode 2 switch scan

@@ -16,5 +16,7 @@ from . import shopify_connector_fulfillment_inbound
 from . import shopify_connector_fulfillment_review
 from . import shopify_connector_fulfillment_mode2
 from . import shopify_connector_fulfillment_scans
+from . import shopify_connector_fulfillment_reconnect
+from . import shopify_connector_ui_store360_fulfillment
 from . import shopify_connector_job_dispatch
 from . import stock_picking

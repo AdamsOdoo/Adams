@@ -4,6 +4,9 @@ from . import shopify_connector_res_partner
 from . import shopify_connector_customer_importer
 from . import shopify_connector_order_binding
 from . import shopify_connector_sale_order_line
+from . import shopify_connector_sale_order_projection
 from . import shopify_connector_order_importer
 from . import shopify_connector_tax_mapping
 from . import shopify_connector_order_scan
+from . import shopify_connector_order_reconnect
+from . import shopify_connector_ui_store360_sale

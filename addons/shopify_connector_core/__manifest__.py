@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.20.0',
+    'version': '19.0.1.21.0',
     'summary': (
         'Core substrate for the Odoo <-> Shopify connector: store, '
         'settings, location cache, binding mixin, job and job log models, '
@@ -68,6 +68,9 @@ later, separately authorized tasks.
         'views/shopify_connector_store_views.xml',
         'views/shopify_connector_job_log_views.xml',
         'views/shopify_connector_job_views.xml',
+        # Store 360 slice: zero-schema analysis views over the job model
+        # (action defined before the menus file that references it).
+        'views/shopify_connector_job_analysis_views.xml',
         'views/shopify_connector_mutation_attempt_views.xml',
         'views/shopify_connector_menus.xml',
         # S1 LOADS LAST, and the ordering is load-bearing rather than tidy.

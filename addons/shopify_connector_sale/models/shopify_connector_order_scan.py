@@ -77,6 +77,19 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
             next_checkpoint = scan_upper_bound
         settings.sudo().write({
             'sale_order_last_import_checkpoint_at': next_checkpoint,
+            # Store 360 / R-4 pending catch-up lineage: this traversal
+            # enumerated everything updated through `scan_upper_bound` for
+            # the generation the job was admitted under. It is only a
+            # PENDING claim — the completion stamp is promoted by the
+            # job-terminal hook once every descendant import for the store
+            # is terminal and non-blocking at the current generation
+            # (shopify_connector_order_reconnect.py). Written in the same
+            # savepoint as the enumeration and checkpoint advance, so a
+            # failed scan records nothing (fail-closed, R-4 §6).
+            'sale_order_catchup_pending_generation':
+                job.expected_connection_generation,
+            'sale_order_catchup_pending_upper_bound_at': scan_upper_bound,
+            'sale_order_catchup_pending_scan_job_id': job.id,
         })
         self.env['shopify.connector.job.log']._system_append(
             job,
@@ -433,6 +446,64 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
                     job_source=job_source,
                     job_type='order_import_sync',
                     payload_hash=node['updatedAt'],
+                    res_model='shopify.connector.store',
+                    res_id=store.id,
+                    shopify_target_gid=node['id'],
+                )
+            return True
+        except IntegrityError:
+            return self._resume_cancelled_order_import(store, node, job_source)
+
+    @api.model
+    def _resume_cancelled_order_import(self, store, node, job_source):
+        """Re-admit work a CANCELLED import job left provably undone.
+
+        `idempotency_key` persists for the life of a job (job.py:760-763),
+        so an import cancelled before it ran — the disconnect quiesce sweep
+        (`_sweep_quiescing_business_jobs`) and the reconnect retirement both
+        produce exactly this shape — would otherwise collide forever on the
+        unchanged `updatedAt` and the order would silently never land
+        (R-4 §5/§6: retry/resume must reconcile without duplication, and a
+        gap must never persist invisibly).
+
+        Deliberately narrow:
+          * only a `cancelled` prior attempt resumes — `succeeded` did the
+            work, `skipped` recorded a policy decision this scan must not
+            overturn, and `failed_final` is DEC-009's manual-fix state whose
+            automatic re-enqueue would defeat the retry taxonomy;
+          * only when no binding proves the evidence already landed;
+          * with a payload deterministic in the prior attempt's id, so a
+            second scan pass collides on the SAME resume key instead of
+            growing a job per pass — exactly-once per superseded attempt.
+        """
+        Job = self.env['shopify.connector.job'].sudo()
+        prior = Job.search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'order_import_sync'),
+            ('shopify_target_gid', '=', node['id']),
+        ], order='id desc', limit=1)
+        if not prior or prior.state != 'cancelled':
+            return False
+        binding = self.env['shopify.connector.order.binding'].sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', '=', node['id']),
+        ], limit=1)
+        if (
+            binding
+            and binding.shopify_updated_at_snapshot
+            and binding.shopify_updated_at_snapshot
+            >= self._as_datetime(node.get('updatedAt'))
+        ):
+            return False
+        try:
+            with self.env.cr.savepoint():
+                self.env['shopify.connector.job.enqueue'].enqueue(
+                    store,
+                    job_source=job_source,
+                    job_type='order_import_sync',
+                    payload_hash='%s#resume:%d' % (
+                        node['updatedAt'], prior.id,
+                    ),
                     res_model='shopify.connector.store',
                     res_id=store.id,
                     shopify_target_gid=node['id'],

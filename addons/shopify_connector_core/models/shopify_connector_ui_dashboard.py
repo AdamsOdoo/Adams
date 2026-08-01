@@ -34,8 +34,10 @@
 
 from datetime import timedelta
 
+import pytz
+
 from odoo import _, api, fields, models
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 
 
 class ShopifyConnectorUiDashboard(models.AbstractModel):
@@ -103,6 +105,573 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             ),
             'refresh_interval_seconds': 30,
             'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
+        }
+
+    # ------------------------------------------------------------------ #
+    #  Store 360 (spec docs/02-product/ui-operations-360-dashboard-spec-
+    #  2026-08-01.md) — second RPC entrypoint, same read-only contract
+    # ------------------------------------------------------------------ #
+
+    # The one server-side period registry. The client sends a KEY, never a
+    # domain, a model name, a context or a date expression (task §7).
+    STORE_360_PERIODS = ('24h', '7d', '30d', '90d')
+    _PERIOD_DAYS = {'7d': 7, '30d': 30, '90d': 90}
+
+    @api.model
+    def get_store_360_data(self, store_id=False, period='30d'):
+        """Return the Store 360 projection: sales performance + connector
+        health for the selected store and period.
+
+        Same hard guarantees as :meth:`get_dashboard_data` — bounded
+        constant-count reads, current user only, no Shopify request, no
+        credential, no write, no hidden-record identifiers or labels in the
+        payload. Commercial and lifecycle regions are contributed by the
+        owning modules through :meth:`_store_360_extra_sections`, each
+        aggregating ON the model whose record rules govern it and drilling
+        down to a native list of that SAME model with the identical
+        server-built domain (spec §6.1).
+        """
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_auditor'
+        ):
+            raise AccessError(_(
+                "The Shopify Connector dashboard is only available to "
+                "connector users."
+            ))
+        period = self._store_360_validate_period(period)
+        stores = self.env['shopify.connector.store'].search([], order='id')
+        store = self._store_360_validate_store(store_id, stores)
+        window = self._store_360_window(period)
+        ctx = {
+            'store': store,
+            'stores': stores,
+            'period': period,
+            'window': window,
+        }
+
+        jobs = self._job_counts_scoped(store)
+        attempts_uncertain = self._uncertain_attempt_count_scoped(store)
+        store_states = self._store_counts()
+        derived = self._derive_state(store_states, jobs, attempts_uncertain)
+        payload = {
+            'meta': self._store_360_meta(ctx),
+            'health': {
+                'state': derived['state'],
+                'lead': derived['lead'],
+                'jobs': jobs,
+                'needs_review':
+                    jobs['blocked_manual_review'] + attempts_uncertain,
+                'backlog':
+                    jobs['queued'] + jobs['running'] + jobs['retry_waiting'],
+                'oldest_waiting': self._oldest_waiting(store),
+                'week': self._week_counters(store),
+                'exceptions': self._store_360_exceptions(
+                    store, jobs, attempts_uncertain,
+                ),
+                'activity': self._recent_activity_scoped(store),
+            },
+            'flows': self._flow_rows(ctx),
+            'stores_region': self._store_360_stores_region(ctx),
+            'setup_available': self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+            'refresh_interval_seconds': 30,
+            'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
+        }
+        payload.update(self._store_360_extra_sections(ctx))
+        payload['critical'] = self._store_360_critical(ctx, payload)
+        return payload
+
+    # -- validation (server-side, fixed registries only) ------------------
+    @api.model
+    def _store_360_validate_period(self, period):
+        if period not in self.STORE_360_PERIODS:
+            raise UserError(_(
+                "Unknown reporting period. Choose one of the offered "
+                "periods."
+            ))
+        return period
+
+    @api.model
+    def _store_360_validate_store(self, store_id, stores):
+        """Resolve the store filter against the caller's own visible set.
+
+        `stores` was searched as the current user, so a store another
+        company owns is simply not in it — an out-of-set id gets the same
+        refusal as a nonsense id, and no probe can distinguish "exists but
+        hidden" from "does not exist".
+        """
+        if not store_id:
+            return stores if len(stores) == 1 else stores.browse()
+        if not isinstance(store_id, int) or store_id not in set(stores.ids):
+            raise UserError(_("Unknown store."))
+        return stores.browse(store_id)
+
+    @api.model
+    def _store_360_window(self, period):
+        """Current + previous window bounds, user-timezone boundaries.
+
+        Returns naive-UTC datetimes for domains plus the timezone name for
+        the caption. The previous window is the current one shifted back by
+        its own length (spec C∆).
+        """
+        tzname = self.env.user.tz or 'UTC'
+        try:
+            tz = pytz.timezone(tzname)
+        except pytz.UnknownTimeZoneError:
+            tzname, tz = 'UTC', pytz.utc
+        now_utc = fields.Datetime.now()
+        now_local = pytz.utc.localize(now_utc).astimezone(tz)
+        if period == '24h':
+            end_local = now_local
+            start_local = end_local - timedelta(hours=24)
+        else:
+            days = self._PERIOD_DAYS[period]
+            end_local = now_local
+            start_local = (
+                now_local - timedelta(days=days - 1)
+            ).replace(hour=0, minute=0, second=0, microsecond=0)
+        duration = end_local - start_local
+        prev_end_local = start_local
+        prev_start_local = start_local - duration
+
+        def _utc(value):
+            return value.astimezone(pytz.utc).replace(tzinfo=None)
+
+        return {
+            'tz': tzname,
+            'start': _utc(start_local),
+            'end': _utc(end_local),
+            'prev_start': _utc(prev_start_local),
+            'prev_end': _utc(prev_end_local),
+        }
+
+    def _store_360_meta(self, ctx):
+        store = ctx['store']
+        window = ctx['window']
+        return {
+            'period': ctx['period'],
+            'periods': list(self.STORE_360_PERIODS),
+            'tz': window['tz'],
+            'window_start': fields.Datetime.to_string(window['start']),
+            'window_end': fields.Datetime.to_string(window['end']),
+            'store_id': store.id if len(store) == 1 else False,
+            'stores': [
+                {
+                    'id': candidate.id,
+                    'name': candidate.name,
+                    'state': candidate.state,
+                }
+                for candidate in ctx['stores']
+            ],
+        }
+
+    # -- extension seam ----------------------------------------------------
+    def _store_360_extra_sections(self, ctx):
+        """Sections contributed by the owning modules.
+
+        Core owns connector health only. The sale module adds `commercial`,
+        `bridge`, `trend`, `products` and `lifecycle`; the fulfillment
+        module adds `dispatch` and its lifecycle exception sources. Each
+        override calls ``super()`` and updates the dict, and each section
+        aggregates on the model whose rules govern it (spec §6.1) — this
+        seam mirrors `_get_handlers` in the job dispatcher.
+        """
+        return {}
+
+    # -- store-scoped bounded reads ----------------------------------------
+    def _store_term(self, store):
+        return [('store_id', '=', store.id)] if len(store) == 1 else []
+
+    def _job_counts_scoped(self, store):
+        Job = self.env['shopify.connector.job']
+        term = self._store_term(store)
+        return {
+            state: Job.search_count(term + [('state', '=', state)])
+            for state in (
+                'queued', 'running', 'retry_waiting', 'failed_retryable',
+                'failed_final', 'blocked_manual_review',
+            )
+        }
+
+    def _uncertain_attempt_count_scoped(self, store):
+        return self.env['shopify.connector.mutation.attempt'].search_count(
+            self._store_term(store) + [
+                ('observed_outcome', '=', 'uncertain'),
+                ('resolution_disposition', '=', False),
+            ]
+        )
+
+    def _oldest_waiting(self, store):
+        oldest = self.env['shopify.connector.job'].search(
+            self._store_term(store) + [
+                ('state', 'in', ('queued', 'retry_waiting')),
+            ],
+            order='create_date asc', limit=1,
+        )
+        if not oldest:
+            return False
+        return self._relative_time(oldest.create_date, fields.Datetime.now())
+
+    def _week_counters(self, store):
+        Job = self.env['shopify.connector.job']
+        term = self._store_term(store)
+        window_start = fields.Datetime.now() - timedelta(days=7)
+        base = term + [('finished_at', '>=', window_start)]
+        return {
+            'succeeded': Job.search_count(base + [('state', '=', 'succeeded')]),
+            'failed': Job.search_count(
+                base + [('state', 'in', ('failed_final', 'failed_retryable'))]
+            ),
+        }
+
+    def _recent_activity_scoped(self, store):
+        rows = self.env['shopify.connector.job'].search_read(
+            domain=self._store_term(store) + [
+                ('state', 'in', list(self._TERMINAL_JOB_STATES)),
+            ],
+            fields=['state', 'job_type', 'job_source', 'store_id',
+                    'finished_at'],
+            limit=self.RECENT_ACTIVITY_LIMIT,
+            order='finished_at desc, id desc',
+        )
+        now = fields.Datetime.now()
+        return [
+            {
+                'id': row['id'],
+                'state': row['state'],
+                'state_label': self._job_state_label(row['state']),
+                'tone': self._job_state_tone(row['state']),
+                'job_label': self._job_type_label(row['job_type']),
+                'source_label': self._job_source_label(row['job_source']),
+                'store': (row['store_id'] or [0, ''])[1]
+                    if row.get('store_id') else '',
+                'relative': self._relative_time(row.get('finished_at'), now),
+                'target': {
+                    'res_model': 'shopify.connector.job',
+                    'domain': [['id', '=', row['id']]],
+                    'name': _("Job"),
+                },
+            }
+            for row in rows
+        ]
+
+    def _store_360_exceptions(self, store, jobs, attempts_uncertain):
+        """The existing exception builder, store-scoped, plus the two
+        registry-guarded decision sources (F7). Count == target-domain count
+        stays the load-bearing invariant."""
+        term = self._store_term(store)
+        term_json = [list(t) for t in term]
+        candidates = [
+            {
+                'id': 'blocked_manual_review',
+                'severity': 'danger',
+                'icon': 'fa-hand-paper-o',
+                'title': _("Jobs waiting on a review decision"),
+                'count': jobs['blocked_manual_review'],
+                'why': _("A reviewer needs to decide how these proceed."),
+                'owner': _("Reviewer"),
+                'target': {
+                    'res_model': 'shopify.connector.job',
+                    'domain': term_json + [
+                        ['state', '=', 'blocked_manual_review']],
+                    'name': _("Jobs waiting on a review decision"),
+                },
+            },
+            {
+                'id': 'uncertain_mutation',
+                'severity': 'danger',
+                'icon': 'fa-hand-paper-o',
+                'title': _("Changes waiting on an administrator decision"),
+                'count': attempts_uncertain,
+                'why': _("An outcome could not be confirmed and needs an "
+                         "administrator judgement."),
+                'owner': _("Administrator"),
+                'target': {
+                    'res_model': 'shopify.connector.mutation.attempt',
+                    'domain': term_json + [
+                        ['observed_outcome', '=', 'uncertain'],
+                        ['resolution_disposition', '=', False]],
+                    'name': _("Changes waiting on a decision"),
+                },
+            },
+            {
+                'id': 'failed_final',
+                'severity': 'danger',
+                'icon': 'fa-exclamation-triangle',
+                'title': _("Jobs that stopped after repeated failures"),
+                'count': jobs['failed_final'],
+                'why': _("These stopped retrying — review the reason to get "
+                         "them moving again."),
+                'owner': _("Operator"),
+                'target': {
+                    'res_model': 'shopify.connector.job',
+                    'domain': term_json + [['state', '=', 'failed_final']],
+                    'name': _("Jobs that stopped after repeated failures"),
+                },
+            },
+            {
+                'id': 'failed_retryable',
+                'severity': 'danger',
+                'icon': 'fa-exclamation-triangle',
+                'title': _("Jobs that need a fix before retrying"),
+                'count': jobs['failed_retryable'],
+                'why': _("These are paused for a manual fix, then a retry."),
+                'owner': _("Operator"),
+                'target': {
+                    'res_model': 'shopify.connector.job',
+                    'domain': term_json + [['state', '=', 'failed_retryable']],
+                    'name': _("Jobs that need a fix before retrying"),
+                },
+            },
+        ]
+        if not len(store) == 1:
+            reconnect_count = self.env[
+                'shopify.connector.store'
+            ].search_count([('state', '=', 'reconnect_needed')])
+            candidates.append({
+                'id': 'reconnect_needed',
+                'severity': 'warning',
+                'icon': 'fa-plug',
+                'title': _("Stores that need reconnecting"),
+                'count': reconnect_count,
+                'why': _("Shopify no longer accepts the saved credentials — "
+                         "reconnect to resume."),
+                'owner': _("Administrator"),
+                'target': {
+                    'res_model': 'shopify.connector.store',
+                    'domain': [['state', '=', 'reconnect_needed']],
+                    'name': _("Stores that need reconnecting"),
+                },
+            })
+        elif store.state == 'reconnect_needed':
+            candidates.append({
+                'id': 'reconnect_needed',
+                'severity': 'warning',
+                'icon': 'fa-plug',
+                'title': _("This store needs reconnecting"),
+                'count': 1,
+                'why': _("Shopify no longer accepts the saved credentials — "
+                         "reconnect to resume."),
+                'owner': _("Administrator"),
+                'target': {
+                    'res_model': 'shopify.connector.store',
+                    'domain': [['id', '=', store.id]],
+                    'name': _("Store"),
+                },
+            })
+        # Registry-guarded decision source: product match decisions. Core
+        # does not depend on the product module; reading it only when its
+        # model is genuinely in the registry keeps core installable alone
+        # while F4/F7 stay complete on a full install (the product module's
+        # files are outside this batch's write-set by the frozen manifest).
+        if 'shopify.connector.product.match.decision' in self.env:
+            pending = self.env[
+                'shopify.connector.product.match.decision'
+            ].search_count(term + [('state', '=', 'pending')])
+            candidates.append({
+                'id': 'match_decisions',
+                'severity': 'danger',
+                'icon': 'fa-hand-paper-o',
+                'title': _("Product matches waiting on a decision"),
+                'count': pending,
+                'why': _("A reviewer must choose the matching product "
+                         "before these products sync."),
+                'owner': _("Reviewer"),
+                'target': {
+                    'res_model': 'shopify.connector.product.match.decision',
+                    'domain': term_json + [['state', '=', 'pending']],
+                    'name': _("Product matches waiting on a decision"),
+                },
+            })
+        active = [c for c in candidates if c['count'] > 0]
+        severity_rank = {'danger': 0, 'warning': 1, 'info': 2}
+        active.sort(key=lambda c: (severity_rank.get(c['severity'], 3),
+                                   -c['count']))
+        return active[:self.MAX_EXCEPTIONS]
+
+    # -- flow rows (F6) ------------------------------------------------------
+    _FLOW_FAMILIES = (
+        ('orders', ('order_import_scan', 'order_import_sync',
+                    'customer_import_sync')),
+        ('catalog', ('product_import_scan', 'product_import_sync')),
+        ('inventory', ('inventory_push_sync', 'inventory_push_scan',
+                       'inventory_first_push_preview',
+                       'inventory_location_sync', 'inventory_activate',
+                       'inventory_set_quantities',
+                       'inventory_mutation_reconcile')),
+        ('export', ()),      # filled by prefix below
+        ('fulfillment', ()),  # filled by prefix below
+    )
+
+    def _flow_family_of(self, job_type):
+        if not job_type:
+            return False
+        if job_type.startswith('product_export_'):
+            return 'export'
+        if job_type.startswith('fulfillment_'):
+            return 'fulfillment'
+        for family, types in self._FLOW_FAMILIES:
+            if job_type in types:
+                return family
+        return False
+
+    def _flow_rows(self, ctx):
+        """Five flow rows from two grouped reads (constant query count).
+
+        Last-success anchors are the per-domain settings watermarks, read
+        only when the owning module actually contributes the field —
+        field-presence guarded for the same reason as the registry guard
+        above."""
+        Job = self.env['shopify.connector.job']
+        store = ctx['store']
+        term = self._store_term(store)
+        backlog_rows = Job._read_group(
+            term + [('state', 'in', ('queued', 'running', 'retry_waiting'))],
+            groupby=['job_type'], aggregates=['__count'],
+        )
+        failure_rows = Job._read_group(
+            term + [('state', 'in', ('failed_retryable', 'failed_final',
+                                     'blocked_manual_review'))],
+            groupby=['job_type'], aggregates=['__count'],
+        )
+        backlog = {}
+        failures = {}
+        for job_type, count in backlog_rows:
+            family = self._flow_family_of(job_type)
+            if family:
+                backlog[family] = backlog.get(family, 0) + count
+        for job_type, count in failure_rows:
+            family = self._flow_family_of(job_type)
+            if family:
+                failures[family] = failures.get(family, 0) + count
+
+        settings = self.env['shopify.connector.store.settings']
+        row = settings.search(
+            [('store_id', '=', store.id)], limit=1,
+        ) if len(store) == 1 else settings.browse()
+        anchors = {}
+        anchor_fields = {
+            'orders': 'sale_order_catchup_synced_through_at',
+            'catalog': 'product_last_import_success_at',
+            'inventory': 'inventory_last_push_scan_at',
+            'fulfillment': 'fulfillment_catchup_observed_through_at',
+        }
+        for family, field_name in anchor_fields.items():
+            if row and field_name in settings._fields:
+                anchors[family] = fields.Datetime.to_string(
+                    row[field_name]
+                ) if row[field_name] else False
+            else:
+                anchors[family] = False
+        labels = {
+            'orders': _("Orders"),
+            'catalog': _("Catalog"),
+            'inventory': _("Inventory"),
+            'export': _("Product export"),
+            'fulfillment': _("Fulfillment"),
+        }
+        now = fields.Datetime.now()
+        rows = []
+        for family in ('orders', 'catalog', 'inventory', 'export',
+                       'fulfillment'):
+            anchor = anchors.get(family)
+            rows.append({
+                'id': family,
+                'label': labels[family],
+                'backlog': backlog.get(family, 0),
+                'failures': failures.get(family, 0),
+                'last_success': anchor,
+                'last_success_relative': self._relative_time(
+                    fields.Datetime.from_string(anchor), now,
+                ) if anchor else False,
+                'tone': 'danger' if failures.get(family, 0)
+                        else ('info' if backlog.get(family, 0)
+                              else 'neutral'),
+            })
+        return rows
+
+    # -- multi-store region (H1) ---------------------------------------------
+    def _store_360_stores_region(self, ctx):
+        """Per-store operational cells from grouped reads (no per-store
+        loop queries; the sale module adds the per-store sales cell in its
+        own section)."""
+        stores = ctx['stores']
+        if len(stores) <= 1:
+            return {'available': False, 'rows': []}
+        Job = self.env['shopify.connector.job']
+        backlog_rows = dict(Job._read_group(
+            [('store_id', 'in', stores.ids),
+             ('state', 'in', ('queued', 'running', 'retry_waiting'))],
+            groupby=['store_id'], aggregates=['__count'],
+        ))
+        attention_rows = dict(Job._read_group(
+            [('store_id', 'in', stores.ids),
+             ('state', 'in', ('failed_retryable', 'failed_final',
+                              'blocked_manual_review'))],
+            groupby=['store_id'], aggregates=['__count'],
+        ))
+        latest_rows = {
+            group: value
+            for group, value in Job._read_group(
+                [('store_id', 'in', stores.ids),
+                 ('finished_at', '!=', False)],
+                groupby=['store_id'], aggregates=['finished_at:max'],
+            )
+        }
+        now = fields.Datetime.now()
+        rows = []
+        for store in stores:
+            latest = latest_rows.get(store)
+            rows.append({
+                'id': store.id,
+                'name': store.name,
+                'state': store.state,
+                'backlog': backlog_rows.get(store, 0),
+                'attention': attention_rows.get(store, 0),
+                'last_activity_relative':
+                    self._relative_time(latest, now) if latest else False,
+            })
+        return {'available': True, 'rows': rows}
+
+    # -- critical band (B1) ----------------------------------------------------
+    def _store_360_critical(self, ctx, payload):
+        """Derived after every section: does a connector problem make the
+        money numbers wrong right now? Renders only when true, and names
+        the worst cause with a direct route."""
+        store = ctx['store']
+        causes = []
+        bridge = payload.get('bridge') or {}
+        if len(store) == 1 and store.state in (
+            'reconnect_needed', 'disconnected', 'disconnecting',
+        ):
+            causes.append({
+                'id': 'store_state',
+                'text': _("Shopify connection unavailable — figures are "
+                          "last known and may be incomplete."),
+                'target': {
+                    'res_model': 'shopify.connector.store',
+                    'domain': [['id', '=', store.id]],
+                    'name': _("Store"),
+                },
+            })
+        if bridge.get('state') in ('stale', 'incomplete'):
+            causes.append({
+                'id': 'bridge_%s' % bridge['state'],
+                'text': bridge.get('critical_text') or _(
+                    "Order import completeness cannot be proven — the "
+                    "figures below may be missing recent orders."),
+                'target': bridge.get('critical_target') or {
+                    'res_model': 'shopify.connector.job',
+                    'domain': [['state', 'in',
+                                ['failed_retryable', 'failed_final',
+                                 'blocked_manual_review']]],
+                    'name': _("Error & Review Center"),
+                },
+            })
+        return {
+            'active': bool(causes),
+            'causes': causes,
         }
 
     # ------------------------------------------------------------------ #

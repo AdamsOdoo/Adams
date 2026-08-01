@@ -48,6 +48,12 @@
               action="action_shopify_connector_mutation_attempt"
               sequence="10"/>
 
+    <menuitem id="menu_shopify_connector_sync_analysis"
+              name="Sync Operations Analysis"
+              parent="menu_shopify_connector_root"
+              action="action_shopify_connector_sync_analysis"
+              sequence="45"/>
+
     <menuitem id="menu_shopify_connector_logs"
               name="Logs"
               parent="menu_shopify_connector_root"
