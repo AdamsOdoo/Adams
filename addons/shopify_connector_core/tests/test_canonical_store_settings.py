@@ -67,6 +67,12 @@ CORE_CLASSIFICATION = {
         'Export Settings (action_shopify_connector_store_settings_export) is '
         'already authoritative for price ownership.',
     ),
+    'sec3_scope_quarantined': (
+        INTERNAL_PROTECTED,
+        'SEC-3 scope-mixin quarantine flag (the settings row carries the '
+        'mixin since it declares connector parent pointers); maintenance '
+        'state, never a merchant decision.',
+    ),
     'setup_wizard_step_key': (
         INTERNAL_PROTECTED,
         'Setup semantic-step progress, written only by the setup service.',

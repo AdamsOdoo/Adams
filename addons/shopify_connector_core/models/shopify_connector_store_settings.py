@@ -29,6 +29,15 @@ class ShopifyConnectorStoreSettings(models.Model):
     """
 
     _name = 'shopify.connector.store.settings'
+    # Store 360 slice 1: the settings row gained connector-to-connector
+    # parent pointers (the per-domain catch-up job stamps), and the SEC-3
+    # posture the guards encode is "a model that declares connector
+    # parents carries the scope mixin" — flag, helpers and remediation
+    # action included. The flag is additive (default False) and the
+    # settings read rule stays the plain company rule; agreement is
+    # enforced at the ORM layer by each domain's own constraint beside
+    # its declared pointer.
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Store Settings'
 
     store_id = fields.Many2one(
@@ -162,22 +171,6 @@ class ShopifyConnectorStoreSettings(models.Model):
         'UNIQUE(store_id)',
         'Only one settings record is allowed per store.',
     )
-
-    @api.model
-    def _sec3_parent_scope_relations(self):
-        """Connector-to-connector relations on the settings row (SEC-3).
-
-        The settings model does not carry the scope mixin (a settings row
-        is 1:1 with its store and never row-level hidden), but the SEC-3
-        relation inventory still requires every connector-to-connector
-        many2one to be DECLARED so a cross-store pointer cannot appear
-        undocumented. Domain extensions that add such a pointer override
-        this, extend the tuple, and enforce the same-store agreement with
-        an ``@api.constrains`` of their own (the mixin's SQL sweep does not
-        run here — enforcement is at the ORM layer, where every sanctioned
-        writer of these pointers lives).
-        """
-        return ()
 
     def _mark_setup_readiness_stale(self):
         """Record that a readiness-relevant choice just changed.
