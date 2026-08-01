@@ -15,6 +15,12 @@
 > Analysis gets a feasible `sale.report`-extension source and is
 > reclassified as a reporting backend enhancement (§14.1); adversarial
 > record-rule tests are mandatory (§8); gap registers added (§15).
+> **Final correction tail (2026-08-01):** aggregate/rule/drill-down-model
+> matrix and lifecycle-projection ruling (§6.10, spec §6.1); Shopify Sales
+> Analysis reclassified "security architecture unresolved — backend
+> prerequisite" (§14.1); rollback corrected — slice 1 leaves durable
+> columns/values, revert-and-orphan is the supported path (§12); runtime
+> source guards replace the stale SQL-AST text (§10.2).
 
 Normative companions:
 [product spec](../02-product/ui-operations-360-dashboard-spec-2026-08-01.md)
@@ -106,13 +112,13 @@ Reproduced verbatim from spec §6, which is normative if the two ever drift.
 
 | # | Displayed label | Operator question | Source model · stored fields | Domain / filter | Aggregation | Time window | Store isolation | Zero/empty behaviour | Stale-data behaviour | Native drill-down | Supported at `a1c5931`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| C1 | Imported Shopify sales | What value of Shopify orders landed in Odoo this period? | `sale.order.amount_total`, `currency_id` joined via `shopify.connector.order.binding.sale_order_id` | binding: `store_id=?`, `sec3_scope_quarantined=False`, `shopify_cancelled_at=False`; order: `state != 'cancel'`, `date_order` in window | SUM | `date_order` (= Shopify `processedAt`) in selected window, user-TZ boundaries | `binding.store_id` | Show `0.00 CUR`; if orders=0 and bridge healthy → "No sales in this period" | Card carries completeness dot + caption bound to bridge state | Orders Workspace `shopify_connector_sale.action_shopify_connector_order_workspace` + same domain | **Yes** (data); endpoint = slice 1 |
+| C1 | Imported Shopify sales | What value of Shopify orders landed in Odoo this period? | `sale.order.amount_total`, `currency_id` joined via `shopify.connector.order.binding.sale_order_id` | binding: `store_id=?`, `sec3_scope_quarantined=False`, `shopify_cancelled_at=False`; order: `state != 'cancel'`, `date_order` in window | SUM | `date_order` (= Shopify `processedAt`) in selected window, user-TZ boundaries | `binding.store_id` | Show `0.00 CUR`; if orders=0 and bridge healthy → "No sales in this period" | Card carries completeness dot + caption bound to bridge state | **native `sale.order` list** (server-built act_window, the C1 domain verbatim — same model/rules/domain as the aggregate; the binding workspace is NOT the drill-down: its rules are connector rules, spec §6.1) | **Yes** (data); endpoint = slice 1 |
 | C2 | Imported orders | How many Shopify orders were imported for the period? | `shopify.connector.order.binding` (+ joined order state) | as C1 | COUNT | as C1 | as C1 | `0` | as C1 | as C1 | **Yes**; endpoint = slice 1 |
 | C3 | Average imported order value | Typical imported order size? | derived C1/C2 | as C1 | SUM/COUNT | as C1 | as C1 | `—` when C2=0 (never divide by zero) | as C1 | as C1 | **Yes** (derived) |
-| C4 | Units sold (imported) | How many product units were sold? | `sale.order.line.product_uom_qty`, filter `shopify_line_item_gid != False` | line join order join binding, C1 exclusions | SUM | as C1 | via binding join | `0` | as C1 | as C1 (order-level list) | **Yes**; endpoint = slice 1 |
+| C4 | Units sold (imported) | How many product units were sold? | `sale.order.line.product_uom_qty`, filter `shopify_line_item_gid != False` | goods lines ∩ order-projection terms, C1 exclusions | SUM | as C1 | via order projection | `0` | as C1 | **native `sale.order.line` list**, identical domain (same model/rules as the aggregate — spec §6.1 ruling B) | **Yes**; endpoint = slice 1 |
 | C∆ | "vs previous period" delta on C1/C2/C3/C4 | Better or worse than the preceding equivalent period? | same as each card | same, window shifted back by its own length | same | previous equivalent window | same | When previous value is 0 → "no prior-period data", never a % | inherits card state | n/a (caption) | **Yes** (derived) |
-| D1 | Sales trend (bars + previous-period line) | How did imported sales move across the period? | as C1 | as C1 | SUM per bucket (day; hour for 24 h) | buckets in user TZ, stated on chart caption | as C1 | Honest empty state (one of the three spec §9.4 variants) | chart caption inherits bridge | table rows link to Orders Workspace day-filtered | **Yes**; endpoint = slice 1 |
-| E1 | Top products (≤5) | Which products drove imported sales? | `sale.order.line`: `product_id`, `product_uom_qty`, `price_subtotal` (untaxed) | as C4 | GROUP BY product, SUM value+units, ORDER value DESC LIMIT 5 | as C1 | via binding join | Section hidden behind "No product sales in this period" line | inherits bridge | Product form + Orders Workspace period filter; exact per-store *line* list needs server-built domain (slice 2 note) | **Yes** (display); drill-down exactness = slice 2 |
+| D1 | Sales trend (bars + previous-period line) | How did imported sales move across the period? | as C1 | as C1 | SUM per bucket (day; hour for 24 h) | buckets in user TZ, stated on chart caption | as C1 | Honest empty state (one of the three spec §9.4 variants) | chart caption inherits bridge | table rows link to the **native `sale.order` list**, day-filtered with the same domain (spec §6.1) | **Yes**; endpoint = slice 1 |
+| E1 | Top products (≤5) | Which products drove imported sales? | `sale.order.line`: `product_id`, `product_uom_qty`, `price_subtotal` (untaxed) | as C4 | GROUP BY product, SUM value+units, ORDER value DESC LIMIT 5 | as C1 | via order projection | Section hidden behind "No product sales in this period" line | inherits bridge | Product form (navigation) + **native `sale.order.line` list** with the E1 domain (server-built, slice 2) — count-exact on the same model (spec §6.1 ruling B) | **Yes** (display); drill-down exactness = slice 2 |
 | E2 | **Share of goods subtotal** (per top product) | How concentrated were product sales? | derived: E1 `price_subtotal` value ÷ SUM `price_subtotal` over **all** eligible goods lines (the C4 population) | as E1; denominator = the same eligible goods-line basis as the numerator — **never** C1 (C1 includes tax + shipping; this ratio must not imply it divides the headline) | ratio | as C1 | as C1 | Hidden when denominator 0 | inherits bridge | n/a (cell; the goods-subtotal basis is printed under the table) | **Yes** (derived; same-basis numerator/denominator, correction §6C) |
 | G1 | Sales data synchronized through | Up to when has Shopify order discovery landed? | `shopify.connector.store.order_sync_last_checkpoint_at` (compute over `settings.sale_order_last_import_checkpoint_at`, `shopify_connector_sale/models/shopify_connector_order_scan.py:566`) | store row | latest value | point-in-time | per store | "Not synchronized yet" empty variant | drives the bridge state machine (spec §9.3) | Store form | **Yes** |
 | G2 | Orders awaiting import | How many discovered orders haven't landed? | `shopify.connector.job` | `job_type='order_import_sync'`, `state in (draft,queued,running,retry_waiting)`, `store_id=?` | COUNT | point-in-time | `job.store_id` | `0` → contributes to "Complete & current" | n/a (is itself the freshness signal) | Sync Center `action_shopify_connector_sync_center` + domain | **Yes** |
@@ -129,12 +135,12 @@ Reproduced verbatim from spec §6, which is normative if the two ever drift.
 | F10 | Quiet metadata: API health · scheduled-sync posture | Anything throttled? Is automation on? | `store.api_health_state (normal/throttled/degraded)`, `api_throttle_observed_at`; `order_sync_scheduled` etc. (cron-verified computes) | store row | latest values | point-in-time | per store | omitted when normal | n/a | Store form | **Yes** ("next scheduled check" clock time itself = deferred; needs a security-reviewed `ir.cron` read) |
 | H1 | Multi-store table | Which store needs me? | per-store: `store.state`, latest terminal `finished_at`, F2/F4+F5 counts, C1 per store currency | grouped by `store_id` (single `read_group` per measure — no N+1) | per-store COUNT/SUM/MAX | point-in-time + selected window for sales | inherent | Region hidden when ≤1 store | sales cell inherits per-store bridge | Store form; counts → Sync/Error Center store-filtered | **Yes**; endpoint = slice 1 |
 | B1 | Critical status band | Does a connector problem make the money numbers wrong? | derived: bridge state ∈ {Stale, Incomplete} or store `reconnect_needed/disconnected` or sale domain disabled with history present | spec §9.3 conditions | boolean + worst cause | point-in-time | selected store | absent when conditions false | is itself the stale surface | cause-specific action (Error Center / Store form) | **Yes** (derived) |
-| L1 | Payment strip: Paid · Authorized — capture pending · Payment pending (non-COD) · COD · needs review | Which imported orders are actually paid? | `binding.shopify_financial_status_snapshot` (raw), `is_cod`, `binding.status` — counted over the C1 population (imported orders only, caption says so) | C1 exclusions + snapshot buckets: `PAID` / `AUTHORIZED` / `PENDING & is_cod=False` / `is_cod=True` / `status='review'` (payment-caused review incl. PARTIALLY_PAID-as-quotation imports and post-import divergence) | COUNT per bucket | as C1 | as C1 | Strip hidden when C2=0 | caption shows oldest `shopify_last_evidence_refresh_at` in the set | Orders Workspace with the same bucket domain | **Yes** (fields stored; buckets are raw-snapshot equality, fail-closed upstream) |
-| L2 | Payment-evidence freshness caption | How fresh is the payment evidence? | `binding.shopify_last_evidence_refresh_at`, `financial_status_changed_at` | C1 population | MIN (oldest) + latest change | point-in-time | as C1 | omitted when C2=0 | is itself the freshness surface | Orders Workspace sorted by evidence age | **Yes** |
-| L3 | COD block: awaiting approval / quotation / confirmed; collection nothing / partially / fully | Where does each COD order stand commercially? | `manual_gateway_approval_state`, `cod_commercial_state`, `cod_collection_state` | `is_cod=True` + C1 exclusions; approval='pending' / commercial ∈ (quotation, confirmed) / collection ∈ (nothing_collected, partially_collected, fully_collected) | COUNT per state | as C1 | as C1 | Block hidden when COD count = 0 | inherits L2 | Orders Workspace COD filter; approvals → the binding list `manual_gateway_approval_state='pending'` | **Yes** (states written at import/refresh/approval — importer:2241-2247, 2290-2296, 2361-2384) |
-| L4 | Order fulfillment progress: Fulfilled · Partially fulfilled · Unfulfilled | How far along is Shopify order fulfillment? | `binding.shopify_fulfillment_status_snapshot` (raw `displayFulfillmentStatus` — Shopify's own order-level rollup, so multi-fulfillment orders are never double-counted) | C1 population; raw-value buckets, any other/NULL value shown as "Not yet observed" | COUNT per bucket | as C1 | as C1 | hidden when C2=0 | caption: snapshot refreshed at import + evidence refresh (`shopify_last_evidence_refresh_at`) — **not** a live carrier feed | Orders Workspace bucket domain | **Yes** (display-only snapshot with stated freshness) |
-| L5 | Odoo dispatch: to dispatch / ready / dispatched | What does the warehouse still owe? | native `stock.picking.state` for outgoing pickings of bound orders (`sale_id` join — the same join production uses, fulfillment_inbound.py:87-89) | pickings of C1 orders: `state not in (done, cancel)` = to dispatch; `state='assigned'` = ready; `state='done'` = dispatched | COUNT | as C1 | via order join | `0` | n/a (Odoo-side truth) | native Delivery Orders list, same domain | **Yes** (native fields; picking ACLs apply to the caller) |
-| L6 | Oldest paid-unfulfilled age | Is anything paid but sitting? | derived: MIN `date_order` where snapshot `PAID` + fulfillment snapshot `UNFULFILLED` | C1 exclusions | MIN age | as C1 | as C1 | omitted when none | elapsed age only — **no SLA claimed** (correction §E: no invented threshold; age is displayed, lateness is not declared) | Orders Workspace same domain, oldest first | **Yes** (derived) |
+| L1 | Payment strip: Paid · Authorized — capture pending · Payment pending (non-COD) · COD · needs review | Which imported orders are actually paid? | `binding.shopify_financial_status_snapshot` (raw), `is_cod`, `binding.status` — counted over the C1 population (imported orders only, caption says so) | C1 exclusions + snapshot buckets: `PAID` / `AUTHORIZED` / `PENDING & is_cod=False` / `is_cod=True` / `status='review'` (payment-caused review incl. PARTIALLY_PAID-as-quotation imports and post-import divergence) | COUNT per bucket | as C1 | as C1 | Strip hidden when C2=0 | caption shows oldest evidence-refresh mirror in the set | **native `sale.order` list** on the lifecycle mirror fields, same bucket domain (spec §6.1 slice 1b; source fields live on the binding, so this row is served by the lifecycle projection — descoping 1b makes it an unresolved slice-1 prerequisite, never "as C1" by silent analogy) | **Yes** (fields stored on the binding; the sale-order mirror is the slice-1b projection) |
+| L2 | Payment-evidence freshness caption | How fresh is the payment evidence? | `shopify_connector_evidence_refreshed_at` (slice-1b mirror of `binding.shopify_last_evidence_refresh_at`) | C1 population | MIN (oldest) | point-in-time | as C1 | omitted when C2=0 | is itself the freshness surface | **native `sale.order` list** ordered by the mirror field (spec §6.1) | **Yes** (binding field stored; sale-order mirror = slice 1b) |
+| L3 | COD block: awaiting approval / quotation / confirmed; collection nothing / partially / fully | Where does each COD order stand commercially? | `manual_gateway_approval_state`, `cod_commercial_state`, `cod_collection_state` | `is_cod=True` + C1 exclusions; approval='pending' / commercial ∈ (quotation, confirmed) / collection ∈ (nothing_collected, partially_collected, fully_collected) | COUNT per state | as C1 | as C1 | Block hidden when COD count = 0 | inherits L2 | **native `sale.order` list** on the lifecycle mirror fields (spec §6.1 slice 1b); the binding approval queue stays reachable from each order, but the count's drill-down is the same-model sale-order list | **Yes** (states written at import/refresh/approval — importer:2241-2247, 2290-2296, 2361-2384; sale-order mirrors = slice 1b) |
+| L4 | Order fulfillment progress: Fulfilled · Partially fulfilled · Unfulfilled | How far along is Shopify order fulfillment? | `binding.shopify_fulfillment_status_snapshot` (raw `displayFulfillmentStatus` — Shopify's own order-level rollup, so multi-fulfillment orders are never double-counted) | C1 population; raw-value buckets, any other/NULL value shown as "Not yet observed" | COUNT per bucket | as C1 | as C1 | hidden when C2=0 | caption: snapshot refreshed at import + evidence refresh (mirror timestamp) — **not** a live carrier feed | **native `sale.order` list** on the fulfillment-status mirror, same bucket domain (spec §6.1 slice 1b) | **Yes** (display-only snapshot with stated freshness; sale-order mirror = slice 1b) |
+| L5 | Odoo dispatch: to dispatch / ready / dispatched | What does the warehouse still owe? | native `stock.picking.state` for outgoing pickings of bound orders (`sale_id` join — the same join production uses, fulfillment_inbound.py:87-89) | pickings of bound-store orders: `state not in (done, cancel)` = to dispatch; `state='assigned'` = ready; `state='done'` = dispatched | COUNT | as C1 | via order projection (data relationship, **not** a sale-rule claim) | `0` | n/a (Odoo-side truth) | native Delivery Orders (`stock.picking`) list, identical domain — exact on its own model | **Yes** — defined as the **rule-visible warehouse population** (ruling D): `stock.picking` ACLs/rules govern this number and they do not equal sale-order rules; the block label states this |
+| L6 | Oldest paid-unfulfilled age | Is anything paid but sitting? | derived: MIN `date_order` where the financial mirror is `PAID` + the fulfillment mirror is `UNFULFILLED` (slice-1b fields) | C1 exclusions | MIN age | as C1 | as C1 | omitted when none | elapsed age only — **no SLA claimed** (correction §E: no invented threshold; age is displayed, lateness is not declared) | **native `sale.order` list**, same domain, oldest first (spec §6.1) | **Yes** (derived; mirrors = slice 1b) |
 | L7 | Lifecycle exceptions (≤3): COD awaiting approval · external fulfillment recorded in Shopify · payment status changed after import · Shopify cancelled a validated fulfillment · fulfilled while payment still pending · unknown fulfillment status observed | What lifecycle event needs a human? | approvals `manual_gateway_approval_state='pending'`; evidence `reconciled_state='review'` with `review_reason ∈ (external_fulfillment_observed, origin_unconfirmed)`; binding `status='review'` + `financial_status_changed_at` + previous≠current snapshot; evidence `review_reason='cancelled_after_validation'`; derived snapshot pair (`displayFulfillmentStatus ∈ (FULFILLED, PARTIALLY_FULFILLED)` + financial `PENDING/AUTHORIZED` + `is_cod=False`); evidence `schema_warning=True` | per candidate, store term, count = drill-down domain count (existing invariant) | COUNT per candidate, ranked | point-in-time | native store term on each model | section replaced by one affirmative line | each item names its evidence timestamp (`last_observed_at` / `financial_status_changed_at`) | binding list / fulfillment review list (`action` per source) with the same domain | **Yes** — every named source has a production writer at `a1c5931` (spec §5); each item states what/why/who/freshness/whether the connector can resolve it (report-only for external events) |
 
 **Commercial metric decision table** (correction-mandated classification;
@@ -255,13 +261,34 @@ Slice 1 changes, in `shopify_connector_sale` (projection) +
 9. **Bridge + flow counters** unchanged: connector-model `search_count` /
    two grouped reads by `job_type` mapped to the five families (F6);
    per-store block one grouped read per measure; attention builder gains
-   the two decision sources — count=domain invariant kept. **Order
-   lifecycle (region L) counters**: grouped reads on the **binding** for
-   payment/COD state distributions (connector data, connector rules) — but
-   the three commercial-value-bearing surfaces (C, D/E, H sales) and any
-   L count that must equal a sale-document drill-down run on the sale
-   documents per the architecture above; L5 dispatch counts run on native
-   `stock.picking` as the caller (picking ACLs apply).
+   the two decision sources — count=domain invariant kept.
+10. **Drill-down principle (final tail ruling — supersedes any earlier
+    binding-workspace drill-down for commercial counts): the aggregate
+    model, the rule model and the drill-down model are the same model.**
+    A binding-side grouped read intersected with sale documents through
+    `sale_order_id` is NOT claimed rule-equivalent — the binding's rules
+    are connector company/quarantine rules, not the caller's sale rules.
+    Consequences (full matrix: spec §6.1):
+    - order-grain commercial counts → aggregate **and** drill down on
+      `sale.order` (server-built act_window, identical domain);
+    - line-grain counts → aggregate and drill down on `sale.order.line`;
+    - **region-L lifecycle strips (slice 1b)**: the payment/COD/fulfillment
+      state fields are mirrored from the binding onto `sale.order`
+      (spec §6.1 note — 7 additional readonly columns, same sanctioned
+      writers/transaction, same backfill migration), so lifecycle counts
+      aggregate and drill down on `sale.order` under the caller's rules
+      with no raw SQL, no `sudo()`, no client-visible ID list, and no
+      hidden-order count/label/state leakage. **If the control room
+      declines slice 1b's schema breadth, the lifecycle strips are an
+      UNRESOLVED slice-1 prerequisite** and region L ships
+      exception-list-only (L7) — recorded, never worked around;
+    - L5 dispatch is the **rule-visible warehouse population**
+      (`stock.picking` rules govern it; native picking drill-down,
+      identical domain);
+    - L7 exception counts stay on their connector evidence models with
+      same-model connector-list drill-downs (existing tested invariant);
+      their payloads carry connector state names/counts only — surfaces
+      the caller can already list natively — never sale-document fields.
 
 **Preserved invariants:** no Shopify request, no credential read, no
 mutation, no `sudo()`, bounded constant query count, current-user access,
@@ -324,7 +351,20 @@ read-only.
      row (assert on the payload walk, not just counts);
   8. projection write protection: an ordinary privileged-sales-user write
      to the projection fields is rejected; only the sanctioned import /
-     refresh / quarantine paths may set them.
+     refresh / quarantine paths may set them;
+  9. **drill-down model equality** (final tail): for every commercial and
+     lifecycle count, assert the served `target.res_model` equals the
+     aggregate's model and the served domain reproduces the aggregate
+     domain verbatim — then re-assert count = list length as the
+     restricted user;
+  10. **picking restrictions** (ruling D): a user with a restrictive
+     `stock.picking` rule sees L5 counts equal to exactly their
+     rule-visible pickings, and the Delivery Orders drill-down shows the
+     same set; no picking count, reference or label from a hidden picking;
+  11. **connector binding company/quarantine rules**: L7 exception counts
+     and the F4 components obey the binding/evidence models' own rules
+     (cross-company store, quarantined rows) — and their payloads carry no
+     sale-document field, verified by the payload walk.
 - Payload discipline unchanged: aggregates, labels, product display names
   and store names only — no customer PII, no payloads, no stack traces, no
   credentials; the recursive forbidden-key/email walk test extends to the
@@ -369,10 +409,17 @@ read-only.
    previous-period-zero delta, the four bridge states, the three empty
    variants (incl. a user without sale access), cross-currency store pair
    (no combined total in payload).
-2. **Guard suite**: SELECT-only + parameterized SQL AST assertions; no
-   `sudo`; no write/enqueue/`_send` reachable; forbidden-key/email walk over
-   the full new payload; count=domain agreement for every exception AND
-   every flow/bridge drill-down.
+2. **Guard suite** (runtime-path guards matching the selected architecture
+   — the earlier "SELECT-only + parameterized SQL AST assertions" text was
+   written for the withdrawn raw-SQL design and is replaced): the dashboard
+   aggregate service contains **no `cr.execute`/raw SQL at all** (source
+   guard scoped to the runtime service — the slice-1 backfill migration
+   script may use bounded SQL and is outside this guard's scope, guarded by
+   its own migration tests); no `sudo()`; no mutation/enqueue/Shopify
+   transport reachability from the service; all reads are ORM grouped
+   reads/searches as the current user; forbidden-key/email walk over the
+   full new payload; count = domain agreement AND drill-down-model equality
+   (§8.9) for every displayed number.
 3. **HOOT** (slice 2): state rendering (healthy/attention/empty variants),
    bridge tones, chart table equivalent, delta "no prior-period data" path,
    exception → `doAction` payload, refresh floor.
@@ -424,13 +471,34 @@ carried by module upgrade like any report extension; no data migration.
 Conditional: one small index migration if §7's open question resolves that
 way.
 
-## 12. Rollback plan
+## 12. Rollback plan (corrected — final tail §5; no "no durable state" claim)
 
-Each slice is independently revertable: revert the slice's merge commit and
-warm-`-u` the module — slice 1 removes only the added RPC surface (no table,
-no rows), slice 2 restores the previous dashboard assets (client action tag
-unchanged), slice 3 removes the report actions/menus. No durable state is
-created by any slice, so no data cleanup is ever needed.
+Each slice is independently revertable **at the code level**, with the
+durable-state consequences stated honestly:
+
+- **Slice 1 creates durable state.** It adds stored `sale_order` columns
+  (the 3 core-projection columns, plus the 7 lifecycle mirrors if slice 1b
+  is accepted) and backfills them. Reverting the slice's merge commit and
+  updating the module stops all reading and writing of those fields and
+  removes the RPC surface — but **the columns and their backfilled values
+  remain in the database, harmlessly orphaned**. That is the intended
+  rollback posture: destructive rollback is NOT the default. Structural
+  removal, if ever wanted, is a **separate, forward, tested cleanup
+  migration** (its own reviewed change), never an automatic side effect of
+  reverting code.
+- **Idempotency / upgrade expectations:** the backfill migration is
+  idempotent (re-running updates only rows whose projection differs from
+  their binding); a warm same-version `-u` after revert runs no scripts;
+  re-installing the slice later re-runs the backfill safely over any
+  orphaned values; a genuine version upgrade carries the columns like any
+  module field. Downgrade below the slice-1 module version is not a
+  supported path (standard Odoo posture) — revert-and-orphan is the
+  supported rollback.
+- **Slice 2** restores the previous dashboard assets (client action tag
+  unchanged) — presentation only, no durable state.
+- **Slice 3** removes the report actions/menus; the `sale.report` view
+  extension disappears with the module upgrade that reverts it (the SQL
+  view is rebuilt on upgrade); no stored rows.
 
 ## 13. Implementation slices (no more than three; not started)
 
@@ -449,16 +517,17 @@ created by any slice, so no data cleanup is ever needed.
 3. **Native reports and final validation** — "Sync Operations Analysis"
    (list/graph/pivot over jobs: store, flow family, state, source, period;
    direct navigation to failed/delayed work) and "Shopify Sales Analysis"
-   per §14.1 (the `sale.report` extension — a reporting backend
-   enhancement), plus the closing validation campaign. *Estimate: medium
-   batch.*
+   per §14.1 (the `sale.report` extension — a reporting backend enhancement
+   whose **security architecture is an unresolved prerequisite**: slice 3
+   may not build it until the §14.1 proof exists), plus the closing
+   validation campaign. *Estimate: medium batch.*
 
 ## 14. Other UI / reporting recommendations, classified
 
 | Candidate | Classification | Reason |
 | --- | --- | --- |
 | Sync Operations Analysis (native graph/pivot/list over `shopify.connector.job`) | **Include with dashboard** (slice 3, highest reporting priority) | Jobs model natively supports Count-measure graph/pivot today (`store_id`, `job_type`, `state`, `job_source`, `create_date`, `finished_at` all stored); genuinely zero schema work; answers the drill-deeper need the dashboard creates |
-| Shopify Sales Analysis (native list/graph/pivot with the approved metric definitions) | **Include with dashboard — requires reporting backend enhancement** (slice 3; correction B resolution below) | Feasible source defined below; NOT zero-schema — it depends on the slice-1 stored store link and a `sale.report` projection extension |
+| Shopify Sales Analysis (native list/graph/pivot with the approved metric definitions) | **Feasible data source identified, security architecture unresolved — backend prerequisite before implementation** (final tail §4 ruling; slice 3 may not build it until resolved) | Feasible source defined below; NOT zero-schema; and `sale.report`'s rule posture must be proven first (§14.1) |
 | Data Readiness surface (unresolved matching/mapping/decision work with direct fixing navigation) | **Next small enhancement** | Building blocks exist (match-decision action, awaiting-configuration action, first-push guard queue); an umbrella menu + saved filters, no new models |
 | Store Health list enrichment (connection, last processing, backlog, failures as store list columns/filters) | **Next small enhancement** | Computed store projections exist; N+1 compute fields need care in list context |
 | Configurable notifications (final failure, stale queue, reconnect required) | **Later** | Needs channel/framework decisions (activities vs mail), per-store settings design (`notification_default_enabled` exists as a seed), and anti-noise rules — a product decision, not a view |
@@ -498,15 +567,31 @@ contradiction is resolved as follows:
   state this distinction (correction B requirement).
 - **Views**: list, graph (bar/line), pivot — truthful because every measure
   is a line-grain numeric.
-- **Security**: `sale.report` keeps its native ACL/record-rule posture (it
-  is Odoo's own sales reporting surface); slice 3 tests verify
-  restrictive-rule and multi-company behaviour on the extended view before
-  acceptance, alongside the §8 suite.
+- **Security ruling (final tail §4 — supersedes the earlier "keeps its
+  native posture" sentence): UNRESOLVED.** `sale.report` is a separate
+  `_auto = False` model with its **own** ACL/record-rule posture; the fact
+  that its SQL view reads `sale_order`/`sale_order_line` does **not** make
+  the caller's arbitrary `sale.order`/`sale.order.line` record rules apply
+  to it — rules attach to models, and a custom restrictive rule on
+  `sale.order` places no clause on a `sale.report` query. No exact-source
+  proof of rule-parity exists (and cannot exist in general for arbitrary
+  custom rules), so the report is classified: **"feasible data source
+  identified, security architecture unresolved — backend prerequisite
+  before implementation."** It is NOT implementation-ready. Resolving the
+  prerequisite requires, before any slice-3 build: an explicit security
+  design (e.g. mirrored `ir.rule`s on the report model whose sufficiency
+  for the deployment's actual rule set is reviewed, or a documented
+  decision that native report rules are the accepted posture) **plus** an
+  executable adversarial test design proving the required business-record
+  restrictions hold on the extended view (restrictive non-company
+  `sale.order` rule, independent line rule, multi-company, quarantine/
+  cancellation exclusions).
 - **Migration/upgrade**: the view is rebuilt on module upgrade (standard
   for `_auto = False` reports); the extension rides `sale.report`'s
   documented seams, so version upgrades carry it like any report
-  extension. Classification: **reporting backend enhancement** — never
-  again described as zero-schema work.
+  extension. Classification: **reporting backend enhancement with an
+  unresolved security prerequisite** — never described as zero-schema or
+  implementation-ready.
 
 ## 15. Functional and technical gap registers (correction addendum §G)
 
@@ -551,7 +636,10 @@ top-down within each register.
 | G-T14 | Unknown Shopify enum values | **[design-fixed upstream]** — fail-closed import/refresh; `schema_warning` evidence surfaced as an L7 exception |
 | G-T15 | Migration/backfill for the projection | **[prereq]** — §11 |
 | G-T16 | Restrictive ACL / record-rule behaviour of the aggregate | **[prereq]** — §6.5/§8; count/domain agreement extends to restricted users |
-| G-T17 | Exact count-to-drill-down agreement for every new number | **[prereq]** — existing invariant extended (tests §10.2/§10.8) |
+| G-T17 | Exact count-to-drill-down agreement for every new number | **[prereq]** — existing invariant extended (tests §10.2/§10.8), now including drill-down-model equality (§8.9) |
+| G-T18 | Commercial counts previously routed to the binding workspace, whose connector rules do not reproduce arbitrary sale rules | **[design-fixed]** — aggregate model = rule model = drill-down model (spec §6.1); lifecycle strips served by the slice-1b mirror projection or explicitly unresolved |
+| G-T19 | `sale.report` rule posture does not inherit arbitrary `sale.order`/`sale.order.line` rules | **[prereq for slice 3]** — Shopify Sales Analysis reclassified "security architecture unresolved" (§14.1); no build until proven |
+| G-T20 | Slice-1 rollback leaves stored columns + backfilled values in place | **[design-fixed as disclosure]** — revert-and-orphan is the supported rollback; structural removal is a separate forward cleanup migration (§12) |
 
 ## 16. Verification summary (correction session's prototype)
 
@@ -570,11 +658,18 @@ correction: **fixture arithmetic is machine-checked from the rendered DOM**
 all pass in healthy, attention AND the Arabic state); the **mobile Stores
 region is stacked cards** with both primary Open actions measured fully
 inside the 390 px viewport (and at 320 px); chart axis labels compute to an
-effective 9.9 px at 390 px with no SVG clipping and the hatched
-incomplete-period bar visible; and the **RTL baseline is a representative
-Arabic state** (`lang="ar"`, mirrored geometry measured, `<bdi>`-isolated
-values — the KPI delta reads `+4.1%` with the sign leading). Static
-prototype verification only — no Odoo browser/tour test is claimed.
+effective **11.4 px at 390 px** (≥ the 11 px spec §11 target; 9.3 px at
+320 px, recorded openly with the table equivalent as the fallback) with no
+SVG clipping and the hatched incomplete-period bar visible; **all 7
+exception/critical Review actions are contained at the descendant level**
+(label, icon and the inflated focus outline inside card + viewport, no
+overlap with explanatory text) at both 390 px and 320 px after the
+final-tail CSS fix — only the two mobile screenshots were regenerated for
+it; and the **RTL baseline is a representative Arabic state** (`lang="ar"`,
+mirrored geometry measured, `<bdi>`-isolated values — the KPI delta reads
+`+4.1%` with the sign leading). Static prototype verification only — no
+Odoo browser/tour test is claimed and none of this is production UI
+acceptance.
 
 ## 17. Not claimed
 

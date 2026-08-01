@@ -744,12 +744,25 @@ table.sc-table {
     .sc-stores td.cell-store::before { content: none; }
     .sc-stores td.cell-open { justify-content: flex-end; }
 
-    /* Correction §8C: keep the chart's axis labels, legend and the final
-     * hatched (incomplete-period) bar legible at 390 px. The SVG scales
-     * with the viewBox, so the label font is raised to compensate
-     * (19 viewBox-px ≈ 10.5 rendered px at 390 px). CSS wins over the
-     * SVG presentation attributes. */
-    .sc-chart-svg text { font-size: 19px; }
+    /* Correction §8C (final tail): the effective rendered axis-label size
+     * must be ≥11 px at 390 px. The SVG scales with its 640-unit viewBox
+     * (scale ≈ 332/640 ≈ 0.52 at 390 px), so the label font is raised to
+     * compensate: 22 viewBox-px × 0.52 ≈ 11.4 rendered px. CSS wins over
+     * the SVG presentation attributes. At 320 px the same rule yields
+     * ≈9.4 px — recorded honestly; the table equivalent is the
+     * accessible fallback and reflow (no overflow) is the 320 px gate. */
+    .sc-chart-svg text { font-size: 22px; }
+
+    /* Final tail §6: exception/critical actions must never overflow their
+     * card at narrow widths. The content spans the full remaining row
+     * beside the icon (icon 16/20px + 12px gap), which deterministically
+     * wraps the action button onto its own row, indented under the text —
+     * label, icon and the 2px+2px focus outline all stay inside the card. */
+    .sc-exception { flex-wrap: wrap; }
+    .sc-exception__main { flex: 1 1 calc(100% - 28px); }
+    .sc-exception .sc-btn { margin-inline-start: 28px; }
+    .sc-critical__body { flex: 1 1 calc(100% - 32px); }
+    .sc-critical .sc-btn { margin-inline-start: 32px; align-self: flex-start; }
 }
 @media (max-width: 380px) {
     /* 320 px reflow: single-column counters, tighter page padding. */

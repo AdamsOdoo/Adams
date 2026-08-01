@@ -1,3 +1,70 @@
+### Shopify Store 360 — final bounded design-correction tail (2026-08-01)
+
+- **Branch / PR:** `fable/ui-operations-360-concept`, starting head
+  `2f19260` (parent `c8189e9`, two above the PR #204 head `a1c5931`);
+  **no PR opened**; PR #204 and Gate 3 UAT untouched. One additive tail
+  commit (see git log).
+- **Files changed:** the Store 360 spec + implementation handoff, prototype
+  CSS, the two mobile PNGs (`attention-mobile-390px`,
+  `attention-cod-lifecycle-mobile-390px` — only these two regenerated),
+  this file. Prototype HTML, benchmark and the six other screenshots
+  untouched.
+- **What changed / residue fixed:** (1) drill-down ruling — the aggregate
+  model, rule model and drill-down model must be the same model
+  (spec §6.1 matrix): commercial counts now drill to native
+  `sale.order`/`sale.order.line` lists, never the binding workspace (whose
+  connector rules do not reproduce arbitrary sale rules); region-L strips
+  are served by a slice-1b lifecycle mirror projection on `sale.order`
+  (7 more columns, same sanctioned writers) or, if the control room
+  declines that breadth, are an explicitly UNRESOLVED slice-1
+  prerequisite; L5 is labelled the rule-visible warehouse population
+  (picking rules); (2) Shopify Sales Analysis reclassified **"feasible
+  data source identified, security architecture unresolved — backend
+  prerequisite"** (`sale.report` is a separate model; its view reading
+  sale tables does not inherit arbitrary sale rules); (3) rollback honesty
+  — slice 1 leaves stored columns + backfilled values after a code revert
+  (revert-and-orphan is the supported path; structural removal is a
+  separate forward cleanup migration); (4) stale "SELECT-only SQL AST"
+  guard text replaced by runtime-path guards (no cr.execute/sudo/mutation
+  reachability; ORM reads as the caller; migration backfill scoped
+  separately); (5) mobile: exception/critical Review actions wrap to
+  their own row at ≤640 px — measured at the DESCENDANT level (label,
+  icon, inflated focus outline) inside card + viewport with no text
+  overlap, at 390 and 320 px; chart axis raised to an effective 11.4 px
+  at 390 px (≥ the 11 px spec target; 9.3 px at 320 recorded openly).
+- **Items deferred:** unchanged from the correction session, plus the
+  slice-1b breadth decision and the sale.report security design (both
+  explicitly control-room decisions).
+- **Learning feedback loop:** *New issues:* a drill-down can silently
+  change the governing rule set when it opens a different model than the
+  aggregate — countered by the same-model principle and a
+  drill-down-model-equality test (handoff §8.9); measuring only a parent
+  box misses descendant overflow — the harness now measures label/icon/
+  focus rectangles. *Repeated patterns:* "security by adjacency" (rules
+  assumed to follow a join — binding→sale, sale.report→sale) appeared
+  twice this program; now a standing check: name the exact model whose
+  rules govern every number. *Rules/checklists updated:* spec §6.1 matrix
+  columns are now mandatory for every metric. *Rejected approaches:*
+  binding-workspace drill-down for sale-document aggregates (revisit only
+  with a proved rule-equivalence mechanism) — recorded in handoff
+  §6.10/§15 G-T18; dedicated `rejected-approaches-log.md` entry still
+  deferred (path not authorized). *Technical debt:* none accepted.
+  *Architecture concerns:* slice-1b widens sale.order to ~10 connector
+  columns — explicitly flagged for control-room ruling. *Tests/gates:*
+  §8.9–§8.11 additions (drill-down equality, picking rules, binding
+  rules). *Future prompts:* Yes — slice packets must name the
+  aggregate/rule/drill-down model triple per metric.
+- **Quality gate confirmation:** handoff updated YES · feedback loop
+  checked YES · learning captured YES · rejected approach recorded in
+  design handoff (log entry deferred, path unauthorized) · technical debt
+  n/a · repeated-issue escalation applied YES (same-model principle).
+- **Next recommended session:** control-room acceptance review of the
+  corrected concept; separately, Gate 3 UAT proceeds independently on
+  PR #204 — this concept neither blocks nor touches it.
+- **Stop condition:** one additive documentation/prototype commit on the
+  concept branch; no production code, no PR, no acceptance claimed;
+  stopped after the return report.
+
 ### Shopify Store 360 design concept + control-room correction (2026-08-01)
 
 - **Branch / PR:** `fable/ui-operations-360-concept` (isolated concept branch

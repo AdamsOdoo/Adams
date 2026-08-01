@@ -69,6 +69,10 @@ combined total.
 > top-product denominator renamed (§6 E2), completeness-bridge language
 > (§9.3), the Order lifecycle region (§3 L, §7.3–§7.5), the workflow
 > traceability matrix (§14), and re-verified prototype evidence (§12–§13).
+> **Final correction tail (2026-08-01):** drill-down/rule-model matrix and
+> lifecycle-projection ruling (§6.1), warehouse-population labelling
+> (ruling D), mobile exception-action containment and the ≥11 px chart-axis
+> target at 390 px (§11, §13).
 
 ## 3. Information architecture (decision order)
 
@@ -253,15 +257,77 @@ invalidation of fields, `active`, access rights and so on"
 accessed 2026-08-01). Operational rows (G/F/H counts) stay on connector
 models exactly as before.
 
+**Drill-down ruling (final correction tail, 2026-08-01) — the aggregate
+model, the rule model and the drill-down model must be the same model.**
+The earlier revision still routed commercial counts to the Orders Workspace,
+which opens `shopify.connector.order.binding` — a model whose record rules
+enforce connector company/quarantine scope but do **not** reproduce
+arbitrary `sale.order`/`sale.order.line` rules; a relational domain through
+`sale_order_id` does not by itself apply the caller's sale-document rules.
+That claim is withdrawn. Corrected rulings:
+
+- **Order-grain commercial metrics** (C1–C3, C∆, D1, H1 sales, L1–L4, L6)
+  aggregate on `sale.order` and drill down to a **native `sale.order` list**
+  via a server-built act_window carrying the identical projected-field
+  domain — same model, same domain, same current-user rules, so
+  count = drill-down by construction, including for rule-restricted users.
+- **Line-grain metrics** (C4, E1, E2 basis) aggregate on `sale.order.line`
+  and drill down to a **native `sale.order.line` list** with the identical
+  domain — never to a binding list with a claimed equivalence.
+- **Lifecycle strips** (L1–L4, L6): the payment/COD/fulfillment source
+  fields live on the binding, so the selected architecture extends the
+  slice-1 projection with **lifecycle mirror fields on `sale.order`**
+  (§6.1 note) written by the same sanctioned import/refresh/approval
+  writers in the same transaction — no raw SQL in the dashboard path, no
+  `sudo()`, no client-visible ID list, aggregate = drill-down on
+  `sale.order` under the caller's rules, and no hidden-order count, label
+  or state can leak because every read runs on the ruled model.
+- **Warehouse dispatch** (L5) is defined as the **rule-visible warehouse
+  population**: it aggregates `stock.picking` as the caller (picking
+  ACL/rules govern it — they do not equal sale-order rules and are not
+  claimed to) and drills down to the native Delivery Orders list with the
+  identical domain — exact on its own model; the label says whose rules
+  apply.
+- **Lifecycle exceptions** (L7) count connector evidence surfaces
+  (bindings, fulfillment evidence, attempts, decisions) under connector
+  rules and drill down to those same connector lists — same-model
+  agreement; their payload carries connector state names and counts the
+  caller can already list natively, never sale-document fields.
+
+### 6.1 Aggregate model → rule model → drill-down model matrix
+
+| Metrics | Aggregate model | ACL/record-rule model that governs | Drill-down `res_model` | Population intersection | Count-to-drill-down agreement | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| C1, C2, C3, C∆, D1, H1 sales cell | `sale.order` (grouped reads) | `sale.order` (caller's ACLs + all record rules, applied inside every grouped read) | `sale.order` | projected fields (`shopify_connector_store_id`, cancellation + quarantine mirrors) ∩ the caller's rule-visible orders | identical model + domain + user for aggregate and list | **Selected — slice 1a (core commercial projection, 3 columns + backfill)** |
+| C4, E1, E2 basis | `sale.order.line` | `sale.order.line` (independent of the order-level rule) | `sale.order.line` | `shopify_line_item_gid != False` ∩ order-projection terms ∩ the caller's rule-visible lines | identical model + domain + user | **Selected — slice 1a** (no new line field needed) |
+| L1 payment strip, L2 freshness, L3 COD states, L4 fulfillment progress, L6 oldest paid-unfulfilled | `sale.order` (lifecycle mirror fields) | `sale.order` | `sale.order` | lifecycle mirrors ∩ the caller's rule-visible orders | identical model + domain + user | **Selected — slice 1b (lifecycle projection, §6.1 note); if the control room declines 1b's schema breadth, these strips become an UNRESOLVED slice-1 prerequisite and region L ships exception-list-only** |
+| L5 dispatch | `stock.picking` (as caller) | `stock.picking` | `stock.picking` (native Delivery Orders) | outgoing pickings of bound orders (data relationship via `sale_id` → projected store; **no sale-rule claim**) | identical model + domain + user; labelled "rule-visible warehouse population" | **Selected with the ruling-D label** |
+| L7 exceptions | binding / fulfillment evidence / mutation attempts / match decisions | each connector model's own rules (company + SEC-3 quarantine) | the same connector model's list | connector-native visibility (caller can already open these lists) | identical model + domain (existing tested invariant) | **Selected (existing mechanism)** |
+| G2, G3, F2–F9, H1 operational cells, B1 | `shopify.connector.job` / store / settings | connector models' rules | Sync Center / Error Center / job or store form | connector-native | identical model + domain (existing tested invariant) | **Selected (unchanged)** |
+
+**§6.1 note — slice-1b lifecycle mirror fields** (all readonly, written only
+by the sanctioned importer/refresh/approval writers in the same transaction
+that writes the binding, backfilled by the slice-1 migration):
+`shopify_connector_financial_status` (Char mirror of the raw snapshot),
+`shopify_connector_is_cod` (Boolean), `shopify_connector_approval_state`,
+`shopify_connector_cod_commercial_state`,
+`shopify_connector_cod_collection_state`,
+`shopify_connector_fulfillment_status` (Char mirror),
+`shopify_connector_review` (Boolean mirror of `binding.status='review'`),
+`shopify_connector_evidence_refreshed_at` (Datetime). This widens the
+sale-order footprint from 3 to ~10 connector columns — flagged explicitly
+as a control-room review point; declining it triggers the fallback recorded
+in the matrix row above, never a silent workaround.
+
 | # | Displayed label | Operator question | Source model · stored fields | Domain / filter | Aggregation | Time window | Store isolation | Zero/empty behaviour | Stale-data behaviour | Native drill-down | Supported at `a1c5931`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| C1 | Imported Shopify sales | What value of Shopify orders landed in Odoo this period? | `sale.order.amount_total`, `currency_id` joined via `shopify.connector.order.binding.sale_order_id` | binding: `store_id=?`, `sec3_scope_quarantined=False`, `shopify_cancelled_at=False`; order: `state != 'cancel'`, `date_order` in window | SUM | `date_order` (= Shopify `processedAt`) in selected window, user-TZ boundaries | `binding.store_id` | Show `0.00 CUR`; if orders=0 and bridge healthy → region-D/E empty state "No sales in this period" | Card carries completeness dot + caption bound to region G state | Orders Workspace `shopify_connector_sale.action_shopify_connector_order_workspace` + same domain | **Yes** (data); endpoint = slice 1 |
+| C1 | Imported Shopify sales | What value of Shopify orders landed in Odoo this period? | `sale.order.amount_total`, `currency_id` joined via `shopify.connector.order.binding.sale_order_id` | binding: `store_id=?`, `sec3_scope_quarantined=False`, `shopify_cancelled_at=False`; order: `state != 'cancel'`, `date_order` in window | SUM | `date_order` (= Shopify `processedAt`) in selected window, user-TZ boundaries | `binding.store_id` | Show `0.00 CUR`; if orders=0 and bridge healthy → region-D/E empty state "No sales in this period" | Card carries completeness dot + caption bound to region G state | **native `sale.order` list** (server-built act_window, the C1 domain verbatim — same model/rules/domain as the aggregate; the binding workspace is NOT the drill-down: its rules are connector rules, §6.1) | **Yes** (data); endpoint = slice 1 |
 | C2 | Imported orders | How many Shopify orders were imported for the period? | `shopify.connector.order.binding` (+ joined order state) | as C1 | COUNT | as C1 | as C1 | `0` | as C1 | as C1 | **Yes**; endpoint = slice 1 |
 | C3 | Average imported order value | Typical imported order size? | derived C1/C2 | as C1 | SUM/COUNT | as C1 | as C1 | `—` when C2=0 (never divide by zero) | as C1 | as C1 | **Yes** (derived) |
-| C4 | Units sold (imported) | How many product units were sold? | `sale.order.line.product_uom_qty`, filter `shopify_line_item_gid != False` | line join order join binding, C1 exclusions | SUM | as C1 | via binding join | `0` | as C1 | as C1 (order-level list) | **Yes**; endpoint = slice 1 |
+| C4 | Units sold (imported) | How many product units were sold? | `sale.order.line.product_uom_qty`, filter `shopify_line_item_gid != False` | goods lines ∩ order-projection terms, C1 exclusions | SUM | as C1 | via order projection | `0` | as C1 | **native `sale.order.line` list**, identical domain (same model/rules as the aggregate — §6.1 ruling B) | **Yes**; endpoint = slice 1 |
 | C∆ | "vs previous period" delta on C1/C2/C3/C4 | Better or worse than the preceding equivalent period? | same as each card | same, window shifted back by its own length | same | previous equivalent window | same | When previous value is 0 → "no prior-period data", never a % | inherits card state | n/a (caption) | **Yes** (derived) |
-| D1 | Sales trend (bars + previous-period line) | How did imported sales move across the period? | as C1 | as C1 | SUM per bucket (day; hour for 24 h) | buckets in user TZ, stated on chart caption | as C1 | Honest empty state (one of the three §9.4 variants) | chart caption inherits G | table rows link to Orders Workspace day-filtered | **Yes**; endpoint = slice 1 |
-| E1 | Top products (≤5) | Which products drove imported sales? | `sale.order.line`: `product_id`, `product_uom_qty`, `price_subtotal` (untaxed) | as C4 | GROUP BY product, SUM value+units, ORDER value DESC LIMIT 5 | as C1 | via binding join | Section hidden behind "No product sales in this period" line | inherits G | Product form (`product.template`) + Orders Workspace period filter; exact per-store *line* list needs server-built domain (slice 2 note) | **Yes** (display); drill-down exactness = slice 2 |
+| D1 | Sales trend (bars + previous-period line) | How did imported sales move across the period? | as C1 | as C1 | SUM per bucket (day; hour for 24 h) | buckets in user TZ, stated on chart caption | as C1 | Honest empty state (one of the three §9.4 variants) | chart caption inherits G | table rows link to the **native `sale.order` list**, day-filtered with the same domain (§6.1) | **Yes**; endpoint = slice 1 |
+| E1 | Top products (≤5) | Which products drove imported sales? | `sale.order.line`: `product_id`, `product_uom_qty`, `price_subtotal` (untaxed) | as C4 | GROUP BY product, SUM value+units, ORDER value DESC LIMIT 5 | as C1 | via order projection | Section hidden behind "No product sales in this period" line | inherits G | Product form (`product.template`, navigation) + **native `sale.order.line` list** with the E1 domain (server-built, slice 2) — count-exact on the same model (§6.1 ruling B) | **Yes** (display); drill-down exactness = slice 2 |
 | E2 | **Share of goods subtotal** (per top product) | How concentrated were product sales? | derived: E1 `price_subtotal` value ÷ SUM `price_subtotal` over **all** eligible goods lines (the C4 population) | as E1; denominator = the same eligible goods-line basis as the numerator — **never** C1 (C1 includes tax + shipping; this ratio must not imply it divides the headline) | ratio | as C1 | as C1 | Hidden when denominator 0 | inherits G | n/a (cell; the goods-subtotal basis is printed under the table) | **Yes** (derived; same-basis numerator/denominator, correction §6C) |
 | G1 | Sales data synchronized through | Up to when has Shopify order discovery landed? | `shopify.connector.store.order_sync_last_checkpoint_at` (compute over `settings.sale_order_last_import_checkpoint_at`, `shopify_connector_sale/models/shopify_connector_order_scan.py:566`) | store row | latest value | point-in-time | per store | "Not synchronized yet" empty variant | drives the G state machine (§9.3) | Store form | **Yes** |
 | G2 | Orders awaiting import | How many discovered orders haven't landed? | `shopify.connector.job` | `job_type='order_import_sync'`, `state in (draft,queued,running,retry_waiting)`, `store_id=?` | COUNT | point-in-time | `job.store_id` | `0` → contributes to "Complete & current" | n/a (is itself the freshness signal) | Sync Center `action_shopify_connector_sync_center` + domain | **Yes** |
@@ -278,12 +344,12 @@ models exactly as before.
 | F10 | Quiet metadata: API health · next scheduled posture | Anything throttled? Is automation on? | `store.api_health_state (normal/throttled/degraded)`, `api_throttle_observed_at`; `order_sync_scheduled` etc. (cron-verified computes) | store row | latest values | point-in-time | per store | omitted when normal | n/a | Store form | **Yes** ("next scheduled check" timestamp itself = deferred, §8: reading `ir.cron.nextcall` needs a deliberate, security-reviewed sudo read) |
 | H1 | Multi-store table | Which store needs me? | per-store: `store.state`, latest terminal `finished_at`, F2/F4+F5 counts, C1 per store currency | grouped by `store_id` (single `read_group` per measure — no N+1) | per-store COUNT/SUM/MAX | point-in-time + selected window for sales | inherent | Region hidden when ≤1 store | sales cell inherits per-store G | Store form; counts → Sync/Error Center store-filtered | **Yes**; endpoint = slice 1 |
 | B1 | Critical status band | Does a connector problem make the money numbers wrong? | derived: G state ∈ {Stale, Incomplete} or store `reconnect_needed/disconnected` or sale domain disabled with history present | §9.3 conditions | boolean + worst cause | point-in-time | selected store | absent when conditions false | is itself the stale surface | cause-specific action (Error Center / Store form) | **Yes** (derived) |
-| L1 | Payment strip: Paid · Authorized — capture pending · Payment pending (non-COD) · COD · needs review | Which imported orders are actually paid? | `binding.shopify_financial_status_snapshot` (raw), `is_cod`, `binding.status` — counted over the C1 population (imported orders only, caption says so) | C1 exclusions + snapshot buckets: `PAID` / `AUTHORIZED` / `PENDING & is_cod=False` / `is_cod=True` / `status='review'` (payment-caused review incl. PARTIALLY_PAID-as-quotation imports and post-import divergence) | COUNT per bucket | as C1 | as C1 | Strip hidden when C2=0 | caption shows oldest `shopify_last_evidence_refresh_at` in the set | Orders Workspace with the same bucket domain | **Yes** (fields stored; buckets are raw-snapshot equality, fail-closed upstream) |
-| L2 | Payment-evidence freshness caption | How fresh is the payment evidence? | `binding.shopify_last_evidence_refresh_at`, `financial_status_changed_at` | C1 population | MIN (oldest) + latest change | point-in-time | as C1 | omitted when C2=0 | is itself the freshness surface | Orders Workspace sorted by evidence age | **Yes** |
-| L3 | COD block: awaiting approval / quotation / confirmed; collection nothing / partially / fully | Where does each COD order stand commercially? | `manual_gateway_approval_state`, `cod_commercial_state`, `cod_collection_state` | `is_cod=True` + C1 exclusions; approval='pending' / commercial ∈ (quotation, confirmed) / collection ∈ (nothing_collected, partially_collected, fully_collected) | COUNT per state | as C1 | as C1 | Block hidden when COD count = 0 | inherits L2 | Orders Workspace COD filter; approvals → the binding list `manual_gateway_approval_state='pending'` | **Yes** (states written at import/refresh/approval — importer:2241-2247, 2290-2296, 2361-2384) |
-| L4 | Order fulfillment progress: Fulfilled · Partially fulfilled · Unfulfilled | How far along is Shopify order fulfillment? | `binding.shopify_fulfillment_status_snapshot` (raw `displayFulfillmentStatus` — Shopify's own order-level rollup, so multi-fulfillment orders are never double-counted) | C1 population; raw-value buckets, any other/NULL value shown as "Not yet observed" | COUNT per bucket | as C1 | as C1 | hidden when C2=0 | caption: snapshot refreshed at import + evidence refresh (`shopify_last_evidence_refresh_at`) — **not** a live carrier feed | Orders Workspace bucket domain | **Yes** (display-only snapshot with stated freshness) |
-| L5 | Odoo dispatch: to dispatch / ready / dispatched | What does the warehouse still owe? | native `stock.picking.state` for outgoing pickings of bound orders (`sale_id` join — the same join production uses, fulfillment_inbound.py:87-89) | pickings of C1 orders: `state not in (done, cancel)` = to dispatch; `state='assigned'` = ready; `state='done'` = dispatched | COUNT | as C1 | via order join | `0` | n/a (Odoo-side truth) | native Delivery Orders list, same domain | **Yes** (native fields; picking ACLs apply to the caller) |
-| L6 | Oldest paid-unfulfilled age | Is anything paid but sitting? | derived: MIN `date_order` where snapshot `PAID` + fulfillment snapshot `UNFULFILLED` | C1 exclusions | MIN age | as C1 | as C1 | omitted when none | elapsed age only — **no SLA claimed** (correction §E: no invented threshold; age is displayed, lateness is not declared) | Orders Workspace same domain, oldest first | **Yes** (derived) |
+| L1 | Payment strip: Paid · Authorized — capture pending · Payment pending (non-COD) · COD · needs review | Which imported orders are actually paid? | `binding.shopify_financial_status_snapshot` (raw), `is_cod`, `binding.status` — counted over the C1 population (imported orders only, caption says so) | C1 exclusions + snapshot buckets: `PAID` / `AUTHORIZED` / `PENDING & is_cod=False` / `is_cod=True` / `status='review'` (payment-caused review incl. PARTIALLY_PAID-as-quotation imports and post-import divergence) | COUNT per bucket | as C1 | as C1 | Strip hidden when C2=0 | caption shows oldest evidence-refresh mirror in the set | **native `sale.order` list** on the lifecycle mirror fields, same bucket domain (§6.1 slice 1b; source fields live on the binding, so this row is served by the lifecycle projection — descoping 1b makes it an unresolved slice-1 prerequisite, never "as C1" by silent analogy) | **Yes** (fields stored on the binding; the sale-order mirror is the slice-1b projection) |
+| L2 | Payment-evidence freshness caption | How fresh is the payment evidence? | `shopify_connector_evidence_refreshed_at` (slice-1b mirror of `binding.shopify_last_evidence_refresh_at`) | C1 population | MIN (oldest) | point-in-time | as C1 | omitted when C2=0 | is itself the freshness surface | **native `sale.order` list** ordered by the mirror field (§6.1) | **Yes** (binding field stored; sale-order mirror = slice 1b) |
+| L3 | COD block: awaiting approval / quotation / confirmed; collection nothing / partially / fully | Where does each COD order stand commercially? | `manual_gateway_approval_state`, `cod_commercial_state`, `cod_collection_state` | `is_cod=True` + C1 exclusions; approval='pending' / commercial ∈ (quotation, confirmed) / collection ∈ (nothing_collected, partially_collected, fully_collected) | COUNT per state | as C1 | as C1 | Block hidden when COD count = 0 | inherits L2 | **native `sale.order` list** on the lifecycle mirror fields (§6.1 slice 1b); the binding approval queue stays reachable from each order, but the count's drill-down is the same-model sale-order list | **Yes** (states written at import/refresh/approval — importer:2241-2247, 2290-2296, 2361-2384; sale-order mirrors = slice 1b) |
+| L4 | Order fulfillment progress: Fulfilled · Partially fulfilled · Unfulfilled | How far along is Shopify order fulfillment? | `binding.shopify_fulfillment_status_snapshot` (raw `displayFulfillmentStatus` — Shopify's own order-level rollup, so multi-fulfillment orders are never double-counted) | C1 population; raw-value buckets, any other/NULL value shown as "Not yet observed" | COUNT per bucket | as C1 | as C1 | hidden when C2=0 | caption: snapshot refreshed at import + evidence refresh (mirror timestamp) — **not** a live carrier feed | **native `sale.order` list** on the fulfillment-status mirror, same bucket domain (§6.1 slice 1b) | **Yes** (display-only snapshot with stated freshness; sale-order mirror = slice 1b) |
+| L5 | Odoo dispatch: to dispatch / ready / dispatched | What does the warehouse still owe? | native `stock.picking.state` for outgoing pickings of bound orders (`sale_id` join — the same join production uses, fulfillment_inbound.py:87-89) | pickings of bound-store orders: `state not in (done, cancel)` = to dispatch; `state='assigned'` = ready; `state='done'` = dispatched | COUNT | as C1 | via order projection (data relationship, **not** a sale-rule claim) | `0` | n/a (Odoo-side truth) | native Delivery Orders (`stock.picking`) list, identical domain — exact on its own model | **Yes** — defined as the **rule-visible warehouse population** (ruling D): `stock.picking` ACLs/rules govern this number and they do not equal sale-order rules; the block label states this |
+| L6 | Oldest paid-unfulfilled age | Is anything paid but sitting? | derived: MIN `date_order` where the financial mirror is `PAID` + the fulfillment mirror is `UNFULFILLED` (slice-1b fields) | C1 exclusions | MIN age | as C1 | as C1 | omitted when none | elapsed age only — **no SLA claimed** (correction §E: no invented threshold; age is displayed, lateness is not declared) | **native `sale.order` list**, same domain, oldest first (§6.1) | **Yes** (derived; mirrors = slice 1b) |
 | L7 | Lifecycle exceptions (≤3): COD awaiting approval · external fulfillment recorded in Shopify · payment status changed after import · Shopify cancelled a validated fulfillment · fulfilled while payment still pending · unknown fulfillment status observed | What lifecycle event needs a human? | approvals `manual_gateway_approval_state='pending'`; evidence `reconciled_state='review'` with `review_reason ∈ (external_fulfillment_observed, origin_unconfirmed)`; binding `status='review'` + `financial_status_changed_at` + previous≠current snapshot; evidence `review_reason='cancelled_after_validation'`; derived snapshot pair (`displayFulfillmentStatus ∈ (FULFILLED, PARTIALLY_FULFILLED)` + financial `PENDING/AUTHORIZED` + `is_cod=False`); evidence `schema_warning=True` | per candidate, store term, count = drill-down domain count (existing invariant) | COUNT per candidate, ranked | point-in-time | native store term on each model | section replaced by one affirmative line | each item names its evidence timestamp (`last_observed_at` / `financial_status_changed_at`) | binding list / fulfillment review list (`action` per source) with the same domain | **Yes** — every named source has a production writer at `a1c5931` (§5); each item states what/why/who/freshness/whether the connector can resolve it (report-only for external events) |
 
 **Rejected at the gate** (must not appear; recorded per prompt §10 and
@@ -340,7 +406,7 @@ Basis, per the correction's §3 checklist:
 | Previous period | same length, immediately preceding, same TZ rules |
 | Currency | one currency per store (enforced at import); cross-currency totals never combined |
 | Incomplete import | never silently ignored — region G states it and region B escalates it (§9.3) |
-| Drill-down domain | the C1 domain verbatim on the Orders Workspace |
+| Drill-down domain | the C1 domain verbatim on the **native `sale.order` list** (same model, same rules, same domain — §6.1) |
 
 ### 7.2 Commercial metric decision table
 
@@ -599,10 +665,21 @@ landed", nothing more). The bridge caption carries this scope.
   detail (top products, chart equivalent) may still scroll inside its own
   sanctioned `overflow-x: auto` container — the page itself never scrolls
   horizontally, at 390 px, at 320 px, and at 200 % zoom (683 px effective).
-  **Mobile chart legibility (correction §8C):** axis labels keep ≥11 px
-  with alternate-label thinning at narrow widths, the legend wraps, and the
-  final incomplete-period hatching stays visible; the accessible table
-  equivalent is unchanged.
+  **Mobile chart legibility (correction §8C, tightened in the final
+  tail):** the effective rendered axis-label size stays **≥11 px at
+  390 px** — implemented by raising the narrow-width SVG label type (the
+  SVG scales with its viewBox, so the stylesheet compensates below
+  640 px) and measured after rendering, not assumed; the legend wraps and
+  the final incomplete-period hatching stays visible. At 320 px the
+  requirement is reflow (no page overflow, no clipping) and the measured
+  effective size is recorded honestly in §13; the accessible table
+  equivalent is always available. Seven daily buckets need no label
+  thinning; the production 30-day view may thin alternate labels.
+  **Exception actions on mobile (final tail):** at ≤640 px every
+  exception's Review action wraps to its own row beneath the content —
+  the button, its label, icon and focus outline are fully inside the card
+  and viewport, never overlapping the explanatory text (measured at the
+  descendant level, §13).
 - Healthy screens are commercially useful (sales content fills them);
   attention screens state explicitly whether the connector problem affects
   the displayed sales figures (region B copy + card completeness dots).
@@ -731,9 +808,17 @@ Environment: Chromium **141.0.7390.37** (Playwright 1.56.1), viewports at
 `deviceScaleFactor: 1`. Each run loaded the committed prototype from disk
 with a state hash and verified the state and direction genuinely applied
 (`document.body.dataset.state`, computed `direction` on the surface root).
-Eleven runs: the six full-page screenshot runs, the two lifecycle
-element-capture runs, plus three check-only runs (320 px reflow; 200 % zoom
-≙ 683 CSS px at both attention and healthy).
+Eleven runs in the correction session (six full-page + two lifecycle
+element captures + three check-only: 320 px reflow and 200 % zoom ≙ 683 CSS
+px at attention and healthy). **Final-tail re-run (same environment): all
+runs repeated as checks after the ≤640 px CSS fixes; only the two mobile
+screenshots were regenerated (`attention-mobile-390px.png`,
+`attention-cod-lifecycle-mobile-390px.png`) — the CSS deltas affect ≤640 px
+only, so the six other committed captures remain those of the correction
+run. Tail measurements: keyboard 16–44 real Tabs unchanged; reduced motion
+unchanged; 2 × `file://` requests per run unchanged; fixture arithmetic
+passes unchanged in healthy, attention and Arabic; the mobile/action/axis
+paragraphs below carry the tail's updated numbers.**
 
 | Run | Viewport | State/dir | Page overflow (`scrollWidth` vs `innerWidth`) | Clipped text outside sanctioned containers | Flow drill-downs | Tabs to LAST flow "Open" (real key presses) | Focus | Requests | Fixture arithmetic |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -764,18 +849,26 @@ combined KPIs (sales 24,910.80; backlog 27; attention 9). The identical
 checks pass against the **Arabic** DOM, proving the RTL state renders the
 same numbers.
 
-**Mobile presentation (correction §8B/§8C), measured at 390 px:** the Stores
-region renders as stacked cards; both cards and both primary **Open**
-actions lie fully inside the viewport (`left ≥ 0`, `right ≤ 390`); the
-stores wrapper has no horizontal scroll (`scrollWidth ≤ clientWidth`). The
-chart at 390 px: axis labels compute to an effective **9.9 px** (19 SVG-px ×
-the 332/640 scale — ≥ the 9.5 px target), all axis labels lie inside the
-SVG bounds (no clipping), the hatched incomplete-period bar is present and
-visible, and the legend fits the viewport. At 320 px the gate is reflow —
-no page overflow, no clipped text, store cards and actions still fully
-visible; the axis size computes to 8.0 px there (recorded openly; the §8C
-legibility target is defined at 390 px, and the accessible table equivalent
-is always available).
+**Mobile presentation (correction §8B/§8C, re-measured after the final
+tail):** the Stores region renders as stacked cards; both cards and both
+primary **Open** actions lie fully inside the viewport (`left ≥ 0`,
+`right ≤ 390`); the stores wrapper has no horizontal scroll
+(`scrollWidth ≤ clientWidth`). **Exception-action containment (final tail
+§6), measured at the DESCENDANT level:** at both 390 px and 320 px, all
+7 visible action cards (the critical band + 3 lifecycle + 3 health
+exceptions) pass — the Review button box, each of its label/icon
+descendants, **and its focus outline inflated by the real 2 px width +
+2 px offset** lie fully inside their card and the viewport, and the button
+rectangle intersects no explanatory-text rectangle (the actions wrap to
+their own row at ≤640 px). The chart at 390 px: axis labels compute to an
+effective **11.4 px** (22 SVG-px × the 332/640 scale — **≥ the 11 px §11
+target**), all axis labels lie inside the SVG bounds (no clipping), the
+hatched incomplete-period bar is present and visible, and the legend fits
+the viewport. At 320 px the gate is reflow — no page overflow, no clipped
+text, store cards, exception actions and their focus outlines still fully
+contained; the axis size computes to **9.3 px** there (recorded openly; the
+≥11 px target is defined at 390 px, and the accessible table equivalent is
+always available; the chart causes no overflow at any width).
 
 **RTL language evidence (correction §8A), measured on the Arabic state:**
 `document.body.dataset.state = 'attention-rtl'`, surface `direction: rtl`,
@@ -823,8 +916,13 @@ Columns: the operator/merchant action and system event; the production entry
 point; stored evidence before → after; the expected Store 360 surface and
 order-workspace state; drill-down + acting role; the failure/review route;
 and known gaps. "OW" = Orders Workspace (binding list/form), "FR" =
-Fulfillment Review list. Every dashboard count named here opens a native
-list with the identical domain (count/domain invariant).
+Fulfillment Review list — these name the **operator's working surface** in
+each workflow, not the dashboard counts' drill-down contract: metric
+drill-downs follow §6.1 (aggregate model = rule model = drill-down model;
+commercial/lifecycle counts open native `sale.order`/`sale.order.line`
+lists, connector-evidence counts open their own connector lists). Every
+dashboard count opens a list on its own aggregate model with the identical
+domain (count/domain invariant).
 
 | # | Workflow / transition (action → event) | Production entry point | Stored evidence (before → after) | Store 360 surface | OW / workspace state | Drill-down · role | Failure/review route | Gaps |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
