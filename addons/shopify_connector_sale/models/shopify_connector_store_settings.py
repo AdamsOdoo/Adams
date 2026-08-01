@@ -309,6 +309,23 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                     )
         return super().write(vals)
 
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return super()._sec3_parent_scope_relations() + (
+            ('sale_order_catchup_pending_scan_job_id', 'store'),
+        )
+
+    @api.constrains('sale_order_catchup_pending_scan_job_id', 'store_id')
+    def _check_catchup_scan_job_store(self):
+        """SEC-3 same-store agreement for the declared job pointer."""
+        for settings in self:
+            job = settings.sale_order_catchup_pending_scan_job_id
+            if job and job.store_id != settings.store_id:
+                raise ValidationError(
+                    'The pending order catch-up scan job must belong to '
+                    'the settings row\'s own store.'
+                )
+
     def _approved_manual_gateway_set(self):
         self.ensure_one()
         values = re.split(r'[,\n]', self.approved_manual_gateways or '')

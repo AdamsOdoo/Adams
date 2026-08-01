@@ -1,4 +1,5 @@
-from odoo import fields, models
+from odoo import api, fields, models
+from odoo.exceptions import ValidationError
 
 
 class ShopifyConnectorStoreSettingsFulfillment(models.Model):
@@ -81,6 +82,23 @@ class ShopifyConnectorStoreSettingsFulfillment(models.Model):
         help='Shopify fulfillment evidence observed through this instant '
              'by the last complete, current-generation pass.',
     )
+
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return super()._sec3_parent_scope_relations() + (
+            ('fulfillment_catchup_pending_job_id', 'store'),
+        )
+
+    @api.constrains('fulfillment_catchup_pending_job_id', 'store_id')
+    def _check_catchup_job_store(self):
+        """SEC-3 same-store agreement for the declared job pointer."""
+        for settings in self:
+            job = settings.fulfillment_catchup_pending_job_id
+            if job and job.store_id != settings.store_id:
+                raise ValidationError(
+                    'The pending fulfillment catch-up job must belong to '
+                    'the settings row\'s own store.'
+                )
 
     def _fulfillment_notification_allowed(self):
         """True only when the store has both enabled the default notification

@@ -320,7 +320,15 @@ class TestOrderImportMappingStatic(TransactionCase):
         expected = {
             'shopify_connector_order_binding.py': 2,
             'shopify_connector_order_importer.py': 2,
-            'shopify_connector_order_scan.py': 1,
+            # Store 360 slice 1 raised the order-scan inventory from 1 to 3:
+            # the checkpoint/lineage settings write (pre-existing), plus the
+            # two minimal technical-sudo READS in the cancelled-import
+            # resume path (`_resume_cancelled_order_import`: the prior-job
+            # lookup and the binding-evidence lookup) — the same P1-3
+            # posture as `_enqueue_once`'s technical-sudo job handle. Job
+            # creation itself still flows only through the sanctioned
+            # `job.enqueue` service.
+            'shopify_connector_order_scan.py': 3,
             'shopify_connector_tax_mapping.py': 0,
         }
         for filename, count in expected.items():
@@ -376,7 +384,12 @@ class TestOrderImportMappingStatic(TransactionCase):
         # schema changed, and no migration script was added -- there is
         # nothing to migrate. One further patch bump, recorded here rather
         # than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.8.0')
+        # Store 360 slice 1 (2026-08-01) added the eleven protected
+        # sale.order projection columns, the catch-up stamp settings fields
+        # and the 19.0.2.9.0 backfill migration -- a genuine schema change
+        # with a genuine migration script, so the version moves a minor
+        # step. Recorded here rather than the guard being relaxed.
+        self.assertEqual(manifest['version'], '19.0.2.9.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

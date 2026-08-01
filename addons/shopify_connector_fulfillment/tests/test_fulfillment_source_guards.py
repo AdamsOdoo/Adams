@@ -41,6 +41,12 @@ ALLOWED_MODEL_FILES = frozenset((
     'shopify_connector_fulfillment_mode2.py',
     'shopify_connector_fulfillment_scans.py',
     'shopify_connector_job_dispatch.py', 'stock_picking.py',
+    # Store 360 final pre-UAT implementation (control room, 2026-08-01):
+    # the reconnect catch-up admission/promotion seam and the read-only
+    # Store 360 dashboard section provider. Recorded amendment, not a
+    # relaxation.
+    'shopify_connector_fulfillment_reconnect.py',
+    'shopify_connector_ui_store360_fulfillment.py',
 ))
 ALLOWED_TEST_FILES = frozenset((
     '__init__.py', 'test_fulfillment_binding.py',
@@ -66,6 +72,11 @@ ALLOWED_TEST_FILES = frozenset((
     'test_ui_visibility_matrix.py', 'test_ui_actions.py',
     'test_ui_import_structure.py', 'test_ui_source_guards.py',
     'test_ui_sec3_scope.py', 'test_ui_tours.py',
+    # Store 360 final pre-UAT implementation (control room, 2026-08-01):
+    # the generation-bound reconnect catch-up suite its §11.D test campaign
+    # mandates. Recorded amendment (see tests/__init__.py), not a
+    # relaxation.
+    'test_fulfillment_reconnect_catchup.py',
 ))
 
 

@@ -402,6 +402,16 @@ class TestFulfillmentConcurrency(TransactionCase):
                 'DELETE FROM shopify_connector_store_settings WHERE store_id = %s',
                 (store_id,),
             )
+            # Store 360 slice 1: sale.order now carries the protected
+            # `shopify_connector_store_id` projection (ondelete='restrict'),
+            # so fixture orders must release the store before it can be
+            # deleted. Cleanup-residue only — the orders themselves are
+            # removed by `_cleanup_business_records` right after (LIFO).
+            cr.execute(
+                'UPDATE sale_order SET shopify_connector_store_id = NULL '
+                'WHERE shopify_connector_store_id = %s',
+                (store_id,),
+            )
             cr.execute(
                 'DELETE FROM shopify_connector_store WHERE id = %s', (store_id,),
             )
