@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopify Store 360 — DESIGN PROTOTYPE (not live data)</title>
+<link rel="stylesheet" href="shopify-operations-360-dashboard.css">
+</head>
+<body data-state="healthy">
+
+<!-- ============================================================
+     PROTOTYPE CHROME — not part of the proposed product surface.
+     Switches the static demonstration states. No network, no timers.
+     ============================================================ -->
+<div class="proto-bar">
+  <span class="proto-bar__label">DESIGN PROTOTYPE — NOT LIVE DATA</span>
+  <div class="proto-bar__group" role="group" aria-label="Prototype state">
+    <button type="button" data-set-state="healthy" aria-pressed="true">Healthy</button>
+    <button type="button" data-set-state="attention" aria-pressed="false">Attention</button>
+    <button type="button" data-set-state="empty" aria-pressed="false">Empty</button>
+  </div>
+  <div class="proto-bar__group" role="group" aria-label="Reading direction">
+    <button type="button" data-set-dir="ltr" aria-pressed="true">LTR</button>
+    <button type="button" data-set-dir="rtl" aria-pressed="false">RTL</button>
+  </div>
+</div>
+
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.3 2.3 4.7-5.2"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4L2.8 20h18.4L12 4z"/><path d="M12 10v4.5"/><circle cx="12" cy="17.2" r="0.4"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M7 11V6.5a1.5 1.5 0 013 0V11m0-5.5v-1a1.5 1.5 0 013 0V11m0-5v1.5a1.5 1.5 0 013 0V12m0-3.5v6.3c0 3.4-2 5.7-5.3 5.7-2.6 0-3.9-1.2-5.2-3.5L4 13.6c-.6-1-.3-2 .6-2.4.8-.4 1.7 0 2.4 1V11"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5m6-5v5M7 8h10v3a5 5 0 01-5 5 5 5 0 01-5-5V8zm5 8v5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6l6 6-6 6"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.6M20 4v4h-4"/></symbol>
+</svg>
+
+<div class="sc360" id="surface" dir="ltr">
+  <div class="sc360__inner">
+
+    <!-- ================= A. SHARED HEADER ================= -->
+    <header class="sc-head">
+      <div class="sc-head__id">
+        <h1>Shopify Store 360</h1>
+        <p class="sc-head__sub">Sales performance and connector health</p>
+      </div>
+      <div class="sc-head__controls">
+        <label class="sc-note" for="store-sel-single" data-states="healthy empty">Store</label>
+        <select class="sc-select" id="store-sel-single" data-states="healthy empty"
+                aria-describedby="proto-static-note">
+          <option selected>Aurora Home Goods</option>
+          <option>Aurora Outlet</option>
+          <option>All stores</option>
+        </select>
+        <label class="sc-note" for="store-sel-all" data-states="attention">Store</label>
+        <select class="sc-select" id="store-sel-all" data-states="attention"
+                aria-describedby="proto-static-note">
+          <option>Aurora Home Goods</option>
+          <option>Aurora Outlet</option>
+          <option selected>All stores</option>
+        </select>
+        <div class="sc-seg" role="group" aria-label="Reporting period">
+          <button type="button" aria-pressed="false" aria-describedby="proto-static-note">24 hours</button>
+          <button type="button" aria-pressed="true" aria-describedby="proto-static-note">7 days</button>
+          <button type="button" aria-pressed="false" aria-describedby="proto-static-note">30 days</button>
+        </div>
+        <button type="button" class="sc-btn" aria-describedby="proto-static-note">
+          <svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+      <p class="sc-head__meta">
+        <span>Updated 09:14</span><span class="sep" aria-hidden="true">·</span>
+        <span>Compared with the previous 7 days</span><span class="sep" aria-hidden="true">·</span>
+        <span data-states="healthy attention">Sales data synchronized through <b>09:12</b></span>
+        <span data-states="empty">Sales data not synchronized yet</span>
+        <span class="sep" aria-hidden="true">·</span>
+        <span>Scheduled sync: <b data-states="healthy attention">on</b><b data-states="empty">off</b></span>
+      </p>
+      <span id="proto-static-note" hidden>Prototype control — the demonstration data is static.</span>
+    </header>
+
+    <!-- ================= B. CRITICAL STATUS (attention only) ================= -->
+    <section aria-label="Critical status" data-states="attention">
+      <div class="sc-critical" role="note">
+        <svg class="ic ic--lg" aria-hidden="true"><use href="#i-plug"/></svg>
+        <div class="sc-critical__body">
+          <div class="sc-critical__title">Aurora Outlet needs reconnecting — sales figures below may be incomplete.</div>
+          <div class="sc-critical__why">Shopify no longer accepts the saved credentials. 12 orders are waiting to
+            import and 3 order imports stopped after repeated failures, so this page understates recent sales
+            for Aurora Outlet.</div>
+        </div>
+        <button type="button" class="sc-btn">
+          <span>Review</span>
+          <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= C. STORE PERFORMANCE — healthy ================= -->
+    <section aria-label="Store performance" data-states="healthy">
+      <div class="sc-kpis">
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Imported Shopify sales</span>
+          <span class="sc-kpi__value">€18,432.50</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +12.4% vs previous 7 days</span>
+          <span class="sc-kpi__def">Incl. taxes &amp; shipping · excludes cancelled orders · not Shopify “net sales”:
+            refunds and edits are never imported. <button type="button" class="sc-lnk">Open orders</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Imported orders</span>
+          <span class="sc-kpi__value">214</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +9.7% vs previous 7 days</span>
+          <span class="sc-kpi__def">Shopify orders imported into Odoo in the period.
+            <button type="button" class="sc-lnk">Open orders</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Average imported order value</span>
+          <span class="sc-kpi__value">€86.13</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +2.4% vs previous 7 days</span>
+          <span class="sc-kpi__def">Imported sales ÷ imported orders. Shows “—” when there are no orders.</span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Units sold</span>
+          <span class="sc-kpi__value">507</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +11.2% vs previous 7 days</span>
+          <span class="sc-kpi__def">Product units on imported orders. Shipping and adjustment lines excluded.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= C. STORE PERFORMANCE — attention ================= -->
+    <section aria-label="Store performance" data-states="attention">
+      <div class="sc-kpis">
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Imported Shopify sales</span>
+          <span class="sc-kpi__value">€24,910.80</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +4.1% vs previous 7 days</span>
+          <span class="sc-kpi__flag"><span class="sc-dot" aria-hidden="true"></span> May be incomplete — see the note above</span>
+          <span class="sc-kpi__def">All stores (EUR) · incl. taxes &amp; shipping · excludes cancelled orders.
+            <button type="button" class="sc-lnk">Open orders</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Imported orders</span>
+          <span class="sc-kpi__value">289</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +3.2% vs previous 7 days</span>
+          <span class="sc-kpi__flag"><span class="sc-dot" aria-hidden="true"></span> 12 more awaiting import</span>
+          <span class="sc-kpi__def">Shopify orders imported into Odoo in the period.
+            <button type="button" class="sc-lnk">Open orders</button></span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Average imported order value</span>
+          <span class="sc-kpi__value">€86.20</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +0.9% vs previous 7 days</span>
+          <span class="sc-kpi__def">Imported sales ÷ imported orders. Shows “—” when there are no orders.</span>
+        </div>
+        <div class="sc-kpi">
+          <span class="sc-kpi__label">Units sold</span>
+          <span class="sc-kpi__value">683</span>
+          <span class="sc-kpi__delta sc-kpi__delta--up">▲ +2.8% vs previous 7 days</span>
+          <span class="sc-kpi__def">Product units on imported orders. Shipping and adjustment lines excluded.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= G. DATA-COMPLETENESS BRIDGE ================= -->
+    <section aria-label="Sales data completeness" data-states="healthy">
+      <p class="sc-bridge">
+        <span class="sc-bridge__state sc-bridge__state--ok">
+          <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Complete &amp; current
+        </span>
+        <span class="sc-bridge__text">Sales data synchronized through <b>today 09:12</b> ·
+          0 orders awaiting import · 0 order imports need attention.</span>
+      </p>
+    </section>
+    <section aria-label="Sales data completeness" data-states="attention">
+      <p class="sc-bridge">
+        <span class="sc-bridge__state sc-bridge__state--bad">
+          <svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Incomplete — action needed
+        </span>
+        <span class="sc-bridge__text">Sales data synchronized through <b>today 07:41</b> ·
+          <button type="button" class="sc-lnk">12 orders awaiting import</button> ·
+          <button type="button" class="sc-lnk">3 order imports need attention</button>.</span>
+      </p>
+    </section>
+
+    <!-- ================= D + E. SALES TREND + TOP PRODUCTS — healthy ================= -->
+    <div class="sc-salesrow" data-states="healthy">
+      <section class="sc-card sc-chart" aria-label="Sales performance trend">
+        <h2 class="sc-h2">Sales trend</h2>
+        <div class="sc-chart__legend">
+          <span class="item"><span class="sc-chart__swatch" aria-hidden="true"></span> This period (daily imported sales)</span>
+          <span class="item"><span class="sc-chart__swatch sc-chart__swatch--line" aria-hidden="true"></span> Previous 7 days</span>
+        </div>
+        <svg class="sc-chart-svg" viewBox="0 0 640 230" role="img"
+             aria-label="Daily imported sales, 26 July to 1 August: total €18,432.50, peaking at €3,187.90 on 29 July; previous 7 days €16,398.71. Full figures in the table below.">
+          <g stroke="#E4E7EC" stroke-width="1">
+            <line x1="40" y1="178" x2="632" y2="178"/>
+            <line x1="40" y1="128" x2="632" y2="128"/>
+            <line x1="40" y1="78"  x2="632" y2="78"/>
+            <line x1="40" y1="28"  x2="632" y2="28"/>
+          </g>
+          <g fill="#475467" font-size="11" text-anchor="end">
+            <text x="34" y="181">€0</text>
+            <text x="34" y="131">€1k</text>
+            <text x="34" y="81">€2k</text>
+            <text x="34" y="31">€3k</text>
+          </g>
+          <g fill="var(--sc-chart-current)">
+            <rect x="62"  y="67.5" width="40" height="110.5" rx="3"/>
+            <rect x="146" y="41.7" width="40" height="136.3" rx="3"/>
+            <rect x="231" y="57.9" width="40" height="120.1" rx="3"/>
+            <rect x="315" y="18.6" width="40" height="159.4" rx="3"/>
+            <rect x="399" y="45.7" width="40" height="132.3" rx="3"/>
+            <rect x="484" y="32.3" width="40" height="145.7" rx="3"/>
+            <rect x="568" y="60.6" width="40" height="117.4" rx="3"/>
+          </g>
+          <text x="335" y="12" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€3,187.90</text>
+          <polyline fill="none" stroke="var(--sc-chart-reference)" stroke-width="2" stroke-dasharray="6 4"
+                    points="82,69 166,60.5 251,63.5 335,52.25 419,67.75 504,57.5 588,55.6"/>
+          <g fill="#475467" font-size="11" text-anchor="middle">
+            <text x="82"  y="196">26</text><text x="166" y="196">27</text><text x="251" y="196">28</text>
+            <text x="335" y="196">29</text><text x="419" y="196">30</text><text x="504" y="196">31</text>
+            <text x="588" y="196">1 Aug</text>
+          </g>
+        </svg>
+        <p class="sc-note sc-chart__caption">Days follow your Odoo timezone. Shopify Analytics buckets by the shop’s
+          timezone, so daily figures can differ there.</p>
+        <details>
+          <summary>View as table</summary>
+          <div class="sc-table-wrap">
+            <table class="sc-table">
+              <caption>Daily imported sales and orders, 26 July – 1 August, with the previous period.</caption>
+              <thead><tr><th scope="col">Day</th><th scope="col" class="num">Sales</th>
+                <th scope="col" class="num">Orders</th><th scope="col" class="num">Previous period</th></tr></thead>
+              <tbody>
+                <tr><td>Sun 26 Jul</td><td class="num">€2,210.40</td><td class="num">26</td><td class="num">€2,180.00</td></tr>
+                <tr><td>Mon 27 Jul</td><td class="num">€2,725.10</td><td class="num">31</td><td class="num">€2,350.00</td></tr>
+                <tr><td>Tue 28 Jul</td><td class="num">€2,402.30</td><td class="num">28</td><td class="num">€2,290.00</td></tr>
+                <tr><td>Wed 29 Jul</td><td class="num">€3,187.90</td><td class="num">38</td><td class="num">€2,515.00</td></tr>
+                <tr><td>Thu 30 Jul</td><td class="num">€2,646.00</td><td class="num">30</td><td class="num">€2,205.00</td></tr>
+                <tr><td>Fri 31 Jul</td><td class="num">€2,913.60</td><td class="num">34</td><td class="num">€2,410.00</td></tr>
+                <tr><td>Sat 1 Aug</td><td class="num">€2,347.20</td><td class="num">27</td><td class="num">€2,448.71</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="sc-card" aria-label="Top products">
+        <h2 class="sc-h2">Top products</h2>
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <caption>Top 5 by imported product sales (excl. tax &amp; shipping), share of €17,290.00.</caption>
+            <thead><tr><th scope="col">Product</th><th scope="col" class="num">Units</th>
+              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share</th></tr></thead>
+            <tbody>
+              <tr><td><button type="button" class="sc-lnk">Linen Cushion Cover</button></td><td class="num">84</td><td class="num">€2,436.00</td><td class="num">14.1%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Oak Serving Board</button></td><td class="num">46</td><td class="num">€1,978.00</td><td class="num">11.4%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Ceramic Vase “Mist”</button></td><td class="num">38</td><td class="num">€1,634.00</td><td class="num">9.5%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Wool Throw Blanket</button></td><td class="num">22</td><td class="num">€1,518.00</td><td class="num">8.8%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Glass Carafe Set</button></td><td class="num">31</td><td class="num">€1,147.00</td><td class="num">6.6%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= D + E. SALES TREND + TOP PRODUCTS — attention ================= -->
+    <div class="sc-salesrow" data-states="attention">
+      <section class="sc-card sc-chart" aria-label="Sales performance trend">
+        <h2 class="sc-h2">Sales trend</h2>
+        <div class="sc-chart__legend">
+          <span class="item"><span class="sc-chart__swatch" aria-hidden="true"></span> This period (daily imported sales)</span>
+          <span class="item"><span class="sc-chart__swatch sc-chart__swatch--line" aria-hidden="true"></span> Previous 7 days</span>
+        </div>
+        <svg class="sc-chart-svg" viewBox="0 0 640 230" role="img"
+             aria-label="Daily imported sales, all stores, 26 July to 1 August: total €24,910.80, peaking at €4,270.20 on 29 July; previous 7 days €23,929.68. 1 August may still rise: 12 orders are awaiting import. Full figures in the table below.">
+          <g stroke="#E4E7EC" stroke-width="1">
+            <line x1="40" y1="178" x2="632" y2="178"/>
+            <line x1="40" y1="141.6" x2="632" y2="141.6"/>
+            <line x1="40" y1="105.3" x2="632" y2="105.3"/>
+            <line x1="40" y1="68.9" x2="632" y2="68.9"/>
+            <line x1="40" y1="32.5" x2="632" y2="32.5"/>
+          </g>
+          <g fill="#475467" font-size="11" text-anchor="end">
+            <text x="34" y="181">€0</text>
+            <text x="34" y="144.6">€1k</text>
+            <text x="34" y="108.3">€2k</text>
+            <text x="34" y="71.9">€3k</text>
+            <text x="34" y="35.5">€4k</text>
+          </g>
+          <g fill="var(--sc-chart-current)">
+            <rect x="62"  y="70.7" width="40" height="107.3" rx="3"/>
+            <rect x="146" y="46.0" width="40" height="132.0" rx="3"/>
+            <rect x="231" y="61.3" width="40" height="116.7" rx="3"/>
+            <rect x="315" y="22.7" width="40" height="155.3" rx="3"/>
+            <rect x="399" y="48.7" width="40" height="129.3" rx="3"/>
+            <rect x="484" y="35.3" width="40" height="142.7" rx="3"/>
+          </g>
+          <rect x="568" y="55.6" width="40" height="122.4" rx="3"
+                fill="var(--sc-chart-current)" fill-opacity="0.55"
+                stroke="var(--sc-chart-current)" stroke-width="1.5" stroke-dasharray="4 3"/>
+          <text x="335" y="16" fill="#1F2937" font-size="11" font-weight="600" text-anchor="middle">€4,270.20</text>
+          <polyline fill="none" stroke="var(--sc-chart-reference)" stroke-width="2" stroke-dasharray="6 4"
+                    points="82,58 166,54.7 251,54 335,52.2 419,54.2 504,51.5 588,51.3"/>
+          <g fill="#475467" font-size="11" text-anchor="middle">
+            <text x="82"  y="196">26</text><text x="166" y="196">27</text><text x="251" y="196">28</text>
+            <text x="335" y="196">29</text><text x="419" y="196">30</text><text x="504" y="196">31</text>
+            <text x="588" y="196">1 Aug</text>
+          </g>
+        </svg>
+        <p class="sc-note sc-chart__caption">The hatched bar for 1 August may still rise — 12 orders are awaiting
+          import. Days follow your Odoo timezone.</p>
+        <details>
+          <summary>View as table</summary>
+          <div class="sc-table-wrap">
+            <table class="sc-table">
+              <caption>Daily imported sales and orders (all stores), 26 July – 1 August, with the previous period.</caption>
+              <thead><tr><th scope="col">Day</th><th scope="col" class="num">Sales</th>
+                <th scope="col" class="num">Orders</th><th scope="col" class="num">Previous period</th></tr></thead>
+              <tbody>
+                <tr><td>Sun 26 Jul</td><td class="num">€2,950.10</td><td class="num">35</td><td class="num">€3,300.00</td></tr>
+                <tr><td>Mon 27 Jul</td><td class="num">€3,630.90</td><td class="num">41</td><td class="num">€3,390.00</td></tr>
+                <tr><td>Tue 28 Jul</td><td class="num">€3,210.40</td><td class="num">39</td><td class="num">€3,410.00</td></tr>
+                <tr><td>Wed 29 Jul</td><td class="num">€4,270.20</td><td class="num">52</td><td class="num">€3,460.00</td></tr>
+                <tr><td>Thu 30 Jul</td><td class="num">€3,556.80</td><td class="num">43</td><td class="num">€3,405.00</td></tr>
+                <tr><td>Fri 31 Jul</td><td class="num">€3,925.30</td><td class="num">45</td><td class="num">€3,480.00</td></tr>
+                <tr><td>Sat 1 Aug (incomplete)</td><td class="num">€3,367.10</td><td class="num">34</td><td class="num">€3,484.68</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="sc-card" aria-label="Top products">
+        <h2 class="sc-h2">Top products</h2>
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <caption>Top 5 by imported product sales (excl. tax &amp; shipping), all stores, share of €23,400.00.</caption>
+            <thead><tr><th scope="col">Product</th><th scope="col" class="num">Units</th>
+              <th scope="col" class="num">Sales</th><th scope="col" class="num">Share</th></tr></thead>
+            <tbody>
+              <tr><td><button type="button" class="sc-lnk">Linen Cushion Cover</button></td><td class="num">112</td><td class="num">€3,248.00</td><td class="num">13.9%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Oak Serving Board</button></td><td class="num">61</td><td class="num">€2,623.00</td><td class="num">11.2%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Ceramic Vase “Mist”</button></td><td class="num">54</td><td class="num">€2,322.00</td><td class="num">9.9%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Wool Throw Blanket</button></td><td class="num">30</td><td class="num">€2,070.00</td><td class="num">8.8%</td></tr>
+              <tr><td><button type="button" class="sc-lnk">Glass Carafe Set</button></td><td class="num">40</td><td class="num">€1,480.00</td><td class="num">6.3%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ================= EMPTY STATE — sales region ================= -->
+    <section aria-label="Store performance" data-states="empty">
+      <div class="sc-empty-card">
+        <h2>Order import hasn’t run for this store yet</h2>
+        <p class="sc-note">Sales figures appear here once Shopify orders are imported into Odoo. Nothing is wrong —
+          this store’s order import simply isn’t enabled yet.</p>
+        <ol>
+          <li>An administrator enables order import in Store Settings.</li>
+          <li>The first scan discovers orders from the last 30 days. Older history needs an
+            administrator-run backfill.</li>
+          <li>Sales figures and the trend appear here as orders land.</li>
+        </ol>
+        <button type="button" class="sc-btn">
+          <span>Open Store Settings</span>
+          <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <section aria-label="Prototype annotation" data-states="empty">
+      <div class="proto-annotation">
+        <span class="proto-annotation__tag">PROTOTYPE ANNOTATION — the three empty-state variants</span>
+        <div class="variant">
+          <b>1 · No sales in this period</b>
+          Connector healthy and data current, but zero orders in the window: the sales cards show €0.00 / 0 / — / 0
+          with the bridge reading “Complete &amp; current”, and the trend area says
+          “No sales in this period.” Nothing is dimmed or alarmed.
+        </div>
+        <div class="variant">
+          <b>2 · Sales data not synchronized yet (shown above)</b>
+          Order import disabled or never run: no fake zeros — the sales region is replaced by the guided card,
+          while connector health below stays fully visible.
+        </div>
+        <div class="variant">
+          <b>3 · History or permissions limit</b>
+          Period older than the imported history: “Orders before 2 July were not imported (import window 30 days —
+          administrators can run a backfill).” If the viewer’s role cannot read sales amounts:
+          “Your role can’t read sales amounts — connector health is unaffected.” Never rendered as €0.00.
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= F. CONNECTOR HEALTH — healthy ================= -->
+    <section class="sc-card" aria-label="Connector health" data-states="healthy">
+      <h2 class="sc-h2">Connector health</h2>
+      <p class="sc-ops__lead">
+        <span class="state state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> All systems normal</span>
+        <span class="quiet">API: normal · Last successful processing 09:12 · Scheduled sync on · 1 store connected</span>
+      </p>
+      <div class="sc-counters">
+        <div class="sc-counter"><span class="sc-counter__label">Active backlog</span>
+          <span class="sc-counter__value">3</span><span class="sc-note">queued or retrying</span></div>
+        <div class="sc-counter"><span class="sc-counter__label">Oldest waiting item</span>
+          <span class="sc-counter__value">4 min</span><span class="sc-note">queue is moving</span></div>
+        <div class="sc-counter"><span class="sc-counter__label">Needs review</span>
+          <span class="sc-counter__value">0</span><span class="sc-note">no human decisions waiting</span></div>
+        <div class="sc-counter"><span class="sc-counter__label">Final failures</span>
+          <span class="sc-counter__value">0</span><span class="sc-note">nothing stopped permanently</span></div>
+      </div>
+
+      <div class="sc-flows" role="table" aria-label="Flow health">
+        <div class="sc-flow sc-flow__head" role="row" aria-hidden="true">
+          <span>Flow</span><span>Status</span><span>Last success</span><span>Backlog</span><span>Failed / blocked</span><span></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Orders</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Imported through 09:12</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>1</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Catalog</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Yesterday 23:40</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Inventory</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Push scan 08:55</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>2</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Product export</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Applied Tue 14:05</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Fulfillment</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Reconciled 08:30</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+      </div>
+
+      <p class="sc-affirm" style="margin-block-start: var(--sc-space-3);">
+        <svg class="ic" aria-hidden="true"><use href="#i-check"/></svg>
+        All clear — nothing needs your attention right now.
+      </p>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">Recent activity</h3>
+      <div class="sc-activity">
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Order import · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">2 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Inventory push · Aurora Home Goods · Odoo event</span>
+          <span class="sc-activity__meta">9 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Order scan · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">14 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Fulfillment reconciliation · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">44 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--neutral">Skipped</span>
+          <span class="sc-activity__text">Order import · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">1 h ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Catalog scan · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">9 h ago</span></div>
+      </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-2);">
+        Last 7 days: 1,284 succeeded, 2 failed. Automatic checks run on a schedule — last activity 2 min ago.</p>
+    </section>
+
+    <!-- ================= F. CONNECTOR HEALTH — attention ================= -->
+    <section class="sc-card" aria-label="Connector health" data-states="attention">
+      <h2 class="sc-h2">Connector health</h2>
+      <p class="sc-ops__lead">
+        <span class="state state--bad"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> 8 items need your attention</span>
+        <span class="quiet">API: normal · Last successful processing 09:11 · Scheduled sync on · 1 of 2 stores connected</span>
+      </p>
+      <div class="sc-counters">
+        <div class="sc-counter"><span class="sc-counter__label">Active backlog</span>
+          <span class="sc-counter__value">27</span><span class="sc-note">queued or retrying</span></div>
+        <div class="sc-counter sc-counter--warn"><span class="sc-counter__label">Oldest waiting item</span>
+          <span class="sc-counter__value">3 h 12 min</span><span class="sc-note">queue is delayed</span></div>
+        <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">Needs review</span>
+          <span class="sc-counter__value">4</span><span class="sc-note">2 match decisions · 2 uncertain changes</span></div>
+        <div class="sc-counter sc-counter--bad"><span class="sc-counter__label">Final failures</span>
+          <span class="sc-counter__value">3</span><span class="sc-note">stopped after repeated failures</span></div>
+      </div>
+
+      <div class="sc-flows" role="table" aria-label="Flow health">
+        <div class="sc-flow sc-flow__head" role="row" aria-hidden="true">
+          <span>Flow</span><span>Status</span><span>Last success</span><span>Backlog</span><span>Failed / blocked</span><span></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Orders</span>
+          <span class="sc-state sc-state--bad" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Failing</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Imported through 07:41</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>14</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>3</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Catalog</span>
+          <span class="sc-state sc-state--decide" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-hand"/></svg> Needs decision</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Today 06:58</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>2</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>2</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Inventory</span>
+          <span class="sc-state sc-state--warn" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Delayed</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Push scan 05:12</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>9</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Product export</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Applied Tue 14:05</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Fulfillment</span>
+          <span class="sc-state sc-state--ok" role="cell"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> On track</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">Reconciled 08:32</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>1</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+      </div>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">Needs your attention</h3>
+      <div class="sc-attn">
+        <div class="sc-exception sc-exception--warning">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-plug"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Aurora Outlet needs reconnecting</div>
+            <div class="sc-exception__why">Shopify no longer accepts the saved credentials — reconnect to resume
+              importing. Until then this store’s orders, stock and fulfillment stay frozen.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">1</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--technical">Connection</span>
+              <span class="sc-owner-chip">Owner: Administrator</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--danger">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-alert"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Order imports stopped after repeated failures</div>
+            <div class="sc-exception__why">These stopped retrying — review the reason to get them moving again.
+              Each one is a Shopify order that is missing from the sales figures above.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">3</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--technical">Technical failure</span>
+              <span class="sc-owner-chip">Owner: Operator</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+        <div class="sc-exception sc-exception--danger">
+          <svg class="ic sc-exception__icon" aria-hidden="true"><use href="#i-hand"/></svg>
+          <div class="sc-exception__main">
+            <div class="sc-exception__title">Waiting on a decision</div>
+            <div class="sc-exception__why">2 product match decisions and 2 uncertain changes need a human ruling.
+              These are decisions for a reviewer — not a system failure.</div>
+            <div class="sc-exception__meta">
+              <span class="sc-exception__count">4</span><span>·</span>
+              <span class="sc-kind-chip sc-kind-chip--decision">Human decision</span>
+              <span class="sc-owner-chip">Owner: Reviewer / Administrator</span>
+            </div>
+          </div>
+          <button type="button" class="sc-btn"><span>Review</span>
+            <svg class="ic ic--arrow" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        </div>
+      </div>
+
+      <h3 class="sc-h2" style="margin-block-start: var(--sc-space-4);">Recent activity</h3>
+      <div class="sc-activity">
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Order import · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">3 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Order scan · Aurora Home Goods · Scheduled sync</span>
+          <span class="sc-activity__meta">8 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">Failed</span>
+          <span class="sc-activity__text">Order import · Aurora Outlet · Scheduled sync</span>
+          <span class="sc-activity__meta">12 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">Failed</span>
+          <span class="sc-activity__text">Order import · Aurora Outlet · Scheduled sync</span>
+          <span class="sc-activity__meta">26 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--success">Done</span>
+          <span class="sc-activity__text">Inventory push · Aurora Home Goods · Odoo event</span>
+          <span class="sc-activity__meta">31 min ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--neutral">Cancelled</span>
+          <span class="sc-activity__text">Product export apply · Aurora Outlet · Manual sync</span>
+          <span class="sc-activity__meta">2 h ago</span></div>
+        <div class="sc-activity__item"><span class="sc-badge sc-badge--danger">Failed</span>
+          <span class="sc-activity__text">Order import · Aurora Outlet · Scheduled sync</span>
+          <span class="sc-activity__meta">3 h ago</span></div>
+      </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-2);">
+        Last 7 days: 1,231 succeeded, 9 failed. Automatic checks run on a schedule — last activity 3 min ago.</p>
+    </section>
+
+    <!-- ================= F. CONNECTOR HEALTH — empty ================= -->
+    <section class="sc-card" aria-label="Connector health" data-states="empty">
+      <h2 class="sc-h2">Connector health</h2>
+      <p class="sc-ops__lead">
+        <span class="state state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Connected — no sync activity yet</span>
+        <span class="quiet">API: normal · Store connected · Order import not enabled</span>
+      </p>
+      <div class="sc-flows" role="table" aria-label="Flow health">
+        <div class="sc-flow sc-flow__head" role="row" aria-hidden="true">
+          <span>Flow</span><span>Status</span><span>Last success</span><span>Backlog</span><span>Failed / blocked</span><span></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Orders</span>
+          <span class="sc-state sc-state--none" role="cell">Not enabled</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">—</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Catalog</span>
+          <span class="sc-state sc-state--none" role="cell">No activity yet</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">—</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Inventory</span>
+          <span class="sc-state sc-state--none" role="cell">No activity yet</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">—</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Product export</span>
+          <span class="sc-state sc-state--none" role="cell">No activity yet</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">—</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+        <div class="sc-flow" role="row">
+          <span class="sc-flow__name" role="cell">Fulfillment</span>
+          <span class="sc-state sc-state--none" role="cell">No activity yet</span>
+          <span class="sc-flow__cell cell-last" role="cell" data-label="Last success">—</span>
+          <span class="sc-flow__cell cell-backlog" role="cell" data-label="Backlog"><b>0</b></span>
+          <span class="sc-flow__cell cell-fail" role="cell" data-label="Failed / blocked"><b>0</b></span>
+          <span class="cell-action" role="cell"><button type="button" class="sc-lnk">Open</button></span>
+        </div>
+      </div>
+      <p class="sc-note" style="margin-block-start: var(--sc-space-3);">
+        No sync activity yet. When syncing starts, recent activity appears here.</p>
+    </section>
+
+    <!-- ================= H. MULTI-STORE (attention only) ================= -->
+    <section class="sc-card sc-stores" aria-label="Store health" data-states="attention">
+      <h2 class="sc-h2">Stores</h2>
+      <div class="sc-table-wrap">
+        <table class="sc-table">
+          <caption>Per-store health and sales for the selected period. Both stores sell in EUR.</caption>
+          <thead>
+            <tr><th scope="col">Store</th><th scope="col">Connection</th><th scope="col">Last successful activity</th>
+              <th scope="col" class="num">Backlog</th><th scope="col" class="num">Attention</th>
+              <th scope="col" class="num">Sales (7 days)</th><th scope="col"></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Aurora Home Goods</td>
+              <td><span class="sc-state sc-state--ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Connected</span></td>
+              <td>Today 09:12</td>
+              <td class="num">6</td>
+              <td class="num">0</td>
+              <td class="num">€18,432.50</td>
+              <td><button type="button" class="sc-lnk">Open</button></td>
+            </tr>
+            <tr>
+              <td>Aurora Outlet</td>
+              <td><span class="sc-state sc-state--bad"><svg class="ic" aria-hidden="true"><use href="#i-plug"/></svg> Reconnect needed</span></td>
+              <td>Today 07:41</td>
+              <td class="num">21</td>
+              <td class="num">7</td>
+              <td class="num">€6,478.30</td>
+              <td><button type="button" class="sc-lnk">Open</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="sc-foot">
+      <span>DESIGN PROTOTYPE — NOT LIVE DATA</span>
+      <span>Static demonstration data · no network requests · no external assets</span>
+      <span>Shopify Store 360 concept · 2026-08-01</span>
+    </footer>
+
+  </div>
+</div>
+
+<script>
+// Prototype-only state switcher. Deterministic: no network, no timers, no
+// randomness. Reads an optional location hash once at load so screenshot
+// automation can address a state directly (#healthy, #attention, #empty,
+// each optionally suffixed with -rtl).
+(function () {
+    "use strict";
+    var surface = document.getElementById("surface");
+
+    function setState(name) {
+        document.body.dataset.state = name;
+        document.querySelectorAll("[data-set-state]").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.dataset.setState === name));
+        });
+    }
+    function setDir(dir) {
+        surface.setAttribute("dir", dir);
+        document.querySelectorAll("[data-set-dir]").forEach(function (b) {
+            b.setAttribute("aria-pressed", String(b.dataset.setDir === dir));
+        });
+    }
+
+    document.querySelectorAll("[data-set-state]").forEach(function (b) {
+        b.addEventListener("click", function () { setState(b.dataset.setState); });
+    });
+    document.querySelectorAll("[data-set-dir]").forEach(function (b) {
+        b.addEventListener("click", function () { setDir(b.dataset.setDir); });
+    });
+
+    var hash = (location.hash || "").replace("#", "");
+    if (hash) {
+        var rtl = /-rtl$/.test(hash);
+        var state = hash.replace(/-rtl$/, "");
+        if (["healthy", "attention", "empty"].indexOf(state) !== -1) { setState(state); }
+        if (rtl) { setDir("rtl"); }
+    }
+}());
+</script>
+</body>
+</html>
