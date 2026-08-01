@@ -144,9 +144,15 @@ describe("shopify connector dashboard", () => {
             commercial: { available: false, reason: "no_permission" },
         }));
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc360-no-permission").toHaveCount(1);
+        // Notes are PER SECTION by design: the default payload also carries a
+        // no-permission lifecycle section, so scope the assertions to the
+        // commercial section this test is about.
+        expect(".sc360-commercial .sc360-no-permission").toHaveCount(1);
+        expect(".sc360-lifecycle .sc360-no-permission").toHaveCount(1);
         expect(".sc360-kpi").toHaveCount(0);
-        expect(queryText(".sc360-no-permission")).toInclude("connector health is unaffected");
+        expect(queryText(".sc360-commercial .sc360-no-permission")).toInclude(
+            "connector health is unaffected"
+        );
     });
 
     test("clicking the orders KPI opens the server-built native action verbatim", async () => {
