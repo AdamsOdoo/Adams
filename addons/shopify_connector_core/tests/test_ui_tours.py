@@ -11,6 +11,10 @@
 
 from odoo.tests.common import HttpCase, new_test_user, tagged
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
+    SHOPIFY_API_VERSION,
+)
+
 
 @tagged('post_install', '-at_install', 'shopify_connector_u0')
 class TestUiTours(HttpCase):
@@ -22,6 +26,19 @@ class TestUiTours(HttpCase):
             password='u0_tour_auditor',
             groups='base.group_user,shopify_connector_core.group_shopify_connector_auditor',
         )
+        # Store 360: a connected store takes the dashboard out of the
+        # first-run empty state so the tour can assert the 360 shell
+        # (period filter, page-updated timestamp, health region, flow
+        # table) and the Sync Operations Analysis surface. Core-only
+        # fixture — commercial regions are driven in the sale module's
+        # browser tours, where order fixtures exist.
+        self.env['shopify.connector.store'].sudo().create({
+            'name': 'U0 Tour Store',
+            'shop_domain': 'u0-tour-store.myshopify.com',
+            'api_version': SHOPIFY_API_VERSION,
+            'state': 'connected',
+            'credential_present': True,
+        })
         self.start_tour('/odoo', 'shopify_connector_u0_nav_tour', login='u0_tour_auditor')
 
     def test_u2_navigation_tour(self):

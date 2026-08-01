@@ -27,3 +27,12 @@ from . import test_tax_mapping_race
 from . import test_batch2_correction_at_any_head
 from . import test_batch2_journeys_sale
 from . import test_ui_b2_sale_tours
+
+# Store 360 slice 1 (final pre-UAT implementation session, 2026-08-01):
+# the protected sale-order projection, the rule-respecting aggregate
+# sections, the adversarial record-rule suite and the generation-bound
+# order catch-up.
+from . import test_sale_order_projection
+from . import test_store360_aggregates
+from . import test_store360_security
+from . import test_order_reconnect_catchup

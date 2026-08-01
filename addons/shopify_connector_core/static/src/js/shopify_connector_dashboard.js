@@ -1,15 +1,22 @@
 /** @odoo-module **/
-// Part of the Shopify Connector (U0 operator UI foundation).
+// Part of the Shopify Connector (U0 foundation → Store 360, spec
+// docs/02-product/ui-operations-360-dashboard-spec-2026-08-01.md).
 //
-// The operational dashboard: the single bounded Owl client action in U0. It
-// stays inside the Odoo web client (standard action + ORM services, standard
-// menus/breadcrumbs); it is not an SPA, has no custom router, no parallel
-// state store, and no client-side list re-implementation. It reads ONLY the
-// read-only aggregate service `shopify.connector.ui.dashboard.get_dashboard_data`
-// and navigates to native filtered lists via the action service.
+// The Shopify Store 360 dashboard: sales performance + connector health in
+// the single bounded Owl client action registered under the ORIGINAL
+// `shopify_connector_dashboard` tag (navigation compatibility preserved).
+// It stays inside the Odoo web client (standard action + ORM services,
+// standard menus/breadcrumbs); it is not an SPA, has no custom router, no
+// parallel state store, and no client-side list re-implementation. It reads
+// ONLY the read-only aggregate service
+// `shopify.connector.ui.dashboard.get_store_360_data` and navigates to
+// native filtered lists through SERVER-BUILT targets — the client never
+// constructs a domain, model name or action id of its own (task §7).
 //
-// Auto-refresh is never faster than 30s and is paused while the browser tab is
-// hidden (PB-12 / WCAG 2.2.2).
+// Auto-refresh is never faster than 30s and is paused while the browser tab
+// is hidden (PB-12 / WCAG 2.2.2). A page refresh updates "Page updated" and
+// must NEVER advance the Shopify-source timestamps — those come from the
+// completion stamps the backend promotes (spec §9.1/§9.5).
 
 import { Component, useState, onWillStart, onMounted, onWillUnmount } from "@odoo/owl";
 import { registry } from "@web/core/registry";
@@ -20,8 +27,8 @@ import { localization } from "@web/core/l10n/localization";
 // `localization` is a Proxy that THROWS for any parameter not yet loaded
 // (`web/static/src/core/l10n/localization.js`), so reading it before the
 // localization service has resolved would stop this component mounting. A
-// surface must never fail to render over a locale parameter, and "ltr" is the
-// documented default.
+// surface must never fail to render over a locale parameter, and "ltr" is
+// the documented default.
 function localeDirection() {
     try {
         return localization.direction || "ltr";
@@ -37,33 +44,21 @@ export class ShopifyConnectorDashboard extends Component {
     setup() {
         this.orm = useService("orm");
         this.action = useService("action");
-        // RTL: bind the reading direction to the USER'S LOCALE, not to the
-        // content. `dir="auto"` resolves from the first strong character of
-        // what is on screen, so an Arabic operator reading English
-        // operational data got `ltr` and every logical property in the
-        // stylesheet resolved LTR-ward.
-        //
-        // Odoo 19's backend sets no `dir` ATTRIBUTE on `<html>` or `<body>`.
-        // It sets the CSS `direction` PROPERTY instead, on inner containers
-        // (`webclient_layout.scss` lines 22/73/84 at the pinned 30bde9ff),
-        // expressly so rtlcss can flip it -- Odoo's own comment there says
-        // so. Binding `dir` on this root is therefore belt-and-braces rather
-        // than a substitute for Odoo's mechanism: it makes this component's
-        // logical properties resolve correctly from the user's locale
-        // without depending on the asset pipeline having produced a flipped
-        // bundle.
-        //
-        // A correction to what this comment previously said: it claimed
-        // `direction` "was never set" by Odoo. That was measured in an
-        // environment where the `rtlcss` binary was MISSING, in which case
-        // `AssetsBundle.run_rtlcss` returns the stylesheet unflipped while
-        // the `.rtl.` URL is still served from the locale alone. The LTR
-        // render was real; the conclusion about Odoo was not.
+        // RTL: bind the reading direction to the USER'S LOCALE (see the
+        // rtlcss note in the git history of this file): Odoo 19 sets the
+        // CSS `direction` property on inner containers, and this attribute
+        // makes the component's logical properties resolve from the locale
+        // without depending on a flipped bundle.
         this.direction = localeDirection();
         this.state = useState({
             status: "loading", // "loading" | "ready" | "error"
             data: null,
             errorMessage: "",
+            // Server-validated filters. The client only ever sends a store
+            // id from the server-provided list and a period KEY from the
+            // server-provided registry.
+            storeId: false,
+            period: "30d",
         });
         this._refreshTimer = null;
         this._onVisibility = this._onVisibility.bind(this);
@@ -91,8 +86,8 @@ export class ShopifyConnectorDashboard extends Component {
         try {
             const data = await this.orm.call(
                 "shopify.connector.ui.dashboard",
-                "get_dashboard_data",
-                []
+                "get_store_360_data",
+                [this.state.storeId || false, this.state.period]
             );
             this.state.data = data;
             this.state.status = "ready";
@@ -137,21 +132,41 @@ export class ShopifyConnectorDashboard extends Component {
         await this._load();
     }
 
-    openException(exception) {
-        if (!exception || !exception.target) {
+    // --- filters (values come exclusively from the server payload) --------
+    async onStoreChange(ev) {
+        const raw = ev.target.value;
+        this.state.storeId = raw ? parseInt(raw, 10) : false;
+        await this._load();
+    }
+
+    async setPeriod(period) {
+        this.state.period = period;
+        await this._load();
+    }
+
+    // --- navigation: server-built targets only -----------------------------
+    openTarget(target) {
+        if (!target || !target.res_model) {
             return;
         }
         this.action.doAction({
             type: "ir.actions.act_window",
-            name: exception.target.name,
-            res_model: exception.target.res_model,
-            domain: exception.target.domain || [],
+            name: target.name,
+            res_model: target.res_model,
+            domain: target.domain || [],
             views: [
                 [false, "list"],
                 [false, "form"],
             ],
             target: "current",
         });
+    }
+
+    // Kept for the health region (same payload shape as before).
+    openException(exception) {
+        if (exception) {
+            this.openTarget(exception.target);
+        }
     }
 
     // S1 entry route 1 of 3. Opens the guided setup client action; the setup
@@ -163,39 +178,139 @@ export class ShopifyConnectorDashboard extends Component {
         );
     }
 
-    // --- presentation helpers (class strings only; no state derivation) ---
+    // --- presentation helpers (class strings / formatting only) -----------
     bandClass(severity) {
         return "sc-band sc-band--" + (severity || "neutral");
     }
     exceptionClass(severity) {
         return "sc-exception sc-exception--" + (severity || "danger");
     }
-    chipClass(chip) {
-        let cls = "sc-chip sc-chip--" + (chip.tone || "neutral");
-        if (chip.loud) {
-            cls += " sc-chip--loud";
-        }
-        return cls;
-    }
     badgeClass(tone) {
         return "sc-badge sc-badge--" + (tone || "neutral");
     }
-    // Fixed bar heights so the sparkline stays a bounded DOM with no inline math in template.
+    bridgeClass(state) {
+        return "sc-bridge sc-bridge--" + (state || "stale");
+    }
+
+    formatMoney(currency, value) {
+        if (value === false || value === null || value === undefined) {
+            return "—";
+        }
+        const decimals =
+            currency && currency.decimal_places !== undefined
+                ? currency.decimal_places
+                : 2;
+        // Plain grouped decimal; the currency name/symbol is rendered
+        // beside the amount inside a <bdi> so RTL contexts keep the pair
+        // intact (spec §11 bidi isolation).
+        const amount = Number(value).toLocaleString(undefined, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+        });
+        if (!currency || !currency.symbol) {
+            return amount;
+        }
+        return currency.position === "before"
+            ? currency.symbol + " " + amount
+            : amount + " " + currency.symbol;
+    }
+
+    formatNumber(value) {
+        if (value === false || value === null || value === undefined) {
+            return "—";
+        }
+        return Number(value).toLocaleString();
+    }
+
+    formatShare(share) {
+        if (share === false || share === null || share === undefined) {
+            return "—";
+        }
+        return Math.round(share * 1000) / 10 + "%";
+    }
+
+    // C∆: truthful comparison caption. Previous 0 → "no prior-period data",
+    // never a percentage (spec C∆).
+    deltaInfo(current, previous) {
+        if (!previous) {
+            return { available: false, text: _t("no prior-period data") };
+        }
+        const ratio = (current - previous) / previous;
+        const pct = Math.round(Math.abs(ratio) * 1000) / 10;
+        if (ratio > 0.0005) {
+            return { available: true, tone: "up", text: "+" + pct + "%" };
+        }
+        if (ratio < -0.0005) {
+            return { available: true, tone: "down", text: "−" + pct + "%" };
+        }
+        return { available: true, tone: "flat", text: "±0%" };
+    }
+
     barHeight(value, max) {
         const m = max || 1;
         const pct = Math.round((Math.min(value, m) / m) * 100);
-        return "height:" + pct + "%";
+        return "height:" + Math.max(pct, value > 0 ? 2 : 0) + "%";
     }
-    get sparkMax() {
+
+    get trendMax() {
         const data = this.state.data;
-        if (!data || !data.sparkline || !data.sparkline.available) {
+        const trend =
+            data && data.commercial && data.commercial.trend;
+        if (!trend || !trend.available) {
             return 1;
         }
         let max = 1;
-        for (const d of data.sparkline.days) {
-            max = Math.max(max, d.success + d.failure);
+        for (const bucket of trend.buckets) {
+            max = Math.max(max, bucket.value, bucket.previous);
         }
         return max;
+    }
+
+    // Localised HH:MM for the two header timestamps. Server sends UTC
+    // strings; the Date conversion applies the browser locale/zone, and the
+    // two labels stay visually and semantically distinct (spec §9.1).
+    formatInstant(value) {
+        if (!value) {
+            return _t("not yet");
+        }
+        const date = new Date(value.replace(" ", "T") + "Z");
+        if (isNaN(date.getTime())) {
+            return value;
+        }
+        return date.toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
+
+    periodLabel(period) {
+        return {
+            "24h": _t("Last 24 hours"),
+            "7d": _t("Last 7 days"),
+            "30d": _t("Last 30 days"),
+            "90d": _t("Last 90 days"),
+        }[period] || period;
+    }
+
+    bridgeLabel(state) {
+        return {
+            complete_current: _t("Complete & current"),
+            processing: _t("Reconciliation in progress"),
+            stale: _t("Not proven current"),
+            incomplete: _t("Incomplete — action needed"),
+        }[state] || state;
+    }
+
+    storeStateLabel(state) {
+        return {
+            setup_incomplete: _t("Setup incomplete"),
+            connected: _t("Connected"),
+            reconnect_needed: _t("Reconnect needed"),
+            disconnecting: _t("Disconnecting"),
+            disconnected: _t("Disconnected"),
+        }[state] || state;
     }
 }
 

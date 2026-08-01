@@ -2,12 +2,30 @@
 
 **Subtitle: Sales performance and connector health.**
 
-> **Status: Design concept + prototype specification. NOT implemented, NOT
-> accepted, NOT a review.** Produced on the isolated branch
-> `fable/ui-operations-360-concept` from the exact PR #204 head
-> `a1c593183f6aaa1238e87486ca518717cefc53a9`. Nothing under `addons/**`
-> changed; PR #204 is untouched. Every repository fact below was read at that
-> exact head and cites its file. Classification per CLAUDE.md §8 throughout.
+> **Status: IMPLEMENTED on `fable/wave-5-completion` (final pre-UAT
+> implementation session, 2026-08-01) — awaiting independent review, final
+> exact-head Odoo.sh qualification and controlled Shopify UAT.** The
+> accepted concept (four commits, head `209f20ab…`) was integrated
+> fast-forward into PR #204's branch and implemented in production code:
+> the eleven protected `sale.order` projection columns (3 core + 8
+> lifecycle mirrors — the earlier "seven mirrors / ~ten columns" phrasing
+> undercounted; the evidence-refresh timestamp is itself a mirror), the
+> `get_store_360_data` aggregate RPC with the same-model drill-down
+> contract, the generation-bound reconnect completion stamps (§9.3/§9.5),
+> the Owl Store 360 screen under the existing `shopify_connector_dashboard`
+> client-action tag, and the Sync Operations Analysis views. The
+> implementation record lives in the companion handoff's "Implemented"
+> section and the PR #204 evidence comment. Shopify Sales Analysis
+> (`sale.report`) remains UNIMPLEMENTED and deferred (§14.1 security
+> prerequisite).
+>
+> *Historical note, preserved truthfully:* this document began as a design
+> concept + prototype specification on the isolated branch
+> `fable/ui-operations-360-concept`, produced from the exact PR #204 head
+> `a1c593183f6aaa1238e87486ca518717cefc53a9` with nothing under `addons/**`
+> changed. Repository line references in the body below were read at that
+> concept head; the implementation may have shifted exact line numbers.
+> Classification per CLAUDE.md §8 throughout.
 
 Companions: [competitor benchmark](../01-research/ui-operations-360-competitor-benchmark-2026-08-01.md) ·
 [implementation handoff](../07-implementation-plan/ui-operations-360-dashboard-handoff-2026-08-01.md) ·
@@ -314,10 +332,13 @@ that writes the binding, backfilled by the slice-1 migration):
 `shopify_connector_cod_collection_state`,
 `shopify_connector_fulfillment_status` (Char mirror),
 `shopify_connector_review` (Boolean mirror of `binding.status='review'`),
-`shopify_connector_evidence_refreshed_at` (Datetime). This widens the
-sale-order footprint from 3 to ~10 connector columns — flagged explicitly
-as a control-room review point; declining it triggers the fallback recorded
-in the matrix row above, never a silent workaround.
+`shopify_connector_evidence_refreshed_at` (Datetime). **Count correction
+(implementation session, 2026-08-01): that list is EIGHT lifecycle mirror
+fields, not seven — the evidence-refresh timestamp is itself a mirror —
+so the total footprint is exactly ELEVEN stored `sale.order` columns
+(3 core + 8 mirrors), not "approximately ten".** The control room accepted
+the footprint by authorizing this implementation; the fallback recorded in
+the matrix row above remains the documented descope path.
 
 | # | Displayed label | Operator question | Source model · stored fields | Domain / filter | Aggregation | Time window | Store isolation | Zero/empty behaviour | Stale-data behaviour | Native drill-down | Supported at `a1c5931`? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -659,9 +680,12 @@ before catch-up → terminal catch-up reconciliation → forced partial-failure
 capture. Every displayed count must still equal its drill-down population and
 no Shopify GID, binding or Odoo order may duplicate.
 
-This requirement is an improvement for the future Store 360 implementation.
-It is not a claim that PR #204 already ships Store 360, and its absence is not
-retroactively treated as a PR #204 UAT failure.
+This requirement is IMPLEMENTED (2026-08-01): the generation-bound
+completion stamps (`sale_order_catchup_generation` /
+`sale_order_catchup_synced_through_at` and their fulfillment
+counterparts), the reconnect catch-up admission on `action_reconnect`,
+and the §9.5 source/freshness presentation ship in the PR #204 candidate,
+and R-4 is a mandatory current-candidate UAT scenario for it.
 
 ## 10. Visual direction
 

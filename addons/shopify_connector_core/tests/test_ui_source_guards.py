@@ -200,29 +200,27 @@ class TestUiSourceGuards(TransactionCase):
             "regardless of its filename.")
 
     def test_sparkline_conveys_more_than_colour(self):
-        """Stage R2 correction (independent review 5049668193 material P2):
-        the 7-day sparkline's per-day success/failure breakdown must not be
-        conveyed by bar colour alone. Source-level regression: the template
-        carries a per-day textual equivalent (outside the decorative
-        ``role="img"`` bars, so assistive tech actually exposes it) and the
-        stylesheet gives the failure bar a non-colour (textured) fill
-        distinct from the success bar's flat fill.
+        """Non-colour-alone charting, carried forward to Store 360 (the same
+        R2 principle the 7-day sparkline satisfied before the trend chart
+        replaced it): the trend must carry a full textual equivalent OUTSIDE
+        the decorative ``role="img"`` bars (a real data table), and the
+        previous-period series must be textured, never colour-alone.
         """
         xml = self._read('static', 'src', 'xml', 'shopify_connector_dashboard.xml')
         self.assertIn(
-            'sc-spark__visually-hidden', xml,
-            "The sparkline must carry a per-day textual equivalent.")
+            'sc360-chart-table', xml,
+            "The trend chart must carry a data-table equivalent.")
         self.assertIn(
-            "day.success", xml,
-            "The per-day textual equivalent must include the success count.")
+            'bucket.value', xml,
+            "The table equivalent must include the current-period value.")
         self.assertIn(
-            "day.failure", xml,
-            "The per-day textual equivalent must include the failure count.")
+            'bucket.previous', xml,
+            "The table equivalent must include the previous-period value.")
         scss = self._read('static', 'src', 'scss', 'shopify_connector_dashboard.scss')
         self.assertIn(
             'repeating-linear-gradient', scss,
-            "The failure bar must carry a non-colour (textured) fill, not "
-            "just a different colour from the success bar.")
+            "The previous-period series must carry a non-colour (textured) "
+            "fill, not just a different colour from the current bars.")
 
     def test_no_external_frontend_dependency(self):
         """No CDN, external font, npm import, or charting library in assets."""
@@ -306,6 +304,11 @@ class TestUiSourceGuards(TransactionCase):
             # second setup flow. An accepted MVP screen, so it joins the
             # allowlist rather than dissolving it.
             'shopify_connector_store_settings_views.xml',
+            # Store 360 slice: zero-schema list/graph/pivot analysis over the
+            # job model under its native rules — no client action, no
+            # controller, no new model. An accepted Store 360 deliverable,
+            # so it joins the allowlist rather than dissolving it.
+            'shopify_connector_job_analysis_views.xml',
         }
         present = {f for f in os.listdir(views_dir) if f.endswith('.xml')}
         self.assertEqual(

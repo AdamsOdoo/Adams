@@ -1,48 +1,111 @@
 /** @odoo-module **/
-// Part of the Shopify Connector (U0 operator UI foundation).
+// Part of the Shopify Connector (Store 360 dashboard).
 //
-// HOOT unit tests for the operational dashboard client action. Covers the
-// render states (empty / healthy / degraded / manual-review), filtered
-// navigation, failed RPC, and accessible labels. The >=30s refresh floor and
-// the visibility-aware background-tab pause are implemented in the client
-// action (see shopify_connector_dashboard.js) and are covered by source review
-// plus the driven runtime walkthrough, not asserted here. Reduced-motion and
-// responsive behaviour are CSS-only (media queries), covered by the SCSS + the
-// runtime walkthrough.
+// HOOT unit tests for the Store 360 client action. Covers the render states
+// (empty / healthy commercial / no-permission), server-built drill-down
+// navigation, the truthful bridge and comparison captions, the two distinct
+// header timestamps, server-validated period filtering, and the failed-RPC
+// band. The >=30s refresh floor and the visibility-aware background-tab
+// pause are implemented in the client action (see
+// shopify_connector_dashboard.js) and are covered by source review plus the
+// driven runtime walkthrough, not asserted here. Reduced-motion and
+// responsive behaviour are CSS-only (media queries), covered by the SCSS +
+// the runtime walkthrough.
+//
+// EXACT COUNT CONTRACT: this suite carries exactly 8 tests — the executor
+// (`test_u3_hoot_suite.py` EXPECTED_SUITES) asserts equality.
 
 import { expect, test, describe, beforeEach } from "@odoo/hoot";
-import { queryAll, queryFirst, queryText } from "@odoo/hoot-dom";
+import { queryFirst, queryText } from "@odoo/hoot-dom";
 import { animationFrame } from "@odoo/hoot-mock";
 import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
 import { ShopifyConnectorDashboard } from "@shopify_connector_core/js/shopify_connector_dashboard";
 
+const CURRENCY = { id: 1, name: "EUR", symbol: "€", decimal_places: 2, position: "after" };
+
 function payload(overrides = {}) {
     return Object.assign(
         {
-            state: "healthy",
-            lead: { severity: "success", icon: "fa-check-circle", text: "All systems normal", hint: "ok" },
-            exceptions: [],
-            affirmative: "All clear — nothing needs your attention right now.",
-            chips: [{ id: "queued", label: "Queued", value: 0, tone: "info", loud: false }],
-            activity: [],
-            cadence: "Automatic checks run on a schedule.",
-            sparkline: { available: false, days: [], summary: "" },
-            stores: { total: 1, connected: 1, reconnect_needed: 0, setup_incomplete: 0,
-                      disconnecting: 0, disconnected: 0, api_degraded: 0 },
+            meta: {
+                period: "30d",
+                periods: ["24h", "7d", "30d", "90d"],
+                tz: "UTC",
+                window_start: "2026-07-01 00:00:00",
+                window_end: "2026-07-31 00:00:00",
+                store_id: 7,
+                stores: [{ id: 7, name: "Aurora Home Goods", state: "connected" }],
+            },
+            health: {
+                state: "healthy",
+                lead: { severity: "success", icon: "fa-check-circle", text: "All systems normal", hint: "ok" },
+                jobs: {},
+                needs_review: 0,
+                backlog: 0,
+                oldest_waiting: false,
+                week: { succeeded: 12, failed: 0 },
+                exceptions: [],
+                activity: [],
+            },
+            flows: [
+                { id: "orders", label: "Orders", backlog: 0, failures: 0,
+                  last_success: "2026-07-30 10:00:00", last_success_relative: "1 h ago", tone: "neutral" },
+            ],
+            stores_region: { available: false, rows: [] },
+            commercial: {
+                available: true,
+                blocks: [{
+                    currency: CURRENCY, sales: 18432.5, orders: 26, aov: 708.9,
+                    previous: { sales: 15000.0, orders: 20, aov: 750.0 },
+                }],
+                orders_total: 26,
+                units: 61,
+                previous_units: 50,
+                orders_target: { res_model: "sale.order", domain: [["shopify_connector_store_id", "=", 7]], name: "Imported Shopify orders" },
+                units_target: { res_model: "sale.order.line", domain: [["shopify_line_item_gid", "!=", false]], name: "Lines" },
+                trend: { available: false, buckets: [] },
+                products: { available: false, rows: [] },
+            },
+            bridge: {
+                available: true, state: "complete_current",
+                text: "Complete & current — every discoverable importable order has landed.",
+                synced_through: "2026-07-31 09:45:00",
+                checkpoint: "2026-07-31 09:50:00",
+                scheduled: true, g2: 0, g3: 0, reconciling: false, disconnected: false,
+                g2_target: { res_model: "shopify.connector.job", domain: [], name: "g2" },
+                g3_target: { res_model: "shopify.connector.job", domain: [], name: "g3" },
+            },
+            lifecycle: { available: false, reason: "no_permission" },
+            dispatch: { available: false, reason: "no_permission" },
+            critical: { active: false, causes: [] },
+            setup_available: true,
             refresh_interval_seconds: 30,
-            generated_at: "2026-07-22 00:00:00",
+            generated_at: "2026-07-31 10:00:00",
         },
         overrides
     );
 }
 
-function mockOrm(getData) {
+function emptyPayload() {
+    return payload({
+        health: {
+            state: "empty",
+            lead: { severity: "info", icon: "fa-plug", text: "Store setup is incomplete", hint: "Connect your store." },
+            jobs: {}, needs_review: 0, backlog: 0, oldest_waiting: false,
+            week: { succeeded: 0, failed: 0 }, exceptions: [], activity: [],
+        },
+    });
+}
+
+function mockOrm(getData, capture) {
     let calls = 0;
     mockService("orm", {
-        call: async (model, method) => {
+        call: async (model, method, args) => {
             expect(model).toBe("shopify.connector.ui.dashboard");
-            expect(method).toBe("get_dashboard_data");
+            expect(method).toBe("get_store_360_data");
             calls += 1;
+            if (capture) {
+                capture(args, calls);
+            }
             return getData(calls);
         },
     });
@@ -51,84 +114,65 @@ function mockOrm(getData) {
 let lastAction = null;
 
 describe("shopify connector dashboard", () => {
-    // INHERITED DEFECT, corrected 2026-07-26. `mockService` was called at
-    // MODULE scope, which mutates the services registry while HOOT is still
-    // registering this suite; HOOT rejects that with "error while registering
-    // suite" and the whole file never ran. Nothing executed this file before
-    // now (no runner existed), so the breakage was invisible.
+    // `mockService` must be called per-test (module scope mutates the
+    // services registry while HOOT is still registering the suite).
     beforeEach(() => {
         lastAction = null;
         mockService("action", { doAction: async (action) => { lastAction = action; } });
     });
 
-    test("healthy state renders the success band and an affirmative line", async () => {
+    test("healthy payload renders the KPI cards and the success band", async () => {
         mockOrm(() => payload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
         expect(".sc-band--success").toHaveCount(1);
-        expect(queryText(".sc-band__text")).toBe("All systems normal");
-        expect(".sc-affirm").toHaveCount(1);
-        expect(".sc-exception").toHaveCount(0);
+        expect(".sc360-kpi").toHaveCount(4);
+        expect(queryText(".sc360-kpi[data-kpi='orders'] .sc360-kpi__value")).toBe("26");
+        // truthful comparison caption present on the sales card
+        expect(queryText(".sc360-kpi[data-kpi='sales'] .sc360-kpi__delta")).toInclude("vs previous period");
     });
 
     test("empty state renders the guided setup card", async () => {
-        mockOrm(() => payload({
-            state: "empty",
-            lead: { severity: "info", icon: "fa-plug", text: "Store setup is incomplete", hint: "Connect your store." },
-        }));
+        mockOrm(() => emptyPayload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
         expect(".sc-band--info").toHaveCount(1);
         expect(".sc-empty").toHaveCount(1);
+        expect(".sc_dashboard_setup").toHaveCount(1);
     });
 
-    test("degraded state renders ranked exceptions with counts", async () => {
+    test("no-permission commercial variant renders the note, never zeros", async () => {
         mockOrm(() => payload({
-            state: "degraded",
-            lead: { severity: "danger", icon: "fa-exclamation-triangle", text: "2 items need your attention", hint: "" },
-            exceptions: [
-                { id: "failed_final", severity: "danger", icon: "fa-exclamation-triangle",
-                  title: "Jobs that stopped", count: 2, why: "why", owner: "Operator",
-                  target: { res_model: "shopify.connector.job", domain: [["state", "=", "failed_final"]], name: "x" } },
-            ],
+            commercial: { available: false, reason: "no_permission" },
         }));
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc-band--danger").toHaveCount(1);
-        expect(".sc-exception").toHaveCount(1);
-        expect(queryText(".sc-exception__count")).toBe("2");
+        expect(".sc360-no-permission").toHaveCount(1);
+        expect(".sc360-kpi").toHaveCount(0);
+        expect(queryText(".sc360-no-permission")).toInclude("connector health is unaffected");
     });
 
-    test("manual-review distinguished by icon and owner, not colour alone", async () => {
-        mockOrm(() => payload({
-            state: "manual_review",
-            lead: { severity: "danger", icon: "fa-hand-paper-o", text: "1 item waiting on a decision", hint: "reviewer" },
-            exceptions: [
-                { id: "blocked_manual_review", severity: "danger", icon: "fa-hand-paper-o",
-                  title: "Waiting on a review decision", count: 1, why: "why", owner: "Reviewer",
-                  target: { res_model: "shopify.connector.job", domain: [["state", "=", "blocked_manual_review"]], name: "x" } },
-            ],
-        }));
+    test("clicking the orders KPI opens the server-built native action verbatim", async () => {
+        mockOrm(() => payload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        // icon present and owner text present -> not colour-only.
-        expect(".sc-exception .fa-hand-paper-o").toHaveCount(1);
-        expect(queryText(".sc-owner-chip")).toInclude("Reviewer");
-    });
-
-    test("clicking an exception opens a filtered native action", async () => {
-        lastAction = null;
-        mockOrm(() => payload({
-            state: "degraded",
-            lead: { severity: "danger", icon: "fa-exclamation-triangle", text: "1 item needs your attention", hint: "" },
-            exceptions: [
-                { id: "failed_final", severity: "danger", icon: "fa-exclamation-triangle",
-                  title: "Jobs that stopped", count: 1, why: "why", owner: "Operator",
-                  target: { res_model: "shopify.connector.job", domain: [["state", "=", "failed_final"]], name: "Failed jobs" } },
-            ],
-        }));
-        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        queryFirst(".sc-exception .sc-btn").click();
+        queryFirst(".sc360-kpi[data-kpi='orders']").click();
         await animationFrame();
         expect(lastAction).not.toBe(null);
-        expect(lastAction.res_model).toBe("shopify.connector.job");
         expect(lastAction.type).toBe("ir.actions.act_window");
+        expect(lastAction.res_model).toBe("sale.order");
+        expect(JSON.stringify(lastAction.domain)).toBe(
+            JSON.stringify([["shopify_connector_store_id", "=", 7]])
+        );
+    });
+
+    test("bridge renders its state label and copy", async () => {
+        mockOrm(() => payload({
+            bridge: Object.assign(payload().bridge, {
+                state: "processing",
+                text: "Reconciliation in progress — figures may rise shortly.",
+                reconciling: true,
+            }),
+        }));
+        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
+        expect(".sc-bridge--processing").toHaveCount(1);
+        expect(queryText(".sc-bridge__state")).toBe("Reconciliation in progress");
     });
 
     test("failed RPC renders an error band with a retry control", async () => {
@@ -138,18 +182,26 @@ describe("shopify connector dashboard", () => {
         expect(".sc-btn").toHaveCount(1); // "Try again"
     });
 
-    test("accessible labels: lead band is a polite live region", async () => {
+    test("the two header timestamps are distinct: page updated vs Shopify source", async () => {
         mockOrm(() => payload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
+        expect(".sc360-ts-page").toHaveCount(1);
+        expect(".sc360-ts-source").toHaveCount(1);
+        expect(queryText(".sc360-ts-page")).toInclude("Page updated");
+        expect(queryText(".sc360-ts-source")).toInclude("synchronized through");
+        // the lead band stays a polite live region
         expect(queryFirst(".sc-band").getAttribute("aria-live")).toBe("polite");
     });
 
-    test("chips carry a textual value, never colour alone", async () => {
-        mockOrm(() => payload({
-            chips: [{ id: "retry_waiting", label: "Waiting to retry", value: 3, tone: "warning", loud: true }],
-        }));
+    test("period buttons come from the server registry and re-query with the key", async () => {
+        const seen = [];
+        mockOrm(() => payload(), (args) => seen.push(args));
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(queryAll(".sc-chip__value").length).toBe(1);
-        expect(queryText(".sc-chip__value")).toBe("3");
+        expect(".sc360-period__btn").toHaveCount(4);
+        const first = queryFirst(".sc360-period__btn"); // "24h"
+        first.click();
+        await animationFrame();
+        expect(seen.length).toBe(2);
+        expect(seen[1][1]).toBe("24h"); // period KEY, never a domain
     });
 });

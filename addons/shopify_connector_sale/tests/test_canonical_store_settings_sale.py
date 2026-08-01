@@ -10,6 +10,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
     CANONICAL_EDITABLE,
     CANONICAL_READONLY,
+    INTERNAL_PROTECTED,
     SETTINGS_MODEL,
     assert_module_classification,
     canonical_form_field_nodes,
@@ -39,6 +40,35 @@ SALE_CLASSIFICATION = {
         'Discovery watermark written by the order scan; an observation, not '
         'a decision.',
     ),
+    # Store 360 / R-4 generation-bound catch-up stamps: connector system
+    # state written only by run_scan (pending lineage) and the job-terminal
+    # promotion hook. Observations of completed work, never merchant
+    # decisions; the dashboard bridge is their read surface.
+    'sale_order_catchup_pending_generation': (
+        INTERNAL_PROTECTED,
+        'Pending catch-up lineage state written by the order scan; surfaced '
+        'through the Store 360 bridge, not a settings decision.',
+    ),
+    'sale_order_catchup_pending_upper_bound_at': (
+        INTERNAL_PROTECTED,
+        'Pending catch-up lineage state written by the order scan; surfaced '
+        'through the Store 360 bridge, not a settings decision.',
+    ),
+    'sale_order_catchup_pending_scan_job_id': (
+        INTERNAL_PROTECTED,
+        'Pending catch-up lineage state written by the order scan; surfaced '
+        'through the Store 360 bridge, not a settings decision.',
+    ),
+    'sale_order_catchup_generation': (
+        INTERNAL_PROTECTED,
+        'Durable completion stamp promoted by the job-terminal hook; the '
+        'Store 360 bridge reads it, no one edits it.',
+    ),
+    'sale_order_catchup_synced_through_at': (
+        INTERNAL_PROTECTED,
+        'The Shopify-source synchronized-through instant; promoted with the '
+        'completion stamp, read by the Store 360 header, never edited.',
+    ),
 }
 
 
@@ -50,8 +80,12 @@ class TestCanonicalStoreSettingsSale(TransactionCase):
 
     def test_the_order_section_reaches_the_canonical_form(self):
         nodes = canonical_form_field_nodes(self.env)
-        for name in SALE_CLASSIFICATION:
-            self.assertIn(name, nodes)
+        for name, (kind, _why) in SALE_CLASSIFICATION.items():
+            if kind in (CANONICAL_EDITABLE, CANONICAL_READONLY):
+                self.assertIn(name, nodes)
+            else:
+                # Internal system state stays OFF the canonical form.
+                self.assertNotIn(name, nodes)
 
     def test_the_fallback_customer_is_a_real_setting_not_a_false_capability(self):
         """§6.4 demands proof before this is presented as supported.

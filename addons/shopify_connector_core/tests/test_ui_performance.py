@@ -115,6 +115,50 @@ class TestUiPerformance(TransactionCase):
         data = self.Dashboard.get_dashboard_data()
         self.assertLessEqual(len(data['activity']), self.Dashboard.RECENT_ACTIVITY_LIMIT)
 
+    # ------------------------------------------------------------------ #
+    #  Store 360: same discipline for the second RPC. The bound covers the
+    #  core payload plus whichever module sections are installed in this
+    #  database (sale/fulfillment providers add their own constant set).
+    # ------------------------------------------------------------------ #
+    def test_store360_query_count_bounded(self):
+        self._seed_jobs(50)
+        n = self._count_queries(
+            lambda: self.Dashboard.get_store_360_data(False, '30d'))
+        self.assertLessEqual(
+            n, 120,
+            "Store 360 issued %d queries; expected a small constant." % n)
+
+    def test_store360_query_count_constant_across_scale(self):
+        self._seed_jobs(20)
+        self.Dashboard.get_store_360_data(False, '30d')  # warm
+        small = self._count_queries(
+            lambda: self.Dashboard.get_store_360_data(False, '30d'))
+        self._seed_jobs(200)
+        large = self._count_queries(
+            lambda: self.Dashboard.get_store_360_data(False, '30d'))
+        self.assertEqual(
+            small, large,
+            "Store 360 query count grew with job volume (%d -> %d)."
+            % (small, large),
+        )
+
+    def test_store360_query_count_constant_across_store_count(self):
+        """No per-store N+1: the multi-store region reads grouped, so more
+        stores must not mean proportionally more queries."""
+        self.Dashboard.get_store_360_data(False, '30d')  # warm
+        two = self._count_queries(
+            lambda: self.Dashboard.get_store_360_data(False, '30d'))
+        for _index in range(6):
+            self._make_store()
+        self.env.flush_all()
+        many = self._count_queries(
+            lambda: self.Dashboard.get_store_360_data(False, '30d'))
+        self.assertLessEqual(
+            many, two + 4,
+            "Store 360 grew from %d to %d queries across 6 extra stores — "
+            "a per-store read is hiding somewhere." % (two, many),
+        )
+
     def test_dashboard_source_uses_bounded_reads(self):
         addon_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         src = open(os.path.join(addon_root, 'models', 'shopify_connector_ui_dashboard.py'),

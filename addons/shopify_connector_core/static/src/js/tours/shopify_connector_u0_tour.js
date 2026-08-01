@@ -32,7 +32,26 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
         },
         {
             trigger: ".o_sc_dashboard",
-            content: "The operational dashboard renders.",
+            content: "The Store 360 dashboard renders.",
+        },
+        // Store 360: with the seeded connected store (test fixture), the
+        // shell shows the header with the period filter group, the two
+        // distinct timestamps, and the connector-health region.
+        {
+            trigger: ".o_sc_dashboard .sc360-period",
+            content: "The reporting-period filter group renders.",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-ts-page",
+            content: "The page-updated timestamp renders.",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-health",
+            content: "The connector-health region renders.",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-flows",
+            content: "The flow-health table renders.",
         },
         {
             trigger: `${menu("menu_shopify_connector_stores")}`,
@@ -60,6 +79,17 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
         {
             trigger: ".o_list_view",
             content: "The Error & Review Center renders.",
+        },
+        // Store 360 slice: the zero-schema Sync Operations Analysis surface
+        // (graph over the job model, native rules).
+        {
+            trigger: `${menu("menu_shopify_connector_sync_analysis")}`,
+            content: "Go to Sync Operations Analysis.",
+            run: "click",
+        },
+        {
+            trigger: ".o_graph_renderer, .o_graph_view, .o_view_nocontent",
+            content: "The analysis graph view renders.",
         },
         {
             trigger: `${menu("menu_shopify_connector_logs")}`,

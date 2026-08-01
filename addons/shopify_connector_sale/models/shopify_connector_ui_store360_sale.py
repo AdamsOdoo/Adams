@@ -74,14 +74,22 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
         window = ctx['window']
         if which == 'current':
             start, end = window['start'], window['end']
+            # INCLUSIVE current end: `end` is "now" truncated to the second,
+            # and an order imported within that same second would satisfy
+            # neither `< end` nor the next refresh's `>= start` shift — a
+            # figure that silently drops the newest order for a second is
+            # exactly the shape §7's truth rules forbid. The previous window
+            # stays half-open below, so the two windows remain disjoint.
+            end_term = ('date_order', '<=', end)
         else:
             start, end = window['prev_start'], window['prev_end']
+            end_term = ('date_order', '<', end)
         domain = [
             ('shopify_connector_quarantined', '=', False),
             ('shopify_connector_cancelled_at', '=', False),
             ('state', '!=', 'cancel'),
             ('date_order', '>=', start),
-            ('date_order', '<', end),
+            end_term,
         ]
         if len(store) == 1:
             domain.insert(0, ('shopify_connector_store_id', '=', store.id))

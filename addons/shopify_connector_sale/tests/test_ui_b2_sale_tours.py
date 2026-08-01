@@ -139,6 +139,63 @@ class TestUiB2SaleTours(OrderImportCase, HttpCase):
     # ------------------------------------------------------------------
 
     def test_order_controls_tour_starts_a_real_scan(self):
+        # ---- Store 360 drill-down (same method, second tour: the frozen
+        # REQUIRED_TOUR_TESTS inventory counts start_tour-calling METHODS,
+        # and extra success markers only raise the runner's floor) ----
+        #
+        # A genuinely bound order: the binding create runs the production
+        # projection sync, so the dashboard's commercial region renders
+        # from the same sanctioned write path production uses, and the
+        # imported-orders KPI opens the NATIVE sale.order list.
+        order = self.env['sale.order'].sudo().create({
+            'partner_id': self.fallback_partner.id,
+            'company_id': self.env.company.id,
+            'pricelist_id': self.pricelist.id,
+            'payment_term_id': self.payment_term.id,
+            'user_id': False,
+            'order_line': [(0, 0, {
+                'product_id': self.product.id,
+                'product_uom_qty': 2,
+                'price_unit': 50.0,
+                'shopify_line_item_gid': 'gid://shopify/LineItem/B2360',
+            })],
+        })
+        self.env['shopify.connector.order.binding'].sudo().create({
+            'store_id': self.store.id,
+            'sale_order_id': order.id,
+            'shopify_gid': 'gid://shopify/Order/B2360',
+            'shopify_order_name': '#B2360',
+            'shopify_financial_status_snapshot': 'PAID',
+            'shopify_fulfillment_status_snapshot': 'UNFULFILLED',
+        })
+        self.assertEqual(
+            order.shopify_connector_store_id, self.store,
+            'the binding create must project the store onto the order',
+        )
+        store360_viewer = self.env['res.users'].create({
+            'name': 'b2sale_360',
+            'login': 'b2sale_360',
+            'password': 'b2sale_360',
+            'company_id': self.env.company.id,
+            'company_ids': [(6, 0, [self.env.company.id])],
+            # Connector operator + full sales read: the drill-down lands on
+            # the native sale.order list under the caller's OWN sale rules.
+            'group_ids': [(6, 0, [
+                self.env.ref('base.group_user').id,
+                self.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
+                ).id,
+                self.env.ref('sales_team.group_sale_salesman_all_leads').id,
+            ])],
+        })
+        self.env.flush_all()
+        self.start_tour(
+            '/odoo',
+            'shopify_connector_b2_store360_drilldown_tour',
+            login=store360_viewer.login,
+        )
+
+        # ---- the original order-controls journey, unchanged ----
         before = self.Job.search_count([
             ('store_id', '=', self.store.id),
             ('job_type', '=', 'order_import_scan'),

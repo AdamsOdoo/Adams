@@ -1,3 +1,46 @@
+### Shopify Store 360 — FINAL PRE-UAT IMPLEMENTATION AND PR #204 INTEGRATION (2026-08-01)
+
+- **Branch / PR:** `fable/wave-5-completion` (PR #204, draft). Started at
+  the required head `a1c5931`; integrated the four accepted concept
+  commits **fast-forward only** (`209f20ab…`) and cherry-picked the R-4
+  package commit (`7a22af2`, `-x` provenance). Implementation commits
+  additive on top; no rebase/amend/squash/force-push; PR remains draft,
+  unaccepted, unmerged.
+- **What shipped (production):** the eleven protected `sale.order`
+  projection columns (3 core + 8 lifecycle mirrors) with the
+  binding-choke-point sanctioned writer, fail-closed unsanctioned-write
+  refusal (including `sudo()` without the sanction context), SEC-3
+  quarantine propagation hook, and the idempotent `19.0.2.9.0` backfill
+  migration; the `get_store_360_data` aggregate RPC (current-user ORM
+  grouped reads, same-model drill-downs per spec §6.1, per-currency
+  partitioning, honest no-permission/bridge states) with sale and
+  fulfillment section providers; generation-bound reconnect completion
+  stamps for orders AND fulfillment with catch-up admission from the real
+  `action_reconnect` (the fulfillment route existed since Wave 4 with
+  zero enqueue sites — now genuinely admitted, scope-key-prefixed); the
+  Store 360 Owl screen under the original client-action tag; Sync
+  Operations Analysis views over the job model. Shopify Sales Analysis
+  remains UNIMPLEMENTED (deferred security prerequisite, handoff §14.1).
+- **Learning feedback loop:** *New issues found by implementing:* (1)
+  `idempotency_key` persists for a job's whole life, so an import
+  cancelled before running (exactly what the disconnect quiesce sweep
+  produces) could never re-enqueue for an unchanged `updatedAt` — a
+  silent permanent coverage gap; closed for orders with a deterministic
+  `#resume:<job id>` key, logged as pre-existing debt for the other
+  domains. (2) A registered dispatch route with no enqueue site is
+  invisible dead code that reads as capability — the fulfillment catch-up
+  taught that "implemented" must include "reachable". (3) The scan
+  checkpoint means *discovered-through*, not *imported-through*; only a
+  completion stamp promoted by the LAST descendant's terminal transition
+  can honestly say "synchronized through". *What worked:* the frozen
+  write-set + guard-test inventory (tour-method set, HOOT count, exact
+  client-action tags) forced every UI change through extension rather
+  than addition; the binding-level sync choke point covered every writer
+  by construction instead of by enumeration. *Repeated pattern:* counting
+  fields wrong in prose while the list beside it was right (the
+  "seven mirrors / ~ten columns" undercount) — corrected to exactly
+  eleven; lists are normative, adjectives are not.
+
 ### Shopify Store 360 — final bounded design-correction tail (2026-08-01)
 
 - **Branch / PR:** `fable/ui-operations-360-concept`, starting head

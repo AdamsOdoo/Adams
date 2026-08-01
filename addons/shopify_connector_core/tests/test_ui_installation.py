@@ -23,6 +23,7 @@ class TestUiInstallation(TransactionCase):
             'shopify_connector_core.action_shopify_connector_mutation_attempt',
             'shopify_connector_core.action_shopify_connector_job_cancel_wizard',
             'shopify_connector_core.action_shopify_connector_mutation_resolution_wizard',
+            'shopify_connector_core.action_shopify_connector_sync_analysis',
         ):
             self.assertTrue(self.env.ref(xmlid), "Missing action %s" % xmlid)
 
@@ -39,6 +40,7 @@ class TestUiInstallation(TransactionCase):
             'shopify_connector_core.menu_shopify_connector_sync_center',
             'shopify_connector_core.menu_shopify_connector_error_center',
             'shopify_connector_core.menu_shopify_connector_mutation_evidence',
+            'shopify_connector_core.menu_shopify_connector_sync_analysis',
             'shopify_connector_core.menu_shopify_connector_logs',
         ):
             self.assertTrue(self.env.ref(xmlid), "Missing menu %s" % xmlid)
@@ -57,6 +59,9 @@ class TestUiInstallation(TransactionCase):
             'shopify_connector_core.view_shopify_connector_mutation_attempt_form',
             'shopify_connector_core.view_shopify_connector_job_cancel_wizard_form',
             'shopify_connector_core.view_shopify_connector_mutation_resolution_wizard_form',
+            'shopify_connector_core.view_shopify_connector_job_analysis_search',
+            'shopify_connector_core.view_shopify_connector_job_analysis_graph',
+            'shopify_connector_core.view_shopify_connector_job_analysis_pivot',
         ):
             self.assertTrue(self.env.ref(xmlid), "Missing view %s" % xmlid)
 
@@ -75,6 +80,12 @@ class TestUiInstallation(TransactionCase):
         data = self.env['shopify.connector.ui.dashboard'].with_user(
             viewer).get_dashboard_data()
         self.assertIn('state', data)
+        # Store 360: the second RPC answers the same caller with the full
+        # section set (the owning modules' sections appear when installed).
+        payload = self.env['shopify.connector.ui.dashboard'].with_user(
+            viewer).get_store_360_data()
+        for key in ('meta', 'health', 'flows', 'critical', 'generated_at'):
+            self.assertIn(key, payload)
 
     def test_manifest_depends_web(self):
         module = self.env['ir.module.module'].search(

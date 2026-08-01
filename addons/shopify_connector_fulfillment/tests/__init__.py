@@ -1,7 +1,11 @@
 # Exhaustive frozen test list (locked prompt §5). No additional test file may be
 # added without a control-room allowlist amendment. The Wave 5 U1 locked prompt
 # is such an amendment: it authorises exactly the six `test_ui_*` modules at the
-# end of this list, and no others. The runtime concurrency
+# end of this list. The Store 360 final pre-UAT implementation authorization
+# (control room, 2026-08-01 — the session that wired the reconnect catch-up
+# admission this module always registered but never enqueued) is the second
+# amendment: it authorises exactly `test_fulfillment_reconnect_catchup`, whose
+# reconnect/R-4 coverage its §11.D test campaign mandates, and no others. The runtime concurrency
 # harness (runtime_layer2_fulfillment_concurrency_harness.py) is deliberately
 # NOT imported here — it is an out-of-band multiprocessing script, never an
 # Odoo test.
@@ -34,3 +38,4 @@ from . import test_ui_visibility_matrix
 from . import test_ui_actions
 from . import test_ui_sec3_scope
 from . import test_ui_tours
+from . import test_fulfillment_reconnect_catchup

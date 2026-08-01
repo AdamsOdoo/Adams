@@ -13,6 +13,16 @@
 # Orders list with the identical domain, so each count is exact on its own
 # model. The L7 items stay on their connector evidence models with native
 # connector-list drill-downs (the existing tested invariant).
+#
+# Measured Odoo 19 fact (this session, pinned 30bde9ff): a dotted
+# `sale_id.*` term in a `stock.picking` search domain applies the CALLER'S
+# `sale.order` record rules inside the subquery when the caller carries
+# such rules (e.g. the salesman own-documents rule). The dispatch numbers
+# for such a caller are therefore the INTERSECTION of their picking rules
+# and their sale rules — strictly narrower, never wider, and identical for
+# the drill-down (same model + domain + user), so the count/list agreement
+# invariant is unaffected and no sale-rule-hidden order leaks through a
+# picking count.
 
 import logging
 
@@ -50,10 +60,12 @@ class ShopifyConnectorUiStore360Fulfillment(models.AbstractModel):
         return sections
 
     def _store_360_fulfillment_settings(self, ctx):
+        # Current user, deliberately: every connector role reads settings,
+        # and the dashboard runtime path carries a no-sudo guard.
         store = ctx['store']
         if len(store) != 1:
             return False
-        return self.env['shopify.connector.store.settings'].sudo().search(
+        return self.env['shopify.connector.store.settings'].search(
             [('store_id', '=', store.id)], limit=1,
         )
 
@@ -72,7 +84,9 @@ class ShopifyConnectorUiStore360Fulfillment(models.AbstractModel):
             ('sale_id.shopify_connector_cancelled_at', '=', False),
             ('sale_id.state', '!=', 'cancel'),
             ('sale_id.date_order', '>=', window['start']),
-            ('sale_id.date_order', '<', window['end']),
+            # Inclusive end for the same same-second reason as the sale
+            # provider's current-window domain.
+            ('sale_id.date_order', '<=', window['end']),
         ]
         if len(store) == 1:
             base.insert(0, ('sale_id.shopify_connector_store_id', '=',

@@ -234,6 +234,46 @@ tours.add("shopify_connector_b2_product_controls_denied_tour", {
 // ---------------------------------------------------------------------------
 // 3. The order controls, on the same store form.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 3b. Store 360 commercial drill-down (Store 360 slice).
+// ---------------------------------------------------------------------------
+// Driven from the sale tour test with a genuinely imported order fixture:
+// the dashboard's commercial region renders real numbers and the imported-
+// orders KPI opens the NATIVE sale.order list built from the server's own
+// domain — the same-model drill-down contract, proven in a real browser.
+tours.add("shopify_connector_b2_store360_drilldown_tour", {
+    url: "/odoo",
+    steps: () => [
+        {
+            trigger: ".o_navbar_apps_menu button",
+            content: "Open the apps menu.",
+            run: "click",
+        },
+        {
+            trigger: ".o_app[data-menu-xmlid='shopify_connector_core.menu_shopify_connector_root']",
+            content: "Open the Shopify Connector app.",
+            run: "click",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-commercial",
+            content: "The Store 360 commercial region renders.",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-ts-source",
+            content: "The Shopify-source timestamp renders distinctly from the page timestamp.",
+        },
+        {
+            trigger: ".o_sc_dashboard .sc360-kpi[data-kpi='orders']",
+            content: "Open the imported-orders drill-down.",
+            run: "click",
+        },
+        {
+            trigger: ".o_list_view",
+            content: "The NATIVE sale.order list renders from the server-built domain.",
+        },
+    ],
+});
+
 tours.add("shopify_connector_b2_order_controls_tour", {
     steps: () => [
         {

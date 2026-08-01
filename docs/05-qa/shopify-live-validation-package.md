@@ -349,14 +349,16 @@ generation/checkpoint/watermark before and after, request ledger, job lineage an
 terminal states, duplicate query results, dashboard/RPC payloads and screenshots
 for disconnected, reconciling, complete and forced-failure states.
 
-**Current-vs-future UI classification.** PR #204 does not implement the separate
-Shopify Store 360 concept. Absence of that future page or its future commercial
-cards is not an R-4 failure. For any current surface that already displays an
-affected state/value, a false green/current claim, silent zeroing, or a page
-timestamp presented as Shopify synchronization time is misleading operator
-behaviour and is recorded under §9. The Store 360 source/freshness presentation
-is a separately tracked UI requirement, not retroactively claimed as PR #204
-scope.
+**Scenario classification (updated 2026-08-01): MANDATORY
+current-candidate scenario.** The PR #204 candidate now implements Store
+360 — the commercial cards, the generation-bound completion stamps
+(`sale_order_catchup_*` / `fulfillment_catchup_*`), the reconnect
+catch-up admission for orders and fulfillment, and the §9.5
+source/freshness presentation — so R-4 exercises shipped behaviour and
+its failure IS a candidate failure. A false green/current claim, silent
+zeroing, a page timestamp presented as Shopify synchronization time, a
+count that disagrees with its drill-down, or a stamp advanced by a
+partial traversal is recorded under §9 against the candidate.
 
 Immediate stop: duplicate record/mutation, wrong-store data, cross-company leak,
 watermark stamped after partial traversal, stale data represented as current, or

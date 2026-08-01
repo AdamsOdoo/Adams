@@ -1,13 +1,117 @@
 # Shopify Store 360 — Implementation Handoff (2026-08-01)
 
-> **Status: Design-concept handoff. NOT implemented, NOT accepted, NOT
-> scheduled.** Produced on the isolated branch `fable/ui-operations-360-concept`
-> from the exact PR #204 head `a1c593183f6aaa1238e87486ca518717cefc53a9`.
-> Nothing under `addons/**` changed in this session; PR #204 is untouched.
-> Implementation may begin only when the control room authorizes it as a
-> wave/batch under CLAUDE.md §13, with its own allowed-files packet,
-> independent review and runtime evidence. This document is the input to that
-> packet, not a substitute for it.
+> **Status: IMPLEMENTED (final pre-UAT implementation session, 2026-08-01,
+> on `fable/wave-5-completion`) — awaiting independent review, final
+> exact-head Odoo.sh qualification and controlled Shopify UAT.** The
+> control room authorized this document's plan as the "FINAL PRE-UAT STORE
+> 360 IMPLEMENTATION AND PR #204 INTEGRATION" packet; §0 below records what
+> actually shipped. *Historical note, preserved truthfully:* this handoff
+> began as a design-concept deliverable on the isolated branch
+> `fable/ui-operations-360-concept`, produced from the exact PR #204 head
+> `a1c593183f6aaa1238e87486ca518717cefc53a9` with nothing under `addons/**`
+> changed in that session.
+
+## 0. Implemented (2026-08-01) — the actuals
+
+- **Projection fields (exactly ELEVEN stored `sale.order` columns — the
+  earlier "seven mirrors / approximately ten" phrasing undercounted; the
+  evidence-refresh timestamp is itself a mirror).** Core (3):
+  `shopify_connector_store_id` (M2O store, `check_company`, indexed),
+  `shopify_connector_cancelled_at` (Datetime),
+  `shopify_connector_quarantined` (Boolean, indexed). Lifecycle mirrors
+  (8): `shopify_connector_financial_status` (Char, raw snapshot),
+  `shopify_connector_is_cod` (Boolean),
+  `shopify_connector_approval_state` (Selection),
+  `shopify_connector_cod_commercial_state` (Selection),
+  `shopify_connector_cod_collection_state` (Selection),
+  `shopify_connector_fulfillment_status` (Char, raw snapshot),
+  `shopify_connector_review` (Boolean),
+  `shopify_connector_evidence_refreshed_at` (Datetime). All `copy=False`,
+  readonly; an unsanctioned write — ordinary, RPC or `sudo()` without the
+  sanction context — fails closed
+  (`shopify_connector_sale/models/shopify_connector_sale_order_projection.py`).
+- **Authoritative writers.** The order-binding `create()`/`write()` choke
+  point synchronises the projection in the SAME transaction as every
+  sanctioned binding writer (importer create `_apply_import`, refresh
+  `_refresh_existing`, the approval action) — future writers are covered
+  by construction; the SEC-3 SQL quarantine sweep/release propagate
+  through the new `_sec3_after_quarantine_flag_update` scope-mixin hook.
+- **Migration.** `shopify_connector_sale` `19.0.2.8.0 → 19.0.2.9.0`,
+  `migrations/19.0.2.9.0/post-migrate.py`: bounded, idempotent
+  `UPDATE … FROM shopify_connector_order_binding` backfill guarded by
+  `IS DISTINCT FROM` on every column (second run touches zero rows);
+  fresh install needs no script. Rollback stays revert-and-orphan (§12).
+- **Provenance, stated per C1/C2 (doc-consistency item 4):** the ORIGINAL
+  evidence is the Shopify payload snapshot on the binding; the RUNTIME
+  PROJECTION is the eleven protected `sale.order` columns; the AGGREGATE
+  model, the RECORD-RULE model and the drill-down `res_model` are all
+  `sale.order` (`sale.order.line` for C4/E1/E2; `stock.picking` for L5;
+  the connector models for G/F/L7) — spec §6.1 unchanged and now
+  implemented verbatim.
+- **Aggregate service.** `get_store_360_data(store_id, period)` on the
+  existing `shopify.connector.ui.dashboard` AbstractModel
+  (`get_dashboard_data` kept); sale sections in
+  `shopify_connector_sale/models/shopify_connector_ui_store360_sale.py`,
+  fulfillment sections in
+  `shopify_connector_fulfillment/models/shopify_connector_ui_store360_fulfillment.py`,
+  contributed through the `_store_360_extra_sections` seam. Current-user
+  ORM grouped reads only; per-currency partitioning; honest
+  `no_permission` variants; server-validated store/period filters.
+- **Generation-bound freshness (R-4 backend prerequisite).** Order side:
+  `run_scan` records the pending lineage
+  (`sale_order_catchup_pending_*`), the job-terminal hook promotes
+  `sale_order_catchup_generation` / `sale_order_catchup_synced_through_at`
+  only when every current-generation order job is terminal and
+  non-blocking; `action_reconnect` retires stale-generation order jobs
+  and admits exactly one catch-up scan; a cancelled import resumes
+  exactly once via a deterministic `#resume:<job id>` key. Fulfillment
+  side: the previously dead-end `fulfillment_reconnect_catchup` route is
+  genuinely admitted from `action_reconnect`, scope-key-prefixed
+  (`FULFILLMENT_SCOPE_PREFIXED_JOB_TYPES`), with
+  `fulfillment_catchup_*` stamps mirroring the order contract.
+- **UI.** The Store 360 Owl screen ships under the ORIGINAL
+  `shopify_connector_dashboard` client-action tag (navigation, S1 setup
+  entry and `.o_sc_dashboard` roots preserved): filters, the two distinct
+  timestamps, critical band, commercial cards + truthful deltas, bridge,
+  trend with hatched previous period + data-table equivalent, top
+  products with goods-subtotal share, lifecycle strips, dispatch
+  (ruling-D labelled), health regions, multi-store table. Tokens only,
+  logical properties, reduced-motion inherited, ≤640 px action
+  containment.
+- **Sync Operations Analysis.** Zero-schema search/graph/pivot views +
+  action + menu over `shopify.connector.job` under its native ACLs and
+  fail-closed company/quarantine rule
+  (`shopify_connector_core/views/shopify_connector_job_analysis_views.xml`).
+- **R-4** (`docs/05-qa/shopify-live-validation-package.md`) is a
+  MANDATORY current-candidate UAT scenario now that Store 360 ships.
+- **Tests.** `test_sale_order_projection.py`, `test_store360_aggregates.py`,
+  `test_store360_security.py`, `test_order_reconnect_catchup.py` (sale);
+  `test_fulfillment_reconnect_catchup.py` (fulfillment, recorded
+  frozen-list amendment); Store 360 extensions in `test_ui_dashboard.py`,
+  `test_ui_performance.py`, `test_ui_source_guards.py`,
+  `test_ui_installation.py` (core); the dashboard HOOT suite rewritten at
+  its contract count of exactly 8; the u0 navigation tour and the sale b2
+  tour extended in place (the frozen tour-method inventory is unchanged).
+- **NOT implemented, explicitly:** Shopify Sales Analysis on
+  `sale.report` (§14.1 security prerequisite unresolved — deferred);
+  refunds/net sales/payouts; COD monetary totals; carrier delivery
+  status; notification frameworks; report builders.
+- **Known limitations** (recorded, not hidden): the visual-evidence
+  instrument's commercial regions render with core-only fixtures (real
+  commercial pixels are driven by the sale b2 browser tour); an
+  old-generation `failed_final` job revived by manual retry is refused at
+  admission — the documented remedy is the per-order manual sync
+  (`action_sync_selected`); the equivalent cancelled-import resume gap in
+  OTHER domains (product/inventory) predates this session and is out of
+  its write-set — logged as debt. **Measured Odoo 19 fact:** a dotted
+  `sale_id.*` term in a picking search domain applies the caller's OWN
+  `sale.order` record rules inside the subquery, so a sale-rule-restricted
+  caller's dispatch numbers are the intersection of picking and sale
+  rules — strictly narrower, never a leak, count/drill-down agreement
+  intact (see the provider header note). The current-window end is
+  INCLUSIVE (`<=` now) so an order imported in the render second never
+  transiently vanishes; the previous window stays half-open, keeping the
+  two disjoint.
 
 > **Correction revision (control room, 2026-08-01):** the raw-SQL aggregate
 > recommendation is **withdrawn** and replaced (§6); slice 1 is reclassified
@@ -274,7 +378,7 @@ Slice 1 changes, in `shopify_connector_sale` (projection) +
     - line-grain counts → aggregate and drill down on `sale.order.line`;
     - **region-L lifecycle strips (slice 1b)**: the payment/COD/fulfillment
       state fields are mirrored from the binding onto `sale.order`
-      (spec §6.1 note — 7 additional readonly columns, same sanctioned
+      (spec §6.1 note — 8 additional readonly columns, same sanctioned
       writers/transaction, same backfill migration), so lifecycle counts
       aggregate and drill down on `sale.order` under the caller's rules
       with no raw SQL, no `sudo()`, no client-visible ID list, and no
@@ -432,8 +536,12 @@ read-only.
    dot on their real backgrounds.
 6. **Perf**: scenario at seeded volume; constant-query assertion — run as
    both an unrestricted and a rule-restricted user.
-7. **Adversarial security suite** — the eight §8 tests, mandatory for
-   slice-1 acceptance.
+7. **Adversarial security suite** — the §8 suite as implemented in
+   `test_store360_security.py` (restrictive sale-order rule, independent
+   line rule, count/drill-down agreement under restriction, hidden-label
+   walk, no-permission and outsider refusals, provider source guards)
+   plus the picking-rule case in `test_fulfillment_reconnect_catchup.py`
+   — mandatory for slice-1 acceptance.
 8. **Order-lifecycle suite (correction addendum §H)** — required of the
    future implementation, explicitly NOT run in this documentation-only
    correction: Python model/service tests for every region-L bucket

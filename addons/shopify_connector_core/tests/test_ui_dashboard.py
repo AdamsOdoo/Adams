@@ -9,7 +9,7 @@
 import re
 
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
 )
@@ -201,3 +201,63 @@ class TestUiDashboard(TransactionCase):
         if data['state'] == 'healthy':
             self.assertEqual(data['stores']['reconnect_needed'], 0)
             self.assertEqual(len(data['exceptions']), 0)
+
+    # ------------------------------------------------------------------ #
+    #  Store 360 core payload (the sale/fulfillment sections are owned and
+    #  tested by their modules; core owns meta/health/flows/critical)
+    # ------------------------------------------------------------------ #
+    def test_store360_payload_core_shape(self):
+        store = self._make_store()
+        self._make_job(store, 'succeeded')
+        payload = self.Dashboard.get_store_360_data(store.id, '30d')
+        for key in ('meta', 'health', 'flows', 'stores_region', 'critical',
+                    'generated_at', 'refresh_interval_seconds'):
+            self.assertIn(key, payload)
+        self.assertEqual(payload['meta']['store_id'], store.id)
+        self.assertEqual(payload['meta']['period'], '30d')
+        self.assertEqual(
+            [row['id'] for row in payload['flows']],
+            ['orders', 'catalog', 'inventory', 'export', 'fulfillment'],
+        )
+
+    def test_store360_refuses_unknown_period_and_store(self):
+        self._make_store()
+        with self.assertRaises(UserError):
+            self.Dashboard.get_store_360_data(False, 'forever')
+        with self.assertRaises(UserError):
+            self.Dashboard.get_store_360_data(987654321, '30d')
+
+    def test_store360_exceptions_are_store_scoped_and_count_exact(self):
+        store_a = self._make_store()
+        store_b = self._make_store()
+        self._make_job(store_a, 'failed_final')
+        self._make_job(store_b, 'failed_final')
+        self._make_job(store_b, 'failed_final')
+        payload = self.Dashboard.get_store_360_data(store_b.id, '30d')
+        failed = [exc for exc in payload['health']['exceptions']
+                  if exc['id'] == 'failed_final']
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]['count'], 2)
+        Job = self.env['shopify.connector.job'].with_user(self.viewer)
+        domain = [tuple(t) for t in failed[0]['target']['domain']]
+        self.assertEqual(Job.search_count(domain), 2)
+
+    def test_store360_multi_store_region_appears_only_with_two_stores(self):
+        store = self._make_store()
+        payload = self.Dashboard.get_store_360_data(store.id, '30d')
+        self.assertFalse(payload['stores_region']['available'])
+        self._make_store()
+        payload = self.Dashboard.get_store_360_data(False, '30d')
+        self.assertTrue(payload['stores_region']['available'])
+        self.assertEqual(len(payload['stores_region']['rows']), 2)
+
+    def test_store360_empty_state_matches_the_first_run(self):
+        payload = self.Dashboard.get_store_360_data()
+        self.assertEqual(payload['health']['state'], 'empty')
+
+    def test_store360_critical_band_names_a_disconnected_store(self):
+        store = self._make_store(state='disconnected')
+        payload = self.Dashboard.get_store_360_data(store.id, '30d')
+        self.assertTrue(payload['critical']['active'])
+        causes = {cause['id'] for cause in payload['critical']['causes']}
+        self.assertIn('store_state', causes)
