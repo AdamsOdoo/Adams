@@ -39,7 +39,30 @@
   by construction instead of by enumeration. *Repeated pattern:* counting
   fields wrong in prose while the list beside it was right (the
   "seven mirrors / ~ten columns" undercount) — corrected to exactly
-  eleven; lists are normative, adjectives are not.
+  eleven; lists are normative, adjectives are not. (4) The full-suite HOOT
+  pass caught what every focused Python run could not: the no-permission
+  note renders **per section** by design, so an unscoped
+  `.sc360-no-permission` selector matched two notes and `queryText()`
+  threw — the test was scoped to the section it names (commit
+  `0e7cba5`, test-only, the frozen 8-test count unchanged). Browser
+  suites test the composed template, not one section's contract.
+- **Verification (this environment — CI supporting evidence, NOT
+  Odoo.sh; DEC-041 D8):** complete `tools/run_connector_suite.sh`
+  campaign (fresh, warm same-version, genuine migrations from both
+  recorded origins with the `19.0.2.9.0` sale backfill executing and the
+  second update running zero scripts, non-standard incl. HOOT ×3 /
+  visual / concurrency / benchmarks) — final green run at the last
+  code-bearing head; per-pass result lines and `summary.json` are
+  preserved under `docs/05-qa/evidence/store360-implementation-2026-08-01/`.
+  Counterfactual proof against the base `a1c5931`: the five new suites
+  collapse without the implementation (3 failed + 33 errors of 38, the
+  projection suite cannot even import; the only 2 passes are vacuous
+  negative-behavior tests) — see `counterfactual-a1c5931.md` there.
+  Warm-call query counts: legacy dashboard 17; Store 360 constant 29
+  (auditor shape) / 48 (full-access shape) regardless of store filter or
+  period — see `query-counts.md` there. No Shopify credential, request,
+  or mutation anywhere in the session; no Odoo.sh run this session (that
+  campaign is the next, UAT-owning step).
 
 ### Shopify Store 360 — final bounded design-correction tail (2026-08-01)
 
