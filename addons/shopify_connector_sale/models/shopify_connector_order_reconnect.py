@@ -293,36 +293,25 @@ class ShopifyConnectorStoreSettingsOrderCatchup(models.Model):
 
           * a cancelled SCAN job never qualifies — an incomplete enumeration
             is a store-wide hole, not a single-target one;
-          * a cancelled IMPORT job qualifies when EITHER
-              (a) a same-store, same-target, CURRENT-generation
-                  `order_import_sync` job has succeeded — the exact order was
-                  re-imported this generation (the deterministic resume
-                  replacement, linked via `superseded_by_job_id`, is exactly
-                  such a job); OR
-              (b) authoritative binding evidence for the target GID is
-                  already at least as new as the version the cancelled job
-                  was to import — the order had already landed.
+          * a cancelled IMPORT job qualifies only when authoritative binding
+            evidence for the target GID is already at least as new as the
+            version the cancelled job was to import — the order had already
+            landed.
 
-        A different-store, different-target or older-generation successor
-        never satisfies coverage. A queued/running/failed/cancelled
-        replacement never satisfies it either: (a) requires `succeeded`, and
-        until then the binding evidence in (b) is not advanced.
+        Success of another job is never itself coverage (PR #204
+        cancellation-coverage correction, 2026-08-01): a same-store,
+        same-target, current-generation `order_import_sync` job reaching
+        `succeeded` — whether or not it is the deterministic replacement
+        linked via `superseded_by_job_id` — proves nothing on its own about
+        whether THIS job's target/version landed; only the binding does. A
+        queued/running/failed/cancelled replacement never advances the
+        binding either, so an unproven hole simply stays a hole.
         """
         if job.job_type != 'order_import_sync':
             return False
         gid = job.shopify_target_gid
         if not gid:
             return False
-        Job = self.env['shopify.connector.job'].sudo()
-        replacement = Job.search_count([
-            ('store_id', '=', store.id),
-            ('job_type', '=', 'order_import_sync'),
-            ('shopify_target_gid', '=', gid),
-            ('expected_connection_generation', '=', current_generation),
-            ('state', '=', 'succeeded'),
-        ])
-        if replacement:
-            return True
         binding = self.env['shopify.connector.order.binding'].sudo().search([
             ('store_id', '=', store.id),
             ('shopify_gid', '=', gid),

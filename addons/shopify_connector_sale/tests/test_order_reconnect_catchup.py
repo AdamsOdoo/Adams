@@ -375,6 +375,25 @@ class TestOrderReconnectCatchup(OrderImportCase):
             ._shopify_connector_promote_order_catchup(self.store)
         self.settings.invalidate_recordset()
 
+    def _seed_binding(self, gid, updated_at_iso, name):
+        """A durable, authoritative binding row proving `gid` last landed
+        at Shopify `updatedAt` instant `updated_at_iso` -- independent of
+        any job, so it can stand as coverage evidence on its own."""
+        order = self.env['sale.order'].sudo().create({
+            'partner_id': self.fallback_partner.id,
+            'company_id': self.env.company.id,
+            'pricelist_id': self.pricelist.id,
+        })
+        return self.Binding.sudo().create({
+            'store_id': self.store.id,
+            'sale_order_id': order.id,
+            'shopify_gid': gid,
+            'shopify_order_name': name,
+            'shopify_updated_at_snapshot':
+                self.env['shopify.connector.order.scan']._as_datetime(
+                    updated_at_iso),
+        })
+
     def test_cancelled_import_blocks_until_linked_replacement_succeeds(self):
         """The reproduced P1-1 and its fix, end to end through the real
         `action_cancel` operator route and the real deterministic resume."""
@@ -480,6 +499,103 @@ class TestOrderReconnectCatchup(OrderImportCase):
             'once every hole is closed the bridge is complete/current again',
         )
 
+    # ------------------------------------------------------------------
+    # PR #204: success alone is never coverage -- only binding evidence is
+    # ------------------------------------------------------------------
+    def test_cancelled_import_linked_replacement_success_without_binding_does_not_cover(self):
+        """A properly linked, succeeded replacement is not itself proof
+        that the cancelled target/version landed: with no binding evidence
+        at all, the hole must stay open (mandatory scenario 2)."""
+        self.store.sudo().write({'connection_generation': 7})
+        generation = self.store.connection_generation
+        self._enable_scheduled_fresh()
+        self._seed_pending(generation)
+        target_gid = 'gid://shopify/Order/LinkedNoBinding'
+        cancelled = self._make_job_with_gid(
+            'order_import_sync', 'cancelled', generation,
+            '2026-07-17T12:00:00Z', target_gid,
+        )
+        replacement = self._make_job_with_gid(
+            'order_import_sync', 'succeeded', generation,
+            'v#linked-no-binding', target_gid,
+        )
+        cancelled.sudo().write({'superseded_by_job_id': replacement.id})
+        self._promote()
+        self.assertNotEqual(
+            self.settings.sale_order_catchup_generation, generation,
+            'a linked, succeeded replacement with no binding evidence '
+            'must not cover the cancelled hole',
+        )
+        self.assertNotEqual(
+            self._bridge_state(), 'complete_current',
+            'the bridge must not claim complete/current with no binding '
+            'proof the target/version landed',
+        )
+
+    def test_cancelled_import_linked_replacement_with_stale_binding_does_not_cover(self):
+        """A linked, succeeded replacement plus binding evidence OLDER than
+        the cancelled job's intended version still leaves the hole open
+        (mandatory scenario 3)."""
+        self.store.sudo().write({'connection_generation': 7})
+        generation = self.store.connection_generation
+        self._enable_scheduled_fresh()
+        self._seed_pending(generation)
+        target_gid = 'gid://shopify/Order/StaleBinding'
+        cancelled = self._make_job_with_gid(
+            'order_import_sync', 'cancelled', generation,
+            '2026-07-17T12:00:00Z', target_gid,
+        )
+        replacement = self._make_job_with_gid(
+            'order_import_sync', 'succeeded', generation,
+            'v#stale-binding-linked', target_gid,
+        )
+        cancelled.sudo().write({'superseded_by_job_id': replacement.id})
+        self._seed_binding(
+            target_gid, '2026-07-17T10:00:00Z', '#StaleBinding',
+        )
+        self._promote()
+        self.assertNotEqual(
+            self.settings.sale_order_catchup_generation, generation,
+            'binding evidence older than the cancelled job\'s intended '
+            'version must not cover the hole',
+        )
+        self.assertNotEqual(
+            self._bridge_state(), 'complete_current',
+            'the bridge must not claim complete/current over stale '
+            'binding evidence',
+        )
+
+    def test_cancelled_import_covered_by_binding_alone_without_replacement(self):
+        """Authoritative binding evidence proving the exact target/version
+        already landed is sufficient on its own -- no replacement job is
+        required (mandatory scenario 5)."""
+        self.store.sudo().write({'connection_generation': 7})
+        generation = self.store.connection_generation
+        self._enable_scheduled_fresh()
+        self._seed_pending(generation)
+        target_gid = 'gid://shopify/Order/BindingAlone'
+        intended_iso = '2026-07-17T12:00:00Z'
+        self._make_job_with_gid(
+            'order_import_sync', 'cancelled', generation,
+            intended_iso, target_gid,
+        )
+        self._seed_binding(target_gid, intended_iso, '#BindingAlone')
+        self._promote()
+        self.assertEqual(
+            self.settings.sale_order_catchup_generation, generation,
+            'authoritative binding evidence alone must cover the '
+            'cancelled hole even with no replacement job',
+        )
+        self.assertEqual(
+            self.settings.sale_order_catchup_synced_through_at,
+            self.settings.sale_order_catchup_pending_upper_bound_at,
+        )
+        self.assertEqual(
+            self._bridge_state(), 'complete_current',
+            'the bridge must reach complete/current once binding '
+            'evidence proves the hole is closed',
+        )
+
     def test_a_cancelled_scan_job_remains_blocking(self):
         self.store.sudo().write({'connection_generation': 7})
         generation = self.store.connection_generation
@@ -511,6 +627,7 @@ class TestOrderReconnectCatchup(OrderImportCase):
     def test_other_store_or_generation_successor_never_covers(self):
         self.store.sudo().write({'connection_generation': 7})
         generation = self.store.connection_generation
+        self._enable_scheduled_fresh()
         self._seed_pending(generation)
         target_gid = 'gid://shopify/Order/WrongSuccessor'
         # A cancelled current-generation import. (Payloads differ between
@@ -543,15 +660,25 @@ class TestOrderReconnectCatchup(OrderImportCase):
             self.settings.sale_order_catchup_generation, generation,
             'a different-target successor cannot cover a cancelled target',
         )
-        # The exact same-target, current-generation success finally covers it.
+        # PR #204 cancellation-coverage correction: an exact same-target,
+        # current-generation success -- with no explicit
+        # `superseded_by_job_id` link and no authoritative binding evidence
+        # -- still does NOT cover the hole (mandatory scenario 1). Success
+        # alone was the unsafe shortcut; it is never coverage by itself.
         self._make_job_with_gid(
             'order_import_sync', 'succeeded', generation,
             'v#final', target_gid,
         )
         self._promote()
-        self.assertEqual(
+        self.assertNotEqual(
             self.settings.sale_order_catchup_generation, generation,
-            'the exact same-target current-generation success covers the hole',
+            'an unlinked same-target/current-generation success with no '
+            'binding evidence must not cover the cancelled hole',
+        )
+        self.assertNotEqual(
+            self._bridge_state(), 'complete_current',
+            'the bridge must not claim complete/current over a hole that '
+            'success alone did not prove closed',
         )
 
     def _make_job_with_gid(self, job_type, state, generation, payload, gid):
