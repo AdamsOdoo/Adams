@@ -17,6 +17,8 @@ import os
 import shutil
 import tempfile
 
+import sass
+
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -110,6 +112,21 @@ class TestUiSourceGuards(TransactionCase):
             for name in files:
                 if name.endswith('.py'):
                     yield os.path.join(root, name)
+
+    def _iter_connector_scss_files(self):
+        """Every connector-owned SCSS source across the addon family."""
+        addons_root = os.path.dirname(self.addon_root)
+        for addon_name in sorted(os.listdir(addons_root)):
+            if not addon_name.startswith('shopify_connector_'):
+                continue
+            static_root = os.path.join(addons_root, addon_name, 'static', 'src')
+            if not os.path.isdir(static_root):
+                continue
+            for root, dirs, files in os.walk(static_root):
+                dirs[:] = [d for d in dirs if d != '__pycache__']
+                for name in sorted(files):
+                    if name.endswith('.scss'):
+                        yield os.path.join(root, name)
 
     # ------------------------------------------------------------------ #
     def test_single_owl_surface(self):
@@ -250,6 +267,32 @@ class TestUiSourceGuards(TransactionCase):
                             src.startswith('@web') or src.startswith('@odoo'),
                             "Only @web/@odoo imports are allowed; found %r" % src,
                         )
+
+    def test_all_connector_scss_compiles_with_odoo_libsass(self):
+        """Compile every connector stylesheet with Odoo's Sass engine.
+
+        Odoo 19's Python ``sass`` dependency is LibSass. Dart Sass accepts
+        newer CSS Color 4 expressions such as ``rgb(16 24 40 / .03)`` that
+        LibSass rejects, and one rejected expression disables the complete
+        backend asset bundle. Compiling every connector-owned SCSS source
+        here makes the production compiler—not a newer substitute—the gate.
+        """
+        compiled = []
+        for path in self._iter_connector_scss_files():
+            relative_path = os.path.relpath(
+                path, os.path.dirname(self.addon_root))
+            try:
+                sass.compile(filename=path, output_style='compressed')
+            except sass.CompileError as error:
+                self.fail(
+                    "Odoo LibSass cannot compile %s:\n%s"
+                    % (relative_path, error))
+            compiled.append(relative_path)
+        self.assertTrue(
+            compiled,
+            "The LibSass compatibility gate did not discover any connector "
+            "SCSS sources.",
+        )
 
     def test_dashboard_service_reads_no_credential_or_payload(self):
         """The aggregate service never touches a credential or raw payload field."""
