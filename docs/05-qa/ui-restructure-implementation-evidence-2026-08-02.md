@@ -13,7 +13,7 @@
 | Required base SHA | `49cfffbd5ff0eca85d2b855d9ebd2e414680af8e` |
 | Working branch | `codex/ui-restructure-implementation` |
 | Signed-contract provenance commits on this branch | `971e6ed` (audit + contract capture); `55ffb6f` (product-owner sign-off + mission prompt) |
-| Draft PR | Not opened yet |
+| Draft PR | [#206](https://github.com/AdamsOdoo/Adams/pull/206), open and draft, targeting `fable/wave-5-completion` |
 | Native Odoo.sh exact-head campaign | Not run in this environment |
 | Live Shopify calls or mutations | Not run |
 
@@ -38,7 +38,24 @@ scope commit's worktree state before commit:
 | `git diff --cached --check` | Exit 0; no whitespace errors |
 | `python3 -c '<12-condition C1/C2/C3/C4/C5/C6/C7/UI/action-effect assertion set>'` | `Batch 0 contract-adversarial checks: 12/12 passed`; exit 0 |
 
-**CI.** Not run yet.
+**CI.** Exact-head GitHub Actions run
+[#153](https://github.com/AdamsOdoo/Adams/actions/runs/30760560925)
+completed successfully for `72bbdcf01873ee6b6f664b817991d1e0a95817f1`.
+The workflow verified both `connector_sha` and `source_head_sha` as that exact
+commit and verified the pinned Odoo 19 source SHA as
+`30bde9ff758834a4912c5ae55843d3a7dad849f1`. Real results from the run log:
+
+| Campaign | Real result |
+| --- | --- |
+| Fresh install | `0 failed, 0 error(s) of 2511 tests`; 37 tour success markers; all 36 required tour tests attributed |
+| Warm update | `0 failed, 0 error(s) of 2511 tests`; 37 tour success markers; all 36 required tour tests attributed |
+| Migration from `50b770a3…` | `0 failed, 0 error(s) of 2511 tests`; all 36 required tours; second update also `0 failed, 0 error(s) of 2511 tests` |
+| Migration from `0a15b176…` | `0 failed, 0 error(s) of 2511 tests`; all 36 required tours; second update also `0 failed, 0 error(s) of 2511 tests` |
+| Nonstandard/concurrency/performance/HOOT campaign | `0 failed, 0 error(s) of 62 tests` |
+| Browser evidence | `verified` by the workflow summary |
+
+This is supporting CI evidence only. It is not the native Odoo.sh exact-head
+gate and made no Shopify request.
 
 **Adversarial pass.** The pass challenged the most likely documentation
 regressions: leaving the old seven/eight-peer IA apparently authoritative;
@@ -51,7 +68,9 @@ clearly superseded provenance behind a prominent signed-delta link. No rendered
 browser run was performed or claimed because this batch contains low-fidelity
 Markdown wireframe notes rather than HTML/CSS production or prototype changes.
 
-**Revert boundary.** Revert the single Batch 0 scope commit after the two signed
-provenance commits; it contains documentation and wireframe notes only.
+**Revert boundary.** Revert `bf8d80a08dd62ef18405373dc045bc74dffc8ce9`
+and its evidence-only successor
+`72bbdcf01873ee6b6f664b817991d1e0a95817f1`, leaving the two signed provenance
+commits in place. Both commits contain documentation and wireframe notes only.
 
 **Deviations.** None currently recorded.
