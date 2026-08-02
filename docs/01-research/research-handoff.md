@@ -1,3 +1,45 @@
+### UI restructure — product-owner sign-off + ChatGPT implementation mission — compact handoff (2026-08-02, continuation)
+
+- **Branch / PR:** `claude/connector-ui-config-design-ks0avb` (same session,
+  second commit); docs-only; no PR opened.
+- **Files changed:**
+  `docs/06-prompts/chatgpt-ui-restructure-implementation-prompt-2026-08-02.md` (new),
+  `docs/02-product/ui-restructure-design-contract-2026-08-02.md` (status
+  banner addendum), this handoff.
+- **What changed / residue fixed:** recorded the dated product-owner
+  instruction of 2026-08-02: C1–C8 signed; implementation authorized to
+  start now; roles for this mission — ChatGPT 5.6 implementation worker with
+  continuous self-validation, Claude independent review and control gate,
+  product owner final authority; no-self-acceptance unchanged. Authored the
+  full ChatGPT mission prompt (base `49cfffbd…`, branch
+  `codex/ui-restructure-implementation`, stacked draft PR into
+  `fable/wave-5-completion`, batches 0/A–F with per-batch self-validation,
+  evidence doc `docs/05-qa/ui-restructure-implementation-evidence-2026-08-02.md`,
+  hard stops, handback contract). Ratifiable defaults set for the two open
+  §5 decisions (export no-JS route: keep, diff-embedded, Administrator-only,
+  audited; order lifecycle: declared-scope, review-excluded metrics).
+- **Items deferred:** independent Claude review + control after ChatGPT's
+  handback; Odoo.sh exact-head campaign; controlled Shopify UAT; R5
+  traceability; product-owner ratification of the two defaults.
+- **Learning feedback loop:** *New issue:* none. *Repeated pattern:* role
+  reassignments must land as dated in-repo records at the moment they
+  happen, or the governance trail breaks — handled here in the prompt file's
+  preamble. *Rules updated:* none (mission-scoped role assignment recorded,
+  CLAUDE.md untouched). *Rejected approaches:* none. *Technical debt:* none
+  new. *Architecture concerns:* none new.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked
+  YES · learning captured YES · rejected approach logged N/A · technical
+  debt logged N/A · repeated-issue escalation N/A.
+- **Next recommended session:** *Independent Claude review + control gate* —
+  after ChatGPT posts `IMPLEMENTATION COMPLETE` on its draft PR: fresh
+  session reviews the exact handback head from scratch (contract C1–C8
+  compliance, protected-contract integrity, test/evidence audit,
+  adversarial re-verification) per
+  `docs/06-prompts/claude-mvp-wave-review-template.md`.
+- **Stop condition:** stopped at prompt/authorization capture; no
+  `addons/**` change, no acceptance, no merge, no runtime/Shopify
+  operation by this session.
+
 ### UI restructure design contract — control-room ruling capture + independent verification — compact handoff (2026-08-02)
 
 - **Branch / PR:** `claude/connector-ui-config-design-ks0avb` (based on the exact

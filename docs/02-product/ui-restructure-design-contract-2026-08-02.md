@@ -1,8 +1,18 @@
 # UI Restructure Design Contract — Locked Target Contracts and Independent Verification (2026-08-02)
 
-> **Status: Control-room ruling captured and independently verified —
-> AWAITING PRODUCT-OWNER STRUCTURE/DESIGN SIGN-OFF. IMPLEMENTATION IS NOT
-> AUTHORIZED BY THIS DOCUMENT.** This document records, verbatim in intent,
+> **Status update (2026-08-02, later same day): SIGNED AND IMPLEMENTATION
+> AUTHORIZED.** By dated product-owner instruction (2026-08-02), C1–C8 are
+> signed and implementation is authorized to start now, with ChatGPT 5.6 as
+> the implementation worker (continuous self-validation) and Claude as the
+> independent review-and-control gate — see the mission record in
+> [`../06-prompts/chatgpt-ui-restructure-implementation-prompt-2026-08-02.md`](../06-prompts/chatgpt-ui-restructure-implementation-prompt-2026-08-02.md).
+> The §5 open items 2 and 3 proceed on the ratifiable defaults stated in
+> that prompt; the no-self-acceptance rule is unchanged. The original
+> status at capture time is preserved below for the record.
+>
+> **Status at capture: Control-room ruling captured and independently
+> verified — awaiting product-owner structure/design sign-off;
+> implementation not authorized by this document.** This document records, verbatim in intent,
 > the 2026-08-02 control-room ruling (ChatGPT 5.6) on the connector's product
 > restructure, together with this session's independent code-level
 > verification of its load-bearing claims at the exact governed candidate
