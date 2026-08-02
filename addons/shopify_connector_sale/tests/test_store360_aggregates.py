@@ -102,6 +102,11 @@ class TestStore360Aggregates(OrderImportCase):
     def test_commercial_arithmetic_and_exclusions(self):
         kept_a = self._imported_order(days_ago=2, amount=100.0, qty=2)
         kept_b = self._imported_order(days_ago=3, amount=50.0, qty=1)
+        # Disclosed separately, but excluded from every reconciled value,
+        # order, unit, trend, and product aggregate.
+        review = self._imported_order(
+            days_ago=2, amount=777.0, qty=7, status='review',
+        )
         # Excluded: Odoo-cancelled.
         cancelled = self._imported_order(days_ago=2, amount=999.0)
         cancelled.write({'state': 'cancel'})
@@ -138,11 +143,63 @@ class TestStore360Aggregates(OrderImportCase):
         self.assertAlmostEqual(
             block['aov'], expected_sales / 2.0, places=2)
         self.assertEqual(commercial['units'], 3)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
 
         # The orders drill-down IS the aggregate population.
         model = self.env['sale.order'].with_user(self.viewer)
         domain = [tuple(t) for t in commercial['orders_target']['domain']]
         self.assertEqual(model.search_count(domain), 2)
+        self.assertNotIn(review, model.search(domain))
+        review_domain = [
+            tuple(t) for t in commercial['awaiting_review']['target']['domain']
+        ]
+        self.assertEqual(model.search(review_domain), review)
+
+    def test_kpis_equal_drilldowns_with_review_quarantine_and_cancel(self):
+        """A3: every commercial KPI reconciles to its exact population."""
+        kept = self._imported_order(days_ago=1, amount=125.0, qty=2)
+        review = self._imported_order(
+            days_ago=1, amount=500.0, qty=5, status='review',
+        )
+        quarantined = self._imported_order(
+            days_ago=1, amount=1000.0, qty=10,
+            sec3_scope_quarantined=True,
+        )
+        cancelled = self._imported_order(days_ago=1, amount=2000.0, qty=20)
+        cancelled.write({'state': 'cancel'})
+
+        commercial = self._payload_360()['commercial']
+        self.assertEqual(commercial['orders_total'], 1)
+        self.assertEqual(commercial['units'], 2)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
+        self.assertEqual(len(commercial['blocks']), 1)
+        block = commercial['blocks'][0]
+        self.assertAlmostEqual(block['sales'], kept.amount_total, places=2)
+
+        Order = self.env['sale.order'].with_user(self.viewer)
+        Line = self.env['sale.order.line'].with_user(self.viewer)
+        order_domain = [
+            tuple(term) for term in commercial['orders_target']['domain']
+        ]
+        line_domain = [
+            tuple(term) for term in commercial['units_target']['domain']
+        ]
+        review_domain = [
+            tuple(term)
+            for term in commercial['awaiting_review']['target']['domain']
+        ]
+        reconciled = Order.search(order_domain)
+        self.assertEqual(reconciled, kept)
+        self.assertAlmostEqual(
+            sum(reconciled.mapped('amount_total')), block['sales'], places=2,
+        )
+        self.assertAlmostEqual(
+            sum(Line.search(line_domain).mapped('product_uom_qty')),
+            commercial['units'], places=2,
+        )
+        self.assertEqual(Order.search(review_domain), review)
+        self.assertNotIn(quarantined, reconciled)
+        self.assertNotIn(cancelled, reconciled)
 
     def test_zero_orders_never_divides(self):
         payload = self._payload_360()
@@ -289,8 +346,9 @@ class TestStore360Aggregates(OrderImportCase):
         self.assertEqual(buckets['pending_non_cod'], 1)
         self.assertEqual(buckets['cod'], 1)
         self.assertEqual(buckets['review'], 1)
-        # An unknown financial value is disclosed, never silently healthy.
-        self.assertEqual(lifecycle['payment']['other'], 1)
+        # The unknown value belongs to the separately-disclosed review order;
+        # it cannot leak back into the reconciled remainder.
+        self.assertEqual(lifecycle['payment']['other'], 0)
 
         cod = lifecycle['cod']
         self.assertEqual(cod['total'], 1)
@@ -300,7 +358,7 @@ class TestStore360Aggregates(OrderImportCase):
         progress = {b['id']: b['count']
                     for b in lifecycle['fulfillment_progress']['buckets']}
         self.assertEqual(progress['fulfilled'], 1)
-        self.assertEqual(progress['unfulfilled'], 5)
+        self.assertEqual(progress['unfulfilled'], 4)
         self.assertEqual(progress['not_observed'], 0)
 
         self.assertTrue(lifecycle['oldest_paid_unfulfilled'])

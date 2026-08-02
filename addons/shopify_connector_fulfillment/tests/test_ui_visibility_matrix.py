@@ -114,6 +114,14 @@ class TestUiVisibilityMatrix(TransactionCase):
         for restricted in (
             'fulfillment_operating_mode', 'fulfillment_switch_in_progress',
             'fulfillment_mode_switch_nonce',
+            'fulfillment_requested_mode',
+            'fulfillment_mode_switch_state',
+            'fulfillment_mode_switch_job_id',
+            'fulfillment_mode_switch_failure_reason',
+            'fulfillment_mode_switch_next_action',
+            'fulfillment_mode_switch_next_retry_at',
+            'fulfillment_mode_switch_is_stale',
+            'fulfillment_mode_switch_verified_at',
         ):
             self.assertNotIn(
                 restricted, user_fields,
@@ -155,6 +163,8 @@ class TestUiVisibilityMatrix(TransactionCase):
         self.assertEqual(self.settings.fulfillment_operating_mode, before_mode)
         self.assertFalse(self.settings.fulfillment_switch_in_progress)
         self.assertFalse(self.settings.fulfillment_mode_switch_nonce)
+        self.assertFalse(self.settings.fulfillment_requested_mode)
+        self.assertFalse(self.settings.fulfillment_mode_switch_job_id)
         self.assertEqual(
             self.env['shopify.connector.job'].search_count([
                 ('store_id', '=', self.store.id),

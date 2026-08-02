@@ -28,8 +28,10 @@ handler, the real response validation and the real cache upsert all run with
 only the socket absent.
 """
 
+from datetime import timedelta
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
@@ -263,6 +265,34 @@ class TestLocationRefreshAdmission(LocationRefreshCase):
             ).action_refresh_shopify_locations(self.store.id)
         self.assertNotEqual(first.id, second.id)
 
+    def test_retry_requeues_the_same_retryable_refresh(self):
+        with self._fail_on_contact():
+            first = self._as(
+                self.user_admin
+            ).action_refresh_shopify_locations(self.store.id)
+        first.sudo().write({
+            'state': 'running', 'started_at': fields.Datetime.now(),
+        })
+        first.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='Correct the location refresh configuration.',
+        )
+
+        with self._fail_on_contact():
+            retried = self._as(
+                self.user_admin
+            ).action_refresh_shopify_locations(self.store.id)
+
+        self.assertEqual(retried, first)
+        self.assertEqual(retried.state, 'queued')
+        self.assertEqual(
+            self.Job.sudo().search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', 'inventory_location_sync'),
+            ]),
+            1,
+        )
+
     # --- authorization --------------------------------------------------
 
     def test_an_auditor_is_refused(self):
@@ -384,6 +414,62 @@ class TestLocationRefreshState(LocationRefreshCase):
         state = self.Service.location_refresh_state(self.store)
         self.assertEqual(state['state'], 'none')
         self.assertFalse(state['job_id'])
+
+    def test_retry_waiting_is_still_running_with_the_next_retry(self):
+        job = self._job('running')
+        retry_at = fields.Datetime.now() + timedelta(minutes=5)
+        job.sudo()._transition_retry_waiting(
+            next_retry_at=retry_at,
+            retry_count=1,
+            error_class='shopify_temporary_server_network',
+            message='Shopify is temporarily unavailable.',
+        )
+
+        state = self.Service.location_refresh_state(self.store)
+
+        self.assertEqual(state['state'], 'waiting')
+        self.assertEqual(state['job_id'], job.id)
+        self.assertEqual(state['job_state'], 'retry_waiting')
+        self.assertEqual(state['next_retry_at'], retry_at)
+
+    def test_retryable_failure_is_failed_with_the_recorded_reason(self):
+        job = self._job('running')
+        job.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='Correct the location refresh configuration.',
+        )
+
+        state = self.Service.location_refresh_state(self.store)
+
+        self.assertEqual(state['state'], 'failed')
+        self.assertEqual(state['job_id'], job.id)
+        self.assertEqual(state['job_state'], 'failed_retryable')
+        self.assertIn('Correct the location refresh', state['reason'])
+        self.assertTrue(state['can_retry'])
+
+    def test_exact_job_followup_does_not_drift_to_a_newer_refresh(self):
+        first = self._job('succeeded')
+        second = self._job('queued')
+
+        state = self.Service.location_refresh_state(
+            self.store, job_id=first.id,
+        )
+
+        self.assertEqual(state['state'], 'succeeded')
+        self.assertEqual(state['job_id'], first.id)
+        self.assertNotEqual(state['job_id'], second.id)
+
+    def test_old_generation_success_is_stale_not_current(self):
+        job = self._job('succeeded')
+        self.store.sudo().write({'connection_generation': 1})
+
+        state = self.Service.location_refresh_state(
+            self.store, job_id=job.id,
+        )
+
+        self.assertEqual(state['state'], 'stale')
+        self.assertEqual(state['job_id'], job.id)
+        self.assertIn('connection', state['reason'].lower())
 
     def test_an_empty_cache_while_pending_is_not_reported_as_zero_locations(self):
         """The single most dangerous thing this surface could say.

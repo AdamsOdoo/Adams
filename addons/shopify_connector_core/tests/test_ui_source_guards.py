@@ -222,6 +222,32 @@ class TestUiSourceGuards(TransactionCase):
             "The previous-period series must carry a non-colour (textured) "
             "fill, not just a different colour from the current bars.")
 
+    def test_sales_metric_names_odoo_value_and_discloses_review_population(self):
+        """C7/A3: the UI may not overclaim Shopify lifecycle truth."""
+        xml = self._read(
+            'static', 'src', 'xml', 'shopify_connector_dashboard.xml',
+        )
+        self.assertIn('Imported Odoo order value', xml)
+        self.assertIn('Awaiting data review', xml)
+        self.assertNotIn(
+            '<div class="sc360-kpi__label">Imported Shopify sales</div>',
+            xml,
+        )
+
+    def test_setup_location_refresh_polling_is_bounded_and_cancelled(self):
+        """C4/A2: no immortal timer may survive a setup refresh/session."""
+        js = self._read(
+            'static', 'src', 'js', 'shopify_connector_setup_wizard.js',
+        )
+        xml = self._read(
+            'static', 'src', 'xml', 'shopify_connector_setup_wizard.xml',
+        )
+        self.assertIn('LOCATION_REFRESH_BACKOFF_MS', js)
+        self.assertIn('onWillUnmount', js)
+        self.assertNotIn('setInterval(', js)
+        self.assertIn('sc_setup_refresh_still_running', xml)
+        self.assertIn('sc_setup_check_refresh', xml)
+
     def test_no_external_frontend_dependency(self):
         """No CDN, external font, npm import, or charting library in assets."""
         asset_files = [

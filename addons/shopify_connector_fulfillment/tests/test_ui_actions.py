@@ -4,6 +4,8 @@ wizards delegate without deciding anything.
 
 import uuid
 
+from lxml import etree
+
 from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
@@ -43,6 +45,7 @@ class TestUiActions(TransactionCase):
         Settings = self.env['shopify.connector.store.settings']
         for model, method in (
             (Settings, 'action_start_mode2_switch'),
+            (Settings, 'action_retry_mode2_switch'),
             (Settings, 'action_rollback_to_mode1'),
             (Binding, 'action_release_fulfillment_review'),
             (Evidence, 'action_import_tracking'),
@@ -53,6 +56,31 @@ class TestUiActions(TransactionCase):
                 callable(getattr(model, method, None)),
                 'Sanctioned action %s is missing -- U1 wires to it.' % method,
             )
+
+    def test_failed_or_running_switch_has_a_direct_return_to_mode1_control(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_store_settings_fulfillment_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        buttons = arch.xpath(
+            "//button[@name='action_rollback_to_mode1' and @type='object']"
+        )
+        self.assertEqual(
+            len(buttons), 1,
+            'A failed/running switch must expose the sanctioned server '
+            'rollback directly; the effective-Mode-derived wizard would '
+            'request Mode 2 again while Mode 1 is still effective.',
+        )
+        invisible = buttons[0].get('invisible') or ''
+        self.assertIn('fulfillment_switch_in_progress', invisible)
+        self.assertIn('fulfillment_mode_switch_state', invisible)
+        self.assertNotEqual(
+            invisible.strip(), "fulfillment_operating_mode != 'mode2'",
+            'Return to Mode 1 must not disappear merely because the failed '
+            'switch correctly kept Mode 1 effective.',
+        )
+        self.assertTrue(buttons[0].get('confirm'))
 
     def test_all_u1_act_windows_resolve_to_an_existing_model(self):
         for xmlid in (
