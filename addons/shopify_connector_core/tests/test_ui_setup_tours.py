@@ -90,9 +90,9 @@ class TestUiSetupTours(HttpCase):
     def test_setup_wizard_traverses_all_twelve_steps(self):
         """Nothing to an activated store, through the browser, in order.
 
-        The tour asserts the step COUNT as well as each step's name at every
-        stop ("Step 4 of 12"), so a dropped, added or reordered step fails
-        here rather than passing quietly. It also asserts the two Wave 5
+        The tour asserts each guarded checkpoint's name and its progress
+        inside one of the four merchant phases, so a dropped, added or
+        reordered checkpoint fails here rather than passing quietly. It also asserts the two Wave 5
         corrections that only exist on screen: that the conditional location
         step is rendered as Not required rather than removed, and that
         readiness runs after the choices it reads rather than before them.

@@ -122,10 +122,11 @@
                         downgrade for anyone who lands there.
                     -->
                     <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
-                            type="action" string="Confirm without the review screen"
+                            type="action" string="Confirm from record"
                             class="btn-secondary"
                             invisible="state != 'previewed'"
                             groups="shopify_connector_core.group_shopify_connector_user"
+                            help="Use the standard Odoo confirmation dialog when the visual review cannot load. The same server checks still apply."
                             context="{'default_preview_id': id}"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="previewed,confirmed,applying,applied"/>
@@ -513,7 +514,7 @@
                                     type="object"
                                     icon="fa-check-square-o"
                                     title="Acknowledge the unprovable media checksum"
-                                    string="Acknowledge"
+                                    string="Acknowledge checksum limitation"
                                     groups="shopify_connector_core.group_shopify_connector_admin"
                                     invisible="export_reconcile_reason != 'checksum_unverifiable' or export_reconcile_ack_at"/>
                         </list>

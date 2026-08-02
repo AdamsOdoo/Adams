@@ -215,8 +215,8 @@
 
     <menuitem id="menu_shopify_connector_store_settings"
               name="Store Settings"
-              parent="shopify_connector_core.menu_shopify_connector_configuration"
+              parent="shopify_connector_core.menu_shopify_connector_sync_rules"
               action="action_shopify_connector_store_settings_open"
               groups="shopify_connector_core.group_shopify_connector_admin"
-              sequence="20"/>
+              sequence="10"/>
 </odoo>

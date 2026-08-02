@@ -261,3 +261,35 @@ class TestUiDashboard(TransactionCase):
         self.assertTrue(payload['critical']['active'])
         causes = {cause['id'] for cause in payload['critical']['causes']}
         self.assertIn('store_state', causes)
+
+    def test_store360_stale_bridge_routes_to_nonempty_store_form(self):
+        store = self._make_store()
+        critical = self.Dashboard._store_360_critical(
+            {'store': store},
+            {'bridge': {'state': 'stale'}},
+        )
+        self.assertTrue(critical['active'])
+        self.assertEqual(critical['severity'], 'warning')
+        cause = critical['causes'][0]
+        self.assertEqual(cause['action_label'], 'Open sync controls')
+        self.assertEqual(cause['target']['res_id'], store.id)
+        self.assertEqual(cause['target']['res_model'],
+                         'shopify.connector.store')
+
+    def test_store360_incomplete_bridge_routes_to_its_failure_evidence(self):
+        store = self._make_store()
+        target = {
+            'res_model': 'shopify.connector.job',
+            'domain': [['store_id', '=', store.id],
+                       ['state', '=', 'failed_final']],
+            'name': 'Order imports needing attention',
+        }
+        critical = self.Dashboard._store_360_critical(
+            {'store': store},
+            {'bridge': {'state': 'incomplete', 'critical_target': target}},
+        )
+        self.assertEqual(critical['severity'], 'danger')
+        self.assertEqual(critical['causes'][0]['target'], target)
+        self.assertEqual(
+            critical['causes'][0]['action_label'], 'Review imports',
+        )

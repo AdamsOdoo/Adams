@@ -16,8 +16,8 @@
 // NAVIGATION IS BY SEMANTIC STEP KEY, NOT BY POSITION. `state.stepKey` is a
 // string — "credential", "location_mapping", "final_readiness" — and every
 // branch, every guard, every server call and every deep link compares against
-// one. The ordinal exists only to render "Step 7 of 12", and it is read out of
-// the server's own step list rather than counted here. This is not stylistic:
+// one. The ordinal remains server evidence for the overall guarded sequence;
+// the merchant-facing progress is grouped into four phases. This is not stylistic:
 // Wave 5 inserted a step into the middle of the accepted order, and a client
 // that had switched on `state.step === 8` would have silently started running
 // the Customer-notifications branch on the Source-of-truth screen. A string
@@ -65,6 +65,37 @@ const MODEL = "shopify.connector.setup.wizard";
 // not arrived yet; every other key in this file comes from that payload.
 const FIRST_STEP_KEY = "welcome";
 
+// The backend keeps twelve semantic checkpoints because each one owns a
+// separate guarded write or proof. The merchant should not have to parse
+// twelve equal-weight tabs, so the UI presents those checkpoints as four
+// memorable phases without changing a single server contract.
+const SETUP_PHASES = [
+    {
+        key: "connect",
+        label: _t("Connect"),
+        description: _t("Store and access"),
+        steps: ["welcome", "identity", "credential", "scopes", "test_connection"],
+    },
+    {
+        key: "configure",
+        label: _t("Configure"),
+        description: _t("Sync decisions"),
+        steps: ["directions", "location_mapping", "source_of_truth", "notification"],
+    },
+    {
+        key: "protect",
+        label: _t("Protect"),
+        description: _t("First stock push"),
+        steps: ["first_push"],
+    },
+    {
+        key: "launch",
+        label: _t("Launch"),
+        description: _t("Readiness and review"),
+        steps: ["final_readiness", "review"],
+    },
+];
+
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";
     static props = { "*": true };
@@ -81,6 +112,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             errorMessage: "",
             busy: false,
             stepKey: FIRST_STEP_KEY,
+            showCompletion: false,
             data: null,
             // Per-step drafts. Nothing here is authoritative: each is sent to
             // the server, which writes it to the field that owns it and
@@ -136,7 +168,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                     this.headingRef.el.focus();
                 }
             },
-            () => [this.state.stepKey]
+            () => [this.state.stepKey, this.state.showCompletion]
         );
     }
 
@@ -187,6 +219,36 @@ export class ShopifyConnectorSetupWizard extends Component {
         return this.steps.find((s) => s.key === this.state.stepKey) || {};
     }
 
+    get phases() {
+        const currentIndex = this.currentIndex;
+        return SETUP_PHASES.map((phase) => {
+            const ordered = phase.steps
+                .map((key) => this.steps.find((step) => step.key === key))
+                .filter(Boolean);
+            const indexes = ordered.map((step) => this.steps.indexOf(step));
+            const includesCurrent = phase.steps.includes(this.state.stepKey);
+            const lastIndex = indexes.length ? Math.max(...indexes) : -1;
+            return {
+                ...phase,
+                ordered,
+                current: includesCurrent,
+                done: lastIndex >= 0 && lastIndex < currentIndex,
+            };
+        });
+    }
+
+    get currentPhase() {
+        return this.phases.find((phase) => phase.current) || this.phases[0] || {};
+    }
+
+    get currentPhaseStepNumber() {
+        const phase = this.currentPhase;
+        const index = (phase.ordered || []).findIndex(
+            (step) => step.key === this.state.stepKey
+        );
+        return index < 0 ? 1 : index + 1;
+    }
+
     /** Position of the current step in the server's own ordered list. */
     get currentIndex() {
         return this.steps.findIndex((s) => s.key === this.state.stepKey);
@@ -207,15 +269,12 @@ export class ShopifyConnectorSetupWizard extends Component {
         return step.applicable === undefined ? true : step.applicable;
     }
 
-    stepClass(step) {
-        let cls = "sc_setup_step";
-        if (step.key === this.state.stepKey) {
-            cls += " sc_setup_step--current";
-        } else if (step.index < (this.currentStep.index || 0)) {
-            cls += " sc_setup_step--done";
-        }
-        if (step.applicable === false) {
-            cls += " sc_setup_step--skipped";
+    phaseClass(phase) {
+        let cls = "sc_setup_phase";
+        if (phase.current) {
+            cls += " sc_setup_phase--current";
+        } else if (phase.done) {
+            cls += " sc_setup_phase--done";
         }
         return cls;
     }
@@ -284,6 +343,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         if (resume && data.resume_step_key) {
             this.state.stepKey = data.resume_step_key;
+            this.state.showCompletion = Boolean(
+                store.setup_completed_at && data.resume_step_key === "review"
+            );
         }
     }
 
@@ -474,12 +536,10 @@ export class ShopifyConnectorSetupWizard extends Component {
                 ok = await this._call("activate", { store_id: storeId });
                 if (ok) {
                     this.notification.add(
-                        _t("Your store is set up. Nothing is syncing yet — the dashboard shows what to do next."),
+                        _t("Your store is ready. The overview shows the next explicit action."),
                         { type: "success" }
                     );
-                    this.action.doAction(
-                        "shopify_connector_core.action_shopify_connector_dashboard"
-                    );
+                    this.state.showCompletion = true;
                 }
                 return;
         }
@@ -876,10 +936,23 @@ export class ShopifyConnectorSetupWizard extends Component {
     }
 
     async rerun() {
+        this.state.showCompletion = false;
         const ok = await this._call("restart_setup", { store_id: this.store.id });
         if (ok) {
             await this.goToStep(FIRST_STEP_KEY);
         }
+    }
+
+    openDashboard() {
+        this.action.doAction(
+            "shopify_connector_core.action_shopify_connector_dashboard"
+        );
+    }
+
+    openStoreSettings() {
+        this.action.doAction(
+            "shopify_connector_core.action_shopify_connector_store_settings_open"
+        );
     }
 }
 

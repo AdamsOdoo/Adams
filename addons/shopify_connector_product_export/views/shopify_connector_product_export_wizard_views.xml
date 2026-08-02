@@ -161,7 +161,7 @@
                 </group>
                 <footer>
                     <button name="action_confirm" type="object"
-                            string="Acknowledge" class="btn-primary"
+                            string="Acknowledge checksum limitation" class="btn-primary"
                             data-hotkey="q"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel" data-hotkey="x"/>

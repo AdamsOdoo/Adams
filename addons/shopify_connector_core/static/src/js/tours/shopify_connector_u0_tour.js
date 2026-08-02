@@ -12,8 +12,8 @@ import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 
-// --- 1. Primary navigation (Auditor and up): Dashboard -> Stores ->
-//        Sync Center -> Error & Review Center -> Logs. Read-only; asserts each
+// --- 1. Primary navigation (Auditor and up): Overview -> Configuration /
+//        Operations / Reporting. Read-only; asserts each
 //        surface renders and no write control is required to move through. ---
 registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
     url: "/odoo",
@@ -32,7 +32,7 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
         },
         {
             trigger: ".o_sc_dashboard",
-            content: "The Store 360 dashboard renders.",
+            content: "The overview dashboard renders.",
         },
         // Store 360: with the seeded connected store (test fixture), the
         // shell shows the header with the period filter group, the two
@@ -54,6 +54,16 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             content: "The flow-health table renders.",
         },
         {
+            trigger: `${menu("menu_shopify_connector_configuration")}`,
+            content: "Open Configuration.",
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_connections")}`,
+            content: "Open Connections.",
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_stores")}`,
             content: "Go to Stores.",
             run: "click",
@@ -61,6 +71,16 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
         {
             trigger: ".o_list_view",
             content: "The stores list renders.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_operations")}`,
+            content: "Open Operations.",
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_sync_recovery")}`,
+            content: "Open Sync & Recovery.",
+            run: "click",
         },
         {
             trigger: `${menu("menu_shopify_connector_sync_center")}`,
@@ -72,19 +92,29 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             content: "The Sync Center list renders.",
         },
         {
+            trigger: `${menu("menu_shopify_connector_operations")}`,
+            content: "Re-open Operations.",
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_error_center")}`,
-            content: "Go to the Error & Review Center.",
+            content: "Go to Needs Attention.",
             run: "click",
         },
         {
             trigger: ".o_list_view",
-            content: "The Error & Review Center renders.",
+            content: "The Needs Attention workspace renders.",
         },
         // Store 360 slice: the zero-schema Sync Operations Analysis surface
         // (graph over the job model, native rules).
         {
+            trigger: `${menu("menu_shopify_connector_reporting")}`,
+            content: "Open Reporting.",
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_sync_analysis")}`,
-            content: "Go to Sync Operations Analysis.",
+            content: "Go to Analysis.",
             run: "click",
         },
         {
@@ -92,13 +122,18 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             content: "The analysis graph view renders.",
         },
         {
+            trigger: `${menu("menu_shopify_connector_reporting")}`,
+            content: "Re-open Reporting.",
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_logs")}`,
-            content: "Go to Logs.",
+            content: "Go to Activity & Audit Trail.",
             run: "click",
         },
         {
             trigger: ".o_list_view",
-            content: "The Logs list renders.",
+            content: "The activity and audit trail renders.",
         },
     ],
 });
@@ -118,6 +153,14 @@ registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
         stepUtils.showAppsMenuItem(),
         {
             trigger: `.o_app${menu("menu_shopify_connector_root")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_operations")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_sync_recovery")}`,
             run: "click",
         },
         {
@@ -154,12 +197,16 @@ registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
             run: "click",
         },
         {
+            trigger: `${menu("menu_shopify_connector_operations")}`,
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_error_center")}`,
             run: "click",
         },
         {
             trigger: ".o_list_view",
-            content: "The Error & Review Center renders for the reviewer.",
+            content: "Needs Attention renders for the reviewer.",
         },
     ],
 });
@@ -182,12 +229,28 @@ registry.category("web_tour.tours").add("shopify_connector_u0_admin_tour", {
             run: "click",
         },
         {
+            trigger: `${menu("menu_shopify_connector_configuration")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_connections")}`,
+            run: "click",
+        },
+        {
             trigger: `${menu("menu_shopify_connector_stores")}`,
             run: "click",
         },
         {
             trigger: ".o_list_view",
             content: "The stores list renders for the administrator.",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_operations")}`,
+            run: "click",
+        },
+        {
+            trigger: `${menu("menu_shopify_connector_error_center")}`,
+            run: "click",
         },
         {
             trigger: `${menu("menu_shopify_connector_mutation_evidence")}`,

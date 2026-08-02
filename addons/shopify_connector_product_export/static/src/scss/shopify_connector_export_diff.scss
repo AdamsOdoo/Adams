@@ -3,11 +3,10 @@
 // The S7 export diff surface. Three rules this file keeps:
 //
 // 1. TOKENS ONLY. Every colour, space, radius, duration and font here comes
-//    from the connector token layer in `shopify_connector_core`. No literal
-//    hex, no ad-hoc pixel value, no external font, no icon library, no CDN.
-//    The tokens are re-declared on this root because the core layer scopes
-//    them to `.o_sc_dashboard` so they cannot leak into the wider backend --
-//    the same scoping discipline, applied to a second root.
+//    from the connector token layer in `shopify_connector_core`, which scopes
+//    those variables to this root as well as dashboard/setup. No private copy
+//    is allowed: duplicated type and radius tokens are how the three surfaces
+//    drifted apart.
 //
 // 2. LOGICAL PROPERTIES, so RTL is correct without a mirrored stylesheet.
 //    `margin-inline-start` rather than `margin-left`, `padding-inline`
@@ -30,42 +29,14 @@
 // is visible against both the card and the page surface.
 
 .o_sc_export_diff {
-    // --- tokens (mirrors shopify_connector_tokens.scss; see note 1) ---
-    --sc-surface-0: #F8FAFC;
-    --sc-surface-1: #FFFFFF;
-    --sc-text-primary: #1F2937;
-    --sc-text-secondary: #475467;
-    --sc-border: #E4E7EC;
-    --sc-border-strong: #79839B;
-    --sc-accent: #175CD3;
-    --sc-focus: #175CD3;
-    --sc-success-text: #067647; --sc-success-bg: #ECFDF3;
-    --sc-warning-text: #B54708; --sc-warning-bg: #FFFAEB;
-    --sc-danger-text: #B42318;  --sc-danger-bg: #FEF3F2;
-    --sc-info-text: #175CD3;    --sc-info-bg: #EFF8FF;
-    --sc-neutral-text: #475467; --sc-neutral-bg: #F2F4F7;
-    --sc-space-1: 4px;  --sc-space-2: 8px;  --sc-space-3: 12px; --sc-space-4: 16px;
-    --sc-space-5: 24px; --sc-space-6: 32px;
-    --sc-fs-caption: 0.75rem;
-    --sc-fs-secondary: 0.875rem;
-    --sc-fs-body: 1rem;
-    --sc-fs-cardtitle: 1.125rem;
-    --sc-fs-lead: 1.375rem;
-    --sc-fw-body: 400;
-    --sc-fw-label: 500;
-    --sc-fw-dominant: 600;
-    --sc-radius: 8px;
-    --sc-motion-2: 150ms;
-    --sc-ease: cubic-bezier(0.2, 0, 0, 1);
-    --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-        Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-
     background: var(--sc-surface-0);
     color: var(--sc-text-primary);
     font-family: var(--sc-font);
     font-size: var(--sc-fs-body);
     block-size: 100%;
-    overflow: auto;
+    max-block-size: 100%;
+    overflow-y: auto;
+    overflow-x: clip;
 
     // Focus is restyled, never removed.
     :focus-visible {
@@ -74,12 +45,12 @@
     }
 
     &__inner {
-        max-inline-size: 960px;
+        max-inline-size: 1120px;
         margin-inline: auto;
-        padding: var(--sc-space-5) var(--sc-space-4);
+        padding: var(--sc-space-6) var(--sc-space-5);
         display: flex;
         flex-direction: column;
-        gap: var(--sc-space-4);
+        gap: var(--sc-space-5);
     }
 
     // --- header ---------------------------------------------------------
@@ -121,6 +92,7 @@
         gap: var(--sc-space-3);
         border-radius: var(--sc-radius);
         padding: var(--sc-space-4);
+        box-shadow: var(--sc-shadow-raised);
         // A coloured rail on the reading-start edge, so the band is
         // distinguishable without relying on hue alone (SC 1.4.1).
         border-inline-start: 4px solid currentColor;
@@ -145,6 +117,7 @@
         border: 1px solid var(--sc-border);
         border-radius: var(--sc-radius);
         padding: var(--sc-space-4);
+        box-shadow: var(--sc-shadow-raised);
 
         &__title {
             font-size: var(--sc-fs-cardtitle);

@@ -105,7 +105,7 @@
                     </group>
                 </sheet>
                 <footer>
-                    <button name="action_confirm" type="object" string="Confirm"
+                    <button name="action_confirm" type="object" string="Confirm mode change"
                             class="btn-primary" data-hotkey="q"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"
                             data-hotkey="x"/>
@@ -159,7 +159,7 @@
                     </group>
                 </sheet>
                 <footer>
-                    <button name="action_confirm" type="object" string="Release"
+                    <button name="action_confirm" type="object" string="Release blocked fulfillment"
                             class="btn-primary" data-hotkey="q"/>
                     <button string="Cancel" class="btn-secondary" special="cancel"
                             data-hotkey="x"/>

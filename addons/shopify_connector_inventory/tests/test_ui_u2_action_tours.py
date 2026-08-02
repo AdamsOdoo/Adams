@@ -7,8 +7,8 @@ operator CONTROLS, and there was none: every control that writes was left to
 inventory controls.
 
   * `Confirm First Push`  -> `action_confirm_first_push`   (writes)
-  * `Change Push`         -> `action_set_push_enabled`     (writes)
-  * `Verify Now`          -> `action_recheck_inventory_pair` (writes + enqueues)
+  * `Change inventory push` -> `action_set_push_enabled` (writes)
+  * `Verify inventory now`  -> `action_recheck_inventory_pair` (writes + enqueues)
 
 WHY A BROWSER, WHEN THE SERVER METHODS ARE ALREADY TESTED. Because the server
 methods being right does not make the screen right, and all three of these had
@@ -21,9 +21,9 @@ a real UI/server disagreement that only pressing the control could find:
      `pending` alone -- so the sanctioned confirmation was unreachable. Every
      pre-existing server test writes `first_push_state = 'previewed'` itself
      before calling the method, which is exactly why none of them saw it.
-  2. `Verify Now` was gated on Operator; its service admits Reviewer or
+  2. `Verify inventory now` was gated on Operator; its service admits Reviewer or
      Administrator only.
-  3. `Change Push` was gated on Operator while its transient wizard was ACL'd
+  3. `Change inventory push` was gated on Operator while its transient wizard was ACL'd
      to Administrator alone, so a Connector User was refused at the dialog.
 
 NO SHOPIFY. Nothing here holds a credential or reaches the network. The two

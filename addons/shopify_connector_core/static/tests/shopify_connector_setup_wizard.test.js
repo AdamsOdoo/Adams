@@ -2,7 +2,8 @@
 // Part of the Shopify Connector (S1 guided setup).
 //
 // HOOT unit tests for the setup wizard client action. These cover what only a
-// mounted component can show: that the twelve accepted steps render in order,
+// mounted component can show: that the twelve guarded checkpoints are grouped
+// into four merchant phases,
 // that navigation is driven by the semantic step KEY rather than by a
 // position, that Back does not lose what was typed, that no source-of-truth
 // option is pre-selected, that a server refusal is surfaced rather than
@@ -154,26 +155,27 @@ describe("shopify connector setup wizard", () => {
         mockService("notification", { add: () => {} });
     });
 
-    test("renders the twelve accepted steps in the accepted order", async () => {
+    test("groups the guarded checkpoints into four merchant phases", async () => {
         mockOrm(() => payload());
         await mount();
-        const labels = queryAll(".sc_setup_step__label").map((el) =>
+        const labels = queryAll(".sc_setup_phase__label").map((el) =>
             el.textContent.trim()
         );
-        expect(labels).toEqual(STEPS.map(([, label]) => label));
+        expect(labels).toEqual(["Connect", "Configure", "Protect", "Launch"]);
+        expect(queryAll(".sc_setup_phase")).toHaveLength(4);
     });
 
-    test("the heading states the step number and the total", async () => {
+    test("the heading shows progress inside the current phase", async () => {
         mockOrm(() => payload());
         await mount();
-        expect(queryText(".sc_setup__heading")).toInclude("Step 1 of 12");
+        expect(queryText(".sc_setup__heading")).toInclude("Connect · 1 of 5");
         expect(queryText(".sc_setup__heading")).toInclude("Welcome");
     });
 
     test("it opens at the resume step key, not always at the first step", async () => {
         mockOrm(() => payload({ resume_step_key: "directions", resume_step: 6 }));
         await mount();
-        expect(queryText(".sc_setup__heading")).toInclude("Step 6 of 12");
+        expect(queryText(".sc_setup__heading")).toInclude("Configure · 1 of 4");
         expect(queryText(".sc_setup__heading")).toInclude("What to sync");
     });
 
@@ -189,7 +191,7 @@ describe("shopify connector setup wizard", () => {
         mockOrm(() => reordered);
         await mount();
         expect(queryText(".sc_setup__heading")).toInclude("Location mapping");
-        expect(queryText(".sc_setup__heading")).toInclude("Step 7 of 12");
+        expect(queryText(".sc_setup__heading")).toInclude("Configure · 2 of 4");
     });
 
     test("a step that does not apply says so instead of disappearing", async () => {
@@ -205,8 +207,9 @@ describe("shopify connector setup wizard", () => {
         );
         mockOrm(() => data);
         await mount();
-        // Still twelve steps in the rail: nothing renumbered.
-        expect(queryAll(".sc_setup_step__label")).toHaveLength(12);
+        // The phase rail stays stable: an inapplicable checkpoint does not
+        // add or remove a top-level phase.
+        expect(queryAll(".sc_setup_phase__label")).toHaveLength(4);
         expect(queryText(".sc_setup_location_skipped")).toInclude(
             "Not required"
         );
@@ -230,9 +233,34 @@ describe("shopify connector setup wizard", () => {
         calls = [];
         queryFirst(".sc_setup_back").click();
         await animationFrame();
-        expect(queryText(".sc_setup__heading")).toInclude("Step 3 of 12");
+        expect(queryText(".sc_setup__heading")).toInclude("Connect · 3 of 5");
         expect(queryText(".sc_setup__heading")).toInclude("Credentials");
         expect(calls).toHaveLength(0);
+    });
+
+    test("a completed store opens on a purposeful completion screen", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "review",
+                resume_step: 12,
+                store: Object.assign(payload().store, {
+                    id: 12,
+                    name: "Aurora Home Goods",
+                    state: "connected",
+                    setup_completed_at: "2026-08-02 10:00:00",
+                    setup_completed_by: "Mitchell Admin",
+                }),
+            })
+        );
+        await mount();
+        expect(queryText(".sc_setup__complete-title")).toInclude(
+            "Aurora Home Goods is connected"
+        );
+        expect(".sc_setup_dashboard").toHaveCount(1);
+        expect(".sc_setup_settings").toHaveCount(1);
+        expect(".sc_setup_rerun").toHaveCount(1);
+        expect(".sc_setup_continue").toHaveCount(0);
+        expect(".sc_setup__steps").toHaveCount(0);
     });
 
     test("a server refusal is shown, not swallowed", async () => {

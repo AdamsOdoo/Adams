@@ -12,7 +12,7 @@
 // responsive behaviour are CSS-only (media queries), covered by the SCSS +
 // the runtime walkthrough.
 //
-// EXACT COUNT CONTRACT: this suite carries exactly 8 tests — the executor
+// EXACT COUNT CONTRACT: this suite carries exactly 10 tests — the executor
 // (`test_u3_hoot_suite.py` EXPECTED_SUITES) asserts equality.
 
 import { expect, test, describe, beforeEach } from "@odoo/hoot";
@@ -209,5 +209,55 @@ describe("shopify connector dashboard", () => {
         await animationFrame();
         expect(seen.length).toBe(2);
         expect(seen[1][1]).toBe("24h"); // period KEY, never a domain
+    });
+
+    test("a freshness warning replaces the contradictory success band and opens the store", async () => {
+        mockOrm(() => payload({
+            critical: {
+                active: true,
+                severity: "warning",
+                title: "Data freshness needs attention",
+                causes: [{
+                    id: "bridge_stale",
+                    severity: "warning",
+                    text: "Order discovery has not completed a full pass.",
+                    action_label: "Open sync controls",
+                    target: {
+                        res_model: "shopify.connector.store",
+                        res_id: 7,
+                        domain: [["id", "=", 7]],
+                        name: "Store sync controls",
+                    },
+                }],
+            },
+        }));
+        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
+        expect(".sc360-critical.sc-band--warning").toHaveCount(1);
+        expect(".sc-band--success").toHaveCount(0);
+        expect(queryText(".sc360-critical")).toInclude("Open sync controls");
+        queryFirst(".sc360-critical .sc-btn").click();
+        await animationFrame();
+        expect(lastAction.res_model).toBe("shopify.connector.store");
+        expect(lastAction.res_id).toBe(7);
+        expect(lastAction.views).toEqual([[false, "form"]]);
+    });
+
+    test("zero commercial counts are information, not links to empty pages", async () => {
+        const commercial = Object.assign({}, payload().commercial, {
+            blocks: [{
+                currency: CURRENCY, sales: 0, orders: 0, aov: 0,
+                previous: { sales: 0, orders: 0, aov: 0 },
+            }],
+            orders_total: 0,
+            units: 0,
+            previous_units: 0,
+        });
+        mockOrm(() => payload({ commercial }));
+        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
+        expect(".sc360-kpi").toHaveCount(4);
+        expect(".sc360-kpi--action").toHaveCount(0);
+        expect(queryText(".sc360-kpi[data-kpi='orders']")).toInclude(
+            "No imported orders"
+        );
     });
 });

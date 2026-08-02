@@ -22,12 +22,12 @@
 
     <menuitem id="menu_shopify_connector_orders"
               name="Orders"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="15"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              sequence="10"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_order_workspace"
-              name="Orders Workspace"
+              name="All Orders"
               parent="menu_shopify_connector_orders"
               action="action_shopify_connector_order_workspace"
               sequence="10"/>

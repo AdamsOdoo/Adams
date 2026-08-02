@@ -78,6 +78,55 @@ class TestUiActions(TransactionCase):
         })
 
     # ------------------------------------------------------------------ #
+    #  navigation architecture
+    # ------------------------------------------------------------------ #
+    def test_root_navigation_has_four_purposeful_homes(self):
+        root = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_root'
+        )
+        children = root.child_id.sorted('sequence')
+        self.assertEqual(
+            children.mapped('name'),
+            ['Overview', 'Operations', 'Reporting', 'Configuration'],
+        )
+        for menu in children:
+            self.assertTrue(
+                menu.action or menu.child_id,
+                '%s is a dead top-level menu' % menu.name,
+            )
+
+    def test_core_operational_reporting_and_configuration_items_are_grouped(self):
+        Operations = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_operations'
+        )
+        Reporting = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_reporting'
+        )
+        Configuration = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_configuration'
+        )
+        Connections = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_connections'
+        )
+        SyncRecovery = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_sync_recovery'
+        )
+        self.assertEqual(Connections.parent_id, Configuration)
+        self.assertEqual(SyncRecovery.parent_id, Operations)
+        expected = {
+            'menu_shopify_connector_sync_center': SyncRecovery,
+            'menu_shopify_connector_error_center': Operations,
+            'menu_shopify_connector_sync_analysis': Reporting,
+            'menu_shopify_connector_logs': Reporting,
+            'menu_shopify_connector_stores': Connections,
+        }
+        for xmlid, parent in expected.items():
+            self.assertEqual(
+                self.env.ref('shopify_connector_core.%s' % xmlid).parent_id,
+                parent,
+            )
+
+    # ------------------------------------------------------------------ #
     #  retry
     # ------------------------------------------------------------------ #
     def test_retry_from_all_valid_states(self):

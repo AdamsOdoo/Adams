@@ -18,9 +18,9 @@
     -->
 
     <menuitem id="menu_shopify_connector_product_export"
-              name="Export"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="34"
+              name="Product Export"
+              parent="shopify_connector_product.menu_shopify_connector_catalog"
+              sequence="40"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_product_export_preview"
@@ -37,15 +37,16 @@
 
     <menuitem id="menu_shopify_connector_product_export_backfill"
               name="Reconnect and Backfill"
-              parent="menu_shopify_connector_product_export"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
               action="action_shopify_connector_export_backfill"
-              sequence="25"/>
+              sequence="70"/>
 
     <menuitem id="menu_shopify_connector_product_export_settings"
               name="Export Settings"
-              parent="menu_shopify_connector_product_export"
+              parent="shopify_connector_core.menu_shopify_connector_sync_rules"
               action="action_shopify_connector_store_settings_export"
-              sequence="30"/>
+              groups="shopify_connector_core.group_shopify_connector_user"
+              sequence="20"/>
 
     <!--
         Diagnostics sits last in the branch on purpose. It is where an
@@ -54,7 +55,7 @@
     -->
     <menuitem id="menu_shopify_connector_product_export_diagnostics"
               name="Export Diagnostics"
-              parent="menu_shopify_connector_product_export"
+              parent="shopify_connector_core.menu_shopify_connector_error_center"
               action="action_shopify_connector_export_diagnostics"
               sequence="40"/>
 </odoo>

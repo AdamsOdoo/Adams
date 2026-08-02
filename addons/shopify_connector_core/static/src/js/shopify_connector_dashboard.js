@@ -149,15 +149,16 @@ export class ShopifyConnectorDashboard extends Component {
         if (!target || !target.res_model) {
             return;
         }
+        const openRecord = Boolean(target.res_id);
         this.action.doAction({
             type: "ir.actions.act_window",
             name: target.name,
             res_model: target.res_model,
+            res_id: target.res_id || undefined,
             domain: target.domain || [],
-            views: [
-                [false, "list"],
-                [false, "form"],
-            ],
+            views: openRecord
+                ? [[false, "form"]]
+                : [[false, "list"], [false, "form"]],
             target: "current",
         });
     }
@@ -190,6 +191,20 @@ export class ShopifyConnectorDashboard extends Component {
     }
     bridgeClass(state) {
         return "sc-bridge sc-bridge--" + (state || "stale");
+    }
+
+    storeHeading(meta) {
+        const stores = (meta && meta.stores) || [];
+        if (stores.length === 1) {
+            return stores[0].name;
+        }
+        if (this.state.storeId) {
+            const selected = stores.find((store) => store.id === this.state.storeId);
+            if (selected) {
+                return selected.name;
+            }
+        }
+        return _t("All Shopify stores");
     }
 
     formatMoney(currency, value) {
