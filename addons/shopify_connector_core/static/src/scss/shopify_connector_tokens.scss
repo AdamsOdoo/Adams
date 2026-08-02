@@ -63,8 +63,10 @@
     // --- Radius (§5) ---
     --sc-radius: 12px;
     --sc-radius-small: 8px;
-    --sc-shadow-raised: 0 1px 2px rgb(16 24 40 / 0.04),
-        0 10px 28px rgb(16 24 40 / 0.06);
+    // Odoo 19 compiles backend assets with LibSass. Keep the legacy comma
+    // form: CSS Color 4's space/slash syntax breaks the entire backend bundle.
+    --sc-shadow-raised: 0 1px 2px rgba(16, 24, 40, 0.04),
+        0 10px 28px rgba(16, 24, 40, 0.06);
 
     // --- Motion (§8) ---
     --sc-motion-1: 100ms;
