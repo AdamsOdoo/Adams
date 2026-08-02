@@ -96,7 +96,7 @@
                         writes `push_enabled` itself.
                     -->
                     <button name="%(action_shopify_connector_location_push_toggle_wizard)d"
-                            type="action" string="Change Push"
+                            type="action" string="Change inventory push"
                             class="btn-primary"
                             groups="shopify_connector_core.group_shopify_connector_operator"/>
                     <!--
@@ -331,7 +331,7 @@
                         test failure — UI and ACL must agree.
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
-                            type="action" string="Verify Now"
+                            type="action" string="Verify inventory now"
                             groups="shopify_connector_core.group_shopify_connector_reviewer"/>
                     <!--
                         The TD-020 closure. A previewed/confirmed pair used to
@@ -445,7 +445,7 @@
                             <field name="last_pushed_at" readonly="1"/>
                         </group>
                     </group>
-                    <group string="First-Push Guard">
+                    <group string="First Stock Push">
                         <group>
                             <field name="first_push_state" readonly="1"/>
                             <field name="first_push_preview_qty" readonly="1"/>
@@ -469,7 +469,7 @@
 
     <record id="action_shopify_connector_inventory_workspace"
             model="ir.actions.act_window">
-        <field name="name">Inventory Workspace</field>
+        <field name="name">Inventory Levels</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id"
@@ -487,7 +487,7 @@
 
     <record id="action_shopify_connector_inventory_first_push"
             model="ir.actions.act_window">
-        <field name="name">First-Push Guard</field>
+        <field name="name">First Stock Push</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
         <!--

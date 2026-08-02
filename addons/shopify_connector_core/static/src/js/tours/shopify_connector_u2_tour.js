@@ -50,6 +50,10 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
 
         // --- Orders (S9 family) ---
         ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Open Operations."
+        ),
+        ...openBranch(
             menu("shopify_connector_sale", "menu_shopify_connector_orders"),
             "Open the Orders branch."
         ),
@@ -63,6 +67,10 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         },
 
         // --- COD reconciliation ---
+        ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
         ...openBranch(
             menu("shopify_connector_sale", "menu_shopify_connector_orders"),
             "Re-open the Orders branch."
@@ -83,8 +91,12 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         // even though the menu is declared in the sale addon. Walking it from
         // the branch it actually renders under is the point of a browser tour.
         ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
+        ...openBranch(
             menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Open the Catalog branch."
+            "Open the Products branch."
         ),
         ...openBranch(
             menu("shopify_connector_sale", "menu_shopify_connector_customer_binding"),
@@ -95,8 +107,12 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
             content: "The customer-binding surface renders.",
         },
         ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
+        ...openBranch(
             menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Re-open the Catalog branch."
+            "Re-open the Products branch."
         ),
         ...openBranch(
             menu("shopify_connector_product", "menu_shopify_connector_product_binding"),
@@ -107,8 +123,12 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
             content: "The product-binding surface renders.",
         },
         ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
+        ...openBranch(
             menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Re-open the Catalog branch."
+            "Re-open the Products branch."
         ),
         ...openBranch(
             menu("shopify_connector_product", "menu_shopify_connector_product_variant_binding"),
@@ -121,6 +141,10 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
 
         // --- Inventory (S10-S12) ---
         ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
+        ...openBranch(
             menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
             "Open the Inventory branch."
         ),
@@ -132,6 +156,10 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
             trigger: ".o_list_view",
             content: "The inventory workspace renders.",
         },
+        ...openBranch(
+            coreMenu("menu_shopify_connector_operations"),
+            "Re-open Operations."
+        ),
         ...openBranch(
             menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
             "Re-open the Inventory branch."
@@ -147,8 +175,12 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
                 "that says there are none.",
         },
         ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
-            "Re-open the Inventory branch."
+            coreMenu("menu_shopify_connector_configuration"),
+            "Open Configuration."
+        ),
+        ...openBranch(
+            menu("shopify_connector_inventory", "menu_shopify_connector_locations"),
+            "Open Locations."
         ),
         ...openBranch(
             menu("shopify_connector_inventory", "menu_shopify_connector_location_mapping"),

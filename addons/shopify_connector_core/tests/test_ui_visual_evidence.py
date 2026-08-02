@@ -2191,7 +2191,7 @@ class TestUiVisualEvidence(HttpCase):
         an `AccessError` also satisfies. That is how a Connector User could
         produce a green, complete, entirely worthless S1 capture set. This
         asserts the distinguishing evidence directly: the step rail exists,
-        it carries all twelve steps, the action row exists, and no error band
+        it carries all four merchant phases, the action row exists, and no error band
         is on screen.
         """
         seeded = self._seed()
@@ -2209,7 +2209,7 @@ class TestUiVisualEvidence(HttpCase):
                 self._open(browser, path, wait, after)
                 payload = json.loads(self._eval(browser, r"""
 (() => JSON.stringify({
-  steps: document.querySelectorAll(".sc_setup_step").length,
+  steps: document.querySelectorAll(".sc_setup_phase").length,
   has_actions: !!document.querySelector(".sc_setup__actions"),
   has_error: !!document.querySelector(".sc_setup__panel") ? false : true,
   heading: (document.querySelector(".sc_setup__heading") || {}).textContent
@@ -2219,8 +2219,8 @@ class TestUiVisualEvidence(HttpCase):
 }))()
 """))
                 self.assertEqual(
-                    payload['steps'], 12,
-                    '%s rendered %d steps, so it is not the wizard'
+                    payload['steps'], 4,
+                    '%s rendered %d phases, so it is not the wizard'
                     % (name, payload['steps']))
                 self.assertTrue(
                     payload['has_actions'],

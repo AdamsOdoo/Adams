@@ -18,27 +18,34 @@
 
     <menuitem id="menu_shopify_connector_inventory"
               name="Inventory"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="33"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              sequence="30"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_inventory_workspace"
-              name="Inventory Workspace"
+              name="Inventory Levels"
               parent="menu_shopify_connector_inventory"
               action="action_shopify_connector_inventory_workspace"
               sequence="10"/>
 
     <menuitem id="menu_shopify_connector_inventory_first_push"
-              name="First-Push Guard"
+              name="First Stock Push"
               parent="menu_shopify_connector_inventory"
               action="action_shopify_connector_inventory_first_push"
               sequence="20"/>
 
+    <menuitem id="menu_shopify_connector_locations"
+              name="Locations"
+              parent="shopify_connector_core.menu_shopify_connector_configuration"
+              groups="shopify_connector_core.group_shopify_connector_user"
+              sequence="30"/>
+
     <menuitem id="menu_shopify_connector_location_mapping"
               name="Location Mapping"
-              parent="menu_shopify_connector_inventory"
+              parent="menu_shopify_connector_locations"
               action="action_shopify_connector_location_mapping"
-              sequence="30"/>
+              groups="shopify_connector_core.group_shopify_connector_user"
+              sequence="10"/>
 
     <!--
         WAVE 5 — the two governed routes the Location Mapping list was
@@ -56,15 +63,15 @@
     -->
     <menuitem id="menu_shopify_connector_location_refresh"
               name="Refresh Shopify Locations"
-              parent="menu_shopify_connector_inventory"
+              parent="menu_shopify_connector_locations"
               action="action_shopify_connector_location_refresh_wizard"
               groups="shopify_connector_core.group_shopify_connector_operator"
-              sequence="40"/>
+              sequence="20"/>
 
     <menuitem id="menu_shopify_connector_location_map"
               name="Map a Shopify Location"
-              parent="menu_shopify_connector_inventory"
+              parent="menu_shopify_connector_locations"
               action="action_shopify_connector_location_map_wizard"
               groups="shopify_connector_core.group_shopify_connector_operator"
-              sequence="50"/>
+              sequence="30"/>
 </odoo>

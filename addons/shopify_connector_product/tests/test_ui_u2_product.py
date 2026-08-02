@@ -79,14 +79,16 @@ class TestUiU2Product(TransactionCase):
                 'shopify_connector_product.%s is missing' % name,
             )
 
-    def test_branch_hangs_off_the_existing_u0_root(self):
-        """One connector app, not a second one."""
+    def test_branch_hangs_off_the_operations_home(self):
+        """Products is operational work, not a competing top-level app."""
         branch = self.env.ref(
             'shopify_connector_product.menu_shopify_connector_catalog'
         )
         self.assertEqual(
             branch.parent_id,
-            self.env.ref('shopify_connector_core.menu_shopify_connector_root'),
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_operations'
+            ),
         )
 
     def test_branch_sequence_does_not_collide_with_a_sibling(self):

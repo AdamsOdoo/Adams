@@ -73,11 +73,11 @@ later, separately authorized tasks.
         'views/shopify_connector_job_analysis_views.xml',
         'views/shopify_connector_mutation_attempt_views.xml',
         'views/shopify_connector_menus.xml',
-        # S1 LOADS LAST, and the ordering is load-bearing rather than tidy.
+        # S1 loads after the core menus, and the ordering is load-bearing.
         #
         # This file needs BOTH `view_shopify_connector_store_form` (which it
         # inherits, from the store views) and `menu_shopify_connector_root`
-        # (which its Configuration branch hangs off, from the menus file). It
+        # (whose Connections branch owns the guided entry, from the menus file). It
         # was originally placed beside the store views, where the menu ref did
         # not yet exist -- invisible on a warm `-u` update of a database that
         # already had the menu, and a hard `ParseError` on a FRESH install.
@@ -86,11 +86,9 @@ later, separately authorized tasks.
         # (issue #193: fresh and warm are not interchangeable).
         'views/shopify_connector_setup_views.xml',
         # Batch 2 checkpoint 1: the canonical Store Settings surface. LOADS
-        # AFTER the setup views for the same load-bearing reason they load
-        # after the menus -- its menu hangs off `menu_shopify_connector_
-        # configuration`, which the setup views file defines. Placed earlier
-        # this would be invisible on a warm `-u` of a database that already
-        # had that menu and a hard `ParseError` on a fresh install.
+        # after the menus because its menu hangs off the core Sync Rules
+        # branch. The setup view ordering is retained so every existing
+        # inherited view and server action is available before extension.
         'views/shopify_connector_store_settings_views.xml',
     ],
     'assets': {
@@ -136,7 +134,7 @@ later, separately authorized tasks.
             # the only module all four depend on.
             'shopify_connector_core/static/src/js/tours/shopify_connector_u2_tour.js',
             'shopify_connector_core/static/src/js/tours/shopify_connector_u2_action_tour.js',
-            # S1 guided setup: the 11-step traversal, the three entry routes
+            # S1 guided setup: the 12-checkpoint traversal, the three entry routes
             # and the keyboard walkthrough.
             'shopify_connector_core/static/src/js/tours/shopify_connector_s1_setup_tour.js',
             # Batch 2 P0 merchant reachability: canonical Store Settings, the

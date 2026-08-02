@@ -636,9 +636,15 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
 
     # -- critical band (B1) ----------------------------------------------------
     def _store_360_critical(self, ctx, payload):
-        """Derived after every section: does a connector problem make the
-        money numbers wrong right now? Renders only when true, and names
-        the worst cause with a direct route."""
+        """Return one truthful attention contract for the overview.
+
+        Job health and order-discovery freshness are independent evidence
+        sources. The old UI rendered both independently, which allowed a red
+        "figures may be incomplete" alert immediately above a green "all
+        systems normal" claim. This projection owns their reconciliation and
+        gives every cause a route that is useful even when a failure list is
+        legitimately empty.
+        """
         store = ctx['store']
         causes = []
         bridge = payload.get('bridge') or {}
@@ -647,30 +653,61 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         ):
             causes.append({
                 'id': 'store_state',
+                'severity': 'danger',
                 'text': _("Shopify connection unavailable — figures are "
                           "last known and may be incomplete."),
+                'action_label': _("Open store"),
                 'target': {
                     'res_model': 'shopify.connector.store',
+                    'res_id': store.id,
                     'domain': [['id', '=', store.id]],
                     'name': _("Store"),
                 },
             })
-        if bridge.get('state') in ('stale', 'incomplete'):
+        if bridge.get('state') == 'stale':
             causes.append({
-                'id': 'bridge_%s' % bridge['state'],
-                'text': bridge.get('critical_text') or _(
-                    "Order import completeness cannot be proven — the "
-                    "figures below may be missing recent orders."),
+                'id': 'bridge_stale',
+                'severity': 'warning',
+                'text': _(
+                    "Order discovery has not completed a full pass for this "
+                    "connection, so sales figures are not proven current."
+                ),
+                'action_label': _("Open sync controls"),
+                'target': {
+                    'res_model': 'shopify.connector.store',
+                    'res_id': store.id if len(store) == 1 else False,
+                    'domain': [['id', '=', store.id]] if len(store) == 1 else [],
+                    'name': _("Store sync controls"),
+                },
+            })
+        elif bridge.get('state') == 'incomplete':
+            causes.append({
+                'id': 'bridge_incomplete',
+                'severity': 'danger',
+                'text': _(
+                    "Some order imports need attention before the sales "
+                    "figures can be trusted."
+                ),
+                'action_label': _("Review imports"),
                 'target': bridge.get('critical_target') or {
                     'res_model': 'shopify.connector.job',
                     'domain': [['state', 'in',
                                 ['failed_retryable', 'failed_final',
                                  'blocked_manual_review']]],
-                    'name': _("Error & Review Center"),
+                    'name': _("Order imports needing attention"),
                 },
             })
+        severity = (
+            'danger' if any(cause['severity'] == 'danger' for cause in causes)
+            else 'warning'
+        )
         return {
             'active': bool(causes),
+            'severity': severity,
+            'title': (
+                _("Action required") if severity == 'danger'
+                else _("Data freshness needs attention")
+            ),
             'causes': causes,
         }
 

@@ -567,8 +567,8 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'steps': self._step_payload(settings, locations),
             'step_count': SETUP_STEP_COUNT,
             # The resume point the client navigates by. The ordinal beside it
-            # is what the heading renders ("Step 7 of 12") and is never what
-            # the client compares against.
+            # remains evidence for the guarded sequence; the UI groups these
+            # keys into four merchant phases and never compares ordinals.
             'resume_step_key': resume_key,
             'resume_step': setup_step_index(resume_key),
             'store': self._store_payload(store, settings),

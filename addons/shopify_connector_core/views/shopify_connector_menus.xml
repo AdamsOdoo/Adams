@@ -3,11 +3,10 @@
     <!--
         U0 operator UI: connector navigation.
 
-        One root app menu "Shopify Connector", gated to the connector Auditor
-        group so the whole tree is hidden from users outside the connector
-        groups. Every first-level destination is a real, usable U0 screen; no
-        empty placeholders for later U1/U2/U3 work are shown. Mutation Evidence
-        is nested under the Error & Review Center as review content.
+        Merchant-first information architecture. First-level destinations are
+        stable business concepts; diagnostic and administrative screens live
+        under Operations and Configuration instead of competing with daily
+        work in the app bar.
 
         Read-only surfaces are visible to all four roles (all imply Auditor);
         write/action controls inside each screen follow the existing server
@@ -19,28 +18,58 @@
               groups="shopify_connector_core.group_shopify_connector_auditor"/>
 
     <menuitem id="menu_shopify_connector_dashboard"
-              name="Dashboard"
+              name="Overview"
               parent="menu_shopify_connector_root"
               action="action_shopify_connector_dashboard"
               sequence="10"/>
 
+    <menuitem id="menu_shopify_connector_operations"
+              name="Operations"
+              parent="menu_shopify_connector_root"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_connector_reporting"
+              name="Reporting"
+              parent="menu_shopify_connector_root"
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_connector_configuration"
+              name="Configuration"
+              parent="menu_shopify_connector_root"
+              sequence="40"/>
+
+    <menuitem id="menu_shopify_connector_connections"
+              name="Connections"
+              parent="menu_shopify_connector_configuration"
+              sequence="10"/>
+
+    <menuitem id="menu_shopify_connector_sync_rules"
+              name="Sync Rules"
+              parent="menu_shopify_connector_configuration"
+              sequence="20"/>
+
+    <menuitem id="menu_shopify_connector_sync_recovery"
+              name="Sync &amp; Recovery"
+              parent="menu_shopify_connector_operations"
+              sequence="50"/>
+
     <menuitem id="menu_shopify_connector_stores"
               name="Stores"
-              parent="menu_shopify_connector_root"
+              parent="menu_shopify_connector_connections"
               action="action_shopify_connector_store"
-              sequence="20"/>
+              sequence="10"/>
 
     <menuitem id="menu_shopify_connector_sync_center"
               name="Sync Center"
-              parent="menu_shopify_connector_root"
+              parent="menu_shopify_connector_sync_recovery"
               action="action_shopify_connector_sync_center"
-              sequence="30"/>
+              sequence="10"/>
 
     <menuitem id="menu_shopify_connector_error_center"
-              name="Error &amp; Review Center"
-              parent="menu_shopify_connector_root"
+              name="Needs Attention"
+              parent="menu_shopify_connector_operations"
               action="action_shopify_connector_error_center"
-              sequence="40"/>
+              sequence="60"/>
 
     <menuitem id="menu_shopify_connector_mutation_evidence"
               name="Mutation Evidence"
@@ -49,14 +78,14 @@
               sequence="10"/>
 
     <menuitem id="menu_shopify_connector_sync_analysis"
-              name="Sync Operations Analysis"
-              parent="menu_shopify_connector_root"
+              name="Analysis"
+              parent="menu_shopify_connector_reporting"
               action="action_shopify_connector_sync_analysis"
-              sequence="45"/>
+              sequence="10"/>
 
     <menuitem id="menu_shopify_connector_logs"
-              name="Logs"
-              parent="menu_shopify_connector_root"
+              name="Activity &amp; Audit Trail"
+              parent="menu_shopify_connector_reporting"
               action="action_shopify_connector_job_log"
-              sequence="50"/>
+              sequence="20"/>
 </odoo>

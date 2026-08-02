@@ -23,13 +23,9 @@ import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 
-// Reaching Configuration is not a plain click, and the reason is worth
-// recording. With all six connector modules installed the app's navbar
-// OVERFLOWS at 1366 px: Odoo marks the entries that do not fit `d-none` and
-// moves them behind the "More Menu" toggle. Configuration, the Error & Review
-// Center and Logs are the three that fall off. A tour cannot click a `d-none`
-// element, and neither can an operator -- they open More first, which is
-// exactly what this does.
+// The premium IA keeps only four first-level homes, so Configuration normally
+// fits without overflow. Keep the More fallback because translated labels or
+// a narrow viewport can still make Odoo collapse a section.
 //
 // Written as one `run()` rather than as two fixed steps so the route is proved
 // on a build where the navbar does NOT overflow as well: fewer installed
@@ -67,11 +63,18 @@ const openConnectorSection = (xmlid) => ({
     },
 });
 
-// The step heading states "Step N of 12". Asserting the COUNT as well as the
-// name is what makes a dropped, added or reordered step fail here rather than
-// pass quietly with eleven.
-const heading = (n, label) =>
-    `.sc_setup__heading:contains('Step ${n} of 12'):contains('${label}')`;
+const PHASE_PROGRESS = {
+    1: ["Connect", "1 of 5"], 2: ["Connect", "2 of 5"],
+    3: ["Connect", "3 of 5"], 4: ["Connect", "4 of 5"],
+    5: ["Connect", "5 of 5"], 6: ["Configure", "1 of 4"],
+    7: ["Configure", "2 of 4"], 8: ["Configure", "3 of 4"],
+    9: ["Configure", "4 of 4"], 10: ["Protect", "1 of 1"],
+    11: ["Launch", "1 of 2"], 12: ["Launch", "2 of 2"],
+};
+const heading = (n, label) => {
+    const [phase, progress] = PHASE_PROGRESS[n];
+    return `.sc_setup__heading:contains('${phase}'):contains('${progress}'):contains('${label}')`;
+};
 
 const CONTINUE = ".sc_setup_continue";
 
@@ -83,6 +86,11 @@ const openSetupWizard = () => [
         run: "click",
     },
     openConnectorSection("menu_shopify_connector_configuration"),
+    {
+        trigger: menu("menu_shopify_connector_connections"),
+        content: "Open Connections.",
+        run: "click",
+    },
     {
         trigger: menu("menu_shopify_connector_setup_wizard"),
         content: "Open the guided setup.",
@@ -305,8 +313,17 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: `${CONTINUE}:contains('Activate')`, run: "click" },
         {
+            trigger: ".sc_setup__complete:contains('is connected')",
+            content: "Activation closes with a purposeful completion state.",
+        },
+        {
+            trigger: ".sc_setup_dashboard:contains('Go to overview')",
+            content: "The completion screen offers one clear primary next step.",
+            run: "click",
+        },
+        {
             trigger: ".o_sc_dashboard",
-            content: "Activation hands off to the dashboard.",
+            content: "The primary completion action opens the overview.",
         },
     ],
 });

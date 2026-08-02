@@ -316,6 +316,16 @@ registry.category("web_tour.tours").add("shopify_connector_u3_checksum_ack_tour"
             run: "click",
         },
         {
+            trigger: coreMenu("menu_shopify_connector_configuration"),
+            content: "Open Configuration.",
+            run: "click",
+        },
+        {
+            trigger: coreMenu("menu_shopify_connector_connections"),
+            content: "Open Connections.",
+            run: "click",
+        },
+        {
             trigger: coreMenu("menu_shopify_connector_stores"),
             content: "Stores — the store owns the reconciliation surface.",
             run: "click",

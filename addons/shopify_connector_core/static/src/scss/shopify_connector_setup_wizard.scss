@@ -183,43 +183,122 @@
     }
     .sc-skeleton--band { block-size: 84px; }
 
-    // --- Step rail: names, not numbers alone; wraps rather than scrolls ---
+    // --- Four merchant phases over the server's twelve guarded steps ---
     .sc_setup__steps ol {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: var(--sc-space-2);
         margin: 0;
         padding: 0;
         list-style: none;
     }
 
-    .sc_setup_step {
+    .sc_setup_phase {
         display: flex;
         align-items: center;
         gap: var(--sc-space-2);
-        padding: var(--sc-space-1) var(--sc-space-3);
+        min-block-size: 64px;
+        padding: var(--sc-space-3);
         border: 1px solid var(--sc-border);
         border-radius: var(--sc-radius);
         background: var(--sc-surface-1);
-        font-size: var(--sc-fs-caption);
         color: var(--sc-text-secondary);
 
-        .sc_setup_step__index {
-            font-weight: var(--sc-fw-dominant);
+        .sc_setup_phase__marker {
+            display: inline-grid;
+            place-items: center;
+            flex: 0 0 auto;
+            inline-size: 28px;
+            block-size: 28px;
+            border: 1px solid var(--sc-border-strong);
+            border-radius: 50%;
+            font-size: var(--sc-fs-caption);
+            font-weight: var(--sc-fw-semibold);
+        }
+        .sc_setup_phase__copy {
+            display: flex;
+            min-inline-size: 0;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .sc_setup_phase__label {
+            color: var(--sc-text-primary);
+            font-weight: var(--sc-fw-semibold);
+        }
+        .sc_setup_phase__description {
+            font-size: var(--sc-fs-caption);
         }
 
-        &.sc_setup_step--current {
+        &.sc_setup_phase--current {
             border-color: var(--sc-accent);
-            color: var(--sc-accent);
-            font-weight: var(--sc-fw-label);
+            background: var(--sc-info-bg);
+            box-shadow: 0 0 0 1px var(--sc-accent);
+            .sc_setup_phase__marker {
+                border-color: var(--sc-accent);
+                background: var(--sc-accent);
+                color: #FFFFFF;
+            }
         }
 
-        // Completion is not signalled by colour alone: the done state also
-        // carries a heavier border and the step keeps its name.
-        &.sc_setup_step--done {
-            border-color: var(--sc-success-text);
-            color: var(--sc-success-text);
+        &.sc_setup_phase--done {
+            .sc_setup_phase__marker {
+                border-color: var(--sc-success-text);
+                background: var(--sc-success-bg);
+                color: var(--sc-success-text);
+            }
         }
+    }
+
+    .sc_setup__complete {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--sc-space-3);
+        padding: var(--sc-space-8) var(--sc-space-6);
+        text-align: center;
+        background: var(--sc-surface-1);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        box-shadow: var(--sc-shadow-raised);
+    }
+    .sc_setup__complete-icon {
+        display: grid;
+        place-items: center;
+        inline-size: 52px;
+        block-size: 52px;
+        border-radius: 50%;
+        background: var(--sc-success-bg);
+        color: var(--sc-success-text);
+        font-size: var(--sc-fs-title);
+    }
+    .sc_setup__eyebrow {
+        margin: 0;
+        color: var(--sc-success-text);
+        font-size: var(--sc-fs-secondary);
+        font-weight: var(--sc-fw-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .sc_setup__complete-title {
+        margin: 0;
+        font-size: var(--sc-fs-dominant);
+        font-weight: var(--sc-fw-bold);
+    }
+    .sc_setup__complete-copy { max-inline-size: 600px; margin: 0; }
+    .sc_setup__complete-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: var(--sc-space-3);
+        margin-block-start: var(--sc-space-3);
+    }
+    .sc-link {
+        border: 0;
+        background: transparent;
+        color: var(--sc-accent);
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
     }
 
     // --- The one panel: a single card, never nested cards ---
@@ -231,6 +310,7 @@
         background: var(--sc-surface-1);
         border: 1px solid var(--sc-border);
         border-radius: var(--sc-radius);
+        box-shadow: var(--sc-shadow-raised);
     }
 
     .sc_setup__heading {
@@ -516,14 +596,6 @@
     // than beside it, so a long reason never pushes it off the edge.
     .sc_setup_check_action { align-self: start; }
 
-    // A step that does not apply to this store stays in the rail, in place,
-    // and says so. It is not removed: removing it would renumber every step
-    // after it, which is the coupling this surface exists without.
-    .sc_setup_step--skipped {
-        border-style: dashed;
-        color: var(--sc-text-secondary);
-    }
-
     // --- The sticky action row -------------------------------------------
     //
     // A normal-flow sibling AFTER the panel that lifts to the bottom edge of
@@ -578,6 +650,8 @@
     // --- Single column at and below 768px (master specification S1) ---
     @media (max-width: 768px) {
         padding: var(--sc-space-4);
+
+        .sc_setup__steps ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
         .sc_setup__panel { padding: var(--sc-space-4); }
 

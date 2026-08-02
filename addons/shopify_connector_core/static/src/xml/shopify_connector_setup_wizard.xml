@@ -41,17 +41,56 @@
                 <!-- ============ READY ============ -->
                 <t t-else="">
 
-                    <!-- Step indicator: plain step names, never numbers alone. -->
-                    <nav class="sc_setup__steps" aria-label="Setup steps">
+                    <section t-if="state.showCompletion"
+                             class="sc_setup__complete" aria-live="polite">
+                        <span class="sc_setup__complete-icon" aria-hidden="true">
+                            <i class="fa fa-check"/>
+                        </span>
+                        <p class="sc_setup__eyebrow">Setup complete</p>
+                        <h1 class="sc_setup__complete-title" tabindex="-1" t-ref="heading">
+                            <t t-esc="store.name || 'Your Shopify store'"/> is connected
+                        </h1>
+                        <p class="sc_setup__complete-copy">
+                            The connector is activated and your twelve safety checkpoints are
+                            saved. Activation did not start a sync or write anything to Shopify.
+                        </p>
+                        <div class="sc_setup__complete-actions" role="group"
+                             aria-label="Completed setup actions">
+                            <button class="sc-btn sc-btn--primary sc_setup_dashboard"
+                                    t-on-click="() => this.openDashboard()">
+                                Go to overview
+                            </button>
+                            <button class="sc-btn sc_setup_settings"
+                                    t-on-click="() => this.openStoreSettings()">
+                                Open store settings
+                            </button>
+                            <button class="sc-link sc_setup_rerun"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.rerun()">
+                                Review setup again
+                            </button>
+                        </div>
+                        <p class="sc_setup__note">
+                            Completed by <t t-esc="store.setup_completed_by"/>.
+                        </p>
+                    </section>
+
+                    <!-- Four merchant phases over twelve guarded checkpoints. -->
+                    <nav t-if="!state.showCompletion" class="sc_setup__steps"
+                         aria-label="Setup progress">
                         <ol>
-                            <t t-foreach="steps" t-as="step" t-key="step.key">
-                                <li t-att-class="stepClass(step)"
-                                    t-att-data-step-key="step.key"
-                                    t-att-aria-current="step.key === state.stepKey ? 'step' : false">
-                                    <span class="sc_setup_step__index" t-esc="step.index"/>
-                                    <span class="sc_setup_step__label" t-esc="step.label"/>
-                                    <span t-if="step.applicable === false"
-                                          class="sc-badge sc-badge--neutral">Not required</span>
+                            <t t-foreach="phases" t-as="phase" t-key="phase.key">
+                                <li t-att-class="phaseClass(phase)"
+                                    t-att-data-phase-key="phase.key"
+                                    t-att-aria-current="phase.current ? 'step' : false">
+                                    <span class="sc_setup_phase__marker" aria-hidden="true">
+                                        <i t-if="phase.done" class="fa fa-check"/>
+                                        <span t-else="" t-esc="phase_index + 1"/>
+                                    </span>
+                                    <span class="sc_setup_phase__copy">
+                                        <span class="sc_setup_phase__label" t-esc="phase.label"/>
+                                        <span class="sc_setup_phase__description" t-esc="phase.description"/>
+                                    </span>
                                 </li>
                             </t>
                         </ol>
@@ -67,10 +106,13 @@
                         needs them and exactly where they used to disappear
                         below the fold.
                     -->
-                    <section class="sc_setup__panel" aria-live="polite">
+                    <section t-if="!state.showCompletion" class="sc_setup__panel" aria-live="polite">
                         <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
-                            <span class="sc_setup__heading-count">
-                                Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
+                            <span class="sc_setup__heading-count"
+                                  t-att-aria-label="'Setup checkpoint ' + currentStep.index + ' of ' + state.data.step_count">
+                                <t t-esc="currentPhase.label"/> ·
+                                <t t-esc="currentPhaseStepNumber"/> of
+                                <t t-esc="currentPhase.ordered.length"/>
                             </span>
                             <span t-esc="currentStep.label"/>
                         </h1>
@@ -975,10 +1017,6 @@
                             </p>
                         </t>
 
-                        <p t-if="store.setup_completed_at" class="sc_setup__note" role="status">
-                            Setup was completed by <t t-esc="store.setup_completed_by"/>. Re-running
-                            it changes nothing until you save a step.
-                        </p>
                     </section>
 
                     <!-- ===== Actions =====
@@ -997,7 +1035,7 @@
                          asserted in the rendered-browser evidence rather than
                          read out of the CSS.
                     -->
-                    <div class="sc_setup__actions" role="group" aria-label="Setup navigation">
+                    <div t-if="!state.showCompletion" class="sc_setup__actions" role="group" aria-label="Setup navigation">
                         <button class="sc-btn sc_setup_back"
                                 t-att-disabled="isFirstStep or state.busy"
                                 t-on-click="() => this.back()">
@@ -1014,12 +1052,6 @@
                                 t-att-disabled="state.busy"
                                 t-on-click="() => this.saveAndExit()">
                             <span>Save &amp; Exit</span>
-                        </button>
-                        <button t-if="store.id and store.setup_completed_at"
-                                class="sc-btn sc_setup_rerun"
-                                t-att-disabled="state.busy"
-                                t-on-click="() => this.rerun()">
-                            <span>Start again</span>
                         </button>
                     </div>
                 </t>

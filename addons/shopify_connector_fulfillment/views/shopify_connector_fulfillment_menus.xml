@@ -3,9 +3,9 @@
     <!--
         U1 operator UI: the fulfillment branch of the connector navigation.
 
-        Placement: under the existing U0 root (`menu_shopify_connector_root`),
-        between Sync Center (30) and Error & Review Center (40). U1 adds no new
-        root app menu — the operator keeps one connector app.
+        Fulfillment work lives under Operations. Its settings live under the
+        single Configuration branch, so task execution and configuration are
+        not mixed at the top level.
 
         VISIBILITY vs AUTHORIZATION. Every menu here is gated on the SEC-2
         customer-facing role `group_shopify_connector_user` (Connector
@@ -21,18 +21,18 @@
 
     <menuitem id="menu_shopify_connector_fulfillment"
               name="Fulfillment"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="35"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              sequence="40"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_review"
-              name="Review Workspace"
+              name="Fulfillment Reviews"
               parent="menu_shopify_connector_fulfillment"
               action="action_shopify_connector_fulfillment_review"
               sequence="10"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_binding"
-              name="Fulfillments"
+              name="Fulfillment Records"
               parent="menu_shopify_connector_fulfillment"
               action="action_shopify_connector_fulfillment_binding"
               sequence="20"/>
@@ -53,7 +53,8 @@
     -->
     <menuitem id="menu_shopify_connector_fulfillment_settings"
               name="Fulfillment Settings"
-              parent="menu_shopify_connector_fulfillment"
+              parent="shopify_connector_core.menu_shopify_connector_sync_rules"
               action="action_shopify_connector_fulfillment_settings"
-              sequence="40"/>
+              groups="shopify_connector_core.group_shopify_connector_user"
+              sequence="30"/>
 </odoo>

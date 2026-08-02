@@ -9,13 +9,14 @@
 
 // S1 (2026-07-27): the setup wizard is a SECOND core-owned root and is added
 // to this selector rather than given its own copy of the token block. The
-// export module re-declares the layer on its own root because it lives in a
-// different addon and cannot rely on this file's load order; a root in THIS
-// addon has no such problem, and a duplicated token list is a list that
-// drifts. The scoping discipline is unchanged: tokens still reach only
-// connector roots, never the wider Odoo backend.
+// The export review root is included here as well. Product export depends on
+// core, so this asset loads first; keeping one token declaration prevents the
+// font/radius drift that appeared when export maintained a private copy. The
+// scoping discipline is unchanged: tokens reach only connector roots, never
+// the wider Odoo backend.
 .o_sc_dashboard,
-.o_sc_setup {
+.o_sc_setup,
+.o_sc_export_diff {
     // --- Surfaces (design-system §5) ---
     --sc-surface-0: #F8FAFC; // page background
     --sc-surface-1: #FFFFFF; // card
@@ -50,13 +51,20 @@
     --sc-fs-body: 1rem;
     --sc-fs-cardtitle: 1.125rem;
     --sc-fs-lead: 1.375rem;
+    --sc-fs-title: 1.5rem;
     --sc-fs-dominant: 1.75rem;
     --sc-fw-body: 400;
+    --sc-fw-regular: 400;
     --sc-fw-label: 500;
+    --sc-fw-semibold: 600;
+    --sc-fw-bold: 700;
     --sc-fw-dominant: 600;
 
     // --- Radius (§5) ---
-    --sc-radius: 8px;
+    --sc-radius: 12px;
+    --sc-radius-small: 8px;
+    --sc-shadow-raised: 0 1px 2px rgb(16 24 40 / 0.04),
+        0 10px 28px rgb(16 24 40 / 0.06);
 
     // --- Motion (§8) ---
     --sc-motion-1: 100ms;
@@ -65,6 +73,8 @@
     --sc-ease: cubic-bezier(0.2, 0, 0, 1);
 
     // --- Font stack (§4): platform only, no external font ---
-    --sc-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-        Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    // Inherit the Odoo web client's resolved UI stack. A second explicit
+    // system stack looked almost identical on one machine and visibly
+    // different on another, especially beside the native app menu.
+    --sc-font: inherit;
 }

@@ -289,14 +289,15 @@
     </record>
 
     <menuitem id="menu_shopify_connector_orders_awaiting_configuration"
-              name="Awaiting Configuration"
-              parent="menu_shopify_connector_orders"
+              name="Orders Awaiting Configuration"
+              parent="shopify_connector_core.menu_shopify_connector_error_center"
               action="action_shopify_connector_orders_awaiting_configuration"
-              sequence="25"/>
+              sequence="20"/>
 
     <menuitem id="menu_shopify_connector_tax_mapping"
               name="Tax Mappings"
-              parent="menu_shopify_connector_orders"
+              parent="shopify_connector_core.menu_shopify_connector_sync_rules"
               action="action_shopify_connector_tax_mapping"
-              sequence="30"/>
+              groups="shopify_connector_core.group_shopify_connector_user"
+              sequence="40"/>
 </odoo>

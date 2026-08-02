@@ -9,8 +9,8 @@
 //
 //   1. Approve Payment          -> action_approve_manual_gateway_order
 //   2. Confirm First Push       -> action_confirm_first_push
-//   3. Verify Now               -> action_recheck_inventory_pair
-//   4. Change Push              -> action_set_push_enabled
+//   3. Verify inventory now     -> action_recheck_inventory_pair
+//   4. Change inventory push    -> action_set_push_enabled
 //
 // These DO write, and two of them enqueue a job. That is exactly why they need
 // a browser test rather than only a server-side one: three real UI/server
@@ -21,9 +21,9 @@
 //     -- the one state `action_confirm_first_push` refuses -- and hidden in
 //     `previewed`, the one state it accepts. The sanctioned confirmation was
 //     unreachable from the shipped UI.
-//   * `Verify Now` was gated on Operator while its service admits only
+//   * `Verify inventory now` was gated on Operator while its service admits only
 //     Reviewer or Administrator.
-//   * `Change Push` was gated on Operator while the transient wizard behind it
+//   * `Change inventory push` was gated on Operator while the transient wizard behind it
 //     was ACL'd to Administrator alone, so a Connector User was refused at the
 //     dialog rather than at the control.
 //
@@ -240,11 +240,11 @@ tours.add("shopify_connector_u2_push_toggle_tour", {
             run: "click",
         },
         focusStep(
-            ".o_form_view button:contains('Change Push')",
+            ".o_form_view button:contains('Change inventory push')",
             "The push control takes keyboard focus and shows a focus ring."
         ),
         {
-            trigger: ".o_form_view button:contains('Change Push')",
+            trigger: ".o_form_view button:contains('Change inventory push')",
             content: "Open the push-change dialog.",
             run: "click",
         },
@@ -277,7 +277,7 @@ tours.add("shopify_connector_u2_recheck_tour", {
             run: "click",
         },
         {
-            trigger: ".o_form_view button:contains('Verify Now')",
+            trigger: ".o_form_view button:contains('Verify inventory now')",
             content: "Open the verification dialog.",
             run: "click",
         },
@@ -311,7 +311,7 @@ tours.add("shopify_connector_u2_recheck_blank_reason_tour", {
             run: "click",
         },
         {
-            trigger: ".o_form_view button:contains('Verify Now')",
+            trigger: ".o_form_view button:contains('Verify inventory now')",
             content: "Open the verification dialog.",
             run: "click",
         },

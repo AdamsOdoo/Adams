@@ -73,7 +73,10 @@
                         <!-- Header: filters + the two DISTINCT timestamps -->
                         <header class="sc360-header">
                             <div class="sc360-header__row">
-                                <h1 class="sc360-title">Shopify Store 360</h1>
+                                <div>
+                                    <p class="sc360-eyebrow">Overview</p>
+                                    <h1 class="sc360-title" t-esc="storeHeading(data.meta)"/>
+                                </div>
                                 <div class="sc360-filters">
                                     <label class="sc360-filter" t-if="data.meta.stores.length &gt; 1">
                                         <span class="sc360-filter__label">Store</span>
@@ -115,15 +118,19 @@
 
                         <!-- B1: critical status band -->
                         <t t-if="data.critical and data.critical.active">
-                            <div class="sc-band sc-band--danger sc360-critical" role="alert">
-                                <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                            <div t-att-class="bandClass(data.critical.severity) + ' sc360-critical'"
+                                 role="alert">
+                                <i class="fa sc-band__icon"
+                                   t-att-class="data.critical.severity === 'danger' ? 'fa-exclamation-triangle' : 'fa-clock-o'"
+                                   aria-hidden="true"/>
                                 <div class="sc-band__body">
+                                    <div class="sc-band__text" t-esc="data.critical.title"/>
                                     <t t-foreach="data.critical.causes" t-as="cause" t-key="cause.id">
                                         <div class="sc360-critical__cause">
-                                            <span class="sc-band__text" t-esc="cause.text"/>
+                                            <span class="sc-band__hint" t-esc="cause.text"/>
                                             <button class="sc-btn sc-btn--inverse"
                                                     t-on-click="() => this.openTarget(cause.target)">
-                                                <span>Review</span>
+                                                <span t-esc="cause.action_label"/>
                                             </button>
                                         </div>
                                     </t>
@@ -132,7 +139,8 @@
                         </t>
 
                         <!-- Region 1: lead answer band (health severity model) -->
-                        <div t-att-class="bandClass(data.health.lead.severity)" aria-live="polite">
+                        <div t-if="!data.critical or !data.critical.active"
+                             t-att-class="bandClass(data.health.lead.severity)" aria-live="polite">
                             <i class="fa sc-band__icon" t-att-class="data.health.lead.icon" aria-hidden="true"/>
                             <div class="sc-band__body">
                                 <div class="sc-band__text" t-esc="data.health.lead.text"/>
@@ -169,7 +177,8 @@
                                             <div class="sc360-kpi__delta">No sales in this period</div>
                                         </t>
                                     </div>
-                                    <button class="sc360-kpi sc360-kpi--action" t-att-data-kpi="'orders'"
+                                    <button t-if="data.commercial.orders_total &gt; 0"
+                                            class="sc360-kpi sc360-kpi--action" t-att-data-kpi="'orders'"
                                             t-on-click="() => this.openTarget(data.commercial.orders_target)">
                                         <div class="sc360-kpi__label">Imported orders</div>
                                         <div class="sc360-kpi__value"><bdi t-esc="formatNumber(data.commercial.orders_total)"/></div>
@@ -181,6 +190,11 @@
                                         </t>
                                         <div class="sc360-kpi__hint">Open the orders</div>
                                     </button>
+                                    <div t-else="" class="sc360-kpi sc360-kpi--empty" t-att-data-kpi="'orders'">
+                                        <div class="sc360-kpi__label">Imported orders</div>
+                                        <div class="sc360-kpi__value">0</div>
+                                        <div class="sc360-kpi__delta">No imported orders in this period</div>
+                                    </div>
                                     <div class="sc360-kpi" t-att-data-kpi="'aov'">
                                         <div class="sc360-kpi__label">Average imported order value</div>
                                         <div class="sc360-kpi__value">
@@ -193,7 +207,8 @@
                                             </div>
                                         </t>
                                     </div>
-                                    <button class="sc360-kpi sc360-kpi--action" t-att-data-kpi="'units'"
+                                    <button t-if="data.commercial.units &gt; 0"
+                                            class="sc360-kpi sc360-kpi--action" t-att-data-kpi="'units'"
                                             t-on-click="() => this.openTarget(data.commercial.units_target)">
                                         <div class="sc360-kpi__label">Units sold (imported)</div>
                                         <div class="sc360-kpi__value"><bdi t-esc="formatNumber(data.commercial.units)"/></div>
@@ -203,6 +218,11 @@
                                         </div>
                                         <div class="sc360-kpi__hint">Open the order lines</div>
                                     </button>
+                                    <div t-else="" class="sc360-kpi sc360-kpi--empty" t-att-data-kpi="'units'">
+                                        <div class="sc360-kpi__label">Units sold (imported)</div>
+                                        <div class="sc360-kpi__value">0</div>
+                                        <div class="sc360-kpi__delta">No imported units in this period</div>
+                                    </div>
                                 </div>
                                 <div class="sc360-currency-note" t-if="data.commercial.blocks.length &gt; 1">
                                     Multiple currencies in this scope — figures are shown per currency, never combined:
@@ -342,7 +362,12 @@
                                     </div>
                                 </t>
                                 <t t-else="">
-                                    <div class="sc360-strips">
+                                    <div t-if="data.commercial and data.commercial.available and data.commercial.orders_total === 0"
+                                         class="sc360-inline-empty" role="status">
+                                        No imported orders are available to classify yet. Lifecycle
+                                        stages will appear after the first successful order import.
+                                    </div>
+                                    <div t-else="" class="sc360-strips">
                                         <div class="sc360-strip" data-strip="payment">
                                             <h3 class="sc360-strip__title">Payment
                                                 <span class="sc360-scope-note">Shopify status observed through
@@ -350,7 +375,9 @@
                                             </h3>
                                             <div class="sc360-strip__items">
                                                 <t t-foreach="data.lifecycle.payment.buckets" t-as="bucket" t-key="bucket.id">
-                                                    <button class="sc360-count" t-on-click="() => this.openTarget(bucket.target)">
+                                                    <button class="sc360-count"
+                                                            t-att-disabled="bucket.count &lt;= 0"
+                                                            t-on-click="() => this.openTarget(bucket.target)">
                                                         <span class="sc360-count__value" t-esc="formatNumber(bucket.count)"/>
                                                         <span class="sc360-count__label" t-esc="bucket.label"/>
                                                     </button>
@@ -360,20 +387,28 @@
                                         <div class="sc360-strip" data-strip="cod" t-if="data.lifecycle.cod.total &gt; 0">
                                             <h3 class="sc360-strip__title">Cash on delivery</h3>
                                             <div class="sc360-strip__items">
-                                                <button class="sc360-count" t-on-click="() => this.openTarget(data.lifecycle.cod.approval_pending_target)">
+                                                <button class="sc360-count"
+                                                        t-att-disabled="data.lifecycle.cod.approval_pending &lt;= 0"
+                                                        t-on-click="() => this.openTarget(data.lifecycle.cod.approval_pending_target)">
                                                     <span class="sc360-count__value" t-esc="formatNumber(data.lifecycle.cod.approval_pending)"/>
                                                     <span class="sc360-count__label">Awaiting approval</span>
                                                 </button>
-                                                <button class="sc360-count" t-on-click="() => this.openTarget(data.lifecycle.cod.quotation_target)">
+                                                <button class="sc360-count"
+                                                        t-att-disabled="data.lifecycle.cod.quotation &lt;= 0"
+                                                        t-on-click="() => this.openTarget(data.lifecycle.cod.quotation_target)">
                                                     <span class="sc360-count__value" t-esc="formatNumber(data.lifecycle.cod.quotation)"/>
                                                     <span class="sc360-count__label">Quotation</span>
                                                 </button>
-                                                <button class="sc360-count" t-on-click="() => this.openTarget(data.lifecycle.cod.confirmed_target)">
+                                                <button class="sc360-count"
+                                                        t-att-disabled="data.lifecycle.cod.confirmed &lt;= 0"
+                                                        t-on-click="() => this.openTarget(data.lifecycle.cod.confirmed_target)">
                                                     <span class="sc360-count__value" t-esc="formatNumber(data.lifecycle.cod.confirmed)"/>
                                                     <span class="sc360-count__label">Confirmed</span>
                                                 </button>
                                                 <t t-foreach="data.lifecycle.cod.collection" t-as="bucket" t-key="bucket.id">
-                                                    <button class="sc360-count" t-on-click="() => this.openTarget(bucket.target)">
+                                                    <button class="sc360-count"
+                                                            t-att-disabled="bucket.count &lt;= 0"
+                                                            t-on-click="() => this.openTarget(bucket.target)">
                                                         <span class="sc360-count__value" t-esc="formatNumber(bucket.count)"/>
                                                         <span class="sc360-count__label" t-esc="bucket.label"/>
                                                     </button>
@@ -386,7 +421,9 @@
                                             </h3>
                                             <div class="sc360-strip__items">
                                                 <t t-foreach="data.lifecycle.fulfillment_progress.buckets" t-as="bucket" t-key="bucket.id">
-                                                    <button class="sc360-count" t-on-click="() => this.openTarget(bucket.target)">
+                                                    <button class="sc360-count"
+                                                            t-att-disabled="bucket.count &lt;= 0"
+                                                            t-on-click="() => this.openTarget(bucket.target)">
                                                         <span class="sc360-count__value" t-esc="formatNumber(bucket.count)"/>
                                                         <span class="sc360-count__label" t-esc="bucket.label"/>
                                                     </button>
@@ -404,7 +441,9 @@
                                             </t>
                                             <div class="sc360-strip__items" t-else="">
                                                 <t t-foreach="data.dispatch.buckets" t-as="bucket" t-key="bucket.id">
-                                                    <button class="sc360-count" t-on-click="() => this.openTarget(bucket.target)">
+                                                    <button class="sc360-count"
+                                                            t-att-disabled="bucket.count &lt;= 0"
+                                                            t-on-click="() => this.openTarget(bucket.target)">
                                                         <span class="sc360-count__value" t-esc="formatNumber(bucket.count)"/>
                                                         <span class="sc360-count__label" t-esc="bucket.label"/>
                                                     </button>
@@ -459,8 +498,13 @@
                                     </div>
                                 </t>
                             </t>
-                            <t t-else="">
+                            <t t-elif="!data.critical or !data.critical.active">
                                 <div class="sc-affirm">All clear — nothing needs your attention right now.</div>
+                            </t>
+                            <t t-else="">
+                                <div class="sc-status-note">
+                                    Job processing is clear. Data freshness still needs attention above.
+                                </div>
                             </t>
 
                             <table class="sc360-table sc360-flows">

@@ -61,7 +61,7 @@ HOOT_SUCCESS = "[HOOT] Test suite succeeded"
 #: you legitimately add or remove a HOOT test, update the number here in the
 #: same commit -- that is the point.
 EXPECTED_SUITES = {
-    'shopify connector dashboard': 8,
+    'shopify connector dashboard': 10,
     'shopify connector export diff': 11,
     # S1 (2026-07-27): the guided setup client action. Wave 5 (2026-07-29)
     # raised this from 9 to 17: the twelve-step order, semantic-key
@@ -79,7 +79,9 @@ EXPECTED_SUITES = {
     # deduplication, revalidation of an off-screen selection, the in-place
     # row update after a mapping, and four distinct empty states -- and none
     # of those properties is observable from the server or from a tour.
-    'shopify connector setup wizard': 30,
+    # Premium revamp: completed stores now have a purposeful landing state
+    # and the twelve guarded checkpoints render as four merchant phases.
+    'shopify connector setup wizard': 31,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so

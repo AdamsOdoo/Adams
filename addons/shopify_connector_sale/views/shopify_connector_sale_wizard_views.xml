@@ -44,7 +44,7 @@
                 </group>
                 <footer>
                     <button name="action_confirm" type="object"
-                            string="Approve" class="btn-primary"
+                            string="Approve manually paid order" class="btn-primary"
                             data-hotkey="q"/>
                     <button string="Cancel" class="btn-secondary"
                             special="cancel" data-hotkey="x"/>
