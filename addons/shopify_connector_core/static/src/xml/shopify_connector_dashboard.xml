@@ -141,8 +141,8 @@
                         </div>
 
                         <!-- Commercial: C1–C4 + C∆ -->
-                        <section class="sc360-section sc360-commercial" aria-label="Imported Shopify sales">
-                            <h2 class="sc-section__title">Imported Shopify sales
+                        <section class="sc360-section sc360-commercial" aria-label="Imported Odoo order value">
+                            <h2 class="sc-section__title">Sales activity in Odoo
                                 <span class="sc360-scope-note">stored in Odoo · <t t-esc="periodLabel(state.period)"/></span>
                             </h2>
                             <t t-if="!data.commercial.available">
@@ -154,7 +154,7 @@
                                 <t t-set="primary" t-value="data.commercial.blocks.length ? data.commercial.blocks[0] : false"/>
                                 <div class="sc360-kpis">
                                     <div class="sc360-kpi" t-att-data-kpi="'sales'">
-                                        <div class="sc360-kpi__label">Imported Shopify sales</div>
+                                        <div class="sc360-kpi__label">Imported Odoo order value</div>
                                         <t t-if="primary">
                                             <div class="sc360-kpi__value">
                                                 <bdi t-esc="formatMoney(primary.currency, primary.sales)"/>
@@ -202,6 +202,14 @@
                                             <bdi t-esc="delta.text"/> <span class="sc360-kpi__delta-caption">vs previous period</span>
                                         </div>
                                         <div class="sc360-kpi__hint">Open the order lines</div>
+                                    </button>
+                                    <button class="sc360-kpi sc360-kpi--action" t-att-data-kpi="'awaiting-review'"
+                                            t-on-click="() => this.openTarget(data.commercial.awaiting_review.target)">
+                                        <div class="sc360-kpi__label">Awaiting data review</div>
+                                        <div class="sc360-kpi__value">
+                                            <bdi t-esc="formatNumber(data.commercial.awaiting_review.count)"/>
+                                        </div>
+                                        <div class="sc360-kpi__hint">Excluded from the reconciled figures above</div>
                                     </button>
                                 </div>
                                 <div class="sc360-currency-note" t-if="data.commercial.blocks.length &gt; 1">

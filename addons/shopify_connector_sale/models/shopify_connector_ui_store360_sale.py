@@ -66,10 +66,13 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
     # ------------------------------------------------------------------ #
     #  Shared domains (the ONE C1 population definition)
     # ------------------------------------------------------------------ #
-    def _store_360_order_domain(self, ctx, which='current'):
+    def _store_360_order_domain(self, ctx, which='current', review=False):
         """The C1 population: imported, non-cancelled, non-quarantined
         Shopify orders of the selected scope, `date_order` in the window.
-        Used verbatim for every order-grain aggregate AND its drill-down."""
+        The reconciled population excludes review rows; passing ``review``
+        builds the separately disclosed review population with every other
+        scope/exclusion term identical. Used verbatim for every order-grain
+        aggregate AND its drill-down."""
         store = ctx['store']
         window = ctx['window']
         if which == 'current':
@@ -87,6 +90,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
         domain = [
             ('shopify_connector_quarantined', '=', False),
             ('shopify_connector_cancelled_at', '=', False),
+            ('shopify_connector_review', '=', bool(review)),
             ('state', '!=', 'cancel'),
             ('date_order', '>=', start),
             end_term,
@@ -131,6 +135,9 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             tz=ctx['window']['tz'])
         current_domain = self._store_360_order_domain(ctx, 'current')
         prev_domain = self._store_360_order_domain(ctx, 'previous')
+        review_domain = self._store_360_order_domain(
+            ctx, 'current', review=True,
+        )
 
         current_rows = Order._read_group(
             current_domain, groupby=['currency_id'],
@@ -200,12 +207,20 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             'orders_target': {
                 'res_model': 'sale.order',
                 'domain': self._serialize_domain(current_domain),
-                'name': _("Imported Shopify orders"),
+                'name': _("Imported Odoo orders"),
             },
             'units_target': {
                 'res_model': 'sale.order.line',
                 'domain': self._serialize_domain(current_line_domain),
-                'name': _("Imported Shopify order lines"),
+                'name': _("Imported Odoo order lines"),
+            },
+            'awaiting_review': {
+                'count': Order.search_count(review_domain),
+                'target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(review_domain),
+                    'name': _("Imported orders awaiting data review"),
+                },
             },
         }
         primary = blocks[0] if blocks else False
@@ -302,7 +317,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 'res_model': 'sale.order',
                 'domain': self._serialize_domain(
                     current_domain + currency_term),
-                'name': _("Imported Shopify orders"),
+                'name': _("Imported Odoo orders"),
             },
         }
 
@@ -502,6 +517,9 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
     def _store_360_lifecycle(self, ctx):
         Order = self.env['sale.order']
         domain = self._store_360_order_domain(ctx, 'current')
+        review_domain = self._store_360_order_domain(
+            ctx, 'current', review=True,
+        )
 
         def target(extra, name):
             return {
@@ -534,9 +552,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 pending_non_cod += count
             else:
                 other += count
-        review = Order.search_count(
-            domain + [('shopify_connector_review', '=', True)],
-        )
+        review = Order.search_count(review_domain)
         payment = {
             'buckets': [
                 {
@@ -574,9 +590,11 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 {
                     'id': 'review', 'label': _("Needs review"),
                     'count': review,
-                    'target': target(
-                        [('shopify_connector_review', '=', True)],
-                        _("Imported orders needing review")),
+                    'target': {
+                        'res_model': 'sale.order',
+                        'domain': self._serialize_domain(review_domain),
+                        'name': _("Imported orders needing review"),
+                    },
                 },
             ],
             'other': other,
