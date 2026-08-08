@@ -461,7 +461,8 @@
                                     <button class="sc-btn sc_setup_refresh_locations"
                                             t-att-disabled="state.busy"
                                             t-on-click="() => this.refreshLocations()">
-                                        <span>Refresh Shopify locations</span>
+                                        <span t-if="refreshState() !== 'failed'">Refresh Shopify locations</span>
+                                        <span t-if="refreshState() === 'failed'">Retry</span>
                                     </button>
                                     <span class="sc-badge sc_setup_refresh_state"
                                           t-att-class="'sc-badge--' + (refreshState() === 'succeeded' ? 'success' : (refreshState() === 'failed' ? 'danger' : (refreshState() === 'none' ? 'neutral' : 'info')))"
@@ -479,12 +480,31 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div t-if="state.locationRefreshStillRunning and (refreshState() === 'waiting' or refreshState() === 'running')"
+                                     class="sc-band sc-band--info sc_setup_refresh_still_running"
+                                     role="status">
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">The refresh is still running</div>
+                                        <div class="sc-band__hint">
+                                            Background work can take longer than this screen waits.
+                                            Nothing was cancelled and this is not a failure.
+                                        </div>
+                                    </div>
+                                    <button class="sc-btn sc_setup_check_refresh"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.checkLocationRefresh()">
+                                        Check status
+                                    </button>
+                                </div>
                                 <div t-if="refreshState() === 'failed'"
                                      class="sc-band sc-band--danger" role="alert">
                                     <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
                                         <div class="sc-band__text">The last location refresh did not finish</div>
                                         <div class="sc-band__hint">
+                                            <span class="sc_setup_refresh_failure_reason"
+                                                  t-if="locations.refresh.reason"
+                                                  t-esc="locations.refresh.reason"/><br t-if="locations.refresh.reason"/>
                                             The list below is whatever was read last time, and may
                                             be incomplete. Try refreshing again; if it keeps
                                             failing, check the connection and the read_locations

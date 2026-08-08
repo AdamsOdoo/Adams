@@ -1971,7 +1971,22 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         ], order='id desc', limit=1)
 
     @api.model
-    def location_refresh_state(self, store):
+    def _location_refresh_failure_reason(self, job):
+        """Last redacted operator-facing transition message for this run."""
+        log = self.env['shopify.connector.job.log'].sudo().search([
+            ('job_id', '=', job.id),
+            ('event_type', '=', 'state_change'),
+            ('to_state', 'in', ('failed_retryable', 'failed_final', 'skipped')),
+        ], order='id desc', limit=1)
+        if log and log.message:
+            return log.message
+        if job.error_class:
+            labels = dict(job._fields['error_class'].selection)
+            return labels.get(job.error_class, job.error_class)
+        return 'The location refresh did not finish safely.'
+
+    @api.model
+    def location_refresh_state(self, store, job_id=None):
         """What the last/current Shopify-location refresh is actually doing.
 
         Four states an operator can act on, and the distinction between them
@@ -1996,41 +2011,65 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         public method, and a public method that trusts its caller's resolution
         is one refactor away from being the route that skipped it. The
         elevation is scoped to this store's own jobs and exposes an id, a
-        state and a fixed-vocabulary error class -- never a Shopify response,
-        never a traceback.
+        state and the redacted operator message already recorded on its audit
+        transition -- never a Shopify response body, technical detail, or a
+        traceback.
         """
         store = self._resolve_store_for_location_action(store.id)
-        pending = self._location_refresh_job(store)
-        if pending:
-            return {
-                'state': 'running' if pending.state == 'running' else 'waiting',
-                'job_id': pending.id,
-                'job_state': pending.state,
-                'reason': '',
-            }
-        last = self.env['shopify.connector.job'].sudo().search([
+        domain = [
             ('store_id', '=', store.id),
             ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
-        ], order='id desc', limit=1)
+        ]
+        if job_id is not None:
+            try:
+                exact_id = int(job_id)
+            except (TypeError, ValueError):
+                raise UserError('This location refresh is not available.')
+            domain.append(('id', '=', exact_id))
+        last = self.env['shopify.connector.job'].sudo().search(
+            domain, order='id desc', limit=1,
+        )
+        if job_id is not None and not last:
+            # Exact store + type agreement, without revealing whether the id
+            # belongs to another store or never existed.
+            raise UserError('This location refresh is not available.')
         if not last:
             return {
                 'state': 'none', 'job_id': False, 'job_state': '', 'reason': '',
+                'next_retry_at': False, 'can_retry': False,
             }
+        base = {
+            'job_id': last.id,
+            'job_state': last.state,
+            'reason': '',
+            'next_retry_at': last.next_retry_at or False,
+            'can_retry': last.state in ('failed_retryable', 'failed_final'),
+        }
+        if last.expected_connection_generation != store.connection_generation:
+            return dict(
+                base,
+                state='stale',
+                reason=(
+                    'This refresh belongs to an earlier store connection. '
+                    'Run a new refresh for the current connection.'
+                ),
+                can_retry=False,
+            )
+        if last.state == 'running':
+            return dict(base, state='running')
+        if last.state in ('draft', 'queued', 'retry_waiting'):
+            return dict(base, state='waiting')
         if last.state == 'succeeded':
-            return {
-                'state': 'succeeded', 'job_id': last.id,
-                'job_state': last.state, 'reason': '',
-            }
+            return dict(base, state='succeeded')
         # Everything else terminal is a refresh that did not deliver: failed,
         # cancelled, skipped. The operator gets the connector's own error
         # CLASS, which is a fixed vocabulary value -- never a raw traceback,
         # never a Shopify response body.
-        return {
-            'state': 'failed',
-            'job_id': last.id,
-            'job_state': last.state,
-            'reason': last.error_class or '',
-        }
+        return dict(
+            base,
+            state='failed',
+            reason=self._location_refresh_failure_reason(last),
+        )
 
     @api.model
     def action_refresh_shopify_locations(self, store_id):
@@ -2137,7 +2176,22 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # identity and state of work that genuinely exists.
         existing = self._location_refresh_job(store)
         if existing:
+            if existing.state == 'failed_retryable':
+                # Retry the preserved logical run.  A new row would discard
+                # the failure lineage the setup surface is asking to recover.
+                existing.with_user(self.env.user).action_manual_retry()
             return existing
+        previous = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+        ], order='id desc', limit=1)
+        if (
+            previous.state == 'failed_final'
+            and previous.expected_connection_generation
+            == store.connection_generation
+        ):
+            previous.with_user(self.env.user).action_manual_retry()
+            return previous
         return self._enqueue_location_sync(store, job_source=job_source)
 
     @api.model
@@ -2274,6 +2328,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             if not connection['has_next_page']:
                 break
             cursor = connection['next_cursor']
+        settings = self.env['shopify.connector.store.settings'].sudo().search([
+            ('store_id', '=', store.id),
+        ], limit=1)
+        if settings:
+            # The cache is readiness evidence. A complete traversal invalidates
+            # a verdict recorded before it; exact-run follow-up recomputes it.
+            settings._mark_setup_readiness_stale()
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
         job._log_transition(
             'verification_read',

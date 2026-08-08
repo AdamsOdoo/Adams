@@ -173,6 +173,13 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         ].action_refresh_shopify_locations(store.id)
 
     @api.model
+    def _setup_follow_location_refresh(self, store, job_id):
+        """Follow the exact admitted run, never whichever run is newest."""
+        return self.env[
+            'shopify.connector.inventory.service'
+        ].location_refresh_state(store, job_id=job_id)
+
+    @api.model
     def _setup_search_locations(self, store, side, query, offset):
         """One bounded page of eligible locations, filtered server-side.
 

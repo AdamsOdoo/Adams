@@ -770,6 +770,14 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         ))
 
     @api.model
+    def _setup_follow_location_refresh(self, store, job_id):
+        """Read one exact domain-owned refresh run. Domain extension seam."""
+        raise UserError(_(
+            'Location mapping needs the Shopify Connector Inventory module, '
+            'which is not installed in this database.'
+        ))
+
+    @api.model
     def _setup_search_locations(self, store, side, query, offset):
         """Bounded server-side location search for the mapping step. Seam.
 
@@ -975,6 +983,8 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         tier = check.get('tier')
         if code == 'mapped_location':
             refresh_state = (locations or {}).get('refresh', {}).get('state')
+            if refresh_state == 'stale':
+                return READINESS_BLOCKING
             if result != 'pass' and refresh_state in ('waiting', 'running'):
                 # A refresh is genuinely in flight, so "no mapping yet" is
                 # not yet a fact about this store. It is also NEVER reported
@@ -1007,6 +1017,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     @api.model
     def _readiness_reason(self, check, state, locations):
         """The sentence under a check, corrected for what is actually known."""
+        if state == READINESS_BLOCKING and check.get('code') == 'mapped_location':
+            refresh = (locations or {}).get('refresh', {})
+            if refresh.get('state') == 'stale':
+                return refresh.get('reason') or _(
+                    'The location list belongs to an earlier store connection.'
+                )
         if state == READINESS_WAITING and check.get('code') == 'mapped_location':
             refresh = (locations or {}).get('refresh', {})
             if refresh.get('state') in ('waiting', 'running'):
@@ -1494,8 +1510,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         Administrator gate is in addition to those, not instead of them.
         """
         store = self._resolve_store(store_id)
-        self._setup_refresh_locations(store)
-        return self.get_setup_state(store_id=store.id)
+        job = self._setup_refresh_locations(store)
+        state = self.get_setup_state(store_id=store.id)
+        # Bind the first response to the exact admitted/coalesced run too. The
+        # next request echoes this id through `follow_location_refresh`.
+        state['location_mapping']['refresh'] = (
+            self._setup_follow_location_refresh(store, job.id)
+        )
+        return state
+
+    @api.model
+    def follow_location_refresh(self, store_id, job_id):
+        """Follow one exact refresh and refresh readiness after its success."""
+        store = self._resolve_store(store_id)
+        refresh = self._setup_follow_location_refresh(store, job_id)
+        settings = self._settings_for(store)
+        if refresh['state'] == 'succeeded' and (
+            not store.last_readiness_at
+            or self._readiness_is_stale(store, settings)
+        ):
+            self.env['shopify.connector.readiness.check'].run_for_store(store)
+            store.invalidate_recordset()
+            self._clear_readiness_stale(settings)
+        state = self.get_setup_state(store_id=store.id)
+        # `get_setup_state` normally presents the newest refresh. Preserve the
+        # exact identity this request followed even if another run now exists.
+        state['location_mapping']['refresh'] = refresh
+        return state
 
     @api.model
     def save_location_mapping(
@@ -1520,6 +1561,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         # A new mapping is exactly what `mapped_location` reads, so any
         # earlier readiness result is now stale.
         self._mark_readiness_stale(settings)
+        # The mapping is the evidence `mapped_location` reads. Recompute now so
+        # the step never displays a stale readiness verdict after a successful
+        # save; this is a local evidence read and makes no Shopify request.
+        self.env['shopify.connector.readiness.check'].run_for_store(store)
+        store.invalidate_recordset()
+        self._clear_readiness_stale(settings)
         self._record_progress(settings, 'location_mapping')
         return self.get_setup_state(store_id=store.id)
 

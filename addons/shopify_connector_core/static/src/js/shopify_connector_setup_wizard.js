@@ -37,6 +37,7 @@
 import {
     Component,
     onWillStart,
+    onWillUnmount,
     useEffect,
     useRef,
     useState,
@@ -64,6 +65,10 @@ const MODEL = "shopify.connector.setup.wizard";
 // The first step's key. Used only as the fallback when the server payload has
 // not arrived yet; every other key in this file comes from that payload.
 const FIRST_STEP_KEY = "welcome";
+
+// Finite one-shot backoff: no interval survives the setup session and no
+// browser loop claims a background run must finish within an arbitrary time.
+const LOCATION_REFRESH_BACKOFF_MS = [250, 500, 1000, 2000];
 
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";
@@ -121,10 +126,21 @@ export class ShopifyConnectorSetupWizard extends Component {
                     nextOffset: false, continuation: null, emptyReason: "",
                 },
             },
+            locationRefreshStillRunning: false,
         });
+
+        this.locationRefreshJobId = null;
+        this.locationRefreshFollowGeneration = 0;
+        this.locationRefreshTimer = null;
+        this.locationRefreshTimerResolve = null;
 
         onWillStart(async () => {
             await this._load(this._contextStoreId());
+        });
+
+        onWillUnmount(() => {
+            this.locationRefreshFollowGeneration += 1;
+            this._cancelLocationRefreshTimer();
         });
 
         // A11y: focus moves to the step heading on advance, so a keyboard or
@@ -234,6 +250,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             running: _t("Running"),
             succeeded: _t("Succeeded"),
             failed: _t("Failed"),
+            stale: _t("Out of date"),
             none: _t("Not run yet"),
         }[this.refreshState()];
     }
@@ -507,11 +524,85 @@ export class ShopifyConnectorSetupWizard extends Component {
         await this._call("run_readiness", { store_id: this.store.id });
     }
 
+    _waitForLocationRefresh(delay, generation) {
+        return new Promise((resolve) => {
+            if (generation !== this.locationRefreshFollowGeneration) {
+                resolve();
+                return;
+            }
+            this.locationRefreshTimerResolve = resolve;
+            this.locationRefreshTimer = setTimeout(() => {
+                this.locationRefreshTimer = null;
+                this.locationRefreshTimerResolve = null;
+                resolve();
+            }, delay);
+        });
+    }
+
+    _cancelLocationRefreshTimer() {
+        if (this.locationRefreshTimer !== null) {
+            clearTimeout(this.locationRefreshTimer);
+            this.locationRefreshTimer = null;
+        }
+        if (this.locationRefreshTimerResolve) {
+            this.locationRefreshTimerResolve();
+            this.locationRefreshTimerResolve = null;
+        }
+    }
+
+    async _followLocationRefreshOnce(jobId) {
+        return this._call("follow_location_refresh", {
+            store_id: this.store.id,
+            job_id: jobId,
+        });
+    }
+
+    async _followLocationRefresh(jobId) {
+        this._cancelLocationRefreshTimer();
+        const generation = ++this.locationRefreshFollowGeneration;
+        this.locationRefreshJobId = jobId;
+        this.state.locationRefreshStillRunning = false;
+        for (const delay of LOCATION_REFRESH_BACKOFF_MS) {
+            await this._waitForLocationRefresh(delay, generation);
+            if (generation !== this.locationRefreshFollowGeneration) {
+                return;
+            }
+            const ok = await this._followLocationRefreshOnce(jobId);
+            if (!ok || generation !== this.locationRefreshFollowGeneration) {
+                return;
+            }
+            if (!["waiting", "running"].includes(this.refreshState())) {
+                return;
+            }
+        }
+        if (generation === this.locationRefreshFollowGeneration) {
+            this.state.locationRefreshStillRunning = true;
+        }
+    }
+
     /** The location step's refresh. Admits a job; contacts nothing from here. */
     async refreshLocations() {
-        await this._call("refresh_shopify_locations", {
+        const ok = await this._call("refresh_shopify_locations", {
             store_id: this.store.id,
         });
+        const refresh = this.locations.refresh || {};
+        if (ok && refresh.job_id) {
+            await this._followLocationRefresh(refresh.job_id);
+        }
+    }
+
+    async checkLocationRefresh() {
+        if (!this.locationRefreshJobId) {
+            return;
+        }
+        const ok = await this._followLocationRefreshOnce(
+            this.locationRefreshJobId
+        );
+        if (ok && ["waiting", "running"].includes(this.refreshState())) {
+            this.state.locationRefreshStillRunning = true;
+        } else if (ok) {
+            this.state.locationRefreshStillRunning = false;
+        }
     }
 
     /** The location step's create. Both identities explicit, both server-checked. */
