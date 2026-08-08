@@ -55,6 +55,18 @@
                             context="{'default_settings_id': id}"
                             invisible="fulfillment_operating_mode != 'mode2'"
                             help="Stop applying Shopify fulfilments to Odoo automatically. Always available."/>
+                    <button name="action_rollback_to_mode1"
+                            type="object"
+                            string="Return to Mode 1"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            confirm="Return this store to stable Mode 1? A running verification read may finish, but its late result cannot activate Mode 2."
+                            invisible="not fulfillment_switch_in_progress and fulfillment_mode_switch_state not in ['failed_retryable', 'failed_final', 'blocked']"/>
+                    <button name="action_retry_mode2_switch"
+                            type="object"
+                            string="Retry verification"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="fulfillment_mode_switch_state not in ['failed_retryable', 'failed_final']"/>
                     <field name="fulfillment_operating_mode" widget="statusbar"
                            statusbar_visible="mode1,mode2"
                            groups="shopify_connector_core.group_shopify_connector_admin"/>
@@ -78,6 +90,22 @@
                                groups="shopify_connector_core.group_shopify_connector_admin">
                             <field name="fulfillment_operating_mode" readonly="1"/>
                             <field name="fulfillment_switch_in_progress" readonly="1"/>
+                            <field name="fulfillment_requested_mode" readonly="1"
+                                   invisible="not fulfillment_requested_mode"/>
+                            <field name="fulfillment_mode_switch_state" readonly="1"
+                                   invisible="not fulfillment_mode_switch_state"/>
+                            <field name="fulfillment_mode_switch_job_id" readonly="1"
+                                   invisible="not fulfillment_mode_switch_job_id"/>
+                            <field name="fulfillment_mode_switch_failure_reason" readonly="1"
+                                   invisible="not fulfillment_mode_switch_failure_reason"/>
+                            <field name="fulfillment_mode_switch_next_retry_at" readonly="1"
+                                   invisible="not fulfillment_mode_switch_next_retry_at"/>
+                            <field name="fulfillment_mode_switch_next_action" readonly="1"
+                                   invisible="not fulfillment_mode_switch_next_action"/>
+                            <field name="fulfillment_mode_switch_is_stale" readonly="1"
+                                   invisible="not fulfillment_mode_switch_is_stale"/>
+                            <field name="fulfillment_mode_switch_verified_at" readonly="1"
+                                   invisible="not fulfillment_mode_switch_verified_at"/>
                             <field name="fulfillment_last_mode_switch_at" readonly="1"
                                    invisible="not fulfillment_last_mode_switch_at"/>
                             <field name="fulfillment_last_mode_switch_uid" readonly="1"

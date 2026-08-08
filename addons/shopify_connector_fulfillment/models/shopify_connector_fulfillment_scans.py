@@ -295,10 +295,25 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         # every order binding touched since that boundary.
         boundary = self._mode_switch_scan_boundary(store, settings)
         Binding = self.env['shopify.connector.order.binding'].sudo()
-        order_bindings = self._paginate_local_to_completion(
-            Binding,
-            [('store_id', '=', store.id), ('write_date', '>=', boundary)],
-        )
+        try:
+            order_bindings = self._paginate_local_to_completion(
+                Binding,
+                [('store_id', '=', store.id), ('write_date', '>=', boundary)],
+            )
+        except JobHandlerError:
+            # Direct handler callers and the dispatcher must both see a stable,
+            # recoverable Mode 1 immediately; the dispatcher will make the same
+            # outcome auditable on the exact job after this error is re-raised.
+            settings.sudo().write({
+                'fulfillment_operating_mode': 'mode1',
+                'fulfillment_requested_mode': False,
+                'fulfillment_switch_in_progress': False,
+                'fulfillment_mode_switch_state': 'failed_retryable',
+                'fulfillment_mode_switch_failure_reason': (
+                    'The verification population could not be read completely.'
+                ),
+            })
+            raise
         blockers = 0
         for order_binding in order_bindings:
             if not order_binding.shopify_gid:
@@ -327,12 +342,30 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         # Advance the shared watermark on any genuinely completed pass,
         # whether or not blockers were found: only the MODE transition
         # depends on `blockers`, never whether the read pass finished.
+        # End fence: rollback may happen while a remote read is running.  Only
+        # the exact still-requested job/nonce may publish a terminal outcome;
+        # a late worker can never reactivate Mode 2 after recovery.
+        settings.invalidate_recordset()
+        expected_nonce = (job.payload_hash or '').rsplit(':', 1)[-1]
+        if not (
+            settings.fulfillment_switch_in_progress
+            and settings.fulfillment_requested_mode == 'mode2'
+            and settings.fulfillment_mode_switch_job_id == job
+            and settings.fulfillment_mode_switch_nonce == expected_nonce
+        ):
+            return
         now = fields.Datetime.now()
         if blockers:
             # Abort back to Mode 1; the switch does not complete.
             settings.sudo().write({
                 'fulfillment_switch_in_progress': False,
                 'fulfillment_operating_mode': 'mode1',
+                'fulfillment_requested_mode': False,
+                'fulfillment_mode_switch_state': 'blocked',
+                'fulfillment_mode_switch_failure_reason': (
+                    'Verification found unreadable or external fulfillment '
+                    'evidence that requires review.'
+                ),
                 'fulfillment_last_reconciliation_at': now,
             })
             job._log_transition(
@@ -345,6 +378,10 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         settings.sudo().write({
             'fulfillment_switch_in_progress': False,
             'fulfillment_operating_mode': 'mode2',
+            'fulfillment_requested_mode': False,
+            'fulfillment_mode_switch_state': 'succeeded',
+            'fulfillment_mode_switch_failure_reason': False,
+            'fulfillment_mode_switch_verified_at': now,
             'fulfillment_last_mode_switch_at': now,
             'fulfillment_last_reconciliation_at': now,
         })
@@ -408,20 +445,78 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
         Layer 2 jobs are NOT cancelled."""
         self.ensure_one()
         self._assert_mode_switch_admin()
-        if self.fulfillment_operating_mode == 'mode2':
+        if (
+            self.fulfillment_operating_mode == 'mode2'
+            and not self.fulfillment_switch_in_progress
+        ):
             # Idempotent re-confirm: nothing changes, no duplicate scan.
             return True
+        current_job = self.sudo().fulfillment_mode_switch_job_id
+        if (
+            self.fulfillment_switch_in_progress
+            and self.sudo().fulfillment_requested_mode == 'mode2'
+            and current_job
+            and current_job.state in ('draft', 'queued', 'running', 'retry_waiting')
+        ):
+            # The confirmation RPC is retry-safe and reuses the exact run.
+            return True
         nonce = uuid.uuid4().hex
+        try:
+            job = self.env[
+                'shopify.connector.fulfillment.service'
+            ]._enqueue_once(
+                self.store_id, 'manual_sync', JOB_TYPE_MODE_SWITCH_SCAN,
+                'mode_switch:%d:%s' % (self.store_id.id, nonce),
+                'shopify.connector.store', self.store_id.id,
+            )
+        except UserError:
+            job = self.env['shopify.connector.job']
+        if not job:
+            self.sudo().write({
+                'fulfillment_operating_mode': 'mode1',
+                'fulfillment_requested_mode': False,
+                'fulfillment_switch_in_progress': False,
+                'fulfillment_mode_switch_nonce': False,
+                'fulfillment_mode_switch_job_id': False,
+                'fulfillment_mode_switch_state': 'admission_refused',
+                'fulfillment_mode_switch_failure_reason': (
+                    'The verification run could not start. Restore the store '
+                    'connection and try again.'
+                ),
+                'fulfillment_mode_switch_verified_at': False,
+            })
+            return True
+        actual_nonce = (job.payload_hash or '').rsplit(':', 1)[-1]
         self.sudo().write({
+            'fulfillment_operating_mode': 'mode1',
+            'fulfillment_requested_mode': 'mode2',
             'fulfillment_switch_in_progress': True,
-            'fulfillment_mode_switch_nonce': nonce,
+            'fulfillment_mode_switch_nonce': actual_nonce,
+            'fulfillment_mode_switch_state': job.state,
+            'fulfillment_mode_switch_job_id': job.id,
+            'fulfillment_mode_switch_failure_reason': False,
+            'fulfillment_mode_switch_verified_at': False,
             'fulfillment_last_mode_switch_uid': self.env.uid,
         })
-        self.env['shopify.connector.fulfillment.service']._enqueue_once(
-            self.store_id, 'manual_sync', JOB_TYPE_MODE_SWITCH_SCAN,
-            'mode_switch:%d:%s' % (self.store_id.id, nonce),
-            'shopify.connector.store', self.store_id.id,
-        )
+        return True
+
+    def action_retry_mode2_switch(self):
+        """Re-arm the exact failed scan; never manufacture a replacement."""
+        self.ensure_one()
+        self._assert_mode_switch_admin()
+        job = self.sudo().fulfillment_mode_switch_job_id
+        if not job or job.job_type != JOB_TYPE_MODE_SWITCH_SCAN:
+            raise UserError('There is no mode verification run to retry.')
+        job.with_user(self.env.user).action_manual_retry()
+        self.sudo().write({
+            'fulfillment_operating_mode': 'mode1',
+            'fulfillment_requested_mode': 'mode2',
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_mode_switch_state': 'queued',
+            'fulfillment_mode_switch_failure_reason': False,
+            'fulfillment_mode_switch_verified_at': False,
+            'fulfillment_last_mode_switch_uid': self.env.uid,
+        })
         return True
 
     def action_rollback_to_mode1(self):
@@ -433,10 +528,23 @@ class ShopifyConnectorStoreSettingsModeSwitch(models.Model):
         self._assert_mode_switch_admin()
         self.sudo().write({
             'fulfillment_operating_mode': 'mode1',
+            'fulfillment_requested_mode': False,
             'fulfillment_switch_in_progress': False,
+            'fulfillment_mode_switch_state': 'recovered',
+            'fulfillment_mode_switch_failure_reason': False,
             'fulfillment_last_mode_switch_at': fields.Datetime.now(),
             'fulfillment_last_mode_switch_uid': self.env.uid,
         })
+        # A queued/retry-waiting verification has no remote effect and can be
+        # cancelled.  A running read is left alone; the end fence above makes
+        # its late result inert.
+        scan = self.sudo().fulfillment_mode_switch_job_id
+        if scan and scan.state in ('queued', 'retry_waiting'):
+            scan.sudo().write({
+                'state': 'cancelled',
+                'cancel_reason': 'Mode switch recovered to Mode 1.',
+                'finished_at': fields.Datetime.now(),
+            })
         # Cancel in-flight Mode 2 evaluation jobs back to review (local only).
         Job = self.env['shopify.connector.job'].sudo()
         in_flight = Job.search([

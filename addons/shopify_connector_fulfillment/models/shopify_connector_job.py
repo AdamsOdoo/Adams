@@ -1,4 +1,5 @@
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
     TERMINAL_JOB_STATES,
@@ -84,6 +85,71 @@ class ShopifyConnectorJobFulfillmentExtension(models.Model):
     Q1 operation-scope override for the two mutation types only."""
 
     _inherit = 'shopify.connector.job'
+
+    def _assert_mode_switch_job_admin(self):
+        """Configuration runs never inherit the generic Operator controls."""
+        if any(job.job_type == JOB_TYPE_MODE_SWITCH_SCAN for job in self) and not (
+            self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            )
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may recover a '
+                'fulfillment operating-mode verification run.'
+            )
+
+    def action_manual_retry(self):
+        self._assert_mode_switch_job_admin()
+        return super().action_manual_retry()
+
+    def action_cancel(self, reason=False):
+        self._assert_mode_switch_job_admin()
+        return super().action_cancel(reason=reason)
+
+    def write(self, vals):
+        """Project exact mode-verification job transitions onto its request."""
+        mode_jobs = self.filtered(
+            lambda job: job.job_type == JOB_TYPE_MODE_SWITCH_SCAN
+        ) if 'state' in vals else self.browse()
+        result = super().write(vals)
+        for job in mode_jobs:
+            job._sync_mode_switch_request_from_job()
+        return result
+
+    def _sync_mode_switch_request_from_job(self):
+        """Keep retry/failure UI truthful when the dispatcher moves the job."""
+        self.ensure_one()
+        settings = self.env['shopify.connector.store.settings'].sudo().search([
+            ('fulfillment_mode_switch_job_id', '=', self.id),
+            ('store_id', '=', self.store_id.id),
+        ], limit=1)
+        if not settings:
+            return
+        if self.state == 'running' and settings.fulfillment_switch_in_progress:
+            settings.write({'fulfillment_mode_switch_state': 'running'})
+        elif (
+            self.state == 'retry_waiting'
+            and settings.fulfillment_requested_mode == 'mode2'
+        ):
+            settings.write({
+                'fulfillment_operating_mode': 'mode1',
+                'fulfillment_switch_in_progress': True,
+                'fulfillment_mode_switch_state': 'retry_waiting',
+                'fulfillment_mode_switch_failure_reason': (
+                    'The verification read was temporarily unavailable.'
+                ),
+            })
+        elif self.state in ('failed_retryable', 'failed_final'):
+            settings.write({
+                'fulfillment_operating_mode': 'mode1',
+                'fulfillment_requested_mode': False,
+                'fulfillment_switch_in_progress': False,
+                'fulfillment_mode_switch_state': self.state,
+                'fulfillment_mode_switch_failure_reason': (
+                    'The verification run did not complete safely (%s).'
+                    % (self.error_class or 'unclassified failure')
+                ),
+            })
 
     job_type = fields.Selection(
         selection_add=[
