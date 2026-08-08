@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - codex/recovery-source-20260808
+  pull_request:
+    branches:
+      - codex/ui-restructure-implementation
 
 permissions:
   contents: read
