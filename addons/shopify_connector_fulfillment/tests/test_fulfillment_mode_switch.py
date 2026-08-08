@@ -707,6 +707,15 @@ class TestFulfillmentModeSwitch(TransactionCase):
         ):
             with self.assertRaises(JobHandlerError):
                 self.Service._handle_fulfillment_mode_switch_scan(job)
+        # ``assertRaises`` is a database savepoint in Odoo, so the handler's
+        # fail-closed projection is deliberately rolled back with the raised
+        # exception here.  The real dispatcher catches JobHandlerError and
+        # routes the exact run outside that savepoint; exercise that durable
+        # transition explicitly before asserting the operator-visible state.
+        job.sudo()._transition_failed_retryable(
+            error_class='data_shape_schema_mismatch',
+            message='The verification population was incomplete.',
+        )
         self.settings.invalidate_recordset()
         # A failed/incomplete pass never completes the switch and never leaves
         # the store permanently switching. Evidence remains attached for a

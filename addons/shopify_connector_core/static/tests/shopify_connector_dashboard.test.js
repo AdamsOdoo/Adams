@@ -60,6 +60,14 @@ function payload(overrides = {}) {
                 orders_total: 26,
                 units: 61,
                 previous_units: 50,
+                awaiting_review: {
+                    count: 0,
+                    target: {
+                        res_model: "sale.order",
+                        domain: [["shopify_connector_review_required", "=", true]],
+                        name: "Awaiting data review",
+                    },
+                },
                 orders_target: { res_model: "sale.order", domain: [["shopify_connector_store_id", "=", 7]], name: "Imported Shopify orders" },
                 units_target: { res_model: "sale.order.line", domain: [["shopify_line_item_gid", "!=", false]], name: "Lines" },
                 trend: { available: false, buckets: [] },

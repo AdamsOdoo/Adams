@@ -35,6 +35,12 @@ from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
+    ShopifyClientError,
+)
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
 from odoo.addons.shopify_connector_inventory.models import (
     shopify_connector_inventory_service as service_module,
 )
@@ -533,6 +539,27 @@ class TestLocationRefreshDispatch(LocationRefreshCase):
             handlers['inventory_location_sync'].__name__,
             '_handle_inventory_location_sync',
         )
+
+    def test_transport_failure_keeps_its_class_and_operator_reason(self):
+        with self._fail_on_contact():
+            job = self._as(self.user_operator).action_refresh_shopify_locations(
+                self.store.id,
+            )
+        job.sudo().write({'state': 'running'})
+        failure = ShopifyClientError(
+            'odoo_validation_configuration',
+            'The recorded location refresh reason is actionable.',
+        )
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), 'execute',
+            side_effect=failure,
+        ), self.assertRaises(JobHandlerError) as raised:
+            self.Service._handle_inventory_location_sync(job)
+
+        self.assertEqual(
+            raised.exception.error_class, 'odoo_validation_configuration',
+        )
+        self.assertIn('recorded location refresh reason', raised.exception.reason)
 
     def test_the_admitted_job_populates_the_cache_through_the_handler(self):
         """End to end, minus the socket.

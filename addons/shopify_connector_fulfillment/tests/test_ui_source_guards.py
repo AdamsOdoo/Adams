@@ -32,7 +32,8 @@ FINGERPRINT_FIELD = re.compile(r'name="[a-z0-9_]*_fingerprint"')
 # The only public actions any U1 button may name (contract section 6), plus the
 # two wizard entry points that delegate to them.
 SANCTIONED_BUTTON_METHODS = frozenset((
-    'action_start_mode2_switch', 'action_rollback_to_mode1',
+    'action_start_mode2_switch', 'action_retry_mode2_switch',
+    'action_rollback_to_mode1',
     'action_release_fulfillment_review', 'action_import_tracking',
     'action_acknowledge_external', 'action_validate_proposed',
     'action_confirm',
