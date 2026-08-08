@@ -1,0 +1,25 @@
+name: Codex source recovery
+
+on:
+  push:
+    branches:
+      - codex/recovery-source-20260808
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact recovery head
+        uses: actions/checkout@v4
+      - name: Package source tree
+        run: tar --exclude=.git -czf /tmp/adams-source-56929e7.tar.gz .
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: adams-source-56929e7
+          path: /tmp/adams-source-56929e7.tar.gz
+          retention-days: 1
+          if-no-files-found: error
