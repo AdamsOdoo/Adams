@@ -633,7 +633,7 @@ class TestFulfillmentModeSwitch(TransactionCase):
         })
         rolled_back = {'done': False}
 
-        def _read_then_rollback(store, order_gid):
+        def _read_then_rollback(read_job, store, order_gid):
             if not rolled_back['done']:
                 self.settings.action_rollback_to_mode1()
                 rolled_back['done'] = True
@@ -671,7 +671,7 @@ class TestFulfillmentModeSwitch(TransactionCase):
             })
         call_count = {'n': 0}
 
-        def _counting_read(store, order_gid):
+        def _counting_read(read_job, store, order_gid):
             call_count['n'] += 1
             return []
 

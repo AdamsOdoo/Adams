@@ -76,6 +76,8 @@
                 <field name="job_type"/>
                 <field name="job_source" optional="show"/>
                 <field name="state" string="State" decoration-bf="1"/>
+                <field name="merchant_write_status" string="Shopify acknowledgement"
+                       optional="show"/>
                 <field name="error_class" optional="show"/>
                 <field name="manual_review_subreason" optional="hide"/>
                 <field name="retry_count" string="Retries" optional="show"/>
@@ -136,6 +138,8 @@
                             <field name="job_source" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="state" readonly="1"/>
+                            <field name="merchant_write_status" readonly="1"
+                                   invisible="not merchant_write_status"/>
                         </group>
                         <group string="Why">
                             <field name="error_class" readonly="1" invisible="not error_class"/>

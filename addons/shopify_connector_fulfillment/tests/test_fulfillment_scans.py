@@ -325,7 +325,7 @@ class TestFulfillmentScans(TransactionCase):
         call_count = {'n': 0}
         real_read = self.Service._read_order_fulfillments
 
-        def _counting_read(store, order_gid):
+        def _counting_read(read_job, store, order_gid):
             call_count['n'] += 1
             return [dict(node, id='%s-%d' % (node['id'], call_count['n']))]
 

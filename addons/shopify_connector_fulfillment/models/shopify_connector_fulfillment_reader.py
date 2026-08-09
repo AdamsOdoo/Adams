@@ -112,22 +112,24 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _read_data(self, store, query, variables):
+    def _read_data(self, job, store, query, variables):
         """Execute a read-only GraphQL query through the core client and return
         its `data` dict. The core client validates the document contains no
         mutation and raises `ShopifyClientError` on transport failure."""
         client = self.env['shopify.connector.api.client']
-        result = client.execute(store, query, variables)
-        data = (result or {}).get('data')
-        if not isinstance(data, dict):
-            raise FulfillmentReadError(
-                'data_shape_schema_mismatch',
-                'A fulfillment read returned no data object.',
-            )
-        return data
+        with client.execute_business_read(
+            job, store, query, variables, purpose='fulfillment',
+        ) as result:
+            data = (result or {}).get('data')
+            if not isinstance(data, dict):
+                raise FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'A fulfillment read returned no data object.',
+                )
+            return data
 
     @api.model
-    def _paginate(self, store, query, variables, connection_path):
+    def _paginate(self, job, store, query, variables, connection_path):
         """Cursor-paginate a connection to completion, fail-closed.
 
         `connection_path` is the dotted path from `data` to the connection dict
@@ -144,7 +146,7 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
         for _page in range(MAX_PAGES):
             page_vars = dict(variables)
             page_vars[cursor_var] = cursor
-            data = self._read_data(store, query, page_vars)
+            data = self._read_data(job, store, query, page_vars)
             connection = self._dig(data, connection_path)
             if not isinstance(connection, dict):
                 raise FulfillmentReadError(
@@ -210,12 +212,12 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _read_fulfillment_orders(self, store, order_gid):
+    def _read_fulfillment_orders(self, job, store, order_gid):
         """Return every FulfillmentOrder for an order (cursor-paginated to
         completion), each with its line items (also paginated to completion).
         Client-side selection of OPEN/IN_PROGRESS FOs is left to the caller."""
         fos = self._paginate(
-            store, FULFILLMENT_ORDERS_QUERY, {'orderId': order_gid},
+            job, store, FULFILLMENT_ORDERS_QUERY, {'orderId': order_gid},
             'order.fulfillmentOrders',
         )
         result = []
@@ -226,7 +228,7 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
                     'A fulfillment order node is malformed.',
                 )
             lines = self._paginate(
-                store, FULFILLMENT_ORDER_LINES_QUERY, {'foId': fo['id']},
+                job, store, FULFILLMENT_ORDER_LINES_QUERY, {'foId': fo['id']},
                 'fulfillmentOrder.lineItems',
             )
             fo = dict(fo)
@@ -235,14 +237,14 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
         return result
 
     @api.model
-    def _read_order_fulfillments(self, store, order_gid):
+    def _read_order_fulfillments(self, job, store, order_gid):
         """Return every Fulfillment for an order (cursor-paginated). Used by the
         reconcile reads, inbound observation, and Mode 2. The nested
         fulfillmentLineItems connection is fetched in one page; if any
         fulfillment has more line items than one page, decision-critical
         completeness cannot be proven — fail closed (§11.4)."""
         fulfillments = self._paginate(
-            store, ORDER_FULFILLMENTS_QUERY, {'orderId': order_gid},
+            job, store, ORDER_FULFILLMENTS_QUERY, {'orderId': order_gid},
             'order.fulfillments',
         )
         for node in fulfillments:
@@ -434,13 +436,13 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
         return gid
 
     @api.model
-    def _refresh_location_cache(self, store):
+    def _refresh_location_cache(self, job, store):
         """Q3 read-only Shopify-location refresh: upsert the core
         `shopify.connector.location` cache from a live locations read through
         sanctioned system code. Owns no inventory coupling; never touches
         location.mapping."""
         Location = self.env['shopify.connector.location'].sudo()
-        nodes = self._paginate(store, LOCATIONS_QUERY, {}, 'locations')
+        nodes = self._paginate(job, store, LOCATIONS_QUERY, {}, 'locations')
         now = fields.Datetime.now()
         for node in nodes:
             if not isinstance(node, dict) or not node.get('id'):

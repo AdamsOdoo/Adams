@@ -1280,7 +1280,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # Store-identity check first (DEC-036 D18), then the fresh
         # Shopify read for this pair.
         try:
-            read = self._read_shopify_inventory_pair(store, binding)
+            read = self._read_shopify_inventory_pair(job, store, binding)
         except JobHandlerError:
             raise
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
@@ -1492,14 +1492,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         )
 
     @api.model
-    def _read_shopify_inventory_pair(self, store, binding):
+    def _read_shopify_inventory_pair(self, job, store, binding):
         """One narrow Shopify read for a pair, corrected to the official
         Shopify Admin GraphQL 2026-07 request shape (PR #182 comment
         5025765389 item 1): the 2026-07 root `inventoryLevel` field no
         longer accepts `inventoryItemId`/`locationId` -- this always
         reads through `inventoryItem(id:) { inventoryLevel(locationId:)
-        { ... } }` instead. Uses the read-only `execute()` transport
-        (never `execute_business` -- this is not a mutation).
+        { ... } }` instead. Uses the job-bound business-read seam.
 
         Returns a structured dict distinguishing every case the review
         requires: `item_exists` (False only when the inventory item
@@ -1532,7 +1531,18 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             'itemId': requested_item_gid,
             'locationId': requested_location_gid,
         }
-        result = client.execute(store, query, variables)
+        with client.execute_business_read(
+            job, store, query, variables, purpose='inventory',
+        ) as result:
+            return self._inventory_pair_read_result(
+                result, requested_item_gid, requested_location_gid,
+            )
+
+    @api.model
+    def _inventory_pair_read_result(
+        self, result, requested_item_gid, requested_location_gid,
+    ):
+        """Validate and normalize one pair read while its lease is held."""
         data = (result or {}).get('data')
         if not isinstance(data, dict):
             raise JobHandlerError(
@@ -2313,7 +2323,27 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'pageInfo { hasNextPage } } }'
             )
             try:
-                result = client.execute(store, query, {'cursor': cursor})
+                with client.execute_business_read(
+                    job, store, query, {'cursor': cursor}, purpose='inventory',
+                ) as result:
+                    connection = self._validate_locations_response(result)
+                    for edge in connection['edges']:
+                        existing = Location.sudo().search([
+                            ('store_id', '=', store.id),
+                            ('shopify_location_gid', '=', edge['gid']),
+                        ], limit=1)
+                        vals = {
+                            'store_id': store.id,
+                            'shopify_location_gid': edge['gid'],
+                            'name': edge['name'],
+                            'shopify_location_active': True,
+                            'last_synced_at': fields.Datetime.now(),
+                        }
+                        if existing:
+                            existing.sudo().write(vals)
+                        else:
+                            Location.sudo().create(vals)
+                        upserted += 1
             except ShopifyClientError as exc:
                 # This is a replay-safe read. Preserve the API client's
                 # accepted fixed taxonomy and redacted operator reason so the
@@ -2323,24 +2353,6 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 raise JobHandlerError(
                     exc.error_class, exc.reason, exc.technical_detail,
                 ) from exc
-            connection = self._validate_locations_response(result)
-            for edge in connection['edges']:
-                existing = Location.sudo().search([
-                    ('store_id', '=', store.id),
-                    ('shopify_location_gid', '=', edge['gid']),
-                ], limit=1)
-                vals = {
-                    'store_id': store.id,
-                    'shopify_location_gid': edge['gid'],
-                    'name': edge['name'],
-                    'shopify_location_active': True,
-                    'last_synced_at': fields.Datetime.now(),
-                }
-                if existing:
-                    existing.sudo().write(vals)
-                else:
-                    Location.sudo().create(vals)
-                upserted += 1
             if not connection['has_next_page']:
                 break
             cursor = connection['next_cursor']
@@ -3330,7 +3342,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'Missing a required Shopify identifier before transport.',
             )
 
-        read = self._read_shopify_inventory_pair(store, binding)
+        read = self._read_shopify_inventory_pair(
+            self.env['shopify.connector.job'].browse(job_id), store, binding,
+        )
 
         if read['store_identity'] != local_snapshot['expected_store_identity']:
             self._fail_closed_pre_c2(
@@ -3735,12 +3749,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         }
 
     @api.model
-    def _reconcile_set_quantities(self, attempt):
+    def _reconcile_set_quantities(self, attempt, reconciliation_job=None):
         store = attempt.store_id
         binding = self.env[
             'shopify.connector.inventory.level.binding'
         ].search([('id', '=', attempt.job_id.res_id)], limit=1)
-        read = self._read_shopify_inventory_pair(store, binding)
+        read = self._read_shopify_inventory_pair(
+            reconciliation_job or attempt.job_id, store, binding,
+        )
         if read['store_identity'] != attempt.expected_store_identity:
             return {
                 'verdict': 'not_applied',
@@ -3980,7 +3996,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding = self.env['shopify.connector.inventory.level.binding'].browse(
             local_snapshot['binding_id']
         )
-        read = self._read_shopify_inventory_pair(store, binding)
+        read = self._read_shopify_inventory_pair(
+            self.env['shopify.connector.job'].browse(job_id), store, binding,
+        )
 
         if read['store_identity'] != local_snapshot['expected_store_identity']:
             self._fail_closed_pre_c2(
@@ -4257,12 +4275,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         }
 
     @api.model
-    def _reconcile_activate(self, attempt):
+    def _reconcile_activate(self, attempt, reconciliation_job=None):
         store = attempt.store_id
         binding = self.env[
             'shopify.connector.inventory.level.binding'
         ].search([('id', '=', attempt.job_id.res_id)], limit=1)
-        read = self._read_shopify_inventory_pair(store, binding)
+        read = self._read_shopify_inventory_pair(
+            reconciliation_job or attempt.job_id, store, binding,
+        )
         if read['store_identity'] != attempt.expected_store_identity:
             return {
                 'verdict': 'not_applied',
@@ -4433,7 +4453,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # result the strategy actually returns, but that fails schema
         # validation, blocks.
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
         except JobHandlerError:
             raise
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:

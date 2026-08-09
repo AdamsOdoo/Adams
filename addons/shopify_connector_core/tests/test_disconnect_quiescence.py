@@ -374,8 +374,8 @@ class TestCallLeaseModelSchema(TransactionCase):
             'only the owned side cursor may commit; found: %s' % committed,
         )
 
-    # 20b. execute_business is the sole guarded public mutation boundary.
-    def test_public_surface_adds_only_execute_business(self):
+    # 20b. The two guarded business boundaries are explicit and purpose-bound.
+    def test_public_surface_adds_only_guarded_business_seams(self):
         ClientClass = client_module.ShopifyConnectorApiClient
         public = {
             name for name, value in vars(
@@ -383,7 +383,9 @@ class TestCallLeaseModelSchema(TransactionCase):
             ).items()
             if callable(value) and not name.startswith('_')
         }
-        self.assertEqual(public, {'execute', 'execute_business'})
+        self.assertEqual(
+            public, {'execute', 'execute_business', 'execute_business_read'},
+        )
         self.assertIn(
             '_validate_graphql_operation',
             guard_called_names(guard_fn_ast(ClientClass.execute)),
@@ -403,6 +405,12 @@ class TestCallLeaseModelSchema(TransactionCase):
         self.assertNotIn('_admit_mutation', guard_called_names(
             guard_fn_ast(ClientClass._send_lifecycle)
         ))
+        read_calls = guard_called_names(
+            guard_fn_ast(ClientClass.execute_business_read)
+        )
+        self.assertIn('_validate_graphql_operation', read_calls)
+        self.assertIn('_admit_business_read', read_calls)
+        self.assertNotIn('_admit_mutation', read_calls)
 
     # API-parity source guards (review 4680664964, blocker 1): execute_business
     # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
@@ -521,6 +529,39 @@ class TestBusinessAdmission(TransactionCase):
         self.env.flush_all()
         with self.assertRaises(ShopifyQuiescedError):
             with self.Client.execute_business(job, self.store, 'q'):
+                pass
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_business_read_admission_owns_lease_until_body_exit(self):
+        job = self._make_job()
+        job.sudo().write({'state': 'running'})
+        self.env.flush_all()
+
+        def fake_send(self, store, body, token=None):
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.dict(
+            client_module.BUSINESS_READ_PURPOSE_JOB_PREFIXES,
+            {'core_test': ('core_',)},
+            clear=False,
+        ), patch.object(type(self.Client), '_send', fake_send):
+            with self.Client.execute_business_read(
+                job, self.store, 'query { shop { id } }',
+                purpose='core_test',
+            ) as result:
+                self.assertIn('data', result)
+                self.assertEqual(self._lease_count(), 1)
+            self.assertEqual(self._lease_count(), 0)
+
+    def test_business_read_wrong_purpose_fails_before_lease(self):
+        job = self._make_job()
+        job.sudo().write({'state': 'running'})
+        self.env.flush_all()
+        with self.assertRaises(ShopifyQuiescedError):
+            with self.Client.execute_business_read(
+                job, self.store, 'query { shop { id } }',
+                purpose='inventory',
+            ):
                 pass
         self.assertEqual(self._lease_count(), 0)
 

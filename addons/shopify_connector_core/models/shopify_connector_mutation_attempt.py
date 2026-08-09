@@ -38,6 +38,14 @@ OBSERVED_OUTCOME_SELECTION = [
     ('failed_clean', 'Failed Clean'),
     ('uncertain', 'Uncertain'),
 ]
+MERCHANT_WRITE_STATUS_SELECTION = [
+    ('queued', 'Queued'),
+    ('sending', 'Sending'),
+    ('accepted', 'Accepted by Shopify'),
+    ('verified', 'Verified in Shopify'),
+    ('needs_attention', 'Needs attention'),
+    ('rejected', 'Rejected'),
+]
 RESOLUTION_DISPOSITION_SELECTION = [
     ('applied', 'Applied'),
     ('not_applied', 'Not Applied'),
@@ -118,6 +126,19 @@ class ShopifyConnectorMutationAttempt(models.Model):
         default='pending',
         readonly=True,
     )
+    merchant_write_status = fields.Selection(
+        MERCHANT_WRITE_STATUS_SELECTION,
+        string='Shopify acknowledgement',
+        compute='_compute_merchant_write_status',
+        store=True,
+        index=True,
+        readonly=True,
+        help=(
+            'Merchant-facing acknowledgement derived from immutable mutation '
+            'evidence. Accepted means Shopify returned affirmative success; '
+            'Verified requires an independent reconciliation read.'
+        ),
+    )
     resolution_disposition = fields.Selection(
         RESOLUTION_DISPOSITION_SELECTION,
         readonly=True,
@@ -154,6 +175,48 @@ class ShopifyConnectorMutationAttempt(models.Model):
         'CHECK(inconclusive_reconciliation_count >= 0)',
         'The inconclusive reconciliation count cannot be negative.',
     )
+
+    @api.model
+    def _merchant_write_status_from_evidence(
+        self, observed_outcome, resolution_disposition=False,
+        resolution_source=False,
+    ):
+        """Project immutable Layer 2 evidence onto the locked C5 ladder.
+
+        Direct success is acceptance evidence, not independent verification.
+        Only a reconciliation read can promote an applied disposition to
+        ``verified``. A manual disposition remains ``needs_attention`` here:
+        it resolves the recovery workflow, but it is deliberately not
+        presented as machine verification of Shopify state.
+        """
+        if observed_outcome == 'pending':
+            return 'sending'
+        if observed_outcome == 'succeeded':
+            return 'accepted'
+        if observed_outcome == 'failed_clean':
+            return 'rejected'
+        if observed_outcome != 'uncertain':
+            return 'needs_attention'
+        if resolution_source != 'reconciliation_read':
+            return 'needs_attention'
+        if resolution_disposition == 'applied':
+            return 'verified'
+        if resolution_disposition == 'not_applied':
+            return 'rejected'
+        return 'needs_attention'
+
+    @api.depends(
+        'observed_outcome', 'resolution_disposition', 'resolution_source',
+    )
+    def _compute_merchant_write_status(self):
+        for attempt in self:
+            attempt.merchant_write_status = (
+                attempt._merchant_write_status_from_evidence(
+                    attempt.observed_outcome,
+                    attempt.resolution_disposition,
+                    attempt.resolution_source,
+                )
+            )
 
     @api.model
     def _surface(self, name):

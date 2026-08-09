@@ -68,6 +68,7 @@ class TestFulfillmentReaderPagination(TransactionCase):
 
     def _paginate(self):
         return self.Service._paginate(
+            False,
             self.store,
             'query',
             {'orderId': 'gid://shopify/Order/1'},

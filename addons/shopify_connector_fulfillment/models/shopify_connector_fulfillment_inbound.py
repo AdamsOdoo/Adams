@@ -207,7 +207,7 @@ class ShopifyConnectorFulfillmentInbound(models.AbstractModel):
         mode = self._store_operating_mode(store)
         try:
             fulfillments = self._read_order_fulfillments(
-                store, order_binding.shopify_gid,
+                job, store, order_binding.shopify_gid,
             )
         except FulfillmentReadError as exc:
             raise JobHandlerError(exc.error_class, exc.message)

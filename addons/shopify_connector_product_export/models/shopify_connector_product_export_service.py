@@ -1768,7 +1768,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_binding_namespace(self, attempt):
+    def _reconcile_binding_namespace(self, attempt, reconciliation_job=None):
         """A definition that already exists is the desired end state."""
         store = attempt.store_id
         client = self.env['shopify.connector.api.client']
@@ -1777,7 +1777,17 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'metafieldDefinitions(first: 1, ownerType: PRODUCT, key: $key) { '
             'nodes { id key } } shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'key': BINDING_METAFIELD_KEY})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'key': BINDING_METAFIELD_KEY},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_binding_namespace_result(attempt, result)
+
+    @api.model
+    def _reconcile_binding_namespace_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -1974,7 +1984,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_create(self, attempt):
+    def _reconcile_create(self, attempt, reconciliation_job=None):
         """Reconcile by the connector's own custom id, never by title.
 
         This is the read that makes an ambiguous create safe: found once →
@@ -1995,7 +2005,17 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
         search = 'metafields.%s:%s' % (BINDING_METAFIELD_KEY, template_id)
-        result = client.execute(store, query, {'query': search})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'query': search},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_create_result(attempt, result)
+
+    @api.model
+    def _reconcile_create_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2226,7 +2246,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_update(self, attempt):
+    def _reconcile_update(self, attempt, reconciliation_job=None):
         """Compare the remote scalars against exactly what was requested."""
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
@@ -2238,7 +2258,17 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'product(id: $id) { id title descriptionHtml vendor productType '
             'tags status updatedAt } shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'id': product_gid})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': product_gid},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_update_result(attempt, expected, result)
+
+    @api.model
+    def _reconcile_update_result(self, attempt, expected, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2413,7 +2443,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         return self._classify_user_errors(result, success, 'Variant update')
 
     @api.model
-    def _reconcile_variants_update(self, attempt):
+    def _reconcile_variants_update(self, attempt, reconciliation_job=None):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         expected = snapshot.get('expected_variants') or []
@@ -2424,7 +2454,19 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'price compareAtPrice inventoryItem { id sku } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        result = client.execute(store, query, {'id': snapshot.get('product_gid')})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_update_result(
+                attempt, expected, result,
+            )
+
+    @api.model
+    def _reconcile_variants_update_result(self, attempt, expected, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2610,7 +2652,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_variants_create(self, attempt):
+    def _reconcile_variants_create(self, attempt, reconciliation_job=None):
         """Adopt-if-found by SKU on the variants this attempt authored."""
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
@@ -2622,7 +2664,21 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'inventoryItem { id sku } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        result = client.execute(store, query, {'id': snapshot.get('product_gid')})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_create_result(
+                attempt, expected_skus, result,
+            )
+
+    @api.model
+    def _reconcile_variants_create_result(
+        self, attempt, expected_skus, result,
+    ):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2793,7 +2849,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             )
             return
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
         except JobHandlerError:
             raise
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:

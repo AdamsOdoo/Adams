@@ -26,6 +26,35 @@ def _python_sources(include_tests=False):
 @tagged('post_install', '-at_install')
 class TestExportSourceGuards(TransactionCase):
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        legacy = []
+        read_calls = []
+        for path in _python_sources():
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                ):
+                    continue
+                if (
+                    node.func.attr == 'execute'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'client'
+                ):
+                    legacy.append((path.name, node.lineno))
+                if node.func.attr == 'execute_business_read':
+                    read_calls.append((path.name, node))
+        self.assertFalse(legacy, legacy)
+        self.assertEqual(len(read_calls), 9)
+        for path, call in read_calls:
+            purpose = next(
+                (kw.value for kw in call.keywords if kw.arg == 'purpose'),
+                None,
+            )
+            self.assertIsInstance(purpose, ast.Constant, path)
+            self.assertEqual(purpose.value, 'product_export', path)
+
     # ------------------------------------------------------------------
     # The UI layer delegates and does nothing else
     # ------------------------------------------------------------------

@@ -67,12 +67,7 @@ class TestExportCreateDedup(ExportCase):
             'products': {'nodes': nodes},
             'shop': {'myshopifyDomain': self.store.shop_domain},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            return self.Service._reconcile_create(_Attempt())
+        return self.Service._reconcile_create_result(_Attempt(), body)
 
     def test_reconciliation_adopts_a_single_matching_product(self):
         verdict = self._reconcile_with([{
@@ -113,12 +108,7 @@ class TestExportCreateDedup(ExportCase):
             'products': {'nodes': []},
             'shop': {'myshopifyDomain': 'someone-else.myshopify.com'},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            verdict = self.Service._reconcile_create(_Attempt())
+        verdict = self.Service._reconcile_create_result(_Attempt(), body)
         self.assertEqual(verdict['error_class'], 'store_identity_mismatch')
 
     # ------------------------------------------------------------------

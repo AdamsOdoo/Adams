@@ -94,6 +94,15 @@ LIFECYCLE_PURPOSE_STATES = {
     'reconnect_probe': ('reconnect_needed', 'disconnected'),
 }
 
+# Batch B2: a business read names the domain whose claimed job owns it. The
+# mapping is deliberately fixed and prefix-based over the immutable job_type;
+# callers cannot invent a generic purpose to borrow another domain's job.
+BUSINESS_READ_PURPOSE_JOB_PREFIXES = {
+    'inventory': ('inventory_',),
+    'fulfillment': ('fulfillment_',),
+    'product_export': ('product_export_',),
+}
+
 
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
@@ -395,6 +404,149 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 technical_detail=redact(str(exc)),
             )
         return self._normalize_response(store, response)
+
+    @contextmanager
+    def execute_business_read(
+        self, job, store, query, variables=None, purpose=None,
+    ):
+        """Issue one job-owned read under the business admission lease.
+
+        This is the named read counterpart to Layer 2 mutation admission. A
+        fixed domain purpose must match the claimed job's immutable type; the
+        job and store must share identity/company; the job must be running; and
+        the existing generation-fenced admission owns a committed lease for
+        the entire caller ``with`` body. Mutations are always refused here.
+        """
+        variables = variables or {}
+        self._validate_graphql_operation(query, variables, mutation_context=None)
+        if self._graphql_contains_mutation(query):
+            raise UserError(
+                'Business-read admission accepts GraphQL queries only.'
+            )
+        if not store.shop_domain or not store.api_version:
+            raise UserError(
+                'A shop domain and API version are required before '
+                'contacting Shopify.'
+            )
+        lease_key, token = self._admit_business_read(job, store, purpose)
+        try:
+            body = {'query': query, 'variables': variables}
+            try:
+                response = self._send(store, body, token)
+            except ShopifyClientError:
+                raise
+            except requests.exceptions.RequestException as exc:
+                raise ShopifyClientError(
+                    error_class=ERROR_TEMPORARY,
+                    reason=REASON_TEMPORARY,
+                    technical_detail=redact(str(exc)),
+                )
+            result = self._normalize_response(store, response)
+            yield result
+        except BaseException as primary_error:
+            try:
+                self._release_lease(lease_key)
+            except BaseException as release_error:
+                raise primary_error from release_error
+            raise
+        else:
+            self._release_lease(lease_key)
+
+    def _admit_business_read(self, job, store, purpose):
+        """Atomically validate read ownership and commit its call lease."""
+        prefixes = BUSINESS_READ_PURPOSE_JOB_PREFIXES.get(purpose)
+        if not prefixes:
+            raise ShopifyQuiescedError(
+                'An unknown business-read purpose was requested.'
+            )
+        if not job or not getattr(job, 'id', False) or not job.exists():
+            raise ShopifyQuiescedError(
+                'A business Shopify read requires a valid job.'
+            )
+        if store.company_id.id not in self.env.companies.ids:
+            raise ShopifyQuiescedError(
+                'The target store company is outside the active company scope.'
+            )
+        # Match business mutation admission: refresh client-credentials tokens
+        # before opening the side transaction, never under a store-row lock.
+        self.env['shopify.connector.store.credential']._ensure_access_token(
+            store, purpose='business',
+        )
+        lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT j.store_id, j.company_id, j.state, j.job_type, "
+                "j.expected_connection_generation, s.company_id, s.state, "
+                "s.connection_generation "
+                "FROM shopify_connector_job j "
+                "JOIN shopify_connector_store s ON s.id = j.store_id "
+                "WHERE j.id = %s AND s.id = %s FOR SHARE OF s",
+                (job.id, store.id),
+            )
+            row = side_cr.fetchone()
+            if not row:
+                raise ShopifyQuiescedError(
+                    'This job does not belong to the target store.'
+                )
+            (
+                job_store_id, job_company_id, job_state, job_type,
+                expected_generation, store_company_id, store_state,
+                store_generation,
+            ) = row
+            if job_store_id != store.id or job_company_id != store_company_id:
+                raise ShopifyQuiescedError(
+                    'This job and store do not share scope ownership.'
+                )
+            if store_company_id not in self.env.companies.ids:
+                raise ShopifyQuiescedError(
+                    'The target store company is outside the active company '
+                    'scope.'
+                )
+            if job_state != 'running':
+                raise ShopifyQuiescedError(
+                    'A business Shopify read requires the claimed running job.'
+                )
+            if not any(job_type.startswith(prefix) for prefix in prefixes):
+                raise ShopifyQuiescedError(
+                    'This job does not own the requested business-read purpose.'
+                )
+            if store_state != 'connected':
+                raise ShopifyQuiescedError(
+                    'This store is not connected; the Shopify call is refused.'
+                )
+            if expected_generation != store_generation:
+                raise ShopifyQuiescedError(
+                    'This store was reconnected; the Shopify call is refused.'
+                )
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_store = side_env['shopify.connector.store'].browse(store.id)
+            token = side_env[
+                'shopify.connector.store.credential'
+            ]._get_access_token(side_store)
+            if not token:
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            lease_key = uuid.uuid4().hex
+            admitted_at = fields.Datetime.now()
+            side_env['shopify.connector.call.lease'].create({
+                'store_id': store.id,
+                'lease_key': lease_key,
+                'job_id': job.id,
+                'worker_ref': self._lease_worker_ref(),
+                'admitted_at': admitted_at,
+                'expires_at': admitted_at + lifetime,
+            })
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return lease_key, token
 
     @contextmanager
     def execute_business(

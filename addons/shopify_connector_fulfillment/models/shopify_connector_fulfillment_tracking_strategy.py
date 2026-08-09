@@ -51,8 +51,10 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     _inherit = 'shopify.connector.fulfillment.service'
 
     @api.model
-    def _read_fulfillment(self, store, fulfillment_gid):
-        data = self._read_data(store, FULFILLMENT_NODE_QUERY, {'id': fulfillment_gid})
+    def _read_fulfillment(self, job, store, fulfillment_gid):
+        data = self._read_data(
+            job, store, FULFILLMENT_NODE_QUERY, {'id': fulfillment_gid},
+        )
         node = data.get('fulfillment')
         return node if isinstance(node, dict) else None
 
@@ -90,6 +92,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     def _prepare_preconditions_fulfillment_tracking_update(
         self, local_snapshot, owner_context,
     ):
+        read_job = self.env['shopify.connector.job'].browse(
+            local_snapshot['job_id']
+        )
         store = self.env['shopify.connector.store'].browse(
             local_snapshot['store_id']
         )
@@ -100,7 +105,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
                 'The fulfillment binding has no Shopify Fulfillment GID.',
             )
         try:
-            node = self._read_fulfillment(store, fulfillment_gid)
+            node = self._read_fulfillment(
+                read_job, store, fulfillment_gid,
+            )
         except FulfillmentReadError as exc:
             self._fail_closed_pre_c2(exc.error_class, exc.message)
         if not node:
@@ -254,7 +261,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _reconcile_fulfillment_tracking_update(self, attempt):
+    def _reconcile_fulfillment_tracking_update(
+        self, attempt, reconciliation_job=None,
+    ):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         observed_identity = store.shop_domain
@@ -269,7 +278,11 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
                 observed_identity, 'No fulfillment identity to reconcile.',
             )
         try:
-            node = self._read_fulfillment(store, fulfillment_gid)
+            node = self._read_fulfillment(
+                reconciliation_job or attempt.job_id,
+                store,
+                fulfillment_gid,
+            )
         except FulfillmentReadError:
             return self._inconclusive_reconcile(
                 observed_identity,

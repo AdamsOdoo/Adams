@@ -172,7 +172,7 @@ class ShopifyConnectorJobDispatchFulfillmentExtension(models.AbstractModel):
         # transient read failure retries the read-safe job; only a genuinely
         # malformed returned structure blocks (LL-013).
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
         except JobHandlerError:
             raise
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:

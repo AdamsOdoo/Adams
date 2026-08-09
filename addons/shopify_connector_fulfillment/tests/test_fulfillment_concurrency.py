@@ -704,7 +704,7 @@ class TestFulfillmentConcurrency(TransactionCase):
         lock_result = {}
         call_state = {'n': 0}
 
-        def _read_fn(store_arg, order_gid):
+        def _read_fn(read_job, store_arg, order_gid):
             call_state['n'] += 1
             if call_state['n'] == 2:
                 # This is condition 14's SECOND, separately fresh read:

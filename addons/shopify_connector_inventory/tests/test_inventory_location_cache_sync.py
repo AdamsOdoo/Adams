@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from odoo.exceptions import AccessError
@@ -69,6 +70,23 @@ class TestInventoryLocationCacheSync(TransactionCase):
             'state': 'running',
             'expected_connection_generation': self.store.connection_generation,
         })
+
+    def setUp(self):
+        super().setUp()
+
+        @contextmanager
+        def legacy_fixture_read(client, job, store, query, variables, purpose):
+            # Existing shape/pagination tests keep their local execute() fixture;
+            # the production source reaches it only through the new named seam.
+            yield client.execute(store, query, variables)
+
+        seam = patch.object(
+            type(self.env['shopify.connector.api.client']),
+            'execute_business_read',
+            new=legacy_fixture_read,
+        )
+        seam.start()
+        self.addCleanup(seam.stop)
 
     def _one_page_response(self, locations):
         return {

@@ -22,6 +22,11 @@
                 <field name="store_id"/>
                 <field name="mutation_domain"/>
                 <field name="job_id"/>
+                <field name="merchant_write_status"/>
+                <filter name="filter_needs_attention" string="Needs attention"
+                        domain="[('merchant_write_status', '=', 'needs_attention')]"/>
+                <filter name="filter_verified" string="Verified in Shopify"
+                        domain="[('merchant_write_status', '=', 'verified')]"/>
                 <filter name="filter_uncertain" string="Waiting on a decision"
                         domain="[('observed_outcome', '=', 'uncertain'), ('resolution_disposition', '=', False)]"/>
                 <filter name="filter_resolved" string="Resolved"
@@ -52,7 +57,8 @@
                 <field name="created_at" string="When"/>
                 <field name="mutation_domain" string="Domain"/>
                 <field name="store_id"/>
-                <field name="observed_outcome" string="Outcome"/>
+                <field name="merchant_write_status" string="Shopify acknowledgement"/>
+                <field name="observed_outcome" string="Technical outcome" optional="hide"/>
                 <field name="resolution_disposition" string="Decision" optional="show"/>
                 <field name="transport_attempted" optional="hide"/>
                 <field name="inconclusive_reconciliation_count" string="Reconcile tries" optional="hide"/>
@@ -86,6 +92,7 @@
                             <field name="mutation_domain" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="job_id" readonly="1"/>
+                            <field name="merchant_write_status" readonly="1"/>
                             <field name="observed_outcome" readonly="1"/>
                             <field name="transport_attempted" readonly="1"/>
                         </group>

@@ -29,6 +29,7 @@ only the socket absent.
 """
 
 from datetime import timedelta
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from odoo import fields
@@ -551,8 +552,8 @@ class TestLocationRefreshDispatch(LocationRefreshCase):
             'The recorded location refresh reason is actionable.',
         )
         with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            side_effect=failure,
+            type(self.env['shopify.connector.api.client']),
+            'execute_business_read', side_effect=failure,
         ), self.assertRaises(JobHandlerError) as raised:
             self.Service._handle_inventory_location_sync(job)
 
@@ -589,10 +590,14 @@ class TestLocationRefreshDispatch(LocationRefreshCase):
             },
         }
         job.sudo().write({'state': 'running'})
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=response,
-        ):
+        Client = type(self.env['shopify.connector.api.client'])
+
+        @contextmanager
+        def fixture_read(client, read_job, store, query, variables, purpose):
+            yield client.execute(store, query, variables)
+
+        with patch.object(Client, 'execute', return_value=response), \
+             patch.object(Client, 'execute_business_read', new=fixture_read):
             self.Service._handle_inventory_location_sync(job)
         cached = self.env['shopify.connector.location'].sudo().search([
             ('store_id', '=', self.store.id),

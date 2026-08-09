@@ -783,7 +783,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         }
 
     @api.model
-    def _reconcile_mutation_dispatch_selftest(self, attempt):
+    def _reconcile_mutation_dispatch_selftest(
+        self, attempt, reconciliation_job=None,
+    ):
         return {
             'verdict': 'applied',
             'observed_store_identity': attempt.expected_store_identity,
@@ -1076,7 +1078,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
             normalized = self._validate_reconciliation_result(result)
         except Exception:
             self._block_original_job(

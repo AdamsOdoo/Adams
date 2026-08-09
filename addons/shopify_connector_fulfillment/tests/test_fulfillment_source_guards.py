@@ -205,6 +205,33 @@ class TestFulfillmentSourceGuards(TransactionCase):
                     violations.append((path.name, node.lineno, 'requests.%s' % attr))
         self.assertFalse(violations, violations)
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        legacy = []
+        read_calls = []
+        for path, source in self._model_sources().items():
+            for node in ast.walk(ast.parse(source)):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                ):
+                    continue
+                if (
+                    node.func.attr == 'execute'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'client'
+                ):
+                    legacy.append((path.name, node.lineno))
+                if node.func.attr == 'execute_business_read':
+                    read_calls.append((path.name, node))
+        self.assertFalse(legacy, legacy)
+        self.assertEqual(len(read_calls), 1)
+        _path, call = read_calls[0]
+        purpose = next(
+            (kw.value for kw in call.keywords if kw.arg == 'purpose'), None,
+        )
+        self.assertIsInstance(purpose, ast.Constant)
+        self.assertEqual(purpose.value, 'fulfillment')
+
     # -- Mutation documents are only reachable through the guarded transport.
 
     def test_fulfillment_mutation_documents_are_guarded(self):

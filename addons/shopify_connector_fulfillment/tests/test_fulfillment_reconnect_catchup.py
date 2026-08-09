@@ -194,7 +194,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
         # stamp does not move to the failing job.
         failing = self._catchup_job()
 
-        def flaky(service, store, gid):
+        def flaky(service, read_job, store, gid):
             if gid.endswith('FCA'):
                 raise FulfillmentReadError(
                     'shopify_graphql_throttled', 'boom')

@@ -24,6 +24,7 @@ from . import test_redaction
 from . import test_security_hardening
 from . import test_test_connection
 from . import test_mutation_attempt
+from . import test_mutation_acknowledgement
 from . import test_mutation_dispatch
 from . import test_mutation_reconciliation
 from . import test_mutation_recovery

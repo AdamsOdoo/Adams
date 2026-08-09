@@ -3389,6 +3389,34 @@ class TestInventoryPushMechanics(TransactionCase):
         self.assertNotIn('payload.get("userErrors") or []', source)
         self.assertNotIn('result.get("user_errors") or []', source)
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        _source, tree = self._service_source_tree()
+        calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+        ]
+        self.assertFalse(
+            [
+                node.lineno for node in calls
+                if node.func.attr == 'execute'
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == 'client'
+            ],
+        )
+        read_calls = [
+            node for node in calls
+            if node.func.attr == 'execute_business_read'
+        ]
+        self.assertEqual(len(read_calls), 2)
+        for call in read_calls:
+            purpose = next(
+                (kw.value for kw in call.keywords if kw.arg == 'purpose'),
+                None,
+            )
+            self.assertIsInstance(purpose, ast.Constant)
+            self.assertEqual(purpose.value, 'inventory')
+
     # ------------------------------------------------------------------
     # `_read_shopify_inventory_pair` response-shape hardening (PR #182
     # comment 5029906989 item 4/8) -- exercised through a mocked
@@ -3416,54 +3444,46 @@ class TestInventoryPushMechanics(TransactionCase):
         }}
 
     def test_read_pair_rejects_duplicate_available_entries(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response([
-                {'name': 'available', 'quantity': 5, 'updatedAt': None},
-                {'name': 'available', 'quantity': 7, 'updatedAt': None},
-            ]),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response([
+                    {'name': 'available', 'quantity': 5, 'updatedAt': None},
+                    {'name': 'available', 'quantity': 7, 'updatedAt': None},
+                ]),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_rejects_item_identity_mismatch(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
-                [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
-                item_id='gid://shopify/InventoryItem/DIFFERENT',
-            ),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response(
+                    [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
+                    item_id='gid://shopify/InventoryItem/DIFFERENT',
+                ),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_rejects_level_location_identity_mismatch(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
-                [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
-                location_id='gid://shopify/Location/WRONG',
-            ),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response(
+                    [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
+                    location_id='gid://shopify/Location/WRONG',
+                ),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_accepts_well_formed_response(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
+        read = self.Service._inventory_pair_read_result(
+            self._pair_read_response(
                 [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
             ),
-        ):
-            read = self.Service._read_shopify_inventory_pair(
-                self.store, self.binding,
-            )
+            self.binding.shopify_inventory_item_gid,
+            self.mapping.shopify_gid,
+        )
         self.assertEqual(read['available'], 5)
         self.assertEqual(
             read['inventory_level_gid'], 'gid://shopify/InventoryLevel/1',

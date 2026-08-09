@@ -132,7 +132,9 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         read_failures = 0
         for binding in bindings:
             try:
-                node = self._read_fulfillment(store, binding.shopify_gid)
+                node = self._read_fulfillment(
+                    job, store, binding.shopify_gid,
+                )
             except FulfillmentReadError:
                 read_failures += 1
                 continue
@@ -245,7 +247,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                 continue
             try:
                 fulfillments = self._read_order_fulfillments(
-                    store, order_binding.shopify_gid,
+                    job, store, order_binding.shopify_gid,
                 )
             except FulfillmentReadError:
                 read_failures += 1
@@ -320,7 +322,7 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                 continue
             try:
                 fulfillments = self._read_order_fulfillments(
-                    store, order_binding.shopify_gid,
+                    job, store, order_binding.shopify_gid,
                 )
             except FulfillmentReadError:
                 # A read that cannot complete is a scan blocker (fail closed).

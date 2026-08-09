@@ -112,6 +112,9 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
 
     @api.model
     def _prepare_preconditions_fulfillment_create(self, local_snapshot, owner_context):
+        read_job = self.env['shopify.connector.job'].browse(
+            local_snapshot['job_id']
+        )
         store = self.env['shopify.connector.store'].browse(
             local_snapshot['store_id']
         )
@@ -123,7 +126,7 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
                 'The picking has no resolvable Shopify order binding.',
             )
         try:
-            fos = self._read_fulfillment_orders(store, order_gid)
+            fos = self._read_fulfillment_orders(read_job, store, order_gid)
         except FulfillmentReadError as exc:
             self._fail_closed_pre_c2(exc.error_class, exc.message)
 
@@ -381,7 +384,7 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _reconcile_fulfillment_create(self, attempt):
+    def _reconcile_fulfillment_create(self, attempt, reconciliation_job=None):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         order_gid = snapshot.get('order_gid')
@@ -397,14 +400,18 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
                 observed_identity, 'No order identity to reconcile against.',
             )
         try:
-            fulfillments = self._read_order_fulfillments(store, order_gid)
+            fulfillments = self._read_order_fulfillments(
+                reconciliation_job or attempt.job_id, store, order_gid,
+            )
         except FulfillmentReadError:
             # An incomplete/malformed read is INCONCLUSIVE, never absence.
             return self._inconclusive_reconcile(
                 observed_identity,
                 'The reconciliation read did not complete; inconclusive.',
             )
-        if self._create_is_applied(attempt, snapshot, fulfillments):
+        if self._create_is_applied(
+            attempt, snapshot, fulfillments, reconciliation_job,
+        ):
             adopted_gid = self._adopted_fulfillment_gid(snapshot, fulfillments)
             return {
                 'verdict': 'applied',
@@ -438,7 +445,9 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
         }
 
     @api.model
-    def _create_is_applied(self, attempt, snapshot, fulfillments):
+    def _create_is_applied(
+        self, attempt, snapshot, fulfillments, reconciliation_job=None,
+    ):
         """Positive APPLIED evidence only: a fulfillment whose trackingInfo
         matches our sent tracking, or (no-tracking case) the FO remaining
         quantities decreased by EXACTLY our sent quantities."""
@@ -458,12 +467,20 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
         # No-tracking case (SRR-10): rely solely on FO remaining decreasing by
         # exactly the sent quantities. Any ambiguity -> not applied evidence ->
         # inconclusive (never a second create).
-        return self._remaining_matches_exact_decrease(attempt, snapshot)
+        return self._remaining_matches_exact_decrease(
+            attempt, snapshot, reconciliation_job,
+        )
 
     @api.model
-    def _remaining_matches_exact_decrease(self, attempt, snapshot):
+    def _remaining_matches_exact_decrease(
+        self, attempt, snapshot, reconciliation_job=None,
+    ):
         try:
-            fos = self._read_fulfillment_orders(attempt.store_id, snapshot['order_gid'])
+            fos = self._read_fulfillment_orders(
+                reconciliation_job or attempt.job_id,
+                attempt.store_id,
+                snapshot['order_gid'],
+            )
         except FulfillmentReadError:
             return False
         current = self._fo_remaining_snapshot(fos)

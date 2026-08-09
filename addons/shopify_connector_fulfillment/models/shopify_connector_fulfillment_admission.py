@@ -249,7 +249,9 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
         ]):
             return
         try:
-            fos = self._read_fulfillment_orders(store, binding.shopify_gid)
+            fos = self._read_fulfillment_orders(
+                job, store, binding.shopify_gid,
+            )
         except FulfillmentReadError as exc:
             raise JobHandlerError(exc.error_class, exc.message)
 
