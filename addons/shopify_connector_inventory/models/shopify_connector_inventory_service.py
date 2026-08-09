@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 54779)
-Total output lines: 4647
-
 import hashlib
 import json
 import logging
@@ -2138,7 +2135,413 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 "Only a Shopify Connector Operator or Administrator may "
                 "refresh the Shopify location list."
             )
-        store = self._resolve_store_for_location_action…4779 tokens truncated…NVENTORY remap is operationally safe. Moving the Odoo location under
+        store = self._resolve_store_for_location_action(store_id)
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if not settings or not settings.inventory_domain_enabled:
+            raise UserError(
+                'Inventory syncing is not enabled for this store, so there '
+                'are no locations to refresh. Enable it first.'
+            )
+        # The credential conditions this read-only operation genuinely
+        # needs, and no more: a token on record, verified since it was last
+        # changed, and a test connection that actually passed. Without all
+        # three the request could only fail, and it would fail after being
+        # queued -- which reads to an operator as "Shopify is broken" rather
+        # than "finish the previous step".
+        if not store.credential_present:
+            raise UserError(
+                'Enter the Shopify Admin API access token before refreshing '
+                'the location list.'
+            )
+        if not store.credential_last_verified_at:
+            raise UserError(
+                'Test the connection before refreshing the location list. '
+                'The stored token has not been verified since it was last '
+                'changed.'
+            )
+        if store.last_test_connection_result != 'pass':
+            raise UserError(
+                'The last connection test did not pass, so the location list '
+                'cannot be refreshed yet. Fix the connection first.'
+            )
+        if store.state == 'connected':
+            job_source = 'manual_sync'
+        elif store.state == 'setup_incomplete':
+            job_source = 'setup_readiness_check'
+        else:
+            raise UserError(
+                'This store is not in a state where its Shopify location '
+                'list can be refreshed. Reconnect it first.'
+            )
+        # Duplicate admission is coalesced rather than queued twice: two
+        # refreshes of the same read-only list are the same refresh, and a
+        # second one would only compete for the same rate limit. The caller
+        # gets the REAL admitted job either way, so the surface reports the
+        # identity and state of work that genuinely exists.
+        existing = self._location_refresh_job(store)
+        if existing:
+            if existing.state == 'failed_retryable':
+                # Retry the preserved logical run.  A new row would discard
+                # the failure lineage the setup surface is asking to recover.
+                existing.with_user(self.env.user).action_manual_retry()
+            return existing
+        previous = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+        ], order='id desc', limit=1)
+        if (
+            previous.state == 'failed_final'
+            and previous.expected_connection_generation
+            == store.connection_generation
+        ):
+            previous.with_user(self.env.user).action_manual_retry()
+            return previous
+        return self._enqueue_location_sync(store, job_source=job_source)
+
+    @api.model
+    def _validate_locations_response(self, result):
+        """Fail-closed GraphQL response/pagination-shape validation for
+        the location cache sync (PR #182 comment 5028910116 item 10): a
+        malformed or partial page must never be silently treated as
+        "zero locations, no next page" -- every shape defect raises
+        `JobHandlerError(data_shape_schema_mismatch, ...)`, which routes
+        through the ordinary read-safe retry path, never a spurious
+        succeeded-empty-store outcome."""
+        if not isinstance(result, dict) or not isinstance(
+            result.get('data'), dict
+        ):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify locations response (no data).',
+            )
+        connection = result['data'].get('locations')
+        if not isinstance(connection, dict):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify locations connection shape.',
+            )
+        edges = connection.get('edges')
+        if not isinstance(edges, list):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify locations edges shape.',
+            )
+        page_info = connection.get('pageInfo')
+        if not isinstance(page_info, dict):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify locations pageInfo shape.',
+            )
+        has_next_page = page_info.get('hasNextPage')
+        if not isinstance(has_next_page, bool):
+            raise JobHandlerError(
+                ERROR_CLASS_DATA_SHAPE,
+                'Malformed Shopify locations hasNextPage shape.',
+            )
+        validated_edges = []
+        for edge in edges:
+            if not isinstance(edge, dict):
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'Malformed Shopify locations edge shape.',
+                )
+            node = edge.get('node')
+            if not isinstance(node, dict):
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'Malformed Shopify locations node shape.',
+                )
+            gid = node.get('id')
+            if not isinstance(gid, str) or not gid:
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'Malformed or missing Shopify Location GID.',
+                )
+            name = node.get('name')
+            if name is not None and not isinstance(name, str):
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'Malformed Shopify locations name shape.',
+                )
+            validated_edges.append({
+                'gid': gid, 'name': name or gid, 'cursor': edge.get('cursor'),
+            })
+        next_cursor = None
+        if has_next_page:
+            if not validated_edges:
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'hasNextPage is true but no edges were returned to '
+                    'derive a page cursor.',
+                )
+            last_cursor = validated_edges[-1]['cursor']
+            if not isinstance(last_cursor, str) or not last_cursor:
+                raise JobHandlerError(
+                    ERROR_CLASS_DATA_SHAPE,
+                    'hasNextPage is true but the page cursor is missing '
+                    'or malformed.',
+                )
+            next_cursor = last_cursor
+        return {
+            'edges': validated_edges, 'has_next_page': has_next_page,
+            'next_cursor': next_cursor,
+        }
+
+    @api.model
+    def _handle_inventory_location_sync(self, job):
+        """Populate the core Shopify location cache (D-013-5).
+
+        Reads the `locations` query (paginated, `includeInactive:
+        false`) and upserts `shopify.connector.location` rows via one
+        of this module's several narrow, named `sudo()` elevations --
+        the core cache's ACL deliberately grants no group create/write,
+        so a non-elevated upsert would always raise.
+        """
+        store = job.store_id
+        client = self.env['shopify.connector.api.client']
+        Location = self.env['shopify.connector.location']
+        cursor = None
+        upserted = 0
+        while True:
+            query = (
+                'query LocationsSync($cursor: String) { '
+                'locations(first: 100, after: $cursor, '
+                'includeInactive: false) { '
+                'edges { cursor node { id name } } '
+                'pageInfo { hasNextPage } } }'
+            )
+            try:
+                result = client.execute(store, query, {'cursor': cursor})
+            except ShopifyClientError as exc:
+                # This is a replay-safe read. Preserve the API client's
+                # accepted fixed taxonomy and redacted operator reason so the
+                # dispatcher can route the exact run and setup can show why it
+                # stopped. Letting this escape as a generic exception would
+                # erase both facts behind ``unknown_system_error``.
+                raise JobHandlerError(
+                    exc.error_class, exc.reason, exc.technical_detail,
+                ) from exc
+            connection = self._validate_locations_response(result)
+            for edge in connection['edges']:
+                existing = Location.sudo().search([
+                    ('store_id', '=', store.id),
+                    ('shopify_location_gid', '=', edge['gid']),
+                ], limit=1)
+                vals = {
+                    'store_id': store.id,
+                    'shopify_location_gid': edge['gid'],
+                    'name': edge['name'],
+                    'shopify_location_active': True,
+                    'last_synced_at': fields.Datetime.now(),
+                }
+                if existing:
+                    existing.sudo().write(vals)
+                else:
+                    Location.sudo().create(vals)
+                upserted += 1
+            if not connection['has_next_page']:
+                break
+            cursor = connection['next_cursor']
+        settings = self.env['shopify.connector.store.settings'].sudo().search([
+            ('store_id', '=', store.id),
+        ], limit=1)
+        if settings:
+            # The cache is readiness evidence. A complete traversal invalidates
+            # a verdict recorded before it; exact-run follow-up recomputes it.
+            settings._mark_setup_readiness_stale()
+        job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
+        job._log_transition(
+            'verification_read',
+            'Location cache sync upserted %d location(s).' % upserted,
+            from_state='running', to_state='succeeded',
+        )
+
+    # ------------------------------------------------------------------
+    # Sanctioned backend creation/admission services (PR #182 comment
+    # 5025803697 item 22): both the location-mapping and inventory-
+    # level-binding models inherit the protected binding mixin, so
+    # ordinary create() of their required fields is denied by design.
+    # These are the narrow, authorization-checked, service-owned
+    # creation surfaces -- no new public action, no UI.
+    # ------------------------------------------------------------------
+
+    @api.model
+    def create_or_update_location_mapping(
+        self, store, odoo_location, shopify_location_gid, push_enabled=True,
+    ):
+        """Sanctioned location-mapping creation/update (item 22.A).
+
+        Resolves and validates `odoo_location` in the caller's own
+        (non-elevated) environment first, so ordinary Odoo visibility
+        and the model's own `@api.constrains` (internal-location,
+        company, no-ancestor/descendant-overlap) all still apply before
+        any elevation -- a narrow `sudo()` is used only for the mixin's
+        protected-field create/write itself. Identity is always
+        explicit: the Shopify Location GID must be supplied by the
+        caller, never inferred by name.
+
+        Wave 5 closes the hole that made "explicit" weaker than it sounds.
+        The GID was accepted as whatever string the caller passed: every
+        existing test handed it a fabricated one and every one of them
+        passed, which is the proof that nothing ever checked it. A GID must
+        now correspond to a currently-ACTIVE cached
+        `shopify.connector.location` row belonging to THIS store, so an
+        arbitrary GID typed into an RPC call, a GID belonging to another
+        store, and a location Shopify no longer reports are all refused
+        before any mapping exists. `shopify_location_name_snapshot` is then
+        taken from that validated cached row -- never from caller input,
+        which would let a browser choose the name an operator later reads
+        back as identity.
+        """
+        if not (
+            self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_operator'
+            )
+            or self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            )
+        ):
+            raise AccessError(
+                "Only a Shopify Connector Operator or Administrator may "
+                "create or update a location mapping."
+            )
+        store = self._resolve_store_for_location_action(store.id)
+        if not isinstance(shopify_location_gid, str) or not shopify_location_gid:
+            raise UserError("An explicit Shopify Location GID is required.")
+        cached_location = self._validated_cached_location(
+            store, shopify_location_gid,
+        )
+        # Rebound into this service's own environment before anything is
+        # checked: a caller-supplied recordset carries its own environment,
+        # and an elevated one would otherwise answer its own visibility and
+        # company questions. The docstring's "resolves in the caller's own
+        # (non-elevated) environment" is only true because of this line.
+        odoo_location = odoo_location.with_env(self.env).exists()
+        if not odoo_location:
+            raise UserError("The Odoo location does not exist.")
+        try:
+            odoo_location.check_access('read')
+        except (AccessError, MissingError):
+            raise UserError("That Odoo location is not available.")
+        if odoo_location.usage != 'internal':
+            raise UserError(
+                "Only an internal Odoo stock location can be mapped."
+            )
+        if odoo_location.company_id and odoo_location.company_id != self.env.company:
+            raise UserError(
+                "The Odoo location belongs to a different company."
+            )
+        Mapping = self.env['shopify.connector.location.mapping']
+        existing = Mapping.search([
+            ('store_id', '=', store.id),
+            ('odoo_location_id', '=', odoo_location.id),
+        ], limit=1)
+        if existing:
+            # Exact existing identity may update non-identity controls
+            # (push_enabled); a differing GID for the same Odoo location
+            # is an identity conflict and must fail closed, never
+            # silently replace the recorded Shopify identity (PR #182
+            # comment 5028910116 item 13).
+            if existing.shopify_gid != shopify_location_gid:
+                raise UserError(
+                    "A location mapping already exists for this Odoo "
+                    "location with a different Shopify Location GID. "
+                    "This service never silently replaces an existing "
+                    "mapping's identity; use the reviewed remap path to "
+                    "change it."
+                )
+            existing.sudo().write({
+                'push_enabled': bool(push_enabled),
+                'shopify_location_name_snapshot': cached_location.name,
+            })
+            return existing
+        # Never silently move an already-mapped Shopify GID to a
+        # different Odoo location either.
+        gid_collision = Mapping.search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', '=', shopify_location_gid),
+        ], limit=1)
+        if gid_collision:
+            raise UserError(
+                "This Shopify Location GID is already mapped to a "
+                "different Odoo location for this store. This service "
+                "never silently moves an existing mapping's identity; "
+                "use the reviewed remap path to move it."
+            )
+        mapping = Mapping.sudo().create({
+            'store_id': store.id,
+            'shopify_gid': shopify_location_gid,
+            'odoo_location_id': odoo_location.id,
+            'match_key': 'manual',
+            'push_enabled': bool(push_enabled),
+            'shopify_location_name_snapshot': cached_location.name,
+        })
+        self._mark_location_readiness_stale(store)
+        return mapping
+
+    @api.model
+    def _validated_cached_location(self, store, shopify_location_gid):
+        """The active cached Shopify location this GID names, or a refusal.
+
+        The cache is read elevated because `shopify.connector.location`
+        deliberately grants no group create/write and this module's own named
+        elevation is how it is maintained -- but the STORE was already
+        resolved through the caller's own record access, so this can only
+        ever read rows belonging to a store the caller may act on. The
+        `store_id` term is what makes that true, and it is not optional.
+
+        Every refusal is deliberately identical in shape and says nothing
+        about what does exist elsewhere: a caller must not be able to
+        distinguish "no such location anywhere" from "that location belongs
+        to somebody else's store" by comparing two messages.
+        """
+        cached = self.env['shopify.connector.location'].sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_location_gid', '=', shopify_location_gid),
+        ], limit=1)
+        if not cached:
+            raise UserError(
+                "This is not an active Shopify location for this store. "
+                "Refresh the Shopify location list and choose one from it; "
+                "a mapping is never created for a location this store's "
+                "own list does not contain."
+            )
+        if not cached.shopify_location_active:
+            raise UserError(
+                "This Shopify location is no longer active in this store's "
+                "location list and cannot be mapped. Refresh the list and "
+                "choose an active location."
+            )
+        return cached
+
+    @api.model
+    def _mark_location_readiness_stale(self, store):
+        """A mapping changed, so `mapped_location`'s last result is stale."""
+        settings = self.env['shopify.connector.store.settings'].search(
+            [('store_id', '=', store.id)], limit=1,
+        )
+        if settings:
+            settings._mark_setup_readiness_stale()
+        return True
+
+    # ------------------------------------------------------------------
+    # Remap: change the Odoo target of an already-bound Shopify location
+    # ------------------------------------------------------------------
+
+    @api.model
+    def remap_location_mapping(
+        self, mapping, odoo_location, reason, confirmed=False,
+    ):
+        """Point an existing Shopify location at a different Odoo location.
+
+        WHY THIS EXISTS RATHER THAN A DIRECT `action_override_binding` BUTTON.
+
+        The generic protected-binding mixin can already change a binding's
+        bound Many2one, and it is correct for what it does -- but it admits
+        **Reviewer** or Administrator, and it proves nothing about whether an
+        INVENTORY remap is operationally safe. Moving the Odoo location under
         a pair whose first push is already previewed or confirmed silently
         changes which warehouse's stock is about to be written to a live
         storefront, and doing it while inventory work is in flight changes
