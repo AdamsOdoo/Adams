@@ -171,7 +171,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
 
         with patch.object(
             Service, '_read_order_fulfillments',
-            lambda service, store, gid: [],
+            lambda service, read_job, store, gid: [],
         ):
             self.Service._handle_fulfillment_reconnect_catchup(job)
         self.settings.invalidate_recordset()

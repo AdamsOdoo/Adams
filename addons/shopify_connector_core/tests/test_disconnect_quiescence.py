@@ -412,6 +412,14 @@ class TestCallLeaseModelSchema(TransactionCase):
         self.assertIn('_admit_business_read', read_calls)
         self.assertNotIn('_admit_mutation', read_calls)
 
+    def test_business_read_ownership_uses_the_immutable_store_fk(self):
+        source = inspect.getsource(
+            client_module.ShopifyConnectorApiClient._admit_business_read
+        )
+        self.assertIn('j.store_id', source)
+        self.assertNotIn('j.company_id', source)
+        self.assertIn('store_company_id not in self.env.companies.ids', source)
+
     # API-parity source guards (review 4680664964, blocker 1): execute_business
     # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
     # captured token, and carries the RRequestException->temporary taxonomy.

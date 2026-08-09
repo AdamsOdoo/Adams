@@ -476,7 +476,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         side_cr = self.env.registry.cursor()
         try:
             side_cr.execute(
-                "SELECT j.store_id, j.company_id, j.state, j.job_type, "
+                "SELECT j.store_id, j.state, j.job_type, "
                 "j.expected_connection_generation, s.company_id, s.state, "
                 "s.connection_generation "
                 "FROM shopify_connector_job j "
@@ -490,11 +490,17 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     'This job does not belong to the target store.'
                 )
             (
-                job_store_id, job_company_id, job_state, job_type,
-                expected_generation, store_company_id, store_state,
-                store_generation,
+                job_store_id, job_state, job_type, expected_generation,
+                store_company_id, store_state, store_generation,
             ) = row
-            if job_store_id != store.id or job_company_id != store_company_id:
+            # The job's immutable store foreign key is the ownership boundary.
+            # ``job.company_id`` is a stored related field derived from that
+            # same store and may still be awaiting recomputation immediately
+            # after enqueue; comparing it here adds no security fact and can
+            # falsely refuse an otherwise valid claimed job.  The target
+            # store's live company is checked against the active environment
+            # immediately below.
+            if job_store_id != store.id:
                 raise ShopifyQuiescedError(
                     'This job and store do not share scope ownership.'
                 )
