@@ -467,6 +467,17 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyQuiescedError(
                 'The target store company is outside the active company scope.'
             )
+        # The dispatcher claims queued -> running in its owning transaction
+        # and deliberately does not commit before invoking the handler.  An
+        # independent lease transaction can therefore only see the last
+        # committed state (normally ``queued``); requiring ``running`` in that
+        # transaction would refuse every genuine first read.  Validate the
+        # protected worker record here, while the side transaction below owns
+        # the live store/generation gate and commits the lease.
+        if job.state != 'running':
+            raise ShopifyQuiescedError(
+                'A business Shopify read requires the claimed running job.'
+            )
         # Match business mutation admission: refresh client-credentials tokens
         # before opening the side transaction, never under a store-row lock.
         self.env['shopify.connector.store.credential']._ensure_access_token(
@@ -476,7 +487,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         side_cr = self.env.registry.cursor()
         try:
             side_cr.execute(
-                "SELECT j.store_id, j.state, j.job_type, "
+                "SELECT j.store_id, j.job_type, "
                 "j.expected_connection_generation, s.company_id, s.state, "
                 "s.connection_generation "
                 "FROM shopify_connector_job j "
@@ -490,7 +501,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     'This job does not belong to the target store.'
                 )
             (
-                job_store_id, job_state, job_type, expected_generation,
+                job_store_id, job_type, expected_generation,
                 store_company_id, store_state, store_generation,
             ) = row
             # The job's immutable store foreign key is the ownership boundary.
@@ -508,10 +519,6 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 raise ShopifyQuiescedError(
                     'The target store company is outside the active company '
                     'scope.'
-                )
-            if job_state != 'running':
-                raise ShopifyQuiescedError(
-                    'A business Shopify read requires the claimed running job.'
                 )
             if not any(job_type.startswith(prefix) for prefix in prefixes):
                 raise ShopifyQuiescedError(

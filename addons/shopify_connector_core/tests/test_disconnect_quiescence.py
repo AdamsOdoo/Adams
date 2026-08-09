@@ -542,8 +542,11 @@ class TestBusinessAdmission(TransactionCase):
 
     def test_business_read_admission_owns_lease_until_body_exit(self):
         job = self._make_job()
-        job.sudo().write({'state': 'running'})
+        # The queued row is committed before a worker claims it.  Keep the
+        # running transition in the owning transaction: the side admission
+        # transaction cannot and must not require that uncommitted state.
         self.env.flush_all()
+        job.sudo().write({'state': 'running'})
 
         def fake_send(self, store, body, token=None):
             return FakeResponse(200, json_body=_success_body())
