@@ -133,7 +133,10 @@ describe("shopify connector dashboard", () => {
         mockOrm(() => payload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
         expect(".sc-band--success").toHaveCount(1);
-        expect(".sc360-kpi").toHaveCount(4);
+        expect(".sc360-kpi").toHaveCount(5);
+        expect(
+            queryText(".sc360-kpi[data-kpi='awaiting-review'] .sc360-kpi__value")
+        ).toBe("0");
         expect(queryText(".sc360-kpi[data-kpi='orders'] .sc360-kpi__value")).toBe("26");
         // truthful comparison caption present on the sales card
         expect(queryText(".sc360-kpi[data-kpi='sales'] .sc360-kpi__delta")).toInclude("vs previous period");
