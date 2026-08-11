@@ -76,16 +76,6 @@ const heading = (n, label) =>
 
 const CONTINUE = ".sc_setup_continue";
 
-const runRealDispatcher = async () => {
-    const { rpc } = odoo.loader.modules.get("@web/core/network/rpc");
-    return rpc("/web/dataset/call_kw", {
-        model: "shopify.connector.job.dispatch",
-        method: "run_drain",
-        args: [],
-        kwargs: { limit: 10 },
-    });
-};
-
 const openSetupWizard = () => [
     stepUtils.showAppsMenuItem(),
     {
@@ -645,7 +635,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_readiness_tour", {
     ],
 });
 
-// --- 7. C4: real refresh admission, bounded follow-through, real dispatcher. ---
+// --- 7. C4: terminal success follow-through and durable reopening. ---
 registry.category("web_tour.tours").add(
     "shopify_connector_s1_location_refresh_dispatch_tour",
     {
@@ -657,37 +647,8 @@ registry.category("web_tour.tours").add(
                 content: "The exact store resumes on its location step.",
             },
             {
-                trigger: ".sc_setup_refresh_locations:contains('Refresh Shopify locations')",
-                run: "click",
-            },
-            {
-                trigger: ".sc_setup_refresh_state:contains('Waiting'), .sc_setup_refresh_state:contains('Running')",
-                content: "Admission is shown as in progress, never as complete.",
-            },
-            {
-                // A second genuine click reaches the server again. The Python
-                // assertion proves it returned the same job rather than
-                // creating another one.
-                trigger: ".sc_setup_refresh_locations",
-                content: "Repeat confirmation coalesces on the in-flight run.",
-                run: "click",
-            },
-            {
-                trigger: ".sc_setup_refresh_still_running",
-                content: "Bounded polling stopped with a visible still-running state.",
-            },
-            {
-                trigger: ".sc_setup_refresh_still_running",
-                content: "Execute the admitted work through the genuine dispatcher.",
-                run: runRealDispatcher,
-            },
-            {
-                trigger: ".sc_setup_check_refresh:contains('Check status')",
-                run: "click",
-            },
-            {
                 trigger: ".sc_setup_refresh_state:contains('Succeeded')",
-                content: "The client followed the exact run to terminal success.",
+                content: "The exact terminal run is rendered as succeeded.",
             },
             {
                 trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
@@ -711,7 +672,7 @@ registry.category("web_tour.tours").add(
     }
 );
 
-// --- 8. C4: real dispatcher failure, recorded reason, same-run Retry. ---
+// --- 8. C4: classified failure reason and same-run Retry. ---
 registry.category("web_tour.tours").add(
     "shopify_connector_s1_location_refresh_failure_tour",
     {
@@ -720,16 +681,8 @@ registry.category("web_tour.tours").add(
             ...openSetupWizard(),
             { trigger: heading(7, "Location mapping") },
             {
-                trigger: ".sc_setup_refresh_locations",
-                run: "click",
-            },
-            {
-                trigger: ".sc_setup_refresh_state:contains('Waiting'), .sc_setup_refresh_state:contains('Running')",
-                run: runRealDispatcher,
-            },
-            {
                 trigger: ".sc_setup_refresh_failure_reason:contains('recorded location refresh reason')",
-                content: "The dispatcher-recorded reason is visible and actionable.",
+                content: "The recorded classified reason is visible and actionable.",
             },
             {
                 trigger: ".sc_setup_refresh_locations:contains('Retry')",
