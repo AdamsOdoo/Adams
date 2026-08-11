@@ -183,11 +183,45 @@
     }
     .sc-skeleton--band { block-size: 84px; }
 
-    // --- Step rail: names, not numbers alone; wraps rather than scrolls ---
-    .sc_setup__steps ol {
-        display: flex;
-        flex-wrap: wrap;
+    // --- Five phase rail over twelve durable steps -----------------------
+    .sc_setup__steps > ol {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
         gap: var(--sc-space-2);
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .sc_setup_phase {
+        min-inline-size: 0;
+        padding: var(--sc-space-2);
+        border: 1px solid var(--sc-border);
+        border-radius: var(--sc-radius);
+        background: var(--sc-surface-0);
+
+        &.sc_setup_phase--current {
+            border-color: var(--sc-accent);
+        }
+
+        &.sc_setup_phase--done {
+            border-color: var(--sc-success-text);
+        }
+    }
+
+    .sc_setup_phase__heading {
+        display: flex;
+        align-items: center;
+        gap: var(--sc-space-2);
+        margin-block-end: var(--sc-space-2);
+        font-size: var(--sc-fs-caption);
+        font-weight: var(--sc-fw-dominant);
+    }
+
+    .sc_setup_phase__steps {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
         margin: 0;
         padding: 0;
         list-style: none;
@@ -204,6 +238,11 @@
         font-size: var(--sc-fs-caption);
         color: var(--sc-text-secondary);
 
+        .sc_setup_step__label {
+            min-inline-size: 0;
+            overflow-wrap: anywhere;
+        }
+
         .sc_setup_step__index {
             font-weight: var(--sc-fw-dominant);
         }
@@ -219,6 +258,18 @@
         &.sc_setup_step--done {
             border-color: var(--sc-success-text);
             color: var(--sc-success-text);
+        }
+    }
+
+    @media (max-width: 900px) {
+        .sc_setup__steps > ol {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 520px) {
+        .sc_setup__steps > ol {
+            grid-template-columns: 1fr;
         }
     }
 

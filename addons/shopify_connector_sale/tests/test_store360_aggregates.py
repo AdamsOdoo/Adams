@@ -139,6 +139,9 @@ class TestStore360Aggregates(OrderImportCase):
         block = commercial['blocks'][0]
         expected_sales = kept_a.amount_total + kept_b.amount_total
         self.assertAlmostEqual(block['sales'], expected_sales, places=2)
+        self.assertAlmostEqual(block['gross'], expected_sales, places=2)
+        self.assertAlmostEqual(block['net'], expected_sales, places=2)
+        self.assertEqual(block['refunds'], 0.0)
         self.assertEqual(block['orders'], 2)
         self.assertAlmostEqual(
             block['aov'], expected_sales / 2.0, places=2)
@@ -150,10 +153,37 @@ class TestStore360Aggregates(OrderImportCase):
         domain = [tuple(t) for t in commercial['orders_target']['domain']]
         self.assertEqual(model.search_count(domain), 2)
         self.assertNotIn(review, model.search(domain))
+        currency_domain = [tuple(t) for t in block['orders_target']['domain']]
+        currency_orders = model.search(currency_domain)
+        self.assertEqual(currency_orders, kept_a | kept_b)
+        self.assertAlmostEqual(
+            sum(currency_orders.mapped('amount_total')),
+            block['gross'], places=2,
+        )
         review_domain = [
             tuple(t) for t in commercial['awaiting_review']['target']['domain']
         ]
         self.assertEqual(model.search(review_domain), review)
+
+    def test_sales_dashboard_is_sales_only_and_keeps_review_separate(self):
+        kept = self._imported_order(days_ago=1, amount=125.0, qty=2)
+        self._imported_order(
+            days_ago=1, amount=500.0, qty=5, status='review',
+        )
+        payload = self.Dashboard.get_sales_dashboard_data(
+            self.store.id, '30d'
+        )
+        self.assertIn('commercial', payload)
+        self.assertNotIn('health', payload)
+        self.assertNotIn('flows', payload)
+        commercial = payload['commercial']
+        self.assertEqual(commercial['orders_total'], 1)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
+        block = commercial['blocks'][0]
+        self.assertAlmostEqual(block['gross'], kept.amount_total, places=2)
+        self.assertAlmostEqual(block['net'], kept.amount_total, places=2)
+        self.assertEqual(block['refunds'], 0.0)
+        self.assertIn('excluded', commercial['refund_scope_note'].lower())
 
     def test_kpis_equal_drilldowns_with_review_quarantine_and_cancel(self):
         """A3: every commercial KPI reconciles to its exact population."""

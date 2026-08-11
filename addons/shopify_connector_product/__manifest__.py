@@ -1,12 +1,11 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.9.0',
+    'version': '19.0.2.10.0',
     'summary': (
-        'Shopify product import completeness (Task 010/010B): read-only '
-        'Shopify product/variant import with attributes, variants, '
-        'prices, and basic images; template/variant binding models; and '
-        'the product_import_sync job type. No product export, update, or '
-        'write back to Shopify of any kind.'
+        'Read-only Shopify product and variant import with scheduled scans, '
+        'bindings, attributes, prices, images, explicit match decisions, '
+        'and operator import controls. Product write-back remains isolated '
+        'in the optional product-export addon.'
     ),
     'description': """
 Shopify Connector Product
@@ -27,9 +26,12 @@ via three narrow extension seams, a job_type selection addition, a
 domain flag mapping gating it on product_domain_enabled, and a handler
 registration, with zero edits to shopify_connector_core itself.
 
-Import-only. No product or variant export, update, or write back to
-Shopify of any kind. No customer, order, inventory, or fulfillment
-logic. No UI, wizard, webhook, or OAuth file.
+This addon is import-only: it never creates or updates a product or variant
+in Shopify. It includes merchant-facing binding lists, import controls,
+scheduled discovery scans, matching decisions and Store Settings fields.
+Product write-back is isolated in ``shopify_connector_product_export``.
+Customer, order, inventory and fulfillment logic live in their respective
+domain addons. There is no webhook delivery pipeline or OAuth flow.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',

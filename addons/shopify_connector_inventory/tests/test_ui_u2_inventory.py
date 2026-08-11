@@ -108,6 +108,55 @@ class TestUiU2Inventory(TransactionCase):
                 'shopify_connector_inventory.%s is missing' % name,
             )
 
+    def test_inventory_and_configuration_destinations_are_separated(self):
+        operations = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_operations'
+        )
+        mappings = self.env.ref(
+            'shopify_connector_product.menu_shopify_connector_catalog'
+        )
+        sync_rules = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_store_settings'
+        )
+        inventory = self.env.ref(
+            'shopify_connector_inventory.menu_shopify_connector_inventory'
+        )
+        self.assertEqual(inventory.parent_id, operations)
+        self.assertEqual(
+            inventory.action,
+            self.env.ref(
+                'shopify_connector_inventory.'
+                'action_shopify_connector_inventory_workspace'
+            ),
+        )
+        self.assertFalse(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_inventory_workspace'
+        ).active)
+        self.assertEqual(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_inventory_first_push'
+        ).parent_id, sync_rules)
+        self.assertEqual(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_location_mapping'
+        ).parent_id, mappings)
+
+    def test_inventory_configuration_actions_are_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        for name in (
+            'action_shopify_connector_inventory_first_push',
+            'action_shopify_connector_location_mapping',
+            'action_shopify_connector_location_refresh_wizard',
+            'action_shopify_connector_location_map_wizard',
+        ):
+            action = self.env.ref(
+                'shopify_connector_inventory.%s' % name
+            )
+            self.assertEqual(action.group_ids, admin)
+
     def test_first_push_guard_is_its_own_filtered_surface(self):
         """RA-008: the ceremony must not be buried in the routine queue."""
         guard = self.env.ref(

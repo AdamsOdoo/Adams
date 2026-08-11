@@ -41,17 +41,30 @@
                 <!-- ============ READY ============ -->
                 <t t-else="">
 
-                    <!-- Step indicator: plain step names, never numbers alone. -->
+                    <!-- Five merchant phases over the unchanged twelve durable
+                         step keys. Both levels keep text labels, so neither
+                         progress nor completion is conveyed by colour alone. -->
                     <nav class="sc_setup__steps" aria-label="Setup steps">
                         <ol>
-                            <t t-foreach="steps" t-as="step" t-key="step.key">
-                                <li t-att-class="stepClass(step)"
-                                    t-att-data-step-key="step.key"
-                                    t-att-aria-current="step.key === state.stepKey ? 'step' : false">
-                                    <span class="sc_setup_step__index" t-esc="step.index"/>
-                                    <span class="sc_setup_step__label" t-esc="step.label"/>
-                                    <span t-if="step.applicable === false"
-                                          class="sc-badge sc-badge--neutral">Not required</span>
+                            <t t-foreach="phases" t-as="phase" t-key="phase.key">
+                                <li t-att-class="phaseClass(phase)"
+                                    t-att-aria-current="phase.key === currentPhase.key ? 'step' : false">
+                                    <div class="sc_setup_phase__heading">
+                                        <span class="sc_setup_phase__index" t-esc="phase.index"/>
+                                        <span class="sc_setup_phase__label" t-esc="phase.label"/>
+                                    </div>
+                                    <ol class="sc_setup_phase__steps">
+                                        <t t-foreach="phaseSteps(phase)" t-as="step" t-key="step.key">
+                                            <li t-att-class="stepClass(step)"
+                                                t-att-data-step-key="step.key"
+                                                t-att-aria-current="step.key === state.stepKey ? 'step' : false">
+                                                <span class="sc_setup_step__index" t-esc="step.index"/>
+                                                <span class="sc_setup_step__label" t-esc="step.label"/>
+                                                <span t-if="step.applicable === false"
+                                                      class="sc-badge sc-badge--neutral">Not required</span>
+                                            </li>
+                                        </t>
+                                    </ol>
                                 </li>
                             </t>
                         </ol>
@@ -70,7 +83,8 @@
                     <section class="sc_setup__panel" aria-live="polite">
                         <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
                             <span class="sc_setup__heading-count">
-                                Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
+                                Phase <t t-esc="currentPhase.index"/> of <t t-esc="state.data.phase_count"/>
+                                · Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
                             </span>
                             <span t-esc="currentStep.label"/>
                         </h1>
@@ -857,7 +871,7 @@
                                         <div class="sc-band__hint">
                                             Inventory syncing is not enabled for this store, so
                                             there is no first stock push to schedule. You can
-                                            enable it later in Store Settings, and this step will
+                                            enable it later in Sync Rules, and this step will
                                             be waiting.
                                         </div>
                                     </div>
@@ -930,7 +944,7 @@
                         <t t-if="state.stepKey === 'review'">
                             <p class="sc_setup__lead">
                                 Here is what this connector will do. You can change any of it
-                                later in Store Settings.
+                                later in Sync Rules.
                             </p>
                             <dl class="sc_setup__summary">
                                 <dt>Store</dt>
@@ -985,7 +999,7 @@
                                     <div class="sc-band__text">
                                         No sync features are enabled. This store will connect
                                         without syncing. You can enable features later from
-                                        Store Settings.
+                                        Sync Rules.
                                     </div>
                                 </div>
                             </div>

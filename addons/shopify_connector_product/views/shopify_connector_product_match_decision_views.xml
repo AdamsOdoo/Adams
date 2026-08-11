@@ -396,5 +396,6 @@
               name="Match Decisions"
               parent="menu_shopify_connector_catalog"
               action="action_shopify_connector_product_match_decision"
-              sequence="5"/>
+              sequence="5"
+              active="False"/>
 </odoo>

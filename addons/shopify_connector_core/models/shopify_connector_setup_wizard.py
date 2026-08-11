@@ -102,6 +102,38 @@ SETUP_STEPS = (
 
 SETUP_STEP_COUNT = len(SETUP_STEPS)
 
+#: C4 presentation-only grouping. The twelve durable step keys above remain
+#: the persistence/navigation contract; these five phases only help a merchant
+#: understand where they are. Every step appears exactly once and in the same
+#: order. Scope/test-connection stay in Connect because the current durable
+#: sequence verifies access and identity together before any sync direction is
+#: chosen; no server-side completion rule moves into this grouping.
+SETUP_PHASES = (
+    (
+        'connect', 'Connect',
+        ('welcome', 'identity', 'credential', 'scopes', 'test_connection'),
+    ),
+    ('choose', 'Choose', ('directions',)),
+    ('map', 'Map', ('location_mapping',)),
+    (
+        'protect', 'Protect',
+        ('source_of_truth', 'notification', 'first_push'),
+    ),
+    ('verify', 'Verify', ('final_readiness', 'review')),
+)
+SETUP_PHASE_COUNT = len(SETUP_PHASES)
+SETUP_STEP_PHASE = {
+    step_key: {
+        'key': phase_key,
+        'label': phase_label,
+        'index': phase_index,
+    }
+    for phase_index, (phase_key, phase_label, step_keys) in enumerate(
+        SETUP_PHASES, start=1,
+    )
+    for step_key in step_keys
+}
+
 #: The step keys, in order, and their display ordinals. `SETUP_STEP_ORDER` is
 #: the ONLY place a step key becomes a number, and the number it becomes is
 #: used for rendering and for monotonic comparison -- never for addressing.
@@ -566,6 +598,18 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         payload = {
             'steps': self._step_payload(settings, locations),
             'step_count': SETUP_STEP_COUNT,
+            'phases': [
+                {
+                    'index': index,
+                    'key': key,
+                    'label': label,
+                    'step_keys': list(step_keys),
+                }
+                for index, (key, label, step_keys) in enumerate(
+                    SETUP_PHASES, start=1,
+                )
+            ],
+            'phase_count': SETUP_PHASE_COUNT,
             # The resume point the client navigates by. The ordinal beside it
             # is what the heading renders ("Step 7 of 12") and is never what
             # the client compares against.
@@ -602,6 +646,9 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 'index': index,
                 'key': key,
                 'label': label,
+                'phase_key': SETUP_STEP_PHASE[key]['key'],
+                'phase_label': SETUP_STEP_PHASE[key]['label'],
+                'phase_index': SETUP_STEP_PHASE[key]['index'],
                 'applicable': applicable.get(key, {}).get('applicable', True),
                 'skipped_reason': applicable.get(key, {}).get('reason', ''),
             }
@@ -1225,7 +1272,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             return _('Shopify will email your customers when a delivery is '
                      'fulfilled.')
         return _('Customers will not be emailed. You can change this later in '
-                 'Store Settings.')
+                 'Sync Rules.')
 
     @api.model
     def _first_push_summary(self, settings):
@@ -1238,7 +1285,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             return _('Stock scanning is scheduled. The first push still waits '
                      'for a preview you confirm.')
         return _('Stock scanning is off for now. You can turn it on later in '
-                 'Store Settings.')
+                 'Sync Rules.')
 
     # ------------------------------------------------------------------
     # Step 2 -- store identity

@@ -149,7 +149,7 @@ tours.add("shopify_connector_b2_store_settings_tour", {
     steps: () => [
         {
             trigger: ".o_list_view .o_data_row .o_data_cell",
-            content: "Store Settings lists the configured store.",
+            content: "Sync Rules lists the configured store.",
             run: "click",
         },
         {

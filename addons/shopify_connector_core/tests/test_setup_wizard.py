@@ -50,6 +50,8 @@ from ..models.shopify_connector_setup_wizard import (
     SETUP_STEP_KEYS,
     SETUP_STEP_ORDER,
     SETUP_STEPS,
+    SETUP_PHASES,
+    SETUP_PHASE_COUNT,
 )
 
 DUMMY_TOKEN = 'shpat_SETUPWIZARDDUMMY000000000000000'
@@ -261,6 +263,33 @@ class TestSetupWizardShape(SetupWizardCase):
         self.assertEqual(state['steps'][0]['key'], 'welcome')
         self.assertEqual(state['steps'][-1]['key'], 'review')
         self.assertEqual(state['resume_step_key'], 'welcome')
+
+    def test_five_merchant_phases_group_every_step_without_changing_keys(self):
+        state = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(SETUP_PHASE_COUNT, 5)
+        self.assertEqual(
+            [phase[0] for phase in SETUP_PHASES],
+            ['connect', 'choose', 'map', 'protect', 'verify'],
+        )
+        self.assertEqual(state['phase_count'], 5)
+        self.assertEqual(
+            [phase['label'] for phase in state['phases']],
+            ['Connect', 'Choose', 'Map', 'Protect', 'Verify'],
+        )
+        grouped = [
+            step_key
+            for phase in state['phases']
+            for step_key in phase['step_keys']
+        ]
+        self.assertEqual(grouped, list(SETUP_STEP_KEYS))
+        self.assertEqual(
+            [step['phase_key'] for step in state['steps']],
+            [
+                'connect', 'connect', 'connect', 'connect', 'connect',
+                'choose', 'map', 'protect', 'protect', 'protect',
+                'verify', 'verify',
+            ],
+        )
 
     def test_scopes_are_derived_from_the_governed_declaration(self):
         """Not a hand-written list that can go stale on a setup screen.
@@ -1317,7 +1346,7 @@ class TestSetupWizardReadinessPresentation(SetupWizardCase):
         self.assertEqual(
             entry['reason'],
             'No sync features are enabled. This store will connect without '
-            'syncing. You can enable features later from Store Settings.',
+            'syncing. You can enable features later from Sync Rules.',
         )
         self.assertNotIn(entry, state['readiness']['blocking'])
 

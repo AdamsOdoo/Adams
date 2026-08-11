@@ -63,6 +63,11 @@ class TestExportPreviewGuard(ExportCase):
             groups='base.group_user,'
                    'shopify_connector_core.group_shopify_connector_reviewer',
         )
+        self.admin = new_test_user(
+            self.env, login='export-admin-fallback-guard',
+            groups='base.group_user,'
+                   'shopify_connector_core.group_shopify_connector_admin',
+        )
 
     # ------------------------------------------------------------------
     # Confirmation is a permission, and a re-verified one
@@ -99,6 +104,67 @@ class TestExportPreviewGuard(ExportCase):
         self.assertEqual(preview.state, 'confirmed')
         self.assertEqual(preview.confirmed_uid, reviewer)
         self.assertEqual(job.job_type, JOB_TYPE_APPLY)
+
+    def test_no_js_confirmation_wizard_is_administrator_only(self):
+        preview = self.make_preview(
+            binding=self.binding,
+            steps=[{'step': JOB_TYPE_UPDATE, 'state': 'pending',
+                    'fields': ['title']}],
+        )
+        Wizard = self.env[
+            'shopify.connector.product.export.confirm.wizard'
+        ]
+        with self.assertRaises(AccessError):
+            Wizard.with_user(self.reviewer).create({
+                'preview_id': preview.id,
+                'acknowledged': True,
+            })
+
+        # Defense in depth at the method boundary: even a transient record
+        # obtained through an elevated fixture cannot turn the fallback into
+        # a second Reviewer confirmation route.
+        wizard = Wizard.sudo().create({
+            'preview_id': preview.id,
+            'acknowledged': True,
+        })
+        with self.assertRaises(AccessError):
+            wizard.with_user(self.reviewer).action_confirm()
+        with self.assertRaises(AccessError):
+            preview.with_user(
+                self.reviewer
+            )._confirm_export_preview_fallback()
+        preview.invalidate_recordset()
+        self.assertEqual(preview.state, 'previewed')
+
+    def test_no_js_admin_confirmation_records_its_route_and_diff_counts(self):
+        preview = self.make_preview(
+            binding=self.binding,
+            steps=[{'step': JOB_TYPE_UPDATE, 'state': 'pending',
+                    'fields': ['title']}],
+            blocked=[{'kind': 'unowned_remote_variant',
+                      'detail': 'Left unchanged.'}],
+        )
+        Wizard = self.env[
+            'shopify.connector.product.export.confirm.wizard'
+        ]
+        wizard = Wizard.with_user(self.admin).create({
+            'preview_id': preview.id,
+            'acknowledged': True,
+        })
+        job = wizard.action_confirm()
+
+        preview.invalidate_recordset()
+        self.assertEqual(preview.state, 'confirmed')
+        self.assertEqual(preview.confirmed_uid, self.admin)
+        self.assertEqual(job.job_type, JOB_TYPE_APPLY)
+        audit_logs = self.env['shopify.connector.job.log'].search([
+            ('job_id.store_id', '=', self.store.id),
+            ('event_type', '=', 'manual_action'),
+            ('message', 'like', 'No-JS export confirmation authorized%'),
+        ])
+        self.assertEqual(len(audit_logs), 1)
+        self.assertIn('steps=1', audit_logs.message)
+        self.assertIn('blocked=1', audit_logs.message)
 
     def test_a_preview_with_no_steps_cannot_be_confirmed(self):
         preview = self.make_preview(binding=self.binding, steps=[])

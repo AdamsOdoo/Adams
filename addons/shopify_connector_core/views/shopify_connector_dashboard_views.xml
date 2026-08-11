@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        U0 operator UI: the operational dashboard client action. The single
-        bounded Owl surface in U0. Its component (tag "shopify_connector_dashboard")
-        is registered in static/src/js/shopify_connector_dashboard.js and reads
-        only the read-only aggregate service shopify.connector.ui.dashboard.
+        C7: two separate client actions backed by separate bounded RPC
+        projections. The original action ID becomes Sales Dashboard so
+        existing references survive; Connector Health gets its own action.
     -->
     <record id="action_shopify_connector_dashboard" model="ir.actions.client">
-        <field name="name">Dashboard</field>
-        <field name="tag">shopify_connector_dashboard</field>
+        <field name="name">Sales Dashboard</field>
+        <field name="tag">shopify_connector_sales_dashboard</field>
+    </record>
+
+    <record id="action_shopify_connector_health" model="ir.actions.client">
+        <field name="name">Connector Health</field>
+        <field name="tag">shopify_connector_health</field>
     </record>
 </odoo>

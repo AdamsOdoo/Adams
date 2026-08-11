@@ -1,48 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--
-        U2 operator UI: the "Catalog &amp; Matching" branch (S24 Mapping
-        Center) of the connector navigation.
-
-        Placement under the existing U0 root at sequence 32.
-
-        The master specification's order is Dashboard, Orders, Sync Center,
-        Review Center, Catalog, Inventory, Fulfillment, Configuration. U0
-        already shipped Dashboard 10, Stores 20, Sync Center 30, Error &
-        Review Center 40 and Logs 50, and those are ACCEPTED code this phase
-        does not renumber. The new branches are therefore slotted into the
-        gap between Sync Center (30) and the Error & Review Center (40) —
-        Catalog 32, Inventory 33, Fulfillment 35 (U1) — which preserves the
-        specification's relative order among the branches U2 owns without
-        touching a single accepted menu.
-
-        VISIBILITY vs AUTHORIZATION. Menus are gated on the SEC-2
-        customer-facing role. That is visibility only. The server enforces the
-        internal capability groups on every ACL row and every action; a denied
-        caller gets an AccessError with zero side effects whether or not a
-        menu rendered. A hidden menu is never the security control.
-
-        The branch owns exactly the two surfaces this module owns. Location
-        mapping and product export are named by the master specification as
-        siblings here, but they belong to other modules (inventory, and the
-        not-yet-built export flow), so they are NOT stubbed: an empty "coming
-        soon" entry is the anti-premium smell §2.1 calls out by name.
-    -->
+    <!-- C1: durable mapping tables are Administrator-only Configuration. -->
 
     <menuitem id="menu_shopify_connector_catalog"
-              name="Catalog &amp; Matching"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="32"
-              groups="shopify_connector_core.group_shopify_connector_user"/>
+              name="Mappings"
+              parent="shopify_connector_core.menu_shopify_connector_configuration"
+              sequence="30"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
 
     <menuitem id="menu_shopify_connector_product_binding"
-              name="Product Matching"
+              name="Product Mappings"
               parent="menu_shopify_connector_catalog"
               action="action_shopify_connector_product_template_binding"
               sequence="10"/>
 
     <menuitem id="menu_shopify_connector_product_variant_binding"
-              name="Variant Matching"
+              name="Variant Mappings"
               parent="menu_shopify_connector_catalog"
               action="action_shopify_connector_product_variant_binding"
               sequence="20"/>

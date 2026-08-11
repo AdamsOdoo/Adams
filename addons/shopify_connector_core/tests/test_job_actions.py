@@ -221,6 +221,11 @@ class TestJobActions(TransactionCase):
         ]
         self.assertEqual(
             sorted(public_methods),
-            ['action_cancel', 'action_manual_retry'],
+            [
+                'action_cancel',
+                'action_manual_retry',
+                'action_open_attention_case',
+                'action_open_recovery_evidence',
+            ],
         )
         self.assertEqual(len(sudo_calls), 2)

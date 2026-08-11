@@ -157,11 +157,31 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             )
             blocks.append({
                 'currency': self._currency_info(currency),
+                'orders_target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        current_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _("Imported Odoo orders — %(currency)s",
+                              currency=currency.name),
+                },
                 'sales': total or 0.0,
+                # Declared-scope lifecycle policy: every refund/divergence
+                # lands in the separately disclosed review population and is
+                # excluded from this reconciled population. Gross and net are
+                # therefore equal here and reconciled refunds are zero; the
+                # dashboard states that limitation instead of implying a
+                # refund ledger the supported kernel does not maintain.
+                'gross': total or 0.0,
+                'refunds': 0.0,
+                'net': total or 0.0,
                 'orders': count,
                 'aov': (total / count) if count else False,
                 'previous': {
                     'sales': prev_total or 0.0,
+                    'gross': prev_total or 0.0,
+                    'refunds': 0.0,
+                    'net': prev_total or 0.0,
                     'orders': prev_count,
                     'aov': (prev_total / prev_count) if prev_count else False,
                 },
@@ -175,11 +195,25 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             currency = self.env['res.currency'].browse(currency_id)
             blocks.append({
                 'currency': self._currency_info(currency),
+                'orders_target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        current_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _("Imported Odoo orders — %(currency)s",
+                              currency=currency.name),
+                },
                 'sales': 0.0,
+                'gross': 0.0,
+                'refunds': 0.0,
+                'net': 0.0,
                 'orders': 0,
                 'aov': False,
                 'previous': {
                     'sales': prev_total or 0.0,
+                    'gross': prev_total or 0.0,
+                    'refunds': 0.0,
+                    'net': prev_total or 0.0,
                     'orders': prev_count,
                     'aov': (prev_total / prev_count) if prev_count else False,
                 },
@@ -222,6 +256,11 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                     'name': _("Imported orders awaiting data review"),
                 },
             },
+            'refund_scope_note': _(
+                "Refunded or otherwise divergent imported orders are shown "
+                "under Awaiting data review and excluded from gross, net, "
+                "refund, and average-order-value figures."
+            ),
         }
         primary = blocks[0] if blocks else False
         result['trend'] = self._store_360_trend(

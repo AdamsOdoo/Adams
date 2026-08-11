@@ -1,18 +1,18 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.9.0',
+    'version': '19.0.2.10.0',
     'summary': (
-        'Shopify customer import and matching (Task 011): read-only '
-        'Shopify customer import, a customer binding model, and the '
-        'customer_import_sync job type. No order/product/inventory/'
-        'fulfillment logic, no customer export, no Shopify write of '
-        'any kind.'
+        'Conservative Shopify customer and supported-kernel order import '
+        'with bindings, tax decisions, guarded totals, scheduled scans, '
+        'operator controls, and review-aware sales reporting. No customer '
+        'export or Shopify mutation.'
     ),
     'description': """
 Shopify Connector Sale
+======================
 
-Customer import and matching domain module, built on
-shopify_connector_core.
+Customer and supported-kernel order import domain module, built on
+``shopify_connector_core`` and ``shopify_connector_product``.
 
 Provides the shopify.connector.customer.binding model, which binds one
 Shopify Customer to one Odoo res.partner; the inert
@@ -25,11 +25,21 @@ already used by the product domain; and the customer_import_sync job
 type, registered on the existing core job and dispatch substrate via
 three narrow extension seams, a job_type selection addition, a domain
 flag mapping gating it on sale_domain_enabled, and a handler
-registration, with zero edits to shopify_connector_core itself.
+registration.
 
-Import-only. No customer export of any kind. No order, product,
-inventory, or fulfillment logic. No UI, wizard, webhook, or OAuth
-file.
+The order importer creates carefully validated initial Odoo sales orders
+for supported Shopify order shapes, with explicit currency, tax, discount,
+shipping, product and customer evidence. Existing imported orders are not
+commercially rewritten after Shopify edits, cancellations or refunds;
+divergent and otherwise unsupported lifecycle cases are routed to review
+and excluded from reconciled sales totals. The addon includes order and
+customer binding views, manual and scheduled scan controls, tax mapping and
+decision workspaces, Store Settings contributions, and reporting fields.
+
+Import-only. It performs no customer export and no Shopify mutation.
+Inventory and fulfillment behavior are provided by their companion addons.
+Freshness is scan/reconciliation based; there is no webhook delivery
+pipeline or OAuth flow.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',

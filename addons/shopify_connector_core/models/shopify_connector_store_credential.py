@@ -336,7 +336,7 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'Shopify credentials can only be created through the '
                 'connector credential service, which invalidates the cached '
                 'token, the recorded verification and the connection state '
-                'at the same time. Use the setup surface or Store Settings.'
+                'at the same time. Use Stores & Onboarding or Sync Rules.'
             ))
         return super().create(vals_list)
 
@@ -354,7 +354,7 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'Shopify credentials can only be changed through the '
                 'connector credential service, which invalidates the cached '
                 'token, the recorded verification and the connection state '
-                'at the same time. Use the setup surface or Store Settings.'
+                'at the same time. Use Stores & Onboarding or Sync Rules.'
             ))
         return super().write(vals)
 

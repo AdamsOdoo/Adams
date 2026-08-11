@@ -64,7 +64,7 @@
                 <group>
                     <filter name="group_store" string="Store"
                             context="{'group_by': 'store_id'}"/>
-                    <filter name="group_type" string="Job type"
+                    <filter name="group_type" string="Run type"
                             context="{'group_by': 'job_type'}"/>
                     <filter name="group_error" string="Error class"
                             context="{'group_by': 'error_class'}"/>

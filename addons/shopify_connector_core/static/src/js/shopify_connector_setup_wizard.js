@@ -165,6 +165,10 @@ export class ShopifyConnectorSetupWizard extends Component {
         return (this.state.data && this.state.data.steps) || [];
     }
 
+    get phases() {
+        return (this.state.data && this.state.data.phases) || [];
+    }
+
     get store() {
         return (this.state.data && this.state.data.store) || {};
     }
@@ -201,6 +205,27 @@ export class ShopifyConnectorSetupWizard extends Component {
 
     get currentStep() {
         return this.steps.find((s) => s.key === this.state.stepKey) || {};
+    }
+
+    get currentPhase() {
+        const key = this.currentStep.phase_key;
+        return this.phases.find((phase) => phase.key === key) || {};
+    }
+
+    phaseSteps(phase) {
+        const keys = new Set(phase.step_keys || []);
+        return this.steps.filter((step) => keys.has(step.key));
+    }
+
+    phaseClass(phase) {
+        let cls = "sc_setup_phase";
+        const currentIndex = this.currentPhase.index || 0;
+        if (phase.key === this.currentPhase.key) {
+            cls += " sc_setup_phase--current";
+        } else if (phase.index < currentIndex) {
+            cls += " sc_setup_phase--done";
+        }
+        return cls;
     }
 
     /** Position of the current step in the server's own ordered list. */

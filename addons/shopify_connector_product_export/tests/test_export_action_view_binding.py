@@ -42,6 +42,42 @@ class TestExportActionViewBinding(TransactionCase):
                          'view_shopify_connector_store_settings_form_export'),
         )
 
+    def test_export_navigation_follows_operations_and_configuration(self):
+        operations = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_operations'
+        )
+        configuration = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_configuration'
+        )
+        flow = self.env.ref(
+            'shopify_connector_product_export.'
+            'menu_shopify_connector_product_export'
+        )
+        settings = self.env.ref(
+            'shopify_connector_product_export.'
+            'menu_shopify_connector_product_export_settings'
+        )
+        self.assertEqual(flow.parent_id, operations)
+        self.assertEqual(flow.name, 'Product Imports/Exports')
+        self.assertFalse(flow.action)
+        self.assertEqual(
+            flow.child_id.filtered('active').sorted('sequence').mapped('name'),
+            ['Product Export Reviews', 'Media Exports'],
+        )
+        self.assertEqual(settings.parent_id, configuration)
+
+    def test_export_settings_action_is_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        action = self._action('action_shopify_connector_store_settings_export')
+        self.assertEqual(action.group_ids, admin)
+        menu = self.env.ref(
+            'shopify_connector_product_export.'
+            'menu_shopify_connector_product_export_settings'
+        )
+        self.assertEqual(menu.group_ids, admin)
+
     def test_export_settings_does_not_resolve_the_fulfillment_list(self):
         """The exact defect: a name-ordered fallback to another module."""
         action = self._action('action_shopify_connector_store_settings_export')

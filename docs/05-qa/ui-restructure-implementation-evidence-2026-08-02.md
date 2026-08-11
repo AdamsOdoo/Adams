@@ -74,3 +74,154 @@ and its evidence-only successor
 commits in place. Both commits contain documentation and wireframe notes only.
 
 **Deviations.** None currently recorded.
+
+## Batch A — release-blocking correctness repairs (F-01, F-02, F-03)
+
+**Scope.** The setup client follows the exact admitted location-refresh job to
+terminal and exposes retryable failure evidence; fulfillment mode switching now
+has durable requested/effective state, terminal cleanup, retry and normal-UI
+rollback; reconciled sales totals exclude unresolved review orders and disclose
+them separately. Existing job-state, mutation-evidence, company/store and
+readiness contracts remain intact.
+
+**Scope commits on the draft PR.** `242580a0fdd0620eae6ae4f855d5a4da3476d6bc`,
+`5f757f8679d81ad8561015da481e834def61fb70`, and
+`94bd5a69cdc2e8cadb279108f13bcf2cc7b5e614`; additive CI corrections
+`78035c7daa0b963d95c6bdea115e4533339a7c9f` and
+`d053a65c86954c348f51557f9aafd87484128a14`, followed by the test-only
+`2f854d8c4691b0d67ec024e15ef9d11d4c4d53d5`.
+
+**Exact-head CI history.** Failures are retained here rather than overwritten:
+
+| Run / exact head | Real result | Disposition |
+| --- | --- | --- |
+| [#168](https://github.com/AdamsOdoo/Adams/actions/runs/31282086646) / `94bd5a69cdc2e8cadb279108f13bcf2cc7b5e614` | Fresh, warm and both migration paths: `3 failed, 0 error(s) of 2536 tests`; nonstandard: `1 failed, 0 error(s) of 62 tests`; browser evidence `FAILED` | Four real regression gaps: the location-refresh handler erased `ShopifyClientError` taxonomy; the mode recovery test asserted transaction state rolled back by `assertRaises`; the source guard omitted the new retry action; the dashboard HOOT fixture omitted `awaiting_review`. Corrected additively. |
+| [#170](https://github.com/AdamsOdoo/Adams/actions/runs/31285148468) / `78035c7daa0b963d95c6bdea115e4533339a7c9f` | Fresh and both migration paths failed before registry load with `SyntaxError`; warm: `12 failed, 7 error(s) of 1417`; nonstandard: `1 failed, 15 error(s) of 51`; browser evidence `FAILED` | Publication defect, not accepted product evidence: the large inventory-service blob was truncated and contained the tool's truncation marker. Restored from the verified local Git blob in the next additive commit; the contaminated downstream counts are not treated as product regressions. |
+| [#172](https://github.com/AdamsOdoo/Adams/actions/runs/31286024589) / `d053a65c86954c348f51557f9aafd87484128a14` | Fresh, warm, both genuine migrations and both second updates: `0 failed, 0 error(s) of 2537 tests`; nonstandard: `1 failed, 0 error(s) of 62 tests`; browser evidence `FAILED` | The restored production source is clean. The sole residual was a HOOT assertion: Batch A intentionally added the fifth “Awaiting data review” KPI but the healthy-fixture assertion still expected four cards. Corrected test-only, with an explicit zero-value assertion for the review card. |
+| [#174](https://github.com/AdamsOdoo/Adams/actions/runs/31287636609) / `2f854d8c4691b0d67ec024e15ef9d11d4c4d53d5` | Fresh, warm, both genuine migrations and both second updates: `0 failed, 0 error(s) of 2537 tests`; nonstandard: `0 failed, 0 error(s) of 62 tests`; browser evidence `verified` | **Batch A exact-head gate passed.** The artifact binds checkout, connector and source-head to the exact commit, verifies the required base and Odoo pin, and records a clean worktree and zero Shopify operations. |
+
+All three completed artifacts verify source base
+`49cfffbd5ff0eca85d2b855d9ebd2e414680af8e`, exact source/head identity,
+clean connector worktree, and pinned Odoo
+`30bde9ff758834a4912c5ae55843d3a7dad849f1`; both record
+`shopify_operations: none`. Run #174 independently repeats and passes those
+checks.
+
+**Test-count identity.** The first Batch A candidate reports 2,536 standard
+tests versus Batch 0's 2,511; the corrected candidate reports 2,537 after the
+error-taxonomy regression was added: a real +26 identity change from the added
+correctness regressions and async browser journeys. The required tour count
+moves from 36 to 38. The final mission count is recorded in Batch F; it is not
+extrapolated from a failed candidate.
+
+**Adversarial pass.** Refused admissions, duplicate refresh clicks, retryable
+and final refresh failures, browser reload/resume, unexpected terminal mode
+scan failure, retry, explicit Return to Mode 1, and review-flagged sales orders
+were exercised by the new and existing suites. The CI correction also protects
+the operator-visible error taxonomy instead of allowing a generic dispatcher
+failure to hide the recoverable reason.
+
+**Revert boundary.** Revert the six Batch A scope/correction commits above as
+one unit. The final correction only restores the complete intended inventory
+service source after the publication defect; reverting it alone would restore
+syntactically invalid Python and is not a valid product rollback.
+
+**Deviations.** No live Shopify or native Odoo.sh campaign was run. The first
+repair publication was truncated by the remote object-publication path; that
+failed head and its CI artifact are preserved above, and every later large-file
+publication is byte-for-byte checked against the local Git blob before any ref
+update.
+
+## Batch B — acknowledgement truth and job-bound business reads (F-04, F-06)
+
+**Scope.** Mutation attempts and jobs expose the signed six-state evidence
+ladder — Queued locally, Sent to Shopify, Shopify response confirmed, Verified
+by readback, Needs review, Failed — without converting admission or transport
+acceptance into business verification. Inventory, fulfillment and product-
+export decision-relevant reads use the job-bound read admission seam, holding
+the lease across the caller body and fencing stale credential/generation work.
+
+**Scope commit on the draft PR.** `23e12d5fb8021114e26cf884170655fe529e24d2`
+(`feat(core): expose acknowledgements and fence business reads`). The commit is
+one review boundary over the integrated Batch B implementation and the already-
+green Batch A evidence update.
+
+**Publication integrity.** All 34 Batch B source/test/view blobs were created
+from the integrated Batch B Git tree and checked against their local Git object
+SHAs before the non-forced ref update. The largest file,
+`shopify_connector_inventory_service.py`, is remote blob
+`fcfc98191a3e02b8a105c749353058d5b67cf721`, exactly matching the local Git
+object; no truncation marker is present.
+
+**Exact-head CI history.** Run
+[#176](https://github.com/AdamsOdoo/Adams/actions/runs/31289281269) at
+`23e12d5fb8021114e26cf884170655fe529e24d2` completed with fresh, warm, both
+genuine migrations and both second updates each reporting
+`6 failed, 9 error(s) of 2547 tests`; the nonstandard campaign was green at
+`0 failed, 0 errors of 62 tests`, while browser evidence failed. The artifact
+still bound checkout, connector and source head to the exact commit, verified
+the required base and Odoo pin, recorded a clean worktree, and recorded
+`shopify_operations: none`.
+
+The failures reduced to two implementation/test-contract gaps. First, the new
+business-read gate redundantly compared `job.company_id`, a stored related
+field that can still be awaiting recomputation directly after enqueue; the
+immutable `job.store_id` already establishes the live store and therefore its
+company, which the gate separately checks against the active company scope.
+That false refusal affected the three media-poll cases and both genuine setup
+tours. Second, reconciliation and fulfillment test doubles retained the old
+one-argument callback/read signatures after the production seams became
+job-bound; the same stale fixtures caused the three core reconciliation
+failures and six fulfillment errors. The frozen core sudo inventory also
+needed to acknowledge the new protected acknowledgement compute. These are
+corrected additively; Batch B remains gated until the repair's exact-head
+artifact proves every campaign green.
+
+The first additive repair was exercised by exact-head run
+[#178](https://github.com/AdamsOdoo/Adams/actions/runs/31291885718) at
+`00112598b18571ebfc7a13be59a9413a8c474d5d`. It reduced every standard
+campaign to `2 failed, 3 error(s) of 2548 tests`; the nonstandard campaign was
+green at `0 failed, 0 error(s) of 62 tests`, browser evidence was verified, and
+all exact-head/base/Odoo-pin/worktree/no-Shopify-operation binds passed. The
+three errors and both tours exposed one remaining implementation defect: the
+side lease transaction tried to observe the worker's uncommitted
+`queued -> running` claim. The protected job record now checks that claim in
+the owning transaction, while the independent side transaction continues to
+enforce immutable store ownership, active company scope, purpose, live store
+state, connection generation and the committed call lease.
+
+Run
+[#180](https://github.com/AdamsOdoo/Adams/actions/runs/31294176483) was triggered
+for the second additive repair at
+`145f03a0f782e60da65c3167a7fadf15c5009ec2`, but GitHub terminated the job
+before any step ran and produced no artifact; one explicit failed-jobs rerun
+ended identically. This is retained as infrastructure evidence only and is not
+a product test result. Batch B remains gated on an executable exact-head run.
+
+**Risk-based acknowledgement policy.** The UI status is a projection of
+immutable attempt evidence, not a second workflow state:
+
+| Domain | Direct affirmative response | Readback that may promote to Verified | Fail-closed boundary |
+| --- | --- | --- | --- |
+| Product and media export | `Accepted by Shopify`; never Verified from transport acceptance alone | A job-bound reconciliation query must find the exact connector-owned product/file/reference state. Async media that is still processing remains inconclusive; only terminal usable state can be applied. | Missing, duplicate, malformed, wrong-store, failed or still-processing evidence cannot verify and routes to retry/review/rejection according to the existing strategy. |
+| Inventory | `Accepted by Shopify`; CAS success is not independently relabelled as Verified | A job-bound exact inventory-item/location read must confirm the requested activation or quantity state for the same store identity. | Identity mismatch, changed precondition, malformed pair evidence or an inconclusive read never authorizes another mutation and cannot verify. |
+| Fulfillment | `Accepted by Shopify`; create/update acknowledgement alone is not verification | A job-bound exact fulfillment/tracking read may verify the authored fulfillment, tracking values, or the strategy's exact quantity-decrease proof. | Read absence and concurrent/no-tracking ambiguity remain inconclusive; the post-C2 path never treats absence as `not_applied` or resends, and caps at duplicate-risk review. |
+
+Only `resolution_source = reconciliation_read` with an `applied` disposition
+maps to `Verified in Shopify`; manual resolution remains `Needs attention` for
+acknowledgement purposes and a clean negative read maps to `Rejected` only
+where the registered strategy permits that conclusion.
+
+**Adversarial pass.** The regression set challenges calls made before job
+admission, wrong-purpose jobs, lease release before/after the caller body,
+credential and connection-generation changes, disconnect quiescence, and
+legacy `client.execute()` call sites. A separate acknowledgement suite proves
+that only positive reconciliation can produce “Verified by readback” and that
+manual resolution never claims machine verification.
+
+**Revert boundary.** Revert
+`23e12d5fb8021114e26cf884170655fe529e24d2`. Batch A remains independently
+revertible beneath it.
+
+**Deviations.** No live Shopify or native Odoo.sh campaign was run. CI is
+supporting evidence only and records `shopify_operations: none` when complete.

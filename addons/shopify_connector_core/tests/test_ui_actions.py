@@ -40,7 +40,7 @@ class TestUiActions(TransactionCase):
         vals.update(extra)
         return cls.Store.create(vals)
 
-    def _make_job(self, state):
+    def _make_job(self, state, **extra):
         self.__class__._seq += 1
         vals = {'store_id': self.store.id, 'job_source': 'setup_readiness_check',
                 'job_type': 'core_manual_maintenance', 'state': state,
@@ -49,6 +49,7 @@ class TestUiActions(TransactionCase):
             vals['manual_review_subreason'] = 'ambiguous_match'
         if state in ('succeeded', 'failed_final', 'skipped', 'cancelled'):
             vals['finished_at'] = fields.Datetime.now()
+        vals.update(extra)
         return self.Job.create(vals)
 
     def _make_attempt(self, job, observed_outcome='uncertain'):
@@ -97,6 +98,60 @@ class TestUiActions(TransactionCase):
         job.invalidate_recordset()
         with self.assertRaises(UserError):
             job.with_user(self.admin).action_manual_retry()
+
+    def test_attention_projection_prioritizes_human_owned_cases(self):
+        blocked = self._make_job('blocked_manual_review')
+        final = self._make_job(
+            'failed_final', error_class='shopify_permission_scope_auth'
+        )
+        retryable = self._make_job(
+            'failed_retryable', error_class='mapping_missing'
+        )
+        self.assertGreater(blocked.attention_priority, final.attention_priority)
+        self.assertGreater(final.attention_priority, retryable.attention_priority)
+        self.assertIn('decision', blocked.attention_owner.lower())
+        self.assertIn('Ambiguous Match', blocked.attention_reason)
+        self.assertIn('Retry', retryable.attention_next_action)
+
+    def test_attention_case_routes_mutation_evidence_to_the_exact_attempt(self):
+        job = self._make_job('blocked_manual_review')
+        attempt = self._make_attempt(job)
+        action = job.with_user(self.admin).action_open_attention_case()
+        self.assertEqual(action['res_model'], attempt._name)
+        self.assertEqual(action['res_id'], attempt.id)
+        self.assertEqual(action['view_mode'], 'form')
+
+    def test_attention_case_routes_a_business_target_without_sudo(self):
+        job = self._make_job(
+            'failed_retryable',
+            error_class='odoo_validation_configuration',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        action = job.with_user(self.admin).action_open_attention_case()
+        self.assertEqual(action['res_model'], self.store._name)
+        self.assertEqual(action['res_id'], self.store.id)
+        self.assertEqual(action['view_mode'], 'form')
+
+    def test_runs_and_attention_actions_have_distinct_populations(self):
+        runs = self.env.ref(
+            'shopify_connector_core.action_shopify_connector_sync_center'
+        )
+        attention = self.env.ref(
+            'shopify_connector_core.action_shopify_connector_error_center'
+        )
+        self.assertEqual(
+            eval(runs.domain or '[]'), [],  # noqa: S307 -- static XML literal
+            'Runs & Recovery must show every run.',
+        )
+        self.assertEqual(
+            eval(attention.domain),  # noqa: S307 -- static XML literal
+            [(
+                'state', 'in',
+                ('blocked_manual_review', 'failed_final', 'failed_retryable'),
+            )],
+        )
+        self.assertNotIn('retry_waiting', attention.domain)
 
     # ------------------------------------------------------------------ #
     #  cancel wizard

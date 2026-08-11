@@ -628,5 +628,5 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
         return self._check_result(
             code, self.WARNING, self.RESULT_FAIL,
             'No sync features are enabled. This store will connect without '
-            'syncing. You can enable features later from Store Settings.',
+            'syncing. You can enable features later from Sync Rules.',
         )

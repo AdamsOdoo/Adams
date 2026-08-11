@@ -21,31 +21,49 @@ import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
 import { ShopifyConnectorSetupWizard } from "@shopify_connector_core/js/shopify_connector_setup_wizard";
 
 const STEPS = [
-    ["welcome", "Welcome"],
-    ["identity", "Store identity"],
-    ["credential", "Credentials"],
-    ["scopes", "Permissions"],
-    ["test_connection", "Test connection"],
-    ["directions", "What to sync"],
-    ["location_mapping", "Location mapping"],
-    ["source_of_truth", "Source of truth"],
-    ["notification", "Customer notifications"],
-    ["first_push", "First stock push"],
-    ["final_readiness", "Final readiness"],
-    ["review", "Review and activate"],
+    ["welcome", "Welcome", "connect", "Connect", 1],
+    ["identity", "Store identity", "connect", "Connect", 1],
+    ["credential", "Credentials", "connect", "Connect", 1],
+    ["scopes", "Permissions", "connect", "Connect", 1],
+    ["test_connection", "Test connection", "connect", "Connect", 1],
+    ["directions", "What to sync", "choose", "Choose", 2],
+    ["location_mapping", "Location mapping", "map", "Map", 3],
+    ["source_of_truth", "Source of truth", "protect", "Protect", 4],
+    ["notification", "Customer notifications", "protect", "Protect", 4],
+    ["first_push", "First stock push", "protect", "Protect", 4],
+    ["final_readiness", "Final readiness", "verify", "Verify", 5],
+    ["review", "Review and activate", "verify", "Verify", 5],
+];
+
+const PHASES = [
+    ["connect", "Connect"],
+    ["choose", "Choose"],
+    ["map", "Map"],
+    ["protect", "Protect"],
+    ["verify", "Verify"],
 ];
 
 function payload(overrides = {}) {
     return Object.assign(
         {
-            steps: STEPS.map(([key, label], index) => ({
+            steps: STEPS.map(([key, label, phaseKey, phaseLabel, phaseIndex], index) => ({
                 index: index + 1,
                 key,
                 label,
+                phase_key: phaseKey,
+                phase_label: phaseLabel,
+                phase_index: phaseIndex,
                 applicable: true,
                 skipped_reason: "",
             })),
             step_count: STEPS.length,
+            phases: PHASES.map(([key, label], index) => ({
+                index: index + 1,
+                key,
+                label,
+                step_keys: STEPS.filter((step) => step[2] === key).map((step) => step[0]),
+            })),
+            phase_count: PHASES.length,
             resume_step_key: "welcome",
             resume_step: 1,
             store: {
@@ -161,6 +179,18 @@ describe("shopify connector setup wizard", () => {
             el.textContent.trim()
         );
         expect(labels).toEqual(STEPS.map(([, label]) => label));
+    });
+
+    test("groups the unchanged twelve steps into the five merchant phases", async () => {
+        mockOrm(() => payload());
+        await mount();
+        const phases = queryAll(".sc_setup_phase__label").map((el) =>
+            el.textContent.trim()
+        );
+        expect(phases).toEqual(PHASES.map(([, label]) => label));
+        expect(queryAll(".sc_setup_phase")).toHaveLength(5);
+        expect(queryAll(".sc_setup_step")).toHaveLength(12);
+        expect(queryText(".sc_setup__heading")).toInclude("Phase 1 of 5");
     });
 
     test("the heading states the step number and the total", async () => {

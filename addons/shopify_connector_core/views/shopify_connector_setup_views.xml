@@ -29,21 +29,16 @@
     </record>
 
     <!--
-        Entry route 2 of 3: Configuration -> Setup Wizard.
+        Entry route 2 of 3: Configuration -> Stores & Onboarding -> Setup
+        Wizard.
 
-        Configuration is a new branch under the existing connector root rather
-        than a new app. It is Administrator-gated in full, because everything
-        that will ever live under it is an administrator's job.
+        Configuration is the Administrator-only pillar under the existing
+        connector root. Onboarding sits with store management rather than as a
+        parallel configuration concept.
     -->
-    <menuitem id="menu_shopify_connector_configuration"
-              name="Configuration"
-              parent="menu_shopify_connector_root"
-              sequence="90"
-              groups="shopify_connector_core.group_shopify_connector_admin"/>
-
     <menuitem id="menu_shopify_connector_setup_wizard"
               name="Setup Wizard"
-              parent="menu_shopify_connector_configuration"
+              parent="menu_shopify_connector_stores"
               action="action_shopify_connector_setup_wizard"
               sequence="10"/>
 

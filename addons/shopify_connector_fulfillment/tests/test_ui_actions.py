@@ -82,6 +82,32 @@ class TestUiActions(TransactionCase):
         )
         self.assertTrue(buttons[0].get('confirm'))
 
+    def test_mode_panel_names_every_c6_fact_and_discloses_remote_read(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_store_settings_fulfillment_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        expected_labels = {
+            'fulfillment_operating_mode': 'Effective mode',
+            'fulfillment_requested_mode': 'Requested mode',
+            'fulfillment_mode_switch_state': 'Scan state',
+            'fulfillment_mode_switch_job_id': 'Transition run',
+            'fulfillment_mode_switch_failure_reason': 'Blocker or reason',
+            'fulfillment_mode_switch_next_action': 'Next action',
+            'fulfillment_mode_switch_verified_at': 'Last verified',
+        }
+        for field_name, label in expected_labels.items():
+            nodes = arch.xpath("//field[@name='%s']" % field_name)
+            self.assertTrue(nodes, field_name)
+            self.assertTrue(
+                any(node.get('string') == label for node in nodes),
+                '%s must render as %s' % (field_name, label),
+            )
+        text = ' '.join(arch.itertext())
+        self.assertIn('Queues a Shopify reconciliation read', text)
+        self.assertIn('does not change the effective mode immediately', text)
+
     def test_all_u1_act_windows_resolve_to_an_existing_model(self):
         for xmlid in (
             'action_shopify_connector_fulfillment_review',

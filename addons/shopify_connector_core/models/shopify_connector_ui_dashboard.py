@@ -6,9 +6,8 @@
 # operational dashboard Owl client action (see
 # static/src/js/shopify_connector_dashboard.js). It is deliberately an
 # ``AbstractModel`` -- it owns no table, no ACL row, and no persistent state.
-# It exposes exactly one public RPC entrypoint, :meth:`get_dashboard_data`,
-# which returns a single JSON-serialisable dict describing the current
-# operator situation.
+# It exposes bounded compatibility, sales, and operational-health projections;
+# each returns a JSON-serialisable dict and never performs a Shopify call.
 #
 # Hard guarantees this service upholds (enforced by test_ui_dashboard.py,
 # test_ui_performance.py and test_ui_source_guards.py):
@@ -182,6 +181,57 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         payload['critical'] = self._store_360_critical(ctx, payload)
         return payload
 
+    @api.model
+    def get_sales_dashboard_data(self, store_id=False, period='30d'):
+        """Return only the merchant sales projection.
+
+        C7 deliberately separates sales reporting from connector health. The
+        owning sale module still contributes the bounded, rule-faithful
+        commercial/lifecycle reads through ``_store_360_extra_sections``;
+        this method selects only those sales sections and never computes or
+        returns queue, attempt, throttle, mapping, or mode-switch aggregates.
+        """
+        self._ensure_dashboard_user()
+        period = self._store_360_validate_period(period)
+        stores = self.env['shopify.connector.store'].search([], order='id')
+        store = self._store_360_validate_store(store_id, stores)
+        ctx = {
+            'store': store,
+            'stores': stores,
+            'period': period,
+            'window': self._store_360_window(period),
+        }
+        contributed = self._store_360_extra_sections(ctx)
+        sales_keys = ('commercial', 'bridge', 'lifecycle', 'dispatch')
+        payload = {
+            'meta': self._store_360_meta(ctx),
+            'refresh_interval_seconds': 30,
+            'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
+        }
+        payload.update({
+            key: contributed[key]
+            for key in sales_keys
+            if key in contributed
+        })
+        payload.setdefault(
+            'commercial', {'available': False, 'reason': 'module_unavailable'}
+        )
+        payload.setdefault(
+            'lifecycle', {'available': False, 'reason': 'module_unavailable'}
+        )
+        payload['critical'] = self._store_360_critical(ctx, payload)
+        return payload
+
+    @api.model
+    def _ensure_dashboard_user(self):
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_auditor'
+        ):
+            raise AccessError(_(
+                "The Shopify Connector dashboard is only available to "
+                "connector users."
+            ))
+
     # -- validation (server-side, fixed registries only) ------------------
     @api.model
     def _store_360_validate_period(self, period):
@@ -350,7 +400,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': [['id', '=', row['id']]],
-                    'name': _("Job"),
+                    'name': _("Run"),
                 },
             }
             for row in rows
@@ -367,7 +417,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'id': 'blocked_manual_review',
                 'severity': 'danger',
                 'icon': 'fa-hand-paper-o',
-                'title': _("Jobs waiting on a review decision"),
+                'title': _("Runs waiting on a review decision"),
                 'count': jobs['blocked_manual_review'],
                 'why': _("A reviewer needs to decide how these proceed."),
                 'owner': _("Reviewer"),
@@ -375,7 +425,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                     'res_model': 'shopify.connector.job',
                     'domain': term_json + [
                         ['state', '=', 'blocked_manual_review']],
-                    'name': _("Jobs waiting on a review decision"),
+                    'name': _("Runs waiting on a review decision"),
                 },
             },
             {
@@ -399,7 +449,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'id': 'failed_final',
                 'severity': 'danger',
                 'icon': 'fa-exclamation-triangle',
-                'title': _("Jobs that stopped after repeated failures"),
+                'title': _("Runs that stopped after repeated failures"),
                 'count': jobs['failed_final'],
                 'why': _("These stopped retrying — review the reason to get "
                          "them moving again."),
@@ -407,21 +457,21 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': term_json + [['state', '=', 'failed_final']],
-                    'name': _("Jobs that stopped after repeated failures"),
+                    'name': _("Runs that stopped after repeated failures"),
                 },
             },
             {
                 'id': 'failed_retryable',
                 'severity': 'danger',
                 'icon': 'fa-exclamation-triangle',
-                'title': _("Jobs that need a fix before retrying"),
+                'title': _("Runs that need a fix before retrying"),
                 'count': jobs['failed_retryable'],
                 'why': _("These are paused for a manual fix, then a retry."),
                 'owner': _("Operator"),
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': term_json + [['state', '=', 'failed_retryable']],
-                    'name': _("Jobs that need a fix before retrying"),
+                    'name': _("Runs that need a fix before retrying"),
                 },
             },
         ]
@@ -535,8 +585,14 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                                      'blocked_manual_review'))],
             groupby=['job_type'], aggregates=['__count'],
         )
+        success_rows = Job._read_group(
+            term + [('state', '=', 'succeeded'),
+                    ('finished_at', '!=', False)],
+            groupby=['job_type'], aggregates=['finished_at:max'],
+        )
         backlog = {}
         failures = {}
+        successes = {}
         for job_type, count in backlog_rows:
             family = self._flow_family_of(job_type)
             if family:
@@ -545,6 +601,13 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             family = self._flow_family_of(job_type)
             if family:
                 failures[family] = failures.get(family, 0) + count
+        for job_type, finished_at in success_rows:
+            family = self._flow_family_of(job_type)
+            if family and (
+                not successes.get(family)
+                or finished_at > successes[family]
+            ):
+                successes[family] = finished_at
 
         settings = self.env['shopify.connector.store.settings']
         row = settings.search(
@@ -576,18 +639,26 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         for family in ('orders', 'catalog', 'inventory', 'export',
                        'fulfillment'):
             anchor = anchors.get(family)
+            success = successes.get(family)
+            if success and (
+                not anchor
+                or success > fields.Datetime.from_string(anchor)
+            ):
+                anchor = fields.Datetime.to_string(success)
+            failures_count = failures.get(family, 0)
+            backlog_count = backlog.get(family, 0)
             rows.append({
                 'id': family,
                 'label': labels[family],
-                'backlog': backlog.get(family, 0),
-                'failures': failures.get(family, 0),
+                'backlog': backlog_count,
+                'failures': failures_count,
                 'last_success': anchor,
                 'last_success_relative': self._relative_time(
                     fields.Datetime.from_string(anchor), now,
                 ) if anchor else False,
-                'tone': 'danger' if failures.get(family, 0)
-                        else ('info' if backlog.get(family, 0)
-                              else 'neutral'),
+                'tone': 'danger' if failures_count
+                        else ('info' if backlog_count
+                              else ('healthy' if anchor else 'unknown')),
             })
         return rows
 
@@ -666,7 +737,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                     'domain': [['state', 'in',
                                 ['failed_retryable', 'failed_final',
                                  'blocked_manual_review']]],
-                    'name': _("Error & Review Center"),
+                    'name': _("Needs Attention"),
                 },
             })
         return {
@@ -811,14 +882,14 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'id': 'blocked_manual_review',
                 'severity': 'danger',
                 'icon': 'fa-hand-paper-o',
-                'title': _("Jobs waiting on a review decision"),
+                'title': _("Runs waiting on a review decision"),
                 'count': jobs['blocked_manual_review'],
                 'why': _("A reviewer needs to decide how these proceed."),
                 'owner': _("Reviewer"),
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': [('state', '=', 'blocked_manual_review')],
-                    'name': _("Jobs waiting on a review decision"),
+                    'name': _("Runs waiting on a review decision"),
                 },
             },
             {
@@ -839,28 +910,28 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'id': 'failed_final',
                 'severity': 'danger',
                 'icon': 'fa-exclamation-triangle',
-                'title': _("Jobs that stopped after repeated failures"),
+                'title': _("Runs that stopped after repeated failures"),
                 'count': jobs['failed_final'],
                 'why': _("These stopped retrying — review the reason to get them moving again."),
                 'owner': _("Operator"),
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': [('state', '=', 'failed_final')],
-                    'name': _("Jobs that stopped after repeated failures"),
+                    'name': _("Runs that stopped after repeated failures"),
                 },
             },
             {
                 'id': 'failed_retryable',
                 'severity': 'danger',
                 'icon': 'fa-exclamation-triangle',
-                'title': _("Jobs that need a fix before retrying"),
+                'title': _("Runs that need a fix before retrying"),
                 'count': jobs['failed_retryable'],
                 'why': _("These are paused for a manual fix, then a retry."),
                 'owner': _("Operator"),
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': [('state', '=', 'failed_retryable')],
-                    'name': _("Jobs that need a fix before retrying"),
+                    'name': _("Runs that need a fix before retrying"),
                 },
             },
             {
@@ -1010,11 +1081,11 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             'core_readiness_check': _("Readiness check"),
             'core_manual_maintenance': _("Maintenance"),
             'core_test_connection': _("Connection test"),
-            'historic_domain_job': _("Sync job"),
+            'historic_domain_job': _("Sync run"),
             'core_dispatch_selftest': _("Dispatch self-test"),
             'mutation_dispatch_selftest': _("Change self-test"),
             'mutation_dispatch_selftest_reconcile': _("Change reconciliation"),
-        }.get(job_type, _("Sync job"))
+        }.get(job_type, _("Sync run"))
 
     def _job_source_label(self, job_source):
         return {

@@ -117,15 +117,17 @@
                     <!--
                         The wizard stays as the second route rather than being
                         replaced. It is the surface that works with JavaScript
-                        assets unavailable, and removing a working confirmation
-                        path to make a nicer one the only one would be a
-                        downgrade for anyone who lands there.
+                        assets unavailable. Because that fallback cannot offer
+                        the primary Owl review interaction, the signed product
+                        default restricts it to Administrators. The wizard still
+                        embeds the complete executable/refused/untouched diff,
+                        and its server action audits the fallback route.
                     -->
                     <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
                             type="action" string="Confirm without the review screen"
                             class="btn-secondary"
                             invisible="state != 'previewed'"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             context="{'default_preview_id': id}"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="previewed,confirmed,applying,applied"/>
@@ -224,7 +226,7 @@
         <field name="name">shopify.connector.product.media.binding.search</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <search string="Exported Media">
+            <search string="Media Exports">
                 <field name="connector_filename"/>
                 <field name="shopify_gid"/>
                 <field name="product_template_binding_id"/>
@@ -251,7 +253,7 @@
         <field name="name">shopify.connector.product.media.binding.list</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <list string="Exported Media" create="false" delete="false">
+            <list string="Media Exports" create="false" delete="false">
                 <field name="connector_filename"/>
                 <field name="media_role"/>
                 <field name="product_template_binding_id" optional="show"/>
@@ -273,7 +275,7 @@
         <field name="name">shopify.connector.product.media.binding.form</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <form string="Exported Media" create="false" delete="false">
+            <form string="Media Export" create="false" delete="false">
                 <header>
                     <!--
                         TD-011. The one production route to the resume
@@ -344,7 +346,7 @@
 
     <record id="action_shopify_connector_product_media_binding"
             model="ir.actions.act_window">
-        <field name="name">Exported Media</field>
+        <field name="name">Media Exports</field>
         <field name="res_model">shopify.connector.product.media.binding</field>
         <field name="view_mode">list,form</field>
         <!--
@@ -605,7 +607,7 @@
                       (0, 0, {'view_mode': 'form', 'sequence': 20,
                               'view_id': ref('view_shopify_connector_store_settings_form_export')})]"/>
         <field name="group_ids"
-               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+               eval="[(6, 0, [ref('shopify_connector_core.group_shopify_connector_admin')])]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No store is configured yet.

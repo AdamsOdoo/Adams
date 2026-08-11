@@ -26,6 +26,8 @@ from odoo.tests.common import TransactionCase, tagged
 class TestUiU2Sale(TransactionCase):
 
     MENUS = (
+        'menu_shopify_connector_sales_dashboard',
+        'menu_shopify_connector_sales_analysis',
         'menu_shopify_connector_orders',
         'menu_shopify_connector_order_workspace',
         'menu_shopify_connector_cod_reconciliation',
@@ -92,8 +94,8 @@ class TestUiU2Sale(TransactionCase):
                 'shopify_connector_sale.%s is missing' % name,
             )
 
-    def test_customer_matching_lives_under_the_catalog_branch(self):
-        """One matching home, not a second one under Orders."""
+    def test_customer_mappings_live_under_configuration_mappings(self):
+        """Durable mapping tables are configuration, not operations."""
         menu = self.env.ref(
             'shopify_connector_sale.menu_shopify_connector_customer_binding'
         )
@@ -103,6 +105,59 @@ class TestUiU2Sale(TransactionCase):
                 'shopify_connector_product.menu_shopify_connector_catalog'
             ),
         )
+        self.assertEqual(menu.name, 'Customer Mappings')
+        self.assertEqual(
+            menu.group_ids,
+            self.env.ref(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+        )
+
+    def test_sales_destinations_join_the_signed_pillars(self):
+        self.assertEqual(
+            self.env.ref(
+                'shopify_connector_sale.menu_shopify_connector_orders'
+            ).parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_operations'
+            ),
+        )
+        self.assertEqual(
+            self.env.ref(
+                'shopify_connector_sale.menu_shopify_connector_sales_dashboard'
+            ).parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_dashboard'
+            ),
+        )
+        self.assertEqual(
+            self.env.ref(
+                'shopify_connector_sale.menu_shopify_connector_sales_analysis'
+            ).parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_reporting'
+            ),
+        )
+        self.assertFalse(
+            self.env.ref(
+                'shopify_connector_sale.menu_shopify_connector_order_workspace'
+            ).active,
+            'Orders opens its workspace directly; the former duplicate leaf '
+            'must stay out of navigation.',
+        )
+
+    def test_sale_mapping_actions_are_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        for xmlid in (
+            'action_shopify_connector_customer_binding',
+            'action_shopify_connector_tax_mapping',
+        ):
+            self.assertEqual(
+                self.env.ref('shopify_connector_sale.%s' % xmlid).group_ids,
+                admin,
+            )
 
     # ------------------------------------------------------------------
     # The dimensions stay separate

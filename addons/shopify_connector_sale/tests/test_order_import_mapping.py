@@ -389,7 +389,11 @@ class TestOrderImportMappingStatic(TransactionCase):
         # and the 19.0.2.9.0 backfill migration -- a genuine schema change
         # with a genuine migration script, so the version moves a minor
         # step. Recorded here rather than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.9.0')
+        # The UI-restructure release adds the supported-kernel order
+        # capability statement, review-aware Sales Dashboard aggregation,
+        # and the split navigation/reporting surfaces. Loaded metadata and
+        # production behavior changed together, so the manifest advances.
+        self.assertEqual(manifest['version'], '19.0.2.10.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

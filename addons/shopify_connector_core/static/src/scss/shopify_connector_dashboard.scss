@@ -498,6 +498,9 @@
         .sc-exception__main { flex: 1 1 100%; }
         .sc-exception > .sc-btn { margin-inline-start: 0; flex: 0 0 auto; }
         .sc360-period__btn { flex: 1 1 auto; }
-        .sc360-table-wrap, .sc360-chart-table { overflow-x: auto; }
+        .sc360-table, .sc360-table-wrap, .sc360-chart-table {
+            display: block;
+            overflow-x: auto;
+        }
     }
 }

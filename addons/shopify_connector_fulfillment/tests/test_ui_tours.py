@@ -90,14 +90,38 @@ class TestUiTours(TransactionCase):
             self.assertTrue(menu.action, '%s has no action' % xmlid)
             self.assertIn(menu.action.res_model, self.env)
 
-    def test_the_fulfillment_branch_hangs_off_the_existing_u0_root(self):
+    def test_the_fulfillment_branch_is_an_operations_destination(self):
         branch = self.env.ref(
             'shopify_connector_fulfillment.menu_shopify_connector_fulfillment')
         self.assertEqual(
             branch.parent_id,
-            self.env.ref('shopify_connector_core.menu_shopify_connector_root'),
-            'U1 must not create a second connector app menu.',
+            self.env.ref('shopify_connector_core.menu_shopify_connector_operations'),
+            'Fulfillment must live under Operations.',
         )
+        self.assertEqual(
+            branch.action,
+            self.env.ref(
+                'shopify_connector_fulfillment.'
+                'action_shopify_connector_fulfillment_binding'
+            ),
+        )
+
+    def test_fulfillment_settings_are_administrator_configuration(self):
+        menu = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'menu_shopify_connector_fulfillment_settings'
+        )
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        self.assertEqual(
+            menu.parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_configuration'
+            ),
+        )
+        self.assertEqual(menu.group_ids, admin)
+        self.assertEqual(menu.action.group_ids, admin)
 
     def test_list_views_are_read_only_surfaces(self):
         """U1 never edits a record inline; every change goes through a

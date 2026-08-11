@@ -79,22 +79,31 @@ class TestUiU2Product(TransactionCase):
                 'shopify_connector_product.%s is missing' % name,
             )
 
-    def test_branch_hangs_off_the_existing_u0_root(self):
-        """One connector app, not a second one."""
+    def test_branch_is_administrator_configuration(self):
+        """Durable mappings are not routine operations navigation."""
         branch = self.env.ref(
             'shopify_connector_product.menu_shopify_connector_catalog'
         )
         self.assertEqual(
             branch.parent_id,
-            self.env.ref('shopify_connector_core.menu_shopify_connector_root'),
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_configuration'
+            ),
+        )
+        self.assertEqual(branch.name, 'Mappings')
+        self.assertEqual(
+            branch.group_ids,
+            self.env.ref(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
         )
 
     def test_branch_sequence_does_not_collide_with_a_sibling(self):
         """A duplicate sequence makes menu order undefined.
 
         This is a real defect this suite caught during development: the
-        Inventory branch was first placed at 30, the same sequence U0 gave
-        Sync Center, so their rendered order depended on insertion id.
+        The signed IA has exactly four top-level pillars with deterministic
+        order.
         """
         root = self.env.ref(
             'shopify_connector_core.menu_shopify_connector_root'
@@ -114,6 +123,14 @@ class TestUiU2Product(TransactionCase):
                 menu.action or menu.child_id,
                 '%s is a dead menu entry' % name,
             )
+
+    def test_mapping_actions_are_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        for name in self.ACTIONS:
+            action = self.env.ref('shopify_connector_product.%s' % name)
+            self.assertEqual(action.group_ids, admin)
 
     # ------------------------------------------------------------------
     # Wiring

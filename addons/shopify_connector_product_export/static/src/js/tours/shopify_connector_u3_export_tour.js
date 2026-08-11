@@ -4,10 +4,9 @@
 // Browser tours for the U3 export surfaces, driven by HttpCase.start_tour (see
 // tests/test_u3_export_tours.py).
 //
-// The navigation tour is the automated acceptance: it walks the whole Export
-// branch and asserts every U3 surface renders for a connector user. It needs
-// no seeded Shopify state, so it runs in the ordinary suite rather than only
-// in a driven runtime campaign.
+// The navigation tour checks the C1 split: export monitoring in Operations,
+// settings in Administrator-only Configuration, and diagnostics/recovery out
+// of navigation. It needs no seeded Shopify state.
 //
 // The review tour opens the Owl diff surface on a seeded preview and asserts
 // the three things that make it safe: the refusals are on screen, the tag
@@ -28,7 +27,7 @@ const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]
 const menu = (xmlid) =>
     `[data-menu-xmlid="shopify_connector_product_export.${xmlid}"]`;
 
-// --- 1. Navigation: every U3 export surface renders. ---
+// --- 1. Navigation: operations plus Administrator configuration. ---
 registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", {
     url: "/odoo",
     steps: () => [
@@ -45,12 +44,12 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", 
         },
         {
             trigger: menu("menu_shopify_connector_product_export"),
-            content: "Open the Export branch.",
+            content: "Open Product Imports/Exports.",
             run: "click",
         },
         {
             trigger: menu("menu_shopify_connector_product_export_preview"),
-            content: "Export Previews.",
+            content: "Product Export Reviews.",
             run: "click",
         },
         {
@@ -59,33 +58,21 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", 
         },
         {
             trigger: menu("menu_shopify_connector_product_export"),
-            content: "Re-open the Export branch — the dropdown collapses on navigation.",
+            content: "Re-open Product Imports/Exports.",
             run: "click",
         },
         {
             trigger: menu("menu_shopify_connector_product_export_media"),
-            content: "Exported Media.",
+            content: "Media Exports.",
             run: "click",
         },
         {
             trigger: ".o_list_view",
-            content: "The exported-media registry renders.",
+            content: "The media export registry renders.",
         },
         {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_backfill"),
-            content: "Reconnect and Backfill.",
-            run: "click",
-        },
-        {
-            trigger: ".o_list_view",
-            content: "The reconnect/backfill catch-up surface renders.",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
+            trigger: coreMenu("menu_shopify_connector_configuration"),
+            content: "Open Configuration.",
             run: "click",
         },
         {
@@ -96,21 +83,6 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", 
         {
             trigger: ".o_list_view",
             content: "The per-store export settings render.",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_diagnostics"),
-            content: "Export Diagnostics.",
-            run: "click",
-        },
-        {
-            trigger: ".o_list_view, .o_nocontent_help",
-            content:
-                "Diagnostics renders — either rows that need a decision, or the " +
-                "empty state that says nothing does.",
         },
     ],
 });

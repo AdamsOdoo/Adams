@@ -184,9 +184,11 @@
 
     <record id="action_shopify_connector_location_mapping"
             model="ir.actions.act_window">
-        <field name="name">Location Mapping</field>
+        <field name="name">Location Mappings</field>
         <field name="res_model">shopify.connector.location.mapping</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="search_view_id"
                ref="view_shopify_connector_location_mapping_search"/>
         <field name="help" type="html">
@@ -196,8 +198,8 @@
             <p>
                 Start with <b>Refresh Shopify Locations</b> to read this
                 store's location list, then <b>Map a Shopify Location</b> to
-                pair one with an Odoo location. Both are in the Inventory
-                menu beside this one.
+                pair one with an Odoo location. Both are in Configuration,
+                under Mappings.
             </p>
             <p>
                 Until a pair exists, inventory for that Shopify location stays
@@ -487,9 +489,11 @@
 
     <record id="action_shopify_connector_inventory_first_push"
             model="ir.actions.act_window">
-        <field name="name">First-Push Guard</field>
+        <field name="name">Inventory Safeguards</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <!--
             BOTH waiting states. Scoping this queue to `pending` alone meant
             the guard listed only rows whose confirm control is not yet

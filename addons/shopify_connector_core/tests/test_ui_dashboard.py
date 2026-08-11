@@ -261,3 +261,79 @@ class TestUiDashboard(TransactionCase):
         self.assertTrue(payload['critical']['active'])
         causes = {cause['id'] for cause in payload['critical']['causes']}
         self.assertIn('store_state', causes)
+
+    # ------------------------------------------------------------------ #
+    #  C7 split dashboards
+    # ------------------------------------------------------------------ #
+    def test_split_payloads_never_mix_sales_and_health(self):
+        store = self._make_store()
+        sales = self.Dashboard.get_sales_dashboard_data(store.id, '30d')
+        health = self.Dashboard.get_connector_health_data(store.id)
+
+        self.assertIn('commercial', sales)
+        for forbidden in (
+            'health', 'flows', 'stores_region', 'throttle', 'mappings',
+            'reconciliation', 'mode_switch',
+        ):
+            self.assertNotIn(forbidden, sales)
+
+        for key in (
+            'health', 'flows', 'stores_region', 'throttle', 'mappings',
+            'reconciliation', 'mode_switch',
+        ):
+            self.assertIn(key, health)
+        for forbidden in ('commercial', 'bridge', 'lifecycle', 'dispatch'):
+            self.assertNotIn(forbidden, health)
+
+    def test_health_all_stores_never_hides_a_failing_store(self):
+        healthy = self._make_store()
+        failing = self._make_store()
+        self._make_job(healthy, 'succeeded')
+        self._make_job(failing, 'failed_final')
+        payload = self.Dashboard.get_connector_health_data(False)
+        rows = {row['id']: row for row in payload['stores_region']['rows']}
+        self.assertEqual(set(rows), {healthy.id, failing.id})
+        self.assertEqual(rows[failing.id]['tone'], 'attention')
+        self.assertEqual(payload['stores_region']['summary']['attention'], 1)
+
+    def test_health_missing_evidence_is_unknown_not_healthy(self):
+        store = self._make_store()
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        self.assertEqual(
+            payload['stores_region']['rows'][0]['tone'], 'unknown',
+        )
+        self.assertTrue(all(
+            row['tone'] == 'unknown' for row in payload['flows']
+        ))
+        self.assertTrue(all(
+            row['state'] in ('observed', 'unknown')
+            for row in payload['mappings']['rows']
+        ))
+        self.assertTrue(any(
+            row['state'] == 'unknown'
+            for row in payload['mappings']['rows']
+        ))
+
+    def test_health_projects_throttle_headroom_with_observation_time(self):
+        store = self._make_store()
+        store._record_throttle_status({
+            'currentlyAvailable': 100,
+            'maximumAvailable': 1000,
+            'restoreRate': 0,
+        })
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['throttle']['rows'][0]
+        self.assertEqual(row['store_id'], store.id)
+        self.assertAlmostEqual(row['headroom_ratio'], 0.1)
+        self.assertEqual(row['tone'], 'danger')
+        self.assertTrue(row['observed_at'])
+
+    def test_split_dashboards_refuse_non_connector_user(self):
+        user = new_test_user(
+            self.env, login='u0_split_outsider', groups='base.group_user'
+        )
+        dashboard = self.Dashboard.with_user(user)
+        with self.assertRaises(AccessError):
+            dashboard.get_sales_dashboard_data()
+        with self.assertRaises(AccessError):
+            dashboard.get_connector_health_data()

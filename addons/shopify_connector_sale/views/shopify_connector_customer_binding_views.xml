@@ -153,9 +153,11 @@
 
     <record id="action_shopify_connector_customer_binding"
             model="ir.actions.act_window">
-        <field name="name">Customer Matching</field>
+        <field name="name">Customer Mappings</field>
         <field name="res_model">shopify.connector.customer.binding</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="search_view_id"
                ref="view_shopify_connector_customer_binding_search"/>
         <field name="help" type="html">
