@@ -26,16 +26,26 @@ const REVIEW_BUTTON = ".o_form_view button:contains('Review Export')";
 const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 const menu = (xmlid) =>
     `[data-menu-xmlid="shopify_connector_product_export.${xmlid}"]`;
+const topMenu = {
+    Operations: coreMenu("menu_shopify_connector_operations"),
+    Configuration: coreMenu("menu_shopify_connector_configuration"),
+};
 
 const openPath = (labels, content = "") => ({
-    trigger: ".o_menu_sections",
+    trigger: topMenu[labels[0]] || ".o_menu_sections",
     content,
     async run() {
         for (const label of labels) {
-            const entry = [...document.querySelectorAll(
-                ".o_menu_sections a, .o_menu_sections button, " +
-                ".o-dropdown--menu a, .o-dropdown--menu button"
+            const topEntry = [...document.querySelectorAll(
+                topMenu[label] || "__missing__"
+            )].find((candidate) => candidate.getClientRects().length);
+            const textNode = [...document.querySelectorAll(
+                ".o_menu_sections *, .o-dropdown--menu *"
             )].find((candidate) => candidate.textContent.trim() === label);
+            const entry = topEntry || (textNode && (
+                textNode.closest("a, button, [role='menuitem'], [data-menu-xmlid]")
+                || textNode
+            ));
             if (!entry) {
                 throw new Error(`${label} is absent from the operator menu tree`);
             }
@@ -261,7 +271,7 @@ registry.category("web_tour.tours").add("shopify_connector_u3_checksum_ack_tour"
             content: "Open the Shopify Connector app.",
             run: "click",
         },
-        openPath(["Configuration", "Stores & Onboarding"],
+        openPath(["Configuration", "Stores"],
             "Stores — the store owns the reconciliation surface."
         ),
         {

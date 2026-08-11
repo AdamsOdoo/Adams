@@ -11,13 +11,21 @@ import { registry } from "@web/core/registry";
 import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
+const topMenu = {
+    Dashboard: menu("menu_shopify_connector_dashboard"),
+    Operations: menu("menu_shopify_connector_operations"),
+    Reporting: menu("menu_shopify_connector_reporting"),
+};
 
 const openPath = (labels, content) => ({
-    trigger: ".o_menu_sections",
+    trigger: topMenu[labels[0]] || ".o_menu_sections",
     content,
     async run() {
         for (const label of labels) {
-            const entry = [...document.querySelectorAll(
+            const topEntry = [...document.querySelectorAll(
+                topMenu[label] || "__missing__"
+            )].find((candidate) => candidate.getClientRects().length);
+            const entry = topEntry || [...document.querySelectorAll(
                 ".o_menu_sections a, .o_menu_sections button, " +
                 ".o-dropdown--menu a, .o-dropdown--menu button"
             )].find((candidate) => candidate.textContent.trim() === label);

@@ -84,4 +84,15 @@
               action="action_shopify_connector_store"
               sequence="10"
               groups="shopify_connector_core.group_shopify_connector_admin"/>
+
+    <!-- Odoo renders a menu that has children as a non-clickable section
+         heading, even when that parent carries an action. Keep the stable
+         parent ID above, and expose its store-list action as a real child so
+         Stores & Onboarding is an operable route rather than a label. -->
+    <menuitem id="menu_shopify_connector_store_records"
+              name="Stores"
+              parent="menu_shopify_connector_stores"
+              action="action_shopify_connector_store"
+              sequence="5"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
 </odoo>

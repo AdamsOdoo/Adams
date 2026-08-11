@@ -260,7 +260,7 @@ tours.add("shopify_connector_b2_store360_drilldown_tour", {
             content: "The Shopify-source timestamp renders distinctly from the page timestamp.",
         },
         {
-            trigger: ".o_sc_dashboard .sc360-kpi[data-kpi='orders']",
+            trigger: ".o_sc_dashboard button.sc360-kpi--action:contains('Imported orders')",
             content: "Open the imported-orders drill-down.",
             run: "click",
         },

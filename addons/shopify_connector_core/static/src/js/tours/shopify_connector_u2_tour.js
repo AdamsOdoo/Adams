@@ -25,16 +25,26 @@ import { stepUtils } from "@web_tour/tour_utils";
 
 const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 const menu = (module, xmlid) => `[data-menu-xmlid="${module}.${xmlid}"]`;
+const topMenu = {
+    Operations: coreMenu("menu_shopify_connector_operations"),
+    Configuration: coreMenu("menu_shopify_connector_configuration"),
+};
 
 const openPath = (labels, content) => ({
-    trigger: ".o_menu_sections",
+    trigger: topMenu[labels[0]] || ".o_menu_sections",
     content,
     async run() {
         for (const label of labels) {
-            const entry = [...document.querySelectorAll(
-                ".o_menu_sections a, .o_menu_sections button, " +
-                ".o-dropdown--menu a, .o-dropdown--menu button"
+            const topEntry = [...document.querySelectorAll(
+                topMenu[label] || "__missing__"
+            )].find((candidate) => candidate.getClientRects().length);
+            const textNode = [...document.querySelectorAll(
+                ".o_menu_sections *, .o-dropdown--menu *"
             )].find((candidate) => candidate.textContent.trim() === label);
+            const entry = topEntry || (textNode && (
+                textNode.closest("a, button, [role='menuitem'], [data-menu-xmlid]")
+                || textNode
+            ));
             if (!entry) {
                 throw new Error(`${label} is absent from the operator menu tree`);
             }
@@ -77,40 +87,28 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         },
 
         // --- Configuration / Mappings ---
-        openPath(["Configuration", "Mappings"],
-            "Open Mappings."
-        ),
-        openPath(["Configuration", "Mappings", "Customer Mappings"],
+        openPath(["Configuration", "Customer Mappings"],
             "Customer mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The customer mappings render.",
         },
-        openPath(["Configuration", "Mappings"],
-            "Re-open Mappings."
-        ),
-        openPath(["Configuration", "Mappings", "Product Mappings"],
+        openPath(["Configuration", "Product Mappings"],
             "Product mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The product mappings render.",
         },
-        openPath(["Configuration", "Mappings"],
-            "Re-open Mappings."
-        ),
-        openPath(["Configuration", "Mappings", "Variant Mappings"],
+        openPath(["Configuration", "Variant Mappings"],
             "Variant mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The variant mappings render.",
         },
-        openPath(["Configuration", "Mappings"],
-            "Re-open Mappings."
-        ),
-        openPath(["Configuration", "Mappings", "Location Mappings"],
+        openPath(["Configuration", "Location Mappings"],
             "Location mappings."
         ),
         {
@@ -119,10 +117,7 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         },
 
         // --- Configuration / Sync Rules ---
-        openPath(["Configuration", "Sync Rules"],
-            "Open Sync Rules."
-        ),
-        openPath(["Configuration", "Sync Rules", "Inventory Safeguards"],
+        openPath(["Configuration", "Inventory Safeguards"],
             "Inventory safeguards."
         ),
         {

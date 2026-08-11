@@ -40,6 +40,7 @@ class TestUiInstallation(TransactionCase):
             'shopify_connector_core.menu_shopify_connector_connector_health',
             'shopify_connector_core.menu_shopify_connector_operations',
             'shopify_connector_core.menu_shopify_connector_stores',
+            'shopify_connector_core.menu_shopify_connector_store_records',
             'shopify_connector_core.menu_shopify_connector_sync_center',
             'shopify_connector_core.menu_shopify_connector_error_center',
             'shopify_connector_core.menu_shopify_connector_mutation_evidence',
@@ -70,6 +71,7 @@ class TestUiInstallation(TransactionCase):
             'menu_shopify_connector_sync_analysis': 'Sync Performance',
             'menu_shopify_connector_logs': 'Audit Trail',
             'menu_shopify_connector_stores': 'Stores & Onboarding',
+            'menu_shopify_connector_store_records': 'Stores',
         }
         for xmlid, label in expected.items():
             menu = self.env.ref('shopify_connector_core.%s' % xmlid)

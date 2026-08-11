@@ -7,6 +7,7 @@
 # rule, bounded reads, and the no-sensitive-data guarantee.
 
 import re
+from datetime import timedelta
 
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
@@ -318,17 +319,31 @@ class TestUiDashboard(TransactionCase):
         store = self._make_store()
         other_store = self._make_store()
         self._make_job(store, 'queued')
-        blocked = self._make_job(store, 'blocked_manual_review')
+        now = fields.Datetime.now()
+        recently_blocked_old_job = self._make_job(
+            store, 'blocked_manual_review',
+            finished_at=now - timedelta(hours=1),
+        )
+        recently_blocked_old_job.sudo().write({
+            'create_date': now - timedelta(days=30),
+        })
+        blocked = self._make_job(
+            store, 'blocked_manual_review',
+            finished_at=now - timedelta(days=2),
+        )
         self._make_job(other_store, 'blocked_manual_review')
 
         payload = self.Dashboard.get_connector_health_data(store.id)
         oldest = payload['health']['oldest_blocked']
-        self.assertTrue(oldest['age'])
+        self.assertEqual(
+            oldest['age'],
+            self.Dashboard._relative_time(blocked.finished_at, now),
+        )
         self.assertEqual(oldest['target']['res_model'], blocked._name)
         domain = [tuple(term) for term in oldest['target']['domain']]
         self.assertEqual(
             self.env[blocked._name].with_user(self.viewer).search(domain),
-            blocked,
+            recently_blocked_old_job | blocked,
         )
 
     def test_health_projects_throttle_headroom_with_observation_time(self):

@@ -365,13 +365,13 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         ]
         oldest = self.env['shopify.connector.job'].search(
             domain,
-            order='create_date asc', limit=1,
+            order='finished_at asc, id asc', limit=1,
         )
         if not oldest:
             return False
         return {
             'age': self._relative_time(
-                oldest.create_date, fields.Datetime.now(),
+                oldest.finished_at, fields.Datetime.now(),
             ),
             'target': {
                 'res_model': 'shopify.connector.job',

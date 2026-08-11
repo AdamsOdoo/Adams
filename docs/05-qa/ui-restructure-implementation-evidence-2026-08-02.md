@@ -276,3 +276,20 @@ required after publication of this correction.
 **Open native/browser evidence.** No live Shopify mutation is claimed. Native
 Odoo.sh and rendered browser-tour evidence remain release-environment gates;
 they must not be inferred from the green non-browser suite.
+
+**Independent-review correction 2.** Exact-tree review of the first correction
+identified three proof/truth defects, all corrected additively: the C4 browser
+journey again performs browser admission, duplicate coalescing, genuine
+dispatcher execution, terminal polling and cache/readiness reload through the
+existing transport seam; U0/U2/U3 navigation resolves visible top branches and
+does not attempt to click Odoo's inert configuration group headers; and oldest
+blocked age now orders and calculates from the transition-owned `finished_at`
+rather than job creation time. The discriminating age test uses a 30-day-old
+job blocked one hour ago beside a newer job blocked two days ago.
+
+After those changes, the affected exact-source populations were rerun: Core
+`0 failed, 0 error(s) of 851 tests`, Product Export
+`0 failed, 0 error(s) of 286 tests`, and a new disposable-database focused
+campaign `0 failed, 0 error(s) of 140 tests`. JavaScript syntax and repository
+diff integrity also passed. Rendered browser and native Odoo.sh execution
+remain explicitly open rather than being inferred from these results.
