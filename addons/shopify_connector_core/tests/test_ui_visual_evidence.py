@@ -999,6 +999,11 @@ OVERFLOW_JS = r"""
   // a new `o_sc_*` root appears without being added to it.
   const SURFACE_SELECTOR = [
     ".o_sc_dashboard", ".o_sc_dashboard__inner",
+    // The split Connector Health dashboard shares the dashboard layout root
+    // and inner box, but keeps its own surface identity. Name it explicitly
+    // so the inventory guard cannot mistake shared styling for missing
+    // measurement coverage.
+    ".o_sc_connector_health",
     ".o_sc_export_diff", ".o_sc_export_diff__inner",
     // S1 (2026-07-27): the guided setup surface. Its non-root elements use
     // the `sc_` prefix precisely so this list stays the inventory of
