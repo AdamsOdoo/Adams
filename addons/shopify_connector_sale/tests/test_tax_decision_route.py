@@ -274,6 +274,16 @@ class TestTaxDecisionRoute(OrderImportCase):
             'rate_and_inclusion_only_non_binding',
         )
 
+    def test_needs_attention_opens_the_tax_mapping_decision(self):
+        job, _detail = self._block_order_on_unknown_tax()
+        action = job.with_user(
+            self.roles['admin']
+        ).action_open_attention_case()
+        self.assertEqual(
+            action['res_model'], 'shopify.connector.tax.decision.wizard',
+        )
+        self.assertEqual(action['target'], 'new')
+
     def test_a_healthy_job_offers_no_decision_route(self):
         job = self._job()
         self.assertFalse(job.tax_decision_pending)

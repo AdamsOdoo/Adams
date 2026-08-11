@@ -32,6 +32,7 @@
 // against real attribute selectors instead.
 
 import { registry } from "@web/core/registry";
+import { stepUtils } from "@web_tour/tour_utils";
 
 const tours = registry.category("web_tour.tours");
 
@@ -244,11 +245,7 @@ tours.add("shopify_connector_b2_product_controls_denied_tour", {
 tours.add("shopify_connector_b2_store360_drilldown_tour", {
     url: "/odoo",
     steps: () => [
-        {
-            trigger: ".o_navbar_apps_menu button",
-            content: "Open the apps menu.",
-            run: "click",
-        },
+        stepUtils.showAppsMenuItem(),
         {
             trigger: ".o_app[data-menu-xmlid='shopify_connector_core.menu_shopify_connector_root']",
             content: "Open the Shopify Connector app.",

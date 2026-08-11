@@ -150,6 +150,27 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 aggregates=['amount_total:sum', '__count'],
             )
         }
+        review_blocks = []
+        for currency, total, count in Order._read_group(
+            review_domain, groupby=['currency_id'],
+            aggregates=['amount_total:sum', '__count'],
+        ):
+            review_blocks.append({
+                'currency': self._currency_info(currency),
+                'value': total or 0.0,
+                'count': count,
+                'target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        review_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _(
+                        "Orders awaiting data review — %(currency)s",
+                        currency=currency.name,
+                    ),
+                },
+            })
+        review_blocks.sort(key=lambda block: block['currency']['name'])
         blocks = []
         for currency, total, count in current_rows:
             prev_total, prev_count = prev_rows.get(
@@ -249,7 +270,8 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 'name': _("Imported Odoo order lines"),
             },
             'awaiting_review': {
-                'count': Order.search_count(review_domain),
+                'count': sum(block['count'] for block in review_blocks),
+                'blocks': review_blocks,
                 'target': {
                     'res_model': 'sale.order',
                     'domain': self._serialize_domain(review_domain),

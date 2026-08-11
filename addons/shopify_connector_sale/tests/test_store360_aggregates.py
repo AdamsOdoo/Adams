@@ -147,6 +147,11 @@ class TestStore360Aggregates(OrderImportCase):
             block['aov'], expected_sales / 2.0, places=2)
         self.assertEqual(commercial['units'], 3)
         self.assertEqual(commercial['awaiting_review']['count'], 1)
+        review_block = commercial['awaiting_review']['blocks'][0]
+        self.assertEqual(review_block['count'], 1)
+        self.assertAlmostEqual(
+            review_block['value'], review.amount_total, places=2,
+        )
 
         # The orders drill-down IS the aggregate population.
         model = self.env['sale.order'].with_user(self.viewer)
@@ -164,10 +169,19 @@ class TestStore360Aggregates(OrderImportCase):
             tuple(t) for t in commercial['awaiting_review']['target']['domain']
         ]
         self.assertEqual(model.search(review_domain), review)
+        review_currency_domain = [
+            tuple(t) for t in review_block['target']['domain']
+        ]
+        review_currency_orders = model.search(review_currency_domain)
+        self.assertEqual(review_currency_orders, review)
+        self.assertAlmostEqual(
+            sum(review_currency_orders.mapped('amount_total')),
+            review_block['value'], places=2,
+        )
 
     def test_sales_dashboard_is_sales_only_and_keeps_review_separate(self):
         kept = self._imported_order(days_ago=1, amount=125.0, qty=2)
-        self._imported_order(
+        review = self._imported_order(
             days_ago=1, amount=500.0, qty=5, status='review',
         )
         payload = self.Dashboard.get_sales_dashboard_data(
@@ -179,6 +193,11 @@ class TestStore360Aggregates(OrderImportCase):
         commercial = payload['commercial']
         self.assertEqual(commercial['orders_total'], 1)
         self.assertEqual(commercial['awaiting_review']['count'], 1)
+        self.assertEqual(len(commercial['awaiting_review']['blocks']), 1)
+        self.assertAlmostEqual(
+            commercial['awaiting_review']['blocks'][0]['value'],
+            review.amount_total, places=2,
+        )
         block = commercial['blocks'][0]
         self.assertAlmostEqual(block['gross'], kept.amount_total, places=2)
         self.assertAlmostEqual(block['net'], kept.amount_total, places=2)
@@ -202,6 +221,10 @@ class TestStore360Aggregates(OrderImportCase):
         self.assertEqual(commercial['orders_total'], 1)
         self.assertEqual(commercial['units'], 2)
         self.assertEqual(commercial['awaiting_review']['count'], 1)
+        review_block = commercial['awaiting_review']['blocks'][0]
+        self.assertAlmostEqual(
+            review_block['value'], review.amount_total, places=2,
+        )
         self.assertEqual(len(commercial['blocks']), 1)
         block = commercial['blocks'][0]
         self.assertAlmostEqual(block['sales'], kept.amount_total, places=2)
@@ -228,6 +251,15 @@ class TestStore360Aggregates(OrderImportCase):
             commercial['units'], places=2,
         )
         self.assertEqual(Order.search(review_domain), review)
+        review_currency_domain = [
+            tuple(term) for term in review_block['target']['domain']
+        ]
+        review_population = Order.search(review_currency_domain)
+        self.assertEqual(review_population, review)
+        self.assertAlmostEqual(
+            sum(review_population.mapped('amount_total')),
+            review_block['value'], places=2,
+        )
         self.assertNotIn(quarantined, reconciled)
         self.assertNotIn(cancelled, reconciled)
 

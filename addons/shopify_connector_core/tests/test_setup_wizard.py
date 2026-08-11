@@ -1148,6 +1148,14 @@ class TestSetupWizardRerun(SetupWizardCase):
             Dashboard.with_user(self.user_a).get_dashboard_data()
             ['setup_available'],
         )
+        self.assertTrue(
+            Dashboard.with_user(self.admin_a).get_sales_dashboard_data()
+            ['setup_available'],
+        )
+        self.assertFalse(
+            Dashboard.with_user(self.user_a).get_sales_dashboard_data()
+            ['setup_available'],
+        )
 
 
 @tagged('post_install', '-at_install')

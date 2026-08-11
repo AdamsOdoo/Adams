@@ -162,7 +162,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                     jobs['blocked_manual_review'] + attempts_uncertain,
                 'backlog':
                     jobs['queued'] + jobs['running'] + jobs['retry_waiting'],
-                'oldest_waiting': self._oldest_waiting(store),
+                'oldest_blocked': self._oldest_blocked(store),
                 'week': self._week_counters(store),
                 'exceptions': self._store_360_exceptions(
                     store, jobs, attempts_uncertain,
@@ -205,6 +205,13 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         sales_keys = ('commercial', 'bridge', 'lifecycle', 'dispatch')
         payload = {
             'meta': self._store_360_meta(ctx),
+            # The app root is the sales dashboard, including on a true first
+            # run. Preserve the setup entry route here as well as on Connector
+            # Health; otherwise an administrator with no visible stores lands
+            # on an honest "sales unavailable" screen with no way to begin.
+            'setup_available': self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
             'refresh_interval_seconds': 30,
             'generated_at': fields.Datetime.to_string(fields.Datetime.now()),
         }
@@ -352,16 +359,26 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             ]
         )
 
-    def _oldest_waiting(self, store):
+    def _oldest_blocked(self, store):
+        domain = self._store_term(store) + [
+            ('state', '=', 'blocked_manual_review'),
+        ]
         oldest = self.env['shopify.connector.job'].search(
-            self._store_term(store) + [
-                ('state', 'in', ('queued', 'retry_waiting')),
-            ],
+            domain,
             order='create_date asc', limit=1,
         )
         if not oldest:
             return False
-        return self._relative_time(oldest.create_date, fields.Datetime.now())
+        return {
+            'age': self._relative_time(
+                oldest.create_date, fields.Datetime.now(),
+            ),
+            'target': {
+                'res_model': 'shopify.connector.job',
+                'domain': self._serialize_domain(domain),
+                'name': _('Blocked connector cases'),
+            },
+        }
 
     def _week_counters(self, store):
         Job = self.env['shopify.connector.job']

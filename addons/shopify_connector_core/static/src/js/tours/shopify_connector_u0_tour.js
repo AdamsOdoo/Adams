@@ -12,6 +12,24 @@ import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 
+const openPath = (labels, content) => ({
+    trigger: ".o_menu_sections",
+    content,
+    async run() {
+        for (const label of labels) {
+            const entry = [...document.querySelectorAll(
+                ".o_menu_sections a, .o_menu_sections button, " +
+                ".o-dropdown--menu a, .o-dropdown--menu button"
+            )].find((candidate) => candidate.textContent.trim() === label);
+            if (!entry) {
+                throw new Error(`${label} is absent from the operator menu tree`);
+            }
+            entry.click();
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+    },
+});
+
 // --- 1. Primary navigation: Dashboard -> Operations -> Reporting. Read-only;
 //        Configuration is covered separately with an Administrator. ---
 registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
@@ -45,11 +63,7 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             trigger: ".o_sc_dashboard .sc360-commercial",
             content: "The review-excluded sales region renders.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_connector_health")}`,
-            content: "Open Connector Health.",
-            run: "click",
-        },
+        openPath(["Dashboard", "Connector Health"], "Open Connector Health."),
         {
             trigger: ".o_sc_connector_health .sc360-stores-table",
             content: "Per-store health renders without sales figures.",
@@ -58,40 +72,24 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             trigger: ".o_sc_connector_health .sc360-flows",
             content: "Domain freshness renders unknown states explicitly.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_sync_center")}`,
-            content: "Go to Runs & Recovery.",
-            run: "click",
-        },
+        openPath(["Operations", "Runs & Recovery"], "Go to Runs & Recovery."),
         {
             trigger: ".o_list_view",
             content: "The runs list renders.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_error_center")}`,
-            content: "Go to Needs Attention.",
-            run: "click",
-        },
+        openPath(["Operations", "Needs Attention"], "Go to Needs Attention."),
         {
             trigger: ".o_list_view",
             content: "Needs Attention renders.",
         },
         // Store 360 slice: the zero-schema Sync Operations Analysis surface
         // (graph over the job model, native rules).
-        {
-            trigger: `${menu("menu_shopify_connector_sync_analysis")}`,
-            content: "Go to Sync Performance.",
-            run: "click",
-        },
+        openPath(["Reporting", "Sync Performance"], "Go to Sync Performance."),
         {
             trigger: ".o_graph_renderer, .o_graph_view, .o_view_nocontent",
             content: "The analysis graph view renders.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_logs")}`,
-            content: "Go to Audit Trail.",
-            run: "click",
-        },
+        openPath(["Reporting", "Audit Trail"], "Go to Audit Trail."),
         {
             trigger: ".o_list_view",
             content: "The audit trail renders.",

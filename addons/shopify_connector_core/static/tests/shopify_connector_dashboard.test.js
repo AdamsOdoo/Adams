@@ -66,6 +66,21 @@ function salesPayload(overrides = {}) {
                 },
                 awaiting_review: {
                     count: 3,
+                    blocks: [
+                        {
+                            currency: CURRENCY,
+                            value: 275.5,
+                            count: 3,
+                            target: {
+                                res_model: "sale.order",
+                                domain: [
+                                    ["shopify_connector_review", "=", true],
+                                    ["currency_id", "=", 2],
+                                ],
+                                name: "Awaiting data review — EUR",
+                            },
+                        },
+                    ],
                     target: {
                         res_model: "sale.order",
                         domain: [["shopify_connector_review", "=", true]],
@@ -112,7 +127,14 @@ function healthPayload(overrides = {}) {
                 jobs: { retry_waiting: 2, failed_final: 1 },
                 needs_review: 1,
                 backlog: 4,
-                oldest_waiting: "2 h ago",
+                oldest_blocked: {
+                    age: "2 h ago",
+                    target: {
+                        res_model: "shopify.connector.job",
+                        domain: [["state", "=", "blocked_manual_review"]],
+                        name: "Blocked connector cases",
+                    },
+                },
                 week: { succeeded: 12, failed: 1 },
                 exceptions: [],
                 activity: [],
@@ -232,6 +254,7 @@ describe("shopify connector dashboard", () => {
         expect(".sc360-sales-currencies tbody tr").toHaveCount(1);
         expect(queryText(".sc360-sales-currencies tbody")).toInclude("EUR");
         expect(queryText(".sc360-commercial")).toInclude("Awaiting data review");
+        expect(queryText(".sc360-review-currencies tbody")).toInclude("275.50");
         expect(".o_sc_connector_health").toHaveCount(0);
     });
 
@@ -303,6 +326,7 @@ describe("shopify connector dashboard", () => {
         expect(queryText(".sc360-stores-table tbody")).toInclude("Borealis");
         expect(queryText(".o_sc_connector_health")).toInclude("Unknown");
         expect(queryText(".o_sc_connector_health")).toInclude("Queue depth");
+        expect(queryText(".o_sc_connector_health")).toInclude("Oldest blocked case");
         expect(queryText(".o_sc_connector_health")).not.toInclude("Imported Odoo order value");
     });
 });

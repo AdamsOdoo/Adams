@@ -338,6 +338,10 @@
         font-size: var(--sc-fs-caption); font-weight: var(--sc-fw-regular);
         color: var(--sc-text-secondary); margin-inline-start: var(--sc-space-2);
     }
+    .sc360-scope-note--action {
+        border: 0; background: transparent; padding: 0;
+        text-decoration: underline; cursor: pointer;
+    }
     .sc360-no-permission {
         padding: var(--sc-space-3); border: 1px dashed var(--sc-border-strong);
         border-radius: var(--sc-radius); color: var(--sc-text-secondary);

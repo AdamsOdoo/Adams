@@ -178,12 +178,13 @@ class TestUiB2SaleTours(OrderImportCase, HttpCase):
             'password': 'b2sale_360',
             'company_id': self.env.company.id,
             'company_ids': [(6, 0, [self.env.company.id])],
-            # Connector operator + full sales read: the drill-down lands on
-            # the native sale.order list under the caller's OWN sale rules.
+            # Connector User + full sales read: the dashboard pillar is a
+            # composite User surface, while the drill-down still lands on the
+            # native sale.order list under the caller's OWN sale rules.
             'group_ids': [(6, 0, [
                 self.env.ref('base.group_user').id,
                 self.env.ref(
-                    'shopify_connector_core.group_shopify_connector_operator'
+                    'shopify_connector_core.group_shopify_connector_user'
                 ).id,
                 self.env.ref('sales_team.group_sale_salesman_all_leads').id,
             ])],

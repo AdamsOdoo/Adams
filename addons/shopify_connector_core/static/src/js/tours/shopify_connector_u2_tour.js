@@ -26,13 +26,27 @@ import { stepUtils } from "@web_tour/tour_utils";
 const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 const menu = (module, xmlid) => `[data-menu-xmlid="${module}.${xmlid}"]`;
 
+const openPath = (labels, content) => ({
+    trigger: ".o_menu_sections",
+    content,
+    async run() {
+        for (const label of labels) {
+            const entry = [...document.querySelectorAll(
+                ".o_menu_sections a, .o_menu_sections button, " +
+                ".o-dropdown--menu a, .o-dropdown--menu button"
+            )].find((candidate) => candidate.textContent.trim() === label);
+            if (!entry) {
+                throw new Error(`${label} is absent from the operator menu tree`);
+            }
+            entry.click();
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+    },
+});
+
 // The connector's top-level branches collapse on navigation, so a child menu
 // click needs its parent re-opened first. Expressed once here rather than
 // repeated at every step.
-const openBranch = (trigger, content) => [
-    { trigger, content, run: "click" },
-];
-
 registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
     url: "/odoo",
     steps: () => [
@@ -47,68 +61,56 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         },
 
         // --- Operations ---
-        {
-            trigger: menu("shopify_connector_sale", "menu_shopify_connector_orders"),
-            content: "Open Orders.",
-            run: "click",
-        },
+        openPath(["Operations", "Orders"],
+            "Open Orders."
+        ),
         {
             trigger: ".o_list_view",
             content: "The orders surface renders.",
         },
-        {
-            trigger: menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
-            content: "Open Inventory.",
-            run: "click",
-        },
+        openPath(["Operations", "Inventory"],
+            "Open Inventory."
+        ),
         {
             trigger: ".o_list_view",
             content: "The inventory surface renders.",
         },
 
         // --- Configuration / Mappings ---
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
+        openPath(["Configuration", "Mappings"],
             "Open Mappings."
         ),
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_customer_binding"),
+        openPath(["Configuration", "Mappings", "Customer Mappings"],
             "Customer mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The customer mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
+        openPath(["Configuration", "Mappings"],
             "Re-open Mappings."
         ),
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_product_binding"),
+        openPath(["Configuration", "Mappings", "Product Mappings"],
             "Product mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The product mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
+        openPath(["Configuration", "Mappings"],
             "Re-open Mappings."
         ),
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_product_variant_binding"),
+        openPath(["Configuration", "Mappings", "Variant Mappings"],
             "Variant mappings."
         ),
         {
             trigger: ".o_list_view",
             content: "The variant mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
+        openPath(["Configuration", "Mappings"],
             "Re-open Mappings."
         ),
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_location_mapping"),
+        openPath(["Configuration", "Mappings", "Location Mappings"],
             "Location mappings."
         ),
         {
@@ -117,12 +119,10 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
         },
 
         // --- Configuration / Sync Rules ---
-        ...openBranch(
-            coreMenu("menu_shopify_connector_store_settings"),
+        openPath(["Configuration", "Sync Rules"],
             "Open Sync Rules."
         ),
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory_first_push"),
+        openPath(["Configuration", "Sync Rules", "Inventory Safeguards"],
             "Inventory safeguards."
         ),
         {

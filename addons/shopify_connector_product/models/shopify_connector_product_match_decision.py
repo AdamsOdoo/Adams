@@ -1160,6 +1160,13 @@ class ShopifyConnectorJobProductMatch(models.Model):
             'context': {'default_decision_id': decision.id},
         }
 
+    def _attention_resolution_action(self):
+        """Make Needs Attention's primary action open the real decision."""
+        self.ensure_one()
+        if self._pending_product_match_decision():
+            return self.action_open_product_match_decision()
+        return super()._attention_resolution_action()
+
 
 class ShopifyConnectorProductMatchDispatch(models.AbstractModel):
     """The dispatcher seam, and the only reason it exists.

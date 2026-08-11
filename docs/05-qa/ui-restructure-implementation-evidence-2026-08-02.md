@@ -225,3 +225,54 @@ revertible beneath it.
 
 **Deviations.** No live Shopify or native Odoo.sh campaign was run. CI is
 supporting evidence only and records `shopify_operations: none` when complete.
+
+## Batches C–F — completed restructure and correction evidence (2026-08-11)
+
+**Implemented scope.** The four-pillar navigation, split Sales Dashboard and
+Connector Health pages, prioritized Needs Attention and Runs & Recovery
+surfaces, five-phase onboarding presentation, recoverable mode-switch panel,
+and export acknowledgement presentation are present in the candidate tree.
+The final independent review found and the correction closes three contract
+gaps:
+
+- awaiting-data-review order count and value are now partitioned by currency,
+  rendered separately, and reconciled to the same server-built drill-down;
+- Needs Attention's primary action structurally dispatches product-match and
+  tax-mapping cases to their sanctioned decision dialogs with the dialogs'
+  existing server-side role checks intact; and
+- Connector Health now reports the oldest `blocked_manual_review` case and
+  drills into exactly that scoped population, rather than reporting queued or
+  retry-waiting age.
+
+The suite-runner inventory was also aligned with the renamed terminal-success
+location-refresh tour. This was a stale test-manifest reference, not a product
+behavior change.
+
+**Final local runtime evidence.** All commands used Odoo 19 source pin
+`30bde9ff758834a4912c5ae55843d3a7dad849f1`, PostgreSQL 16, the repository's
+six connector addons, no live Shopify transport, and a disposable local
+database. The final documented tree produced:
+
+| Campaign | Result |
+| --- | --- |
+| Fresh correction-focused ORM/ACL/aggregate/decision routes | `0 failed, 0 error(s) of 140 tests` |
+| Standard connector suite, resource-isolated by module/class but covering the exact monolithic population | Core `851`; Sale `344`; Inventory `436`; Fulfillment `350`; Product Export `286`; Product `242 + 59 + 13` — total `2,581`, all `0 failed, 0 error(s)` |
+| Product genuine lifecycle opt-in | `0 failed, 0 error(s) of 4 tests` |
+| Remaining nonstandard concurrency/performance campaign | `0 failed, 0 error(s) of 41 tests` |
+| Static integrity | Python compile/AST, changed XML parse, changed JavaScript `node --check`, and `git diff --check` passed |
+
+The standard suite was isolated only to reset process memory between bounded
+populations after the container terminated a monolithic process without a
+test failure. The isolated counts sum to the same `2,581` tests reported by
+the complete monolithic inventory; every retained process ended at `0/0`.
+
+**Published CI classification.** GitHub Actions run
+[#184](https://github.com/AdamsOdoo/Adams/actions/runs/31449515770) on the prior
+published candidate started zero steps, retained no artifact, and is recorded
+as infrastructure-only evidence. It is not treated as a product failure or as
+a substitute for the local runtime results above. A new exact-head run is
+required after publication of this correction.
+
+**Open native/browser evidence.** No live Shopify mutation is claimed. Native
+Odoo.sh and rendered browser-tour evidence remain release-environment gates;
+they must not be inferred from the green non-browser suite.

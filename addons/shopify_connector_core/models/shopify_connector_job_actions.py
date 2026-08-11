@@ -194,7 +194,7 @@ class ShopifyConnectorJobActions(models.Model):
         )
 
     def action_open_attention_case(self):
-        """Route one human-owned case to its evidence or affected record."""
+        """Route one human-owned case to its domain resolution flow."""
         self.ensure_one()
         self.check_access('read')
         if self.state not in HUMAN_ATTENTION_STATES:
@@ -202,6 +202,9 @@ class ShopifyConnectorJobActions(models.Model):
                 'This run is not waiting on a person. Open it in Runs & '
                 'Recovery instead.'
             )
+        resolution = self._attention_resolution_action()
+        if resolution:
+            return resolution
         attempt = self._operator_mutation_attempt()
         if attempt:
             return self._operator_form_action(
@@ -214,6 +217,16 @@ class ShopifyConnectorJobActions(models.Model):
                     target, 'Resolve affected record'
                 )
         return self._operator_form_action(self, 'Review connector case')
+
+    def _attention_resolution_action(self):
+        """Optional-module hook for the case's sanctioned decision UI.
+
+        Product, tax and future domain modules extend this hook.  Keeping the
+        dispatch structural prevents core from guessing a route from mutable
+        error copy or depending on optional models.
+        """
+        self.ensure_one()
+        return False
 
     def action_manual_retry(self):
         self.ensure_one()

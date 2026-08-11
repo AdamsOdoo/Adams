@@ -314,6 +314,23 @@ class TestUiDashboard(TransactionCase):
             for row in payload['mappings']['rows']
         ))
 
+    def test_health_oldest_blocked_ignores_queue_and_drills_to_same_scope(self):
+        store = self._make_store()
+        other_store = self._make_store()
+        self._make_job(store, 'queued')
+        blocked = self._make_job(store, 'blocked_manual_review')
+        self._make_job(other_store, 'blocked_manual_review')
+
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        oldest = payload['health']['oldest_blocked']
+        self.assertTrue(oldest['age'])
+        self.assertEqual(oldest['target']['res_model'], blocked._name)
+        domain = [tuple(term) for term in oldest['target']['domain']]
+        self.assertEqual(
+            self.env[blocked._name].with_user(self.viewer).search(domain),
+            blocked,
+        )
+
     def test_health_projects_throttle_headroom_with_observation_time(self):
         store = self._make_store()
         store._record_throttle_status({

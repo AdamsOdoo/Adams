@@ -61,6 +61,15 @@
                         </div>
                     </header>
 
+                    <div t-if="!data.meta.stores.length" class="sc-empty">
+                        <p>No visible store evidence exists yet.</p>
+                        <button t-if="data.setup_available"
+                                class="sc-btn sc_dashboard_setup"
+                                t-on-click="() => this.openSetup()">
+                            Set up your store
+                        </button>
+                    </div>
+
                     <t t-if="data.critical and data.critical.active">
                         <div class="sc-band sc-band--danger sc360-critical" role="alert">
                             <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
@@ -101,6 +110,31 @@
                                     <div class="sc360-kpi__value" t-esc="formatNumber(data.commercial.units)"/>
                                 </button>
                             </div>
+
+                            <table class="sc360-table sc360-review-currencies">
+                                <caption class="sc-visually-hidden">Awaiting-review values separated by currency</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Awaiting-review currency</th>
+                                        <th scope="col" class="sc360-table__num">Excluded order value</th>
+                                        <th scope="col" class="sc360-table__num">Orders</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="data.commercial.awaiting_review.blocks.length">
+                                        <t t-foreach="data.commercial.awaiting_review.blocks" t-as="block" t-key="block.currency.id">
+                                            <tr>
+                                                <th scope="row" t-esc="block.currency.name"/>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.target)"><bdi t-esc="formatMoney(block.currency, block.value)"/></button></td>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.target)" t-esc="formatNumber(block.count)"/></td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr><td colspan="3">No imported orders are awaiting data review.</td></tr>
+                                    </t>
+                                </tbody>
+                            </table>
 
                             <table class="sc360-table sc360-sales-currencies">
                                 <caption class="sc-visually-hidden">Sales values separated by currency</caption>
@@ -253,7 +287,11 @@
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Retry waiting</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.jobs.retry_waiting)"/></div>
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Retries exhausted</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.jobs.failed_final)"/></div>
                             </div>
-                            <p class="sc360-scope-note" t-if="data.health.oldest_waiting">Oldest waiting run: <bdi t-esc="data.health.oldest_waiting"/></p>
+                            <button class="sc360-scope-note sc360-scope-note--action"
+                                    t-if="data.health.oldest_blocked"
+                                    t-on-click="() => this.openTarget(data.health.oldest_blocked.target)">
+                                Oldest blocked case: <bdi t-esc="data.health.oldest_blocked.age"/>
+                            </button>
                             <t t-foreach="data.health.exceptions" t-as="exc" t-key="exc.id">
                                 <div t-att-class="exceptionClass(exc.severity)">
                                     <div class="sc-exception__main"><span class="sc-owner-chip" t-esc="exc.owner"/><span class="sc-exception__title" t-esc="exc.title"/><span class="sc-exception__count" t-esc="formatNumber(exc.count)"/><div class="sc-exception__why" t-esc="exc.why"/></div>

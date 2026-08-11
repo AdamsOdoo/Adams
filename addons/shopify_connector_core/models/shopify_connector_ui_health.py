@@ -30,7 +30,7 @@ class ShopifyConnectorUiHealth(models.AbstractModel):
                     jobs['blocked_manual_review'] + attempts_uncertain,
                 'backlog':
                     jobs['queued'] + jobs['running'] + jobs['retry_waiting'],
-                'oldest_waiting': self._oldest_waiting(store),
+                'oldest_blocked': self._oldest_blocked(store),
                 'week': self._week_counters(store),
                 'exceptions': self._store_360_exceptions(
                     store, jobs, attempts_uncertain,

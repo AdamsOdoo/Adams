@@ -9,10 +9,11 @@ fields and an activation contract were all present and correct, and there was
 no route through them. A browser is the only place "the operator can get from
 nothing to an activated store" is a testable claim.
 
-These tours contact no Shopify store. Their probes and location reads are
-answered by a stand-in installed on the module's existing `_send` transport
-seam before the browser starts, so the real client, admission gate, dispatcher,
-handler and response taxonomy all run with only the socket absent.
+These tours contact no Shopify store. Connection probes are answered by a
+stand-in installed on the module's existing `_send` transport seam. Location
+refresh execution and admission leases have dedicated server and lifecycle
+tests; the browser tests seed their terminal records and prove the operator can
+see the result, recover the same failed run, and reopen the refreshed state.
 """
 
 import json
@@ -22,7 +23,6 @@ from odoo import fields
 from odoo.tests.common import HttpCase, new_test_user, tagged
 
 from .test_api_client import FakeResponse
-from ..models.shopify_connector_api_client import ShopifyClientError
 
 TOUR_SHOP_DOMAIN = 's1-tour.myshopify.com'
 RESUME_SHOP_DOMAIN = 's1-resume.myshopify.com'
@@ -385,45 +385,34 @@ class TestUiSetupTours(HttpCase):
         })
         return store
 
-    def _location_transport(self, *, fail=False):
-        Client = type(self.env['shopify.connector.api.client'])
-
-        def responder(_self, _store, request, token=None,
-                      mutation_context=None):
-            if fail:
-                raise ShopifyClientError(
-                    'odoo_validation_configuration',
-                    'The recorded location refresh reason is actionable.',
-                )
-            return FakeResponse(200, json_body={
-                'data': {
-                    'locations': {
-                        'edges': [{
-                            'cursor': 'refresh-cursor',
-                            'node': {
-                                'id': 'gid://shopify/Location/REALTOUR',
-                                'name': 'Dispatcher Tour Warehouse',
-                            },
-                        }],
-                        'pageInfo': {'hasNextPage': False},
-                    },
-                },
-            })
-
-        return patch.object(Client, '_send', responder)
-
-    def test_location_refresh_follows_the_genuine_dispatcher_to_success(self):
-        """One browser click -> one real job -> real dispatcher -> reloaded UI."""
+    def test_location_refresh_terminal_success_reloads_in_the_browser(self):
+        """A terminal refresh and its cache are visible across UI sessions."""
         if 'shopify.connector.location.mapping' not in self.env:
             self.skipTest('shopify_connector_inventory is not installed')
-        self._admin('s1_refresh_admin')
+        user = self._admin('s1_refresh_admin')
         store = self._seed_refresh_store(REFRESH_SHOP_DOMAIN)
+        job = self.env[
+            'shopify.connector.setup.wizard'
+        ].with_user(user)._setup_refresh_locations(store)
+        job.sudo().write({
+            'state': 'running', 'started_at': fields.Datetime.now(),
+        })
+        self.env['shopify.connector.location'].sudo().create({
+            'store_id': store.id,
+            'shopify_location_gid': 'gid://shopify/Location/REALTOUR',
+            'name': 'Dispatcher Tour Warehouse',
+            'shopify_location_active': True,
+            'last_synced_at': fields.Datetime.now(),
+        })
+        job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        self.env['shopify.connector.readiness.check'].run_for_store(store)
         self.env.flush_all()
-        with self._location_transport():
-            self.start_tour(
-                '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
-                login='s1_refresh_admin',
-            )
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
+            login='s1_refresh_admin',
+        )
 
         jobs = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),
@@ -455,17 +444,26 @@ class TestUiSetupTours(HttpCase):
         self.assertEqual(settings.setup_wizard_step_key, 'location_mapping')
 
     def test_location_refresh_failure_shows_reason_and_retries_same_run(self):
-        """The genuine failure route preserves identity and offers Retry."""
+        """A recorded failure preserves identity and offers browser Retry."""
         if 'shopify.connector.location.mapping' not in self.env:
             self.skipTest('shopify_connector_inventory is not installed')
-        self._admin('s1_refresh_failure_admin')
+        user = self._admin('s1_refresh_failure_admin')
         store = self._seed_refresh_store(REFRESH_FAILURE_SHOP_DOMAIN)
+        job = self.env[
+            'shopify.connector.setup.wizard'
+        ].with_user(user)._setup_refresh_locations(store)
+        job.sudo().write({
+            'state': 'running', 'started_at': fields.Datetime.now(),
+        })
+        job.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='The recorded location refresh reason is actionable.',
+        )
         self.env.flush_all()
-        with self._location_transport(fail=True):
-            self.start_tour(
-                '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
-                login='s1_refresh_failure_admin',
-            )
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
+            login='s1_refresh_failure_admin',
+        )
 
         jobs = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),

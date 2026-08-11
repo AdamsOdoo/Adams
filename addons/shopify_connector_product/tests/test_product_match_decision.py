@@ -522,6 +522,17 @@ class TestProductMatchDecision(TransactionCase):
             'the refusal must leave the job exactly where it was',
         )
 
+    def test_needs_attention_opens_the_product_match_decision(self):
+        job, _first, _second, _sent = self._ambiguous_template_run()
+        action = job.with_user(
+            self.roles['reviewer']
+        ).action_open_attention_case()
+        self.assertEqual(
+            action['res_model'],
+            'shopify.connector.product.match.decision.wizard',
+        )
+        self.assertEqual(action['target'], 'new')
+
     def test_generic_resolve_review_is_allowed_once_the_decision_is_made(self):
         job, first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
