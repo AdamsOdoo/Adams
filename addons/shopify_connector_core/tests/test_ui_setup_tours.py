@@ -10,19 +10,26 @@ no route through them. A browser is the only place "the operator can get from
 nothing to an activated store" is a testable claim.
 
 These tours contact no Shopify store. The full traversal's connection probe is
-answered at the existing `_send` transport seam. Location-refresh dispatcher
-behavior is covered by the server suite; the browser-specific refresh tours
-seed persisted terminal jobs so they deterministically prove rendering,
-follow-through, and same-run retry across real RPC boundaries.
+answered at the existing `_send` transport seam. The two C4 refresh journeys
+use Odoo's real-request HttpCase mode, committed fixture cursors and an
+independent production dispatcher cursor, so browser RPCs and background work
+observe the same durable database state without sharing the test transaction.
 """
 
 import json
+import queue
+import threading
 from unittest.mock import patch
 
-from odoo import fields
-from odoo.tests.common import HttpCase, new_test_user, tagged
+from odoo import SUPERUSER_ID, api, fields
+from odoo.sql_db import db_connect
+from odoo.tests.common import HttpCase, TransactionCase, new_test_user, tagged
 
 from .test_api_client import FakeResponse
+from ..models.shopify_connector_api_client import (
+    ShopifyClientError,
+    ShopifyQuiescedError,
+)
 
 TOUR_SHOP_DOMAIN = 's1-tour.myshopify.com'
 RESUME_SHOP_DOMAIN = 's1-resume.myshopify.com'
@@ -364,108 +371,515 @@ class TestUiSetupTours(HttpCase):
             login='s1_readiness_admin',
         )
 
-    # ------------------------------------------------------------------
-    # C4 / A2: exact location-refresh follow-through in a real browser
-    # ------------------------------------------------------------------
 
-    def _seed_refresh_store(self, domain):
-        store = self._seed_inventory_store(domain, cached=[])
-        self.env[
-            'shopify.connector.store.credential'
-        ].action_set_token(store, REFRESH_DUMMY_TOKEN)
-        scopes = self.env[
-            'shopify.connector.readiness.check'
-        ].REQUIRED_MVP_SCOPES
-        store.sudo().write({
-            'credential_last_verified_at': fields.Datetime.now(),
-            'last_test_connection_result': 'pass',
-            'granted_scopes': json.dumps(sorted(set(scopes) | {
-                'read_locations', 'write_inventory',
-            })),
-        })
-        return store
+
+@tagged('post_install', '-at_install', 'shopify_connector_s1')
+class TestUiC4LocationRefreshTours(HttpCase):
+    """C4 browser proof with real request and dispatcher transactions."""
+
+    registry_test_mode = False
+    BOUND_SECONDS = 30
+    STATEMENT_TIMEOUT_MS = 20000
+    LOCK_TIMEOUT_MS = 10000
+
+    def authenticate(self, user, password, **kwargs):
+        """Authenticate from a fresh cursor that sees committed C4 fixtures."""
+        auth_cr = self._open_bounded_cursor()
+        test_cr, test_env = self.cr, self.env
+        try:
+            self.cr = auth_cr
+            self.env = api.Environment(auth_cr, SUPERUSER_ID, {})
+            session = super().authenticate(user, password, **kwargs)
+            auth_cr.commit()
+            return session
+        finally:
+            self.cr = test_cr
+            self.env = test_env
+            # `super()` rebuilds the opener while the auth cursor is current;
+            # subsequent HttpCase bookkeeping belongs back on the test cursor.
+            self.opener.cr = test_cr
+            auth_cr.close()
+
+    def _open_bounded_cursor(self):
+        cr = db_connect(self.env.cr.dbname).cursor()
+        try:
+            cr.execute(
+                "SELECT set_config('statement_timeout', %s, true), "
+                "set_config('lock_timeout', %s, true)",
+                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
+            )
+        except BaseException:
+            cr.close()
+            raise
+        return cr
+
+    def _commit_fixture(self, domain, login):
+        cr = self._open_bounded_cursor()
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            user = new_test_user(
+                env, login=login, password=login,
+                groups=(
+                    'base.group_user,'
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ),
+            )
+            user.write({
+                'company_id': env.company.id,
+                'company_ids': [(6, 0, [env.company.id])],
+            })
+            store = env['shopify.connector.store'].create({
+                'name': 'C4 Real Request Store',
+                'shop_domain': domain,
+                'company_id': env.company.id,
+            })
+            settings = env['shopify.connector.store.settings'].create({
+                'store_id': store.id,
+                'inventory_domain_enabled': True,
+                'setup_wizard_step_key': 'location_mapping',
+            })
+            env[
+                'shopify.connector.store.credential'
+            ].action_set_token(store, REFRESH_DUMMY_TOKEN)
+            scopes = env[
+                'shopify.connector.readiness.check'
+            ].REQUIRED_MVP_SCOPES
+            store.write({
+                'credential_last_verified_at': fields.Datetime.now(),
+                'last_test_connection_result': 'pass',
+                'granted_scopes': json.dumps(sorted(set(scopes) | {
+                    'read_locations', 'write_inventory',
+                })),
+            })
+            fixture = {
+                'store_id': store.id,
+                'user_id': user.id,
+                'partner_id': user.partner_id.id,
+                'settings_id': settings.id,
+                'domain': domain,
+                'login': login,
+            }
+            cr.commit()
+            return fixture
+        finally:
+            cr.close()
+
+    def _cleanup_fixture(self, fixture):
+        """Delete committed C4 rows in foreign-key-safe order, then prove zero."""
+        cr = self._open_bounded_cursor()
+        try:
+            store_id = fixture['store_id']
+            for table in (
+                'shopify_connector_call_lease',
+                'shopify_connector_mutation_attempt',
+                'shopify_connector_job_log',
+                'shopify_connector_location_mapping',
+                'shopify_connector_location',
+                'shopify_connector_job',
+                'shopify_connector_store_access_token',
+                'shopify_connector_store_settings',
+                'shopify_connector_store_credential',
+            ):
+                cr.execute(
+                    "SELECT to_regclass(%s)", ('public.%s' % table,),
+                )
+                if cr.fetchone()[0]:
+                    cr.execute(
+                        'DELETE FROM %s WHERE store_id = %%s' % table,
+                        (store_id,),
+                    )
+            cr.execute(
+                'DELETE FROM shopify_connector_store WHERE id = %s',
+                (store_id,),
+            )
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            env['res.users'].browse(fixture['user_id']).exists().unlink()
+            env['res.partner'].browse(fixture['partner_id']).exists().unlink()
+            cr.commit()
+        finally:
+            cr.close()
+
+        verify = self._open_bounded_cursor()
+        try:
+            verify.execute(
+                'SELECT count(*) FROM shopify_connector_store WHERE id = %s',
+                (fixture['store_id'],),
+            )
+            self.assertEqual(verify.fetchone()[0], 0, 'C4 store residue')
+            verify.execute(
+                'SELECT count(*) FROM shopify_connector_job WHERE store_id = %s',
+                (fixture['store_id'],),
+            )
+            self.assertEqual(verify.fetchone()[0], 0, 'C4 job residue')
+            verify.execute(
+                'SELECT count(*) FROM shopify_connector_location '
+                'WHERE store_id = %s', (fixture['store_id'],),
+            )
+            self.assertEqual(verify.fetchone()[0], 0, 'C4 cache residue')
+            verify.execute(
+                'SELECT count(*) FROM res_users WHERE id = %s',
+                (fixture['user_id'],),
+            )
+            self.assertEqual(verify.fetchone()[0], 0, 'C4 user residue')
+        finally:
+            verify.rollback()
+            verify.close()
+
+    def _patch_process_seam(self, owner, name, replacement):
+        original = getattr(owner, name)
+        patcher = patch.object(owner, name, replacement)
+        patcher.start()
+
+        def restore():
+            patcher.stop()
+            self.assertIs(
+                getattr(owner, name), original,
+                'the C4 process seam was not restored',
+            )
+
+        self.addCleanup(restore)
+
+    def _install_transport(self, fixture, fail_first):
+        Client = type(self.env['shopify.connector.api.client'])
+        original_send = Client._send
+        transport_calls = []
+        lock = threading.Lock()
+        warehouse = (
+            'Dispatcher Retry Warehouse' if fail_first
+            else 'Dispatcher Tour Warehouse'
+        )
+
+        def responder(client, store, body, token=None, mutation_context=None):
+            if store.shop_domain != fixture['domain']:
+                return original_send(
+                    client, store, body, token,
+                    mutation_context=mutation_context,
+                )
+            with lock:
+                transport_calls.append(store.id)
+                attempt = len(transport_calls)
+            if fail_first and attempt == 1:
+                # A genuine client classification, not a pre-seeded job state.
+                return FakeResponse(200, json_body={'data': {}}, headers={})
+            return FakeResponse(200, json_body={
+                'data': {
+                    'locations': {
+                        'edges': [{
+                            'cursor': 'c4-cursor',
+                            'node': {
+                                'id': 'gid://shopify/Location/C4REAL',
+                                'name': warehouse,
+                            },
+                        }],
+                        'pageInfo': {'hasNextPage': False},
+                    },
+                },
+            })
+
+        self._patch_process_seam(Client, '_send', responder)
+        return transport_calls, lock
+
+    def _install_admission_observer(self, fixture, milestones):
+        Wizard = type(self.env['shopify.connector.setup.wizard'])
+        original_admit = Wizard._setup_refresh_locations
+        original_follow = Wizard.follow_location_refresh
+        admissions = []
+        lock = threading.Lock()
+
+        def observed_admit(wizard, store):
+            job = original_admit(wizard, store)
+            if store.shop_domain == fixture['domain']:
+                with lock:
+                    admissions.append(job.id)
+            return job
+
+        @api.model
+        def observed_follow(wizard, store_id, job_id):
+            result = original_follow(wizard, store_id, job_id)
+            if store_id == fixture['store_id']:
+                with lock:
+                    count = len(admissions)
+                # This method is a separate browser RPC after refresh_shopify_
+                # locations returned. Therefore the admission transaction for
+                # `count` is committed before its matching event is released.
+                for threshold, event in milestones:
+                    if count >= threshold:
+                        event.set()
+            return result
+
+        self._patch_process_seam(Wizard, '_setup_refresh_locations', observed_admit)
+        self._patch_process_seam(Wizard, 'follow_location_refresh', observed_follow)
+        return admissions, lock
+
+    def _start_dispatcher(self, fixture, dispatch_events):
+        findings = queue.Queue()
+        stop = threading.Event()
+
+        def worker():
+            threading.current_thread().dbname = self.env.cr.dbname
+            try:
+                for dispatch_event in dispatch_events:
+                    if not dispatch_event.wait(self.BOUND_SECONDS):
+                        raise AssertionError('C4 dispatch event timed out')
+                    if stop.is_set():
+                        return
+                    cr = self._open_bounded_cursor()
+                    try:
+                        env = api.Environment(cr, SUPERUSER_ID, {})
+                        other_store_ids = env[
+                            'shopify.connector.store'
+                        ].search([
+                            ('id', '!=', fixture['store_id']),
+                        ]).ids
+                        handled = env[
+                            'shopify.connector.job.dispatch'
+                        ]._drain_one(
+                            exclude_store_ids=tuple(other_store_ids),
+                        )
+                        if not handled:
+                            raise AssertionError(
+                                'the scoped C4 dispatcher claimed no job'
+                            )
+                    finally:
+                        cr.rollback()
+                        cr.close()
+            except BaseException as exc:
+                findings.put((type(exc).__name__, str(exc)))
+
+        thread = threading.Thread(
+            target=worker, name='c4-location-dispatcher', daemon=True,
+        )
+        thread.start()
+
+        def stop_worker():
+            stop.set()
+            for event in dispatch_events:
+                event.set()
+            thread.join(self.BOUND_SECONDS)
+            self.assertFalse(thread.is_alive(), 'C4 dispatcher worker survived cleanup')
+
+        self.addCleanup(stop_worker)
+        return thread, findings
+
+    def _fresh_result(self, fixture):
+        cr = self._open_bounded_cursor()
+        try:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            jobs = env['shopify.connector.job'].search([
+                ('store_id', '=', fixture['store_id']),
+                ('job_type', '=', 'inventory_location_sync'),
+            ])
+            locations = env['shopify.connector.location'].search([
+                ('store_id', '=', fixture['store_id']),
+            ])
+            store = env['shopify.connector.store'].browse(fixture['store_id'])
+            settings = env[
+                'shopify.connector.store.settings'
+            ].browse(fixture['settings_id'])
+            return {
+                'job_ids': jobs.ids,
+                'job_state': jobs.state,
+                'job_generation': jobs.expected_connection_generation,
+                'store_generation': store.connection_generation,
+                'location_names': locations.mapped('name'),
+                'last_readiness_at': bool(store.last_readiness_at),
+                'readiness_stale': bool(settings.setup_readiness_stale_since),
+                'resume': settings.setup_wizard_step_key,
+            }
+        finally:
+            cr.rollback()
+            cr.close()
+
+    def _assert_worker_clean(self, thread, findings):
+        thread.join(self.BOUND_SECONDS)
+        self.assertFalse(thread.is_alive(), 'C4 dispatcher did not terminate')
+        errors = []
+        while not findings.empty():
+            errors.append(findings.get_nowait())
+        self.assertEqual(errors, [], 'C4 dispatcher findings')
 
     def test_location_refresh_success_is_followed_and_reloaded(self):
-        """A persisted successful run is rendered and survives reopening."""
+        """Two browser clicks coalesce, dispatch, recompute and reopen."""
         if 'shopify.connector.location.mapping' not in self.env:
             self.skipTest('shopify_connector_inventory is not installed')
-        user = self._admin('s1_refresh_admin')
-        store = self._seed_refresh_store(REFRESH_SHOP_DOMAIN)
-        job = self.env[
-            'shopify.connector.setup.wizard'
-        ].with_user(user)._setup_refresh_locations(store)
-        job.sudo().write({
-            'state': 'running',
-            'started_at': fields.Datetime.now(),
-        })
-        job.sudo().write({
-            'state': 'succeeded',
-            'finished_at': fields.Datetime.now(),
-        })
-        self.env['shopify.connector.location'].sudo().create({
-            'store_id': store.id,
-            'shopify_location_gid': 'gid://shopify/Location/REALTOUR',
-            'name': 'Dispatcher Tour Warehouse',
-            'shopify_location_active': True,
-        })
-        self.env.flush_all()
+        fixture = self._commit_fixture(REFRESH_SHOP_DOMAIN, 's1_refresh_admin')
+        self.addCleanup(self._cleanup_fixture, fixture)
+        # Odoo's post-install loader holds the registry class lock in this
+        # main thread. Real HTTP/worker threads need the same bounded lock
+        # decoupling as Odoo's own registry test-mode patch, while retaining
+        # mutual exclusion among themselves against the already-built registry.
+        self._patch_process_seam(
+            type(self.registry), '_lock', threading.RLock(),
+        )
+        calls, calls_lock = self._install_transport(fixture, fail_first=False)
+        dispatch = threading.Event()
+        admissions, admissions_lock = self._install_admission_observer(
+            fixture, [(2, dispatch)],
+        )
+        thread, findings = self._start_dispatcher(fixture, [dispatch])
+
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
-            login='s1_refresh_admin',
+            login=fixture['login'],
         )
-
-        jobs = self.env['shopify.connector.job'].sudo().search([
-            ('store_id', '=', store.id),
-            ('job_type', '=', 'inventory_location_sync'),
-        ])
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(jobs.state, 'succeeded')
+        self._assert_worker_clean(thread, findings)
+        with admissions_lock:
+            admitted_ids = list(admissions)
+        with calls_lock:
+            transport_count = len(calls)
+        self.assertEqual(len(admitted_ids), 2, 'the browser did not click twice')
         self.assertEqual(
-            jobs.expected_connection_generation,
-            store.connection_generation,
+            len(set(admitted_ids)), 1,
+            'duplicate browser admission created an unrelated run',
         )
-        cached = self.env['shopify.connector.location'].sudo().search([
-            ('store_id', '=', store.id),
-        ])
-        self.assertEqual(len(cached), 1)
-        self.assertEqual(cached.name, 'Dispatcher Tour Warehouse')
-        settings = self.env[
-            'shopify.connector.store.settings'
-        ].sudo().search([('store_id', '=', store.id)], limit=1)
-        self.assertEqual(settings.setup_wizard_step_key, 'location_mapping')
+        self.assertEqual(transport_count, 1)
+        result = self._fresh_result(fixture)
+        self.assertEqual(result['job_ids'], [admitted_ids[0]])
+        self.assertEqual(result['job_state'], 'succeeded')
+        self.assertEqual(result['job_generation'], result['store_generation'])
+        self.assertEqual(result['location_names'], ['Dispatcher Tour Warehouse'])
+        self.assertTrue(result['last_readiness_at'])
+        self.assertFalse(result['readiness_stale'])
+        self.assertEqual(result['resume'], 'location_mapping')
 
     def test_location_refresh_failure_shows_reason_and_retries_same_run(self):
-        """A persisted classified failure preserves identity on Retry."""
+        """A classified dispatched failure retries the same run to success."""
         if 'shopify.connector.location.mapping' not in self.env:
             self.skipTest('shopify_connector_inventory is not installed')
-        user = self._admin('s1_refresh_failure_admin')
-        store = self._seed_refresh_store(REFRESH_FAILURE_SHOP_DOMAIN)
-        job = self.env[
-            'shopify.connector.setup.wizard'
-        ].with_user(user)._setup_refresh_locations(store)
-        job.sudo().write({
-            'state': 'running',
-            'started_at': fields.Datetime.now(),
-        })
-        job._transition_failed_retryable(
-            error_class='odoo_validation_configuration',
-            message='The recorded location refresh reason is actionable.',
+        fixture = self._commit_fixture(
+            REFRESH_FAILURE_SHOP_DOMAIN, 's1_refresh_failure_admin',
         )
-        self.env.flush_all()
-        self.start_tour(
-            '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
-            login='s1_refresh_failure_admin',
+        self.addCleanup(self._cleanup_fixture, fixture)
+        self._patch_process_seam(
+            type(self.registry), '_lock', threading.RLock(),
+        )
+        calls, calls_lock = self._install_transport(fixture, fail_first=True)
+        first_dispatch = threading.Event()
+        retry_dispatch = threading.Event()
+        admissions, admissions_lock = self._install_admission_observer(
+            fixture, [(1, first_dispatch), (2, retry_dispatch)],
+        )
+        thread, findings = self._start_dispatcher(
+            fixture, [first_dispatch, retry_dispatch],
         )
 
-        jobs = self.env['shopify.connector.job'].sudo().search([
-            ('store_id', '=', store.id),
-            ('job_type', '=', 'inventory_location_sync'),
-        ])
-        self.assertEqual(len(jobs), 1)
-        self.assertEqual(
-            jobs.state, 'queued',
-            'the browser Retry must requeue the same failed run',
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
+            login=fixture['login'],
         )
+        self._assert_worker_clean(thread, findings)
+        with admissions_lock:
+            admitted_ids = list(admissions)
+        with calls_lock:
+            transport_count = len(calls)
+        self.assertEqual(len(admitted_ids), 2, 'initial and Retry clicks are required')
         self.assertEqual(
-            jobs.error_class, 'odoo_validation_configuration',
+            len(set(admitted_ids)), 1,
+            'Retry created an unrelated location-refresh run',
         )
+        self.assertEqual(transport_count, 2)
+        result = self._fresh_result(fixture)
+        self.assertEqual(result['job_ids'], [admitted_ids[0]])
+        self.assertEqual(result['job_state'], 'succeeded')
+        self.assertEqual(result['location_names'], ['Dispatcher Retry Warehouse'])
+        self.assertTrue(result['last_readiness_at'])
+        self.assertFalse(result['readiness_stale'])
+
+
+@tagged('post_install', '-at_install')
+class TestSetupBusinessReadPolicy(TransactionCase):
+    """The setup exception is exact; ordinary and quiesced reads stay shut."""
+
+    def setUp(self):
+        super().setUp()
+        self.store = self.env['shopify.connector.store'].create({
+            'name': 'Setup Business Read Policy',
+            'shop_domain': 'setup-business-read-policy.myshopify.com',
+            'state': 'setup_incomplete',
+        })
+        self.env[
+            'shopify.connector.store.credential'
+        ].action_set_token(self.store, REFRESH_DUMMY_TOKEN)
+        self.env.flush_all()
+        self.registry_enter_test_mode()
+
+    def _running_job(self, job_type='inventory_location_sync'):
+        return self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': job_type,
+            'state': 'running',
+            'payload_hash': 'setup-business-read-policy-%s' % job_type,
+            'started_at': fields.Datetime.now(),
+        })
+
+    @staticmethod
+    def _send_ok(client, store, body, token=None):
+        return FakeResponse(200, json_body={'data': {'shop': {'id': 'gid'}}})
+
+    def test_setup_location_refresh_business_read_is_admitted(self):
+        job = self._running_job()
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), '_send', self._send_ok):
+            with Client.execute_business_read(
+                job, self.store, 'query { shop { id } }', purpose='inventory',
+            ) as result:
+                self.assertEqual(result['data']['shop']['id'], 'gid')
+                self.assertEqual(
+                    self.env['shopify.connector.call.lease'].search_count([
+                        ('job_id', '=', job.id),
+                    ]),
+                    1,
+                )
+        self.assertFalse(self.env['shopify.connector.call.lease'].search([
+            ('job_id', '=', job.id),
+        ]))
+
+    def test_other_setup_inventory_business_read_remains_blocked(self):
+        job = self._running_job('inventory_push_scan')
+        with self.assertRaises(ShopifyQuiescedError):
+            with self.env[
+                'shopify.connector.api.client'
+            ].execute_business_read(
+                job, self.store, 'query { shop { id } }', purpose='inventory',
+            ):
+                pass
+        self.assertFalse(self.env['shopify.connector.call.lease'].search([
+            ('job_id', '=', job.id),
+        ]))
+
+    def test_setup_location_read_is_quiesced_outside_setup_incomplete(self):
+        job = self._running_job()
+        for state in ('reconnect_needed', 'disconnecting', 'disconnected'):
+            with self.subTest(state=state):
+                self.store.write({'state': state})
+                self.env.flush_all()
+                with self.assertRaises(ShopifyQuiescedError):
+                    with self.env[
+                        'shopify.connector.api.client'
+                    ].execute_business_read(
+                        job, self.store, 'query { shop { id } }',
+                        purpose='inventory',
+                    ):
+                        pass
+                self.assertFalse(
+                    self.env['shopify.connector.call.lease'].search([
+                        ('job_id', '=', job.id),
+                    ])
+                )
+
+    def test_setup_business_token_exchange_purpose_is_setup_only(self):
+        Credential = self.env['shopify.connector.store.credential']
+        self.assertTrue(Credential._assert_token_exchange_allowed(
+            self.store, 'setup_business_read',
+        ))
+        for state in (
+            'connected', 'reconnect_needed', 'disconnecting', 'disconnected',
+        ):
+            with self.subTest(state=state):
+                self.store.write({'state': state})
+                self.env.flush_all()
+                with self.assertRaises(ShopifyClientError):
+                    Credential._assert_token_exchange_allowed(
+                        self.store, 'setup_business_read',
+                    )

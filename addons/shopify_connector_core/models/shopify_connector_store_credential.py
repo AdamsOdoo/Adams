@@ -91,6 +91,10 @@ TOKEN_REFRESH_WAIT_SECONDS = 0.25
 TOKEN_EXCHANGE_PURPOSE_STATES = {
     'business': ('connected',),
     'setup': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    # Exact pre-activation cache read used by the onboarding location refresh.
+    # Kept separate from `setup`: that broader diagnostic family intentionally
+    # includes reconnect_needed, while business work must remain quiesced there.
+    'setup_business_read': ('setup_incomplete',),
     'reconnect': ('reconnect_needed', 'disconnected'),
 }
 

@@ -103,6 +103,14 @@ BUSINESS_READ_PURPOSE_JOB_PREFIXES = {
     'product_export': ('product_export_',),
 }
 
+# The only pre-activation business read. This is deliberately an exact triple,
+# not another prefix or a store-state bypass: the inventory location refresh
+# admitted by guided setup exists to produce the cache used by onboarding
+# readiness. Every other business read remains connected-only.
+SETUP_BUSINESS_READ_JOBS = frozenset({
+    ('inventory', 'setup_readiness_check', 'inventory_location_sync'),
+})
+
 
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
@@ -478,16 +486,26 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyQuiescedError(
                 'A business Shopify read requires the claimed running job.'
             )
-        # Match business mutation admission: refresh client-credentials tokens
-        # before opening the side transaction, never under a store-row lock.
+        setup_business_read = (
+            purpose, job.job_source, job.job_type,
+        ) in SETUP_BUSINESS_READ_JOBS
+        # Refresh client-credentials tokens before opening the side transaction,
+        # never under a store-row lock. The credential service performs its own
+        # fresh committed state check. Its setup-business purpose is narrower
+        # than the general setup probe family, so reconnect-needed/disconnected
+        # stores cannot contact Shopify in the interval before the final gate.
         self.env['shopify.connector.store.credential']._ensure_access_token(
-            store, purpose='business',
+            store,
+            purpose=(
+                'setup_business_read' if setup_business_read
+                else 'business'
+            ),
         )
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
         try:
             side_cr.execute(
-                "SELECT j.store_id, j.job_type, "
+                "SELECT j.store_id, j.job_source, j.job_type, "
                 "j.expected_connection_generation, s.company_id, s.state, "
                 "s.connection_generation "
                 "FROM shopify_connector_job j "
@@ -501,7 +519,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     'This job does not belong to the target store.'
                 )
             (
-                job_store_id, job_type, expected_generation,
+                job_store_id, job_source, job_type, expected_generation,
                 store_company_id, store_state, store_generation,
             ) = row
             # The job's immutable store foreign key is the ownership boundary.
@@ -524,7 +542,12 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 raise ShopifyQuiescedError(
                     'This job does not own the requested business-read purpose.'
                 )
-            if store_state != 'connected':
+            setup_state_allowed = (
+                store_state == 'setup_incomplete'
+                and (purpose, job_source, job_type)
+                in SETUP_BUSINESS_READ_JOBS
+            )
+            if store_state != 'connected' and not setup_state_allowed:
                 raise ShopifyQuiescedError(
                     'This store is not connected; the Shopify call is refused.'
                 )

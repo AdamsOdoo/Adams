@@ -155,8 +155,8 @@ TestUiSetupTours.test_setup_resumes_at_the_step_it_was_left_on \
 TestUiSetupTours.test_setup_is_operable_by_keyboard_alone \
 TestUiSetupTours.test_the_location_step_shows_every_cached_location_and_maps_one \
 TestUiSetupTours.test_a_blocking_readiness_row_deep_links_by_step_key \
-TestUiSetupTours.test_location_refresh_success_is_followed_and_reloaded \
-TestUiSetupTours.test_location_refresh_failure_shows_reason_and_retries_same_run \
+TestUiC4LocationRefreshTours.test_location_refresh_success_is_followed_and_reloaded \
+TestUiC4LocationRefreshTours.test_location_refresh_failure_shows_reason_and_retries_same_run \
 TestUiB2SettingsTours.test_store_settings_tour_changes_a_setting_through_the_menu_route \
 TestUiB2ProductTours.test_product_controls_tour_starts_a_real_scan \
 TestUiB2ProductTours.test_product_controls_are_absent_for_a_role_the_server_refuses \
@@ -321,20 +321,67 @@ preflight_browser() {
         exit 2
     fi
 
-    # The binary existing is not the same as the binary STARTING. A sandbox
-    # that forbids user namespaces, or a missing shared library, produces a
-    # binary that resolves and then dies -- which Odoo also turns into a skip.
-    local probe_dir
+    # Odoo drives Chromium through CDP. A headless process is expected to stay
+    # alive, and `--dump-dom` can hang even when CDP is healthy, so capability
+    # is proved through the same HTTP + WebSocket boundary HttpCase consumes.
+    local probe_dir probe_log browser_pid port
     probe_dir="$(mktemp -d)"
-    if ! "$ODOO_BROWSER_BIN" --headless=new --no-sandbox --disable-gpu \
-            --disable-dev-shm-usage --user-data-dir="$probe_dir" \
-            --dump-dom about:blank >/dev/null 2>&1; then
-        rm -rf "$probe_dir"
-        log "FATAL: ${ODOO_BROWSER_BIN} resolves but cannot render a page"
-        log "headlessly. Odoo would turn the failed connection into a SkipTest."
+    probe_log="$probe_dir/chromium.log"
+    "$ODOO_BROWSER_BIN" --headless --no-sandbox --disable-gpu \
+        --disable-dev-shm-usage --remote-debugging-address=127.0.0.1 \
+        --remote-debugging-port=0 --user-data-dir="$probe_dir/profile" \
+        about:blank >"$probe_log" 2>&1 &
+    browser_pid=$!
+    port=""
+    for _ in $(seq 1 300); do
+        if [[ -s "$probe_dir/profile/DevToolsActivePort" ]]; then
+            IFS= read -r port <"$probe_dir/profile/DevToolsActivePort"
+            break
+        fi
+        if ! kill -0 "$browser_pid" 2>/dev/null; then
+            break
+        fi
+        read -r -t 0.1 _unused || true
+    done
+    if [[ -z "$port" ]] || ! kill -0 "$browser_pid" 2>/dev/null || \
+       ! "$PYTHON" - "$port" <<'PY'
+import json
+import sys
+import urllib.request
+
+import websocket
+
+port = int(sys.argv[1])
+base = f'http://127.0.0.1:{port}'
+with urllib.request.urlopen(base + '/json/version', timeout=5) as response:
+    version = json.load(response)
+ws_url = version.get('webSocketDebuggerUrl')
+if not ws_url:
+    raise SystemExit('CDP version response has no browser WebSocket URL')
+ws = websocket.create_connection(ws_url, timeout=5, suppress_origin=True)
+try:
+    ws.send(json.dumps({'id': 1, 'method': 'Browser.getVersion'}))
+    reply = json.loads(ws.recv())
+finally:
+    ws.close()
+if not reply.get('result', {}).get('product'):
+    raise SystemExit('Browser.getVersion returned no product')
+with urllib.request.urlopen(base + '/json/list', timeout=5) as response:
+    targets = json.load(response)
+if not any(target.get('type') == 'page' for target in targets):
+    raise SystemExit('CDP exposed no inspectable page target')
+PY
+    then
+        kill "$browser_pid" 2>/dev/null || true
+        wait "$browser_pid" 2>/dev/null || true
+        log "FATAL: ${ODOO_BROWSER_BIN} did not expose a usable CDP endpoint."
+        sed -n '1,40p' "$probe_log" >&2
+        rm -r -- "$probe_dir"
         exit 2
     fi
-    rm -rf "$probe_dir"
+    kill "$browser_pid" 2>/dev/null || true
+    wait "$browser_pid" 2>/dev/null || true
+    rm -r -- "$probe_dir"
 
     log "browser: ${ODOO_BROWSER_BIN} (${BROWSER_VERSION})"
     log "websocket-client: ${WEBSOCKET_VERSION}"

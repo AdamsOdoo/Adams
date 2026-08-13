@@ -635,7 +635,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_readiness_tour", {
     ],
 });
 
-// --- 7. C4: terminal success follow-through and durable reopening. ---
+// --- 7. C4: browser admission, coalescing, dispatch and durable reopening. ---
 registry.category("web_tour.tours").add(
     "shopify_connector_s1_location_refresh_dispatch_tour",
     {
@@ -647,8 +647,26 @@ registry.category("web_tour.tours").add(
                 content: "The exact store resumes on its location step.",
             },
             {
+                trigger: ".sc_setup_refresh_locations",
+                content: "The merchant starts the location refresh in the browser.",
+                run: "click",
+            },
+            {
+                trigger: ".sc_setup_refresh_state:contains('Waiting')",
+                content: "The admitted run is visible before a dispatcher handles it.",
+            },
+            {
+                trigger: ".sc_setup_refresh_still_running",
+                content: "The first browser RPC completed without a dispatcher.",
+            },
+            {
+                trigger: ".sc_setup_refresh_locations:not([disabled])",
+                content: "The merchant performs the second refresh RPC before dispatch.",
+                run: "click",
+            },
+            {
                 trigger: ".sc_setup_refresh_state:contains('Succeeded')",
-                content: "The exact terminal run is rendered as succeeded.",
+                content: "The genuine dispatcher completed the exact admitted run.",
             },
             {
                 trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
@@ -672,7 +690,7 @@ registry.category("web_tour.tours").add(
     }
 );
 
-// --- 8. C4: classified failure reason and same-run Retry. ---
+// --- 8. C4: dispatched classified failure and same-run successful Retry. ---
 registry.category("web_tour.tours").add(
     "shopify_connector_s1_location_refresh_failure_tour",
     {
@@ -681,8 +699,13 @@ registry.category("web_tour.tours").add(
             ...openSetupWizard(),
             { trigger: heading(7, "Location mapping") },
             {
-                trigger: ".sc_setup_refresh_failure_reason:contains('recorded location refresh reason')",
-                content: "The recorded classified reason is visible and actionable.",
+                trigger: ".sc_setup_refresh_locations",
+                content: "The merchant starts the failing refresh in the browser.",
+                run: "click",
+            },
+            {
+                trigger: ".sc_setup_refresh_failure_reason:contains('did not serve the Admin API version')",
+                content: "The dispatcher's classified merchant-safe reason is visible.",
             },
             {
                 trigger: ".sc_setup_refresh_locations:contains('Retry')",
@@ -690,8 +713,12 @@ registry.category("web_tour.tours").add(
                 run: "click",
             },
             {
-                trigger: ".sc_setup_refresh_state:contains('Waiting')",
-                content: "Retry requeued the preserved run identity.",
+                trigger: ".sc_setup_refresh_state:contains('Succeeded')",
+                content: "Retry continued the preserved run and completed successfully.",
+            },
+            {
+                trigger: ".sc_setup__location:contains('Dispatcher Retry Warehouse')",
+                content: "The retried dispatcher populated the real location cache.",
             },
         ],
     }
