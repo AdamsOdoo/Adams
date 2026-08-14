@@ -677,7 +677,17 @@ registry.category("web_tour.tours").add(
                 run: "click",
             },
             { trigger: ".o_sc_dashboard" },
-            ...openSetupWizard(),
+            // App-launch reachability was already proved at the start of this
+            // journey. Reopen Setup from the connector dashboard so this
+            // second half isolates the durable close/reopen claim instead of
+            // depending on a second apps-launcher render in the constrained
+            // native Odoo.sh browser.
+            openConnectorSection("menu_shopify_connector_configuration"),
+            {
+                trigger: menu("menu_shopify_connector_setup_wizard"),
+                content: "Reopen the guided setup from the connector app.",
+                run: "click",
+            },
             {
                 trigger: heading(7, "Location mapping"),
                 content: "Closing and reopening resumes the same store and step.",
