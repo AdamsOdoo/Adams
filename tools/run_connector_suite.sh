@@ -344,7 +344,7 @@ preflight_browser() {
         sleep 0.1
     done
     if [[ -z "$port" ]] || ! kill -0 "$browser_pid" 2>/dev/null || \
-       ! "$PYTHON" - "$port" <<'PY'
+       ! "$VENV/bin/python" - "$port" <<'PY'
 import json
 import sys
 import urllib.request
