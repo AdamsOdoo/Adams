@@ -341,7 +341,7 @@ preflight_browser() {
         if ! kill -0 "$browser_pid" 2>/dev/null; then
             break
         fi
-        read -r -t 0.1 _unused || true
+        sleep 0.1
     done
     if [[ -z "$port" ]] || ! kill -0 "$browser_pid" 2>/dev/null || \
        ! "$PYTHON" - "$port" <<'PY'
