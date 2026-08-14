@@ -2,11 +2,20 @@
 <odoo>
     <!-- C1: durable mapping tables are Administrator-only Configuration. -->
 
-    <menuitem id="menu_shopify_connector_catalog"
-              name="Mappings"
-              parent="shopify_connector_core.menu_shopify_connector_configuration"
-              sequence="30"
-              groups="shopify_connector_core.group_shopify_connector_admin"/>
+    <!--
+        Use an exact many2many replacement here.  The menuitem ``groups``
+        shorthand links the declared group but does not retire a group linked
+        by an older module version.  Databases upgraded from the former
+        operator-facing Catalog branch must lose that obsolete visibility.
+    -->
+    <record id="menu_shopify_connector_catalog" model="ir.ui.menu">
+        <field name="name">Mappings</field>
+        <field name="parent_id"
+               ref="shopify_connector_core.menu_shopify_connector_configuration"/>
+        <field name="sequence">30</field>
+        <field name="group_ids"
+               eval="[Command.set([ref('shopify_connector_core.group_shopify_connector_admin')])]"/>
+    </record>
 
     <menuitem id="menu_shopify_connector_product_binding"
               name="Product Mappings"
