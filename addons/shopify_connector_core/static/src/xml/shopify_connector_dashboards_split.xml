@@ -240,11 +240,11 @@
                     <t t-if="data.health.state === 'empty'">
                         <div t-att-class="bandClass(data.health.lead.severity)" aria-live="polite">
                             <i class="fa sc-band__icon" t-att-class="data.health.lead.icon" aria-hidden="true"/>
-                            <div class="sc-band__body"><div class="sc-band__text" t-esc="data.health.lead.text"/><div class="sc-band__hint" t-esc="data.health.lead.hint"/></div>
-                        </div>
-                        <div class="sc-empty">
-                            <p>No visible store evidence exists yet.</p>
-                            <button t-if="data.setup_available" class="sc-btn sc_dashboard_setup" t-on-click="() => this.openSetup()">Set up your store</button>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text" t-esc="data.health.lead.text"/>
+                                <div class="sc-band__hint" t-esc="data.health.lead.hint"/>
+                                <button t-if="data.setup_available" class="sc-btn sc-band__action sc_dashboard_setup" t-on-click="() => this.openSetup()">Set up your store</button>
+                            </div>
                         </div>
                     </t>
                     <t t-else="">

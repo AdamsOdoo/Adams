@@ -187,12 +187,13 @@
                            options="{'no_create': True, 'no_open': True}"/>
                     <field name="odoo_location_id"
                            options="{'no_create': True}"/>
-                    <field name="push_enabled"/>
+                    <field name="push_enabled"
+                            string="Enable future inventory synchronization for this location"/>
                 </group>
                 <div class="alert alert-warning" role="status">
-                    Mapping a location does not push any stock. The first
-                    push for each product and location still waits for its
-                    own explicit confirmation.
+                    This setting only enables future inventory synchronization. Creating
+                    the mapping does not push stock; each product-location
+                    pair still requires explicit confirmation before its first push.
                 </div>
                 <footer>
                     <button name="action_confirm" type="object"

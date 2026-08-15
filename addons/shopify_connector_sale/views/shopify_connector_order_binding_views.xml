@@ -9,7 +9,7 @@
         is explicit that each gets its own badge:
 
           * Shopify financial status  (what the shop says about payment)
-          * Shopify fulfilment status (what the shop says about shipping)
+          * Shopify fulfillment status (what the shop says about shipping)
           * cancellation              (shopify_cancelled_at / reason)
           * connector binding status  (what THIS connector concluded)
           * COD collection            (three further COD dimensions)
@@ -72,7 +72,7 @@
                             string="Shopify Financial Status"
                             context="{'group_by': 'shopify_financial_status_snapshot'}"/>
                     <filter name="group_fulfillment"
-                            string="Shopify Fulfilment Status"
+                            string="Shopify Fulfillment Status"
                             context="{'group_by': 'shopify_fulfillment_status_snapshot'}"/>
                     <filter name="group_status" string="Binding Status"
                             context="{'group_by': 'status'}"/>
@@ -97,7 +97,7 @@
                 <field name="shopify_financial_status_snapshot"
                        string="Payment (Shopify)"/>
                 <field name="shopify_fulfillment_status_snapshot"
-                       string="Fulfilment (Shopify)"/>
+                       string="Fulfillment (Shopify)"/>
                 <field name="status" string="Connector"
                        decoration-warning="status == 'review'"
                        decoration-muted="status == 'inactive'"/>
@@ -175,7 +175,7 @@
                                    readonly="1" string="Previously"
                                    invisible="not shopify_previous_financial_status_snapshot"/>
                             <field name="shopify_fulfillment_status_snapshot"
-                                   readonly="1" string="Fulfilment"/>
+                                   readonly="1" string="Fulfillment"/>
                             <field name="shopify_cancelled_at" readonly="1"
                                    string="Cancelled at"/>
                             <field name="shopify_processed_at" readonly="1"/>
@@ -319,7 +319,7 @@
 
     <record id="action_shopify_connector_order_workspace"
             model="ir.actions.act_window">
-        <field name="name">Orders Workspace</field>
+        <field name="name">Orders</field>
         <field name="res_model">shopify.connector.order.binding</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id"
@@ -348,7 +348,7 @@
                 <!-- Three badges, one per COD dimension. Same rule as the
                      orders list: never merged into a single "COD state". -->
                 <field name="cod_commercial_state" string="Commercial"/>
-                <field name="cod_fulfillment_state" string="Fulfilment"/>
+                <field name="cod_fulfillment_state" string="Fulfillment"/>
                 <field name="cod_collection_state" string="Collection"
                        decoration-success="cod_collection_state == 'fully_collected'"
                        decoration-warning="cod_collection_state == 'partially_collected'"
@@ -393,7 +393,7 @@
                 No cash-on-delivery orders awaiting reconciliation.
             </p>
             <p>
-                COD orders appear here with their commercial, fulfilment and
+                COD orders appear here with their commercial, fulfillment and
                 collection states shown separately.
             </p>
         </field>

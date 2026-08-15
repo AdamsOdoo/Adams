@@ -48,7 +48,7 @@
                 <filter name="filter_status_review" string="In Review"
                         domain="[('status', '=', 'review')]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <separator/>
                 <filter name="filter_imported_last_week" string="Imported This Week"
@@ -76,7 +76,7 @@
                 <field name="shopify_title"/>
                 <field name="product_template_id"/>
                 <field name="store_id" optional="show"/>
-                <field name="match_key" optional="show"/>
+                <field name="match_key" string="Matched by" optional="show"/>
                 <field name="shopify_status" optional="show"/>
                 <field name="status"
                        decoration-warning="status == 'review'"
@@ -86,7 +86,7 @@
                     badge carries the word "Quarantined" as well as the
                     danger family.
                 -->
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
                 <field name="shopify_last_imported_at" optional="hide"/>
                 <field name="shopify_gid" optional="hide"/>
@@ -109,7 +109,7 @@
                     -->
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This binding's company no longer agrees with its
                         store's. It is hidden from ordinary reads and no job
                         will process it until an administrator releases it.
@@ -140,7 +140,7 @@
                     <group>
                         <group string="Match Evidence">
                             <field name="status" readonly="1"/>
-                            <field name="match_key" readonly="1"/>
+                            <field name="match_key" string="Matched by" readonly="1"/>
                             <field name="matched_by_uid" readonly="1"/>
                             <field name="matched_at" readonly="1"/>
                         </group>
@@ -196,13 +196,13 @@
             <search string="Variant Bindings">
                 <field name="product_variant_id"/>
                 <field name="shopify_gid"/>
-                <field name="product_template_binding_id"/>
+                <field name="product_template_binding_id" string="Product mapping"/>
                 <field name="store_id"/>
                 <filter name="filter_needs_attention"
                         string="Needs Attention"
                         domain="['|', ('status', '=', 'review'), ('sec3_scope_quarantined', '=', True)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_template" string="Product"
@@ -223,10 +223,10 @@
         <field name="arch" type="xml">
             <list string="Variant Bindings" create="false" delete="false">
                 <field name="product_variant_id"/>
-                <field name="product_template_binding_id" optional="show"/>
+                <field name="product_template_binding_id" string="Product mapping" optional="show"/>
                 <field name="shopify_option_values" optional="show"/>
                 <field name="store_id" optional="hide"/>
-                <field name="match_key" optional="show"/>
+                <field name="match_key" string="Matched by" optional="show"/>
                 <!--
                     Price snapshots are shown as plain text, deliberately.
                     They are a snapshot of what Shopify last reported, not an
@@ -239,7 +239,7 @@
                 <field name="status"
                        decoration-warning="status == 'review'"
                        decoration-muted="status == 'inactive'"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
             </list>
         </field>
@@ -254,7 +254,7 @@
                 <sheet>
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This binding's company no longer agrees with its
                         store's. No job will process it until an administrator
                         releases it.
@@ -265,7 +265,7 @@
                     <group>
                         <group string="Odoo">
                             <field name="product_template_binding_id"
-                                   readonly="1"/>
+                                   string="Product mapping" readonly="1"/>
                             <field name="company_id" readonly="1"/>
                         </group>
                         <group string="Shopify">
@@ -287,7 +287,7 @@
                         </group>
                         <group string="Match Evidence">
                             <field name="status" readonly="1"/>
-                            <field name="match_key" readonly="1"/>
+                            <field name="match_key" string="Matched by" readonly="1"/>
                             <field name="matched_by_uid" readonly="1"/>
                             <field name="matched_at" readonly="1"/>
                         </group>

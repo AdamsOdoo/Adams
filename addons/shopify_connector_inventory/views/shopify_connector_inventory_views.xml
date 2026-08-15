@@ -34,7 +34,7 @@
                 <filter name="filter_push_disabled" string="Push Disabled"
                         domain="[('push_enabled', '=', False)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_store" string="Store"
@@ -60,7 +60,7 @@
                 <field name="status"
                        decoration-warning="status == 'review'"
                        decoration-muted="status == 'inactive'"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
             </list>
         </field>
@@ -153,7 +153,7 @@
                 <sheet>
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This mapping's company no longer agrees with its
                         store's. Inventory for this location is paused until
                         an administrator releases it.
@@ -174,7 +174,7 @@
                             <field name="store_id" readonly="1"/>
                             <field name="shopify_gid" readonly="1"/>
                             <field name="status" readonly="1"/>
-                            <field name="match_key" readonly="1"/>
+                            <field name="match_key" string="Matched by" readonly="1"/>
                         </group>
                     </group>
                 </sheet>
@@ -218,7 +218,7 @@
         <field name="model">shopify.connector.inventory.level.binding</field>
         <field name="arch" type="xml">
             <search string="Inventory Levels">
-                <field name="product_variant_binding_id"/>
+                <field name="product_variant_binding_id" string="Product variant"/>
                 <field name="location_mapping_id"/>
                 <field name="store_id"/>
                 <field name="shopify_inventory_item_gid"/>
@@ -241,7 +241,7 @@
                 <filter name="filter_never_pushed" string="Never Pushed"
                         domain="[('last_pushed_at', '=', False)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_location" string="Location"
@@ -261,18 +261,18 @@
         <field name="model">shopify.connector.inventory.level.binding</field>
         <field name="arch" type="xml">
             <list string="Inventory Levels" create="false" delete="false">
-                <field name="product_variant_binding_id"/>
-                <field name="location_mapping_id" optional="show"/>
-                <field name="pending_target_available" string="Odoo Target"/>
+                <field name="product_variant_binding_id" string="Product variant"/>
+                <field name="location_mapping_id" string="Location pair" optional="show"/>
+                <field name="pending_target_available" string="Odoo quantity"/>
                 <field name="last_known_shopify_available"
-                       string="Shopify (last known)"/>
+                       string="Shopify quantity (last known)"/>
                 <field name="last_pushed_available" optional="hide"/>
-                <field name="last_pushed_at" optional="show"/>
-                <field name="first_push_state"
+                <field name="last_pushed_at" string="Last pushed" optional="show"/>
+                <field name="first_push_state" string="First stock push"
                        decoration-warning="first_push_state == 'pending'"
                        decoration-success="first_push_state == 'confirmed'"/>
                 <field name="status" optional="hide"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
                 <field name="store_id" optional="hide"/>
             </list>
@@ -358,7 +358,7 @@
                 <sheet>
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This level's company no longer agrees with its store's.
                         No push or verification job will process it until an
                         administrator releases it.
@@ -423,7 +423,7 @@
                     <group>
                         <group string="Pair">
                             <field name="product_variant_binding_id"
-                                   readonly="1"/>
+                                   string="Product variant" readonly="1"/>
                             <field name="location_mapping_id" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="company_id" readonly="1"/>
@@ -462,7 +462,7 @@
                         <field name="shopify_inventory_item_gid" readonly="1"/>
                         <field name="shopify_gid" readonly="1"/>
                         <field name="status" readonly="1"/>
-                        <field name="match_key" readonly="1"/>
+                        <field name="match_key" string="Matched by" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -471,7 +471,7 @@
 
     <record id="action_shopify_connector_inventory_workspace"
             model="ir.actions.act_window">
-        <field name="name">Inventory Workspace</field>
+        <field name="name">Inventory</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id"

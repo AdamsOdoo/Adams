@@ -46,7 +46,7 @@
 
     <!-- Evidence is a contextual drill-down, never a navigation concept. -->
     <menuitem id="menu_shopify_connector_mutation_evidence"
-              name="Mutation Evidence"
+              name="Shopify Write Evidence"
               parent="menu_shopify_connector_error_center"
               action="action_shopify_connector_mutation_attempt"
               sequence="10"

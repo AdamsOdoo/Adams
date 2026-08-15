@@ -47,7 +47,7 @@
                 <filter name="filter_cancelled" string="Cancelled"
                         domain="[('state', '=', 'cancelled')]"/>
                 <separator/>
-                <filter name="filter_has_evidence" string="Has mutation evidence"
+                <filter name="filter_has_evidence" string="Has Shopify write evidence"
                         domain="[('mutation_attempt_id', '!=', False)]"/>
                 <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
@@ -83,7 +83,7 @@
                 <field name="error_class" string="Recorded reason" optional="hide"/>
                 <field name="retry_count" string="Retries" optional="show"/>
                 <field name="next_retry_at" string="Next retry" optional="show"/>
-                <field name="mutation_attempt_id" string="Mutation evidence" optional="show" widget="many2one"/>
+                <field name="mutation_attempt_id" string="Shopify write evidence" optional="show" widget="many2one"/>
                 <field name="operator_has_mutation_evidence" column_invisible="True"/>
                 <field name="res_model" optional="hide"/>
                 <field name="started_at" string="Started" optional="hide"/>
@@ -177,7 +177,7 @@
                                 string="Log entries"
                                 context="{'search_default_job_id': id}"/>
                     </div>
-                    <widget name="web_ribbon" title="Mutation evidence"
+                    <widget name="web_ribbon" title="Shopify write evidence"
                             bg_color="text-bg-warning"
                             invisible="not operator_has_mutation_evidence"/>
                     <group>
@@ -215,7 +215,7 @@
                     </group>
                     <div class="text-muted"
                          invisible="not operator_has_mutation_evidence">
-                        This run carries mutation evidence. It is resolved only through the
+                        This run carries Shopify write evidence. It is resolved only through the
                         administrator mutation-attempt review — the generic retry and cancel
                         actions do not apply.
                     </div>
@@ -239,7 +239,7 @@
         <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No runs yet</p>
-            <p>Every queued, running, retrying and completed connector run appears here. Retry queues local background work; cancel records a reason; Shopify mutation evidence opens read-only before any administrator decision.</p>
+            <p>Every queued, running, retrying and completed connector run appears here. Retry queues local background work; cancel records a reason; Shopify write evidence opens read-only before any administrator decision.</p>
         </field>
     </record>
 

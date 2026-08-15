@@ -73,7 +73,7 @@
     * { box-sizing: border-box; }
 
     .o_sc_setup__inner {
-        max-inline-size: 880px;
+        max-inline-size: 1120px;
         margin-inline: auto;
         display: flex;
         flex-direction: column;
@@ -228,10 +228,12 @@
     }
 
     .sc_setup_step {
-        display: flex;
-        align-items: center;
-        gap: var(--sc-space-2);
-        padding: var(--sc-space-1) var(--sc-space-3);
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: start;
+        column-gap: var(--sc-space-2);
+        row-gap: var(--sc-space-1);
+        padding: var(--sc-space-2);
         border: 1px solid var(--sc-border);
         border-radius: var(--sc-radius);
         background: var(--sc-surface-1);
@@ -239,12 +241,20 @@
         color: var(--sc-text-secondary);
 
         .sc_setup_step__label {
+            grid-column: 2;
             min-inline-size: 0;
-            overflow-wrap: anywhere;
+            overflow-wrap: normal;
+            line-height: 1.3;
         }
 
         .sc_setup_step__index {
+            grid-column: 1;
             font-weight: var(--sc-fw-dominant);
+        }
+
+        > .sc-badge {
+            grid-column: 2;
+            justify-self: start;
         }
 
         &.sc_setup_step--current {
@@ -275,6 +285,8 @@
 
     // --- The one panel: a single card, never nested cards ---
     .sc_setup__panel {
+        inline-size: min(100%, 880px);
+        margin-inline: auto;
         display: flex;
         flex-direction: column;
         gap: var(--sc-space-4);
@@ -590,6 +602,8 @@
         position: sticky;
         inset-block-end: 0;
         z-index: 1;
+        inline-size: min(100%, 880px);
+        margin-inline: auto;
         display: flex;
         flex-wrap: wrap;
         gap: var(--sc-space-3);

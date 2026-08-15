@@ -18,7 +18,7 @@
         <field name="name">shopify.connector.mutation.attempt.search</field>
         <field name="model">shopify.connector.mutation.attempt</field>
         <field name="arch" type="xml">
-            <search string="Mutation evidence">
+            <search string="Shopify write evidence">
                 <field name="store_id"/>
                 <field name="mutation_domain"/>
                 <field name="job_id"/>
@@ -49,7 +49,7 @@
         <field name="name">shopify.connector.mutation.attempt.list</field>
         <field name="model">shopify.connector.mutation.attempt</field>
         <field name="arch" type="xml">
-            <list string="Mutation evidence" default_order="created_at desc"
+            <list string="Shopify write evidence" default_order="created_at desc"
                   decoration-danger="observed_outcome == 'uncertain' and not resolution_disposition"
                   decoration-success="observed_outcome == 'succeeded' or resolution_disposition == 'applied'"
                   decoration-muted="observed_outcome == 'failed_clean' or resolution_disposition == 'not_applied'"
@@ -72,7 +72,7 @@
         <field name="name">shopify.connector.mutation.attempt.form</field>
         <field name="model">shopify.connector.mutation.attempt</field>
         <field name="arch" type="xml">
-            <form string="Mutation evidence" create="false" delete="false" edit="false">
+            <form string="Shopify write evidence" create="false" delete="false" edit="false">
                 <header>
                     <button name="%(action_shopify_connector_mutation_resolution_wizard)d" type="action"
                             string="Resolve" class="btn-primary"
@@ -134,13 +134,13 @@
 
     <!-- Action -->
     <record id="action_shopify_connector_mutation_attempt" model="ir.actions.act_window">
-        <field name="name">Mutation Evidence</field>
+        <field name="name">Shopify Write Evidence</field>
         <field name="res_model">shopify.connector.mutation.attempt</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_shopify_connector_mutation_attempt_search"/>
         <field name="context">{}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">No mutation evidence</p>
+            <p class="o_view_nocontent_smiling_face">No Shopify write evidence</p>
             <p>When a change to Shopify needs an audited decision, its evidence appears here.</p>
         </field>
     </record>

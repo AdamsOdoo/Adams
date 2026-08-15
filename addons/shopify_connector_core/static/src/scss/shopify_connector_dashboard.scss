@@ -51,6 +51,7 @@
             line-height: 1.2;
         }
         .sc-band__hint { font-size: var(--sc-fs-secondary); color: var(--sc-text-secondary); }
+        .sc-band__action { align-self: flex-start; margin-block-start: var(--sc-space-2); }
 
         &.sc-band--success { background: var(--sc-success-bg); color: var(--sc-success-text);
             .sc-band__hint { color: var(--sc-success-text); } }

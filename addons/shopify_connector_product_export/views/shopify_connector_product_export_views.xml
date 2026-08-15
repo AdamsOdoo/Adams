@@ -28,7 +28,7 @@
         <field name="name">shopify.connector.product.export.preview.search</field>
         <field name="model">shopify.connector.product.export.preview</field>
         <field name="arch" type="xml">
-            <search string="Export Previews">
+            <search string="Product Export Reviews">
                 <field name="product_template_id"/>
                 <field name="store_id"/>
                 <field name="remote_product_gid"/>
@@ -42,7 +42,7 @@
                         string="Has Refused Differences"
                         domain="[('has_blocked_differences', '=', True)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_store" string="Store"
@@ -61,7 +61,7 @@
         <field name="name">shopify.connector.product.export.preview.list</field>
         <field name="model">shopify.connector.product.export.preview</field>
         <field name="arch" type="xml">
-            <list string="Export Previews" create="false" delete="false">
+            <list string="Product Export Reviews" create="false" delete="false">
                 <field name="previewed_at"/>
                 <field name="product_template_id"/>
                 <field name="export_path"/>
@@ -77,11 +77,11 @@
                        decoration-danger="state == 'blocked'"
                        decoration-success="state == 'applied'"
                        decoration-muted="state == 'expired'"/>
-                <field name="has_blocked_differences" string="Refusals"
+                <field name="has_blocked_differences" string="Blocked changes"
                        widget="boolean_toggle" readonly="1"/>
                 <field name="expires_at" optional="show"/>
-                <field name="confirmed_uid" optional="show"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="confirmed_uid" string="Confirmed by" optional="show"/>
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="hide"/>
             </list>
         </field>
@@ -152,7 +152,7 @@
                             <field name="product_template_id" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="export_path" readonly="1"/>
-                            <field name="product_template_binding_id"
+                            <field name="product_template_binding_id" string="Product mapping"
                                    readonly="1"
                                    invisible="not product_template_binding_id"/>
                             <field name="remote_product_gid" readonly="1"
@@ -164,7 +164,7 @@
                             <field name="remote_updated_at" readonly="1"
                                    invisible="not remote_updated_at"/>
                             <field name="source_write_date" readonly="1"/>
-                            <field name="confirmed_uid" readonly="1"
+                            <field name="confirmed_uid" string="Confirmed by" readonly="1"
                                    invisible="not confirmed_uid"/>
                             <field name="confirmed_at" readonly="1"
                                    invisible="not confirmed_at"/>
@@ -201,7 +201,7 @@
 
     <record id="action_shopify_connector_product_export_preview"
             model="ir.actions.act_window">
-        <field name="name">Export Previews</field>
+        <field name="name">Product Export Reviews</field>
         <field name="res_model">shopify.connector.product.export.preview</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'search_default_filter_awaiting_review': 1}</field>
@@ -229,7 +229,7 @@
             <search string="Media Exports">
                 <field name="connector_filename"/>
                 <field name="shopify_gid"/>
-                <field name="product_template_binding_id"/>
+                <field name="product_template_binding_id" string="Product mapping"/>
                 <field name="store_id"/>
                 <filter name="filter_in_flight" string="In Flight"
                         domain="[('remote_status', 'in', ['staged', 'uploaded', 'processing', 'ready'])]"/>
@@ -256,8 +256,8 @@
             <list string="Media Exports" create="false" delete="false">
                 <field name="connector_filename"/>
                 <field name="media_role"/>
-                <field name="product_template_binding_id" optional="show"/>
-                <field name="product_variant_binding_id" optional="hide"/>
+                <field name="product_template_binding_id" string="Product mapping" optional="show"/>
+                <field name="product_variant_binding_id" string="Product variant mapping" optional="hide"/>
                 <field name="remote_status"
                        decoration-warning="remote_status in ['staged', 'uploaded', 'processing']"
                        decoration-danger="remote_status == 'failed'"
@@ -538,7 +538,7 @@
                             <field name="product_export_domain_enabled"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
                             <field name="product_export_binding_namespace_ready"
-                                   readonly="1"/>
+                                   string="Product export mappings ready" readonly="1"/>
                         </group>
                         <group string="Ownership">
                             <field name="price_source_of_truth"
@@ -573,7 +573,7 @@
                 <field name="product_export_domain_enabled"
                        widget="boolean_toggle" readonly="1"/>
                 <field name="product_export_binding_namespace_ready"
-                       widget="boolean_toggle" readonly="1"/>
+                       string="Product export mappings ready" widget="boolean_toggle" readonly="1"/>
                 <field name="price_source_of_truth"/>
                 <field name="media_source_of_truth"/>
             </list>

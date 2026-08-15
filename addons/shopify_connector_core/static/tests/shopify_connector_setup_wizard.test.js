@@ -672,7 +672,7 @@ describe("shopify connector setup wizard", () => {
         expect(rows[0]).toInclude("Mapped");
         expect(rows[0]).toInclude("WH/Stock");
         expect(rows[1]).toInclude("Not mapped");
-        expect(rows[1]).toInclude("will not be synchronised");
+        expect(rows[1]).toInclude("will not be synchronized");
     });
 
     // ======================================================================

@@ -4,7 +4,7 @@
          settings and mode move to Administrator-only Configuration. -->
 
     <menuitem id="menu_shopify_connector_fulfillment"
-              name="Fulfillment"
+              name="Fulfillments"
               parent="shopify_connector_core.menu_shopify_connector_operations"
               action="action_shopify_connector_fulfillment_binding"
               sequence="40"

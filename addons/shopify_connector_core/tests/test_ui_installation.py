@@ -101,7 +101,7 @@ class TestUiInstallation(TransactionCase):
             ],
             'menu_shopify_connector_operations': [
                 'Orders', 'Product Imports/Exports', 'Inventory',
-                'Fulfillment', 'Runs & Recovery', 'Needs Attention',
+                'Fulfillments', 'Runs & Recovery', 'Needs Attention',
             ],
             'menu_shopify_connector_reporting': [
                 'Sales Analysis', 'Sync Performance', 'Audit Trail',

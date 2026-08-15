@@ -104,7 +104,7 @@
                         <t t-if="state.stepKey === 'welcome'">
                             <p class="sc_setup__lead">
                                 This connects one Shopify store to this Odoo database. It
-                                takes about ten minutes, and <strong>nothing synchronises
+                                takes about ten minutes, and <strong>nothing synchronizes
                                 and nothing is written to Shopify until you finish and
                                 say so</strong>.
                             </p>
@@ -463,9 +463,9 @@
                             <t t-else="">
                                 <p class="sc_setup__lead">
                                     Each Shopify location has to be paired with an Odoo
-                                    internal location before its stock can be synchronised.
+                                    internal location before its stock can be synchronized.
                                     <strong>An unmapped Shopify location is not
-                                    synchronised.</strong> Pairing is always explicit —
+                                    synchronized.</strong> Pairing is always explicit —
                                     nothing is matched by name.
                                 </p>
 
@@ -632,7 +632,7 @@
                                             </span>
                                             <span t-else="" class="sc_setup__location-target">
                                                 Stock for this Shopify location will not be
-                                                synchronised until it is mapped.
+                                                synchronized until it is mapped.
                                             </span>
                                             <code class="sc_setup__location-gid"
                                                   t-esc="location.shopify_gid"/>
