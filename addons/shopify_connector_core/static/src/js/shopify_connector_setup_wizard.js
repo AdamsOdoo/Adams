@@ -80,6 +80,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.notification = useService("notification");
         this.direction = localeDirection();
         this.headingRef = useRef("heading");
+        this.panelRef = useRef("panel");
 
         this.state = useState({
             status: "loading", // "loading" | "ready" | "error"
@@ -126,6 +127,10 @@ export class ShopifyConnectorSetupWizard extends Component {
                     nextOffset: false, continuation: null, emptyReason: "",
                 },
             },
+            // Per-Shopify-row Odoo choices.  Keeping the choice beside the
+            // row removes the old two-list/two-search/global-select puzzle;
+            // the server still validates both identities on every save.
+            locationMappingChoices: {},
             locationRefreshStillRunning: false,
         });
 
@@ -148,6 +153,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         // left at the bottom of the previous one.
         useEffect(
             () => {
+                if (this.panelRef.el) {
+                    this.panelRef.el.scrollTop = 0;
+                }
                 if (this.headingRef.el) {
                     this.headingRef.el.focus();
                 }
@@ -187,6 +195,9 @@ export class ShopifyConnectorSetupWizard extends Component {
                 refresh: { state: "none" },
                 mapped_count: 0,
                 unmapped_count: 0,
+                mapping_complete: false,
+                shopify_total: 0,
+                odoo_total: 0,
             }
         );
     }
@@ -246,6 +257,20 @@ export class ShopifyConnectorSetupWizard extends Component {
     get currentStepApplies() {
         const step = this.currentStep;
         return step.applicable === undefined ? true : step.applicable;
+    }
+
+    /** One navigation rule, mirrored by the server-side Continue guard. */
+    get canContinue() {
+        if (
+            this.state.stepKey === "location_mapping" &&
+            this.currentStepApplies
+        ) {
+            return Boolean(
+                this.refreshState() === "succeeded" &&
+                this.locations.mapping_complete
+            );
+        }
+        return true;
     }
 
     stepClass(step) {
@@ -397,14 +422,20 @@ export class ShopifyConnectorSetupWizard extends Component {
      * Work that happens on ARRIVING at a step, whichever direction it was
      * reached from.
      *
-     * Final readiness is the one step with any: entering it must evaluate the
-     * configuration as it is NOW, not replay a result recorded before the
-     * choices above it were made. It re-runs only when there is nothing to
-     * show or when what is shown is stale, so paging back and forth does not
-     * queue a run per keystroke. `run_readiness` reads stored evidence and
-     * contacts nothing.
+     * Location discovery starts on entry because it is part of the step, not
+     * an optional utility action. Final readiness evaluates the configuration
+     * as it is NOW, not a result recorded before the choices above it changed.
      */
     async _onEnterStep() {
+        if (
+            this.state.stepKey === "location_mapping" &&
+            this.currentStepApplies &&
+            this.store.id &&
+            ["none", "stale"].includes(this.refreshState())
+        ) {
+            await this.refreshLocations();
+            return;
+        }
         if (this.state.stepKey !== "final_readiness") {
             return;
         }
@@ -630,13 +661,22 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
     }
 
+    setLocationMappingChoice(shopifyGid, odooLocationId) {
+        this.state.locationMappingChoices[shopifyGid] = odooLocationId;
+        this.state.errorMessage = "";
+    }
+
     /** The location step's create. Both identities explicit, both server-checked. */
-    async createMapping() {
-        if (!this.state.form.mapShopifyGid) {
+    async createMapping(shopifyGid = null) {
+        const selectedShopifyGid = shopifyGid || this.state.form.mapShopifyGid;
+        const selectedOdooLocationId = shopifyGid
+            ? this.state.locationMappingChoices[shopifyGid]
+            : this.state.form.mapOdooLocationId;
+        if (!selectedShopifyGid) {
             this.state.errorMessage = _t("Choose a Shopify location to map.");
             return;
         }
-        if (!this.state.form.mapOdooLocationId) {
+        if (!selectedOdooLocationId) {
             this.state.errorMessage = _t("Choose an Odoo location to map it to.");
             return;
         }
@@ -644,17 +684,26 @@ export class ShopifyConnectorSetupWizard extends Component {
         // `<select>` retains an assigned value after its `<option>` is gone, so
         // searching away from a chosen location used to leave the identity in
         // `state.form`, off screen, and send it on the next click.
-        this._revalidateLocationSelection("shopify");
-        this._revalidateLocationSelection("odoo");
-        if (!this.state.form.mapShopifyGid || !this.state.form.mapOdooLocationId) {
+        if (!shopifyGid) {
+            this._revalidateLocationSelection("shopify");
+            this._revalidateLocationSelection("odoo");
+        }
+        if (
+            !this.visibleShopifyLocations.some(
+                (row) => row.shopify_gid === selectedShopifyGid
+            ) ||
+            !this.visibleOdooLocations.some(
+                (row) => String(row.id) === String(selectedOdooLocationId)
+            )
+        ) {
             this.state.errorMessage = _t(
                 "The location you had chosen is no longer in the list on " +
                 "screen, so nothing was mapped. Choose from the current list."
             );
             return;
         }
-        const mappedGid = this.state.form.mapShopifyGid;
-        const mappedOdooId = parseInt(this.state.form.mapOdooLocationId, 10);
+        const mappedGid = selectedShopifyGid;
+        const mappedOdooId = parseInt(selectedOdooLocationId, 10);
         const mappedOdooName = (
             this.visibleOdooLocations.find(
                 (row) => row.id === mappedOdooId
@@ -668,6 +717,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (ok) {
             this.state.form.mapShopifyGid = "";
             this.state.form.mapOdooLocationId = "";
+            delete this.state.locationMappingChoices[mappedGid];
             // Update the affected row IN PLACE rather than re-running the
             // search. Re-running it fetched a single page at the LAST requested
             // offset and replaced the accumulated results with it, so an
@@ -734,6 +784,15 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         const showing = this.locationShowing(side);
         return showing.shown < showing.total;
+    }
+
+    /** Search is progressive disclosure, not empty-page furniture. */
+    showLocationSearch(side) {
+        const search = this.state.locationSearch[side];
+        const total = side === "shopify"
+            ? this.locations.shopify_total
+            : this.locations.odoo_total;
+        return search.items !== null || (total || 0) > 10;
     }
 
     async searchLocations(side) {
@@ -817,18 +876,32 @@ export class ShopifyConnectorSetupWizard extends Component {
      */
     _revalidateLocationSelection(side) {
         if (side === "shopify") {
+            const visibleGids = new Set(
+                this.visibleShopifyLocations.map((row) => row.shopify_gid)
+            );
+            for (const gid of Object.keys(this.state.locationMappingChoices)) {
+                if (!visibleGids.has(gid)) {
+                    delete this.state.locationMappingChoices[gid];
+                }
+            }
             const gid = this.state.form.mapShopifyGid;
-            if (gid && !this.visibleShopifyLocations.some(
-                (row) => row.shopify_gid === gid
-            )) {
+            if (gid && !visibleGids.has(gid)) {
                 this.state.form.mapShopifyGid = "";
             }
             return;
         }
-        const id = this.state.form.mapOdooLocationId;
-        if (id && !this.visibleOdooLocations.some(
-            (row) => String(row.id) === String(id)
+        const visibleIds = new Set(
+            this.visibleOdooLocations.map((row) => String(row.id))
+        );
+        for (const [gid, selectedId] of Object.entries(
+            this.state.locationMappingChoices
         )) {
+            if (selectedId && !visibleIds.has(String(selectedId))) {
+                delete this.state.locationMappingChoices[gid];
+            }
+        }
+        const id = this.state.form.mapOdooLocationId;
+        if (id && !visibleIds.has(String(id))) {
             this.state.form.mapOdooLocationId = "";
         }
     }
@@ -907,7 +980,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "no_cached_locations":
                 return _t(
                     "No Shopify locations have been read for this store yet. " +
-                    "Press Refresh Shopify locations."
+                    "Use Try again if automatic loading did not finish."
                 );
             case "no_eligible_odoo_locations":
                 return _t(

@@ -72,15 +72,19 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         Location = self.env['shopify.connector.location']
         Mapping = self.env['shopify.connector.location.mapping']
 
-        cached = Location.sudo().search(
-            [
-                ('store_id', '=', store.id),
-                ('shopify_location_active', '=', True),
-            ],
-            order='name asc, id asc',
-            limit=SETUP_LOCATION_LIST_LIMIT,
+        active_domain = [
+            ('store_id', '=', store.id),
+            ('shopify_location_active', '=', True),
+        ]
+        all_active = Location.sudo().search(
+            active_domain, order='name asc, id asc',
         )
-        mappings = Mapping.search([('store_id', '=', store.id)])
+        cached = all_active[:SETUP_LOCATION_LIST_LIMIT]
+        active_gids = all_active.mapped('shopify_location_gid')
+        mappings = Mapping.search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', 'in', active_gids),
+        ]) if active_gids else Mapping.browse()
         by_gid = {mapping.shopify_gid: mapping for mapping in mappings}
 
         locations = []
@@ -99,26 +103,32 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
                 ),
                 'push_enabled': bool(mapping.push_enabled) if mapping else False,
             })
-        mapped_count = sum(1 for entry in locations if entry['mapped'])
+        mapped_count = len(mappings)
+        shopify_total = len(all_active)
+        unmapped_count = max(shopify_total - mapped_count, 0)
+        refresh = Service.location_refresh_state(store)
+        mapping_complete = bool(
+            refresh.get('state') == 'succeeded'
+            and shopify_total
+            and not unmapped_count
+        )
 
         return {
             'available': True,
             'reason': '',
             'locations': locations,
             'odoo_locations': self._setup_eligible_odoo_locations(store),
-            'refresh': Service.location_refresh_state(store),
+            'refresh': refresh,
             'mapped_count': mapped_count,
-            'unmapped_count': len(locations) - mapped_count,
+            'unmapped_count': unmapped_count,
             # What `mapped_location` needs to pass, restated for the surface
             # so the step and the readiness row cannot disagree about it.
-            'has_valid_mapping': bool(mappings),
-            'truncated': len(cached) >= SETUP_LOCATION_LIST_LIMIT,
+            'has_valid_mapping': mapping_complete,
+            'mapping_complete': mapping_complete,
+            'truncated': shopify_total > SETUP_LOCATION_LIST_LIMIT,
             # Honest totals for the "Showing X of Y" line and for deciding
             # whether the search affordance is worth surfacing prominently.
-            'shopify_total': Location.sudo().search_count([
-                ('store_id', '=', store.id),
-                ('shopify_location_active', '=', True),
-            ]),
+            'shopify_total': shopify_total,
             'odoo_total': self._eligible_odoo_location_count(store),
         }
 
@@ -170,7 +180,7 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         """Admit the governed refresh job. No transport, no direct call."""
         return self.env[
             'shopify.connector.inventory.service'
-        ].action_refresh_shopify_locations(store.id)
+        ]._setup_refresh_shopify_locations(store.id)
 
     @api.model
     def _setup_follow_location_refresh(self, store, job_id):

@@ -186,8 +186,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             content: "The token input no longer exists once it is submitted.",
         },
         {
-            // The action row is reachable without scrolling to the bottom of
-            // this long step -- which is the whole point of it being sticky.
+            // The action row is a separate visible row below the panel.
             trigger: CONTINUE,
             content: "Continue is on screen on the longest step.",
             run() {
@@ -196,8 +195,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
                 if (rect.bottom > window.innerHeight + 1 || rect.top < 0) {
                     throw new Error(
                         "the action row is outside the viewport on the " +
-                        "Permissions step; a sticky bar that is not on " +
-                        "screen is not sticky"
+                        "Permissions step"
                     );
                 }
             },
@@ -364,7 +362,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     ],
 });
 
-// --- 4. Keyboard traversal, focus management and the sticky action row. ---
+// --- 4. Keyboard traversal, focus management and the action row. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
     url: "/odoo",
     steps: () => [
@@ -417,7 +415,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
             trigger: ".sc_setup__actions",
             content:
                 "Every action-row control reserves clearance so focus cannot " +
-                "land underneath the sticky bar.",
+                "land against the panel edge.",
             run() {
                 const controls = document.querySelectorAll(
                     ".sc_setup__actions button:not([disabled])"
@@ -431,8 +429,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
                     if (!margin || parseFloat(margin) <= 0) {
                         throw new Error(
                             "an action-row control reserves no scroll " +
-                            "clearance, so keyboard focus can land under the " +
-                            "sticky bar: " + control.outerHTML.slice(0, 80)
+                            "clearance: " + control.outerHTML.slice(0, 80)
                         );
                     }
                 }
@@ -513,41 +510,6 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             content: "A refresh control exists on the step itself.",
         },
 
-        // --- Wave 5: the bounded server-side search, driven for real. The
-        //     reachability BOUND (a row past the first page) is a server
-        //     test; what the browser proves is that the search control
-        //     genuinely filters through the RPC and genuinely clears.
-        {
-            trigger: ".sc_setup_search_shopify",
-            run: "edit Warehouse C",
-        },
-        { trigger: ".sc_setup_search_shopify_go", run: "click" },
-        {
-            // The Shopify counter specifically. Two elements shared the
-            // `.sc_setup__showing` class, so this could previously have been
-            // satisfied by the Odoo counter instead.
-            trigger: ".sc_setup__showing--shopify:contains('Showing 1 of 1')",
-            content: "The search narrowed the list, with an honest count.",
-        },
-        {
-            trigger: ".sc_setup__locations:not(:contains('Tour Warehouse A'))",
-            content: "Rows that do not match are genuinely gone, not hidden.",
-        },
-        {
-            trigger: ".sc_setup__location:contains('Tour Warehouse C')",
-            content: "The matching row is the one shown.",
-        },
-        { trigger: ".sc_setup_search_shopify_clear", run: "click" },
-        {
-            trigger: ".sc_setup__location:contains('Tour Warehouse A')",
-            content: "Clearing the search restores the full first page.",
-        },
-
-        {
-            // Create a second mapping through the governed route.
-            trigger: "#sc_setup_map_shopify",
-            run: "select gid://shopify/Location/TOURB",
-        },
         {
             // The eligible-Odoo-location assertion lives INSIDE this step's
             // `run()` rather than as its own `:not([value=''])` trigger. An
@@ -555,11 +517,16 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             // hoot-dom correctly reports it as not visible and a trigger on
             // one can only ever time out -- it would be asserting that a
             // dropdown is open, which is not the claim.
-            trigger: "#sc_setup_map_odoo",
+            trigger:
+                ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                ".sc_setup_map_odoo",
             content: "At least one eligible Odoo location is offered, and a "
                      + "location not already mapped elsewhere is chosen.",
             run() {
-                const select = document.querySelector("#sc_setup_map_odoo");
+                const select = document.querySelector(
+                    ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                    ".sc_setup_map_odoo"
+                );
                 // Pick a location that is NOT already the target of another
                 // Shopify mapping. `UNIQUE(store_id, odoo_location_id)` refuses a
                 // second mapping onto the same Odoo location, so taking the
@@ -590,7 +557,12 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
                 select.dispatchEvent(new Event("change", { bubbles: true }));
             },
         },
-        { trigger: ".sc_setup_create_mapping", run: "click" },
+        {
+            trigger:
+                ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                ".sc_setup_create_mapping",
+            run: "click",
+        },
         {
             // Exact state, not a substring that "Not mapped" also satisfies.
             // The DATABASE consequence is asserted by the Python test that

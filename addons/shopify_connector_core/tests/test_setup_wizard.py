@@ -1292,7 +1292,8 @@ class TestSetupWizardConditionalLocationStep(SetupWizardCase):
     def test_continuing_past_the_step_fabricates_no_mapping(self):
         store = self._ready_store()
         self._as(self.admin_a).save_directions(store.id, ['inventory'])
-        self._as(self.admin_a).acknowledge_location_mapping(store.id)
+        with self.assertRaises(UserError):
+            self._as(self.admin_a).acknowledge_location_mapping(store.id)
         if 'shopify.connector.location.mapping' in self.env:
             self.assertFalse(
                 self.env['shopify.connector.location.mapping'].sudo().search(

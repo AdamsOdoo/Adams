@@ -453,9 +453,10 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
         -- the repo-wide AST guard on every `_check_*` method requires
         this. When the inventory domain is disabled, stays not-applicable
         pass (unchanged core behavior via the CORE-R1 baseline). When
-        enabled: requires at least one active location mapping, and
-        requires `write_inventory` to be present in the store's granted
-        scopes snapshot.
+        enabled: requires a successful current location discovery, requires
+        every active cached Shopify location to have an explicit mapping, and
+        requires `write_inventory` to be present in the store's granted scopes
+        snapshot.  The setup step and readiness therefore enforce one rule.
         """
         code = 'mapped_location'
         settings = self.env['shopify.connector.store.settings'].search(
@@ -468,15 +469,38 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
                 'this store.',
                 not_applicable=True,
             )
-        mapping_count = self.env[
-            'shopify.connector.location.mapping'
-        ].search_count([('store_id', '=', store.id)])
-        if not mapping_count:
+        refresh = self.env[
+            'shopify.connector.inventory.service'
+        ].location_refresh_state(store)
+        if refresh.get('state') != 'succeeded':
             return self._check_result(
                 code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
-                'Inventory syncing is on, but no Shopify location is mapped '
-                'to an Odoo location yet. Stock cannot be synchronised for '
-                'a location that is not mapped.',
+                'Inventory syncing is on, but the current Shopify location '
+                'list has not been loaded successfully yet.',
+            )
+        active_locations = self.env['shopify.connector.location'].search([
+            ('store_id', '=', store.id),
+            ('shopify_location_active', '=', True),
+        ])
+        if not active_locations:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
+                'Shopify returned no active inventory locations for this '
+                'store.',
+            )
+        active_gids = active_locations.mapped('shopify_location_gid')
+        mapped_gids = set(self.env[
+            'shopify.connector.location.mapping'
+        ].search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', 'in', active_gids),
+        ]).mapped('shopify_gid'))
+        missing_count = len(set(active_gids) - mapped_gids)
+        if missing_count:
+            return self._check_result(
+                code, self.ESSENTIAL, self.RESULT_NOT_PROVEN,
+                '%d active Shopify location(s) still need an explicit Odoo '
+                'location mapping.' % missing_count,
             )
         try:
             scopes = json.loads(store.granted_scopes or '[]')
@@ -490,7 +514,7 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
             )
         return self._check_result(
             code, self.ESSENTIAL, self.RESULT_PASS,
-            'At least one location is mapped and write_inventory is '
+            'Every active Shopify location is mapped and write_inventory is '
             'granted.',
         )
 
@@ -2185,6 +2209,56 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'This store is not in a state where its Shopify location '
                 'list can be refreshed. Reconnect it first.'
             )
+        return self._admit_location_refresh(store, job_source)
+
+    @api.model
+    def _setup_refresh_shopify_locations(self, store_id):
+        """Admit the setup-only location read for an unfinished recovery.
+
+        Credential replacement deliberately demotes a previously connected
+        store to ``reconnect_needed``.  The guided setup is also the surface
+        where that Administrator repairs configuration, so refusing its
+        read-only location discovery there makes mapping and readiness
+        circular.  This private seam keeps the exemption narrow:
+
+        * the setup wizard has already enforced Administrator authority and
+          this method repeats it before admission;
+        * ``setup_incomplete`` and ``reconnect_needed`` use the narrow setup
+          read, while a connected store keeps the ordinary manual-sync route;
+        * a fresh passing connection test is mandatory;
+        * the exact ``setup_readiness_check`` / ``inventory_location_sync``
+          read is admitted; no business write or ordinary sync is opened;
+        * ``disconnecting`` and ``disconnected`` remain closed.
+
+        The public workspace action above intentionally keeps its existing
+        lifecycle contract.  A generic RPC cannot select this private method.
+        """
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may refresh '
+                'locations during guided setup.'
+            )
+        store = self._resolve_store_for_location_action(store_id)
+        if store.last_test_connection_result != 'pass':
+            raise UserError(
+                'The connection test must pass before Shopify locations can '
+                'be loaded.'
+            )
+        if store.state == 'connected':
+            return self._admit_location_refresh(store, 'manual_sync')
+        if store.state not in ('setup_incomplete', 'reconnect_needed'):
+            raise UserError(
+                'Location discovery is not available from this setup state.'
+            )
+        return self._admit_location_refresh(
+            store, 'setup_readiness_check',
+        )
+
+    @api.model
+    def _admit_location_refresh(self, store, job_source):
+        """Coalesce/retry/admit one location refresh under a chosen source."""
         # Duplicate admission is coalesced rather than queued twice: two
         # refreshes of the same read-only list are the same refresh, and a
         # second one would only compete for the same rate limit. The caller

@@ -105,6 +105,9 @@ function payload(overrides = {}) {
                 mapped_count: 0,
                 unmapped_count: 0,
                 has_valid_mapping: false,
+                mapping_complete: false,
+                shopify_total: 0,
+                odoo_total: 0,
             },
             matching_choices: [
                 {
@@ -621,6 +624,9 @@ describe("shopify connector setup wizard", () => {
                     mapped_count: 0,
                     unmapped_count: 0,
                     has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 0,
+                    odoo_total: 0,
                 },
             })
         );
@@ -629,6 +635,47 @@ describe("shopify connector setup wizard", () => {
         expect(panel).toInclude("Reading your Shopify locations");
         expect(panel).toInclude("not a report that Shopify has no locations");
         expect(queryText(".sc_setup_refresh_state")).toInclude("Waiting");
+    });
+
+    test("entering the required location step starts discovery automatically", async () => {
+        const initial = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "none", job_id: false, reason: "" },
+            }),
+        });
+        const loaded = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+            }),
+        });
+        mockOrm((method) =>
+            method === "refresh_shopify_locations" ? loaded : initial
+        );
+
+        await mount();
+
+        expect(
+            calls.some((call) => call.method === "refresh_shopify_locations")
+        ).toBe(true);
+    });
+
+    test("Continue stays disabled until every active location is mapped", async () => {
+        mockOrm(() => payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+                shopify_total: 2,
+                unmapped_count: 1,
+                mapping_complete: false,
+            }),
+        }));
+        await mount();
+        expect(queryFirst(".sc_setup_continue").disabled).toBe(true);
     });
 
     test("a mapped and an unmapped location are visibly different", async () => {
@@ -663,7 +710,10 @@ describe("shopify connector setup wizard", () => {
                     refresh: { state: "succeeded", job_id: 7, reason: "" },
                     mapped_count: 1,
                     unmapped_count: 1,
-                    has_valid_mapping: true,
+                    has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 2,
+                    odoo_total: 1,
                 },
             })
         );
@@ -672,7 +722,7 @@ describe("shopify connector setup wizard", () => {
         expect(rows[0]).toInclude("Mapped");
         expect(rows[0]).toInclude("WH/Stock");
         expect(rows[1]).toInclude("Not mapped");
-        expect(rows[1]).toInclude("will not be synchronized");
+        expect(rows[1]).toInclude("Choose the Odoo location");
     });
 
     // ======================================================================
@@ -833,6 +883,9 @@ describe("shopify connector setup wizard", () => {
                     mapped_count: 0,
                     unmapped_count: 0,
                     has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 0,
+                    odoo_total: 0,
                 },
                 locationMapping
             ),
@@ -1112,10 +1165,9 @@ describe("shopify connector setup wizard", () => {
         await component.searchLocations("odoo");
         await animationFrame();
 
-        component.state.form.mapShopifyGid = "gid://shopify/Location/3";
-        component.state.form.mapOdooLocationId = "10";
+        component.setLocationMappingChoice("gid://shopify/Location/3", "10");
         const searchesBefore = server.searchCalls.length;
-        await component.createMapping();
+        await component.createMapping("gid://shopify/Location/3");
         await animationFrame();
 
         // The write happened, with both identities explicit.
@@ -1141,8 +1193,9 @@ describe("shopify connector setup wizard", () => {
         );
         expect(mapped[0].textContent).toInclude("WH10/Stock");
         // The selection is consumed, not left armed for a second click.
-        expect(component.state.form.mapShopifyGid).toBe("");
-        expect(component.state.form.mapOdooLocationId).toBe("");
+        expect(
+            component.state.locationMappingChoices["gid://shopify/Location/3"]
+        ).toBeUndefined();
     });
 
     test("a selection is revalidated after every search, clear and load more", async () => {
@@ -1167,16 +1220,12 @@ describe("shopify connector setup wizard", () => {
         await animationFrame();
         component.state.form.mapShopifyGid = "gid://shopify/Location/1";
         await animationFrame();
-        expect(queryFirst("#sc_setup_map_shopify").value).toBe(
-            "gid://shopify/Location/1"
-        );
 
         // ...and gone after the next one.
         shopify.query = "south";
         await component.searchLocations("shopify");
         await animationFrame();
         expect(component.state.form.mapShopifyGid).toBe("");
-        expect(queryFirst("#sc_setup_map_shopify").value).toBe("");
 
         // Load more keeps a selection that is still on screen...
         component.state.form.mapShopifyGid = "gid://shopify/Location/2";

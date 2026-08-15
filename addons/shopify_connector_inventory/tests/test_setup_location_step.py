@@ -105,6 +105,22 @@ class TestSetupLocationStep(TransactionCase):
             'shopify_location_active': active,
         })
 
+    def _mark_refresh_succeeded(self):
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'setup-location-current-success',
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
+        job.sudo().write({'state': 'running'})
+        job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        return job
+
 
     def _assert_refused(self, call):
         """Assert a call is refused, without caring which refusal it is.
@@ -388,16 +404,16 @@ class TestSetupLocationStep(TransactionCase):
             )
         )
 
-    def test_the_setup_refresh_reaches_the_public_guarded_action(self):
+    def test_the_setup_refresh_reaches_the_private_setup_guard(self):
         calls = []
-        original = type(self.Service).action_refresh_shopify_locations
+        original = type(self.Service)._setup_refresh_shopify_locations
 
         def spy(self_, store_id):
             calls.append(store_id)
             return original(self_, store_id)
 
         with patch.object(
-            type(self.Service), 'action_refresh_shopify_locations', spy,
+            type(self.Service), '_setup_refresh_shopify_locations', spy,
         ):
             with self._fail_on_contact():
                 self._as().refresh_shopify_locations(self.store.id)
@@ -408,6 +424,26 @@ class TestSetupLocationStep(TransactionCase):
         ])
         self.assertEqual(len(job), 1)
         self.assertEqual(job.state, 'queued')
+
+    def test_continue_requires_a_current_refresh_and_every_mapping(self):
+        self._cache('gid://shopify/Location/C1', 'Continue One')
+        self._cache('gid://shopify/Location/C2', 'Continue Two')
+        with self.assertRaises(UserError):
+            self._as().acknowledge_location_mapping(self.store.id)
+
+        self._mark_refresh_succeeded()
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/C1', self.location_a.id,
+        )
+        with self.assertRaises(UserError) as refusal:
+            self._as().acknowledge_location_mapping(self.store.id)
+        self.assertIn('1 location', str(refusal.exception))
+
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/C2', self.location_b.id,
+        )
+        state = self._as().acknowledge_location_mapping(self.store.id)
+        self.assertTrue(state['location_mapping']['mapping_complete'])
 
     def test_a_mapping_created_in_setup_recomputes_readiness_immediately(self):
         self._cache('gid://shopify/Location/ST1', 'Stale probe')
@@ -532,8 +568,20 @@ class TestSetupLocationStep(TransactionCase):
             checks['mapped_location']['action_step_key'], 'location_mapping',
         )
         self._cache('gid://shopify/Location/RD1', 'Readiness probe')
+        self._cache('gid://shopify/Location/RD2', 'Readiness probe two')
+        self._mark_refresh_succeeded()
         self._as().save_location_mapping(
             self.store.id, 'gid://shopify/Location/RD1', self.location_a.id,
+        )
+        state = self._as().run_readiness(self.store.id)
+        checks = {c['code']: c for c in state['readiness']['checks']}
+        self.assertEqual(checks['mapped_location']['state'], 'blocking')
+        self.assertIn(
+            'every active', checks['mapped_location']['reason'].lower(),
+        )
+
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/RD2', self.location_b.id,
         )
         state = self._as().run_readiness(self.store.id)
         checks = {c['code']: c for c in state['readiness']['checks']}

@@ -21,63 +21,43 @@
 //    animation at all rather than one somebody remembered to switch off. There
 //    is no animation anywhere on the credential or readiness steps.
 //
-// Responsive: a single column at and below 768px, and nothing that can
-// overflow horizontally at 390px -- the step rail wraps rather than scrolls,
-// and the action row wraps rather than pushing the primary control off-screen.
+// Responsive: a compact current-phase rail at and below 768px, and nothing
+// that can overflow horizontally at 390px.
 
 .o_sc_setup {
-    // Local, named, derived from the token scale rather than measured off a
-    // screenshot. Used by the sticky bar's own sizing AND by the scroll
-    // margin that keeps focus out from under it, so the two can never drift.
-    --sc-setup-actions-inset: var(--sc-space-3);
-    --sc-setup-actions-clearance: var(--sc-space-8);
-
     background: var(--sc-surface-0);
+    box-sizing: border-box;
     color: var(--sc-text-primary);
     font-family: var(--sc-font);
     padding: var(--sc-space-6);
 
-    // THIS SURFACE OWNS ITS OWN VERTICAL SCROLLING, AND IT HAS TO.
-    //
-    // Measured, not assumed. A client action renders inside
-    // `.o_action_manager`, which is `overflow: hidden` at the pinned Odoo
-    // and provides no scrolling of its own -- scrolling is a view's job,
-    // and a bare client action is not a view. With `min-height: 100%` here
-    // and nothing scrolling anywhere, the rendered-evidence instrument
-    // measured between 328px and 1774px of setup content overflowing that
-    // ancestor, with `doc_extent: 0` and no scrollable element anywhere in
-    // the chain: the bottom of every long step was CLIPPED AND
-    // UNREACHABLE, at all four required widths. A sticky action row over
-    // content nobody can scroll to would have been polish on an unusable
-    // screen.
-    //
-    // `block-size: 100%` resolves against that ancestor's definite height,
-    // so this box is exactly the visible region and its content scrolls
-    // inside it -- which also gives `position: sticky` on the action row a
-    // real scrollport to stick to.
     block-size: 100%;
     max-block-size: 100%;
-    overflow-y: auto;
-    // NEVER a connector-created horizontal page scroll. `clip` rather than
-    // `hidden` so the pair stays explicit: beside `overflow-y: auto` either
-    // keyword behaves the same, but `clip` says "this axis does not scroll"
-    // rather than "this axis scrolls and its bar is hidden".
-    overflow-x: clip;
-    // The scroll container is now ours, so the sanctioned scroll padding is
-    // available at last: a control scrolled into view lands clear of the
-    // sticky row rather than under it. The `scroll-margin` on each control
-    // below stays as well -- belt and braces, and the one that still works
-    // if this box ever stops being the scroller.
-    scroll-padding-block-end: var(--sc-setup-actions-clearance);
+    overflow: hidden;
 
     * { box-sizing: border-box; }
 
     .o_sc_setup__inner {
         max-inline-size: 1120px;
+        block-size: 100%;
+        min-block-size: 0;
         margin-inline: auto;
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        grid-template-columns: 16rem minmax(0, 1fr);
         gap: var(--sc-space-5);
+
+        > .sc-skeleton,
+        > p[role="status"],
+        > .sc-band {
+            grid-column: 1 / -1;
+        }
+    }
+
+    .sc_setup__workspace {
+        min-inline-size: 0;
+        min-block-size: 0;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
     }
 
     // --- Focus visibility (WCAG 2.4.7): every operable element ---
@@ -91,17 +71,9 @@
         border-radius: 4px;
     }
 
-    // --- Focus must never land UNDER the sticky action bar (WCAG 2.4.11) ---
-    //
-    // When the browser scrolls a focused control into view it honours that
-    // control's own scroll margin, so reserving the bar's height here is what
-    // stops a keyboard user tabbing to a control that is technically focused
-    // and visually hidden behind the bar. The other half -- `scroll-padding`
-    // on the scroll container -- is set on this surface's root above, now
-    // that the root is the scroll container; this stays because it is the
-    // half that keeps working if that ever changes.
+    // Keep keyboard focus comfortably inside the owned panel scrollport.
     a, button, input, select, textarea, [tabindex] {
-        scroll-margin-block-end: var(--sc-setup-actions-clearance);
+        scroll-margin-block-end: var(--sc-space-4);
         scroll-margin-block-start: var(--sc-space-4);
     }
 
@@ -184,9 +156,14 @@
     .sc-skeleton--band { block-size: 84px; }
 
     // --- Five phase rail over twelve durable steps -----------------------
+    .sc_setup__steps {
+        min-block-size: 0;
+        overflow-y: auto;
+    }
+
     .sc_setup__steps > ol {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        display: flex;
+        flex-direction: column;
         gap: var(--sc-space-2);
         margin: 0;
         padding: 0;
@@ -271,22 +248,12 @@
         }
     }
 
-    @media (max-width: 900px) {
-        .sc_setup__steps > ol {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-
-    @media (max-width: 520px) {
-        .sc_setup__steps > ol {
-            grid-template-columns: 1fr;
-        }
-    }
-
     // --- The one panel: a single card, never nested cards ---
     .sc_setup__panel {
-        inline-size: #{"min(100%, 880px)"};
-        margin-inline: auto;
+        inline-size: 100%;
+        min-block-size: 0;
+        overflow-y: auto;
+        scroll-padding-block: var(--sc-space-4);
         display: flex;
         flex-direction: column;
         gap: var(--sc-space-4);
@@ -537,6 +504,28 @@
         text-align: start;
     }
 
+    .sc_setup__row-map {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: end;
+        gap: var(--sc-space-2);
+        margin-block-start: var(--sc-space-2);
+
+        label {
+            grid-column: 1 / -1;
+            font-weight: var(--sc-fw-label);
+        }
+
+        select {
+            min-inline-size: 0;
+            inline-size: 100%;
+            padding: var(--sc-space-2) var(--sc-space-3);
+            border: 1px solid var(--sc-border-strong);
+            border-radius: var(--sc-radius);
+            font: inherit;
+        }
+    }
+
     .sc_setup__location-name { font-weight: var(--sc-fw-label); }
     .sc_setup__location-target {
         font-size: var(--sc-fs-secondary);
@@ -556,25 +545,6 @@
         max-inline-size: 100%;
     }
 
-    .sc_setup__map {
-        display: flex;
-        flex-direction: column;
-        gap: var(--sc-space-3);
-        padding: var(--sc-space-4);
-        border: 1px solid var(--sc-border);
-        border-radius: var(--sc-radius);
-
-        select {
-            inline-size: 100%;
-            max-inline-size: 100%;
-            padding: var(--sc-space-2) var(--sc-space-3);
-            border: 1px solid var(--sc-border-strong);
-            border-radius: var(--sc-radius);
-            font-family: inherit;
-            font-size: var(--sc-fs-body);
-        }
-    }
-
     // A readiness row's own fix control sits under its explanation rather
     // than beside it, so a long reason never pushes it off the edge.
     .sc_setup_check_action { align-self: start; }
@@ -587,62 +557,44 @@
         color: var(--sc-text-secondary);
     }
 
-    // --- The sticky action row -------------------------------------------
-    //
-    // A normal-flow sibling AFTER the panel that lifts to the bottom edge of
-    // the scrollport while there is content below it. At the very bottom of
-    // the page it settles into its own space, so it never permanently covers
-    // the last field of a form -- which a fixed bar would.
-    //
-    // Logical properties throughout (`inset-block-end`, `padding-inline`), so
-    // RTL needs no mirrored rule. No transition and no animation anywhere on
-    // it: there is nothing here that benefits from movement, so there is
-    // nothing for a reduced-motion user to switch off.
+    // --- Dedicated action row: always visible, never overlays the panel ---
     .sc_setup__actions {
-        position: sticky;
-        inset-block-end: 0;
-        z-index: 1;
-        inline-size: #{"min(100%, 880px)"};
-        margin-inline: auto;
+        inline-size: 100%;
         display: flex;
         flex-wrap: wrap;
         gap: var(--sc-space-3);
-        margin-block-start: var(--sc-space-2);
-        padding-block: var(--sc-setup-actions-inset);
-        // Safe-area inset on a phone, so the row clears a home indicator
-        // rather than sitting under it. `max()` keeps the ordinary spacing on
-        // every device that reports no inset.
-        //
-        // INTERPOLATED, and it has to be. Sass owns the name `max()` and
-        // evaluates it at compile time, so an unescaped
-        // `max(var(...), env(...))` is not a CSS function call -- it is a
-        // Sass call with two arguments Sass cannot compare, and it fails the
-        // WHOLE bundle with `"var(--...)" is not a number for 'max'`. That
-        // takes every connector stylesheet down with it, which is worse than
-        // the missing inset would have been. `#{}` emits the text verbatim
-        // and lets the browser resolve it.
+        padding-block: var(--sc-space-3);
         padding-block-end: #{
-            "max(var(--sc-setup-actions-inset), env(safe-area-inset-bottom))"
+            "max(var(--sc-space-3), env(safe-area-inset-bottom))"
         };
-        // NO negative inline margin. The first version bled the bar's
-        // background 16px past `.o_sc_setup__inner` on each side so it would
-        // span the full surface, and that is exactly the connector-owned
-        // horizontal overflow the TD-016 instrument exists to catch: it
-        // measured `scroll_width 896` against `client_width 880` at every
-        // width, in both directions. The bar spans the content column, which
-        // is what it should have done: the column is already centred with
-        // `max-inline-size: 880px; margin-inline: auto`, so a bar aligned to
-        // it reads as part of the same card rather than as a page chrome.
         background: var(--sc-surface-0);
-        // The only thing separating a floating bar from the content sliding
-        // under it. A hairline, not a shadow: a shadow at this size reads as
-        // decoration and costs contrast on the border below it.
         border-block-start: 1px solid var(--sc-border);
+
+        .sc_setup_exit { order: 2; }
+        .sc_setup_rerun { order: 2; }
+        .sc_setup_continue {
+            order: 3;
+            margin-inline-start: auto;
+        }
     }
 
     // --- Single column at and below 768px (master specification S1) ---
     @media (max-width: 768px) {
         padding: var(--sc-space-4);
+
+        .o_sc_setup__inner {
+            grid-template-columns: 1fr;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: var(--sc-space-3);
+        }
+
+        .sc_setup__steps {
+            overflow: visible;
+        }
+
+        .sc_setup_phase:not(.sc_setup_phase--current) {
+            display: none;
+        }
 
         .sc_setup__panel { padding: var(--sc-space-4); }
 
@@ -656,6 +608,16 @@
         .sc_setup__actions .sc-btn {
             flex: 1 1 auto;
             justify-content: center;
+        }
+
+        .sc_setup__actions .sc_setup_continue {
+            margin-inline-start: 0;
+        }
+
+        .sc_setup__row-map {
+            grid-template-columns: 1fr;
+
+            label { grid-column: auto; }
         }
     }
 }

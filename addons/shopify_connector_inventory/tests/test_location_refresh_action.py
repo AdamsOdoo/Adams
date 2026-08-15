@@ -213,6 +213,34 @@ class TestLocationRefreshAdmission(LocationRefreshCase):
                 )
         self.store.sudo().write({'state': 'setup_incomplete'})
 
+    def test_setup_can_read_locations_after_a_passed_reconnect_test(self):
+        """Only the setup-only read seam accepts reconnect-needed."""
+        self.store.sudo().write({'state': 'reconnect_needed'})
+        with self._fail_on_contact():
+            job = self._as(
+                self.user_admin
+            )._setup_refresh_shopify_locations(self.store.id)
+        self.assertEqual(job.job_source, 'setup_readiness_check')
+        self.assertEqual(job.state, 'queued')
+
+    def test_setup_reconnect_refresh_still_requires_an_administrator(self):
+        self.store.sudo().write({'state': 'reconnect_needed'})
+        with self._fail_on_contact():
+            with self.assertRaises(AccessError):
+                self._as(
+                    self.user_operator
+                )._setup_refresh_shopify_locations(self.store.id)
+
+    def test_setup_refresh_never_opens_disconnecting_or_disconnected(self):
+        for state in ('disconnecting', 'disconnected'):
+            with self.subTest(state=state):
+                self.store.sudo().write({'state': state})
+                with self._fail_on_contact():
+                    with self.assertRaises(UserError):
+                        self._as(
+                            self.user_admin
+                        )._setup_refresh_shopify_locations(self.store.id)
+
     def test_the_action_delegates_to_the_sanctioned_admission_service(self):
         """The route, asserted rather than assumed.
 

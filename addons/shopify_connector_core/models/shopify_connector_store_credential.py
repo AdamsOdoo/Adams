@@ -94,7 +94,11 @@ TOKEN_EXCHANGE_PURPOSE_STATES = {
     # Exact pre-activation cache read used by the onboarding location refresh.
     # Kept separate from `setup`: that broader diagnostic family intentionally
     # includes reconnect_needed, while business work must remain quiesced there.
-    'setup_business_read': ('setup_incomplete',),
+    # Guided setup may repair a previously connected store after credential
+    # replacement has deliberately demoted it to ``reconnect_needed``.  This
+    # purpose is still used only by the exact setup location-read triple in
+    # the API client; it does not open ordinary business reads or writes.
+    'setup_business_read': ('setup_incomplete', 'reconnect_needed'),
     'reconnect': ('reconnect_needed', 'disconnected'),
 }
 

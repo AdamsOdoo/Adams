@@ -543,7 +543,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     'This job does not own the requested business-read purpose.'
                 )
             setup_state_allowed = (
-                store_state == 'setup_incomplete'
+                store_state in ('setup_incomplete', 'reconnect_needed')
                 and (purpose, job_source, job_type)
                 in SETUP_BUSINESS_READ_JOBS
             )

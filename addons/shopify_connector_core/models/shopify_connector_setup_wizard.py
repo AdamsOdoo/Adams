@@ -1528,16 +1528,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     def acknowledge_location_mapping(self, store_id):
         """Step 7's Continue.
 
-        Records progress and nothing else. It deliberately does NOT require a
-        mapping to exist: whether a mapping is required is a readiness
-        decision, made by `mapped_location` on the final-readiness step with
-        the full picture, and duplicating that rule here would give an
-        operator two different answers to the same question. It also
-        deliberately enqueues nothing -- a step that silently contacted
-        Shopify because somebody pressed Continue would be a surprise.
+        The inventory setup cannot advance on an unknown or partial location
+        configuration.  The domain seam owns the facts and exposes the same
+        ``mapping_complete`` value consumed by readiness; this method merely
+        enforces that one answer at the navigation boundary.  Continue itself
+        still enqueues nothing and contacts nothing.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
+        if settings.inventory_domain_enabled:
+            locations = self._setup_location_payload(store, settings)
+            refresh_state = (locations.get('refresh') or {}).get('state')
+            if refresh_state != 'succeeded':
+                raise UserError(_(
+                    'Shopify locations must finish loading before you can '
+                    'continue.'
+                ))
+            if not locations.get('shopify_total'):
+                raise UserError(_(
+                    'Shopify returned no active inventory locations. Add or '
+                    'activate a Shopify location, then load the list again.'
+                ))
+            if not locations.get('mapping_complete'):
+                raise UserError(_(
+                    'Map every active Shopify location before continuing. '
+                    '%(count)s location(s) still need an Odoo location.',
+                    count=locations.get('unmapped_count', 0),
+                ))
         self._record_progress(settings, 'location_mapping')
         return self.get_setup_state(store_id=store.id)
 

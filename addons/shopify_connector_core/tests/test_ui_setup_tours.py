@@ -268,6 +268,18 @@ class TestUiSetupTours(HttpCase):
                 'name': name,
                 'shopify_location_active': True,
             })
+        refresh_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 's1-location-tour-%s' % store.id,
+            'expected_connection_generation': store.connection_generation,
+        })
+        refresh_job.sudo().write({'state': 'running'})
+        refresh_job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
         if mapped_gid:
             warehouse = self.env['stock.warehouse'].search(
                 [('company_id', '=', self.env.company.id)], limit=1,
@@ -848,9 +860,18 @@ class TestSetupBusinessReadPolicy(TransactionCase):
             ('job_id', '=', job.id),
         ]))
 
-    def test_setup_location_read_is_quiesced_outside_setup_incomplete(self):
+    def test_setup_location_read_opens_only_setup_and_reconnect_states(self):
         job = self._running_job()
-        for state in ('reconnect_needed', 'disconnecting', 'disconnected'):
+        self.store.write({'state': 'reconnect_needed'})
+        self.env.flush_all()
+        Client = self.env['shopify.connector.api.client']
+        with patch.object(type(Client), '_send', self._send_ok):
+            with Client.execute_business_read(
+                job, self.store, 'query { shop { id } }', purpose='inventory',
+            ) as result:
+                self.assertEqual(result['data']['shop']['id'], 'gid')
+
+        for state in ('disconnecting', 'disconnected'):
             with self.subTest(state=state):
                 self.store.write({'state': state})
                 self.env.flush_all()
@@ -873,9 +894,12 @@ class TestSetupBusinessReadPolicy(TransactionCase):
         self.assertTrue(Credential._assert_token_exchange_allowed(
             self.store, 'setup_business_read',
         ))
-        for state in (
-            'connected', 'reconnect_needed', 'disconnecting', 'disconnected',
-        ):
+        self.store.write({'state': 'reconnect_needed'})
+        self.env.flush_all()
+        self.assertTrue(Credential._assert_token_exchange_allowed(
+            self.store, 'setup_business_read',
+        ))
+        for state in ('connected', 'disconnecting', 'disconnected'):
             with self.subTest(state=state):
                 self.store.write({'state': state})
                 self.env.flush_all()
