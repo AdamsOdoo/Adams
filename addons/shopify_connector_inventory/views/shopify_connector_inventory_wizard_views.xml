@@ -188,7 +188,7 @@
                     <field name="odoo_location_id"
                            options="{'no_create': True}"/>
                     <field name="push_enabled"
-                            string="Enable future inventory synchronization for this location"/>
+                            string="Enable future inventory sync"/>
                 </group>
                 <div class="alert alert-warning" role="status">
                     This setting only enables future inventory synchronization. Creating

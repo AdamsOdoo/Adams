@@ -535,15 +535,15 @@
                     <group>
                         <group string="Domain">
                             <field name="store_id" readonly="1"/>
-                            <field name="product_export_domain_enabled"
+                            <field name="product_export_domain_enabled" string="Product exports enabled"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
                             <field name="product_export_binding_namespace_ready"
                                    string="Product export mappings ready" readonly="1"/>
                         </group>
                         <group string="Ownership">
-                            <field name="price_source_of_truth"
+                            <field name="price_source_of_truth" string="Price owner"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
-                            <field name="media_source_of_truth"
+                            <field name="media_source_of_truth" string="Media owner"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
                         </group>
                     </group>
@@ -570,12 +570,12 @@
         <field name="arch" type="xml">
             <list string="Export Settings" create="false" delete="false">
                 <field name="store_id"/>
-                <field name="product_export_domain_enabled"
+                <field name="product_export_domain_enabled" string="Product exports enabled"
                        widget="boolean_toggle" readonly="1"/>
                 <field name="product_export_binding_namespace_ready"
                        string="Product export mappings ready" widget="boolean_toggle" readonly="1"/>
-                <field name="price_source_of_truth"/>
-                <field name="media_source_of_truth"/>
+                <field name="price_source_of_truth" string="Price owner"/>
+                <field name="media_source_of_truth" string="Media owner"/>
             </list>
         </field>
     </record>
