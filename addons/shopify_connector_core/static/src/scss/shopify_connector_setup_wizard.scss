@@ -285,7 +285,7 @@
 
     // --- The one panel: a single card, never nested cards ---
     .sc_setup__panel {
-        inline-size: min(100%, 880px);
+        inline-size: #{"min(100%, 880px)"};
         margin-inline: auto;
         display: flex;
         flex-direction: column;
@@ -602,7 +602,7 @@
         position: sticky;
         inset-block-end: 0;
         z-index: 1;
-        inline-size: min(100%, 880px);
+        inline-size: #{"min(100%, 880px)"};
         margin-inline: auto;
         display: flex;
         flex-wrap: wrap;
