@@ -955,6 +955,7 @@ describe("shopify connector setup wizard", () => {
 
         await releaseSearch(server);
         await inFlight;
+        await animationFrame();
         expect(component.state.busy).toBe(false);
         expect(queryFirst(".sc_setup_search_shopify_go").disabled).toBe(false);
         expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(false);
