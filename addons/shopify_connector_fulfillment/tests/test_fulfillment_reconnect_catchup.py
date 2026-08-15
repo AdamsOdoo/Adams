@@ -153,8 +153,11 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
     # fail-closed pending stamp
     # ------------------------------------------------------------------
     def _order_binding(self, suffix):
+        partner = self.env['res.partner'].sudo().create({
+            'name': 'Reconnect Catchup %s' % suffix,
+        })
         order = self.env['sale.order'].sudo().create({
-            'partner_id': self.env.ref('base.res_partner_1').id,
+            'partner_id': partner.id,
             'company_id': self.env.company.id,
         })
         return self.env['shopify.connector.order.binding'].sudo().create({
