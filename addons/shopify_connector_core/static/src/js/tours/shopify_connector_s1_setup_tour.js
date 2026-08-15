@@ -607,7 +607,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_readiness_tour", {
     ],
 });
 
-// --- 7. C4: browser admission, coalescing, dispatch and durable reopening. ---
+// --- 7. C4: automatic admission, dispatch and durable reopening. ---
 registry.category("web_tour.tours").add(
     "shopify_connector_s1_location_refresh_dispatch_tour",
     {
@@ -619,26 +619,10 @@ registry.category("web_tour.tours").add(
                 content: "The exact store resumes on its location step.",
             },
             {
-                trigger: ".sc_setup_refresh_locations",
-                content: "The merchant starts the location refresh in the browser.",
-                run: "click",
-            },
-            {
-                trigger: ".sc_setup_refresh_state:contains('Waiting')",
-                content: "The admitted run is visible before a dispatcher handles it.",
-            },
-            {
-                trigger: ".sc_setup_refresh_still_running",
-                content: "The first browser RPC completed without a dispatcher.",
-            },
-            {
-                trigger: ".sc_setup_refresh_locations:not([disabled])",
-                content: "The merchant performs the second refresh RPC before dispatch.",
-                run: "click",
-            },
-            {
                 trigger: ".sc_setup_refresh_state:contains('Succeeded')",
-                content: "The genuine dispatcher completed the exact admitted run.",
+                content:
+                    "Automatic discovery admitted one run and the genuine " +
+                    "dispatcher completed it.",
             },
             {
                 trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
@@ -681,17 +665,14 @@ registry.category("web_tour.tours").add(
             ...openSetupWizard(),
             { trigger: heading(7, "Location mapping") },
             {
-                trigger: ".sc_setup_refresh_locations",
-                content: "The merchant starts the failing refresh in the browser.",
-                run: "click",
-            },
-            {
                 trigger: ".sc_setup_refresh_failure_reason:contains('did not serve the Admin API version')",
-                content: "The dispatcher's classified merchant-safe reason is visible.",
+                content:
+                    "Automatic discovery exposes the dispatcher's classified " +
+                    "merchant-safe reason.",
             },
             {
-                trigger: ".sc_setup_refresh_locations:contains('Retry')",
-                content: "Retry is reachable from the normal setup surface.",
+                trigger: ".sc_setup_refresh_locations:contains('Try again')",
+                content: "Try again is reachable from the normal setup surface.",
                 run: "click",
             },
             {

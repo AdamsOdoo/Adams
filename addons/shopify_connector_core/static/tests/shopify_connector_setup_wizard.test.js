@@ -942,6 +942,7 @@ describe("shopify connector setup wizard", () => {
             locationMapping: {
                 locations: [shopifyRow(1)],
                 odoo_locations: [odooRow(9)],
+                shopify_total: 11,
             },
         });
         server.hold = true;

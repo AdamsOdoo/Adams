@@ -711,7 +711,7 @@ class TestUiC4LocationRefreshTours(HttpCase):
         self.assertEqual(errors, [], 'C4 dispatcher findings')
 
     def test_location_refresh_success_is_followed_and_reloaded(self):
-        """Two browser clicks coalesce, dispatch, recompute and reopen."""
+        """Automatic browser admission dispatches, recomputes and reopens."""
         if 'shopify.connector.location.mapping' not in self.env:
             self.skipTest('shopify_connector_inventory is not installed')
         fixture = self._commit_fixture(REFRESH_SHOP_DOMAIN, 's1_refresh_admin')
@@ -726,7 +726,7 @@ class TestUiC4LocationRefreshTours(HttpCase):
         calls, calls_lock = self._install_transport(fixture, fail_first=False)
         dispatch = threading.Event()
         admissions, admissions_lock = self._install_admission_observer(
-            fixture, [(2, dispatch)],
+            fixture, [(1, dispatch)],
         )
         thread, findings = self._start_dispatcher(fixture, [dispatch])
 
@@ -739,10 +739,9 @@ class TestUiC4LocationRefreshTours(HttpCase):
             admitted_ids = list(admissions)
         with calls_lock:
             transport_count = len(calls)
-        self.assertEqual(len(admitted_ids), 2, 'the browser did not click twice')
         self.assertEqual(
-            len(set(admitted_ids)), 1,
-            'duplicate browser admission created an unrelated run',
+            len(admitted_ids), 1,
+            'entering the required step did not admit exactly one automatic run',
         )
         self.assertEqual(transport_count, 1)
         result = self._fresh_result(fixture)
@@ -784,10 +783,13 @@ class TestUiC4LocationRefreshTours(HttpCase):
             admitted_ids = list(admissions)
         with calls_lock:
             transport_count = len(calls)
-        self.assertEqual(len(admitted_ids), 2, 'initial and Retry clicks are required')
+        self.assertEqual(
+            len(admitted_ids), 2,
+            'automatic discovery and the explicit Try again are both required',
+        )
         self.assertEqual(
             len(set(admitted_ids)), 1,
-            'Retry created an unrelated location-refresh run',
+            'Try again created an unrelated location-refresh run',
         )
         self.assertEqual(transport_count, 2)
         result = self._fresh_result(fixture)

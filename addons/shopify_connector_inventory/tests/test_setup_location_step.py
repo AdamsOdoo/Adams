@@ -576,8 +576,10 @@ class TestSetupLocationStep(TransactionCase):
         state = self._as().run_readiness(self.store.id)
         checks = {c['code']: c for c in state['readiness']['checks']}
         self.assertEqual(checks['mapped_location']['state'], 'blocking')
-        self.assertIn(
-            'every active', checks['mapped_location']['reason'].lower(),
+        self.assertEqual(
+            checks['mapped_location']['reason'],
+            '1 active Shopify location(s) still need an explicit Odoo '
+            'location mapping.',
         )
 
         self._as().save_location_mapping(
