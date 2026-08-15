@@ -945,6 +945,13 @@ describe("shopify connector setup wizard", () => {
                 shopify_total: 11,
             },
         });
+        component.setLocationMappingChoice(
+            "gid://shopify/Location/1",
+            "9"
+        );
+        await animationFrame();
+        expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(false);
+
         server.hold = true;
         const inFlight = component.searchLocations("shopify");
         await animationFrame();
