@@ -53,18 +53,13 @@
                     promise on nothing, and the announcement competes with
                     the dialog's own arrival for the same attention.
 
-                    The `alert-info` class stays because it is
-                    PRESENTATIONAL — it is why this reads as the reason
-                    the dialog opened rather than as one more paragraph.
-                    Odoo's view validator warns on an `alert-*` class whose
-                    role is not alert/alertdialog/status; that warning
-                    encodes a visual heuristic, and it is accepted here
-                    rather than obeyed, because obeying it means declaring
-                    a live region that has nothing to announce. The same
-                    answer was already recorded for the withdrawal
-                    dialog's note band in Batch 1.
+                    The connector-owned `o_sc_note` classes preserve the
+                    explanatory band treatment without using Bootstrap's
+                    live-region-oriented `alert-*` classes. This keeps the
+                    correct static-note semantics and passes Odoo's view
+                    accessibility validator without a false announcement.
                 -->
-                <div class="alert alert-info o_sc_tax_decision" role="note">
+                <div class="o_sc_note o_sc_note--info o_sc_tax_decision" role="note">
                     <strong>This order stopped because Shopify charged a tax
                     the connector has not been told about.</strong>
                     Choose the Odoo tax it means. Nothing is sent to Shopify,

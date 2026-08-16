@@ -113,6 +113,7 @@ class TestInventoryLevelBinding(TransactionCase):
             'shopify_inventory_item_gid': item_gid,
         })
 
+    @mute_logger('odoo.sql_db')
     def test_required_fields(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():

@@ -50,6 +50,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.models import (
     shopify_connector_job_dispatch as dispatch_module,
 )
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see test_job_dispatch.py.
@@ -104,6 +105,7 @@ class TestDispatchThroughput(TransactionCase):
         )
         self.assertEqual(self.Dispatch._resolve_drain_batch_size(), 75)
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch')
     def test_batch_size_rejects_malformed_and_out_of_range_values(self):
         """A typo must neither stop the drain nor monopolise the worker."""
         for bad in ('abc', '', '   ', '0', '-5', '501', '10000', '3.5'):

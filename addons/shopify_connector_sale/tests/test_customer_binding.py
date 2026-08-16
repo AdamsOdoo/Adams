@@ -82,6 +82,7 @@ class TestCustomerBinding(TransactionCase):
     # 1. Required fields.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_requires_store_id(self):
         partner = self._make_partner()
         with self.assertRaises(Exception):
@@ -91,6 +92,7 @@ class TestCustomerBinding(TransactionCase):
                     'partner_id': partner.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_shopify_gid(self):
         partner = self._make_partner()
         with self.assertRaises(Exception):
@@ -100,6 +102,7 @@ class TestCustomerBinding(TransactionCase):
                     'partner_id': partner.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_partner_id(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():

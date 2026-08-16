@@ -274,7 +274,7 @@
                     reused. Administrator only, and the reason below is
                     recorded on the audit trail.
                 </div>
-                <div class="alert alert-info" role="note">
+                <div class="o_sc_note o_sc_note--info" role="note">
                     Use this when the mapped Odoo location must change — for
                     example after a physical warehouse move. Once every pair
                     of a Shopify location is back to Pending, the

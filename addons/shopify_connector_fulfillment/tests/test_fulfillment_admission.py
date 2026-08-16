@@ -6,6 +6,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -243,6 +244,7 @@ class TestFulfillmentPickingAdmission(TransactionCase):
     # Theme A — centralized `_enqueue_once` collision recovery
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_duplicate_admission_enqueue_collision_returns_existing_job(self):
         # Two _enqueue_once calls for the SAME picking under the SAME
         # job_type but with different payload_hash: the fast idempotency-key

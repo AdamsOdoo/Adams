@@ -26,6 +26,7 @@ from ..models.shopify_connector_product_scan import (
     PRODUCT_SCAN_PAGE_SIZE,
     PRODUCT_SCAN_TARGET,
 )
+from odoo.tools import mute_logger
 
 VIEWS_ROOT = Path(__file__).resolve().parent.parent / 'views'
 MODELS_ROOT = Path(__file__).resolve().parent.parent / 'models'
@@ -466,6 +467,7 @@ class TestProductScanProducer(TransactionCase):
             'the child identity must be the verbatim remote stamp',
         )
 
+    @mute_logger('odoo.sql_db')
     def test_repeated_enumeration_of_an_unchanged_product_coalesces(self):
         node = self._node('77', '2026-07-19T08:30:00Z')
         self._run_scan([self._page([node])])

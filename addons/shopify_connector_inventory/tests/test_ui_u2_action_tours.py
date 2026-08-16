@@ -47,6 +47,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attemp
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
 )
+from odoo.tools import mute_logger
 
 GUARD_ACTION = (
     'shopify_connector_inventory.action_shopify_connector_inventory_first_push'
@@ -652,6 +653,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             ('job_id', 'in', jobs.ids),
         ]), jobs
 
+    @mute_logger('odoo.http')
     def test_location_withdraw_all_tour_returns_every_pair_to_pending(self):
         """The whole mapping-level closure, driven through the real chain.
 
@@ -762,6 +764,7 @@ class TestUiU2InventoryActionTours(HttpCase):
         for binding in (previewed, confirmed_live, confirmed_dry):
             self.assertNotEqual(binding.first_push_state, 'confirmed')
 
+    @mute_logger('odoo.http')
     def test_location_withdraw_all_refuses_a_decision_made_against_stale_state(self):
         """A pair confirmed while the dialog is open voids the decision.
 
@@ -896,6 +899,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             'no Shopify mutation may be attempted by a withdrawal',
         )
 
+    @mute_logger('odoo.http')
     def test_single_pair_withdrawal_refuses_a_decision_made_against_stale_state(self):
         """The same snapshot defect, on the single-pair route.
 

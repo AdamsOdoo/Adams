@@ -94,6 +94,7 @@ class TestProductVariantBinding(TransactionCase):
     # 1. Required fields.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_requires_store_id(self):
         template_binding = self._make_template_binding(
             'gid://shopify/Product/100', 'Template 100',
@@ -106,6 +107,7 @@ class TestProductVariantBinding(TransactionCase):
                     'product_template_binding_id': template_binding.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_shopify_gid(self):
         template_binding = self._make_template_binding(
             'gid://shopify/Product/101', 'Template 101',
@@ -118,6 +120,7 @@ class TestProductVariantBinding(TransactionCase):
                     'product_template_binding_id': template_binding.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_product_template_binding_id(self):
         """product_template_binding_id is required and never stands in
         for a missing variant binding -- importing a variant always

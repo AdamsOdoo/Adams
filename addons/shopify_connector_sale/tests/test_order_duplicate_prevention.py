@@ -16,6 +16,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 class TestOrderDuplicatePrevention(OrderImportCase):
@@ -41,6 +42,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
             'product_id', 'product_uom_qty', 'price_unit', 'discount', 'tax_ids',
         ]), line_before)
 
+    @mute_logger('odoo.sql_db')
     def test_every_discovery_source_collides_on_same_entity_identity(self):
         Scan = self.env['shopify.connector.order.scan']
         node = {
@@ -63,6 +65,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs.job_source, 'scheduled_sync')
 
+    @mute_logger('odoo.sql_db')
     def test_overlapping_windows_and_repeated_pages_do_not_duplicate(self):
         Scan = self.env['shopify.connector.order.scan']
         node = {
@@ -81,6 +84,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
             ('shopify_target_gid', '=', node['id']),
         ]), 1)
 
+    @mute_logger('odoo.sql_db')
     def test_database_binding_constraints_are_the_last_race_anchor(self):
         binding = self.Importer._apply_import(
             self.store, self._payload('gid://shopify/Order/BindingAnchor'),

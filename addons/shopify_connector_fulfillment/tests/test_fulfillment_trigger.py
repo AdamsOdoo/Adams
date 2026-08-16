@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -221,6 +222,7 @@ class TestFulfillmentTrigger(TransactionCase):
     # Theme A — transaction safety around the two foreground hooks
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_second_tracking_write_persists_while_first_job_non_terminal(self):
         # Two sequential tracking-admission writes on the same picking while
         # the first admission job remains non-terminal: the SECOND write's
@@ -253,6 +255,7 @@ class TestFulfillmentTrigger(TransactionCase):
         # hook's internal enqueue attempt.
         self.assertEqual(picking.carrier_tracking_ref, 'TN-SECOND')
 
+    @mute_logger('odoo.addons.shopify_connector_fulfillment.models.stock_picking')
     def test_unexpected_action_done_hook_failure_rolls_back_atomically(self):
         # An unexpected (non-collision) enqueue-hook exception during
         # `_action_done` must propagate, rolling back the whole validation
@@ -270,6 +273,7 @@ class TestFulfillmentTrigger(TransactionCase):
             with self.assertRaises(RuntimeError):
                 picking._action_done()
 
+    @mute_logger('odoo.addons.shopify_connector_fulfillment.models.stock_picking')
     def test_unexpected_write_hook_failure_rolls_back_atomically(self):
         picking = self._make_picking(
             'outgoing', self.stock_loc, self.customer_loc, state='done',
@@ -304,6 +308,10 @@ class TestFulfillmentTrigger(TransactionCase):
             self.env['shopify.connector.fulfillment.binding'].with_user(
                 self.stock_user).search([])
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_inventory.models.'
+        'shopify_connector_inventory_service'
+    )
     def test_ordinary_stock_user_validates_delivery_enqueues_one_job(self):
         picking = self._deliverable_picking()
         picking.move_ids._action_confirm()
@@ -342,6 +350,11 @@ class TestFulfillmentTrigger(TransactionCase):
         ])
         self.assertEqual(len(jobs), 1)
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_fulfillment.models.stock_picking',
+        'odoo.addons.shopify_connector_inventory.models.'
+        'shopify_connector_inventory_service',
+    )
     def test_ordinary_stock_user_unexpected_hook_failure_rolls_back(self):
         picking = self._deliverable_picking()
         picking.move_ids._action_confirm()

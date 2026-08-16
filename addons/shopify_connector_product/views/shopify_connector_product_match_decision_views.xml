@@ -31,10 +31,9 @@
                     ambiguous import, and nothing a reviewer does in this
                     dialog changes it. `status` is a live-region role and
                     promises to announce a change; there is no change.
-                    The `alert-info` class is presentational and stays,
-                    and Odoo's `alert-*`-needs-a-live-role view warning is
-                    accepted rather than obeyed — see the tax decision
-                    dialog for the full reasoning.
+                    The connector-owned `o_sc_note` classes keep the
+                    explanatory band styling without claiming a live-region
+                    role; see the tax decision dialog for the full reasoning.
 
                     `o_sc_match_decision_wizard` is an INERT surface
                     marker on this same band, for the same reason and with
@@ -44,7 +43,7 @@
                     the body changes what an overflow instrument measures
                     without changing a pixel.
                 -->
-                <div class="alert alert-info o_sc_match_decision_wizard" role="note">
+                <div class="o_sc_note o_sc_note--info o_sc_match_decision_wizard" role="note">
                     <strong>This import stopped because more than one Odoo
                     record already carries the identifier Shopify sent.</strong>
                     Choose the one this Shopify record means. Nothing is sent
@@ -242,13 +241,13 @@
                         the same information a second time (WCAG 1.4.1), not
                         the only carrier of it.
                     -->
-                    <div class="alert alert-warning" role="note"
+                    <div class="o_sc_note o_sc_note--warning" role="note"
                          invisible="state != 'pending'">
                         <strong>This import is waiting for a decision.</strong>
                         Until one is made, re-queueing the job runs the same
                         search and stops at the same ambiguity.
                     </div>
-                    <div class="alert alert-secondary" role="note"
+                    <div class="o_sc_note o_sc_note--neutral" role="note"
                          invisible="state != 'superseded'">
                         <strong>Superseded.</strong>
                         <field name="superseded_reason" readonly="1"

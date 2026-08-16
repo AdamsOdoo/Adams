@@ -62,6 +62,7 @@ from .common import ExportCase, FILE_GID, PRODUCT_GID, VARIANT_GID
 from .test_media_export_pipeline import PNG_1X1
 
 import base64
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -391,6 +392,10 @@ class TestExportMutationExpiry(ExportCase):
     # The post-transport boundary: `_advance_plan`
     # ------------------------------------------------------------------
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_product_export.models.'
+        'shopify_connector_product_export_service'
+    )
     def test_expiry_mid_plan_blocks_the_next_step_and_keeps_the_applied_one(self):
         preview = self._confirmed_applying(
             binding=self.binding,
@@ -427,6 +432,10 @@ class TestExportMutationExpiry(ExportCase):
             'A part-applied export must never be recorded as applied.',
         )
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_product_export.models.'
+        'shopify_connector_product_export_service'
+    )
     def test_expiry_mid_plan_enqueues_no_child_job(self):
         """The concrete consequence: no successor job is created."""
         preview = self._confirmed_applying(

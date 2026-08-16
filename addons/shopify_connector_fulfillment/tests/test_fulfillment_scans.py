@@ -9,6 +9,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (  # noqa: E501
     FulfillmentReadError,
 )
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -208,6 +209,10 @@ class TestFulfillmentScans(TransactionCase):
     # Theme A — per-store isolation in the cron entry point
     # ------------------------------------------------------------------
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_fulfillment.models.'
+        'shopify_connector_fulfillment_scans'
+    )
     def test_cron_one_store_unexpected_failure_does_not_starve_other_stores(self):
         store_2 = self.env['shopify.connector.store'].create({
             'name': 'FUL Test 2',

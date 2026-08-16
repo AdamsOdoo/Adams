@@ -67,6 +67,7 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     MAX_CAS_RETRY_ORDINAL,
     pair_scope_key,
 )
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -497,6 +498,7 @@ class TestInventoryConcurrency(TransactionCase):
     # 8.1 -- Simultaneous same-pair push_sync admission
     # ==================================================================
 
+    @mute_logger('odoo.sql_db')
     def test_simultaneous_admission_serializes_to_exactly_one_pair_job(self):
         info = self._durable_pair()
         other = self._durable_pair()
@@ -608,10 +610,12 @@ class TestInventoryConcurrency(TransactionCase):
             cr.commit()
         self.assertEqual(self._count_nonterminal(info, child_type), 1)
 
+    @mute_logger('odoo.sql_db')
     def test_orchestration_no_level_yields_exactly_one_activation_child(self):
         info = self._durable_pair()
         self._assert_one_child_under_scope_contention(info, 'inventory_activate')
 
+    @mute_logger('odoo.sql_db')
     def test_orchestration_level_change_yields_one_set_quantities_child(self):
         info = self._durable_pair()
         self._assert_one_child_under_scope_contention(
@@ -871,6 +875,7 @@ class TestInventoryConcurrency(TransactionCase):
     # 8.8 -- PostgreSQL concurrency error
     # ==================================================================
 
+    @mute_logger('odoo.sql_db')
     def test_pg_lock_contention_is_a_safe_skip_never_a_pg_error(self):
         """The inventory pair paths guard by ``FOR UPDATE SKIP LOCKED``
         (``try_lock_for_update``) and unique-constraint coalescing, never a

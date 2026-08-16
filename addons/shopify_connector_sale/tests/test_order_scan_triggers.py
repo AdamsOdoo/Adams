@@ -8,6 +8,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 class TestOrderScanTriggers(OrderImportCase):
@@ -95,6 +96,7 @@ class TestOrderScanTriggers(OrderImportCase):
             ('id', '=', binding.id),
         ]), 1)
 
+    @mute_logger('odoo.addons.shopify_connector_sale.models.shopify_connector_order_scan')
     def test_cron_requires_both_flags_and_connected_store(self):
         self.settings.write({'order_scheduled_sync_enabled': False})
         self.env['shopify.connector.store']._cron_enqueue_order_scans()

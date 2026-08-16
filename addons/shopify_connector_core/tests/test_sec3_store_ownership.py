@@ -120,7 +120,7 @@ SEC3_MODELS = (
     ('shopify.connector.product.match.decision', '_row_match_decision'),
 )
 
-# Models that deliberately carry NO `ir.model.access.csv` row, so no connector
+# Models that deliberately grant NO `ir.model.access.csv` permission, so no
 # group -- not even Administrator -- may read them through RPC. They are still
 # in SEC3_MODELS (they are durable and store-scoped and must have the company
 # rule and the relation declarations), but the four read-shape tests assert the
@@ -687,8 +687,8 @@ class TestSec3ModelMatrix(Sec3Base):
 
         `shopify.connector.store.access.token` is the one model where hiding it
         from everybody is the POINT rather than a regression. It holds the
-        cached 24-hour Shopify access token, and it carries no
-        `ir.model.access.csv` row on purpose, so no connector group -- including
+        cached 24-hour Shopify access token, and its `ir.model.access.csv`
+        marker grants no permission, so no connector group -- including
         Administrator -- can reach it through RPC. The token is reachable only
         through the sanctioned, store-scoped `sudo()` accessor on
         `shopify.connector.store.credential`.
@@ -1282,6 +1282,7 @@ class TestSec3HistoricRows(Sec3Base):
             store.company_id,
             'a refused remediation must not have assigned anything')
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_a_historic_cross_store_row_is_quarantined_not_re_homed(self):
         """The shape a constraint can never catch, because it predates it.
 
@@ -1328,6 +1329,7 @@ class TestSec3HistoricRows(Sec3Base):
             variant_a.product_template_binding_id.store_id, self.store_a2,
             'the sweep must not have re-homed either half')
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_releasing_a_quarantine_requires_the_disagreement_to_be_resolved(self):
         binding_a2 = self._row_template_binding(self.store_a2)
         variant_a = self._row_variant_binding(self.store_a)
@@ -1348,6 +1350,7 @@ class TestSec3HistoricRows(Sec3Base):
             record.with_user(self.user_a).action_sec3_release_scope_quarantine()
         self.assertTrue(record.sec3_scope_quarantined)
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_quarantining_evidence_also_hides_its_ledger_lines(self):
         """A stored related flag does not follow a SQL write to its source.
 

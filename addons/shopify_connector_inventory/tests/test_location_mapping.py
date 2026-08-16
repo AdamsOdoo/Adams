@@ -94,6 +94,7 @@ class TestLocationMapping(TransactionCase):
             'shopify_location_active': active,
         })
 
+    @mute_logger('odoo.sql_db')
     def test_explicit_identity_no_name_inference(self):
         """Creation requires an explicit Shopify Location GID and Odoo
         location -- there is no name-matching creation path at all."""

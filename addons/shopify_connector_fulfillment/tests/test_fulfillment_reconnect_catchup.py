@@ -23,6 +23,7 @@ from ..models.shopify_connector_job import (
     JOB_TYPE_RECONCILIATION_CHECK,
     JOB_TYPE_RECONNECT_CATCHUP,
 )
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -98,6 +99,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
     # ------------------------------------------------------------------
     # admission from the real entry point (was a dead-end at a1c5931)
     # ------------------------------------------------------------------
+    @mute_logger('odoo.sql_db')
     def test_reconnect_admits_the_registered_catchup_route(self):
         self.assertFalse(self._catchup_jobs(),
                          'nothing may admit the route before reconnect')

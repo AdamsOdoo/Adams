@@ -16,6 +16,7 @@ from ..models.shopify_connector_tax_mapping import (
     safe_tax_preview,
 )
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 class TestOrderTaxResolution(OrderImportCase):
@@ -275,6 +276,7 @@ class TestOrderTaxResolution(OrderImportCase):
         self.assertEqual(str(rate), '5')
         self.assertEqual(signatures, (self._key(evidence),))
 
+    @mute_logger('odoo.sql_db')
     def test_mapping_key_shape_and_uniqueness(self):
         tax = self._tax()
         with self.assertRaises(ValidationError):

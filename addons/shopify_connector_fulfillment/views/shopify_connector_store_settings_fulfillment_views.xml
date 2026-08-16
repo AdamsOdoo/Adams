@@ -82,7 +82,7 @@
                         reconciliation scan completes.
                     </div>
 
-                    <div class="alert alert-warning" role="note"
+                    <div class="o_sc_note o_sc_note--warning" role="note"
                          invisible="fulfillment_operating_mode != 'mode1' or fulfillment_switch_in_progress"
                          groups="shopify_connector_core.group_shopify_connector_admin">
                         <strong>Queues a Shopify reconciliation read.</strong>

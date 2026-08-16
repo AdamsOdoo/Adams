@@ -21,12 +21,13 @@ So the ephemeral value lives here instead, and the identity row stays still.
 
 ACCESS
 
-This model deliberately carries NO row in `ir.model.access.csv`. That is
-stronger than the Administrator-only rule on the credential: no connector group
-can read this table through RPC at all, including an Administrator. The token is
-reachable only through the sanctioned, store-scoped `sudo()` accessors on
-`shopify.connector.store.credential`, which is the single seam the API client
-already used before this table existed.
+This model deliberately grants NO permission in `ir.model.access.csv`. Its
+single deny-only marker has all four permission columns disabled and exists
+only so Odoo's module validator can distinguish this deliberate policy from an
+accidentally forgotten ACL. No connector group can read this table through RPC,
+including an Administrator. The token is reachable only through the sanctioned,
+store-scoped `sudo()` accessors on `shopify.connector.store.credential`, which
+is the single seam the API client already used before this table existed.
 
 The token is stored plain behind that access control. It is **not** encrypted at
 rest -- the same honest residual recorded for `access_token` on the credential

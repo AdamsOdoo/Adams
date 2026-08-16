@@ -107,6 +107,7 @@ class TestOrderBinding(OrderImportCase):
         self.assertEqual(stored, self.EXPECTED_PROTECTED_FIELDS)
         self.Binding._assert_binding_field_classification()
 
+    @mute_logger('odoo.sql_db')
     def test_required_fields_and_uniqueness(self):
         with self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():

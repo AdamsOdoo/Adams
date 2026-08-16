@@ -26,6 +26,7 @@ from ..models.shopify_connector_product_export_service import (
 )
 from .common import ExportCase, FakeSendResponse, PRODUCT_GID
 from .test_export_preview_guard import _product_read_body
+from odoo.tools import mute_logger
 
 TERMINAL = ('succeeded', 'failed_final', 'skipped', 'cancelled')
 
@@ -133,6 +134,7 @@ class TestExportApplyHandoff(ExportCase):
         """
         return self.make_job(job_type, preview._name, preview.id, PRODUCT_GID)
 
+    @mute_logger('odoo.sql_db')
     def test_a_second_live_job_for_the_same_target_is_still_refused(self):
         """Releasing the key on hand-off must not open the scope generally."""
         preview = self._confirmed_preview()
@@ -143,6 +145,7 @@ class TestExportApplyHandoff(ExportCase):
             self.env.flush_all()
         self.assertIn('operation_scope_key', str(caught.exception))
 
+    @mute_logger('odoo.sql_db')
     def test_the_child_holds_the_scope_against_a_further_duplicate(self):
         preview = self._confirmed_preview()
         job = self._apply_job(preview)

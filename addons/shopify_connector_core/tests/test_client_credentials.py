@@ -41,6 +41,7 @@ from ..models.shopify_connector_api_client import (
     ShopifyClientError,
 )
 from .test_api_client import FakeResponse, _success_body
+from odoo.tools import mute_logger
 
 DUMMY_CLIENT_ID = 'dummy-client-id-0000000000000000'
 DUMMY_CLIENT_SECRET = 'dummy-client-secret-LEAKCANARY-00000000'
@@ -627,8 +628,8 @@ class TestEndToEndAndLeakage(ClientCredentialsCase):
         self.assertTrue(state['store']['token_expires_at'])
 
     def test_no_group_reads_the_token_cache_over_rpc(self):
-        """The cache model carries no ACL row: even the Administrator is
-        refused, and the token is reachable only through the sanctioned
+        """The cache model grants no ACL permission: even the Administrator
+        is refused, and the token is reachable only through the sanctioned
         internal seam."""
         self._set_client_credentials()
         with patch.object(
@@ -794,6 +795,7 @@ class TestVulnerableCacheUpgrade(ClientCredentialsCase):
         module.migrate(self.env.cr, '19.0.1.16.0')
         return module
 
+    @mute_logger('sc_post_migrate')
     def test_an_unprovable_cache_row_is_removed_not_blessed(self):
         row = self._seed_vulnerable_cache_row()
         self.assertTrue(row.exists())
@@ -808,6 +810,7 @@ class TestVulnerableCacheUpgrade(ClientCredentialsCase):
         # mints a fresh one through the corrected path.
         self.assertFalse(self.Credential._get_access_token(self.store))
 
+    @mute_logger('sc_post_migrate')
     def test_the_migration_is_idempotent(self):
         self._seed_vulnerable_cache_row()
         self._run_migration()
@@ -867,6 +870,7 @@ class TestVulnerableCacheUpgrade(ClientCredentialsCase):
             self.Credential._get_access_token(self.store), DUMMY_OFFLINE_TOKEN,
         )
 
+    @mute_logger('sc_post_migrate')
     def test_configured_client_credentials_survive_the_upgrade(self):
         """The pair a merchant configured is preserved; only the cache goes."""
         self._seed_vulnerable_cache_row()

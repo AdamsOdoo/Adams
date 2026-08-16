@@ -86,6 +86,7 @@ class TestProductTemplateBinding(TransactionCase):
     # 1. Required fields.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_requires_store_id(self):
         template = self._make_template()
         with self.assertRaises(Exception):
@@ -95,6 +96,7 @@ class TestProductTemplateBinding(TransactionCase):
                     'product_template_id': template.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_shopify_gid(self):
         template = self._make_template()
         with self.assertRaises(Exception):
@@ -104,6 +106,7 @@ class TestProductTemplateBinding(TransactionCase):
                     'product_template_id': template.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_product_template_id(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
