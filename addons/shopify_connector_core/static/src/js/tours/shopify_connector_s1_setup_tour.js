@@ -506,8 +506,10 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             content: "The Shopify identity is shown, read-only.",
         },
         {
-            trigger: ".sc_setup_refresh_locations",
-            content: "A refresh control exists on the step itself.",
+            trigger: ".sc_setup_refresh_state",
+            content:
+                "Automatic discovery always exposes its state on the step; " +
+                "the manual retry control appears only after a terminal result.",
         },
 
         {
@@ -651,6 +653,19 @@ registry.category("web_tour.tours").add(
             {
                 trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
                 content: "The reopened setup shows the refreshed store, not another store.",
+            },
+            {
+                trigger:
+                    ".sc_setup_refresh_state:contains('Waiting'), " +
+                    ".sc_setup_refresh_state:contains('Running')",
+                content:
+                    "The genuine re-entry visibly starts its own discovery pass.",
+            },
+            {
+                trigger: ".sc_setup_refresh_state:contains('Succeeded')",
+                content:
+                    "Re-entering the location step starts and completes a new " +
+                    "discovery pass rather than showing cached rows as current.",
             },
         ],
     }

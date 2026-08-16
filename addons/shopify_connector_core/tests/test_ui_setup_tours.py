@@ -690,8 +690,10 @@ class TestUiC4LocationRefreshTours(HttpCase):
             ].browse(fixture['settings_id'])
             return {
                 'job_ids': jobs.ids,
-                'job_state': jobs.state,
-                'job_generation': jobs.expected_connection_generation,
+                'job_states': jobs.mapped('state'),
+                'job_generations': jobs.mapped(
+                    'expected_connection_generation'
+                ),
                 'store_generation': store.connection_generation,
                 'location_names': locations.mapped('name'),
                 'last_readiness_at': bool(store.last_readiness_at),
@@ -724,11 +726,14 @@ class TestUiC4LocationRefreshTours(HttpCase):
             type(self.registry), '_lock', threading.RLock(),
         )
         calls, calls_lock = self._install_transport(fixture, fail_first=False)
-        dispatch = threading.Event()
+        first_dispatch = threading.Event()
+        reopen_dispatch = threading.Event()
         admissions, admissions_lock = self._install_admission_observer(
-            fixture, [(1, dispatch)],
+            fixture, [(1, first_dispatch), (2, reopen_dispatch)],
         )
-        thread, findings = self._start_dispatcher(fixture, [dispatch])
+        thread, findings = self._start_dispatcher(
+            fixture, [first_dispatch, reopen_dispatch],
+        )
 
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
@@ -740,14 +745,21 @@ class TestUiC4LocationRefreshTours(HttpCase):
         with calls_lock:
             transport_count = len(calls)
         self.assertEqual(
-            len(admitted_ids), 1,
-            'entering the required step did not admit exactly one automatic run',
+            len(admitted_ids), 2,
+            'the initial entry and genuine reopen did not each admit one run',
         )
-        self.assertEqual(transport_count, 1)
+        self.assertEqual(transport_count, 2)
         result = self._fresh_result(fixture)
-        self.assertEqual(result['job_ids'], [admitted_ids[0]])
-        self.assertEqual(result['job_state'], 'succeeded')
-        self.assertEqual(result['job_generation'], result['store_generation'])
+        self.assertEqual(set(result['job_ids']), set(admitted_ids))
+        self.assertTrue(
+            all(state == 'succeeded' for state in result['job_states'])
+        )
+        self.assertTrue(
+            all(
+                generation == result['store_generation']
+                for generation in result['job_generations']
+            )
+        )
         self.assertEqual(result['location_names'], ['Dispatcher Tour Warehouse'])
         self.assertTrue(result['last_readiness_at'])
         self.assertFalse(result['readiness_stale'])
@@ -794,7 +806,7 @@ class TestUiC4LocationRefreshTours(HttpCase):
         self.assertEqual(transport_count, 2)
         result = self._fresh_result(fixture)
         self.assertEqual(result['job_ids'], [admitted_ids[0]])
-        self.assertEqual(result['job_state'], 'succeeded')
+        self.assertEqual(result['job_states'], ['succeeded'])
         self.assertEqual(result['location_names'], ['Dispatcher Retry Warehouse'])
         self.assertTrue(result['last_readiness_at'])
         self.assertFalse(result['readiness_stale'])

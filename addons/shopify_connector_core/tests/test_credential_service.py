@@ -179,6 +179,11 @@ CORE_SUDO_SITES = [
     ('shopify_connector_setup_wizard.py', 'save_first_push_schedule',
      'settings', 1),
     ('shopify_connector_setup_wizard.py', 'activate', 'settings', 1),
+    # Activation triggers only the already-declared enqueue crons for the
+    # workflows the administrator selected.  The cron methods retain their
+    # own eligibility and mutation guards; this elevation merely avoids
+    # making a newly activated store wait for the next clock boundary.
+    ('shopify_connector_setup_wizard.py', 'activate', 'cron', 1),
     ('shopify_connector_setup_wizard.py', 'restart_setup', 'settings', 1),
     # SEC-3 (#197) scope-mixin seams. The upgrade sweep must see rows that the
     # fail-closed rules hide from every ordinary reader -- including, by
@@ -224,6 +229,10 @@ CORE_SUDO_SITES = [
     # recorded exactly like every other one instead of escaping as an unhandled
     # error. Same store, same scope, same audit shape as ordinal 1.
     ('shopify_connector_store.py', '_run_connection_probe', 'Job', 2),
+    # A later successful probe keeps the historic failed rows for audit but
+    # links them to the success so current-health projections stop treating
+    # recovered credential failures as active work.
+    ('shopify_connector_store.py', '_run_connection_probe', 'Job', 3),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
     ('shopify_connector_store.py',

@@ -80,10 +80,10 @@ EXPECTED_SUITES = {
     # row update after a mapping, and four distinct empty states -- and none
     # of those properties is observable from the server or from a tour. The
     # first-run Sales Dashboard setup CTA adds the 31st client assertion.
-    # The location-discovery polish (2026-08-15) raised it to 33: opening the
+    # The location-discovery polish (2026-08-15) raised it to 34: opening the
     # required location step starts discovery automatically, and Continue
     # remains blocked until every active Shopify location is mapped.
-    'shopify connector setup wizard': 33,
+    'shopify connector setup wizard': 34,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so

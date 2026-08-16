@@ -492,6 +492,25 @@ class TestStore360Aggregates(OrderImportCase):
         self.assertEqual(payload['bridge']['state'], 'incomplete')
         self.assertTrue(payload['critical']['active'])
 
+    def test_disabled_order_import_routes_attention_to_settings(self):
+        self.settings.sudo().write({
+            'sale_domain_enabled': False,
+            'sale_order_last_import_checkpoint_at': fields.Datetime.now(),
+        })
+        payload = self._payload_360()
+        bridge = payload['bridge']
+        self.assertEqual(bridge['state'], 'incomplete')
+        self.assertEqual(bridge['g3'], 0)
+        self.assertIn('disabled', bridge['critical_text'])
+        self.assertEqual(
+            bridge['critical_target']['res_model'],
+            'shopify.connector.store.settings',
+        )
+        self.assertEqual(
+            bridge['critical_target']['domain'],
+            [['store_id', '=', self.store.id]],
+        )
+
     def test_unvalidated_filters_are_refused(self):
         from odoo.exceptions import UserError
         with self.assertRaises(UserError):

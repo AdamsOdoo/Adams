@@ -576,13 +576,38 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 ),
                 'name': _("Order discovery runs"),
             },
+            'settings_target': {
+                'res_model': 'shopify.connector.store.settings',
+                'domain': self._serialize_domain([
+                    ('store_id', '=', store.id),
+                ]),
+                'name': _("Order import settings"),
+            },
+            'store_target': {
+                'res_model': 'shopify.connector.store',
+                'domain': self._serialize_domain([('id', '=', store.id)]),
+                'name': _("Store connection"),
+            },
         }
         if state == 'incomplete':
-            result['critical_text'] = _(
-                "A connector problem may make these figures incomplete — "
-                "review order imports."
-            )
-            result['critical_target'] = result['g3_target']
+            if g3 > 0:
+                result['critical_text'] = _(
+                    "A connector problem may make these figures incomplete — "
+                    "review order imports."
+                )
+                result['critical_target'] = result['g3_target']
+            elif sale_disabled_with_history and not disconnected:
+                result['critical_text'] = _(
+                    "Order import is disabled, so these figures are historic "
+                    "and may be incomplete — review order import settings."
+                )
+                result['critical_target'] = result['settings_target']
+            else:
+                result['critical_text'] = _(
+                    "The Shopify connection is unavailable, so these figures "
+                    "are last known and may be incomplete."
+                )
+                result['critical_target'] = result['store_target']
         elif state == 'stale':
             result['critical_text'] = _(
                 "Order discovery is not current yet — run or enable order "
