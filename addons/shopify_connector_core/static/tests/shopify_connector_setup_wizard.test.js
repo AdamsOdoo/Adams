@@ -1204,7 +1204,7 @@ describe("shopify connector setup wizard", () => {
         // The selection is consumed, not left armed for a second click.
         expect(
             component.state.locationMappingChoices["gid://shopify/Location/3"]
-        ).toBeUndefined();
+        ).toBe(undefined);
     });
 
     test("a selection is revalidated after every search, clear and load more", async () => {
