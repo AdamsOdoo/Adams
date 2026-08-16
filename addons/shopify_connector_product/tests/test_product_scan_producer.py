@@ -292,7 +292,11 @@ class TestProductScanProducer(TransactionCase):
             self._page([self._node('1')], has_next=True, end_cursor='CUR-1'),
             self._page([self._node('2')], cursor_prefix='d'),
         ])
-        self.assertEqual(sent[0]['after'], False)
+        self.assertIsNone(
+            sent[0]['after'],
+            'the first GraphQL page must send JSON null for an optional '
+            'String cursor, never JSON false',
+        )
         self.assertEqual(
             sent[1]['after'], 'CUR-1',
             'the second page must be requested with the cursor the SERVER '

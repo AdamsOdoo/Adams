@@ -47,15 +47,42 @@ class TestOrderScanTriggers(OrderImportCase):
         node.update(extra)
         return node
 
-    def _patch_scan(self, bodies):
+    def _patch_scan(self, bodies, sent=None):
         bodies = iter(bodies)
+        sent = sent if sent is not None else []
 
         def fake_execute(_client, _job, _store, _query, variables=None):
+            sent.append(dict(variables or {}))
             return self._result(next(bodies))
 
         client = self.env['shopify.connector.api.client']
         return patch.object(
             type(client), 'execute_business', new=fake_execute,
+        )
+
+    def test_scan_uses_graphql_null_then_the_server_cursor(self):
+        job = self._job(
+            job_type='order_import_scan', target='scan:order', state='running',
+        )
+        sent = []
+        bodies = [
+            self._scan_body(
+                [self._node('CursorFirst')],
+                has_next=True,
+                end_cursor='CUR-1',
+            ),
+            self._scan_body([]),
+        ]
+        with self._patch_scan(bodies, sent=sent):
+            self.env['shopify.connector.order.scan'].run_scan(job)
+        self.assertIsNone(
+            sent[0]['after'],
+            'the first GraphQL page must send JSON null for an optional '
+            'String cursor, never JSON false',
+        )
+        self.assertEqual(
+            sent[1]['after'], 'CUR-1',
+            'the second page must use the cursor Shopify returned',
         )
 
     def test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent(self):

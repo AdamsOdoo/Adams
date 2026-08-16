@@ -205,7 +205,11 @@ class ShopifyConnectorProductScan(models.AbstractModel):
     @api.model
     def _enumerate(self, job, store, query_filter, job_source):
         client = self.env['shopify.connector.api.client']
-        cursor = False
+        # GraphQL nullable String variables must use JSON null on the first
+        # page.  Python ``False`` serializes as JSON false, which Shopify
+        # correctly refuses to coerce to ``String`` before executing the
+        # query.
+        cursor = None
         page_count = 0
         seen_cursors = set()
         seen_gids = set()
