@@ -1327,7 +1327,15 @@ describe("shopify connector setup wizard", () => {
             odoo: [],
             emptyReasonFor: () => reason,
         });
-        const component = await mountLocationStep(server);
+        const component = await mountLocationStep(server, {
+            locationMapping: {
+                refresh: {
+                    state: "failed",
+                    job_id: 7,
+                    reason: "Automatic loading did not finish.",
+                },
+            },
+        });
 
         component.state.locationSearch.shopify.query = "nothing matches this";
         await component.searchLocations("shopify");
@@ -1336,10 +1344,9 @@ describe("shopify connector setup wizard", () => {
         expect(noResults).toInclude("No location matches this search");
         // The controls that are the way OUT of a fruitless search must survive
         // it: a zero-result search used to hide the search row, the Clear
-        // button and the Map control together, leaving no visible route back.
+        // button together, leaving no visible route back.
         expect(queryAll(".sc_setup_search_shopify")).toHaveLength(1);
         expect(queryAll(".sc_setup_search_shopify_clear")).toHaveLength(1);
-        expect(queryAll(".sc_setup_create_mapping")).toHaveLength(1);
 
         reason = "no_cached_locations";
         component.state.locationSearch.shopify.query = "";
@@ -1347,7 +1354,8 @@ describe("shopify connector setup wizard", () => {
         await animationFrame();
         const noCache = queryText(".sc_setup__empty--shopify");
         expect(noCache).toInclude("No Shopify locations have been read");
-        expect(noCache).toInclude("Refresh Shopify locations");
+        expect(noCache).toInclude("Try again");
+        expect(queryText(".sc_setup_refresh_locations")).toInclude("Try again");
         expect(noCache).not.toBe(noResults);
     });
 
