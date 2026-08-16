@@ -1005,6 +1005,10 @@ OVERFLOW_JS = r"""
     // measurement coverage.
     ".o_sc_connector_health",
     ".o_sc_export_diff", ".o_sc_export_diff__inner",
+    // Static connector note bands are layout-bearing content surfaces too:
+    // long consequence copy must be measured where it wraps inside dialogs
+    // and forms, independently of the Odoo chrome that contains it.
+    ".o_sc_note",
     // S1 (2026-07-27): the guided setup surface. Its non-root elements use
     // the `sc_` prefix precisely so this list stays the inventory of
     // MEASURED ROOTS rather than a list of every class in the connector.

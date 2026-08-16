@@ -312,7 +312,7 @@ tours.add("shopify_connector_b2_tax_decision_tour", {
             // stopped order and that nothing in this dialog can change. The
             // selector states the corrected semantics, so a revert to `status`
             // fails the tour rather than passing on the class alone.
-            trigger: `${DIALOG} .alert-info[role='note']`,
+            trigger: `${DIALOG} .o_sc_tax_decision[role='note']`,
             content:
                 "The dialog says why the order stopped, and that nothing is " +
                 "sent to Shopify.",
@@ -372,7 +372,7 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
             // the tax dialog above (2026-07-31): static instructional copy is
             // document structure, and the tour asserts the role so the ruling
             // cannot be reverted quietly.
-            trigger: `${DIALOG} .alert-info[role='note']`,
+            trigger: `${DIALOG} .o_sc_match_decision_wizard[role='note']`,
             content:
                 "The dialog says why the import stopped before asking anything.",
         },
