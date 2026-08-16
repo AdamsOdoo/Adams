@@ -619,6 +619,8 @@ class TestReadinessSlotClosure(TransactionCase):
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'Job', 2, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
+                 'Job', 3, 'Probe audit job lifecycle.'),
+                ('shopify_connector_store.py', '_run_connection_probe',
                  'job', 1, 'Probe audit job lifecycle.'),
                 ('shopify_connector_store.py', '_run_connection_probe',
                  'job', 2, 'Probe audit job lifecycle.'),
