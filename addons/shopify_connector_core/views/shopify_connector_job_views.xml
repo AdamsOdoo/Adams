@@ -28,7 +28,7 @@
                 <field name="job_type" string="Run type"/>
                 <field name="error_class"/>
                 <filter name="filter_needs_attention" string="Needs attention"
-                        domain="[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable'))]"/>
+                        domain="[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable')), ('superseded_by_job_id', '=', False)]"/>
                 <separator/>
                 <filter name="filter_queued_running" string="Queued / running"
                         domain="[('state', 'in', ('queued', 'running'))]"/>

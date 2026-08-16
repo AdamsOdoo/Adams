@@ -2270,6 +2270,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 # Retry the preserved logical run.  A new row would discard
                 # the failure lineage the setup surface is asking to recover.
                 existing.with_user(self.env.user).action_manual_retry()
+            self._trigger_dispatch_after_location_refresh()
             return existing
         previous = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),
@@ -2281,8 +2282,28 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             == store.connection_generation
         ):
             previous.with_user(self.env.user).action_manual_retry()
+            self._trigger_dispatch_after_location_refresh()
             return previous
-        return self._enqueue_location_sync(store, job_source=job_source)
+        job = self._enqueue_location_sync(store, job_source=job_source)
+        self._trigger_dispatch_after_location_refresh()
+        return job
+
+    @api.model
+    def _trigger_dispatch_after_location_refresh(self):
+        """Schedule the governed dispatcher promptly after this RPC commits.
+
+        This preserves the queue boundary: the screen never calls Shopify.
+        It only asks Odoo to run the existing dispatcher without waiting for
+        its five-minute fallback cadence.
+        """
+        cron = self.env.ref(
+            'shopify_connector_core.'
+            'ir_cron_shopify_connector_job_dispatch_drain',
+            raise_if_not_found=False,
+        )
+        if cron:
+            cron.sudo()._trigger()
+        return True
 
     @api.model
     def _validate_locations_response(self, result):

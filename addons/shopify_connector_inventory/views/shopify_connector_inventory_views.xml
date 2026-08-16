@@ -28,7 +28,7 @@
         <field name="model">shopify.connector.location.mapping</field>
         <field name="arch" type="xml">
             <search string="Location Mapping">
-                <field name="shopify_location_name_snapshot"/>
+                <field name="shopify_location_name_snapshot" string="Shopify location"/>
                 <field name="odoo_location_id"/>
                 <field name="store_id"/>
                 <filter name="filter_push_disabled" string="Push Disabled"
@@ -52,7 +52,7 @@
         <field name="model">shopify.connector.location.mapping</field>
         <field name="arch" type="xml">
             <list string="Location Mapping" create="false" delete="false">
-                <field name="shopify_location_name_snapshot"/>
+                <field name="shopify_location_name_snapshot" string="Shopify location"/>
                 <field name="odoo_location_id"/>
                 <field name="store_id" optional="show"/>
                 <field name="push_enabled" widget="boolean_toggle"

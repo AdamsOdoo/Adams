@@ -43,8 +43,9 @@ right for any connector group.
 
 No Shopify request is made anywhere in this file except through
 `action_test_connection`, which is step 5's whole purpose and is the existing
-read-only probe. Nothing here enqueues a domain job, and activation
-deliberately starts no synchronisation.
+read-only probe. Activation triggers only existing read/scan cron producers;
+their own eligibility and queue boundaries remain authoritative, and no
+Shopify mutation is admitted here.
 """
 
 import json
@@ -1282,10 +1283,11 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         if 'inventory_scheduled_sync_enabled' not in settings._fields:
             return _('Inventory scheduling is not available in this install.')
         if settings.inventory_scheduled_sync_enabled:
-            return _('Stock scanning is scheduled. The first push still waits '
-                     'for a preview you confirm.')
-        return _('Stock scanning is off for now. You can turn it on later in '
-                 'Sync Rules.')
+            return _('Stock scanning is enabled. The first push still waits '
+                     'for a preview you explicitly confirm.')
+        return _('Stock scanning will be enabled when setup is completed. '
+                 'The first push still waits for a preview you explicitly '
+                 'confirm.')
 
     # ------------------------------------------------------------------
     # Step 2 -- store identity
@@ -1510,6 +1512,18 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             values[domain['field']] = enabled
             if bool(settings[domain['field']]) != enabled:
                 changed = True
+        # A merchant selecting a read workflow is selecting the workflow, not
+        # merely making a later scheduler checkbox available.  Keep the
+        # scheduler mirrors aligned here so catalog/order discovery starts
+        # after activation without a second, easily missed configuration step.
+        # Shopify writes remain protected by their own preview/confirmation
+        # gates; these two flags only admit read-side discovery scans.
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            values['product_scheduled_sync_enabled'] = (
+                'product_import' in keys
+            )
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            values['order_scheduled_sync_enabled'] = 'sale' in keys
         settings.sudo().write(values)
         if changed:
             # `domain_flag_enablement` and `mapped_location` both read these
@@ -1690,13 +1704,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
 
     @api.model
     def save_first_push_schedule(self, store_id, schedule_now):
-        """Step 10. Scheduling ONLY -- the first-push guard is untouched.
+        """Step 10. Enable scanning -- the first-push guard is untouched.
 
-        This flips the scheduled stock-scan flag and nothing else. The scan
-        enqueues a preview; the preview waits for an explicit confirmation
-        before a single quantity reaches Shopify. Nothing here previews,
-        confirms, admits a push job or writes to Shopify, and "scheduled" is
-        never presented as "pushed".
+        ``schedule_now`` remains in the RPC signature for compatibility with
+        an already-open wizard, but inventory-enabled onboarding no longer
+        offers a misleading opt-out. The scan creates protected preview work;
+        it never confirms, admits a push job or writes a quantity to Shopify.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
@@ -1705,7 +1718,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             and 'inventory_scheduled_sync_enabled' in settings._fields
         ):
             settings.sudo().write({
-                'inventory_scheduled_sync_enabled': bool(schedule_now),
+                'inventory_scheduled_sync_enabled': True,
             })
         self._record_progress(settings, 'first_push')
         return self.get_setup_state(store_id=store.id)
@@ -1726,9 +1739,10 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         looking at those checks on this screen and a generic refusal here
         would be a worse message than the one they can already see.
 
-        No synchronisation starts. No Shopify mutation occurs. No domain job
-        is enqueued. Activation records that setup is complete and the
-        dashboard takes over.
+        Selected read-side discovery schedules start through their existing
+        queue producers. No Shopify mutation occurs: every write-side workflow
+        keeps its preview, review, and confirmation guards. Activation records
+        that setup is complete and the dashboard takes over.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
@@ -1791,6 +1805,37 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 'on' if settings.notification_default_enabled else 'off',
             )
         )
+        # Do not make a newly activated merchant wait for the next 15/60-minute
+        # cron boundary. Trigger only the existing enqueue crons for workflows
+        # they selected; the normal eligibility, queue, and write guards remain
+        # authoritative inside those producers and handlers.
+        cron_refs = []
+        if (
+            'product_scheduled_sync_enabled' in settings._fields
+            and settings.product_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_product.ir_cron_shopify_connector_product_scan'
+            )
+        if (
+            'order_scheduled_sync_enabled' in settings._fields
+            and settings.order_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_sale.ir_cron_shopify_connector_order_scan'
+            )
+        if (
+            'inventory_scheduled_sync_enabled' in settings._fields
+            and settings.inventory_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_inventory.'
+                'ir_cron_shopify_connector_inventory_push_scan'
+            )
+        for xmlid in cron_refs:
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            if cron:
+                cron.sudo()._trigger()
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------

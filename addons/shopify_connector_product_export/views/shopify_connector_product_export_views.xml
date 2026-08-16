@@ -207,12 +207,13 @@
         <field name="context">{'search_default_filter_awaiting_review': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No export preview yet
+                No completed export preview is awaiting review
             </p>
             <p>
                 Enable "Export to Shopify" on a product, then use
                 <em>Preview Shopify Export</em> on its form. Nothing is ever
                 written to Shopify without a reviewed, confirmed preview.
+                A preview still being prepared appears in Runs &amp; Recovery.
             </p>
         </field>
     </record>

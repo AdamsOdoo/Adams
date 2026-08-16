@@ -826,6 +826,19 @@ class ShopifyConnectorStore(models.Model):
             'state': 'succeeded',
             'finished_at': fields.Datetime.now(),
         })
+        # A later successful probe is authoritative recovery evidence for the
+        # same store. Preserve older failures in Runs & Recovery, but link them
+        # to this success so active-health projections stop presenting obsolete
+        # credential failures as work that still needs attention.
+        prior_failures = Job.sudo().search([
+            ('id', '!=', job.id),
+            ('store_id', '=', self.id),
+            ('job_type', '=', 'core_test_connection'),
+            ('state', 'in', ('failed_retryable', 'failed_final')),
+            ('superseded_by_job_id', '=', False),
+        ])
+        if prior_failures:
+            prior_failures.write({'superseded_by_job_id': job.id})
         JobLog._system_append(
             job, 'attempt',
             'Connection verified with %s.' % shop.get('name'),

@@ -344,7 +344,15 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         Job = self.env['shopify.connector.job']
         term = self._store_term(store)
         return {
-            state: Job.search_count(term + [('state', '=', state)])
+            state: Job.search_count(
+                term + [('state', '=', state)] + (
+                    [('superseded_by_job_id', '=', False)]
+                    if state in (
+                        'failed_retryable', 'failed_final',
+                        'blocked_manual_review',
+                    ) else []
+                )
+            )
             for state in (
                 'queued', 'running', 'retry_waiting', 'failed_retryable',
                 'failed_final', 'blocked_manual_review',
@@ -362,6 +370,7 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
     def _oldest_blocked(self, store):
         domain = self._store_term(store) + [
             ('state', '=', 'blocked_manual_review'),
+            ('superseded_by_job_id', '=', False),
         ]
         oldest = self.env['shopify.connector.job'].search(
             domain,
@@ -441,7 +450,8 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'target': {
                     'res_model': 'shopify.connector.job',
                     'domain': term_json + [
-                        ['state', '=', 'blocked_manual_review']],
+                        ['state', '=', 'blocked_manual_review'],
+                        ['superseded_by_job_id', '=', False]],
                     'name': _("Runs waiting on a review decision"),
                 },
             },
@@ -473,7 +483,9 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'owner': _("Operator"),
                 'target': {
                     'res_model': 'shopify.connector.job',
-                    'domain': term_json + [['state', '=', 'failed_final']],
+                    'domain': term_json + [
+                        ['state', '=', 'failed_final'],
+                        ['superseded_by_job_id', '=', False]],
                     'name': _("Runs that stopped after repeated failures"),
                 },
             },
@@ -487,7 +499,9 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
                 'owner': _("Operator"),
                 'target': {
                     'res_model': 'shopify.connector.job',
-                    'domain': term_json + [['state', '=', 'failed_retryable']],
+                    'domain': term_json + [
+                        ['state', '=', 'failed_retryable'],
+                        ['superseded_by_job_id', '=', False]],
                     'name': _("Runs that need a fix before retrying"),
                 },
             },
@@ -599,7 +613,8 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         )
         failure_rows = Job._read_group(
             term + [('state', 'in', ('failed_retryable', 'failed_final',
-                                     'blocked_manual_review'))],
+                                     'blocked_manual_review')),
+                    ('superseded_by_job_id', '=', False)],
             groupby=['job_type'], aggregates=['__count'],
         )
         success_rows = Job._read_group(
@@ -696,7 +711,8 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
         attention_rows = dict(Job._read_group(
             [('store_id', 'in', stores.ids),
              ('state', 'in', ('failed_retryable', 'failed_final',
-                              'blocked_manual_review'))],
+                              'blocked_manual_review')),
+             ('superseded_by_job_id', '=', False)],
             groupby=['store_id'], aggregates=['__count'],
         ))
         latest_rows = {
@@ -784,9 +800,18 @@ class ShopifyConnectorUiDashboard(models.AbstractModel):
             'queued': Job.search_count([('state', '=', 'queued')]),
             'running': Job.search_count([('state', '=', 'running')]),
             'retry_waiting': Job.search_count([('state', '=', 'retry_waiting')]),
-            'failed_retryable': Job.search_count([('state', '=', 'failed_retryable')]),
-            'failed_final': Job.search_count([('state', '=', 'failed_final')]),
-            'blocked_manual_review': Job.search_count([('state', '=', 'blocked_manual_review')]),
+            'failed_retryable': Job.search_count([
+                ('state', '=', 'failed_retryable'),
+                ('superseded_by_job_id', '=', False),
+            ]),
+            'failed_final': Job.search_count([
+                ('state', '=', 'failed_final'),
+                ('superseded_by_job_id', '=', False),
+            ]),
+            'blocked_manual_review': Job.search_count([
+                ('state', '=', 'blocked_manual_review'),
+                ('superseded_by_job_id', '=', False),
+            ]),
             'skipped': Job.search_count([('state', '=', 'skipped')]),
         }
 

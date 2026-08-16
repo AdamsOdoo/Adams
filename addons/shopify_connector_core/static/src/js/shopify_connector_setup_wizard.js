@@ -99,7 +99,6 @@ export class ShopifyConnectorSetupWizard extends Component {
                 price: "",
                 notification: false,
                 notificationConfirmed: false,
-                schedulePush: false,
                 scopesRead: false,
                 mapShopifyGid: "",
                 mapOdooLocationId: "",
@@ -339,7 +338,6 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.price = "";
         this.state.form.notification = false;
         this.state.form.notificationConfirmed = false;
-        this.state.form.schedulePush = false;
         this.state.form.mapShopifyGid = "";
         this.state.form.mapOdooLocationId = "";
         // Seed the credential-path choice from what the store already uses, so
@@ -430,10 +428,24 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (
             this.state.stepKey === "location_mapping" &&
             this.currentStepApplies &&
-            this.store.id &&
-            ["none", "stale"].includes(this.refreshState())
+            this.store.id
         ) {
-            await this.refreshLocations();
+            const refresh = this.locations.refresh || {};
+            if (
+                ["waiting", "running"].includes(this.refreshState()) &&
+                refresh.job_id
+            ) {
+                // Keep the screen interactive while the bounded follower
+                // updates it in place; mounting must not wait through the
+                // polling backoff.
+                void this._followLocationRefresh(refresh.job_id);
+                return;
+            }
+            // Cached rows render immediately, but every entry also requests a
+            // fresh discovery pass. The server coalesces an equivalent active
+            // refresh, so opening/re-entering this screen is the trigger and
+            // the merchant never has to know that a manual refresh exists.
+            void this.refreshLocations();
             return;
         }
         if (this.state.stepKey !== "final_readiness") {
@@ -531,7 +543,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "first_push":
                 ok = await this._call("save_first_push_schedule", {
                     store_id: storeId,
-                    schedule_now: this.state.form.schedulePush,
+                    schedule_now: true,
                 });
                 break;
             case "final_readiness":

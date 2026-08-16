@@ -56,6 +56,9 @@
     .sc_setup__workspace {
         min-inline-size: 0;
         min-block-size: 0;
+        block-size: 100%;
+        max-block-size: 100%;
+        overflow: hidden;
         display: grid;
         grid-template-rows: minmax(0, 1fr) auto;
     }

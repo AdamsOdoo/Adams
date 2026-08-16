@@ -8,7 +8,7 @@ guided setup anywhere in the connector: `shopify.connector.store` carries
 `create="false"` on both its list and its form, so there was no route to create
 a store at all outside a data import or a `sudo()` call, and every setup
 decision -- credential, scopes, directions, source of truth, notifications,
-first-push scheduling -- had to be found on separate screens in an order
+first-push scanning -- had to be found on separate screens in an order
 nobody stated.
 
 What these tests hold
@@ -21,9 +21,9 @@ every entry point including a foreign id supplied directly; progress is durable
 and resumes where it left off; Back loses nothing; the credential is
 write-only and never comes back; no source-of-truth choice is ever pre-selected
 into consent; notifications are off by default and take an explicit
-consequence-stating confirmation; the first-push guard is scheduled but never
-bypassed; and activation starts no synchronisation and writes nothing to
-Shopify.
+consequence-stating confirmation; the first-push guard is enabled but never
+bypassed; and activation promptly triggers only the selected read-side
+producers while writing nothing to Shopify.
 
 No Shopify request is made anywhere in this file. Step 5's probe is driven
 through the module's existing `_send` transport seam with a stand-in, exactly
@@ -34,6 +34,7 @@ the real response taxonomy all run with only the socket absent.
 import json
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
 
@@ -528,6 +529,25 @@ class TestSetupWizardSteps(SetupWizardCase):
             self._settings(store).setup_wizard_step_key, 'test_connection',
         )
 
+    def test_a_later_pass_supersedes_obsolete_connection_failures(self):
+        store = self._ready_store()
+        old_failure = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_test_connection',
+            'state': 'failed_final',
+            'payload_hash': 'obsolete-connection-failure',
+            'finished_at': fields.Datetime.now(),
+        })
+
+        with self._transport(ok=True):
+            self._as(self.admin_a).run_test_connection(store.id)
+
+        old_failure.invalidate_recordset()
+        self.assertTrue(old_failure.superseded_by_job_id)
+        self.assertEqual(old_failure.superseded_by_job_id.state, 'succeeded')
+        self.assertEqual(old_failure.superseded_by_job_id.store_id, store)
+
     def test_a_failing_test_connection_does_not_advance_or_lose_the_token(self):
         """A refusal must not read as a pass, and must not discard the
         credential the operator has just entered."""
@@ -603,6 +623,25 @@ class TestSetupWizardSteps(SetupWizardCase):
         self.assertTrue(settings.inventory_domain_enabled)
         self.assertFalse(settings.product_domain_enabled)
 
+    def test_selected_read_workflows_enable_their_schedulers(self):
+        """Choosing a workflow is the complete onboarding decision."""
+        store = self._ready_store()
+        self._as(self.admin_a).save_directions(
+            store.id, ['product_import', 'sale'],
+        )
+        settings = self._settings(store)
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.product_scheduled_sync_enabled)
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.order_scheduled_sync_enabled)
+
+        self._as(self.admin_a).save_directions(store.id, [])
+        settings.invalidate_recordset()
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            self.assertFalse(settings.product_scheduled_sync_enabled)
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            self.assertFalse(settings.order_scheduled_sync_enabled)
+
     # --- source of truth ------------------------------------------------
 
     def test_both_source_of_truth_choices_are_required(self):
@@ -669,9 +708,8 @@ class TestSetupWizardSteps(SetupWizardCase):
 
     # --- first stock push -----------------------------------------------
 
-    def test_first_push_scheduling_never_bypasses_the_guard(self):
-        """Scheduling flips a scan flag. It does not preview, confirm, admit a
-        push job or write a quantity to Shopify."""
+    def test_first_push_scanning_never_bypasses_the_guard(self):
+        """Scanning does not preview, confirm, admit or write a quantity."""
         store = self._ready_store()
         self._as(self.admin_a).save_directions(store.id, ['inventory'])
         before = self.env['shopify.connector.job'].sudo().search_count([
@@ -688,6 +726,14 @@ class TestSetupWizardSteps(SetupWizardCase):
             before,
             'scheduling must admit no job',
         )
+
+    def test_inventory_enabled_cannot_silently_disable_first_push_scanning(self):
+        store = self._ready_store()
+        self._as(self.admin_a).save_directions(store.id, ['inventory'])
+        self._as(self.admin_a).save_first_push_schedule(store.id, False)
+        settings = self._settings(store)
+        if 'inventory_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.inventory_scheduled_sync_enabled)
 
     def test_first_push_passes_through_safely_when_inventory_is_off(self):
         store = self._ready_store()
@@ -976,12 +1022,13 @@ class TestSetupWizardActivation(SetupWizardCase):
         store.invalidate_recordset()
         self.assertNotEqual(store.state, 'connected')
 
-    def test_activation_starts_no_sync_and_writes_nothing_to_shopify(self):
-        """The whole safety claim of the review step, observed not asserted.
+    def test_activation_admits_no_direct_job_and_writes_nothing_to_shopify(self):
+        """The review step only nudges existing read-side cron producers.
 
         The transport seam is replaced with a responder that FAILS the test if
-        it is reached, so a request of any kind would be caught -- not only a
-        mutation.
+        it is reached, and no domain job is admitted in the activation
+        transaction. The scheduled producers run later through their normal
+        eligibility and queue boundaries.
         """
         store = self._complete_through_readiness()
         jobs_before = self.env['shopify.connector.job'].sudo().search_count([

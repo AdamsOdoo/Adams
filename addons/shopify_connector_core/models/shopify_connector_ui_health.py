@@ -111,7 +111,8 @@ class ShopifyConnectorUiHealth(models.AbstractModel):
         attention_rows = dict(Job._read_group(
             [('store_id', 'in', ids),
              ('state', 'in', ('failed_retryable', 'failed_final',
-                              'blocked_manual_review'))],
+                              'blocked_manual_review')),
+             ('superseded_by_job_id', '=', False)],
             groupby=['store_id'], aggregates=['__count'],
         ))
         uncertain_rows = dict(Attempt._read_group(
@@ -261,6 +262,7 @@ class ShopifyConnectorUiHealth(models.AbstractModel):
                 ('job_source', '=', 'reconciliation'),
                 ('state', 'in', ('failed_retryable', 'failed_final',
                                  'blocked_manual_review')),
+                ('superseded_by_job_id', '=', False),
             ]),
             'ambiguous_mutations': Attempt.search_count(term + [
                 ('observed_outcome', '=', 'uncertain'),
@@ -298,7 +300,8 @@ class ShopifyConnectorUiHealth(models.AbstractModel):
             [('store_id', 'in', visible.ids),
              ('job_type', '=', 'fulfillment_mode_switch_scan'),
              ('state', 'in', ('failed_retryable', 'failed_final',
-                              'blocked_manual_review'))],
+                              'blocked_manual_review')),
+             ('superseded_by_job_id', '=', False)],
             groupby=['store_id'], aggregates=['__count'],
         )) if visible else {}
         rows = []

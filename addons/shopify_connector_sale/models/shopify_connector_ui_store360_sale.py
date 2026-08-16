@@ -451,6 +451,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             ('store_id', '=', store.id),
             ('job_type', 'in', list(_ORDER_JOB_TYPES)),
             ('state', 'in', list(_G3_STATES)),
+            ('superseded_by_job_id', '=', False),
         ]
         g2 = Job.search_count(g2_domain)
         g3 = Job.search_count(g3_domain)
@@ -563,13 +564,31 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 'domain': self._serialize_domain(g3_domain or []),
                 'name': _("Order imports needing attention"),
             },
+            'discovery_target': {
+                'res_model': 'shopify.connector.job',
+                'domain': self._serialize_domain(
+                    self._store_term(store) + [
+                        ('job_type', 'in', (
+                            'order_import_scan', 'order_import_sync',
+                            'customer_import_sync',
+                        )),
+                    ]
+                ),
+                'name': _("Order discovery runs"),
+            },
         }
-        if state in ('stale', 'incomplete'):
+        if state == 'incomplete':
             result['critical_text'] = _(
                 "A connector problem may make these figures incomplete — "
                 "review order imports."
             )
             result['critical_target'] = result['g3_target']
+        elif state == 'stale':
+            result['critical_text'] = _(
+                "Order discovery is not current yet — run or enable order "
+                "import before relying on these figures."
+            )
+            result['critical_target'] = result['discovery_target']
         return result
 
     # ------------------------------------------------------------------ #

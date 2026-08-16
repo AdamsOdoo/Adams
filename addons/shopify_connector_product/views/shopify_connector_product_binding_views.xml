@@ -175,11 +175,12 @@
         <field name="context">{'search_default_filter_needs_attention': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Every product is matched.
+                No Shopify product mappings yet.
             </p>
             <p>
-                Product bindings appear here after a catalog import. Nothing
-                needs your decision right now.
+                Product mappings appear after eligible products are imported
+                or adopted. An empty list does not mean every product has
+                already been matched.
             </p>
         </field>
     </record>

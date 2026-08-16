@@ -1345,6 +1345,53 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             'restoreRate': throttle_status.get('restoreRate'),
         }
 
+    @api.model
+    def _record_throttle_status_isolated(self, store, throttle_status):
+        """Persist response telemetry without locking the business job.
+
+        A handler may issue more than one Shopify read.  Recording the first
+        response on ``store`` in the handler transaction takes a row-update
+        lock; the next call's CORE-R2 admission then opens its independent
+        cursor and waits for ``FOR SHARE`` on the same row.  The handler is
+        waiting for that admission while the admission is waiting for the
+        handler to commit: a self-deadlock which leaves the visible run queued
+        and the shared dispatcher occupied.
+
+        Telemetry is observational and already best-effort, so production
+        writes it in its own short, non-blocking transaction.  The dispatcher
+        commits each business job before it evaluates same-pass
+        backpressure, so the committed observation remains visible for the
+        next claim without coupling it to the handler transaction.  Odoo's
+        TransactionCase cursor forbids commits; there we retain the original
+        in-transaction write so the existing deterministic unit tests keep
+        exercising the projection without opening a competing real cursor.
+        """
+        commit = getattr(self.env.cr, 'commit', None)
+        if getattr(commit, '__name__', '') == 'forbidden':
+            return store._record_throttle_status(throttle_status)
+
+        side_cr = self.env.registry.cursor()
+        try:
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_store = side_env['shopify.connector.store'].browse(
+                store.id
+            ).try_lock_for_update()
+            if not side_store:
+                side_cr.rollback()
+                return False
+            result = side_store._record_throttle_status(throttle_status)
+            side_cr.commit()
+            return result
+        except Exception:  # noqa: BLE001 - telemetry is explicitly best effort
+            side_cr.rollback()
+            _logger.exception(
+                'Could not persist isolated Shopify rate head-room for store '
+                '%s; the response itself is unaffected.', store.id,
+            )
+            return False
+        finally:
+            side_cr.close()
+
     def _error_from_graphql_errors(self, errors, response):
         first_error = errors[0] if errors else {}
         extensions = first_error.get('extensions') or {}
@@ -1456,7 +1503,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         # a failure, so the result is returned regardless.
         if throttle_status and store:
             try:
-                store._record_throttle_status(throttle_status)
+                self._record_throttle_status_isolated(store, throttle_status)
             except Exception:  # noqa: BLE001 - see above
                 _logger.exception(
                     'Could not record Shopify rate head-room for store %s; '

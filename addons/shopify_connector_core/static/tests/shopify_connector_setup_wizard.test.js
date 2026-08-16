@@ -663,6 +663,31 @@ describe("shopify connector setup wizard", () => {
         ).toBe(true);
     });
 
+    test("re-entering location mapping refreshes an already populated cache", async () => {
+        const cached = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                locations: [{
+                    shopify_gid: "gid://shopify/Location/1",
+                    name: "Shop location",
+                    mapped: false,
+                }],
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+                shopify_total: 1,
+                unmapped_count: 1,
+            }),
+        });
+        mockOrm(() => cached);
+
+        await mount();
+
+        expect(queryText(".sc_setup__panel")).toInclude("Shop location");
+        expect(
+            calls.some((call) => call.method === "refresh_shopify_locations")
+        ).toBe(true);
+    });
+
     test("Continue stays disabled until every active location is mapped", async () => {
         mockOrm(() => payload({
             resume_step_key: "location_mapping",

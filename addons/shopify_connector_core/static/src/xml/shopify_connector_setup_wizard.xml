@@ -783,29 +783,22 @@
                             <t t-if="isDomainEnabled('inventory')">
                                 <p class="sc_setup__lead">
                                     <strong>Nothing is written to Shopify until you review and
-                                    confirm the stock preview.</strong> This step only picks
-                                    when the connector starts looking.
+                                    confirm the stock preview.</strong> Stock scanning is enabled
+                                    automatically so the preview is ready when product mappings
+                                    exist.
                                 </p>
-                                <label class="sc_setup__choice">
-                                    <input type="radio" name="sc_setup_push"
-                                           t-att-checked="state.form.schedulePush"
-                                           t-on-change="() => this.state.form.schedulePush = true"/>
-                                    <span class="sc_setup__choice-label">Schedule stock scanning now</span>
-                                    <span class="sc_setup__choice-consequence">
-                                        The connector starts preparing a first-push preview for
-                                        you to review.
-                                    </span>
-                                </label>
-                                <label class="sc_setup__choice">
-                                    <input type="radio" name="sc_setup_push"
-                                           t-att-checked="!state.form.schedulePush"
-                                           t-on-change="() => this.state.form.schedulePush = false"/>
-                                    <span class="sc_setup__choice-label">Do it later</span>
-                                    <span class="sc_setup__choice-consequence">
-                                        A first-class choice. The dashboard keeps it visible
-                                        without nagging.
-                                    </span>
-                                </label>
+                                <div class="sc-band sc-band--info" role="status">
+                                    <i class="fa fa-shield sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">First stock push is protected</div>
+                                        <div class="sc-band__hint">
+                                            The connector prepares the exact Odoo and Shopify
+                                            quantities for each mapped product and location. A
+                                            reviewer must confirm every first push before any
+                                            inventory quantity can be sent.
+                                        </div>
+                                    </div>
+                                </div>
                             </t>
                             <t t-else="">
                                 <div class="sc-band sc-band--info" role="status">
