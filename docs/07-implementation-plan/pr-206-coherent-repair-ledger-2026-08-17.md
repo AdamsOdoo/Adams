@@ -179,7 +179,9 @@ Primary existing contracts: [`DEC-010`](../04-decisions/DEC-010-inventory-archit
 | `a54d6d3` | Product review corrections and behavioral regressions | Re-reviewed: PASS |
 | `204825d` | Production first-pair bootstrap from product binding, mapping activation, scan, and legacy reconciliation | Review found that existing pairs remained eligible after a parent became stale |
 | `12ef156` | Centralized active-parent/store/company eligibility at admission, dispatch, CAS, and reconciliation boundaries | Review found a post-terminalization TOCTOU that could roll back durable evidence |
-| `0c1b38f` | Suppress stale-race successors without raising; preserve terminal/mutation evidence with behavioral race regressions | Final independent re-review pending |
+| `0c1b38f` | Suppress stale-race successors without raising; preserve terminal/mutation evidence with behavioral race regressions | Review found immutable cross-store scope had been suppressed together with status races |
+| `6c1d68a` | Validate store/company scope before activation identity/evidence writes; retain safe status-race suppression | Review found the analogous quantity-success evidence path unguarded |
+| `0277637` | Validate store/company scope before quantity-success evidence writes with corrupt-binding regression | Inventory stack re-reviewed: PASS |
 
 The release branch has not been pushed from this repair worktree at this point.
 
@@ -188,7 +190,7 @@ The release branch has not been pushed from this repair worktree at this point.
 | Exact candidate head/tree | Recorded above; clean exact-head worktree | Re-record if candidate advances |
 | Focused automated tests | Python compile, XML parse, diff check, and suite-runner fail-closed self-tests pass locally; no local Odoo/PostgreSQL runtime is installed | Runtime product, inventory, order, fulfillment, security, UX tests pass in exact-head CI/Odoo.sh |
 | Full connector suite | Not rerun | Zero failures/errors on exact candidate |
-| Independent Luna review | Security and product corrections passed; inventory final correction re-review pending | Resolve the final inventory/final-delta review |
+| Independent Luna review | Security, product, and inventory correction stacks passed; holistic integrated review pending | Resolve final integrated-delta findings |
 | Actions/Odoo.sh | Historical exact-head success recorded above | Re-run at final integrated HEAD and module upgrade |
 | Product live proof | Seed import defect and unconfirmed preview documented | Corrected import/update/create recovery verified in Shopify dev store |
 | Inventory live proof | No initial level binding; first push unreachable | Pair creation → preview → confirmation → activation/set → repeat/CAS/retry/reconcile |
