@@ -75,8 +75,8 @@ class TestProductPriceImport(TransactionCase):
             float_compare(template.list_price, 24.99, precision_digits=2), 0,
         )
 
-    def test_odoo_authoritative_does_not_write_price(self):
-        self._settings('odoo_authoritative')
+    def test_odoo_authoritative_initializes_birth_then_does_not_refresh_price(self):
+        settings = self._settings('odoo_authoritative')
         payload = self._payload(
             'gid://shopify/Product/4002',
             variants=[self._variant('gid://shopify/ProductVariant/4002', 24.99,
@@ -84,12 +84,27 @@ class TestProductPriceImport(TransactionCase):
         )
         result = self.Importer._apply_import(self.store, payload)
         template = result['template_binding'].product_template_id
-        self.assertNotEqual(
+        # Birth initialization is independent of ongoing ownership: a newly
+        # created Odoo product must be usable immediately even when Odoo owns
+        # later price refreshes.
+        self.assertEqual(
             float_compare(template.list_price, 24.99, precision_digits=2), 0,
         )
+        changed = self._payload(
+            'gid://shopify/Product/4002',
+            variants=[self._variant('gid://shopify/ProductVariant/4002', 31.50,
+                                    sku='PR-2')],
+        )
+        self.Importer._apply_import(self.store, changed)
+        template.invalidate_recordset(['list_price'])
+        self.assertEqual(
+            float_compare(template.list_price, 24.99, precision_digits=2), 0,
+        )
+        self.assertEqual(settings.price_source_of_truth, 'odoo_authoritative')
 
-    def test_unset_source_of_truth_does_not_write_price(self):
-        # No settings row at all -> defaults, price not authoritative.
+    def test_unset_source_of_truth_initializes_birth_then_does_not_refresh_price(self):
+        # No settings row at all -> defaults, so later refreshes are not
+        # price-authoritative; the first import still performs birth setup.
         payload = self._payload(
             'gid://shopify/Product/4003',
             variants=[self._variant('gid://shopify/ProductVariant/4003', 24.99,
@@ -97,7 +112,20 @@ class TestProductPriceImport(TransactionCase):
         )
         result = self.Importer._apply_import(self.store, payload)
         template = result['template_binding'].product_template_id
-        self.assertNotEqual(
+        self.assertEqual(
+            float_compare(template.list_price, 24.99, precision_digits=2), 0,
+        )
+        self.Importer._apply_import(
+            self.store,
+            self._payload(
+                'gid://shopify/Product/4003',
+                variants=[self._variant(
+                    'gid://shopify/ProductVariant/4003', 31.50, sku='PR-3',
+                )],
+            ),
+        )
+        template.invalidate_recordset(['list_price'])
+        self.assertEqual(
             float_compare(template.list_price, 24.99, precision_digits=2), 0,
         )
 

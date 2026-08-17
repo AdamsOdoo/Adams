@@ -682,20 +682,33 @@ class TestProductImportMatching(TransactionCase):
             'status': 'active',
             'description_html': False,
             'options': [{
-                'name': 'Size', 'position': 1, 'values': ['Small', 'Large'],
+                # Keep this fixture independent of the database's standard
+                # ``Size`` attribute, which is often configured with
+                # create_variant='always' and is intentionally incompatible
+                # with Shopify's sparse structured-variant import path.
+                'name': 'SC010B Structured Birth Size',
+                'position': 1, 'values': ['Small', 'Large'],
             }],
             'variants': [{
                 'gid': 'gid://shopify/ProductVariant/905-structured-small',
                 'sku': 'STRUCTURED-SMALL', 'barcode': False, 'price': 10.0,
                 'compare_at_price': False,
-                'selected_options': [{'name': 'Size', 'value': 'Small'}],
-                'option_values': 'Size: Small', 'image_url': False,
+                'selected_options': [{
+                    'name': 'SC010B Structured Birth Size',
+                    'value': 'Small',
+                }],
+                'option_values': 'SC010B Structured Birth Size: Small',
+                'image_url': False,
             }, {
                 'gid': 'gid://shopify/ProductVariant/905-structured-large',
                 'sku': 'STRUCTURED-LARGE', 'barcode': False, 'price': 12.0,
                 'compare_at_price': False,
-                'selected_options': [{'name': 'Size', 'value': 'Large'}],
-                'option_values': 'Size: Large', 'image_url': False,
+                'selected_options': [{
+                    'name': 'SC010B Structured Birth Size',
+                    'value': 'Large',
+                }],
+                'option_values': 'SC010B Structured Birth Size: Large',
+                'image_url': False,
             }],
         }
         result = self.Importer._apply_import(self.store, payload)
