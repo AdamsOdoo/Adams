@@ -423,32 +423,32 @@ class TestInventoryConcurrency(TransactionCase):
             cr.commit()
             return job.id
 
-    def _durable_reviewer(self):
+    def _durable_admin(self):
         with db_connect(self.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            reviewer = env['res.users'].create({
-                'name': 'Conc Reviewer %s' % uuid.uuid4().hex[:8],
-                'login': 'conc_reviewer_%s' % uuid.uuid4().hex[:8],
+            admin = env['res.users'].create({
+                'name': 'Conc Administrator %s' % uuid.uuid4().hex[:8],
+                'login': 'conc_admin_%s' % uuid.uuid4().hex[:8],
                 'group_ids': [(6, 0, [
                     env.ref(
                         'shopify_connector_core.'
-                        'group_shopify_connector_reviewer'
+                        'group_shopify_connector_admin'
                     ).id,
                 ])],
             })
-            reviewer_id = reviewer.id
-            partner_id = reviewer.partner_id.id
+            admin_id = admin.id
+            partner_id = admin.partner_id.id
             cr.commit()
-        # Issue #198: the committed reviewer IS torn down. Raw-SQL deletion was
+        # Issue #198: the committed administrator IS torn down. Raw-SQL deletion was
         # unsafe against the partner/mail FK graph, so teardown goes through the
         # ORM by exact id instead -- Odoo's own `ondelete` handling resolves the
         # graph, and a genuinely blocked delete raises here rather than leaving
         # silent residue.
         self.addCleanup(
             self._cleanup_business_rows,
-            {'user_id': reviewer_id, 'partner_id': partner_id},
+            {'user_id': admin_id, 'partner_id': partner_id},
         )
-        return reviewer_id
+        return admin_id
 
     # ------------------------------------------------------------------
     # Verification helpers (always through a fresh committed connection)
@@ -787,14 +787,14 @@ class TestInventoryConcurrency(TransactionCase):
     def test_concurrent_manual_review_release_one_successor(self):
         info = self._durable_pair()
         blocked_id = self._durable_blocked_release_job(info)
-        reviewer_uid = self._durable_reviewer()
+        admin_uid = self._durable_admin()
 
         # A concurrent operation holds the binding row lock: the release must
         # fail closed (UserError) and create no successor, no transport.
         with self._holding_row_lock(
             'shopify.connector.inventory.level.binding', info['binding_id'],
         ):
-            with self._txn(uid=reviewer_uid) as (cr, env):
+            with self._txn(uid=admin_uid) as (cr, env):
                 binding = env[
                     'shopify.connector.inventory.level.binding'
                 ].browse(info['binding_id'])
@@ -806,7 +806,7 @@ class TestInventoryConcurrency(TransactionCase):
         self.assertEqual(self._count_jobs(info, 'inventory_push_sync'), 0)
 
         # Uncontended: exactly one release, one ordinal-0 push_sync successor.
-        with self._txn(uid=reviewer_uid) as (cr, env):
+        with self._txn(uid=admin_uid) as (cr, env):
             binding = env[
                 'shopify.connector.inventory.level.binding'
             ].browse(info['binding_id'])
@@ -1043,13 +1043,13 @@ class TestInventoryConcurrencyResidue(TransactionCase):
         """Create the committed fixtures, tear them down, report survivors."""
         case = self._fixture_case()
         info = case._durable_pair()
-        reviewer_id = case._durable_reviewer()
+        admin_id = case._durable_admin()
         info = dict(info)
         with db_connect(self.dbname).cursor() as cr:
             env = api.Environment(cr, SUPERUSER_ID, {})
-            info['user_id'] = reviewer_id
+            info['user_id'] = admin_id
             info['partner_id'] = env['res.users'].browse(
-                reviewer_id
+                admin_id
             ).partner_id.id
         # Everything above is committed and must therefore be observable.
         self.assertTrue(

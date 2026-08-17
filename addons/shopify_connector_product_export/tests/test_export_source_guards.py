@@ -171,7 +171,13 @@ class TestExportSourceGuards(TransactionCase):
             # and it exposes no new operator-facing surface. Authorisation
             # and company access were established upstream at enqueue
             # (`enqueue_preview` / `action_confirm_export_preview`).
-            'shopify_connector_product_export_service.py': 21,
+            # 21 -> 22 (PR #206 product contract repair). Create
+            # finalization now writes a fully evidenced pre-existing variant
+            # binding when Shopify returns the durable variant identity. The
+            # binding fields are connector-protected, the path is reachable
+            # only from an admitted create job, and omitting this elevation
+            # would leave the create replay boundary incomplete.
+            'shopify_connector_product_export_service.py': 22,
             # 20 -> 26 (TD-011, authorised deliberately). Six elevations,
             # each reviewed:
             #   `_admit_media_job`      1 - reads the connector's own job
@@ -204,10 +210,16 @@ class TestExportSourceGuards(TransactionCase):
             #                                the three above.
             'shopify_connector_media_export_service.py': 28,
             'shopify_connector_product_export_preview.py': 2,
-            # TD-015 moved the PD-PX-7 stub out of the seams file into
-            # `shopify_connector_export_reconnect.py`, where the pass now
-            # lives, so this file's one elevation went with it.
-            'shopify_connector_product_export_seams.py': 0,
+            # PR #206 product contract repair adds two reviewed elevations:
+            #   create recovery preview 1 - after Administrator, company,
+            #                               state and definitely-not-applied
+            #                               evidence checks, read the protected
+            #                               preview that owns the source product;
+            #   import finalization      1 - mark the imported product eligible
+            #                               for safe preview-based updates. The
+            #                               field is connector-owned and this is
+            #                               the production importer transition.
+            'shopify_connector_product_export_seams.py': 2,
             # PD-PX-7 (TD-015). Eleven elevations, all on connector-owned
             # rows and none reachable by an unauthorised user:
             #   store state           4 - `export_reconcile_*` are readonly

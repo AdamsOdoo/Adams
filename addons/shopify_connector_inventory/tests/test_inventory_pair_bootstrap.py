@@ -7,6 +7,7 @@ test: it represents a pre-existing installation whose derived pair is
 missing, not a normal fixture shortcut.
 """
 
+import copy
 import uuid
 from unittest.mock import patch
 
@@ -71,9 +72,10 @@ class TestInventoryPairBootstrap(TransactionCase):
 
     def _new_chain(
         self, tag, gid=None, mapping_first=False, push_enabled=True,
-        variant_status='active', mapping_status='active',
+        variant_status='active', mapping_status='active', location=None,
     ):
         """Create a real binding/mapping chain in either arrival order."""
+        location = location or self.location
         template = self.env['product.template'].sudo().create({
             'name': 'Inventory Pair Bootstrap Product %s' % tag,
         })
@@ -89,7 +91,7 @@ class TestInventoryPairBootstrap(TransactionCase):
             mapping = self.Mapping.sudo().create({
                 'store_id': self.store.id,
                 'shopify_gid': 'gid://shopify/Location/%s' % tag,
-                'odoo_location_id': self.location.id,
+                'odoo_location_id': location.id,
                 'match_key': 'manual',
                 'push_enabled': push_enabled,
                 'status': mapping_status,
@@ -110,7 +112,7 @@ class TestInventoryPairBootstrap(TransactionCase):
             mapping = self.Mapping.sudo().create({
                 'store_id': self.store.id,
                 'shopify_gid': 'gid://shopify/Location/%s' % tag,
-                'odoo_location_id': self.location.id,
+                'odoo_location_id': location.id,
                 'match_key': 'manual',
                 'push_enabled': push_enabled,
                 'status': mapping_status,
@@ -278,6 +280,11 @@ class TestInventoryPairBootstrap(TransactionCase):
             gid='gid://shopify/InventoryItem/BOOTSTRAP-STALE-MAPPING',
             mapping_first=True,
             mapping_status='stale',
+            location=self.env['stock.location'].create({
+                'name': 'Inventory Pair Bootstrap Stale Mapping Location',
+                'usage': 'internal',
+                'location_id': self.location.location_id.id,
+            }),
         )
         self.assertFalse(self._pair(variant, stale_mapping))
         stale_mapping.sudo().write({'status': 'active'})
@@ -397,7 +404,11 @@ class TestInventoryPairBootstrapFromProductImport(TransactionCase):
         }
 
         def fake_send(client_self, store, body, token=None):
-            return _FakeSendResponse(response)
+            # A real HTTP response is decoded into a fresh object per request.
+            # The importer deliberately consumes/replaces pagination state,
+            # so replaying the same mutable test dictionary would manufacture
+            # a malformed second response with no ``variants.pageInfo``.
+            return _FakeSendResponse(copy.deepcopy(response))
 
         return patch.object(
             type(self.env['shopify.connector.api.client']),
