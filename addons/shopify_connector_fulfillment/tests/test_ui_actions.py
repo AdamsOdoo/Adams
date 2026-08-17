@@ -190,7 +190,7 @@ class TestUiActions(TransactionCase):
     def test_release_wizard_requires_a_non_empty_reason(self):
         binding = self._make_binding()
         Wizard = self.env['shopify.connector.fulfillment.review.release.wizard']
-        wizard = Wizard.with_user(self.plain_user).create({
+        wizard = Wizard.with_user(self.admin_user).create({
             'binding_id': binding.id, 'reason': '   ',
         })
         with self.assertRaises(UserError):

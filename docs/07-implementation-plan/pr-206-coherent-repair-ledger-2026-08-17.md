@@ -283,8 +283,11 @@ local integration tree. The PR remains draft and unmerged.
   sale version `19.0.2.11.0`, proves User denial at the fulfillment wizard ACL
   plus Administrator delegation to the sanctioned domain refusal, and treats
   both privileged fulfillment wizards as Administrator-only rendered views.
+  Independent review found and corrected one adjacent stale empty-reason
+  fixture so it exercises form validation as Administrator rather than failing
+  earlier at the User ACL.
   Production code remains unchanged. Compile and diff checks pass; independent
-  review and exact-head native rerun are required before acceptance.
+  re-review and exact-head native rerun are required before acceptance.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
