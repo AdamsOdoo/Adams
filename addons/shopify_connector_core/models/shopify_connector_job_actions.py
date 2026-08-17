@@ -100,11 +100,13 @@ class ShopifyConnectorJobActions(models.Model):
                 or 'No recorded failure reason'
             )
             if job.state == 'blocked_manual_review':
-                owner = 'Reviewer or Administrator decision'
+                owner = 'Administrator decision'
                 next_action = (
-                    'Review the preserved Shopify evidence before deciding.'
+                    'An Administrator must review the preserved Shopify '
+                    'evidence before deciding.'
                     if has_evidence else
-                    'Open the affected record, decide the case, then resolve it.'
+                    'An Administrator must open the affected record, decide '
+                    'the case, then resolve it.'
                 )
             elif job.state == 'failed_final':
                 owner = 'Operator or Administrator'

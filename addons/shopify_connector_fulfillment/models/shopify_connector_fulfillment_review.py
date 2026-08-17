@@ -214,23 +214,21 @@ class ShopifyConnectorFulfillmentInboundEvidenceReview(models.Model):
 
     _inherit = 'shopify.connector.fulfillment.inbound.evidence'
 
-    def _assert_reviewer(self):
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+    def _assert_administrator(self):
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Operator or Administrator '
-                'may act on a fulfillment review case.'
+                'Only a Shopify Connector Administrator may import '
+                'tracking from a fulfillment review case.'
             )
 
     def action_import_tracking(self):
         self.ensure_one()
-        self._assert_reviewer()
+        # Importing tracking writes the Odoo delivery and acknowledges the
+        # external observation. It is therefore review resolution, not a
+        # routine read/operation available to a Connector User.
+        self._assert_administrator()
         return self.env[
             'shopify.connector.fulfillment.service'
         ]._review_import_tracking(self)

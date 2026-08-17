@@ -27,6 +27,7 @@ No Shopify transport of any kind occurs in this module.
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
+from odoo.tools.convert import convert_file
 
 CORE = 'shopify_connector_core'
 
@@ -182,6 +183,58 @@ class TestSec2Roles(TransactionCase):
                 user.id,
                 self._group('group_shopify_connector_reviewer').id,
             },
+        )
+
+    def test_security_xml_upgrade_removes_historical_user_reviewer_edge(self):
+        """Reload the real security XML against a stale pre-upgrade graph.
+
+        The historical edge is deliberately seeded on the actual group record,
+        then the module's update data is applied through Odoo's XML loader. This
+        proves the ``(6, 0, ...)`` replacement reaches both the group closure
+        and an already-existing Connector User, while Administrator retains the
+        Reviewer capability. Applying the same update twice proves idempotence.
+        """
+        user_group = self._group('group_shopify_connector_user')
+        admin_group = self._group('group_shopify_connector_admin')
+        reviewer = self._group('group_shopify_connector_reviewer')
+        operator = self._group('group_shopify_connector_operator')
+
+        # Simulate a database upgraded from the additive User -> Reviewer
+        # contract. The existing role user must lose the stale effective edge.
+        user_group.write({'implied_ids': [(4, reviewer.id)]})
+        self.assertIn(reviewer.id, user_group.implied_ids.ids)
+        self.assertTrue(self.role_user.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+
+        convert_file(
+            self.env, CORE, 'security/shopify_connector_security.xml', None,
+            mode='update', noupdate=False,
+        )
+        self.env.invalidate_all()
+        user_group = self._group('group_shopify_connector_user')
+        admin_group = self._group('group_shopify_connector_admin')
+        self.assertEqual(set(user_group.implied_ids.ids), {operator.id})
+        self.assertNotIn(reviewer.id, user_group.all_implied_ids.ids)
+        self.assertFalse(self.role_user.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+        self.assertIn(reviewer.id, admin_group.implied_ids.ids)
+        self.assertTrue(self.role_admin.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+
+        # Reapplying the same module update must not add edges or otherwise
+        # change the exact graph.
+        convert_file(
+            self.env, CORE, 'security/shopify_connector_security.xml', None,
+            mode='update', noupdate=False,
+        )
+        self.env.invalidate_all()
+        self.assertEqual(
+            set(self._group('group_shopify_connector_user').implied_ids.ids),
+            {operator.id},
+        )
+        self.assertEqual(
+            set(self._group('group_shopify_connector_admin').implied_ids.ids),
+            {user_group.id, reviewer.id},
         )
 
     def test_effective_user_groups_match_the_group_closure(self):

@@ -6,7 +6,7 @@ import uuid
 
 from lxml import etree
 
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
 USER_ROLE = 'shopify_connector_core.group_shopify_connector_user'
@@ -56,6 +56,18 @@ class TestUiActions(TransactionCase):
                 callable(getattr(model, method, None)),
                 'Sanctioned action %s is missing -- U1 wires to it.' % method,
             )
+
+    def test_import_tracking_button_is_administrator_only(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_fulfillment_evidence_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        buttons = arch.xpath(
+            "//button[@name='action_import_tracking' and @type='object']"
+        )
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(buttons[0].get('groups'), ADMIN_ROLE)
 
     def test_failed_or_running_switch_has_a_direct_return_to_mode1_control(self):
         view = self.env.ref(
@@ -192,11 +204,9 @@ class TestUiActions(TransactionCase):
         wizard = Wizard.with_user(self.plain_user).create({
             'binding_id': binding.id, 'reason': 'operator decided',
         })
-        # `plain_user` holds the Connector User role, which resolves to
-        # Reviewer, so the ROLE check passes and the server refuses on the
-        # precondition instead: there is no blocked mutation for this binding.
-        # (Odoo's assertRaises does not accept a tuple of exception types.)
-        with self.assertRaises(UserError):
+        # Connector User is not a review-resolution role. The server must
+        # refuse the direct delegated call before inspecting blocked state.
+        with self.assertRaises(AccessError):
             wizard.action_confirm()
 
     def _make_binding(self):

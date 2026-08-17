@@ -33,8 +33,8 @@ class TestFulfillmentReviewRelease(TransactionCase):
     not_applied) or a pre-C2 job with no attempt is eligible and gets a
     manual_sync + empty-trigger-origin replacement under lineage; a post-C2
     uncertain attempt is reconcile-only and never resent. The release helper
-    and acknowledgement are Administrator-gated; importing tracking remains
-    routine Operator/User work.
+    and acknowledgement are Administrator-gated; importing tracking is also
+    Administrator-gated because it writes the delivery and closes evidence.
     """
 
     @classmethod
@@ -73,8 +73,8 @@ class TestFulfillmentReviewRelease(TransactionCase):
             'location_dest_id': cls.customer_loc.id,
             'sale_id': cls.sale.id,
         })
-        # Release and acknowledgement are Administrator-gated. Importing
-        # tracking remains routine Operator/Admin work.
+        # Release, acknowledgement, and importing tracking are all
+        # Administrator-gated review-resolution actions.
         cls.reviewer_user = cls.env['res.users'].create({
             'name': 'FUL reviewer',
             'login': 'ful_reviewer_%s' % uuid.uuid4().hex,
@@ -218,6 +218,26 @@ class TestFulfillmentReviewRelease(TransactionCase):
         self.assertEqual(self.picking.state, before_state)
         evidence.invalidate_recordset()
         self.assertEqual(evidence.reconciled_state, 'acknowledged')
+
+    def test_connector_user_cannot_import_tracking_and_leaves_zero_delta(self):
+        tracking = [{'number': '1Z-DENIED', 'url': 'http://track/denied', 'company': 'UPS'}]
+        evidence = self._evidence(tracking_snapshot=json.dumps(tracking))
+        before = {
+            'carrier_tracking_ref': self.picking.carrier_tracking_ref,
+            'state': self.picking.state,
+            'reconciled_state': evidence.reconciled_state,
+            'resolution_actor_uid': evidence.resolution_actor_uid.id,
+            'resolution_at': evidence.resolution_at,
+        }
+        with self.assertRaises(AccessError):
+            evidence.with_user(self.connector_user).action_import_tracking()
+        self.picking.invalidate_recordset()
+        evidence.invalidate_recordset()
+        self.assertEqual(self.picking.carrier_tracking_ref, before['carrier_tracking_ref'])
+        self.assertEqual(self.picking.state, before['state'])
+        self.assertEqual(evidence.reconciled_state, before['reconciled_state'])
+        self.assertEqual(evidence.resolution_actor_uid.id, before['resolution_actor_uid'])
+        self.assertEqual(evidence.resolution_at, before['resolution_at'])
 
     # ------------------------------------------------------------------
     # Review-release sanctioned helper

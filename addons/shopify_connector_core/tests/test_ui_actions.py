@@ -109,7 +109,11 @@ class TestUiActions(TransactionCase):
         )
         self.assertGreater(blocked.attention_priority, final.attention_priority)
         self.assertGreater(final.attention_priority, retryable.attention_priority)
-        self.assertIn('decision', blocked.attention_owner.lower())
+        self.assertEqual(blocked.attention_owner, 'Administrator decision')
+        self.assertNotIn('Reviewer', blocked.attention_owner)
+        self.assertIn('Administrator', blocked.attention_next_action)
+        self.assertEqual(blocked.recovery_owner, blocked.attention_owner)
+        self.assertEqual(blocked.recovery_next_action, blocked.attention_next_action)
         self.assertIn('Ambiguous Match', blocked.attention_reason)
         self.assertIn('Retry', retryable.attention_next_action)
 
