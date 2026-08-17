@@ -716,11 +716,22 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
             self.env.cr.commit()
             return
         locked_binding.invalidate_recordset()
+        Service = self.env['shopify.connector.inventory.service']
+        if not Service._binding_scope_compatible(
+            locked_binding, expected_store=job.store_id,
+        ):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The activation recovery binding is outside the job store '
+                'or company scope; no identity evidence or successor job '
+                'was recorded.',
+            )
+            self.env.cr.commit()
+            return
         if exc.observed_level_gid and not locked_binding.shopify_gid:
             locked_binding.sudo().write({'shopify_gid': exc.observed_level_gid})
         job.sudo().write({'state': 'skipped', 'finished_at': fields.Datetime.now()})
         job.flush_recordset(['state', 'operation_scope_key'])
-        Service = self.env['shopify.connector.inventory.service']
         new_job = Service._create_inventory_job(
             job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, locked_binding,
             trigger_origin=job.trigger_origin or False,
@@ -4950,6 +4961,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         self, job, attempt, phase, consequence, reconciliation_job=False,
     ):
         binding = self._lock_binding_for_pair(job)
+        if (
+            consequence['action'] == 'succeed'
+            and not self._binding_scope_compatible(
+                binding, expected_store=job.store_id,
+            )
+        ):
+            raise ValidationError(
+                'Inventory activation evidence cannot be recorded for a '
+                'binding outside the job store/company scope.'
+            )
         if phase == 'reconciliation' and consequence['action'] == 'domain_callback':
             if not self._binding_operationally_eligible(binding):
                 self._block_pair(
