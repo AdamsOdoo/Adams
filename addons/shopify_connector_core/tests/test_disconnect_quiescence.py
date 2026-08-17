@@ -1171,6 +1171,86 @@ class TestGenuineRealAdmission(TransactionCase):
                 worker_cr.close()
             self._cleanup(dbname, store_id, job_ids)
 
+    def test_response_telemetry_cannot_invalidate_caller_fk_snapshot(self):
+        """A successful response may be followed by store-owned child writes.
+
+        Production telemetry is committed independently.  It must not update
+        the parent store until the caller's REPEATABLE READ transaction ends,
+        otherwise PostgreSQL's implicit FK ``FOR KEY SHARE`` sees a newer
+        parent tuple and raises a genuine SQLSTATE 40001.  This is the exact
+        sequence exercised by onboarding location discovery.
+        """
+        dbname = self.env.cr.dbname
+        store_id = None
+        job_ids = []
+        worker_cr = None
+        synthetic_lease_key = uuid.uuid4().hex
+        throttle = {
+            'maximumAvailable': 2000.0,
+            'currentlyAvailable': 900.0,
+            'restoreRate': 100.0,
+        }
+        try:
+            store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
+            worker_cr = self._open_bounded(dbname)
+            worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = worker_env['shopify.connector.store'].browse(store_id)
+            job = worker_env['shopify.connector.job'].browse(job_ids[0])
+            Client = worker_env['shopify.connector.api.client']
+
+            response = FakeResponse(200, json_body={
+                'data': {'ok': True},
+                'extensions': {'cost': {'throttleStatus': throttle}},
+            })
+
+            with patch.object(
+                    self.registry, 'cursor',
+                    self._real_registry_cursor(dbname)), patch.object(
+                    type(Client), '_send', return_value=response):
+                with Client.execute_business(
+                        job, store, 'query { shop { id } }'):
+                    # A real store FK insert after response normalization.  The
+                    # former immediate side-transaction telemetry update made
+                    # this statement raise a genuine 40001.
+                    worker_env['shopify.connector.call.lease'].create({
+                        'store_id': store_id,
+                        'lease_key': synthetic_lease_key,
+                        'job_id': job.id,
+                        'worker_ref': 'telemetry-fk-regression',
+                        'admitted_at': fields.Datetime.now(),
+                        'expires_at': fields.Datetime.add(
+                            fields.Datetime.now(), minutes=1,
+                        ),
+                    })
+                worker_cr.commit()
+
+            observer = self._open_bounded(dbname)
+            try:
+                observer.execute(
+                    'SELECT count(*) FROM shopify_connector_call_lease '
+                    'WHERE store_id = %s AND lease_key = %s',
+                    (store_id, synthetic_lease_key),
+                )
+                self.assertEqual(
+                    observer.fetchone()[0], 1,
+                    'the caller child row must commit without SQLSTATE 40001',
+                )
+                observer.execute(
+                    'SELECT api_throttle_available, api_throttle_maximum, '
+                    'api_throttle_restore_rate '
+                    'FROM shopify_connector_store WHERE id = %s',
+                    (store_id,),
+                )
+                self.assertEqual(observer.fetchone(), (900.0, 2000.0, 100.0))
+                observer.rollback()
+            finally:
+                observer.close()
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_ids)
+
     # C. Real caller-rollback independence: the committed lease survives the
     # worker's own main-transaction rollback, then releases on context exit.
     def test_real_admission_survives_caller_rollback(self):

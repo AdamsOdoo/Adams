@@ -1347,7 +1347,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
 
     @api.model
     def _record_throttle_status_isolated(self, store, throttle_status):
-        """Persist response telemetry without locking the business job.
+        """Persist response telemetry after the business transaction ends.
 
         A handler may issue more than one Shopify read.  Recording the first
         response on ``store`` in the handler transaction takes a row-update
@@ -1358,39 +1358,61 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         and the shared dispatcher occupied.
 
         Telemetry is observational and already best-effort, so production
-        writes it in its own short, non-blocking transaction.  The dispatcher
-        commits each business job before it evaluates same-pass
-        backpressure, so the committed observation remains visible for the
-        next claim without coupling it to the handler transaction.  Odoo's
-        TransactionCase cursor forbids commits; there we retain the original
-        in-transaction write so the existing deterministic unit tests keep
-        exercising the projection without opening a competing real cursor.
+        writes it in its own short, non-blocking transaction *after* the
+        business transaction commits or rolls back.  The timing is
+        load-bearing: committing a side-transaction update of the store while
+        the caller still owns an older REPEATABLE READ snapshot makes a later
+        child-row insert (whose foreign key takes ``FOR KEY SHARE`` on that
+        store) fail with SQLSTATE 40001.  Location discovery exposed exactly
+        that deterministic sequence.
+
+        Post-transaction callbacks preserve the original observational
+        independence on both success and failure, while ensuring the store
+        update cannot invalidate the caller's snapshot.  They run
+        synchronously from ``commit()``/``rollback()``, so same-pass
+        backpressure still sees the durable observation before the dispatcher
+        considers the next claim.  Odoo's TransactionCase cursor forbids
+        commits; there we retain the direct in-transaction write so the
+        deterministic unit tests keep exercising the projection.
         """
         commit = getattr(self.env.cr, 'commit', None)
         if getattr(commit, '__name__', '') == 'forbidden':
             return store._record_throttle_status(throttle_status)
 
-        side_cr = self.env.registry.cursor()
-        try:
-            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
-            side_store = side_env['shopify.connector.store'].browse(
-                store.id
-            ).try_lock_for_update()
-            if not side_store:
+        registry = self.env.registry
+        uid = self.env.uid
+        context = dict(self.env.context)
+        store_id = store.id
+        payload = dict(throttle_status)
+
+        def persist_after_transaction():
+            side_cr = registry.cursor()
+            try:
+                side_env = api.Environment(side_cr, uid, context)
+                side_store = side_env['shopify.connector.store'].browse(
+                    store_id
+                ).try_lock_for_update()
+                if not side_store:
+                    side_cr.rollback()
+                    return False
+                result = side_store._record_throttle_status(payload)
+                side_cr.commit()
+                return result
+            except Exception:  # noqa: BLE001 - telemetry is best effort
                 side_cr.rollback()
+                _logger.exception(
+                    'Could not persist deferred Shopify rate head-room for '
+                    'store %s; the response itself is unaffected.', store_id,
+                )
                 return False
-            result = side_store._record_throttle_status(throttle_status)
-            side_cr.commit()
-            return result
-        except Exception:  # noqa: BLE001 - telemetry is explicitly best effort
-            side_cr.rollback()
-            _logger.exception(
-                'Could not persist isolated Shopify rate head-room for store '
-                '%s; the response itself is unaffected.', store.id,
-            )
-            return False
-        finally:
-            side_cr.close()
+            finally:
+                side_cr.close()
+
+        # Exactly one callback runs. Odoo clears the opposite callback set
+        # before executing the completed transaction's callbacks.
+        self.env.cr.postcommit.add(persist_after_transaction)
+        self.env.cr.postrollback.add(persist_after_transaction)
+        return True
 
     def _error_from_graphql_errors(self, errors, response):
         first_error = errors[0] if errors else {}

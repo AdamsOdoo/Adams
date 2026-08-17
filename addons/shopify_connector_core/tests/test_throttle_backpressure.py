@@ -532,8 +532,8 @@ class TestThrottleBackpressure(TransactionCase):
         )
         self.assertIn('_record_throttle_status', source)
 
-    def test_response_telemetry_uses_an_isolated_non_blocking_write(self):
-        """A first API response cannot row-lock the next call's admission."""
+    def test_response_telemetry_uses_a_deferred_isolated_write(self):
+        """Telemetry cannot invalidate the business transaction snapshot."""
         import inspect
 
         from odoo.addons.shopify_connector_core.models import (
@@ -547,6 +547,8 @@ class TestThrottleBackpressure(TransactionCase):
         self.assertIn('registry.cursor()', source)
         self.assertIn('try_lock_for_update()', source)
         self.assertIn('side_cr.commit()', source)
+        self.assertIn('postcommit.add', source)
+        self.assertIn('postrollback.add', source)
 
     def test_backpressure_can_only_ever_defer(self):
         """No path here raises a rate, shortens a delay or admits work."""
