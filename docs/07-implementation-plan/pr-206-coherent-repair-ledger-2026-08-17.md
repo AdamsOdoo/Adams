@@ -190,7 +190,7 @@ The release branch has not been pushed from this repair worktree at this point.
 | Exact candidate head/tree | Recorded above; clean exact-head worktree | Re-record if candidate advances |
 | Focused automated tests | Python compile, XML parse, diff check, and suite-runner fail-closed self-tests pass locally; no local Odoo/PostgreSQL runtime is installed | Runtime product, inventory, order, fulfillment, security, UX tests pass in exact-head CI/Odoo.sh |
 | Full connector suite | Not rerun | Zero failures/errors on exact candidate |
-| Independent Luna review | Security, product, and inventory correction stacks passed; holistic integrated review pending | Resolve final integrated-delta findings |
+| Independent Luna review | Security, product, and inventory correction stacks passed; holistic integrated code review at `075e303` (tree `23a8491`) passed with no remaining actionable finding | Recheck only if runtime qualification requires a material code correction |
 | Actions/Odoo.sh | Historical exact-head success recorded above | Re-run at final integrated HEAD and module upgrade |
 | Product live proof | Seed import defect and unconfirmed preview documented | Corrected import/update/create recovery verified in Shopify dev store |
 | Inventory live proof | No initial level binding; first push unreachable | Pair creation → preview → confirmation → activation/set → repeat/CAS/retry/reconcile |
