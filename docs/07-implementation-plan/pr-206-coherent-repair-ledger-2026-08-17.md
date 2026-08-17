@@ -246,6 +246,17 @@ local integration tree. The PR remains draft and unmerged.
   pagination, and elevation behavior remain unchanged. Compile, exact sudo
   count, and diff checks pass locally. Independent Luna review: PASS; its sole
   non-blocking wording nit was corrected. Native rerun is required.
+- Exact-head Odoo.sh build `36526292` tested published head `354d45c3` and
+  reached the inventory trigger layer with only two failures. Both stale-parent
+  tests correctly observed fail-closed admission and dispatch, but then
+  incorrectly expected parent reactivation to create a second job while the
+  original `blocked_manual_review` intent still owned the pair scope.
+- Correction `8a6b5983` invalidates the TransactionCase relation cache before
+  proving the repaired parent is operationally eligible, proves duplicate
+  admission remains coalesced, and resolves the same blocked intent through an
+  explicit Connector Administrator back to `queued`. Production inventory
+  code is unchanged. Compile and diff checks pass; independent Luna review:
+  PASS, with no actionable finding. Native rerun is required.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
