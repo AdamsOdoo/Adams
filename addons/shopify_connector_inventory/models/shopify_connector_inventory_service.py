@@ -1720,6 +1720,12 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'The inventory domain is no longer enabled for this store.'
             )
             return
+        # Legacy rows can pre-date the inventory-level pair table, and a
+        # product binding and a location mapping are allowed to arrive in
+        # either order.  Reconcile that durable identity before taking the
+        # scan snapshot so the first-push ceremony is reachable from this
+        # production entry point as well as from the write hooks below.
+        self._bootstrap_inventory_level_bindings(store=store)
         Binding = self.env['shopify.connector.inventory.level.binding']
         bindings = Binding.search([
             ('store_id', '=', store.id),
@@ -3195,6 +3201,229 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         return True
 
     @api.model
+    def _bootstrap_inventory_level_bindings(
+        self, variant_bindings=None, location_mappings=None, store=None,
+    ):
+        """Reconcile durable variant identity with mapped locations.
+
+        This is an internal production hook, not a public binding-creation
+        API.  Product import/create finalisation, location mapping changes,
+        scheduled scans, and mutation reconciliation may all call it.  The
+        public :meth:`ensure_inventory_level_binding` guard remains the only
+        user-facing creation route; this helper deliberately has no role
+        check because its callers are trusted connector transitions or
+        background jobs.
+
+        The Shopify InventoryItem GID is read only from the already persisted
+        product-variant binding.  No Shopify lookup or synthetic identity is
+        performed here.  The pair is created only when both sides name the
+        same store and their Odoo company scope is compatible.  A savepoint
+        around the create makes the database unique constraints the atomic
+        race guard; a concurrent exact create is treated as an idempotent
+        success, while a different identity is left for review.
+
+        ``shopify_inventory_tracked`` is intentionally not used to change
+        Odoo product configuration.  A false source value remains evidence on
+        the variant binding and the existing push handler's live read routes
+        that pair to ``skipped`` before any Shopify mutation.
+        """
+        VariantBinding = self.env[
+            'shopify.connector.product.variant.binding'
+        ].sudo()
+        Mapping = self.env['shopify.connector.location.mapping'].sudo()
+        LevelBinding = self.env[
+            'shopify.connector.inventory.level.binding'
+        ].sudo()
+
+        stores = self.env['shopify.connector.store'].sudo().browse()
+        store_scope_requested = store is not None
+        if store_scope_requested:
+            stores = store.sudo().exists()
+        scope_store_ids = set(stores.ids)
+
+        # A supplied recordset is itself the scope.  Derive this before any
+        # widening search so a mapping write can never scan every product
+        # binding in the database merely because the mapping-side hook did
+        # not receive an explicit ``store`` argument.
+        if not store_scope_requested and variant_bindings is not None:
+            scope_store_ids.update(
+                variant_bindings.sudo().exists().mapped('store_id').ids
+            )
+        if not store_scope_requested and location_mappings is not None:
+            scope_store_ids.update(
+                location_mappings.sudo().exists().mapped('store_id').ids
+            )
+        if store_scope_requested and not stores:
+            return LevelBinding.browse()
+
+        # When one side is supplied, constrain the other side to that side's
+        # store set.  Passing ``None`` means "discover all legacy candidates";
+        # an explicitly empty recordset remains empty and is not widened.
+        if variant_bindings is None:
+            variant_domain = [
+                ('shopify_inventory_item_gid', '!=', False),
+                ('status', '=', 'active'),
+            ]
+            if scope_store_ids:
+                variant_domain.append(
+                    ('store_id', 'in', sorted(scope_store_ids)),
+                )
+            variants = VariantBinding.search(variant_domain)
+        else:
+            variants = variant_bindings.sudo().exists()
+            if scope_store_ids:
+                variants = variants.filtered(
+                    lambda binding: binding.store_id.id in scope_store_ids
+                )
+            variants = variants.filtered(
+                lambda binding: (
+                    binding.status == 'active'
+                    and
+                    isinstance(binding.shopify_inventory_item_gid, str)
+                    and bool(binding.shopify_inventory_item_gid.strip())
+                )
+            )
+        if variant_bindings is None:
+            variants = variants.filtered(
+                lambda binding: binding.status == 'active'
+            )
+
+        if location_mappings is None:
+            mapping_domain = [
+                ('shopify_gid', '!=', False),
+                ('status', '=', 'active'),
+                ('push_enabled', '=', True),
+            ]
+            if scope_store_ids:
+                mapping_domain.append(
+                    ('store_id', 'in', sorted(scope_store_ids)),
+                )
+            mappings = Mapping.search(mapping_domain)
+        else:
+            mappings = location_mappings.sudo().exists()
+            if scope_store_ids:
+                mappings = mappings.filtered(
+                    lambda mapping: mapping.store_id.id in scope_store_ids
+                )
+            mappings = mappings.filtered(
+                lambda mapping: (
+                    mapping.status == 'active'
+                    and mapping.push_enabled
+                    and
+                    isinstance(mapping.shopify_gid, str)
+                    and bool(mapping.shopify_gid.strip())
+                )
+            )
+        if location_mappings is None:
+            mappings = mappings.filtered(
+                lambda mapping: (
+                    mapping.status == 'active' and mapping.push_enabled
+                )
+            )
+
+        if not variants or not mappings:
+            return LevelBinding.browse()
+
+        mappings_by_store = {}
+        for mapping in mappings:
+            mappings_by_store.setdefault(mapping.store_id.id, Mapping.browse())
+            mappings_by_store[mapping.store_id.id] |= mapping
+
+        ensured = LevelBinding.browse()
+        for variant in variants:
+            store_record = variant.store_id
+            if not store_record or not store_record.company_id:
+                _logger.warning(
+                    'Inventory pair bootstrap skipped variant binding %s: '
+                    'the owning store has no company.', variant.id,
+                )
+                continue
+            inventory_item_gid = variant.shopify_inventory_item_gid
+            if not isinstance(inventory_item_gid, str):
+                continue
+            inventory_item_gid = inventory_item_gid.strip()
+            if not inventory_item_gid:
+                continue
+
+            product = variant.product_variant_id
+            for mapping in mappings_by_store.get(
+                store_record.id, Mapping.browse(),
+            ):
+                location = mapping.odoo_location_id
+                store_company = store_record.company_id
+                if (
+                    product.company_id and
+                    product.company_id != store_company
+                ) or (
+                    location.company_id and
+                    location.company_id != store_company
+                ):
+                    # The pair must fail closed rather than relying on the
+                    # current worker company (which may differ from the
+                    # store's company in a multi-company cron run).
+                    _logger.warning(
+                        'Inventory pair bootstrap skipped variant binding '
+                        '%s and location mapping %s: company scope does not '
+                        'match store %s.', variant.id, mapping.id,
+                        store_record.id,
+                    )
+                    continue
+
+                pair_domain = [
+                    ('store_id', '=', store_record.id),
+                    ('product_variant_binding_id', '=', variant.id),
+                    ('location_mapping_id', '=', mapping.id),
+                ]
+                existing = LevelBinding.search(pair_domain, limit=1)
+                if existing:
+                    if (
+                        existing.shopify_inventory_item_gid
+                        == inventory_item_gid
+                    ):
+                        ensured |= existing
+                    else:
+                        # The binding identity is immutable.  Do not repair a
+                        # conflicting legacy row by silently changing the
+                        # stored GID; a reviewed recovery must do that.
+                        _logger.error(
+                            'Inventory pair bootstrap found conflicting '
+                            'InventoryItem identity for level binding %s; '
+                            'leaving it unchanged.', existing.id,
+                        )
+                    continue
+
+                vals = {
+                    'store_id': store_record.id,
+                    'product_variant_binding_id': variant.id,
+                    'location_mapping_id': mapping.id,
+                    'shopify_inventory_item_gid': inventory_item_gid,
+                }
+                try:
+                    with self.env.cr.savepoint():
+                        created = LevelBinding.with_company(
+                            store_company
+                        ).create(vals)
+                except IntegrityError:
+                    # Another import/mapping transition may have created the
+                    # exact row between the search and insert.  Re-read after
+                    # the savepoint; only the exact same pair/GID is benign.
+                    created = LevelBinding.search(pair_domain, limit=1)
+                    if not created:
+                        raise
+                    if (
+                        created.shopify_inventory_item_gid
+                        != inventory_item_gid
+                    ):
+                        _logger.error(
+                            'Inventory pair bootstrap raced with a '
+                            'conflicting InventoryItem identity for pair '
+                            'variant=%s mapping=%s.', variant.id, mapping.id,
+                        )
+                        continue
+                ensured |= created
+        return ensured
+
+    @api.model
     def ensure_inventory_level_binding(
         self, variant_binding, location_mapping, shopify_inventory_item_gid,
     ):
@@ -3207,17 +3436,12 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         error when the caller re-requests the same pair with the same
         GID.
         """
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Operator or Administrator may "
-                "create an inventory-level binding."
+                "Only a Shopify Connector Administrator may create an "
+                "inventory-level binding."
             )
         variant_binding = variant_binding.exists()
         location_mapping = location_mapping.exists()
@@ -3230,6 +3454,19 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             raise UserError(
                 "The product-variant binding and location mapping must "
                 "belong to the same store."
+            )
+        if variant_binding.status != 'active':
+            raise UserError(
+                "The product-variant binding is not active and cannot "
+                "create an inventory pair."
+            )
+        if (
+            location_mapping.status != 'active'
+            or not location_mapping.push_enabled
+        ):
+            raise UserError(
+                "The location mapping must be active and push-enabled "
+                "before an inventory pair can be created."
             )
         if (
             not isinstance(shopify_inventory_item_gid, str)
@@ -4505,6 +4742,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
             return
         original = attempt.job_id
+        # Reconciliation is also a repair boundary for installations that
+        # were upgraded with product/location identity but without the
+        # derived inventory-level pair.  This is idempotent and does not
+        # alter the mutation attempt being reconciled.
+        self._bootstrap_inventory_level_bindings(store=job.store_id)
         if attempt.observed_outcome == 'pending':
             Dispatch._block_original_job(
                 original, ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE_RISK,

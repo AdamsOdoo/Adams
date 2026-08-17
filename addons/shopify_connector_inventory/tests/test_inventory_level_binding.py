@@ -1,4 +1,4 @@
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
@@ -292,10 +292,10 @@ class TestInventoryLevelBinding(TransactionCase):
     # 22.B)
     # ------------------------------------------------------------------
 
-    def test_sanctioned_service_creates_binding_for_operator(self):
+    def test_sanctioned_service_creates_binding_for_administrator(self):
         Service = self.env['shopify.connector.inventory.service']
         binding = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/111',
@@ -308,18 +308,33 @@ class TestInventoryLevelBinding(TransactionCase):
     def test_sanctioned_service_ensure_is_idempotent(self):
         Service = self.env['shopify.connector.inventory.service']
         first = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/112',
         )
         second = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/112',
         )
         self.assertEqual(first.id, second.id)
+
+    def test_sanctioned_service_denied_for_operator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        before = self.Binding.search_count([
+            ('store_id', '=', self.store.id),
+        ])
+        with self.assertRaises(AccessError):
+            Service.with_user(self.user_operator).ensure_inventory_level_binding(
+                self.variant_binding, self.mapping,
+                'gid://shopify/InventoryItem/113',
+            )
+        self.assertEqual(
+            self.Binding.search_count([('store_id', '=', self.store.id)]),
+            before,
+        )
 
     def test_sanctioned_service_denied_for_auditor(self):
         auditor = self.env['res.users'].create({
@@ -332,8 +347,15 @@ class TestInventoryLevelBinding(TransactionCase):
             ])],
         })
         Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(Exception):
+        before = self.Binding.search_count([
+            ('store_id', '=', self.store.id),
+        ])
+        with self.assertRaises(AccessError):
             Service.with_user(auditor).ensure_inventory_level_binding(
                 self.variant_binding, self.mapping,
-                'gid://shopify/InventoryItem/113',
+                'gid://shopify/InventoryItem/114',
             )
+        self.assertEqual(
+            self.Binding.search_count([('store_id', '=', self.store.id)]),
+            before,
+        )

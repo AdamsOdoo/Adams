@@ -56,6 +56,36 @@ class ShopifyConnectorLocationMapping(models.Model):
             'push_enabled',
         ))
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        mappings = super().create(vals_list)
+        if mappings:
+            # The mapping may be created before or after the product import.
+            # The internal service reconciles both orders without exposing a
+            # public unguarded binding-creation method.
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._bootstrap_inventory_level_bindings(
+                location_mappings=mappings,
+            )
+        return mappings
+
+    def write(self, vals):
+        result = super().write(vals)
+        if set(vals) & {
+            'store_id', 'shopify_gid', 'odoo_location_id', 'push_enabled',
+            'status',
+        }:
+            # `action_set_push_enabled` deliberately delegates to write on a
+            # sudo record; this post-write hook therefore covers the public
+            # enable/disable action and sanctioned mapping service alike.
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._bootstrap_inventory_level_bindings(
+                location_mappings=self,
+            )
+        return result
+
     @api.constrains('store_id', 'odoo_location_id')
     def _check_no_ancestor_descendant_overlap(self):
         for mapping in self:
