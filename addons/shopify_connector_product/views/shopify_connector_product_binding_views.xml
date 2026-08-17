@@ -172,6 +172,13 @@
                eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="search_view_id"
                ref="view_shopify_connector_product_template_binding_search"/>
+        <!--
+            Odoo updates only the fields declared by an XML record.  Keep this
+            explicit so an upgrade clears the historical default
+            `search_default_filter_needs_attention` instead of retaining it
+            when the declaration is merely removed.
+        -->
+        <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No product mappings match the current view.
