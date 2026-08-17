@@ -307,3 +307,39 @@ For each live record, append Odoo IDs, Shopify GIDs, job/preview/attempt IDs,
 before/after values, role/company/store, verified remote outcome, retry/replay
 evidence, and cleanup status. Never record a dispatched job as a successful
 Shopify mutation without a verified remote read.
+
+## 7. Bounded historical-action upgrade repair — 2026-08-17
+
+- Live pre-repair candidate: `7dbce3e24824824f8fe25794de7b14662ed357ef`,
+  tree `cdf39402d26392cbd9c42faff6d8c2571b791265`; draft PR #206 remained
+  open and unmerged. GitHub Actions run `32044626405` failed only the two
+  historical-upgrade campaigns and their immediate repeat updates at
+  `TestUiU2Product.test_product_mappings_open_without_hiding_healthy_rows`.
+- Exact-head Odoo.sh development build `36529951` remained successful on
+  `7dbce3e`; it is historical evidence and cannot qualify a later correction.
+- Both supported historical origins (`50b770a315b53f0c05f0b8867bb801d75c6476ef`
+  and `0a15b176e60b77bf2f40195a9961591c788e14f8`) store
+  `{'search_default_filter_needs_attention': 1}` on the canonical Product
+  Mappings action. The candidate removed the XML field, but Odoo 19 update
+  loading writes only fields present in the XML record, so the old database
+  value survived.
+- Bounded correction commit `68ba2a0b39be6f56e8e2003d712414770460ff15`
+  explicitly declares an empty action context. Its behavioral regression
+  seeds the real historical value, creates an action-owned saved favorite,
+  reloads the real XML twice in update mode, and proves neutral context,
+  favorite preservation, repeat idempotency, and unchanged job/log/mutation
+  attempt/optional export-preview counts.
+- Static pre-integration checks passed: Python compilation, XML parsing,
+  `git diff --check`, and suite-runner self-tests. A fresh GPT-5.6 SOL Medium
+  reviewer accepted source head `8f20afba239edd6416b3c8c5557d142b3759de74`
+  with no blocking source finding. It recorded two non-blocking proof-depth
+  gaps for the exact-head campaigns: the existing browser tour does not itself
+  toggle the optional filter, and the XML-loader regression compares artifact
+  row counts rather than transport mocks/existing-row state. Runtime focused,
+  fresh, warm, both historical, repeat-upgrade, nonstandard/concurrency,
+  browser-tour, exact-head Actions, and exact-head Odoo.sh evidence remain
+  pending at this ledger entry.
+- No Shopify credential, request, mutation, connector job, preview, or sync was
+  used for this repair. Controlled Shopify UAT remains blocked until the new
+  exact head passes automated and Odoo.sh qualification and the development
+  credential is securely available.
