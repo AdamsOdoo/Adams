@@ -257,6 +257,20 @@ local integration tree. The PR remains draft and unmerged.
   explicit Connector Administrator back to `queued`. Production inventory
   code is unchanged. Compile and diff checks pass; independent Luna review:
   PASS, with no actionable finding. Native rerun is required.
+- Exact-head Odoo.sh build `36528250` tested published head `32791038` and
+  stopped at its five-error ceiling after 1,762 tests (zero failures). Two
+  repeated scan fixtures omitted production's per-run UUID payload identity;
+  the broad cache invalidation flushed their duplicate durable idempotency
+  keys. Three mapping tests still expected Operator configuration mutation
+  after the accepted role contract made mapping create/update and push-enable
+  changes Administrator-only.
+- Correction `130db2b1` replaces the global cache flushes with targeted parent
+  status invalidation, gives direct scan fixtures the same fresh payload hash
+  as `run_inventory_push_scan()`, proves Operator denial leaves mapping state
+  unchanged, and runs mapping configuration/validation positives as an
+  explicit Connector Administrator. Production code is unchanged. Compile and
+  diff checks pass; independent Luna reviews: PASS for scan identity/cache and
+  PASS for the complete mapping-role call matrix. Native rerun is required.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
