@@ -210,6 +210,9 @@ local integration tree. The PR remains draft and unmerged.
   replaces source inspection with a runtime ownership transition test.
   `compileall` and `git diff --check` pass locally. Exact-head runtime rerun is
   required before this correction can be accepted.
+- An independent Luna review passed the correction with no finding: it is
+  test-only, accounts for every reported native failure/error, preserves the
+  production importer, and does not mask a candidate defect.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
