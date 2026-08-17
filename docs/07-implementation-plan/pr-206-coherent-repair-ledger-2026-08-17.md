@@ -98,10 +98,12 @@ The isolated seed product currently used for UAT is:
   retry, no-op handling, and reconcile-only uncertain outcomes.
 - Shopify `InventoryItem.tracked` is persisted as source evidence. Policy:
   tracked items are eligible for inventory sync; untracked items are skipped
-  with evidence; tracked state is not silently equated with Odoo product type
-  or Track Inventory. Newly imported products may receive a configured Odoo
-  tracking default, existing products retain user overrides, and later sync
-  enablement requires an explicit user/configuration transition.
+  with evidence. For a newly created Odoo template only, `tracked=true`
+  initializes the template as storable so the imported product can participate
+  in stock flows; `tracked=false` does not force an Odoo product-type change.
+  Existing Odoo products always retain their user-selected product type, and a
+  later Shopify tracking change remains evidence rather than silently changing
+  that local configuration.
 
 ### Order/line
 
@@ -166,12 +168,27 @@ Primary existing contracts: [`DEC-010`](../04-decisions/DEC-010-inventory-archit
 
 ## 6. Ongoing evidence and release gates
 
+### Accepted implementation commits (integration branch)
+
+| Commit | Scope | Independent review |
+|---|---|---|
+| `dcc3e0e` | Living ledger, seam map, and canonical contracts | Accepted as the Phase A evidence baseline |
+| `b7caaa8` | Visible role hierarchy, server-side capability enforcement, and mapping UX | Review found review-closure authority/copy and upgrade-proof gaps |
+| `4ab1b7b` | Administrator-only review closure, corrected UI copy, and repeat XML-update proof | Re-reviewed: PASS |
+| `52b6f4b` | Product birth normalization, ownership-aware export, singleton normalization, create/finalization/recovery contracts | Review found legacy repair, orphan-create, recovery/control exposure, structured price, and InventoryItem uniqueness gaps |
+| `a54d6d3` | Product review corrections and behavioral regressions | Re-reviewed: PASS |
+| `204825d` | Production first-pair bootstrap from product binding, mapping activation, scan, and legacy reconciliation | Review found that existing pairs remained eligible after a parent became stale |
+| `12ef156` | Centralized active-parent/store/company eligibility at admission, dispatch, CAS, and reconciliation boundaries | Review found a post-terminalization TOCTOU that could roll back durable evidence |
+| `0c1b38f` | Suppress stale-race successors without raising; preserve terminal/mutation evidence with behavioral race regressions | Final independent re-review pending |
+
+The release branch has not been pushed from this repair worktree at this point.
+
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
 | Exact candidate head/tree | Recorded above; clean exact-head worktree | Re-record if candidate advances |
-| Focused automated tests | Not rerun in this documentation commit | Product, inventory, order, fulfillment, security, UX tests pass |
+| Focused automated tests | Python compile, XML parse, diff check, and suite-runner fail-closed self-tests pass locally; no local Odoo/PostgreSQL runtime is installed | Runtime product, inventory, order, fulfillment, security, UX tests pass in exact-head CI/Odoo.sh |
 | Full connector suite | Not rerun | Zero failures/errors on exact candidate |
-| Independent Luna review | Phase A reports received; implementation review pending | Review every worker commit; resolve findings |
+| Independent Luna review | Security and product corrections passed; inventory final correction re-review pending | Resolve the final inventory/final-delta review |
 | Actions/Odoo.sh | Historical exact-head success recorded above | Re-run at final integrated HEAD and module upgrade |
 | Product live proof | Seed import defect and unconfirmed preview documented | Corrected import/update/create recovery verified in Shopify dev store |
 | Inventory live proof | No initial level binding; first push unreachable | Pair creation → preview → confirmation → activation/set → repeat/CAS/retry/reconcile |

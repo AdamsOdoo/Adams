@@ -24,6 +24,9 @@ Upstream ground truth (DEC-041 D1), odoo/odoo@19.0 `30bde9ff`, read 2026-07-25:
 No Shopify transport of any kind occurs in this module.
 """
 
+import importlib.util
+from pathlib import Path
+
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
@@ -236,6 +239,33 @@ class TestSec2Roles(TransactionCase):
             set(self._group('group_shopify_connector_admin').implied_ids.ids),
             {user_group.id, reviewer.id},
         )
+
+    def test_role_post_migration_is_exact_and_idempotent(self):
+        """The versioned upgrade mirrors the XML replacement contract."""
+        user = self._group('group_shopify_connector_user')
+        admin = self._group('group_shopify_connector_admin')
+        operator = self._group('group_shopify_connector_operator')
+        reviewer = self._group('group_shopify_connector_reviewer')
+        user.write({'implied_ids': [(4, reviewer.id)]})
+
+        path = (
+            Path(__file__).resolve().parents[1]
+            / 'migrations' / '19.0.1.23.0' / 'post-migrate.py'
+        )
+        spec = importlib.util.spec_from_file_location(
+            'shopify_connector_core_role_post_migrate', path,
+        )
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+
+        for _iteration in range(2):
+            migration.migrate(self.env.cr, '19.0.1.22.0')
+            self.env.invalidate_all()
+            self.assertEqual(set(user.implied_ids.ids), {operator.id})
+            self.assertEqual(
+                set(admin.implied_ids.ids), {user.id, reviewer.id},
+            )
+            self.assertNotIn(reviewer.id, user.all_implied_ids.ids)
 
     def test_effective_user_groups_match_the_group_closure(self):
         """Prove the closure on the *user*, not only on the group records."""

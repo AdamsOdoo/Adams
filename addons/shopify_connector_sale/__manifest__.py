@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Sale',
-    'version': '19.0.2.10.0',
+    'version': '19.0.2.11.0',
     'summary': (
         'Conservative Shopify customer and supported-kernel order import '
         'with bindings, tax decisions, guarded totals, scheduled scans, '
