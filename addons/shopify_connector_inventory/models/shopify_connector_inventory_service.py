@@ -724,7 +724,19 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
         new_job = Service._create_inventory_job(
             job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, locked_binding,
             trigger_origin=job.trigger_origin or False,
+            allow_ineligible=True,
         )
+        if not new_job:
+            job._log_transition(
+                'state_change',
+                'A valid Shopify InventoryLevel already exists; skipped '
+                'this unnecessary activation, but the fresh push-sync '
+                'successor was suppressed because the pair became '
+                'ineligible. predecessor_job_id=%d.' % (job.id,),
+                from_state='running', to_state='skipped',
+            )
+            self.env.cr.commit()
+            return
         job._log_transition(
             'state_change',
             'A valid Shopify InventoryLevel already exists; skipped this '
@@ -844,6 +856,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
     @api.model
     def _create_inventory_job(
         self, store, job_source, job_type, binding, trigger_origin=False,
+        allow_ineligible=False,
     ):
         """Create one inventory job under the pair-serialization identity,
         routed through the core's sole sanctioned domain enqueue service
@@ -864,17 +877,41 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         context path through this method for a nonzero value. The sole
         surface that can ever produce a nonzero ordinal is
         `_create_cas_successor_job` below.
+
+        ``allow_ineligible`` is reserved for callers that have already
+        terminalized a predecessor in the same transaction. It suppresses a
+        successor when parent status or scope changed in the final TOCTOU
+        window; ordinary admission leaves it false so scope errors remain
+        strict before business intent is created.
         """
+        Job = self.env['shopify.connector.job']
+        binding = binding.sudo().exists()
+        # A deleted/expired binding is an idempotent no-successor outcome
+        # after a predecessor has already been terminalized. Do not raise
+        # here: the caller must retain that terminal evidence and commit it.
+        if len(binding) != 1:
+            return Job
         if binding.store_id != store:
+            if allow_ineligible:
+                return Job
             raise UserError(
                 'The inventory job store must match the level binding store.'
             )
-        if not self._binding_operationally_eligible(binding):
+        # Store/company topology is a pre-intent contract. Unlike an
+        # active/stale transition, a scope mismatch is not a benign TOCTOU
+        # race: refuse it before a job identity or business intent exists.
+        if not self._binding_scope_compatible(binding, expected_store=store):
+            if allow_ineligible:
+                return Job
             raise UserError(
-                'Inventory work cannot be admitted while its level binding, '
-                'variant binding, or location mapping is inactive, disabled, '
-                'or outside the owning store/company scope.'
+                'Inventory work cannot be admitted outside the owning '
+                'store/company scope.'
             )
+        if not self._binding_operationally_eligible(binding):
+            # Parent status/push-enable changes can race the final enqueue
+            # check. Return an empty job recordset instead of raising after
+            # a caller has terminalized its predecessor.
+            return Job
         pair_key = pair_scope_key(
             store.id,
             binding.shopify_inventory_item_gid,
@@ -890,7 +927,45 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         )
 
     @api.model
-    def _create_cas_successor_job(self, locked_predecessor, binding):
+    def _binding_scope_compatible(self, binding, expected_store=None):
+        """Return whether the pair's immutable store/company scope is valid.
+
+        This deliberately excludes operational status and push-enable state;
+        callers use it to distinguish a hard pre-intent scope rejection from
+        an ineligible parent that may have changed after a terminal handoff.
+        """
+        binding = binding.sudo().exists()
+        if len(binding) != 1:
+            return False
+        store = binding.store_id
+        variant_binding = binding.product_variant_binding_id
+        mapping = binding.location_mapping_id
+        if not store or not store.company_id or not variant_binding or not mapping:
+            return False
+        if expected_store is not None and store != expected_store:
+            return False
+        if (
+            variant_binding.store_id != store
+            or mapping.store_id != store
+            or binding.company_id != store.company_id
+        ):
+            return False
+        product = variant_binding.product_variant_id
+        location = mapping.odoo_location_id
+        if not product or not location:
+            return False
+        if (
+            product.company_id and product.company_id != store.company_id
+        ) or (
+            location.company_id and location.company_id != store.company_id
+        ):
+            return False
+        return True
+
+    @api.model
+    def _create_cas_successor_job(
+        self, locked_predecessor, binding, allow_ineligible=False,
+    ):
         """The sole creation surface for a nonzero `cas_retry_ordinal`
         (PR #182 comment 5029906989 item 6). Requires an already
         row-locked `inventory_set_quantities` predecessor (the caller
@@ -973,7 +1048,10 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             locked_predecessor.store_id, locked_predecessor.job_source,
             JOB_TYPE_SET_QUANTITIES, binding,
             trigger_origin=locked_predecessor.trigger_origin or False,
+            allow_ineligible=allow_ineligible,
         )
+        if not new_job:
+            return self.env['shopify.connector.job']
         new_job.sudo().write({'cas_retry_ordinal': cas_retry_ordinal})
         return new_job
 
@@ -992,12 +1070,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding = binding.sudo().exists()
         if len(binding) != 1:
             return False
-        store = binding.store_id
         variant_binding = binding.product_variant_binding_id
         mapping = binding.location_mapping_id
-        if not store or not store.company_id:
-            return False
         if not variant_binding or not mapping:
+            return False
+        if not self._binding_scope_compatible(binding):
             return False
         if (
             binding.status != 'active'
@@ -1006,21 +1083,8 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             or not mapping.push_enabled
         ):
             return False
-        if (
-            variant_binding.store_id != store
-            or mapping.store_id != store
-            or binding.company_id != store.company_id
-        ):
-            return False
-        product = variant_binding.product_variant_id
         location = mapping.odoo_location_id
-        if not product or not location or location.usage != 'internal':
-            return False
-        if (
-            product.company_id and product.company_id != store.company_id
-        ) or (
-            location.company_id and location.company_id != store.company_id
-        ):
+        if not location or location.usage != 'internal':
             return False
         if (
             not isinstance(binding.shopify_inventory_item_gid, str)
@@ -1502,7 +1566,18 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             new_job = self._create_inventory_job(
                 store, job.job_source, JOB_TYPE_ACTIVATE, locked_binding,
                 trigger_origin=job.trigger_origin or False,
+                allow_ineligible=True,
             )
+            if not new_job:
+                job._log_transition(
+                    'state_change',
+                    'No Shopify inventory level exists yet; the '
+                    'orchestration job was terminalized, but activation '
+                    'was suppressed because the pair became ineligible. '
+                    'predecessor_job_id=%d.' % (job.id,),
+                    from_state='running', to_state='succeeded',
+                )
+                return
             job._log_transition(
                 'state_change',
                 'No Shopify inventory level exists yet; enqueued '
@@ -1618,7 +1693,17 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         new_job = self._create_inventory_job(
             store, job.job_source, JOB_TYPE_SET_QUANTITIES, locked_binding,
             trigger_origin=job.trigger_origin or False,
+            allow_ineligible=True,
         )
+        if not new_job:
+            job._log_transition(
+                'state_change',
+                'The orchestration job was terminalized, but the quantity '
+                'push was suppressed because the pair became ineligible. '
+                'predecessor_job_id=%d.' % (job.id,),
+                from_state='running', to_state='succeeded',
+            )
+            return
         job._log_transition(
             'state_change',
             'Enqueued inventory_set_quantities toward the current '
@@ -3695,12 +3780,24 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # constraint within this same transaction.
         locked_job.flush_recordset(['state', 'operation_scope_key'])
         if is_cas_replacement:
-            new_job = self._create_cas_successor_job(locked_job, binding)
+            new_job = self._create_cas_successor_job(
+                locked_job, binding, allow_ineligible=True,
+            )
         else:
             new_job = self._create_inventory_job(
                 locked_job.store_id, locked_job.job_source, new_job_type,
                 binding, trigger_origin=locked_job.trigger_origin or False,
+                allow_ineligible=True,
             )
+        if not new_job:
+            locked_job._log_transition(
+                'state_change',
+                'Replacement %s was suppressed because the inventory pair '
+                'became ineligible after the predecessor was terminalized; '
+                'predecessor_job_id=%d.' % (cancel_reason, locked_job.id),
+                from_state=from_state, to_state='cancelled',
+            )
+            return self.env['shopify.connector.job']
         locked_job.sudo().write({'superseded_by_job_id': new_job.id})
         locked_job._log_transition(
             'state_change',
@@ -3725,7 +3822,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         new_job = self._create_inventory_job(
             job.store_id, job.job_source, JOB_TYPE_PUSH_SYNC, binding,
             trigger_origin=job.trigger_origin or False,
+            allow_ineligible=True,
         )
+        if not new_job:
+            job._log_transition(
+                'state_change',
+                'Activation confirmed applied; the fresh push-sync '
+                'successor was suppressed because the pair became '
+                'ineligible. predecessor_job_id=%d.' % (job.id,),
+            )
+            return self.env['shopify.connector.job']
         job._log_transition(
             'state_change',
             'Activation confirmed applied; atomically enqueued a fresh '
