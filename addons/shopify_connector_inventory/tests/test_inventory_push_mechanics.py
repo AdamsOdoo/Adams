@@ -3636,6 +3636,63 @@ class TestInventoryPushMechanics(TransactionCase):
             ('res_id', '=', self.binding.id),
         ]))
 
+    def test_set_quantities_success_rejects_corrupt_cross_store_binding(
+        self,
+    ):
+        foreign_store = self.env['shopify.connector.store'].create({
+            'name': 'Push Mechanics Quantity Foreign Store',
+            'shop_domain': 'push-mechanics-quantity-foreign.myshopify.com',
+            'api_version': '2026-07',
+        })
+        self.env.cr.execute(
+            'UPDATE shopify_connector_inventory_level_binding '
+            'SET store_id = %s WHERE id = %s',
+            (foreign_store.id, self.binding.id),
+        )
+        self.env['shopify.connector.inventory.level.binding'].invalidate_model()
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        before = (
+            self.binding.last_pushed_available,
+            self.binding.last_pushed_at,
+            self.binding.shopify_gid,
+        )
+        job.sudo().write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now(),
+        })
+        Service = self.Service
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                Service._apply_consequence_set_quantities(
+                    job, attempt, 'direct',
+                    {
+                        'observed_outcome': 'succeeded',
+                        'error_class': False,
+                        'manual_review_subreason': False,
+                        'action': 'succeed',
+                        'message': 'Set quantities applied.',
+                        'evidence': {
+                            'inventory_level_gid':
+                            'gid://shopify/InventoryLevel/WRONG-SCOPE',
+                        },
+                    },
+                )
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            (
+                self.binding.last_pushed_available,
+                self.binding.last_pushed_at,
+                self.binding.shopify_gid,
+            ),
+            before,
+        )
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('res_model', '=', 'shopify.connector.inventory.level.binding'),
+            ('res_id', '=', self.binding.id),
+            ('id', '!=', job.id),
+        ]))
+
     def test_cas_replacement_race_preserves_attempt_without_successor(self):
         job, token = self._make_mutation_job(
             'inventory_set_quantities', cas_retry_ordinal=1,

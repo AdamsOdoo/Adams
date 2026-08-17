@@ -4448,6 +4448,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         self, job, attempt, phase, consequence, reconciliation_job=False,
     ):
         binding = self._lock_binding_for_pair(job)
+        if (
+            consequence['action'] == 'succeed'
+            and not self._binding_scope_compatible(
+                binding, expected_store=job.store_id,
+            )
+        ):
+            raise ValidationError(
+                'Inventory quantity evidence cannot be recorded for a '
+                'binding outside the job store/company scope.'
+            )
         domain_payload = consequence.get('domain_payload') or {}
         if phase == 'direct' and domain_payload.get('reason') == 'cas_stale':
             if not self._binding_operationally_eligible(binding):
