@@ -172,8 +172,8 @@ class TestExportSourceGuards(TransactionCase):
             # and company access were established upstream at enqueue
             # (`enqueue_preview` / `action_confirm_export_preview`).
             # 21 -> 22 (PR #206 product contract repair). Create
-            # finalization now writes a fully evidenced pre-existing variant
-            # binding when Shopify returns the durable variant identity. The
+            # finalization now writes a fully evidenced variant binding when
+            # Shopify returns the durable variant identity. The
             # binding fields are connector-protected, the path is reachable
             # only from an admitted create job, and omitting this elevation
             # would leave the create replay boundary incomplete.

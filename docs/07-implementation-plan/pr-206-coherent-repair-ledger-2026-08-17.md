@@ -231,6 +231,21 @@ local integration tree. The PR remains draft and unmerged.
   mutation-safety behavior are unchanged. Compile, XML parse, forbidden-token,
   and diff checks pass locally. Independent Luna review: PASS, no actionable
   finding. Native rerun remains required.
+- Exact-head Odoo.sh build `36525283` tested `119debd8` and reached 1,547
+  tests before reporting two failures and three errors in the next layer.
+  The failures were frozen elevation budgets that had not recorded two
+  reviewed product-export seam elevations and one create-finalization
+  elevation. The errors were stale fixtures: a Reviewer attempted the new
+  Administrator-only inventory recovery, two mappings reused the same
+  store/Odoo-location identity, and a replay reused an importer-mutated fake
+  response instead of a fresh HTTP decode.
+- Correction `6d277208` uses an Administrator for the recovery race, gives
+  the second mapping a distinct real internal location, deep-copies the fake
+  response for each request, and documents/locks the reviewed `sudo()` budgets
+  at seams `2` and service `22`. Production authorization, uniqueness,
+  pagination, and elevation behavior remain unchanged. Compile, exact sudo
+  count, and diff checks pass locally. Independent Luna review: PASS; its sole
+  non-blocking wording nit was corrected. Native rerun is required.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
