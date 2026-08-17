@@ -216,6 +216,21 @@ local integration tree. The PR remains draft and unmerged.
 - Odoo.sh branch rebuild `36523471` was requested while the platform mirror
   still pointed at `93fee1f3`; it repeated the already classified stale-head
   failure and is not qualification evidence for the corrected candidate.
+- After the delayed branch-event queue caught up, exact-head Odoo.sh build
+  `36524471` tested `c6b990f7` and exposed five additional stale qualification
+  fixtures in the next module layer: one catalog journey reused the same
+  InventoryItem GID for distinct variants; two protected-surface attack
+  matrices omitted the newly protected birth/snapshot fields; one option
+  assertion omitted canonical `position: 0`; and a source guard matched the
+  word “mutation” in recovery guidance rather than executable request logic.
+  The run stopped at its five-failure ceiling after 1,403 tests.
+- Correction `79fff864` makes fixture InventoryItem identity unique per
+  variant, exercises every new protected field through create/alter/clear
+  denials, asserts the canonical option position, and preserves recovery
+  guidance using remote-operation terminology. Production synchronization and
+  mutation-safety behavior are unchanged. Compile, XML parse, forbidden-token,
+  and diff checks pass locally. Independent Luna review: PASS, no actionable
+  finding. Native rerun remains required.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
