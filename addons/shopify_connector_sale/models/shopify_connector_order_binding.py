@@ -175,16 +175,11 @@ class ShopifyConnectorOrderBinding(models.Model):
     def action_approve_manual_gateway_order(self, reason=False):
         """Record approval intent and enqueue a read-only evidence refresh."""
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'approve a manual-gateway order.'
             )
         if not isinstance(reason, str) or not reason.strip():

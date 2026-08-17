@@ -172,15 +172,19 @@
                eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="search_view_id"
                ref="view_shopify_connector_product_template_binding_search"/>
-        <field name="context">{'search_default_filter_needs_attention': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No Shopify product mappings yet.
+                No product mappings match the current view.
+            </p>
+            <p>
+                This view opens with all mappings, including healthy active
+                mappings. If a filter is active, clear it to distinguish a
+                filtered empty state from a store with no mappings yet.
             </p>
             <p>
                 Product mappings appear after eligible products are imported
-                or adopted. An empty list does not mean every product has
-                already been matched.
+                or adopted. Use <b>Needs Attention</b> to focus on review and
+                company-scope conflicts.
             </p>
         </field>
     </record>
@@ -309,11 +313,12 @@
                ref="view_shopify_connector_product_variant_binding_search"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                Every variant is matched.
+                No variant mappings match the current view.
             </p>
             <p>
                 Variant bindings appear here once their product has been
-                imported and matched.
+                imported and matched. Clear any active filter to distinguish
+                a filtered empty state from a catalog with no variant mappings.
             </p>
         </field>
     </record>

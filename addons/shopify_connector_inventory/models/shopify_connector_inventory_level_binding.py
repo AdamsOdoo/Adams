@@ -173,7 +173,7 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
                 )
 
     def action_confirm_first_push(self):
-        """Reviewer/Administrator-only explicit first-push confirmation.
+        """Administrator-only explicit first-push confirmation.
 
         Records the confirming actor and timestamp and moves
         `first_push_state` from `previewed` to `confirmed`. A row with no
@@ -184,16 +184,11 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
         mutation job type for this pair (D-013-4).
         """
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Reviewer or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "confirm a first push."
             )
         if self.first_push_state != 'previewed':

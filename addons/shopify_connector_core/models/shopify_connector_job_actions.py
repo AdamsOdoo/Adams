@@ -241,14 +241,11 @@ class ShopifyConnectorJobActions(models.Model):
                 "A manual retry is not allowed from state %r." % from_state
             )
         if from_state == 'blocked_manual_review':
-            permitted = (
-                self.env.user.has_group(
-                    'shopify_connector_core.'
-                    'group_shopify_connector_reviewer'
-                )
-                or self.env.user.has_group(
-                    'shopify_connector_core.group_shopify_connector_admin'
-                )
+            # A blocked review is a privileged recovery decision.  Connector
+            # Users may retry ordinary transient/permanent failures, but may
+            # not resolve or bypass a reviewer-owned state.
+            permitted = self.env.user.has_group(
+                'shopify_connector_core.group_shopify_connector_admin'
             )
         else:
             permitted = (

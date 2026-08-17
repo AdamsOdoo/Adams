@@ -308,7 +308,7 @@ class ShopifyConnectorProductExportPreview(models.Model):
         return self.action_confirm_export_preview()
 
     def action_confirm_export_preview(self):
-        """Reviewer/Administrator confirmation. The only door to an apply.
+        """Administrator confirmation. The only door to an apply.
 
         Re-verified rather than trusted: the preview is re-checked for
         expiry under a row lock at confirmation time, so a preview that
@@ -317,16 +317,11 @@ class ShopifyConnectorProductExportPreview(models.Model):
         looking at a minute ago.
         """
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'confirm a product export.'
             )
         locked = self.try_lock_for_update()

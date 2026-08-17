@@ -74,19 +74,11 @@
             <form string="Location Mapping" create="false" delete="false">
                 <header>
                     <!--
-                        GROUP GATING IS DERIVED FROM THE SERVER, NOT FROM THE
-                        role matrix. `action_set_push_enabled` admits
-                        Operator OR Administrator (see the method's own
-                        guard), and the ACL gives Reviewer write on this
-                        model, so the button and the editable field carry
-                        exactly those groups. The premium UX master
-                        specification §2.4 lists this screen as
-                        "User: read, Administrator: act", which disagrees with
-                        the merged server guard; the view follows the SERVER,
-                        because a view that hides a permitted capability is a
-                        UI defect and a view that shows a denied one is worse.
-                        The discrepancy is recorded for the control room
-                        rather than resolved by silently changing either side.
+                        GROUP GATING IS DERIVED FROM THE SERVER. Changing a
+                        location mapping is connector configuration, so both
+                        the push-toggle route and the editable Odoo target
+                        are Administrator-only. The server remains the final
+                        authority for direct RPC calls.
 
                         `action_set_push_enabled(enabled)` takes a REQUIRED
                         argument, and an Odoo object button passes none, so
@@ -98,7 +90,7 @@
                     <button name="%(action_shopify_connector_location_push_toggle_wizard)d"
                             type="action" string="Change Push"
                             class="btn-primary"
-                            groups="shopify_connector_core.group_shopify_connector_operator"/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
                         WAVE 5 — REMAP.
 
@@ -166,7 +158,7 @@
                     <group>
                         <group string="Mapping">
                             <field name="odoo_location_id"
-                                   groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                                   groups="shopify_connector_core.group_shopify_connector_admin"/>
                             <field name="push_enabled" readonly="1"/>
                             <field name="company_id" readonly="1"/>
                         </group>
@@ -314,7 +306,7 @@
                     <button name="action_confirm_first_push" type="object"
                             string="Confirm First Push" class="btn-primary"
                             invisible="first_push_state != 'previewed'"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             confirm="This is the FIRST stock push for this
                                      product and location. Shopify's quantity
                                      will be replaced by Odoo's. This cannot
@@ -325,16 +317,13 @@
                         The reason is mandatory because it lands on the
                         verification job's audit trail.
 
-                        REVIEWER, not operator. The service guard is
-                        "Only a Shopify Connector Reviewer or Administrator
-                        may release a blocked inventory pair"; gating the
-                        button on Operator showed a control to a role the
-                        server refuses, which the packet's §3 rule names as a
-                        test failure — UI and ACL must agree.
+                        Administrator-only. Re-checking a blocked inventory
+                        pair is privileged recovery; the button and wizard
+                        must agree with the server guard.
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
                         The TD-020 closure. A previewed/confirmed pair used to
                         be a dead end: the remap guard (correctly) refuses to

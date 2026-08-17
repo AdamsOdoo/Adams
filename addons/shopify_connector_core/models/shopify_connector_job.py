@@ -433,16 +433,11 @@ class ShopifyConnectorJob(models.Model):
                 'Mutation-evidence-linked jobs may only be resolved through '
                 'action_resolve_mutation_attempt.'
             )
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Reviewer or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "resolve a manual-review job."
             )
         if self.state != 'blocked_manual_review':

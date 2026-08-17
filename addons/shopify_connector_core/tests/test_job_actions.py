@@ -76,7 +76,7 @@ class TestJobActions(TransactionCase):
         cases = (
             ('failed_retryable', self.operator),
             ('failed_final', self.operator),
-            ('blocked_manual_review', self.reviewer),
+            ('blocked_manual_review', self.admin),
             ('skipped', self.operator),
         )
         for state, user in cases:

@@ -2502,16 +2502,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         which would let a browser choose the name an operator later reads
         back as identity.
         """
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Operator or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "create or update a location mapping."
             )
         store = self._resolve_store_for_location_action(store.id)
@@ -4643,16 +4638,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
 
     @api.model
     def _recheck_inventory_pair(self, binding, reason):
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Reviewer or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "release a blocked inventory pair."
             )
         if not isinstance(reason, str) or not reason.strip():

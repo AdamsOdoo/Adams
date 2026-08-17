@@ -113,18 +113,18 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         self._configure()
         payload = self._manual_payload('gid://shopify/Order/Approval')
         binding = self.Importer._apply_import(self.store, payload)
-        reviewer = self.roles['reviewer']
-        self.assertFalse(reviewer.has_group('sales_team.group_sale_salesman'))
+        admin = self.roles['admin']
+        self.assertFalse(admin.has_group('sales_team.group_sale_salesman'))
         with self.assertRaises(AccessError):
-            binding.sale_order_id.with_user(reviewer).check_access('read')
-        for role in ('auditor', 'operator'):
+            binding.sale_order_id.with_user(admin).check_access('read')
+        for role in ('auditor', 'operator', 'reviewer'):
             with self.assertRaises(AccessError, msg=role):
                 binding.with_user(self.roles[role]).action_approve_manual_gateway_order(
                     'approve'
                 )
         for reason in (False, '', '   '):
             with self.assertRaises(UserError):
-                binding.with_user(reviewer).action_approve_manual_gateway_order(
+                binding.with_user(admin).action_approve_manual_gateway_order(
                     reason
                 )
 
@@ -136,13 +136,13 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         ])
         approved_at = datetime(2026, 7, 17, 15, 30, 0)
         with patch.object(fields.Datetime, 'now', return_value=approved_at):
-            binding.with_user(reviewer).action_approve_manual_gateway_order(
+            binding.with_user(admin).action_approve_manual_gateway_order(
                 'Approved by buyer@example.invalid +971 50 123 4567'
             )
         binding.invalidate_recordset()
         self.assertEqual(binding.manual_gateway_approved_at, approved_at)
         self.assertEqual(
-            binding.manual_gateway_approved_by_uid, reviewer,
+            binding.manual_gateway_approved_by_uid, admin,
         )
         self.assertEqual(
             binding.manual_gateway_approved_shopify_updated_at,
@@ -159,7 +159,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         ]), audit_before + 1)
         logs = self.JobLog.search([('job_id', '=', audits.id)])
         self.assertEqual(len(logs), 1)
-        self.assertEqual(logs.actor_uid, reviewer)
+        self.assertEqual(logs.actor_uid, admin)
         self.assertNotIn('buyer@example.invalid', logs.message)
         self.assertNotIn('123 4567', logs.message)
 
@@ -167,13 +167,13 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         self._configure()
         payload = self._manual_payload('gid://shopify/Order/ApprovalRefresh')
         binding = self.Importer._apply_import(self.store, payload)
-        reviewer_binding = binding.with_user(self.roles['reviewer'])
-        reviewer_binding.action_approve_manual_gateway_order('approved')
+        admin_binding = binding.with_user(self.roles['admin'])
+        admin_binding.action_approve_manual_gateway_order('approved')
         job_count = self.Job.search_count([])
         audit_count = self.JobLog.search_count([
             ('event_type', '=', 'manual_action'),
         ])
-        reviewer_binding.action_approve_manual_gateway_order('duplicate')
+        admin_binding.action_approve_manual_gateway_order('duplicate')
         self.assertEqual(self.Job.search_count([]), job_count)
         self.assertEqual(self.JobLog.search_count([
             ('event_type', '=', 'manual_action'),
@@ -184,7 +184,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         binding.invalidate_recordset()
         self.assertEqual(binding.sale_order_id.state, 'sale')
         self.assertEqual(binding.manual_gateway_approval_state, 'approved')
-        reviewer_binding.action_approve_manual_gateway_order('already approved')
+        admin_binding.action_approve_manual_gateway_order('already approved')
         self.assertEqual(self.Job.search_count([]), job_count)
 
     def test_changed_evidence_supersedes_approval_without_confirming(self):
@@ -224,7 +224,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
         payload = self._manual_payload('gid://shopify/Order/PaidAfterApproval')
         binding = self.Importer._apply_import(self.store, payload)
         binding.with_user(
-            self.roles['reviewer']
+            self.roles['admin']
         ).action_approve_manual_gateway_order('approved pending evidence')
         payload['displayFinancialStatus'] = 'PAID'
         payload['updatedAt'] = '2026-07-17T14:30:00Z'
@@ -260,7 +260,7 @@ class TestOrderManualGatewayOverlay(OrderImportCase):
                 ):
                     with self.assertRaises(UserError):
                         binding.with_user(
-                            self.roles['reviewer']
+                            self.roles['admin']
                         ).action_approve_manual_gateway_order('approved')
                 binding.invalidate_recordset()
                 self.assertEqual(

@@ -120,7 +120,7 @@ class TestInventoryPushMechanics(TransactionCase):
             'login': 'push_mechanics_reviewer',
             'group_ids': [(6, 0, [
                 cls.env.ref(
-                    'shopify_connector_core.group_shopify_connector_reviewer'
+                    'shopify_connector_core.group_shopify_connector_admin'
                 ).id,
             ])],
         })

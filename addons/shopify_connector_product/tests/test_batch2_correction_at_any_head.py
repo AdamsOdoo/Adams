@@ -100,6 +100,9 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
         cls.reviewer = cls._role_user(
             'reviewer', 'group_shopify_connector_reviewer', cls.company,
         )
+        cls.admin = cls._role_user(
+            'admin', 'group_shopify_connector_admin', cls.company,
+        )
         cls.operator = cls._role_user(
             'operator', 'group_shopify_connector_operator', cls.company,
         )
@@ -198,7 +201,7 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
         return job, decision, first, second
 
     def _confirm(self, decision, chosen, user=None):
-        wizard = self.Wizard.with_user(user or self.reviewer).with_context(
+        wizard = self.Wizard.with_user(user or self.admin).with_context(
             default_decision_id=decision.id,
         ).create({})
         wizard.write({'selected_template_id': chosen.id})

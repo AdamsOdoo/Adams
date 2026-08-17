@@ -13,28 +13,21 @@
         </record>
 
         <!--
-            SEC-2 (issue #196) role layer, method Option M-A: purely ADDITIVE
-            `implied_ids`. Two customer-facing roles are exposed on the user
-            form; the four legacy capability groups stay exactly where they are
-            as server-side authorization primitives, keep their XML IDs, and are
-            never renamed. Every existing `has_group` check and ACL row keeps
-            working unchanged because Odoo 19 resolves group membership through
-            the transitive closure:
-            `res.users.all_group_ids = group_ids.all_implied_ids`
-            (odoo/odoo@19.0 30bde9ff, odoo/addons/base/models/res_users.py
-            L447-L449), and `res.groups.all_implied_ids` is "the group itself
-            with all its implied groups" (base/models/res_groups.py L71-L73).
+            SEC-2 role layer. The four legacy capability groups remain hidden
+            server-side primitives with stable XML IDs; the two groups carrying
+            `privilege_id` are the only customer-facing choices.
 
-            Customer-facing (carry `privilege_id`, so the user form shows a
-            two-entry selector; Odoo 19 builds the selector from
-            `res.groups.privilege.group_ids`, base/models/res_groups.py
-            L343-L352, so a group WITHOUT a privilege is not offered there):
+            The implication graph is deliberately an exact replacement (not an
+            additive update):
 
-              User          -> Operator, Reviewer  (=> Auditor transitively)
-              Administrator -> User                (=> everything)
+              User          -> Operator -> Auditor
+              Administrator -> User + Reviewer -> Operator/Auditor
 
-            Server-side primitives (no `privilege_id`, hidden from the form):
-            Auditor, Operator, Reviewer.
+            User must not inherit Reviewer. Reviewer-gated confirmation,
+            recovery, and review-resolution methods therefore remain unavailable
+            to an ordinary Connector User even when called directly through RPC.
+            Administrator explicitly retains Reviewer so the contract does not
+            depend on the current contents of User's implication set.
         -->
 
         <record id="group_shopify_connector_auditor" model="res.groups">
@@ -57,23 +50,22 @@
             <field name="implied_ids" eval="[(4, ref('group_shopify_connector_auditor'))]"/>
         </record>
 
-        <!-- SEC-2 Connector User: the NEW customer-facing role. It grants no
-             access of its own; every right arrives through the implied closure,
-             which is what keeps this change purely additive. -->
+        <!-- SEC-2 Connector User: routine operational execution only. Use an
+             exact replacement so upgrades remove the historical Reviewer edge
+             from this group rather than leaving it behind via additive commands. -->
         <record id="group_shopify_connector_user" model="res.groups">
             <field name="name">User</field>
             <field name="privilege_id" ref="privilege_shopify_connector"/>
-            <field name="implied_ids" eval="[(4, ref('group_shopify_connector_operator')), (4, ref('group_shopify_connector_reviewer'))]"/>
+            <field name="implied_ids" eval="[(6, 0, [ref('group_shopify_connector_operator')])]"/>
         </record>
 
-        <!-- SEC-2 Connector Administrator: the EXISTING administrator group,
-             re-purposed as the second customer-facing role. XML ID unchanged.
-             Operator/Reviewer stay in `implied_ids` so the closure is identical
-             if the User group is ever removed from the chain. -->
+        <!-- SEC-2 Connector Administrator: the second customer-facing role.
+             Keep Reviewer explicit so Administrator retains all privileged
+             capabilities even if the User implication is changed later. -->
         <record id="group_shopify_connector_admin" model="res.groups">
             <field name="name">Administrator</field>
             <field name="privilege_id" ref="privilege_shopify_connector"/>
-            <field name="implied_ids" eval="[(4, ref('group_shopify_connector_user')), (4, ref('group_shopify_connector_operator')), (4, ref('group_shopify_connector_reviewer'))]"/>
+            <field name="implied_ids" eval="[(6, 0, [ref('group_shopify_connector_user'), ref('group_shopify_connector_reviewer')])]"/>
         </record>
 
     </data>

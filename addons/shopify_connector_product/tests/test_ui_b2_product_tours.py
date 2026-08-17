@@ -95,7 +95,7 @@ class TestUiB2ProductTours(HttpCase):
             'b2prod_operator', 'group_shopify_connector_operator',
         )
         cls.reviewer = cls._tour_user(
-            'b2prod_reviewer', 'group_shopify_connector_reviewer',
+            'b2prod_reviewer', 'group_shopify_connector_admin',
         )
         cls.auditor = cls._tour_user(
             'b2prod_auditor', 'group_shopify_connector_auditor',
@@ -110,11 +110,10 @@ class TestUiB2ProductTours(HttpCase):
             'company_id': cls.env.company.id,
             'company_ids': [(6, 0, [cls.env.company.id])],
             # EXACTLY the role under test, and that is load bearing.
-            # `group_shopify_connector_user` implies BOTH Operator and
-            # Reviewer (`shopify_connector_security.xml`), so adding it "so
-            # the menus work" hands an auditor the operator control and an
-            # operator the reviewer control -- and both denied-role tours then
-            # measure a fixture that granted what it was written to refuse.
+            # The fixture uses exactly the capability under test. Do not add
+            # Administrator to an operator/auditor probe merely to make a
+            # menu render; direct action URLs and server guards are the
+            # authorization boundary.
             # Every tour below opens its surface by URL and needs no menu.
             'group_ids': [(6, 0, [
                 cls.env.ref('base.group_user').id,
@@ -298,9 +297,8 @@ class TestUiB2ProductTours(HttpCase):
         self.assertEqual(binding.match_key, 'manual')
         self.env.flush_all()
         # The binding's own form, by id. The Product Matching LIST action
-        # carries `search_default_filter_needs_attention`, so a healthy
-        # `active` binding is correctly absent from it -- opening the list and
-        # asserting a row would be asserting that filter is broken.
+        # opens without a default Needs Attention filter, so healthy active
+        # bindings remain visible in the normal mapping workspace.
         self.start_tour(
             self._url(BINDING_ACTION, binding.id),
             'shopify_connector_b2_resolved_binding_tour',

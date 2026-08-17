@@ -272,17 +272,8 @@ class TestUiU2Inventory(TransactionCase):
                     [], limit=1,
                 )
 
-    def test_push_toggle_gating_matches_the_server_guard_exactly(self):
-        """The view must gate on what the SERVER permits, not on a doc.
-
-        `action_set_push_enabled` admits Operator or Administrator. The
-        premium UX master specification lists this screen as User-read /
-        Administrator-act, which disagrees. This test pins the view to the
-        server: an auditor-only caller is refused, and a Connector User --
-        who implies Operator -- is permitted. If the server guard is ever
-        tightened to Administrator, this test fails and the button's
-        `groups=` has to move with it.
-        """
+    def test_push_toggle_is_administrator_only(self):
+        """Changing a location mapping is connector configuration."""
         mapping = self._mapping('gid://shopify/Location/U2Denied')
         auditor = self._user('u2_inv_auditor', [
             'shopify_connector_core.group_shopify_connector_auditor',
@@ -296,13 +287,20 @@ class TestUiU2Inventory(TransactionCase):
             'a refused toggle must leave the mapping untouched',
         )
 
-        connector_user = self._user('u2_inv_user_allowed', [
+        connector_user = self._user('u2_inv_user_denied', [
             'shopify_connector_core.group_shopify_connector_user',
         ])
         self.assertTrue(connector_user.has_group(
             'shopify_connector_core.group_shopify_connector_operator'
-        ), 'Connector User must imply Operator for this gating to hold')
-        mapping.with_user(connector_user).action_set_push_enabled(not before)
+        ), 'Connector User must retain routine Operator capability')
+        with self.assertRaises(AccessError):
+            mapping.with_user(connector_user).action_set_push_enabled(not before)
+        mapping.invalidate_recordset()
+        self.assertEqual(mapping.push_enabled, before)
+        admin = self._user('u2_inv_user_admin', [
+            'shopify_connector_core.group_shopify_connector_admin',
+        ])
+        mapping.with_user(admin).action_set_push_enabled(not before)
         mapping.invalidate_recordset()
         self.assertEqual(mapping.push_enabled, not before)
 

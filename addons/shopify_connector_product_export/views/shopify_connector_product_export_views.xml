@@ -463,7 +463,7 @@
                     <button name="action_shopify_export_reconnect_reconciliation"
                             type="object" class="btn-secondary"
                             string="Re-run Export Reconciliation"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             confirm="Every open export preview for this store will be expired and must be reviewed again, and every previously exported product will be re-read from Shopify. Continue?"/>
                 </group>
                 <!--

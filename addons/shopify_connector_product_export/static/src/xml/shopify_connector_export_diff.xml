@@ -237,7 +237,7 @@
                             <span t-else="">Confirm this export</span>
                         </button>
                         <p t-elif="data.state === 'previewed'" class="sc-x-note" role="status">
-                            Only a Shopify Connector Reviewer or Administrator can confirm an
+                            Only a Shopify Connector Administrator can confirm an
                             export, and only while the preview is still current.
                         </p>
                         <button class="sc-x-btn" t-on-click="() => this.refresh()">Refresh</button>

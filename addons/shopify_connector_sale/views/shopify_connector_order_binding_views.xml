@@ -133,7 +133,7 @@
                             type="action" string="Approve Payment"
                             class="btn-primary"
                             invisible="manual_gateway_approval_state != 'pending'"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                 </header>
                 <sheet>
                     <div class="alert alert-danger" role="alert"

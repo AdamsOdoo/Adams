@@ -136,17 +136,21 @@ class TestSec2Roles(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_connector_user_resolves_to_the_expected_capability_closure(self):
-        """SEC-2 packet §H test 14: user resolves to user+operator+reviewer+auditor."""
+        """User resolves only to User, Operator and Auditor."""
         closure = self._group('group_shopify_connector_user').all_implied_ids
         expected = {
             self._group(x).id for x in (
                 'group_shopify_connector_user',
                 'group_shopify_connector_operator',
-                'group_shopify_connector_reviewer',
                 'group_shopify_connector_auditor',
             )
         }
         self.assertEqual(set(closure.ids) & self._connector_group_ids(), expected)
+        self.assertNotIn(
+            self._group('group_shopify_connector_reviewer').id,
+            closure.ids,
+            'Connector User must not inherit Reviewer capabilities',
+        )
 
     def test_connector_administrator_resolves_to_all_connector_groups(self):
         """SEC-2 packet §H test 14: admin resolves to all connector groups."""
@@ -164,6 +168,22 @@ class TestSec2Roles(TransactionCase):
             'Connector User must not imply Connector Administrator',
         )
 
+    def test_role_edges_are_exact_and_upgrade_safe(self):
+        """The XML uses replacement semantics, so stale Reviewer edges vanish."""
+        user = self._group('group_shopify_connector_user')
+        admin = self._group('group_shopify_connector_admin')
+        self.assertEqual(
+            set(user.implied_ids.ids),
+            {self._group('group_shopify_connector_operator').id},
+        )
+        self.assertEqual(
+            set(admin.implied_ids.ids),
+            {
+                user.id,
+                self._group('group_shopify_connector_reviewer').id,
+            },
+        )
+
     def test_effective_user_groups_match_the_group_closure(self):
         """Prove the closure on the *user*, not only on the group records."""
         for user, xmlid in (
@@ -177,10 +197,9 @@ class TestSec2Roles(TransactionCase):
             )
 
     def test_has_group_resolves_capability_groups_through_the_roles(self):
-        """The 44 existing server-side has_group checks keep working."""
+        """User is routine-only; Administrator retains every capability."""
         for xmlid in ('group_shopify_connector_auditor',
-                      'group_shopify_connector_operator',
-                      'group_shopify_connector_reviewer'):
+                      'group_shopify_connector_operator'):
             self.assertTrue(
                 self.role_user.has_group('%s.%s' % (CORE, xmlid)),
                 'Connector User must satisfy has_group(%s)' % xmlid,
@@ -189,6 +208,15 @@ class TestSec2Roles(TransactionCase):
                 self.role_admin.has_group('%s.%s' % (CORE, xmlid)),
                 'Connector Administrator must satisfy has_group(%s)' % xmlid,
             )
+        self.assertFalse(
+            self.role_user.has_group(
+                '%s.group_shopify_connector_reviewer' % CORE),
+            'Connector User must NOT satisfy the reviewer check',
+        )
+        self.assertTrue(
+            self.role_admin.has_group(
+                '%s.group_shopify_connector_reviewer' % CORE),
+        )
         self.assertFalse(
             self.role_user.has_group(
                 '%s.group_shopify_connector_admin' % CORE),

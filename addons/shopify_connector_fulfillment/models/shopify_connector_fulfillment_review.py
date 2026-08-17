@@ -29,16 +29,11 @@ class ShopifyConnectorFulfillmentReviewService(models.AbstractModel):
 
     @api.model
     def _release_blocked_mutation(self, binding, reason):
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may release '
+                'Only a Shopify Connector Administrator may release '
                 'a blocked fulfillment mutation.'
             )
         if not isinstance(reason, str) or not reason.strip():
@@ -222,17 +217,14 @@ class ShopifyConnectorFulfillmentInboundEvidenceReview(models.Model):
     def _assert_reviewer(self):
         if not (
             self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
+                'shopify_connector_core.group_shopify_connector_operator'
             )
             or self.env.user.has_group(
                 'shopify_connector_core.group_shopify_connector_admin'
             )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
         ):
             raise AccessError(
-                'Only a Shopify Connector Operator, Reviewer, or Administrator '
+                'Only a Shopify Connector Operator or Administrator '
                 'may act on a fulfillment review case.'
             )
 
@@ -245,23 +237,24 @@ class ShopifyConnectorFulfillmentInboundEvidenceReview(models.Model):
 
     def action_acknowledge_external(self):
         self.ensure_one()
-        self._assert_reviewer()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may acknowledge '
+                'external fulfillment evidence.'
+            )
         return self.env[
             'shopify.connector.fulfillment.service'
         ]._review_acknowledge(self)
 
     def action_validate_proposed(self):
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'explicitly validate a proposed fulfillment.'
             )
         return self.env[

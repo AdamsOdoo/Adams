@@ -194,18 +194,18 @@ class TestSecurityHardening(TransactionCase):
         self.assertEqual(job.state, 'blocked_manual_review')
         self.assertFalse(self._logs(job, 'manual_action'))
 
-        job.with_user(self.roles['reviewer']).action_resolve_manual_review()
+        job.with_user(self.roles['admin']).action_resolve_manual_review()
         job.invalidate_recordset()
         self.assertEqual(job.state, 'queued')
         self.assertFalse(job.manual_review_subreason)
         logs = self._logs(job, 'manual_action')
         self.assertEqual(len(logs), 1)
-        self.assertEqual(logs.actor_uid, self.roles['reviewer'])
+        self.assertEqual(logs.actor_uid, self.roles['admin'])
 
         illegal = self._job('failed_retryable')
         with self.assertRaises(UserError):
             illegal.with_user(
-                self.roles['reviewer']
+                self.roles['admin']
             ).action_resolve_manual_review()
         self.assertEqual(illegal.state, 'failed_retryable')
         self.assertFalse(self._logs(illegal, 'manual_action'))

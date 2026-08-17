@@ -168,7 +168,7 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
         """Whether THIS user could confirm THIS preview right now.
 
         Mirrors `action_confirm_export_preview` rather than guessing: same
-        two groups, same state, same expiry, same empty-plan rule. The server
+        Administrator capability, same state, same expiry, same empty-plan rule. The server
         remains the authority — this only decides whether to render a button
         that would otherwise fail. A UI that offers a control the backend
         refuses is a UI that teaches operators to distrust it.
@@ -177,13 +177,8 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
             return False
         if not (preview.apply_plan or {}).get('steps'):
             return False
-        return bool(
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        return self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         )
 
     @api.model

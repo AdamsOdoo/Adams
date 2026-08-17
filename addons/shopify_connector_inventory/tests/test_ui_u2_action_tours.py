@@ -21,10 +21,8 @@ a real UI/server disagreement that only pressing the control could find:
      `pending` alone -- so the sanctioned confirmation was unreachable. Every
      pre-existing server test writes `first_push_state = 'previewed'` itself
      before calling the method, which is exactly why none of them saw it.
-  2. `Verify Now` was gated on Operator; its service admits Reviewer or
-     Administrator only.
-  3. `Change Push` was gated on Operator while its transient wizard was ACL'd
-     to Administrator alone, so a Connector User was refused at the dialog.
+  2. `Verify Now` is a privileged recovery action and is Administrator-only.
+  3. `Change Push` changes connector configuration and is Administrator-only.
 
 NO SHOPIFY. Nothing here holds a credential or reaches the network. The two
 enqueueing paths create a `shopify.connector.job` ROW; job execution is a
@@ -109,10 +107,11 @@ class TestUiU2InventoryActionTours(HttpCase):
             'product_template_binding_id': template_binding.id,
         })
 
-        # Two roles, both real customer-facing SEC-2 roles.
+        # Administrator is the customer-facing role allowed to confirm,
+        # recover, and change location configuration. Auditor proves denial.
         cls.reviewer = cls._connector_user(
             'u2act_reviewer',
-            'shopify_connector_core.group_shopify_connector_user',
+            'shopify_connector_core.group_shopify_connector_admin',
         )
         # Auditor implies read everywhere and act nowhere: the role the
         # server refuses for every control in this file.
@@ -302,12 +301,10 @@ class TestUiU2InventoryActionTours(HttpCase):
     # ------------------------------------------------------------------
 
     def test_push_toggle_tour(self):
-        """A Connector User opens the dialog and applies the change.
+        """An Administrator opens the dialog and applies the change.
 
-        Before the ACL correction this failed at the DIALOG rather than at
-        the control: the button was gated on Operator, the transient wizard
-        was ACL'd to Administrator alone, and a Connector User was refused
-        on `create()` after pressing a control the UI had offered them.
+        The server and transient wizard agree on the Administrator-only
+        configuration boundary.
         """
         self.assertTrue(self.mapping.push_enabled)
         self.env.flush_all()

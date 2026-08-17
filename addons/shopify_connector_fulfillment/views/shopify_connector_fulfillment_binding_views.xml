@@ -72,7 +72,7 @@
                     <button name="%(action_shopify_connector_fulfillment_review_release)d"
                             type="action"
                             string="Release blocked mutation"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             help="Supersede exactly one blocked fulfilment mutation and hand off a single replacement job. A mutation whose outcome is uncertain is never resent."/>
                 </header>
                 <sheet>

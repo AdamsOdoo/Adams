@@ -32,7 +32,7 @@
         * `get_export_preview_data` raises `AccessError` for any caller
           outside the connector groups, and reads the preview as the current
           user so the ordinary ACL and the SEC-3 company record rules apply;
-        * `action_confirm_export_preview` re-checks Reviewer/Administrator
+        * `action_confirm_export_preview` re-checks Administrator authority
           under a row lock, which is AUTHORIZATION.
 
         A user who reached this tag by hand gets an AccessError from the

@@ -132,6 +132,19 @@ class TestUiU2Product(TransactionCase):
             action = self.env.ref('shopify_connector_product.%s' % name)
             self.assertEqual(action.group_ids, admin)
 
+    def test_product_mappings_open_without_hiding_healthy_rows(self):
+        """The default action must show all mappings, not only attention rows."""
+        action = self.env.ref(
+            'shopify_connector_product.action_shopify_connector_product_template_binding'
+        )
+        self.assertNotIn(
+            'search_default_filter_needs_attention', action.context or '',
+            'healthy mappings must not be hidden by the default action',
+        )
+        self.assertIn('No product mappings match the current view', action.help)
+        self.assertIn('clear it', action.help)
+        self.assertIn('healthy active', action.help)
+
     # ------------------------------------------------------------------
     # Wiring
     # ------------------------------------------------------------------

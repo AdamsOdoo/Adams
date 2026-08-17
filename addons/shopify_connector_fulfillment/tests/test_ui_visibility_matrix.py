@@ -55,15 +55,15 @@ class TestUiVisibilityMatrix(TransactionCase):
 
     # ------------------------------------------------ implied-group closure
 
-    def test_connector_user_resolves_to_operator_reviewer_auditor(self):
-        """SEC-2 Option M-A: the customer-facing role resolves to the internal
-        capability primitives through additive implied_ids."""
+    def test_connector_user_resolves_to_operator_and_auditor_only(self):
+        """User is routine operational, never Reviewer-capable."""
         user = self.connector_user
-        for internal in (G_OPERATOR, G_REVIEWER, G_AUDITOR):
+        for internal in (G_OPERATOR, G_AUDITOR):
             self.assertTrue(
                 user.has_group(internal),
                 'Connector User must resolve to %s' % internal,
             )
+        self.assertFalse(user.has_group(G_REVIEWER))
         self.assertFalse(
             user.has_group(ADMIN_ROLE),
             'Connector User must NOT resolve to Administrator.',

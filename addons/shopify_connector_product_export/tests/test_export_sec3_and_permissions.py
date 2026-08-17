@@ -311,7 +311,7 @@ class TestExportSec3AndPermissions(ExportCase):
         with self.assertRaises(UserError):
             self.Service.enqueue_preview(self.template, self.store)
 
-    def test_reconnect_expiry_requires_reviewer_or_admin(self):
+    def test_reconnect_expiry_requires_administrator(self):
         operator = new_test_user(
             self.env, login='export-operator-2',
             groups='base.group_user,shopify_connector_core.group_shopify_connector_operator',
@@ -327,13 +327,13 @@ class TestExportSec3AndPermissions(ExportCase):
             'step': 'product_export_update', 'state': 'pending',
             'fields': ['title'],
         }])
-        reviewer = new_test_user(
-            self.env, login='export-reviewer-3',
+        admin = new_test_user(
+            self.env, login='export-admin-3',
             groups='base.group_user,'
-                   'shopify_connector_core.group_shopify_connector_reviewer',
+                   'shopify_connector_core.group_shopify_connector_admin',
         )
         expired = self.store.with_user(
-            reviewer
+            admin
         ).action_shopify_export_reconnect_reconciliation()
         preview.invalidate_recordset()
         self.assertEqual(expired, 1)

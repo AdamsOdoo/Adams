@@ -107,16 +107,11 @@ class ShopifyConnectorLocationMapping(models.Model):
 
     def action_set_push_enabled(self, enabled):
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Operator or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "change a location mapping's push-enable flag."
             )
         self.sudo().write({'push_enabled': bool(enabled)})

@@ -1133,12 +1133,12 @@ class ShopifyConnectorJobProductMatch(models.Model):
         return super().action_resolve_manual_review()
 
     def action_open_product_match_decision(self):
-        """Open the decision dialog for this job (Reviewer or Administrator).
+        """Open the decision dialog for this job (Administrator only).
 
-        The capability contract is the existing one: whoever may resolve a
-        `blocked_manual_review` job may make this decision, because
-        confirming it resumes exactly that job through exactly that route.
-        An Operator may start an import and may not decide a match.
+        Whoever may resolve a `blocked_manual_review` job may make this
+        decision, because confirming it resumes exactly that job through
+        exactly that route. An ordinary Connector User may start an import and
+        may not decide a match.
         """
         self.ensure_one()
         self.env['shopify.connector.product.match.decision.wizard'] \

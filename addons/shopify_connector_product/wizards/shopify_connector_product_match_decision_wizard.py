@@ -112,26 +112,19 @@ class ShopifyConnectorProductMatchDecisionWizard(models.TransientModel):
 
     @api.model
     def _assert_match_decision_reviewer(self):
-        """The existing capability contract, restated on the server.
+        """Require the Administrator capability for a match decision.
 
         Confirming resumes a `blocked_manual_review` job through
-        `action_manual_retry`, which admits a Reviewer or an Administrator
-        from that state and nobody else. Requiring the same two groups here
-        means the dialog cannot offer a decision whose consequence the caller
-        would then be refused -- and an Operator, who may start an import,
-        still cannot decide what a product means.
+        `action_manual_retry`. Product identity is a privileged review
+        resolution, so an ordinary Connector User may start an import but may
+        not decide what a product means or bypass the blocked state.
         """
         user = self.env.user
-        if not (
-            user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'decide what a Shopify product matches.'
             )
 
