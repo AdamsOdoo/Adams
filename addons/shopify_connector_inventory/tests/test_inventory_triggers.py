@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import patch
 
 from odoo.tests.common import TransactionCase, tagged
@@ -171,6 +172,11 @@ class TestInventoryTriggers(TransactionCase):
             'job_source': 'scheduled_sync',
             'job_type': 'inventory_push_scan',
             'state': 'running',
+            # Production `run_inventory_push_scan()` gives every scheduled
+            # pass a fresh payload identity. Keep direct handler fixtures on
+            # that durable idempotency contract so repeated scans cannot
+            # collide on the store/job unique key.
+            'payload_hash': uuid.uuid4().hex,
             'expected_connection_generation': self.store.connection_generation,
         })
 
@@ -600,8 +606,9 @@ class TestInventoryTriggers(TransactionCase):
 
         self.variant_binding.sudo().write({'status': 'active'})
         # The parent write happens inside this TransactionCase transaction;
-        # invalidate the relation cache to model the next RPC/worker read.
-        self.env.invalidate_all()
+        # invalidate only its cached status to model the next RPC/worker read
+        # without flushing unrelated deferred job computes in the class env.
+        self.variant_binding.invalidate_recordset(['status'], flush=False)
         self.assertTrue(Service._binding_operationally_eligible(self.binding))
         result = Service._try_enqueue_push_sync(
             self.store, self.binding, 'manual_sync',
@@ -644,8 +651,9 @@ class TestInventoryTriggers(TransactionCase):
 
         self.mapping.sudo().write({'status': 'active'})
         # The parent write happens inside this TransactionCase transaction;
-        # invalidate the relation cache to model the next RPC/worker read.
-        self.env.invalidate_all()
+        # invalidate only its cached status to model the next RPC/worker read
+        # without flushing unrelated deferred job computes in the class env.
+        self.mapping.invalidate_recordset(['status'], flush=False)
         self.assertTrue(Service._binding_operationally_eligible(self.binding))
         result = Service._try_enqueue_push_sync(
             self.store, self.binding, 'manual_sync',

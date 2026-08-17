@@ -77,6 +77,16 @@ class TestLocationMapping(TransactionCase):
                 ).id,
             ])],
         })
+        cls.user_admin = cls.env['res.users'].create({
+            'name': 'Location Mapping Administrator',
+            'login': 'location_mapping_administrator',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _make_mapping(self, location, gid):
         return self.Mapping.sudo().create({
@@ -155,9 +165,13 @@ class TestLocationMapping(TransactionCase):
             self.internal_location, 'gid://shopify/Location/8',
         )
         self.assertTrue(mapping.push_enabled)
-        mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        with self.assertRaises(AccessError):
+            mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        mapping.invalidate_recordset(['push_enabled'])
+        self.assertTrue(mapping.push_enabled)
+        mapping.with_user(self.user_admin).action_set_push_enabled(False)
         self.assertFalse(mapping.push_enabled)
-        with self.assertRaises(Exception):
+        with self.assertRaises(AccessError):
             mapping.with_user(self.user_auditor).action_set_push_enabled(True)
 
     def test_odoo_binding_field_name(self):
@@ -174,11 +188,22 @@ class TestLocationMapping(TransactionCase):
     # binding mixin; only this narrow service method may create/update.
     # ------------------------------------------------------------------
 
-    def test_sanctioned_service_creates_mapping_for_operator(self):
+    def test_sanctioned_service_creates_mapping_for_administrator(self):
         self._cache_location('gid://shopify/Location/900', name='Warehouse 900')
         Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(AccessError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location,
+                'gid://shopify/Location/900',
+            )
+        self.assertFalse(self.Mapping.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/Location/900'),
+        ]))
         mapping = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/900',
         )
@@ -192,13 +217,13 @@ class TestLocationMapping(TransactionCase):
         self._cache_location('gid://shopify/Location/901', name='Warehouse 901')
         Service = self.env['shopify.connector.inventory.service']
         first = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/901',
             push_enabled=True,
         )
         second = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/901',
             push_enabled=False,
@@ -209,7 +234,7 @@ class TestLocationMapping(TransactionCase):
     def test_sanctioned_service_denied_for_auditor(self):
         self._cache_location('gid://shopify/Location/902')
         Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(Exception):
+        with self.assertRaises(AccessError):
             Service.with_user(
                 self.user_auditor
             ).create_or_update_location_mapping(
@@ -224,7 +249,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.customer_location,
                 'gid://shopify/Location/903',
@@ -234,7 +259,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location, '',
             )
@@ -245,7 +270,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/NEVER-CACHED',
@@ -264,7 +289,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/FOREIGN',
@@ -278,7 +303,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/INACTIVE',
@@ -292,13 +317,13 @@ class TestLocationMapping(TransactionCase):
         self._cache_location('gid://shopify/Location/DIFFERENT')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/910',
         )
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/DIFFERENT',
@@ -315,13 +340,13 @@ class TestLocationMapping(TransactionCase):
         self._cache_location('gid://shopify/Location/911')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/911',
         )
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location_b,
                 'gid://shopify/Location/911',
@@ -364,7 +389,7 @@ class TestLocationMapping(TransactionCase):
         mapping = self._make_mapping(
             self.internal_location, 'gid://shopify/Location/F4-2',
         )
-        mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        mapping.with_user(self.user_admin).action_set_push_enabled(False)
         Location = self.env['shopify.connector.location']
         result = Location._resolve_odoo_location(
             self.store, 'gid://shopify/Location/F4-2',
