@@ -213,6 +213,9 @@ local integration tree. The PR remains draft and unmerged.
 - An independent Luna review passed the correction with no finding: it is
   test-only, accounts for every reported native failure/error, preserves the
   production importer, and does not mask a candidate defect.
+- Odoo.sh branch rebuild `36523471` was requested while the platform mirror
+  still pointed at `93fee1f3`; it repeated the already classified stale-head
+  failure and is not qualification evidence for the corrected candidate.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
