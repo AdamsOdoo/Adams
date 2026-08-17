@@ -1,9 +1,9 @@
 # PR #206 — Coherent Repair and UAT Ledger
 
-**Repository:** `AdamsOdoo/Adams`  
-**PR:** Draft #206  
-**Candidate:** `codex/ui-restructure-implementation`  
-**Environment:** Odoo.sh development branches/databases and the confirmed Shopify development store only  
+**Repository:** `AdamsOdoo/Adams`
+**PR:** Draft #206
+**Candidate:** `codex/ui-restructure-implementation`
+**Environment:** Odoo.sh development branches/databases and the confirmed Shopify development store only
 **Owner:** GPT-5.6 SOL; independent review by GPT-5.6 Luna
 
 This is the living ledger for the dependency-ordered product, inventory, order,
