@@ -271,6 +271,20 @@ local integration tree. The PR remains draft and unmerged.
   explicit Connector Administrator. Production code is unchanged. Compile and
   diff checks pass; independent Luna reviews: PASS for scan identity/cache and
   PASS for the complete mapping-role call matrix. Native rerun is required.
+- Exact-head Odoo.sh build `36528980` tested published head `1dcd16be` and
+  passed the product, export, and inventory layers before exposing one failure
+  and four errors in inventory UI, sale manifest, and fulfillment UI contract
+  tests. The production boundaries were already correct: the failing fixtures
+  logged an Administrator into a Connector User absence tour, froze the prior
+  sale module version, and attempted to create/build the now
+  Administrator-only fulfillment review-release wizard as Connector User.
+- The pending native-qualification correction gives the absence tour a real
+  Connector User while retaining the Administrator positive fixture, records
+  sale version `19.0.2.11.0`, proves User denial at the fulfillment wizard ACL
+  plus Administrator delegation to the sanctioned domain refusal, and treats
+  both privileged fulfillment wizards as Administrator-only rendered views.
+  Production code remains unchanged. Compile and diff checks pass; independent
+  review and exact-head native rerun are required before acceptance.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
