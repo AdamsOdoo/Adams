@@ -287,7 +287,7 @@ local integration tree. The PR remains draft and unmerged.
   fixture so it exercises form validation as Administrator rather than failing
   earlier at the User ACL.
   Production code remains unchanged. Compile and diff checks pass; independent
-  re-review and exact-head native rerun are required before acceptance.
+  re-review: PASS. Exact-head native rerun is required before acceptance.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
