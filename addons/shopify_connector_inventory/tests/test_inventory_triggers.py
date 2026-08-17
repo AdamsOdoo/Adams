@@ -516,3 +516,130 @@ class TestInventoryTriggers(TransactionCase):
             and 'successor_job_id=%d' % successor.id in (log.message or '')
             for log in logs
         ))
+
+    # ------------------------------------------------------------------
+    # Parent-binding operational eligibility (P1 correction). A level row
+    # may already exist and carry a confirmed/pending first-push state, but
+    # it must not remain an operational escape hatch after its variant or
+    # mapped-location parent is stale/disabled. Reactivation restores the
+    # normal production trigger paths.
+    # ------------------------------------------------------------------
+
+    def _preview_jobs_for_binding(self, binding):
+        return self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_first_push_preview'),
+            ('res_id', '=', binding.id),
+        ])
+
+    def test_pending_pair_stale_variant_skips_scan_until_reactivated(self):
+        Service = self.env['shopify.connector.inventory.service']
+        self.binding.sudo().write({'first_push_state': 'pending'})
+        self.variant_binding.sudo().write({'status': 'stale'})
+        scan_job = self._make_scan_job()
+        Service._handle_inventory_push_scan(scan_job)
+        self.assertFalse(self._preview_jobs_for_binding(self.binding))
+        self.assertEqual(self.binding.first_push_state, 'pending')
+
+        self.variant_binding.sudo().write({'status': 'active'})
+        scan_job = self._make_scan_job()
+        Service._handle_inventory_push_scan(scan_job)
+        self.assertEqual(
+            len(self._preview_jobs_for_binding(self.binding)), 1,
+        )
+
+    def test_pending_pair_stale_mapping_skips_scan_until_reactivated(self):
+        Service = self.env['shopify.connector.inventory.service']
+        self.binding.sudo().write({'first_push_state': 'pending'})
+        self.mapping.sudo().write({'status': 'stale'})
+        scan_job = self._make_scan_job()
+        Service._handle_inventory_push_scan(scan_job)
+        self.assertFalse(self._preview_jobs_for_binding(self.binding))
+        self.assertEqual(self.binding.first_push_state, 'pending')
+
+        self.mapping.sudo().write({'status': 'active'})
+        scan_job = self._make_scan_job()
+        Service._handle_inventory_push_scan(scan_job)
+        self.assertEqual(
+            len(self._preview_jobs_for_binding(self.binding)), 1,
+        )
+
+    def test_confirmed_stale_variant_blocks_enqueue_and_dispatch(self):
+        Service = self.env['shopify.connector.inventory.service']
+        self.binding.sudo().write({'first_push_state': 'confirmed'})
+        self.variant_binding.sudo().write({'status': 'stale'})
+
+        result = Service._try_enqueue_push_sync(
+            self.store, self.binding, 'manual_sync',
+        )
+        self.assertFalse(result)
+        self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+
+        dispatch_job = self._make_push_sync_job()
+        with patch.object(
+            type(Service), '_read_shopify_inventory_pair',
+        ) as mocked_read:
+            Service._handle_inventory_push_sync(dispatch_job)
+        mocked_read.assert_not_called()
+        dispatch_job.invalidate_recordset()
+        self.assertEqual(dispatch_job.state, 'blocked_manual_review')
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', 'in', [
+                'inventory_activate', 'inventory_set_quantities',
+            ]),
+            ('res_id', '=', self.binding.id),
+        ]))
+
+        self.variant_binding.sudo().write({'status': 'active'})
+        result = Service._try_enqueue_push_sync(
+            self.store, self.binding, 'manual_sync',
+        )
+        self.assertTrue(result)
+
+    def test_confirmed_stale_mapping_blocks_enqueue_and_dispatch(self):
+        Service = self.env['shopify.connector.inventory.service']
+        self.binding.sudo().write({'first_push_state': 'confirmed'})
+        self.mapping.sudo().write({'status': 'stale'})
+
+        result = Service._try_enqueue_push_sync(
+            self.store, self.binding, 'manual_sync',
+        )
+        self.assertFalse(result)
+        self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+
+        dispatch_job = self._make_push_sync_job()
+        with patch.object(
+            type(Service), '_read_shopify_inventory_pair',
+        ) as mocked_read:
+            Service._handle_inventory_push_sync(dispatch_job)
+        mocked_read.assert_not_called()
+        dispatch_job.invalidate_recordset()
+        self.assertEqual(dispatch_job.state, 'blocked_manual_review')
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', 'in', [
+                'inventory_activate', 'inventory_set_quantities',
+            ]),
+            ('res_id', '=', self.binding.id),
+        ]))
+
+        self.mapping.sudo().write({'status': 'active'})
+        result = Service._try_enqueue_push_sync(
+            self.store, self.binding, 'manual_sync',
+        )
+        self.assertTrue(result)
+
+    def test_stock_event_skips_stale_variant_without_creating_a_job(self):
+        self.variant_binding.sudo().write({'status': 'stale'})
+        supplier_location = self.env.ref('stock.stock_location_suppliers')
+        move = self.env['stock.move'].create({
+            'product_id': self.template.product_variant_id.id,
+            'product_uom_qty': 2.0,
+            'product_uom': self.template.uom_id.id,
+            'location_id': supplier_location.id,
+            'location_dest_id': self.mapped_location.id,
+        })
+        move._action_confirm()
+        move._action_assign()
+        for line in move.move_line_ids:
+            line.quantity = 2.0
+        move._action_done()
+        self.assertFalse(self._open_push_jobs_for_binding(self.binding))

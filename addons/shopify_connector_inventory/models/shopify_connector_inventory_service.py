@@ -865,6 +865,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         surface that can ever produce a nonzero ordinal is
         `_create_cas_successor_job` below.
         """
+        if binding.store_id != store:
+            raise UserError(
+                'The inventory job store must match the level binding store.'
+            )
+        if not self._binding_operationally_eligible(binding):
+            raise UserError(
+                'Inventory work cannot be admitted while its level binding, '
+                'variant binding, or location mapping is inactive, disabled, '
+                'or outside the owning store/company scope.'
+            )
         pair_key = pair_scope_key(
             store.id,
             binding.shopify_inventory_item_gid,
@@ -968,13 +978,68 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         return new_job
 
     @api.model
+    def _binding_operationally_eligible(self, binding):
+        """Return whether a pair may enter any inventory work path.
+
+        This is deliberately narrower than the existing review/stale gate:
+        a level row is usable only while its own binding, its product-variant
+        parent, and its mapped location parent are all active, the mapping is
+        push-enabled, and every relation remains inside one store/company
+        scope.  The helper is internal and reads through a narrow sudo so
+        background jobs can validate parent state without granting users raw
+        access to stock records.
+        """
+        binding = binding.sudo().exists()
+        if len(binding) != 1:
+            return False
+        store = binding.store_id
+        variant_binding = binding.product_variant_binding_id
+        mapping = binding.location_mapping_id
+        if not store or not store.company_id:
+            return False
+        if not variant_binding or not mapping:
+            return False
+        if (
+            binding.status != 'active'
+            or variant_binding.status != 'active'
+            or mapping.status != 'active'
+            or not mapping.push_enabled
+        ):
+            return False
+        if (
+            variant_binding.store_id != store
+            or mapping.store_id != store
+            or binding.company_id != store.company_id
+        ):
+            return False
+        product = variant_binding.product_variant_id
+        location = mapping.odoo_location_id
+        if not product or not location or location.usage != 'internal':
+            return False
+        if (
+            product.company_id and product.company_id != store.company_id
+        ) or (
+            location.company_id and location.company_id != store.company_id
+        ):
+            return False
+        if (
+            not isinstance(binding.shopify_inventory_item_gid, str)
+            or not binding.shopify_inventory_item_gid.strip()
+            or not isinstance(mapping.shopify_gid, str)
+            or not mapping.shopify_gid.strip()
+        ):
+            return False
+        return True
+
+    @api.model
     def _binding_push_admission_blocked(self, binding):
-        """`review`/`stale` inventory-level bindings must never enter
-        automatic or manual push execution (PR #182 comment 5029906989
-        item 4/§10 -- the required freeze-gate proof #4). `active`
-        remains eligible; so does `manually_overridden` -- the mixin's
-        own existing semantics for that value are unchanged and never
-        reinterpreted here (only `review`/`stale` are ever gated)."""
+        """Preserve the existing review/stale freeze gate.
+
+        `_binding_operationally_eligible` is the broader operational gate;
+        this predicate remains separate so the established review/stale
+        disposition is still enforced at every later handoff and replacement
+        path without changing its audit semantics.
+        """
         return binding.status in ('review', 'stale')
 
     @api.model
@@ -1020,8 +1085,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
 
         The sole `inventory_push_sync` admission point for every trigger
         surface (stock-move event, manual push, scheduled scan) --
-        gating here on `_binding_push_admission_blocked` (PR #182
-        comment 5029906989 item 4) covers all three at once; the direct
+        gating here on `_binding_operationally_eligible` plus the existing
+        `_binding_push_admission_blocked` freeze gate covers all three at
+        once; the direct
         orchestration dispatch and the CAS/reconciliation replacement
         paths each re-check the same gate independently since a binding
         can be flagged `review`/`stale` after this job was already
@@ -1044,6 +1110,16 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         security, unrelated constraints, malformed identity) propagates
         unchanged.
         """
+        if not self._binding_operationally_eligible(binding):
+            _logger.info(
+                'Inventory pair store_id=%s item=%s location=%s: '
+                'push_sync admission refused while its level, variant, '
+                'or location binding is inactive, disabled, or out of scope.',
+                store.id,
+                binding.shopify_inventory_item_gid,
+                binding.location_mapping_id.shopify_gid,
+            )
+            return self.env['shopify.connector.job']
         if self._binding_push_admission_blocked(binding):
             _logger.info(
                 'Inventory pair store_id=%s item=%s location=%s: '
@@ -1186,8 +1262,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         bindings = Binding.search([
             ('location_mapping_id', 'in', mappings.ids),
             ('product_variant_binding_id.product_variant_id', 'in', product_ids),
+            ('status', '=', 'active'),
+            ('product_variant_binding_id.status', '=', 'active'),
+            ('location_mapping_id.status', '=', 'active'),
         ])
         for binding in bindings:
+            if not self._binding_operationally_eligible(binding):
+                continue
             settings = self.env['shopify.connector.store.settings'].search(
                 [('store_id', '=', binding.store_id.id)], limit=1,
             )
@@ -1211,9 +1292,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         bindings = self.env['shopify.connector.inventory.level.binding'].search([
             ('store_id', '=', store.id),
             ('location_mapping_id.push_enabled', '=', True),
+            ('status', '=', 'active'),
+            ('product_variant_binding_id.status', '=', 'active'),
+            ('location_mapping_id.status', '=', 'active'),
         ])
         enqueued = self.env['shopify.connector.job']
         for binding in bindings:
+            if not self._binding_operationally_eligible(binding):
+                continue
             self._refresh_pending_target(binding)
             job = self._try_enqueue_push_sync(store, binding, 'manual_sync')
             enqueued |= job
@@ -1275,6 +1361,19 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # time, independent of `_try_enqueue_push_sync`'s own admission-
         # time gate, since the binding may have been flagged after this
         # job was already created.
+        if (
+            binding.store_id != store
+            or not self._binding_operationally_eligible(binding)
+        ):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The inventory pair is not operationally eligible: its '
+                'level binding, variant binding, or location mapping is '
+                'inactive, disabled, or outside the owning store/company '
+                'scope. No Shopify work was sent.',
+            )
+            return
+
         if self._binding_push_admission_blocked(binding):
             job._transition_blocked_manual_review(
                 ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
@@ -1376,6 +1475,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                     'longer exists; retry later.',
                 )
             locked_binding.invalidate_recordset()
+            if not self._binding_operationally_eligible(locked_binding):
+                job._transition_blocked_manual_review(
+                    ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'The inventory pair became ineligible before its '
+                    'activation handoff; no Shopify mutation may proceed.',
+                )
+                return
             if self._binding_push_admission_blocked(locked_binding):
                 # Re-checked under the row lock (PR #182 comment
                 # 5029906989 item 4): a concurrent writer may have
@@ -1488,6 +1594,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'longer exists; retry later.',
             )
         locked_binding.invalidate_recordset()
+        if not self._binding_operationally_eligible(locked_binding):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The inventory pair became ineligible before its quantity '
+                'handoff; no Shopify mutation may proceed.',
+            )
+            return
         if self._binding_push_admission_blocked(locked_binding):
             # Re-checked under the row lock (PR #182 comment 5029906989
             # item 4) -- see the identical reasoning in the activation
@@ -1730,6 +1843,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         bindings = Binding.search([
             ('store_id', '=', store.id),
             ('location_mapping_id.push_enabled', '=', True),
+            ('status', '=', 'active'),
+            ('product_variant_binding_id.status', '=', 'active'),
+            ('location_mapping_id.status', '=', 'active'),
         ])
         mapped = len(bindings)
         enqueued_count = 0
@@ -1737,6 +1853,8 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         unchanged_count = 0
         previewed_count = 0
         for binding in bindings:
+            if not self._binding_operationally_eligible(binding):
+                continue
             target, _free_qty = self._refresh_pending_target(binding)
             # TD-012. The shipped first-push form tells the operator, in
             # the `pending` empty state, that "the preview runs on the next
@@ -1807,6 +1925,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             job._transition_failed_final(
                 'unknown_system_error',
                 'The inventory-level binding no longer exists.',
+            )
+            return
+        if not self._binding_operationally_eligible(binding):
+            job._transition_blocked_manual_review(
+                ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The first-push preview cannot run while its level binding, '
+                'variant binding, or location mapping is inactive, disabled, '
+                'or outside the owning store/company scope.',
             )
             return
         target, _free_qty = self._refresh_pending_target(binding)
@@ -1888,6 +2014,8 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         nothing loses nothing. The savepoint plus the constraint remain the
         atomic guard for the TOCTOU window between the read and the create.
         """
+        if not self._binding_operationally_eligible(binding):
+            return self.env['shopify.connector.job']
         if self._binding_push_admission_blocked(binding):
             return self.env['shopify.connector.job']
         store = binding.store_id
@@ -3661,6 +3789,17 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             local_snapshot['binding_id']
         )
         if (
+            binding.store_id.id != local_snapshot['store_id']
+            or not self._binding_operationally_eligible(binding)
+        ):
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The inventory pair is no longer operationally eligible: '
+                'its level binding, variant binding, or location mapping is '
+                'inactive, disabled, or outside the owning store/company '
+                'scope; no Shopify work may proceed.',
+            )
+        if (
             not local_snapshot['inventory_item_gid']
             or not local_snapshot['location_gid']
         ):
@@ -4194,6 +4333,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding = self._lock_binding_for_pair(job)
         domain_payload = consequence.get('domain_payload') or {}
         if phase == 'direct' and domain_payload.get('reason') == 'cas_stale':
+            if not self._binding_operationally_eligible(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'The inventory pair is no longer operationally eligible; '
+                    'no CAS replacement may be created until its level, '
+                    'variant, and location bindings are active and in scope.',
+                )
+                return
             if self._binding_push_admission_blocked(binding):
                 self._block_pair(
                     job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
@@ -4221,6 +4368,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             # Never a CAS replacement -- always ordinal 0, regardless of
             # this job's own possibly-nonzero ordinal (PR #182 comment
             # 5028910116 item 7).
+            if not self._binding_operationally_eligible(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'The inventory pair is no longer operationally eligible; '
+                    'no reconciliation replacement may be created until its '
+                    'level, variant, and location bindings are active and '
+                    'in scope.',
+                )
+                return
             if self._binding_push_admission_blocked(binding):
                 self._block_pair(
                     job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
@@ -4323,6 +4479,17 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding = self.env['shopify.connector.inventory.level.binding'].browse(
             local_snapshot['binding_id']
         )
+        if (
+            binding.store_id.id != local_snapshot['store_id']
+            or not self._binding_operationally_eligible(binding)
+        ):
+            self._fail_closed_pre_c2(
+                job_id, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'The inventory pair is no longer operationally eligible: '
+                'its level binding, variant binding, or location mapping is '
+                'inactive, disabled, or outside the owning store/company '
+                'scope; no Shopify work may proceed.',
+            )
         read = self._read_shopify_inventory_pair(
             self.env['shopify.connector.job'].browse(job_id), store, binding,
         )
@@ -4678,6 +4845,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
     ):
         binding = self._lock_binding_for_pair(job)
         if phase == 'reconciliation' and consequence['action'] == 'domain_callback':
+            if not self._binding_operationally_eligible(binding):
+                self._block_pair(
+                    job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                    'The inventory pair is no longer operationally eligible; '
+                    'no reconciliation replacement may be created until its '
+                    'level, variant, and location bindings are active and '
+                    'in scope.',
+                )
+                return
             if self._binding_push_admission_blocked(binding):
                 self._block_pair(
                     job, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
@@ -4742,6 +4918,26 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
             return
         original = attempt.job_id
+        binding = self.env[
+            'shopify.connector.inventory.level.binding'
+        ].browse(original.res_id).exists()
+        if (
+            not binding
+            or original.res_model
+            != 'shopify.connector.inventory.level.binding'
+            or binding.store_id != job.store_id
+            or not self._binding_operationally_eligible(binding)
+        ):
+            Dispatch._block_original_job(
+                original, ERROR_CLASS_VALIDATION, SUBREASON_BINDING_CONFLICT,
+                'Reconciliation was refused because the inventory pair is '
+                'no longer operationally eligible; no Shopify read or '
+                'mutation was sent.',
+            )
+            Dispatch._complete_reconciliation_job(
+                job, 'Ineligible inventory pair was routed to review.',
+            )
+            return
         # Reconciliation is also a repair boundary for installations that
         # were upgraded with product/location identity but without the
         # derived inventory-level pair.  This is idempotent and does not
