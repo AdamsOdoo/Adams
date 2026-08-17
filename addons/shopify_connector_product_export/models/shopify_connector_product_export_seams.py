@@ -111,6 +111,66 @@ class ShopifyConnectorJobProductExportExtension(models.Model):
             return 'product_export_domain_enabled'
         return super()._domain_flag_for_job_type(job_type)
 
+    def action_recover_not_applied_create(self):
+        """Start a fresh preview after a definitely-not-applied create.
+
+        The original mutation attempt remains immutable and the original job
+        remains blocked. This action creates a new read-only preview job with
+        a new idempotency/business-intent identity; it never requeues or
+        resends the old mutation.
+        """
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may recover a '
+                'definitely-not-applied product create.'
+            )
+        if self.job_type != JOB_TYPE_CREATE or self.state != (
+            'blocked_manual_review'
+        ):
+            raise UserError(
+                'This run is not a blocked product-create recovery case.'
+            )
+        attempt = self._operator_mutation_attempt()
+        if (
+            not attempt
+            or attempt.mutation_domain != JOB_TYPE_CREATE
+            or attempt.observed_outcome != 'failed_clean'
+            or attempt.effective_disposition() != 'not_applied'
+        ):
+            raise UserError(
+                'Only a definitely-not-applied product create may start a '
+                'fresh recovery preview.'
+            )
+        preview = self.env[
+            'shopify.connector.product.export.preview'
+        ].sudo().browse(self.res_id).exists()
+        template = preview.product_template_id if preview else self.env[
+            'product.template'
+        ].browse()
+        if not template:
+            raise UserError(
+                'The source product for this create recovery no longer exists.'
+            )
+        if not template.shopify_export_enabled:
+            raise UserError(
+                'Enable this product for Shopify export after correcting the '
+                'source/configuration issue, then recover the create.'
+            )
+        service = self.env['shopify.connector.product.export.service']
+        fresh_job = service.enqueue_preview(template, self.store_id)
+        self.store_id._create_lifecycle_audit_job(
+            'Fresh product-create recovery preview enqueued after a '
+            'definitely-not-applied mutation: original_job_id=%d '
+            'original_attempt_id=%d fresh_preview_job_id=%d template_id=%d.'
+            % (self.id, attempt.id, fresh_job.id, template.id)
+        )
+        return self._operator_form_action(
+            fresh_job, 'Fresh product export recovery preview'
+        )
+
 
 # ======================================================================
 # Seam 2: shopify.connector.store.settings — the domain flags.
@@ -178,11 +238,32 @@ class ProductTemplateProductExport(models.Model):
              'never a side effect of export.',
     )
     shopify_export_vendor = fields.Char(string='Shopify Vendor')
+    shopify_export_vendor_managed = fields.Boolean(
+        string='Manage Shopify Vendor',
+        help='When enabled, an empty vendor is an explicit Shopify clear. '
+             'A non-empty legacy value is managed automatically.',
+    )
     shopify_export_product_type = fields.Char(string='Shopify Product Type')
+    shopify_export_product_type_managed = fields.Boolean(
+        string='Manage Shopify Product Type',
+        help='When enabled, an empty product type is an explicit Shopify '
+             'clear. A non-empty legacy value is managed automatically.',
+    )
     shopify_export_tags = fields.Char(
         string='Shopify Tags',
         help='Comma-separated. Exported as the complete Shopify tag list for '
              'this product.',
+    )
+    shopify_export_tags_managed = fields.Boolean(
+        string='Manage Shopify Tags',
+        help='When enabled, an empty tag list is an explicit Shopify clear. '
+             'A non-empty legacy value is managed automatically.',
+    )
+    shopify_export_description_managed = fields.Boolean(
+        string='Manage Shopify Description',
+        help='When enabled, an empty description is an explicit Shopify '
+             'clear. A non-empty legacy Odoo description is managed '
+             'automatically.',
     )
 
     def action_shopify_export_preview(self):
@@ -219,6 +300,31 @@ class ProductTemplateProductExport(models.Model):
                 'store for this company.'
             )
         return True
+
+
+class ShopifyConnectorProductImporterExportExtension(models.AbstractModel):
+    """Make an imported binding immediately previewable for safe updates.
+
+    Product export remains an explicit opt-in for products created only in
+    Odoo.  A successful Shopify import is different: it has already created a
+    durable remote mapping, so leaving the imported template disabled makes
+    the safe update-preview route unreachable.  This extension is optional
+    and loaded only when the product-export addon is installed; the importer
+    itself remains independent of export fields.
+    """
+
+    _inherit = 'shopify.connector.product.importer'
+
+    @api.model
+    def _apply_within_savepoint(
+        self, store, payload, settings, media, notes, job=None,
+    ):
+        result = super()._apply_within_savepoint(
+            store, payload, settings, media, notes, job,
+        )
+        template = result['template_binding'].product_template_id
+        template.sudo().write({'shopify_export_enabled': True})
+        return result
 
 
 # ======================================================================

@@ -41,7 +41,13 @@ class TestProductVariantBinding(TransactionCase):
         'shopify_option_values',
         'shopify_price_snapshot',
         'shopify_compare_at_price_snapshot',
+        'shopify_sku_snapshot',
+        'shopify_barcode_snapshot',
+        'shopify_inventory_item_gid',
+        'shopify_inventory_tracked',
+        'shopify_inventory_tracked_known',
         'shopify_last_imported_at',
+        'shopify_birth_initialized',
         'shopify_primary_image_url',
         'shopify_image_checksum',
     ))

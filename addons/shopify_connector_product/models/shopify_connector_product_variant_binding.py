@@ -44,7 +44,15 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     shopify_option_values = fields.Text(readonly=True)
     shopify_price_snapshot = fields.Float(readonly=True)
     shopify_compare_at_price_snapshot = fields.Float(readonly=True)
+    shopify_sku_snapshot = fields.Char(readonly=True)
+    shopify_barcode_snapshot = fields.Char(readonly=True)
+    shopify_inventory_item_gid = fields.Char(readonly=True, index=True)
+    # ``known`` distinguishes an explicit Shopify false from an older API
+    # response that did not include the tracking field.
+    shopify_inventory_tracked = fields.Boolean(readonly=True)
+    shopify_inventory_tracked_known = fields.Boolean(readonly=True)
     shopify_last_imported_at = fields.Datetime(readonly=True)
+    shopify_birth_initialized = fields.Boolean(readonly=True)
     shopify_primary_image_url = fields.Char(readonly=True)
     # D-010B-6 image ownership: the checksum of the image bytes the
     # connector last wrote into product.product.image_variant_1920 for this
@@ -62,7 +70,13 @@ class ShopifyConnectorProductVariantBinding(models.Model):
             'shopify_option_values',
             'shopify_price_snapshot',
             'shopify_compare_at_price_snapshot',
+            'shopify_sku_snapshot',
+            'shopify_barcode_snapshot',
+            'shopify_inventory_item_gid',
+            'shopify_inventory_tracked',
+            'shopify_inventory_tracked_known',
             'shopify_last_imported_at',
+            'shopify_birth_initialized',
             'shopify_primary_image_url',
             'shopify_image_checksum',
         ))

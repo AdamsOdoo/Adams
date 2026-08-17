@@ -39,7 +39,12 @@ class TestProductTemplateBinding(TransactionCase):
         'shopify_title',
         'shopify_status',
         'shopify_primary_image_url',
+        'shopify_description_html',
+        'shopify_vendor',
+        'shopify_product_type',
+        'shopify_tags',
         'shopify_last_imported_at',
+        'shopify_birth_initialized',
         'shopify_updated_at',
         'shopify_image_checksum',
     ))

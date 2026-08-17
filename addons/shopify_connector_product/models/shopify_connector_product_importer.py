@@ -26,6 +26,10 @@ from .shopify_connector_product_match_decision import (
     DECISION_LEVEL_VARIANT,
     build_match_evidence,
 )
+from .shopify_connector_product_normalization import (
+    normalize_option_specs,
+    normalize_selected_options,
+)
 
 # Read-only GraphQL query only -- never a mutation (Task 010B remains
 # import-only; see test_product_import_matching.py's source-level guard).
@@ -36,10 +40,10 @@ from .shopify_connector_product_match_decision import (
 # so `first` is always explicit). `pageInfo { hasNextPage endCursor }`
 # drives the handler's page loop until exhaustion.
 #
-# `inventoryItem { id }` is requested per D-010B-1 but never stored or
-# acted upon here -- Task 010B imports no inventory quantity or location
-# (the inventory domain gate stays closed). It is read only so the query
-# shape matches the accepted packet; no stock.* model is ever touched.
+# InventoryItem identity and tracking are source evidence for the product
+# binding.  This importer still does not read quantities or locations and does
+# not touch stock.* models; the inventory domain consumes the persisted GID in
+# its own production transitions.
 #
 # `image { url }` on a variant reads the (deprecated but still available)
 # ProductVariant.image field per the accepted packet D-010B-1; the current
@@ -75,7 +79,7 @@ query ConnectorProductImport($id: ID!, $cursor: String) {
         compareAtPrice
         selectedOptions { name value }
         image { url }
-        inventoryItem { id }
+        inventoryItem { id tracked }
       }
       pageInfo { hasNextPage endCursor }
     }
@@ -107,12 +111,6 @@ MAX_ACCUMULATED_VARIANTS = 2048
 # it is NOT a catalog cap (a real 2,048-variant product needs <=21 pages at
 # `first: 100`) and never limits a legitimate product.
 MAX_VARIANT_PAGES = MAX_ACCUMULATED_VARIANTS + 2
-
-# The Shopify default single-variant option shape -- a product whose only
-# option is `Title` with sole value `Default Title` is a true single-variant
-# product and gets no Odoo attribute structure (D-010B-2 special case).
-DEFAULT_OPTION_NAME = 'title'
-DEFAULT_OPTION_VALUE = 'default title'
 
 # D-010B-6 media download bounds. Named constants, never inlined.
 MAX_IMAGE_BYTES = 20 * 1024 * 1024
@@ -501,7 +499,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _normalize_payload(self, product):
-        """Raw accumulated product node -> the internal payload dict."""
+        """Raw accumulated product node -> the complete internal payload.
+
+        Keep source presence distinct from a valid empty value.  ``None``
+        means Shopify did not provide the field; an empty string/list is a
+        real source value and is retained in the binding evidence.  Birth
+        initialization decides which valid values may populate a new Odoo
+        record, while later refreshes use the configured ownership policy.
+        """
         product = product or {}
         variants_connection = product.get('variants') or {}
         variant_nodes = variants_connection.get('nodes') or []
@@ -509,6 +514,11 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             'gid': product.get('id'),
             'title': product.get('title'),
             'status': (product.get('status') or '').lower() or None,
+            'description_html': product.get('descriptionHtml'),
+            'vendor': product.get('vendor'),
+            'product_type': product.get('productType'),
+            'tags': list(product.get('tags') or [])
+                if product.get('tags') is not None else None,
             'updated_at': product.get('updatedAt'),
             'image_url': (product.get('featuredImage') or {}).get('url'),
             'options': self._normalize_options(product.get('options')),
@@ -525,9 +535,23 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                         variant.get('selectedOptions')
                     ),
                     'option_values': self._format_option_values(
-                        variant.get('selectedOptions')
+                        self._normalize_selected_options(
+                            variant.get('selectedOptions')
+                        )
                     ),
                     'image_url': (variant.get('image') or {}).get('url'),
+                    'inventory_item_gid': (
+                        (variant.get('inventoryItem') or {}).get('id')
+                    ),
+                    'inventory_tracked': self._inventory_tracked_value(
+                        variant.get('inventoryItem')
+                    ),
+                    'inventory_tracked_known': (
+                        isinstance(variant.get('inventoryItem'), dict)
+                        and isinstance(
+                            variant.get('inventoryItem').get('tracked'), bool,
+                        )
+                    ),
                 }
                 for variant in variant_nodes
             ],
@@ -535,26 +559,11 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _normalize_options(self, options):
-        result = []
-        for option in options or []:
-            result.append({
-                'name': option.get('name'),
-                'position': option.get('position') or 0,
-                'values': [
-                    value.get('name')
-                    for value in (option.get('optionValues') or [])
-                    if value.get('name') is not None
-                ],
-            })
-        result.sort(key=lambda option: option['position'])
-        return result
+        return normalize_option_specs(options)
 
     @api.model
     def _normalize_selected_options(self, selected_options):
-        return [
-            {'name': option.get('name'), 'value': option.get('value')}
-            for option in (selected_options or [])
-        ]
+        return normalize_selected_options(selected_options)
 
     @api.model
     def _format_option_values(self, selected_options):
@@ -564,6 +573,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             '%s: %s' % (option.get('name'), option.get('value'))
             for option in selected_options
         )
+
+    @api.model
+    def _inventory_tracked_value(self, inventory_item):
+        """Return the raw tracking flag, preserving explicit false."""
+        if not isinstance(inventory_item, dict):
+            return None
+        value = inventory_item.get('tracked')
+        return value if isinstance(value, bool) else None
 
     @api.model
     def _money_to_float(self, value):
@@ -777,13 +794,9 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 'or map it manually.' % (payload.get('gid'),),
             )
         with self.env.cr.savepoint():
-            binding.sudo().write({
-                'shopify_title': payload.get('title') or False,
-                'shopify_status': payload.get('status') or False,
-                'shopify_primary_image_url': payload.get('image_url') or False,
-                'shopify_last_imported_at': fields.Datetime.now(),
-                'status': 'stale',
-            })
+            archived_vals = self._template_snapshot_vals(payload)
+            archived_vals['status'] = 'stale'
+            binding.sudo().write(archived_vals)
             variant_bindings = self.env[
                 'shopify.connector.product.variant.binding'
             ].search(
@@ -863,6 +876,9 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             binding.shopify_gid: binding.product_variant_id
             for binding in variant_bindings
         }
+        self._apply_birth_initialization(
+            payload, template_binding, source, variant_bindings,
+        )
         self._apply_template_media(
             store, payload, template_binding, source, settings, media, notes,
         )
@@ -882,6 +898,89 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             'variant_bindings': variant_bindings,
         }
 
+    @api.model
+    def _apply_birth_initialization(
+        self, payload, template_binding, source, variant_bindings,
+    ):
+        """Initialize Odoo master data from the first valid Shopify source.
+
+        Birth initialization is deliberately separate from refresh ownership:
+        a product created by Shopify must be usable immediately even when the
+        store later chooses snapshot-only or Odoo-authoritative refreshes.
+        Existing manually mapped Odoo products are never overwritten.  The
+        marker also lets an upgrade repair bindings created by the older
+        importer, which had no birth phase and therefore left SKU/price blank.
+
+        Tracking policy is explicit and conservative: a newly created Odoo
+        product with ``tracked=true`` becomes storable; ``tracked=false`` is
+        retained as source evidence but does not force a service/storable
+        conversion. Existing products and user overrides are untouched.
+        """
+        created_source = source in ('created_singleton', 'created_structured')
+        # Historical Shopify-created bindings did not have a match key.  A
+        # SKU/barcode candidate binding is an existing merchant product and
+        # must never be mistaken for a connector-created birth, even when its
+        # birth marker is still false after an upgrade.  In particular, its
+        # local price and description remain merchant-owned.
+        legacy_import_source = (
+            source == 'existing_binding'
+            and not template_binding.shopify_birth_initialized
+            and not template_binding.match_key
+        )
+        if not created_source and not legacy_import_source:
+            return
+
+        template = template_binding.product_template_id
+        template_values = {}
+        if created_source:
+            description = payload.get('description_html')
+            if description is not None and not template.description_sale:
+                template_values['description_sale'] = description or False
+
+            priced = [
+                variant.get('price')
+                for variant in (payload.get('variants') or [])
+                if variant.get('price') is not None
+            ]
+            if priced:
+                template_values['list_price'] = min(priced)
+
+        # Only a Shopify-created Odoo record receives the explicit tracking
+        # conversion. A false source flag is intentionally evidence-only.
+        if created_source and any(
+            variant.get('inventory_tracked') is True
+            for variant in (payload.get('variants') or [])
+            if variant.get('inventory_tracked_known')
+        ) and 'is_storable' in template._fields:
+            template_values['is_storable'] = True
+        if template_values:
+            template.sudo().write(template_values)
+
+        by_gid = {
+            binding.shopify_gid: binding
+            for binding in variant_bindings
+        }
+        payload_by_gid = {
+            variant.get('gid'): variant
+            for variant in (payload.get('variants') or [])
+            if variant.get('gid')
+        }
+        for gid, binding in by_gid.items():
+            variant_payload = payload_by_gid.get(gid)
+            if not variant_payload:
+                continue
+            product = binding.product_variant_id
+            values = {}
+            if variant_payload.get('sku') and not product.default_code:
+                values['default_code'] = variant_payload['sku']
+            if variant_payload.get('barcode') and not product.barcode:
+                values['barcode'] = variant_payload['barcode']
+            if values:
+                product.sudo().write(values)
+            binding.sudo().write({'shopify_birth_initialized': True})
+
+        template_binding.sudo().write({'shopify_birth_initialized': True})
+
     # ------------------------------------------------------------------
     # Template resolution (existing binding -> SKU/barcode candidate ->
     # confident create, with attribute structure on the create path).
@@ -899,12 +998,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         """
         TemplateBinding = self.env['shopify.connector.product.template.binding']
         shopify_gid = payload.get('gid')
-        snapshot_vals = {
-            'shopify_title': payload.get('title') or False,
-            'shopify_status': payload.get('status') or False,
-            'shopify_primary_image_url': payload.get('image_url') or False,
-            'shopify_last_imported_at': fields.Datetime.now(),
-        }
+        snapshot_vals = self._template_snapshot_vals(payload)
 
         existing = TemplateBinding.search([
             ('store_id', '=', store.id), ('shopify_gid', '=', shopify_gid),
@@ -969,9 +1063,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             )
             source = 'created_structured'
         else:
-            template = self.env['product.template'].create({
+            template_vals = {
                 'name': payload.get('title') or shopify_gid,
-            })
+            }
+            if payload.get('description_html') is not None:
+                template_vals['description_sale'] = (
+                    payload.get('description_html') or False
+                )
+            template = self.env['product.template'].create(template_vals)
             option_specs = None
             source = 'created_singleton'
         binding = TemplateBinding.sudo().create(dict(
@@ -984,23 +1083,36 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         return binding, source, option_specs
 
     @api.model
+    def _template_snapshot_vals(self, payload):
+        """Build the complete, nullable template source-evidence snapshot."""
+        tags = payload.get('tags')
+        return {
+            'shopify_title': payload.get('title') or False,
+            'shopify_status': payload.get('status') or False,
+            'shopify_description_html': (
+                payload.get('description_html')
+                if payload.get('description_html') is not None else False
+            ),
+            'shopify_vendor': (
+                payload.get('vendor') if payload.get('vendor') is not None
+                else False
+            ),
+            'shopify_product_type': (
+                payload.get('product_type')
+                if payload.get('product_type') is not None else False
+            ),
+            'shopify_tags': list(tags) if tags is not None else False,
+            'shopify_primary_image_url': payload.get('image_url') or False,
+            'shopify_last_imported_at': fields.Datetime.now(),
+        }
+
+    @api.model
     def _needs_attribute_structure(self, payload):
         """True when the product carries real options requiring an Odoo
         attribute structure. False for the Shopify default single-variant
         shape (sole option `Title` / `Default Title`) and for a payload
         with no options at all -- both take the clean singleton path."""
-        options = payload.get('options') or []
-        if not options:
-            return False
-        if len(options) == 1:
-            option = options[0]
-            name = (option.get('name') or '').strip().lower()
-            values = [
-                (value or '').strip().lower() for value in option.get('values') or []
-            ]
-            if name == DEFAULT_OPTION_NAME and values == [DEFAULT_OPTION_VALUE]:
-                return False
-        return True
+        return bool(normalize_option_specs(payload.get('options') or []))
 
     @api.model
     def _create_structured_template(self, payload, settings, notes):
@@ -1059,6 +1171,10 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
         template = self.env['product.template'].create({
             'name': payload.get('title') or payload.get('gid'),
+            **(
+                {'description_sale': payload.get('description_html') or False}
+                if payload.get('description_html') is not None else {}
+            ),
             'attribute_line_ids': line_commands,
         })
         return template, option_specs
@@ -1305,11 +1421,37 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
 
     @api.model
     def _variant_snapshot_vals(self, variant_payload):
+        selected_options = normalize_selected_options(
+            variant_payload.get('selected_options')
+        )
+        option_values = variant_payload.get('option_values')
+        if not selected_options:
+            option_values = False
+        elif not option_values:
+            option_values = self._format_option_values(selected_options)
         return {
-            'shopify_option_values': variant_payload.get('option_values') or False,
+            'shopify_option_values': option_values,
             'shopify_price_snapshot': variant_payload.get('price') or 0.0,
             'shopify_compare_at_price_snapshot': (
                 variant_payload.get('compare_at_price') or 0.0
+            ),
+            'shopify_sku_snapshot': (
+                variant_payload.get('sku')
+                if variant_payload.get('sku') is not None else False
+            ),
+            'shopify_barcode_snapshot': (
+                variant_payload.get('barcode')
+                if variant_payload.get('barcode') is not None else False
+            ),
+            'shopify_inventory_item_gid': (
+                variant_payload.get('inventory_item_gid') or False
+            ),
+            'shopify_inventory_tracked': (
+                variant_payload.get('inventory_tracked')
+                if variant_payload.get('inventory_tracked_known') else False
+            ),
+            'shopify_inventory_tracked_known': bool(
+                variant_payload.get('inventory_tracked_known')
             ),
             'shopify_last_imported_at': fields.Datetime.now(),
             'shopify_primary_image_url': variant_payload.get('image_url') or False,
