@@ -183,7 +183,33 @@ Primary existing contracts: [`DEC-010`](../04-decisions/DEC-010-inventory-archit
 | `6c1d68a` | Validate store/company scope before activation identity/evidence writes; retain safe status-race suppression | Review found the analogous quantity-success evidence path unguarded |
 | `0277637` | Validate store/company scope before quantity-success evidence writes with corrupt-binding regression | Inventory stack re-reviewed: PASS |
 
-The release branch has not been pushed from this repair worktree at this point.
+The accepted repair stack was published to the PR branch through the GitHub
+Git-object API because this environment had no usable Git credential helper.
+Published head `93fee1f3adae109dd7e56655365f6354f653b102` has tree
+`c636a2f90b8ca889e16f6c7e9d220621daf73ca4`, an exact match to the reviewed
+local integration tree. The PR remains draft and unmerged.
+
+### First exact-head runtime qualification
+
+- Odoo.sh development build `36522751` tested published head `93fee1f3` and
+  stopped with four product-test failures and one test error among 1,112
+  tests. No Shopify mutation was attempted.
+- The error was environmental fixture coupling: the structured-birth test
+  reused the global Odoo attribute name `Size`, which can already exist with
+  `create_variant='always'`; the production importer correctly rejected that
+  incompatible sparse-variant state.
+- Two failures asserted the superseded rule that Odoo-authoritative or unset
+  ongoing ownership also prevented birth-time price initialization. The
+  accepted contract intentionally separates birth initialization from later
+  refresh ownership.
+- One failure was a brittle source-text assertion that every `list_price`
+  assignment had to live inside `_apply_prices`; it rejected the intentional
+  birth initializer without testing behavior.
+- Correction commit `8fe8aab` gives the structured fixture a unique attribute,
+  proves birth initialization followed by ownership-protected refreshes, and
+  replaces source inspection with a runtime ownership transition test.
+  `compileall` and `git diff --check` pass locally. Exact-head runtime rerun is
+  required before this correction can be accepted.
 
 | Gate/evidence | Status at ledger creation | Required closure |
 |---|---|---|
