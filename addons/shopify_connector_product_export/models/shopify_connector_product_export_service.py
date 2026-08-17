@@ -1918,6 +1918,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
                 'This product has more variants than one export job carries.',
             )
+        self._validate_local_create_variant_identities(variants)
 
         product_input = dict(scalars)
         if options:
@@ -1974,6 +1975,55 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                  fields.Datetime.now()
              )},
         )
+
+    @api.model
+    def _validate_local_create_variant_identities(self, variants):
+        """Fail closed before ProductSet when local identity is not unique.
+
+        ProductSet can create a remote product before a malformed response is
+        available for binding.  Every local variant therefore needs at least
+        one durable identity, and duplicate SKU/barcode values are rejected
+        even when one of the two fields would normally be preferred.  This
+        keeps an ambiguous local catalog from creating an orphan remote
+        product and guarantees that finalization can prove a one-to-one map.
+        """
+        missing = [
+            variant.display_name
+            for variant in variants
+            if not (str(variant.default_code or '').strip()
+                    or str(variant.barcode or '').strip())
+        ]
+        if missing:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'Product create requires every Odoo variant to have a SKU '
+                'or barcode before Shopify ProductSet is called: %s.' % (
+                    ', '.join(missing),
+                ),
+            )
+        for field_name, label in (
+            ('default_code', 'SKU'), ('barcode', 'barcode'),
+        ):
+            seen = {}
+            for variant in variants:
+                value = str(getattr(variant, field_name) or '').strip()
+                if not value:
+                    continue
+                seen.setdefault(value, []).append(variant.display_name)
+            duplicates = {
+                value: names for value, names in seen.items()
+                if len(names) > 1
+            }
+            if duplicates:
+                detail = '; '.join(
+                    '%s (%s)' % (value, ', '.join(names))
+                    for value, names in sorted(duplicates.items())
+                )
+                self._fail_closed_pre_c2(
+                    ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                    'Product create requires unique local %s identities; '
+                    'duplicate values: %s.' % (label, detail),
+                )
 
     @api.model
     def _create_variant_input(self, store, variant, include_price, options):

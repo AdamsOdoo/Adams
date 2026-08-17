@@ -190,6 +190,37 @@ class TestProductVariantBinding(TransactionCase):
                     'product_template_binding_id': template_binding.id,
                 })
 
+    @mute_logger('odoo.sql_db')
+    def test_unique_store_inventory_item_gid_enforced(self):
+        first_template_binding = self._make_template_binding(
+            'gid://shopify/Product/105', 'Inventory Item First',
+        )
+        second_template_binding = self._make_template_binding(
+            'gid://shopify/Product/106', 'Inventory Item Second',
+        )
+        item_gid = 'gid://shopify/InventoryItem/105'
+        self.VariantBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/105',
+            'product_variant_id': (
+                first_template_binding.product_template_id.product_variant_id.id
+            ),
+            'product_template_binding_id': first_template_binding.id,
+            'shopify_inventory_item_gid': item_gid,
+        })
+        with self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                self.VariantBinding.sudo().create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/ProductVariant/106',
+                    'product_variant_id': (
+                        second_template_binding.product_template_id
+                        .product_variant_id.id
+                    ),
+                    'product_template_binding_id': second_template_binding.id,
+                    'shopify_inventory_item_gid': item_gid,
+                })
+
     # ------------------------------------------------------------------
     # 3. Access matrix.
     # ------------------------------------------------------------------

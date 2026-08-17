@@ -1,12 +1,16 @@
 """Runtime regressions for the repaired product export contract."""
 
-from odoo.tests.common import tagged
+from odoo.exceptions import AccessError
+from odoo.tests.common import new_test_user, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
 
-from ..models.shopify_connector_product_export_service import JOB_TYPE_CREATE
+from ..models.shopify_connector_product_export_service import (
+    ExportPreC2FailClosedError,
+    JOB_TYPE_CREATE,
+)
 from .common import ExportCase, PRODUCT_GID, VARIANT_GID
 
 
@@ -71,6 +75,103 @@ class TestProductContractRepair(ExportCase):
             ],
         )
         self.assertIn('$input: ProductSetInput!', request['operation'])
+
+    def test_create_preflight_rejects_missing_identity_without_transport(self):
+        self.settings.sudo().write({
+            'product_export_binding_namespace_ready': True,
+        })
+        self.variant.write({'default_code': False, 'barcode': False})
+        preview = self.make_preview(
+            export_path='create', state='applying',
+            steps=[{
+                'step': JOB_TYPE_CREATE, 'state': 'pending',
+                'variant_ids': self.variant.ids,
+            }],
+            diff={'variants_create': [
+                {'odoo_variant_id': self.variant.id, 'values': {}},
+            ], 'untouched': {}},
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        job = self.make_job(JOB_TYPE_CREATE, preview._name, preview.id)
+        with self.assertRaises(ExportPreC2FailClosedError) as caught:
+            self.Service._prepare_preconditions_create(
+                self.Service._prepare_local_create(job), {},
+            )
+        self.assertEqual(caught.exception.error_class, 'binding_conflict')
+        self.assertEqual(caught.exception.subreason, 'binding_conflict')
+
+    def test_create_preflight_rejects_duplicate_local_identity(self):
+        self.settings.sudo().write({
+            'product_export_binding_namespace_ready': True,
+        })
+        extra = self.env['product.product'].create({
+            'product_tmpl_id': self.template.id,
+            'default_code': 'WIDGET-1',
+            'barcode': '0002',
+        })
+        preview = self.make_preview(
+            export_path='create', state='applying',
+            steps=[{
+                'step': JOB_TYPE_CREATE, 'state': 'pending',
+                'variant_ids': [self.variant.id, extra.id],
+            }],
+            diff={'variants_create': [
+                {'odoo_variant_id': self.variant.id, 'values': {}},
+                {'odoo_variant_id': extra.id, 'values': {}},
+            ], 'untouched': {}},
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        job = self.make_job(JOB_TYPE_CREATE, preview._name, preview.id)
+        with self.assertRaises(ExportPreC2FailClosedError) as caught:
+            self.Service._prepare_preconditions_create(
+                self.Service._prepare_local_create(job), {},
+            )
+        self.assertEqual(caught.exception.error_class, 'binding_conflict')
+        self.assertIn('duplicate', str(caught.exception).lower())
+
+    def test_recovery_action_is_server_denied_to_non_administrator(self):
+        operator = new_test_user(
+            self.env,
+            login='product_recovery_operator_%s' % self.template.id,
+            groups='base.group_user,shopify_connector_core.group_shopify_connector_operator',
+        )
+        preview = self.make_preview(export_path='create')
+        job = self.make_job(JOB_TYPE_CREATE, preview._name, preview.id)
+        with self.assertRaises(AccessError):
+            job.with_user(operator).action_recover_not_applied_create()
+
+    def test_recovery_and_managed_clear_controls_are_exposed_with_safe_copy(self):
+        job_view = self.env.ref(
+            'shopify_connector_product_export.'
+            'view_shopify_connector_job_form_product_export_recovery'
+        )
+        job_arch = job_view.arch_db
+        self.assertIn('action_recover_not_applied_create', job_arch)
+        self.assertIn(
+            'shopify_connector_core.group_shopify_connector_admin', job_arch,
+        )
+        self.assertIn('fresh read-only preview', job_arch)
+        self.assertIn('original mutation attempt and evidence remain unchanged', job_arch)
+
+        product_view = self.env.ref(
+            'shopify_connector_product_export.'
+            'view_product_template_form_shopify_export'
+        )
+        product_arch = product_view.arch_db
+        for field_name in (
+            'shopify_export_description_managed',
+            'shopify_export_vendor_managed',
+            'shopify_export_product_type_managed',
+            'shopify_export_tags_managed',
+        ):
+            self.assertIn(field_name, product_arch)
+        self.assertIn('explicit Shopify clear', product_arch)
 
     def test_default_title_singleton_is_a_safe_update_noop(self):
         binding = self.bind_template()

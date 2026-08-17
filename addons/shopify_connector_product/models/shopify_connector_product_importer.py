@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import math
 import os
 import tempfile
 from contextlib import ExitStack
@@ -847,6 +848,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             or binding.shopify_updated_at != updated_at
         ):
             return None
+        # Rows created by the pre-birth importer have no match key and a
+        # false birth marker.  They must get one migration pass even when the
+        # remote updatedAt did not change: the old importer could have stamped
+        # the timestamp while leaving the Odoo SKU/price/description at their
+        # defaults.  Candidate-matched merchant products keep the normal
+        # short-circuit and are never treated as connector-created.
+        if not binding.shopify_birth_initialized and not binding.match_key:
+            return None
         variant_bindings = self.env[
             'shopify.connector.product.variant.binding'
         ].search([('product_template_binding_id', '=', binding.id)], order='id')
@@ -868,6 +877,17 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
         template_binding, source, option_specs = self._resolve_template(
             store, payload, settings, notes, job,
         )
+        VariantBinding = self.env[
+            'shopify.connector.product.variant.binding'
+        ]
+        previous_snapshot_bindings = VariantBinding.search([
+            ('store_id', '=', store.id),
+            ('product_template_binding_id', '=', template_binding.id),
+        ])
+        previous_price_snapshots = {
+            binding.product_variant_id.id: binding.shopify_price_snapshot
+            for binding in previous_snapshot_bindings
+        }
         variant_bindings = self._resolve_variants(
             store, payload, template_binding, source, option_specs,
             settings, media, notes, job,
@@ -876,14 +896,18 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             binding.shopify_gid: binding.product_variant_id
             for binding in variant_bindings
         }
-        self._apply_birth_initialization(
+        birth_price_initialized = self._apply_birth_initialization(
             payload, template_binding, source, variant_bindings,
+            product_by_gid=product_by_gid,
+            previous_price_snapshots=previous_price_snapshots,
+            notes=notes,
         )
         self._apply_template_media(
             store, payload, template_binding, source, settings, media, notes,
         )
         self._apply_prices(
             payload, template_binding, source, settings, notes, product_by_gid,
+            birth_price_initialized=birth_price_initialized,
         )
         # D-010B-7: stamp the exact remote updatedAt only after the whole
         # import has succeeded (it is the last write inside the savepoint, so
@@ -901,6 +925,7 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     @api.model
     def _apply_birth_initialization(
         self, payload, template_binding, source, variant_bindings,
+        product_by_gid=None, previous_price_snapshots=None, notes=None,
     ):
         """Initialize Odoo master data from the first valid Shopify source.
 
@@ -928,22 +953,14 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             and not template_binding.match_key
         )
         if not created_source and not legacy_import_source:
-            return
+            return False
 
         template = template_binding.product_template_id
         template_values = {}
-        if created_source:
+        if created_source or legacy_import_source:
             description = payload.get('description_html')
             if description is not None and not template.description_sale:
                 template_values['description_sale'] = description or False
-
-            priced = [
-                variant.get('price')
-                for variant in (payload.get('variants') or [])
-                if variant.get('price') is not None
-            ]
-            if priced:
-                template_values['list_price'] = min(priced)
 
         # Only a Shopify-created Odoo record receives the explicit tracking
         # conversion. A false source flag is intentionally evidence-only.
@@ -955,6 +972,24 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             template_values['is_storable'] = True
         if template_values:
             template.sudo().write(template_values)
+
+        # A newly created structured product must receive the exact additive
+        # price_extra decomposition during birth, before any refresh-mode
+        # ownership decision is consulted.  Legacy rows get the same repair
+        # only when their old-defect signature is proven from the immutable
+        # connector snapshot and the current valid Shopify values.
+        price_repaired = False
+        if created_source:
+            price_repaired = self._apply_birth_price_contract(
+                payload, template, product_by_gid or {}, notes,
+            )
+        elif legacy_import_source and self._legacy_price_repair_proven(
+            payload, template, product_by_gid or {},
+            previous_price_snapshots or {},
+        ):
+            price_repaired = self._apply_birth_price_contract(
+                payload, template, product_by_gid or {}, notes,
+            )
 
         by_gid = {
             binding.shopify_gid: binding
@@ -980,6 +1015,93 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             binding.sudo().write({'shopify_birth_initialized': True})
 
         template_binding.sudo().write({'shopify_birth_initialized': True})
+        return price_repaired
+
+    @api.model
+    def _valid_birth_price(self, value):
+        """Return a finite, non-negative Shopify price or ``None``."""
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(value) or value < 0:
+            return None
+        return value
+
+    @api.model
+    def _legacy_price_repair_proven(self, payload, template, product_by_gid,
+                                    previous_price_snapshots):
+        """Prove the narrow pre-birth price defect before repairing it.
+
+        The legacy importer left a connector-created template at Odoo's
+        default 1.00 while it did persist the remote price snapshot.  A
+        repair is safe only when the local template is still exactly 1.00,
+        every current remote variant price is valid, and every prior snapshot
+        agrees with that current value.  This deliberately refuses to infer
+        ownership from a changed remote value or from a missing snapshot.
+        """
+        precision = self.env['decimal.precision'].precision_get('Product Price')
+        if float_compare(
+            template.list_price, 1.0, precision_digits=precision,
+        ) != 0:
+            return False
+        variants = payload.get('variants') or []
+        if not variants or len(product_by_gid) < len(variants):
+            return False
+        for variant in variants:
+            current = self._valid_birth_price(variant.get('price'))
+            if current is None:
+                return False
+            product = product_by_gid.get(variant.get('gid'))
+            if not product:
+                return False
+            if product.id not in previous_price_snapshots:
+                return False
+            previous = self._valid_birth_price(
+                previous_price_snapshots[product.id],
+            )
+            if previous is None or float_compare(
+                previous, current, precision_digits=precision,
+            ) != 0:
+                return False
+            if float_compare(current, 1.0, precision_digits=precision) == 0:
+                return False
+        return True
+
+    @api.model
+    def _apply_birth_price_contract(
+        self, payload, template, product_by_gid, notes=None,
+    ):
+        """Initialize base price and exact structured ``price_extra``."""
+        variants = payload.get('variants') or []
+        priced = []
+        for variant in variants:
+            price = self._valid_birth_price(variant.get('price'))
+            if price is not None:
+                priced.append(dict(variant, price=price))
+        if not priced:
+            return False
+        precision = self.env['decimal.precision'].precision_get('Product Price')
+        base = float_round(
+            min(variant['price'] for variant in priced),
+            precision_digits=precision,
+        )
+        template.sudo().write({'list_price': base})
+        if len(variants) <= 1 or not template.attribute_line_ids:
+            return True
+        decomposed = self._decompose_price_extra(
+            template, priced, base, precision, product_by_gid,
+        )
+        if not decomposed and notes is not None:
+            notes.append((
+                'price_undecomposable',
+                'Shopify product %s has per-variant prices that do not fit '
+                'Odoo\'s additive price_extra model exactly; the template '
+                'list price is set to the minimum variant price and the '
+                'exact per-variant prices remain in binding snapshots. No '
+                'price_extra was invented.' % (payload.get('gid'),),
+            ))
+        return True
 
     # ------------------------------------------------------------------
     # Template resolution (existing binding -> SKU/barcode candidate ->
@@ -1911,11 +2033,18 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _apply_prices(self, payload, template_binding, source, settings, notes, product_by_gid):
+    def _apply_prices(
+        self, payload, template_binding, source, settings, notes,
+        product_by_gid, birth_price_initialized=False,
+    ):
         """Write Odoo prices only when the store's price source of truth is
         `shopify_authoritative` and this path may write (first import, or an
         existing-binding refresh in `shopify_fields` mode). Snapshots on the
-        binding keep full fidelity regardless."""
+        binding keep full fidelity regardless. Birth initialization has
+        already performed the one-time price contract and therefore wins over
+        this ongoing-ownership gate for the current import."""
+        if birth_price_initialized:
+            return
         if not self._price_is_shopify_authoritative(settings):
             return
         if not self._should_write_shopify_owned_fields(source, settings):

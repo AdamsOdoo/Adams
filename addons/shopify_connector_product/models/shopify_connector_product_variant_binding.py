@@ -46,6 +46,8 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     shopify_compare_at_price_snapshot = fields.Float(readonly=True)
     shopify_sku_snapshot = fields.Char(readonly=True)
     shopify_barcode_snapshot = fields.Char(readonly=True)
+    # Nullable so pre-existing bindings upgrade without an invented identity;
+    # PostgreSQL permits multiple NULLs in the scoped unique constraint below.
     shopify_inventory_item_gid = fields.Char(readonly=True, index=True)
     # ``known`` distinguishes an explicit Shopify false from an older API
     # response that did not include the tracking field.
@@ -89,6 +91,11 @@ class ShopifyConnectorProductVariantBinding(models.Model):
     _store_product_variant_uniq = models.Constraint(
         'UNIQUE(store_id, product_variant_id)',
         'This product.product is already bound for this store.',
+    )
+    _store_inventory_item_gid_uniq = models.Constraint(
+        'UNIQUE(store_id, shopify_inventory_item_gid)',
+        'This Shopify InventoryItem is already bound to a variant for this '
+        'store.',
     )
 
     # ------------------------------------------------------------------

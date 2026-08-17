@@ -405,9 +405,13 @@
                     </group>
                     <group invisible="not shopify_export_enabled">
                         <field name="shopify_export_vendor"/>
+                        <field name="shopify_export_vendor_managed"/>
                         <field name="shopify_export_product_type"/>
+                        <field name="shopify_export_product_type_managed"/>
                         <field name="shopify_export_tags"
                                placeholder="tag-one, tag-two"/>
+                        <field name="shopify_export_tags_managed"/>
+                        <field name="shopify_export_description_managed"/>
                     </group>
                     <div class="text-muted" colspan="2"
                          invisible="not shopify_export_enabled">
@@ -415,7 +419,10 @@
                         variants are ever exported. Collections, merchant
                         metafields, existing media and publication state are
                         never touched. Every change needs a reviewed,
-                        confirmed preview.
+                        confirmed preview. Leave a Manage checkbox off to
+                        omit an empty local value; enable it and clear the
+                        value only when the empty value is an explicit
+                        Shopify clear.
                     </div>
                 </group>
             </xpath>
