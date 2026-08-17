@@ -157,7 +157,10 @@ class TestProductContractRepair(ExportCase):
             'shopify_connector_core.group_shopify_connector_admin', job_arch,
         )
         self.assertIn('fresh read-only preview', job_arch)
-        self.assertIn('original mutation attempt and evidence remain unchanged', job_arch)
+        self.assertIn(
+            'original remote operation and evidence remain unchanged',
+            job_arch,
+        )
 
         product_view = self.env.ref(
             'shopify_connector_product_export.'

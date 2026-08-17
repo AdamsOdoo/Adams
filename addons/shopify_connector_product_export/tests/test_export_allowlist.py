@@ -111,4 +111,6 @@ class TestExportAllowlist(ExportCase):
             'value_ids': [(6, 0, values.ids)],
         })
         options = self.Service._desired_options(self.template)
-        self.assertEqual(options, [{'name': 'Size', 'values': ['S', 'M']}])
+        self.assertEqual(options, [{
+            'name': 'Size', 'position': 0, 'values': ['S', 'M'],
+        }])

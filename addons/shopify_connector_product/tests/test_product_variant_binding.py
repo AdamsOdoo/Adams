@@ -333,7 +333,15 @@ class TestProductVariantBinding(TransactionCase):
             'shopify_option_values': 'Size=M',
             'shopify_price_snapshot': 10.0,
             'shopify_compare_at_price_snapshot': 12.0,
+            'shopify_sku_snapshot': 'PROTECTED-SKU',
+            'shopify_barcode_snapshot': 'PROTECTED-BARCODE',
+            'shopify_inventory_item_gid': (
+                'gid://shopify/InventoryItem/ProtectedSurface'
+            ),
+            'shopify_inventory_tracked': True,
+            'shopify_inventory_tracked_known': True,
             'shopify_last_imported_at': '2000-01-03 00:00:00',
+            'shopify_birth_initialized': True,
             'shopify_primary_image_url': 'https://example.invalid/original',
             'shopify_image_checksum': 'original-checksum',
         })
@@ -357,7 +365,15 @@ class TestProductVariantBinding(TransactionCase):
             'shopify_option_values': 'Size=Forged',
             'shopify_price_snapshot': 999.0,
             'shopify_compare_at_price_snapshot': 1000.0,
+            'shopify_sku_snapshot': 'FORGED-SKU',
+            'shopify_barcode_snapshot': 'FORGED-BARCODE',
+            'shopify_inventory_item_gid': (
+                'gid://shopify/InventoryItem/Forged'
+            ),
+            'shopify_inventory_tracked': False,
+            'shopify_inventory_tracked_known': False,
             'shopify_last_imported_at': fields.Datetime.now(),
+            'shopify_birth_initialized': False,
             'shopify_primary_image_url': 'https://example.invalid/forged',
             'shopify_image_checksum': 'forged-checksum',
         }

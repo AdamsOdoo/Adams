@@ -165,7 +165,16 @@ class TestBatch2ProductJourneys(TransactionCase):
             'id': gid, 'sku': sku, 'barcode': barcode,
             'price': '9.99', 'compareAtPrice': None,
             'selectedOptions': [], 'image': None,
-            'inventoryItem': {'id': 'gid://shopify/InventoryItem/1'},
+            # Shopify inventory identity is per variant.  Reusing one fixed
+            # InventoryItem GID made the second product collide with the
+            # binding's store-scoped uniqueness constraint, turning this
+            # journey into a retry rather than proving two independent
+            # imports.
+            'inventoryItem': {
+                'id': 'gid://shopify/InventoryItem/%s' % (
+                    gid.rsplit('/', 1)[-1],
+                ),
+            },
         }
 
     def _patch_transport(self, scan_pages=(), products=None):
