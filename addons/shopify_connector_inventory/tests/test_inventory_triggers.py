@@ -98,6 +98,15 @@ class TestInventoryTriggers(TransactionCase):
                 ).id,
             ])],
         })
+        cls.user_admin = cls.env['res.users'].create({
+            'name': 'Trigger Test Administrator',
+            'login': 'trigger_test_administrator',
+            'group_ids': [(6, 0, [
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _open_push_jobs_for_binding(self, binding):
         return self.env['shopify.connector.job'].search([
@@ -590,10 +599,22 @@ class TestInventoryTriggers(TransactionCase):
         ]))
 
         self.variant_binding.sudo().write({'status': 'active'})
+        # The parent write happens inside this TransactionCase transaction;
+        # invalidate the relation cache to model the next RPC/worker read.
+        self.env.invalidate_all()
+        self.assertTrue(Service._binding_operationally_eligible(self.binding))
         result = Service._try_enqueue_push_sync(
             self.store, self.binding, 'manual_sync',
         )
-        self.assertTrue(result)
+        # The blocked review is deliberately non-terminal and still owns the
+        # pair scope. Reactivating the parent must not mint a duplicate job;
+        # an Administrator releases the existing business intent instead.
+        self.assertFalse(result)
+        self.assertEqual(len(self._open_push_jobs_for_binding(self.binding)), 1)
+        dispatch_job.with_user(self.user_admin).action_resolve_manual_review()
+        dispatch_job.invalidate_recordset()
+        self.assertEqual(dispatch_job.state, 'queued')
+        self.assertFalse(dispatch_job.manual_review_subreason)
 
     def test_confirmed_stale_mapping_blocks_enqueue_and_dispatch(self):
         Service = self.env['shopify.connector.inventory.service']
@@ -622,10 +643,21 @@ class TestInventoryTriggers(TransactionCase):
         ]))
 
         self.mapping.sudo().write({'status': 'active'})
+        # The parent write happens inside this TransactionCase transaction;
+        # invalidate the relation cache to model the next RPC/worker read.
+        self.env.invalidate_all()
+        self.assertTrue(Service._binding_operationally_eligible(self.binding))
         result = Service._try_enqueue_push_sync(
             self.store, self.binding, 'manual_sync',
         )
-        self.assertTrue(result)
+        # Preserve the one non-terminal review intent and recover it through
+        # the privileged route; never create a second pair-scoped job.
+        self.assertFalse(result)
+        self.assertEqual(len(self._open_push_jobs_for_binding(self.binding)), 1)
+        dispatch_job.with_user(self.user_admin).action_resolve_manual_review()
+        dispatch_job.invalidate_recordset()
+        self.assertEqual(dispatch_job.state, 'queued')
+        self.assertFalse(dispatch_job.manual_review_subreason)
 
     def test_stock_event_skips_stale_variant_without_creating_a_job(self):
         self.variant_binding.sudo().write({'status': 'stale'})
