@@ -393,7 +393,10 @@ class TestOrderImportMappingStatic(TransactionCase):
         # capability statement, review-aware Sales Dashboard aggregation,
         # and the split navigation/reporting surfaces. Loaded metadata and
         # production behavior changed together, so the manifest advances.
-        self.assertEqual(manifest['version'], '19.0.2.10.0')
+        # The coherent-repair upgrade qualification adds an explicit migration
+        # checkpoint so existing databases consume the tightened role graph
+        # and newly persisted product/inventory identity safely.
+        self.assertEqual(manifest['version'], '19.0.2.11.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

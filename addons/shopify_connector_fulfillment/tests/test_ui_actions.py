@@ -197,16 +197,19 @@ class TestUiActions(TransactionCase):
             wizard.action_confirm()
 
     def test_release_wizard_delegates_and_lets_the_server_refuse(self):
-        """There is no blocked mutation, so the SERVER refuses. The wizard must
-        surface that refusal rather than pre-judging eligibility itself."""
+        """The ACL refuses User; Admin reaches the sanctioned server action."""
         binding = self._make_binding()
         Wizard = self.env['shopify.connector.fulfillment.review.release.wizard']
-        wizard = Wizard.with_user(self.plain_user).create({
-            'binding_id': binding.id, 'reason': 'operator decided',
-        })
-        # Connector User is not a review-resolution role. The server must
-        # refuse the direct delegated call before inspecting blocked state.
         with self.assertRaises(AccessError):
+            Wizard.with_user(self.plain_user).create({
+                'binding_id': binding.id, 'reason': 'operator decided',
+            })
+        wizard = Wizard.with_user(self.admin_user).create({
+            'binding_id': binding.id, 'reason': 'administrator decided',
+        })
+        # There is no blocked mutation. Reaching the binding's sanctioned
+        # action is therefore proved by its domain-level refusal.
+        with self.assertRaises(UserError):
             wizard.action_confirm()
 
     def _make_binding(self):

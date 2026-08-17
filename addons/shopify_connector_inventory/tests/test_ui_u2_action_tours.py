@@ -113,6 +113,10 @@ class TestUiU2InventoryActionTours(HttpCase):
             'u2act_reviewer',
             'shopify_connector_core.group_shopify_connector_admin',
         )
+        cls.connector_user = cls._connector_user(
+            'u2act_user',
+            'shopify_connector_core.group_shopify_connector_user',
+        )
         # Auditor implies read everywhere and act nowhere: the role the
         # server refuses for every control in this file.
         cls.auditor = cls._connector_user(
@@ -826,13 +830,13 @@ class TestUiU2InventoryActionTours(HttpCase):
         self.start_tour(
             self._url(MAPPING_ACTION),
             'shopify_connector_u2_location_withdraw_all_denied_tour',
-            login='u2act_reviewer',
+            login='u2act_user',
         )
 
         # And the server refuses the same role at every layer beneath it, so
         # the hidden control is a courtesy rather than the protection.
         Service = self.env['shopify.connector.inventory.service'].with_user(
-            self.reviewer)
+            self.connector_user)
         with self.assertRaises(AccessError):
             Service.first_push_withdrawal_preview(self.mapping)
         with self.assertRaises(AccessError):
@@ -841,7 +845,9 @@ class TestUiU2InventoryActionTours(HttpCase):
         with self.assertRaises(AccessError):
             self.env[
                 'shopify.connector.location.withdraw.all.wizard'
-            ].with_user(self.reviewer).create({'mapping_id': self.mapping.id})
+            ].with_user(self.connector_user).create({
+                'mapping_id': self.mapping.id,
+            })
 
     def test_location_withdrawal_performs_no_shopify_request(self):
         """The mapping-level route reaches no transport, and enqueues nothing.

@@ -63,7 +63,10 @@ class TestUiTours(TransactionCase):
         # User is correctly refused, which the visibility matrix asserts
         # separately. Building it as a User here would assert the opposite of
         # the security contract.
-        admin_only = {'view_shopify_connector_fulfillment_mode_switch_wizard_form'}
+        admin_only = {
+            'view_shopify_connector_fulfillment_mode_switch_wizard_form',
+            'view_shopify_connector_fulfillment_review_release_wizard_form',
+        }
         for xmlid, model, view_type in U1_VIEWS:
             view = self.env.ref('shopify_connector_fulfillment.%s' % xmlid)
             self.assertEqual(view.model, model)
