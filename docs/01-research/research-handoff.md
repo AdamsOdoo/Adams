@@ -22346,3 +22346,71 @@ into the Wave 4 branch under a new authorized prompt, determine the new exact
 Wave 4 candidate SHA, and reassess which runtime evidence must be repeated
 because U0 modified the core addon — before any new Odoo.sh campaign is
 authorized for that PR.
+
+---
+
+## Session handoff — 2026-08-18 — Program review, architecture/UI audit, DEC-042 one-iteration completion program
+
+**Session scope:** product-owner strategy consultation and program setup.
+No `addons/**` change; docs-only session on branch `claude/new-session-xetxxf`.
+
+**Work performed:**
+
+1. **Recovery-strategy assessment** `[Recommendation → accepted by product
+   owner]`: rebuild-from-scratch rejected; open-ended patching rejected;
+   dependency-ordered repair-in-place on draft PR #206 confirmed as the
+   strategy. Basis: 2026-08-17/18 UAT defects are seam defects, not
+   architectural failures; product + inventory verticals already re-proven
+   live on store 562 after repair.
+2. **Architecture audit** `[Inference — from direct code inspection,
+   2026-08-18]`: ~54k LOC production / ~95k test. ~25–30% prose (much of it
+   changelog-in-docstrings), ~1,100–1,300 LOC copy-pasted correctness
+   machinery across domains (three copies of core's reconcile handler; three
+   drifted cursor-scan producers; four `userErrors` classifiers; four
+   admission-gate copies in the API client), two god-files
+   (`inventory_service.py` 5,327 lines; `shopify_connector_store.py` 1,801).
+   Core mutation framework (Layer-2 attempt protocol, registry seams) is
+   sound and reusable — webhook module delegates in 10 lines, proving the
+   pattern. Feature gaps vs competition: refunds, cancellations,
+   multi-currency (fails closed), customer export, collections, discounts,
+   gift-card accounting, draft orders, OAuth flow — deferred post-release.
+3. **UI/UX audit** `[Inference — from direct code inspection, 2026-08-18]`:
+   premium in core + product_export (design tokens, 54 HOOT tests, 32 tours,
+   real a11y), stock and untested in fulfillment/webhook/sale/inventory.
+   Ten prioritized defects including a setup-wizard fatal-state dead end, a
+   dashboard filter race, destroyed diff on confirm failure, light-mode-only
+   token layer, jargon leakage, and four remaining default-filter traps.
+4. **DEC-042 recorded** (product-owner directive, 2026-08-18): one-iteration
+   completion program — B1 order/fulfillment vertical UAT, B2 backend
+   consolidation, B3 webhook real-time sync, B4 UI/UX hardening + dark mode,
+   B5 full testing + release qualification. Sol implements (subagents for
+   mechanical work), Luna is a medium-effort pre-push sanity gate, Claude is
+   the binding independent reviewer via PR #206 comments, product owner
+   merges. Autonomous loop: `READY-FOR-CLAUDE-REVIEW` comment wakes the
+   Claude reviewer session (PR-activity subscription); verdict posted
+   durably to the PR; one consolidated correction per REVISE.
+5. **Master prompt authored:**
+   [`../06-prompts/sol-one-iteration-master-prompt.md`](../06-prompts/sol-one-iteration-master-prompt.md)
+   — pasted once into ChatGPT by the product owner; no relay after that.
+
+**Learning-feedback loop:** the UAT breakage confirmed LL-class lesson:
+bottom-up test suites that manufacture intermediate state prove components,
+not products — every future domain gate must include a live vertical journey
+before acceptance (now enforced by DEC-042's batch acceptance criteria).
+Second lesson: duplicated safety invariants drift (scan validation divergence
+found in-code); the B2 consolidation turns them into single-definition hooks.
+
+**State:** DEC-042 + master prompt + this handoff committed on
+`claude/new-session-xetxxf`. Claude reviewer session subscribed to PR #206
+activity with a scheduled fallback check-in. Awaiting the product owner
+pasting the master prompt into ChatGPT (Sol); first review will trigger on
+Sol's first `READY-FOR-CLAUDE-REVIEW` comment.
+
+**Next-session prompt (for a fresh Claude session, if this one is lost):**
+"Read CLAUDE.md §13, DEC-042, and
+docs/06-prompts/sol-one-iteration-master-prompt.md. You are the independent
+reviewer for the one-iteration completion program on draft PR #206. Check PR
+#206 for the newest `READY-FOR-CLAUDE-REVIEW — Batch <N> — <SHA>` comment
+without a matching `CLAUDE INDEPENDENT REVIEW` verdict, then perform the
+memoryless exact-SHA review per DEC-040 scrutiny rules and post the complete
+verdict as a PR comment. Never implement program code in the reviewer role."
