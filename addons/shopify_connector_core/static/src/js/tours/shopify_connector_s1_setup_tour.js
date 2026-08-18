@@ -335,7 +335,49 @@ registry.category("web_tour.tours").add("shopify_connector_s1_dashboard_entry_to
     ],
 });
 
-// --- 3. Save & Exit, then resume where it stopped. ---
+// --- 3. Explicitly start a second store while one store is visible. ---
+registry.category("web_tour.tours").add("shopify_connector_s1_new_store_tour", {
+    url: "/odoo",
+    steps: () => [
+        ...openSetupWizard(),
+        {
+            trigger: heading(1, "Welcome"),
+            content: "The existing store opens through the normal resume path.",
+        },
+        {
+            trigger: ".sc_setup_new_store",
+            content: "An Administrator can intentionally start another store.",
+            run: "click",
+        },
+        {
+            trigger: ".o_sc_setup[data-store-id='new']",
+            content: "The new-store flow has no selected existing store.",
+        },
+        { trigger: CONTINUE, run: "click" },
+        {
+            trigger: ".o_sc_setup[data-store-id='new'] #sc_setup_name",
+            content: "The new identity form starts blank.",
+            run() {
+                const name = document.querySelector("#sc_setup_name");
+                const domain = document.querySelector("#sc_setup_domain");
+                if (!name || name.value || !domain || domain.value) {
+                    throw new Error("new-store identity was not blank");
+                }
+            },
+        },
+        { trigger: "#sc_setup_name", run: "edit S1 Second Store" },
+        { trigger: "#sc_setup_domain", run: "edit s1-second.myshopify.com" },
+        { trigger: CONTINUE, run: "click" },
+        {
+            trigger: heading(3, "Credentials"),
+            content: "The second store was created and the flow advanced.",
+        },
+        { trigger: ".sc_setup_exit", run: "click" },
+        { trigger: ".o_sc_dashboard" },
+    ],
+});
+
+// --- 4. Save & Exit, then resume where it stopped. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     url: "/odoo",
     steps: () => [
@@ -362,7 +404,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     ],
 });
 
-// --- 4. Keyboard traversal, focus management and the action row. ---
+// --- 5. Keyboard traversal, focus management and the action row. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
     url: "/odoo",
     steps: () => [

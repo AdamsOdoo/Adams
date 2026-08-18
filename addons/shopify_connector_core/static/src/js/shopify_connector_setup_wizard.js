@@ -139,7 +139,10 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.locationRefreshTimerResolve = null;
 
         onWillStart(async () => {
-            await this._load(this._contextStoreId());
+            await this._load(
+                this._contextStoreId(),
+                this._contextStartsNewStore(),
+            );
         });
 
         onWillUnmount(() => {
@@ -166,6 +169,11 @@ export class ShopifyConnectorSetupWizard extends Component {
     _contextStoreId() {
         const context = (this.props.action && this.props.action.context) || {};
         return context.default_setup_store_id || null;
+    }
+
+    _contextStartsNewStore() {
+        const context = (this.props.action && this.props.action.context) || {};
+        return Boolean(context.default_setup_new_store);
     }
 
     get steps() {
@@ -306,10 +314,11 @@ export class ShopifyConnectorSetupWizard extends Component {
 
     // --- server round trips -------------------------------------------------
 
-    async _load(storeId) {
+    async _load(storeId, newStore = false) {
         try {
             const data = await this.orm.call(MODEL, "get_setup_state", [], {
                 store_id: storeId || null,
+                new_store: newStore,
             });
             this._adopt(data, true);
             this.state.status = "ready";
@@ -344,6 +353,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         // a rerun opens on the merchant's actual path. A store with no
         // credential yet defaults to the Dev Dashboard path, because that is
         // the app-creation flow Shopify currently gives a new merchant.
+        this.state.form.credentialMode = "dev_dashboard_client_credentials";
         if (store.credential_present && store.auth_mode) {
             this.state.form.credentialMode = store.auth_mode;
         }
@@ -474,6 +484,28 @@ export class ShopifyConnectorSetupWizard extends Component {
             { type: "success" }
         );
         this.action.doAction("shopify_connector_core.action_shopify_connector_dashboard");
+    }
+
+    async startNewStore() {
+        if (this.state.busy) {
+            return;
+        }
+        this.locationRefreshFollowGeneration += 1;
+        this._cancelLocationRefreshTimer();
+        this.state.busy = true;
+        try {
+            const data = await this.orm.call(MODEL, "get_setup_state", [], {
+                store_id: null,
+                new_store: true,
+            });
+            this._adopt(data, true);
+            this.state.stepKey = FIRST_STEP_KEY;
+            this.state.errorMessage = "";
+        } catch (error) {
+            this.state.errorMessage = this._message(error);
+        } finally {
+            this.state.busy = false;
+        }
     }
 
     /** One handler per step, selected by KEY. Each calls one guarded method. */

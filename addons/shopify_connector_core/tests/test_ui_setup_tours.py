@@ -33,6 +33,8 @@ from ..models.shopify_connector_api_client import (
 
 TOUR_SHOP_DOMAIN = 's1-tour.myshopify.com'
 RESUME_SHOP_DOMAIN = 's1-resume.myshopify.com'
+NEW_STORE_EXISTING_DOMAIN = 's1-existing.myshopify.com'
+NEW_STORE_DOMAIN = 's1-second.myshopify.com'
 REFRESH_SHOP_DOMAIN = 's1-refresh.myshopify.com'
 REFRESH_FAILURE_SHOP_DOMAIN = 's1-refresh-failure.myshopify.com'
 REFRESH_DUMMY_TOKEN = 'shpat_S1REFRESH0000000000000000000000'
@@ -215,6 +217,32 @@ class TestUiSetupTours(HttpCase):
             settings.sale_domain_enabled,
             'resuming discarded a saved choice',
         )
+
+    def test_setup_can_start_a_second_store_without_touching_the_first(self):
+        """The explicit new-store control escapes the one-store auto-resume."""
+        self._admin('s1_new_store_admin')
+        existing = self.env['shopify.connector.store'].sudo().create({
+            'name': 'S1 Existing Store',
+            'shop_domain': NEW_STORE_EXISTING_DOMAIN,
+            'company_id': self.env.company.id,
+        })
+        self.env.flush_all()
+        self.start_tour(
+            '/odoo', 'shopify_connector_s1_new_store_tour',
+            login='s1_new_store_admin',
+        )
+        stores = self.env['shopify.connector.store'].sudo().search([
+            ('shop_domain', 'in', (
+                NEW_STORE_EXISTING_DOMAIN, NEW_STORE_DOMAIN,
+            )),
+        ], order='id asc')
+        self.assertEqual(
+            stores.mapped('shop_domain'),
+            [NEW_STORE_EXISTING_DOMAIN, NEW_STORE_DOMAIN],
+        )
+        existing.invalidate_recordset()
+        self.assertEqual(existing.name, 'S1 Existing Store')
+        self.assertEqual(existing.shop_domain, NEW_STORE_EXISTING_DOMAIN)
 
     def test_setup_is_operable_by_keyboard_alone(self):
         """Full keyboard traversal, and focus moves to the step heading.

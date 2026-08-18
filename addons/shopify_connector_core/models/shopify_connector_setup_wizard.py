@@ -571,16 +571,23 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def get_setup_state(self, store_id=None):
+    def get_setup_state(self, store_id=None, new_store=False):
         """The whole render payload for the wizard, as the current user.
 
         One bounded round trip per navigation rather than a call per field.
         Every value is either a plain-language label this service owns or a
         field the caller could read anyway -- and the credential is not among
         them: `credential_present` is a boolean, and no token, fragment or
-        length ever crosses this boundary.
+        length ever crosses this boundary. `new_store=True` is an explicit
+        Administrator intent that suppresses the one-candidate resume
+        convenience; creation still happens only when the identity step calls
+        `save_store_identity` without a `store_id`.
         """
         self._assert_setup_admin()
+        if new_store and store_id:
+            raise UserError(_(
+                'Choose an existing store or start a new one, not both.'
+            ))
         store = False
         if store_id:
             store = self._resolve_store(store_id)
@@ -590,7 +597,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         candidates = self.env['shopify.connector.store'].search(
             [], order='id asc', limit=20,
         )
-        if not store and len(candidates) == 1:
+        if not store and not new_store and len(candidates) == 1:
             store = candidates
 
         settings = self._settings_for(store) if store else False

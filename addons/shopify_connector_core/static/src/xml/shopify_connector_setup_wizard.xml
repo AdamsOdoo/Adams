@@ -18,7 +18,8 @@
 <templates xml:space="preserve">
 
     <t t-name="shopify_connector_core.SetupWizard">
-        <div class="o_sc_setup" t-att-dir="direction">
+        <div class="o_sc_setup" t-att-dir="direction"
+             t-att-data-store-id="store.id || 'new'">
             <div class="o_sc_setup__inner">
 
                 <!-- ============ LOADING ============ -->
@@ -75,6 +76,15 @@
                          row is a separate grid row, so it remains reachable
                          without ever covering a field. -->
                     <section class="sc_setup__panel" aria-live="polite" t-ref="panel">
+                        <div t-if="state.data and state.data.stores.length and store.id"
+                             class="sc_setup__store_actions"
+                             role="group" aria-label="Store setup options">
+                            <button class="sc-btn sc-btn--secondary sc_setup_new_store"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.startNewStore()">
+                                Set up another store
+                            </button>
+                        </div>
                         <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
                             <span class="sc_setup__heading-count">
                                 Phase <t t-esc="currentPhase.index"/> of <t t-esc="state.data.phase_count"/>

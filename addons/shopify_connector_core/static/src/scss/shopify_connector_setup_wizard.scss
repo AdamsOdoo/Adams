@@ -281,6 +281,11 @@
         }
     }
 
+    .sc_setup__store_actions {
+        display: flex;
+        justify-content: flex-end;
+    }
+
     .sc_setup__subheading {
         margin: 0;
         font-size: var(--sc-fs-cardtitle);

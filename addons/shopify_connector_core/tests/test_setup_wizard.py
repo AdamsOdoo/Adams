@@ -353,6 +353,7 @@ class TestSetupWizardAuthorization(SetupWizardCase):
         for call in (
             lambda: setup.get_setup_state(store.id),
             lambda: setup.get_setup_state(),
+            lambda: setup.get_setup_state(new_store=True),
             lambda: setup.save_store_identity('x', 'y.myshopify.com'),
             lambda: setup.save_credential(store.id, DUMMY_TOKEN),
             lambda: setup.acknowledge_scopes(store.id),
@@ -446,6 +447,41 @@ class TestSetupWizardSteps(SetupWizardCase):
         self._make_store()
         with self.assertRaises(UserError):
             self._as(self.admin_a).save_store_identity('Again', SHOP_DOMAIN)
+
+    def test_an_explicit_new_store_flow_does_not_select_or_change_existing(self):
+        existing = self._make_store(
+            name='Existing store', domain='existing-store.myshopify.com',
+        )
+
+        # Normal entry still resumes the only visible store. The explicit
+        # flag is the deliberate escape hatch for the second-store path.
+        resumed = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(resumed['store']['id'], existing.id)
+        blank = self._as(self.admin_a).get_setup_state(new_store=True)
+        self.assertFalse(blank['store']['id'])
+        self.assertEqual(blank['store']['name'], '')
+        self.assertEqual(blank['store']['shop_domain'], '')
+        self.assertEqual([row['id'] for row in blank['stores']], [existing.id])
+
+        with self.assertRaises(UserError):
+            self._as(self.admin_a).get_setup_state(
+                store_id=existing.id, new_store=True,
+            )
+
+        created = self._as(self.admin_a).save_store_identity(
+            'Second store', 'second-store.myshopify.com',
+        )
+        second = self.Store.browse(created['store']['id'])
+        self.assertNotEqual(second, existing)
+        self.assertEqual(
+            self.Store.search_count([
+                ('company_id', '=', self.company_a.id),
+            ]),
+            2,
+        )
+        existing.invalidate_recordset()
+        self.assertEqual(existing.name, 'Existing store')
+        self.assertEqual(existing.shop_domain, 'existing-store.myshopify.com')
 
     def test_identity_does_not_assert_what_readiness_confirms(self):
         """Shape only. The store-identity check confirms it against Shopify."""
