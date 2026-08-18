@@ -379,3 +379,51 @@ Shopify mutation without a verified remote read.
   Future premium UX should distinguish invalid client credentials, wrong or
   unpermitted shop, app-not-installed, insufficient scopes, revoked/expired
   access token, and transport failure when Shopify provides reliable evidence.
+
+## 9. Correct-store product and inventory UAT — 2026-08-18
+
+- Exact qualified starting source was
+  `b9ff84ef47d8ed8c94bdfee7e22089e01c8ac8b8` (tree
+  `7da2d8c678eeabd0325c6c7c892a019bcc657cee`) on draft PR #206. GitHub
+  Actions run `32103926602` and Odoo.sh development build `36553922` passed
+  at that exact head; all six connector modules were upgraded twice.
+- Store `562` was created through the supported second-store setup route for
+  `testin-lzhbzhtc.myshopify.com`, API `2026-07`. The credential was entered
+  through the write-only production form, remained masked, and Test Connection
+  returned the exact remote shop identity. Onboarding completed with catalog
+  import/export and inventory enabled, first-push protection enabled, and
+  eleven granted scopes. No credential or token is recorded here.
+- Product scan job `3196` imported Shopify product
+  `gid://shopify/Product/8650641047737`, variant
+  `gid://shopify/ProductVariant/48603042840761`, and InventoryItem
+  `gid://shopify/InventoryItem/50769579835577` into template `951`, variant
+  `1401`, template binding `948`, and variant binding `862`. SKU
+  `SHOPIFY-SEED-20260817-C`, price `29.95`, tracked evidence, export eligibility,
+  snapshots, company/store scope, and three production-created inventory-level
+  bindings were present. Re-import was duplicate-free.
+- Update preview `121` was a safe no-op: no scalar or variant changes, no false
+  singleton option mismatch, and no blank vendor/SKU/price emission. It was not
+  confirmed and caused no Shopify mutation.
+- Location mapping `94` paired Shopify location
+  `gid://shopify/Location/90389938361` with `WH/Stock`. Inventory-level binding
+  `164` carried the correct InventoryItem and inventory-level identities. A
+  stale pre-preview event job `3199` was safely blocked before mutation and
+  cancelled with an operator reason. The production scan produced the genuine
+  first-push preview; Administrator confirmation then produced mutation attempt
+  `170`. Shopify quantity changed from `7` to `5`, and reconciliation performed
+  the fresh remote read. An immediate repeat scan produced no second effective
+  mutation. Other mapped-location first-push previews remain unconfirmed.
+- Two independent, newly created Odoo templates (`952` and `953`) were both
+  blocked at create preview because the custom-ID preflight falsely returned
+  the same unrelated seed product GID. Shopify documents metafield-search
+  syntax as `metafields.{namespace}.{key}:{value}` and warns that a definition
+  without filtering enabled can return unfiltered products. The connector used
+  `metafields.odoo_template_id:<id>`, omitting the namespace, against a
+  unique-only definition. This is a candidate defect, not duplicate evidence.
+- The bounded correction replaces both create-preflight and ambiguous-create
+  reconciliation list searches with Shopify's dedicated
+  `productByIdentifier(identifier: ProductIdentifierInput!)` custom-ID lookup.
+  The identifier continues to omit namespace intentionally so Shopify resolves
+  the app-reserved namespace, matching the `productSet` identifier contract.
+  Behavioral regressions assert the exact on-wire query and variables for
+  both production reads and prove zero-or-one result normalization.

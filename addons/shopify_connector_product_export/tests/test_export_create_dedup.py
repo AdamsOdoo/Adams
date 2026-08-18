@@ -46,6 +46,57 @@ class TestExportCreateDedup(ExportCase):
         # ProductSetOperation polling path is not used in MVP.
         self.assertIn('synchronous: true', request['operation'])
 
+    def test_preflight_uses_the_exact_custom_id_lookup(self):
+        sent = []
+        body = {'data': {
+            'product': None,
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+
+        def responder(client_self, store, request, token=None,
+                      mutation_context=None):
+            sent.append(request)
+            return FakeSendResponse(body)
+
+        job = self.make_job(
+            'product_export_preview', 'product.template', self.template.id,
+        )
+        with self.send_patch(responder):
+            result = self.Service._search_remote_by_custom_id(
+                self.store, job, self.template.id,
+            )
+
+        self.assertEqual(result['nodes'], [])
+        self.assertIn('productByIdentifier', sent[-1]['query'])
+        self.assertNotIn('products(first:', sent[-1]['query'])
+        self.assertEqual(sent[-1]['variables'], {
+            'identifier': {'customId': {
+                'key': BINDING_METAFIELD_KEY,
+                'value': str(self.template.id),
+            }},
+        })
+
+    def test_preflight_returns_only_the_exact_identifier_product(self):
+        body = {'data': {
+            'product': {
+                'id': PRODUCT_GID,
+                'title': 'Exact custom-id match',
+                'updatedAt': '2026-08-18T00:00:00Z',
+            },
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+        job = self.make_job(
+            'product_export_preview', 'product.template', self.template.id,
+        )
+        with self.send_patch(
+            lambda self, store, request, token=None,
+            mutation_context=None: FakeSendResponse(body)
+        ):
+            result = self.Service._search_remote_by_custom_id(
+                self.store, job, self.template.id,
+            )
+        self.assertEqual([node['id'] for node in result['nodes']], [PRODUCT_GID])
+
     # ------------------------------------------------------------------
     # Reconciliation by custom id, before any retry
     # ------------------------------------------------------------------
@@ -64,7 +115,7 @@ class TestExportCreateDedup(ExportCase):
             expected_store_identity = self.store.shop_domain
             preconditions_snapshot = {'custom_id_value': str(self.template.id)}
         body = {'data': {
-            'products': {'nodes': nodes},
+            'product': nodes[0] if nodes else None,
             'shop': {'myshopifyDomain': self.store.shop_domain},
         }}
         return self.Service._reconcile_create_result(_Attempt(), body)
@@ -78,23 +129,44 @@ class TestExportCreateDedup(ExportCase):
         self.assertEqual(verdict['verdict'], 'applied')
         self.assertEqual(verdict['action'], 'succeed')
 
-    def test_reconciliation_refuses_to_choose_between_two_products(self):
-        verdict = self._reconcile_with([
-            {'id': PRODUCT_GID, 'title': 'A', 'updatedAt': 'x',
-             'variants': {'nodes': []}},
-            {'id': 'gid://shopify/Product/222', 'title': 'B', 'updatedAt': 'y',
-             'variants': {'nodes': []}},
-        ])
-        self.assertEqual(verdict['verdict'], 'not_applied')
-        self.assertEqual(verdict['action'], 'block_manual_review')
-        self.assertEqual(verdict['error_class'], 'duplicate_risk')
-
     def test_reconciliation_reports_not_applied_when_nothing_matches(self):
         verdict = self._reconcile_with([])
         self.assertEqual(verdict['verdict'], 'not_applied')
         # A reviewer releases the retry: the connector does not resend on its
         # own after an ambiguous create.
         self.assertEqual(verdict['action'], 'block_manual_review')
+
+    def test_reconciliation_uses_the_exact_custom_id_lookup(self):
+        preview = self._confirmed_create_preview()
+        job = self.make_job(JOB_TYPE_CREATE, preview._name, preview.id)
+        job.sudo().write({'state': 'running'})
+
+        class _Attempt:
+            store_id = self.store
+            expected_store_identity = self.store.shop_domain
+            preconditions_snapshot = {'custom_id_value': str(self.template.id)}
+            job_id = job
+
+        sent = []
+        body = {'data': {
+            'product': None,
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+
+        def responder(client_self, store, request, token=None,
+                      mutation_context=None):
+            sent.append(request)
+            return FakeSendResponse(body)
+
+        with self.send_patch(responder):
+            verdict = self.Service._reconcile_create(_Attempt())
+
+        self.assertEqual(verdict['verdict'], 'not_applied')
+        self.assertIn('productByIdentifier', sent[-1]['query'])
+        self.assertEqual(sent[-1]['variables']['identifier']['customId'], {
+            'key': BINDING_METAFIELD_KEY,
+            'value': str(self.template.id),
+        })
 
     def test_reconciliation_refuses_a_different_store_identity(self):
         preview = self._confirmed_create_preview()

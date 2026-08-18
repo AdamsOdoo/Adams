@@ -574,19 +574,25 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         """
         client = self.env['shopify.connector.api.client']
         query = (
-            'query ProductExportFindByCustomId($query: String!) { '
-            'products(first: 2, query: $query) { nodes { id title '
-            'updatedAt } } shop { myshopifyDomain } }'
+            'query ProductExportFindByCustomId('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title updatedAt } shop { myshopifyDomain } }'
         )
-        search = 'metafields.%s:%s' % (BINDING_METAFIELD_KEY, template_id)
+        identifier = {
+            'customId': {
+                'key': BINDING_METAFIELD_KEY,
+                'value': str(template_id),
+            },
+        }
         with client.execute_business(
-            job, store, query, {'query': search},
+            job, store, query, {'identifier': identifier},
         ) as result:
             data = (result or {}).get('data') or {}
-        nodes = ((data.get('products') or {}).get('nodes')) or []
+        product = data.get('product')
         return {
             'store_identity': (data.get('shop') or {}).get('myshopifyDomain'),
-            'nodes': nodes,
+            'nodes': [product] if isinstance(product, dict) else [],
         }
 
     @api.model
@@ -2074,10 +2080,9 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
     def _reconcile_create(self, attempt, reconciliation_job=None):
         """Reconcile by the connector's own custom id, never by title.
 
-        This is the read that makes an ambiguous create safe: found once →
-        adopt and bind; found more than once → review (this connector will
-        not choose between two products); not found → the attempt did not
-        apply.
+        This is the read that makes an ambiguous create safe: the dedicated
+        unique-identifier lookup returns the matching product to adopt and
+        bind, or no product when the attempt did not apply.
         """
         store = attempt.store_id
         template_id = (attempt.preconditions_snapshot or {}).get(
@@ -2085,20 +2090,27 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
         client = self.env['shopify.connector.api.client']
         query = (
-            'query ProductExportReconcileCreate($query: String!) { '
-            'products(first: 2, query: $query) { nodes { id title status '
+            'query ProductExportReconcileCreate('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title status '
             'descriptionHtml vendor productType tags updatedAt '
             'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
             'selectedOptions { name value } '
-            'inventoryItem { id sku tracked } } } } } '
+            'inventoryItem { id sku tracked } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        search = 'metafields.%s:%s' % (BINDING_METAFIELD_KEY, template_id)
+        identifier = {
+            'customId': {
+                'key': BINDING_METAFIELD_KEY,
+                'value': str(template_id),
+            },
+        }
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,
             query,
-            {'query': search},
+            {'identifier': identifier},
             purpose='product_export',
         ) as result:
             return self._reconcile_create_result(attempt, result)
@@ -2109,7 +2121,8 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
             return self._reconcile_identity_mismatch(identity)
-        nodes = ((data.get('products') or {}).get('nodes')) or []
+        product = data.get('product')
+        nodes = [product] if isinstance(product, dict) else []
         if len(nodes) == 1:
             return {
                 'verdict': 'applied',
