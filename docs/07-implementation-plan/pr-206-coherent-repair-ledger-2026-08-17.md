@@ -344,6 +344,37 @@ Shopify mutation without a verified remote read.
   exact head passes automated and Odoo.sh qualification and the development
   credential is securely available.
 
+## 10. Independent Claude review — W1 webhook foundation — 2026-08-18
+
+- Reviewed head `f62db111c394560d2ad13bbaacbe41b79758c52c` (the W1 webhook
+  foundation `shopify_connector_webhook` + `shopify_connector_product_webhook`
+  and the recent qualification-fix commits), which had carried only
+  ChatGPT-side Sol/Luna review. This is the independent Claude review owed
+  under DEC-040/DEC-042 and the Batch-3 baseline.
+- **Verdict: REVISE** — posted verbatim and durably to PR #206
+  ([comment 5328283841](https://github.com/AdamsOdoo/Adams/pull/206#issuecomment-5328283841)).
+- Four+1 blocking findings: **B-1** `includeFields=['admin_graphql_api_id']`
+  strips `updated_at` (Shopify docs verified) → constant payload digest →
+  every product update after the first silently deduped and reported
+  `processed`; **B-2** `app/uninstalled` fences a healthy store with no
+  authoritative read and no generation fence, and via an unsigned topic
+  header is forgeable/replayable; **B-3** `_ensure_expected_for_store` never
+  restores `expected=True` → permanent readiness `NOT_PROVEN` after a
+  domain-addon reinstall; **B-4** the security-critical route and the whole
+  subscription lifecycle have no behavioral test (45 `read_text` source-grep
+  assertions, no `HttpCase`); **B-5** callback token has no rotation/
+  revocation path. Plus a HIGH first-run deadlock risk on the product-export
+  custom-ID preflight (lookup issued before the unique metafield definition
+  is bootstrapped) and an 11-item P2 set.
+- Genuinely sound and to be preserved: raw-body HMAC discipline, race-safe
+  DB dedup, token-only store resolution, add-only framework delegation,
+  read-only ACLs via sentinel-context sudo services.
+- Process finding fed to the loop: ≥3 test files in this range were committed
+  in a state that could not run green — exact-head green CI stays a
+  non-negotiable batch-acceptance precondition.
+- Resolution: one consolidated correction (B-1…B-5 + P2 + three live open
+  questions), then re-post `READY-FOR-CLAUDE-REVIEW` at the new head.
+
 ## 8. Correct-store recovery and new-store onboarding defect — 2026-08-18
 
 - Exact accepted pre-UAT source was `27d819b00e332b1dd1b9da6aa4f8bc96046ce345`
