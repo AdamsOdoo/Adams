@@ -343,3 +343,39 @@ Shopify mutation without a verified remote read.
   used for this repair. Controlled Shopify UAT remains blocked until the new
   exact head passes automated and Odoo.sh qualification and the development
   credential is securely available.
+
+## 8. Correct-store recovery and new-store onboarding defect — 2026-08-18
+
+- Exact accepted pre-UAT source was `27d819b00e332b1dd1b9da6aa4f8bc96046ce345`
+  (tree `7b5620a11a1558564f43add1b33cfa359b74d1f1`) on draft PR #206 and
+  Odoo.sh development build `36538828`.
+- Development store record `555` was configured for the wrong Shopify shop.
+  Its failed connection jobs were configuration evidence only: the live UI
+  showed zero product mappings, zero inventory-level records, zero imported
+  orders, and no Shopify write evidence. No corrected-store credential was
+  submitted and no Shopify request or mutation was made during this audit.
+- The supported Store Identity step refused to replace the domain on the
+  never-connected record. The ordinary Setup Wizard also auto-resumed the sole
+  existing store, while Stores & Onboarding disabled raw create/edit/delete;
+  an Administrator therefore had no production UI route to start the
+  user-authorized replacement store. This is a critical onboarding/recovery
+  defect, separate from the original wrong-domain configuration error.
+- Bounded commits `349936845a3c080cf303bc8d65b54e7f796130af` and
+  `82c2bed377589e24470e42051029139ee01700de` add an explicit Administrator-only
+  **Set up another store** route. Normal entry deterministically resumes the
+  oldest visible store; only explicit new-store intent returns a blank identity
+  flow. The store swap clears location searches, continuations, choices,
+  refresh job/poll state, and restores heading focus. Existing stores, jobs,
+  credentials, bindings, and mutation evidence are not modified.
+- Backend, HOOT, and browser-tour regressions cover one and multiple existing
+  stores, blank new identity, second-store creation, original-store
+  preservation, transient-state isolation, timer cancellation, and focus.
+  Python/JavaScript compilation, XML parsing, and `git diff --check` pass
+  locally. Native Odoo/HOOT runtime, exact-head Actions, and exact-head Odoo.sh
+  qualification remain required before the corrected store is created and
+  product/inventory UAT resumes.
+- Non-blocking UX observation: client-credential exchange failures still use
+  access-token-invalid/revoked wording even when no access token was issued.
+  Future premium UX should distinguish invalid client credentials, wrong or
+  unpermitted shop, app-not-installed, insufficient scopes, revoked/expired
+  access token, and transport failure when Shopify provides reliable evidence.
