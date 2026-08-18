@@ -1738,6 +1738,52 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
+    def _activation_completion_policy(self, store, settings):
+        """Return the finalisation decision for an activation attempt.
+
+        Core owns the transaction and the store lifecycle transition, while
+        an installed domain addon may have a durable readiness proof that has
+        to be established asynchronously after that transition.  The default
+        keeps core-only installations unchanged.  Addons must not perform a
+        remote request here: a false result is a hand-off to their durable
+        job/worker path, and the setup-completion write below is skipped.
+
+        The return value is intentionally a small policy seam rather than a
+        boolean override of ``activate``.  That preserves the core admission,
+        generation fencing, audit and read-side scheduling transaction for
+        every addon and makes it impossible for an extension to bypass the
+        final completion guard accidentally.
+        """
+        del store, settings
+        return {'complete': True}
+
+    @api.model
+    def _activation_preflight(self, store, settings):
+        """Return whether an installed domain permits lifecycle activation.
+
+        This is an additive domain seam before ``action_activate``.  Core has
+        no knowledge of domain-specific post-connection prerequisites, while a
+        domain addon may need to refuse activation before it can enqueue any
+        dependent reconciliation work.  The hook is local-only: it must not
+        perform a Shopify request.  Core-only installations keep the
+        historical behaviour through the affirmative default.
+        """
+        del store, settings
+        return {'allowed': True}
+
+    @api.model
+    def _activation_completion_guard(self, store, settings):
+        """Return whether completion may be written at this exact point.
+
+        An extension may use this final local-only seam to revalidate its
+        asynchronous proof immediately before core writes ``setup_completed``.
+        It must acquire any sanctioned lifecycle locks itself and must not make
+        a network request.  Core-only installations remain unchanged.
+        """
+        del store, settings
+        return True
+
+    @api.model
     def activate(self, store_id):
         """Step 12. Delegate to the existing activation, then hand off.
 
@@ -1752,7 +1798,9 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         Selected read-side discovery schedules start through their existing
         queue producers. No Shopify mutation occurs: every write-side workflow
         keeps its preview, review, and confirmation guards. Activation records
-        that setup is complete and the dashboard takes over.
+        setup as complete only when any installed domain completion policy has
+        returned its proof; otherwise it returns the durable hand-off state and
+        leaves the operator in setup.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
@@ -1792,9 +1840,29 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                     check['label'] for check in readiness['waiting']
                 ),
             ))
+        activation_preflight = self._activation_preflight(store, settings)
+        if activation_preflight and not activation_preflight.get('allowed', True):
+            return self.get_setup_state(store_id=store.id)
         if store.state != 'connected':
             store.action_activate()
             store.invalidate_recordset()
+        # A modular domain may need a post-connection, asynchronous proof
+        # (for example a webhook subscription read-back) before setup is
+        # truthfully complete.  The hook runs only after the lifecycle
+        # transition, and a deferred policy deliberately leaves the completion
+        # timestamp, completion actor, completion audit and read-side cron
+        # nudges untouched.  No remote operation is permitted in this
+        # transaction; the addon must return a durable job hand-off instead.
+        activation_policy = self._activation_completion_policy(store, settings)
+        if activation_policy and not activation_policy.get('complete', True):
+            return self.get_setup_state(store_id=store.id)
+        # A domain proof can become stale between the asynchronous policy
+        # decision and this completion write (disconnect/reconnect or a
+        # credential replacement).  Give the installed domain one final,
+        # local-only fence while the core transaction is still open; a false
+        # result leaves setup incomplete and re-renders the truthful state.
+        if not self._activation_completion_guard(store, settings):
+            return self.get_setup_state(store_id=store.id)
         settings.sudo().write({
             'setup_wizard_step_key': 'review',
             'setup_wizard_step': SETUP_STEP_COUNT,

@@ -592,6 +592,16 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "review":
                 ok = await this._call("activate", { store_id: storeId });
                 if (ok) {
+                    if (["pending", "action_required"].includes(
+                        this.store.setup_completion_state
+                    )) {
+                        this.notification.add(
+                            this.store.setup_completion_message ||
+                            _t("Setup is waiting for verification before it can be completed."),
+                            { type: "warning" }
+                        );
+                        return;
+                    }
                     this.notification.add(
                         _t("Your store is set up. Nothing is syncing yet — the dashboard shows what to do next."),
                         { type: "success" }

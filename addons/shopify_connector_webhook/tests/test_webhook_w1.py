@@ -165,6 +165,89 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE', dispatch)
         self.assertIn(SHOPIFY_API_VERSION, controller)
 
+    def test_setup_activation_defers_completion_until_stored_webhook_proof(self):
+        """The installed W1 hook cannot make the setup wizard false-green."""
+        addon_root = Path(__file__).resolve().parents[1]
+        core_root = addon_root.parent / 'shopify_connector_core'
+        core_setup = (core_root / 'models' /
+                      'shopify_connector_setup_wizard.py').read_text()
+        webhook_setup = (addon_root / 'models' /
+                         'shopify_connector_webhook_setup.py').read_text()
+        wizard_js = (core_root / 'static' / 'src' / 'js' /
+                     'shopify_connector_setup_wizard.js').read_text()
+        self.assertIn('def _activation_completion_policy', core_setup)
+        self.assertLess(
+            core_setup.index('_activation_completion_policy(store, settings)'),
+            core_setup.index("'setup_completed_at': fields.Datetime.now()"),
+        )
+        self.assertIn("'complete': False", webhook_setup)
+        self.assertIn("source='setup_readiness_check'", webhook_setup)
+        self.assertIn("'setup_completion_state': status['state']", webhook_setup)
+        self.assertIn('setup_completion_state', wizard_js)
+        self.assertIn('connected_job_proof', webhook_setup)
+        self.assertIn('expected_connection_generation', webhook_setup)
+        self.assertIn('Setup is waiting for verification',
+                      (core_root / 'static' / 'src' / 'xml' /
+                       'shopify_connector_setup_wizard.xml').read_text())
+        self.assertIn('read-back proof', webhook_setup)
+
+    def test_setup_projection_never_treats_connected_without_proof_as_complete(self):
+        """Static fence for the two-stage lifecycle state projection."""
+        setup = (Path(__file__).resolve().parents[1] / 'models' /
+                 'shopify_connector_webhook_setup.py').read_text()
+        self.assertIn("if settings.setup_completed_at:", setup)
+        self.assertIn("if store.state != 'connected':", setup)
+        self.assertIn("'state': 'pending'", setup)
+        self.assertIn("'state': 'ready_to_complete'", setup)
+        self.assertIn('job.expected_connection_generation', setup)
+        self.assertNotIn("setup_completed_at': fields.Datetime.now()", setup)
+
+    def test_activation_fences_are_fresh_and_client_secret_gate_is_truthful(self):
+        store = (Path(__file__).resolve().parents[2] / 'shopify_connector_core' /
+                 'models' / 'shopify_connector_store.py').read_text()
+        wizard = (Path(__file__).resolve().parents[2] / 'shopify_connector_core' /
+                  'models' / 'shopify_connector_setup_wizard.py').read_text()
+        setup = (Path(__file__).resolve().parents[1] / 'models' /
+                 'shopify_connector_webhook_setup.py').read_text()
+        self.assertLess(
+            store.index('locked_state, locked_generation ='),
+            store.index("if locked_state == 'connected':"),
+        )
+        self.assertIn('def _activation_preflight', wizard)
+        self.assertIn('def _activation_completion_guard', wizard)
+        self.assertIn('Credential._lifecycle_credential_version', setup)
+        self.assertIn('store._lock_store_for_lifecycle()', setup)
+        self.assertIn("'client_secret_required'", setup)
+        self.assertIn('Client ID + Client secret', setup)
+        self.assertIn("'setup_completion_code': status.get('code', False)", setup)
+
+    def test_setup_reconcile_progression_does_not_reenqueue_child_work(self):
+        setup = (Path(__file__).resolve().parents[1] / 'models' /
+                 'shopify_connector_webhook_setup.py').read_text()
+        subscription = (Path(__file__).resolve().parents[1] / 'models' /
+                        'shopify_connector_webhook_subscription.py').read_text()
+        self.assertIn('CHILD_SETUP_JOB_TYPES', setup)
+        self.assertIn("'child_work_pending'", setup)
+        self.assertIn("if status.get('code') == 'child_work_pending'", setup)
+        self.assertIn(
+            "('expected_connection_generation', '=', store.connection_generation)",
+            setup,
+        )
+        self.assertIn('subscription.last_job_id', setup)
+        self.assertIn("if subscription.state == 'active':", setup)
+        self.assertIn('Historical job rows remain immutable audit', setup)
+        self.assertIn('self._require_hmac_client_secret(store)', subscription)
+        self.assertIn('self._require_hmac_client_secret(subscription.store_id)',
+                      subscription)
+        self.assertIn('def _hmac_epoch_for_admitted_job', subscription)
+        self.assertIn('Credential._lifecycle_credential_version', subscription)
+        self.assertIn("'hmac_credential_epoch'] = (", subscription)
+        self.assertIn('job.expected_connection_generation', subscription)
+        self.assertIn('stale active job', setup)
+        self.assertIn("'expected_connection_generation', '=',\n                     store.connection_generation", subscription)
+        self.assertIn("'state': 'cancelled'", subscription)
+        self.assertIn('A stale webhook reconciliation job is in', subscription)
+
     def test_bootstrap_lifecycle_and_scheduler_guards_are_production_paths(self):
         root = Path(__file__).resolve().parents[1]
         subscription = (root / 'models' /

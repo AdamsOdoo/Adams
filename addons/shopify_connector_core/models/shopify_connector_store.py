@@ -1063,7 +1063,8 @@ class ShopifyConnectorStore(models.Model):
         already do. If any check fails, raises `UserError` and leaves
         the state untouched -- never calls Shopify, never runs OAuth,
         and never claims VAL-B2 has passed or that MBQ-05 is resolved
-        (DEC-022 §4.4).
+        (DEC-022 §4.4). An already-connected fresh state is an idempotent
+        no-op and does not repeat those evidence checks or bump the generation.
         """
         self.ensure_one()
         # SEC (Stage R1): Administrator boundary before the store-row lifecycle
@@ -1082,6 +1083,15 @@ class ShopifyConnectorStore(models.Model):
                 'Cannot activate: a disconnect is in progress or has completed '
                 'for this store.'
             )
+        # CORE-R2 idempotency fence: make the activation decision from the
+        # fresh state returned by the lifecycle lock.  A second activation
+        # request may arrive after the first transaction committed (or may
+        # race it and wait on the same row lock); it must be a no-op rather
+        # than a second generation bump and a second audit claim.  In
+        # particular, do not consult cached evidence or write the row again
+        # once the locked state is already connected.
+        if locked_state == 'connected':
+            return None
         if not self.credential_present:
             raise UserError(
                 'Cannot activate: no credential is present for this '

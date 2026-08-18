@@ -104,6 +104,29 @@
                             </div>
                         </div>
 
+                        <!-- Optional domain hand-off state.  Core-only setup
+                             keeps this empty; an installed domain addon may
+                             defer completion to a durable post-activation
+                             proof without making the connector look ready. -->
+                        <div t-if="store.setup_completion_state === 'pending'"
+                             class="sc-band sc-band--info sc_setup__completion_pending"
+                             role="status">
+                            <i class="fa fa-clock-o sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text">Setup is waiting for verification</div>
+                                <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                            </div>
+                        </div>
+                        <div t-if="store.setup_completion_state === 'action_required'"
+                             class="sc-band sc-band--warning sc_setup__completion_action"
+                             role="alert">
+                            <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text">Setup needs an operator action</div>
+                                <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                            </div>
+                        </div>
+
                         <!-- ===== welcome ===== -->
                         <t t-if="state.stepKey === 'welcome'">
                             <p class="sc_setup__lead">

@@ -205,10 +205,90 @@ class SetupWizardCase(TransactionCase):
         user = user or self.admin_a
         store = self._make_store(user=user)
         self._as(user).save_credential(store.id, DUMMY_TOKEN)
+        # The optional W1 addon needs an app client secret for Shopify webhook
+        # HMAC verification.  Keep the core fixture's offline-token journey
+        # valid by seeding that non-returned test evidence before activation;
+        # the production wizard never writes this field from a read payload.
+        if self._webhook_installed():
+            Credential = self.env['shopify.connector.store.credential']
+            credential = Credential.sudo().search([
+                ('store_id', '=', store.id),
+            ], limit=1)
+            Credential.sudo()._credential_surface('_mutate_token').browse(
+                credential.id,
+            ).write({'client_secret': 's1-setup-client-secret'})
         with self._transport(ok=True):
             self._as(user).run_test_connection(store.id)
         store.invalidate_recordset()
         return store
+
+    def _webhook_installed(self):
+        return 'shopify.connector.webhook.registry' in self.env.registry.models
+
+    def _complete_webhook_setup_proof(self, store):
+        """Seed W1's durable read-back evidence for core setup tests.
+
+        This is test-only evidence: no Shopify request is made.  The W1
+        product-export journey owns the same two-stage assertion; core's
+        existing activation tests use this helper only so their original
+        completion assertions remain valid when the optional addon is part of
+        the all-modules qualification database.
+        """
+        if not self._webhook_installed():
+            return
+        from odoo.addons.shopify_connector_core.tools.api_version import (
+            SHOPIFY_API_VERSION,
+        )
+        Credential = self.env['shopify.connector.store.credential']
+        credential = Credential.sudo().search([
+            ('store_id', '=', store.id),
+        ], limit=1)
+        Credential.sudo()._credential_surface('_mutate_token').browse(
+            credential.id,
+        ).write({'client_secret': 's1-webhook-proof-client-secret'})
+        Secret = self.env['shopify.connector.webhook.secret']
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        Secret._ensure_for_store(store)
+        expected = Subscription._ensure_expected_for_store(store)
+        callback_digest = Secret._callback_url_digest_for_store(store)
+        epoch = Subscription._credential_epoch(store)
+        for subscription in expected:
+            subscription._service_write({
+                'state': 'active',
+                'shopify_subscription_gid': (
+                    'gid://shopify/WebhookSubscription/s1-%d'
+                    % subscription.id
+                ),
+                'actual_topic': subscription.topic_enum,
+                'actual_uri_digest': callback_digest,
+                'actual_api_version': SHOPIFY_API_VERSION,
+                'actual_format': 'JSON',
+                'last_reconciled_at': fields.Datetime.now(),
+                'hmac_credential_epoch': epoch,
+                'last_error': False,
+            })
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'webhook_subscription_reconcile'),
+            ('job_source', '=', 'setup_readiness_check'),
+            ('state', '=', 'queued'),
+        ])
+        if jobs:
+            jobs.write({
+                'state': 'running',
+                'started_at': fields.Datetime.now(),
+            })
+            jobs.write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+
+    def _complete_pending_webhook_activation(self, store):
+        if not self._webhook_installed():
+            return
+        self._complete_webhook_setup_proof(store)
+        self._as(self.admin_a).run_readiness(store.id)
+        self._as(self.admin_a).activate(store.id)
 
 
 @tagged('post_install', '-at_install')
@@ -977,6 +1057,70 @@ class TestSetupWizardActivation(SetupWizardCase):
         store.invalidate_recordset()
         return store
 
+    def test_w1_offline_token_without_app_secret_stops_before_activation(self):
+        """Webhook setup must not enqueue impossible subscription work."""
+        if not self._webhook_installed():
+            self.skipTest('shopify_connector_webhook is not installed')
+        self._make_readiness_passable()
+        store = self._make_store(user=self.admin_a)
+        setup = self._as(self.admin_a)
+        setup.save_credential(store.id, DUMMY_TOKEN)
+        with self._transport(ok=True):
+            setup.run_test_connection(store.id)
+        setup.save_directions(store.id, ['sale'])
+        setup.acknowledge_location_mapping(store.id)
+        setup.save_source_of_truth(
+            store.id, 'odoo_source', 'odoo_authoritative',
+        )
+        setup.save_notification(store.id, False)
+        setup.save_first_push_schedule(store.id, False)
+        setup.run_readiness(store.id)
+        Job = self.env['shopify.connector.job'].sudo()
+        webhook_job_types = (
+            'webhook_subscription_bootstrap',
+            'webhook_subscription_reconcile',
+            'webhook_subscription_create',
+            'webhook_subscription_delete',
+            'webhook_subscription_mutation_reconcile',
+        )
+        before_webhook_jobs = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', 'in', webhook_job_types),
+        ])
+        before_readiness_jobs = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), '_send',
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError('offline-token gate contacted Shopify')
+            ),
+        ):
+            state = setup.activate(store.id)
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'setup_incomplete')
+        self.assertEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('job_type', 'in', webhook_job_types),
+            ]),
+            before_webhook_jobs,
+            'the client-secret gate must admit no webhook job',
+        )
+        self.assertGreaterEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('job_type', '=', 'core_readiness_check'),
+            ]),
+            before_readiness_jobs + 1,
+            'activation may record its expected core readiness audit job',
+        )
+        payload = state['store']
+        self.assertEqual(payload['setup_completion_state'], 'action_required')
+        self.assertEqual(payload['setup_completion_code'], 'client_secret_required')
+        self.assertIn('Client ID + Client secret', payload['setup_completion_message'])
+
     def test_activation_re_runs_readiness_when_the_step_was_not_run(self):
         """PR #204 Odoo.sh qualification correction, 2026-07-31.
 
@@ -1050,14 +1194,27 @@ class TestSetupWizardActivation(SetupWizardCase):
         # reaching this line.
         self.assertIn(store.last_readiness_result, ('pass', 'warning'))
         self.assertEqual(store.state, 'connected')
-        self.assertEqual(
-            Job.search_count([
-                ('store_id', '=', store.id),
-                ('state', 'in', ('queued', 'running')),
-            ]),
-            jobs_before,
-            'activation must enqueue no domain job',
-        )
+        if self._webhook_installed():
+            self.assertEqual(
+                Job.search_count([
+                    ('store_id', '=', store.id),
+                    ('job_type', '=', 'webhook_subscription_reconcile'),
+                    ('job_source', '=', 'setup_readiness_check'),
+                    ('state', 'in', ('queued', 'running')),
+                ]),
+                1,
+                'W1 activation must hand off exactly one reconciliation job',
+            )
+            self.assertFalse(self._settings(store).setup_completed_at)
+        else:
+            self.assertEqual(
+                Job.search_count([
+                    ('store_id', '=', store.id),
+                    ('state', 'in', ('queued', 'running')),
+                ]),
+                jobs_before,
+                'activation must enqueue no domain job',
+            )
 
     def test_activation_is_refused_while_an_essential_check_fails(self):
         """A genuine essential failure, produced rather than simulated.
@@ -1104,6 +1261,8 @@ class TestSetupWizardActivation(SetupWizardCase):
 
         with patch.object(Client, '_send', refuse):
             self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         store.invalidate_recordset()
         self.assertEqual(store.state, 'connected')
         self.assertEqual(
@@ -1149,6 +1308,8 @@ class TestSetupWizardActivation(SetupWizardCase):
 
         with patch.object(Client, '_send', refuse):
             self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         store.invalidate_recordset()
         self.assertEqual(
             store.state, 'connected',
@@ -1182,6 +1343,8 @@ class TestSetupWizardActivation(SetupWizardCase):
     def test_completion_is_audited_with_the_actor(self):
         store = self._complete_through_readiness()
         self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         audits = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),
             ('job_type', '=', 'core_manual_maintenance'),

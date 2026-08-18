@@ -3278,6 +3278,67 @@ class _GenuineRaceHelpers:
 
 
 @tagged('post_install', '-at_install')
+class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
+    """Two real PostgreSQL callers must not bump a connected store twice."""
+
+    def test_concurrent_activation_of_already_connected_store_is_idempotent(self):
+        dbname = self.env.cr.dbname
+        store_id = None
+        threads = []
+        results = queue.Queue()
+        barrier = threading.Barrier(2)
+        try:
+            store_id, _domain, _job = self._commit_connected_fixture(dbname)
+            before = self._observe_store(dbname, store_id)
+            generation_before = before[1]
+
+            def activate_once():
+                cr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    cr = self._open_bounded(dbname, read_committed=True)
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    store = env['shopify.connector.store'].browse(store_id)
+                    barrier.wait(timeout=self.BOUND_SECONDS)
+                    # This is the real public production method on an
+                    # independent backend; no state or lock seam is patched.
+                    store.action_activate()
+                    cr.commit()
+                    results.put({'ok': True})
+                except BaseException as exc:
+                    results.put(self._sanitize(exc, 'activation'))
+                finally:
+                    if cr is not None:
+                        try:
+                            cr.rollback()
+                        finally:
+                            cr.close()
+
+            threads = [
+                threading.Thread(target=activate_once, daemon=True)
+                for _ in range(2)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=self.BOUND_SECONDS)
+            self._assert_workers_dead(threads)
+            outcomes = [results.get_nowait(), results.get_nowait()]
+            self.assertEqual(outcomes, [{'ok': True}, {'ok': True}])
+            after = self._observe_store(dbname, store_id)
+            self.assertEqual(after[0], 'connected')
+            self.assertEqual(
+                after[1], generation_before,
+                'a repeated activation must not bump the connection epoch',
+            )
+        finally:
+            for thread in threads:
+                if thread.is_alive():
+                    thread.join(timeout=self.BOUND_SECONDS)
+            self._cleanup(dbname, store_id)
+
+
+@tagged('post_install', '-at_install')
 class TestLifecycleAdmissionRaceGenuine(_GenuineRaceHelpers, TransactionCase):
     """CORE-R2 review 4691182306 #1/#2 -- GENUINE independent-transaction proof
     that the atomic lifecycle admission (`_admit_lifecycle`, a store-row FOR SHARE

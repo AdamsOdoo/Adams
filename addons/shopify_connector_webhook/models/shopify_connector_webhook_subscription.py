@@ -93,6 +93,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     """Expected-vs-observed subscription state for one store/topic."""
 
     _name = 'shopify.connector.webhook.subscription'
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Webhook Subscription'
     _order = 'store_id, topic, id'
 
@@ -205,6 +206,72 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         return credential.credential_epoch if credential else 0
 
     @api.model
+    def _hmac_epoch_for_admitted_job(self, job):
+        """Read the current HMAC epoch under the finalization lock fence.
+
+        A mutation reconciliation consequence is the last local write after a
+        Shopify read-back.  It must not copy an epoch from a caller payload or
+        from the original attempt snapshot: a credential replacement may have
+        raced the network call.  Reuse the sanctioned store -> credential
+        lifecycle lock order and compare the immutable job generation while
+        both rows are held.  If the job no longer describes the connected
+        store, refuse the consequence so the dispatcher retries/reroutes the
+        full reconciliation rather than recording stale HMAC proof.
+        """
+        job.ensure_one()
+        store = job.store_id
+        locked_state, locked_generation = store._lock_store_for_lifecycle()
+        if (
+            locked_state != 'connected'
+            or locked_generation != job.expected_connection_generation
+        ):
+            raise ShopifyQuiescedError(
+                'Webhook mutation evidence was superseded before local '
+                'HMAC proof finalization.'
+            )
+        Credential = self.env[
+            'shopify.connector.store.credential'
+        ].sudo()
+        credential_version = Credential._lifecycle_credential_version(
+            store, lock=True,
+        )
+        if not credential_version:
+            raise ShopifyQuiescedError(
+                'Webhook mutation evidence has no current credential epoch.'
+            )
+        credential = Credential.browse(credential_version[0])
+        credential.invalidate_recordset()
+        if credential.credential_state != 'present':
+            raise ShopifyQuiescedError(
+                'Webhook mutation evidence has no present credential epoch.'
+            )
+        return credential.credential_epoch
+
+    @api.model
+    def _has_hmac_client_secret(self, store):
+        """Return whether this store can verify Shopify webhook signatures."""
+        credential = self.env[
+            'shopify.connector.store.credential'
+        ].sudo().search([('store_id', '=', store.id)], limit=1)
+        return bool(
+            credential
+            and credential.credential_state == 'present'
+            and credential.client_secret
+        )
+
+    @api.model
+    def _require_hmac_client_secret(self, store):
+        """Fail closed before any subscription job or remote operation."""
+        if not self._has_hmac_client_secret(store):
+            raise ValidationError(
+                'Webhook subscriptions require a stored Shopify app client '
+                'secret for HMAC verification. Offline access-token mode alone '
+                'cannot be used for webhook setup; use Client ID + Client '
+                'secret token-exchange mode and retry.'
+            )
+        return True
+
+    @api.model
     def _ensure_expected_for_store(self, store):
         """Materialize the registry rows without contacting Shopify."""
         store.ensure_one()
@@ -308,12 +375,66 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     ('job_type', '=', job_type),
                     ('res_model', '=', res_model),
                     ('res_id', '=', res_id),
+                    ('expected_connection_generation', '=',
+                     store.connection_generation),
                     ('state', 'not in', (
                         'succeeded', 'failed_final', 'skipped', 'cancelled',
                     )),
                 ], limit=1)
                 if active:
                     return active
+                # A reconnect makes a setup parent job stale, but its
+                # operation-scope key still serializes the old active row.
+                # Retire only that read-only parent through the durable job
+                # state path, then retry once with a bounded nonce.  Mutation
+                # jobs are deliberately not auto-retired: an uncertain remote
+                # effect remains a manual-review fence.
+                if (
+                    job_type == 'webhook_subscription_reconcile'
+                    and source == 'setup_readiness_check'
+                ):
+                    stale = Job.search([
+                        ('store_id', '=', store.id),
+                        ('job_type', '=', job_type),
+                        ('res_model', '=', res_model),
+                        ('res_id', '=', res_id),
+                        ('expected_connection_generation', '!=',
+                         store.connection_generation),
+                        ('state', 'not in', (
+                            'succeeded', 'failed_final', 'skipped',
+                            'cancelled',
+                        )),
+                    ], order='id asc')
+                    for stale_job in stale:
+                        if stale_job.state == 'blocked_manual_review':
+                            raise ValidationError(
+                                'A stale webhook reconciliation job is in '
+                                'manual review; resolve it before starting a '
+                                'new setup generation.'
+                            )
+                        if stale_job._has_mutation_attempt_evidence():
+                            raise ValidationError(
+                                'A stale webhook reconciliation job carries '
+                                'mutation evidence; resolve it manually before '
+                                'starting a new setup generation.'
+                            )
+                        from_state = stale_job.state
+                        stale_job.sudo().write({
+                            'state': 'cancelled',
+                            'cancel_reason': (
+                                'Superseded by a newer connection generation; '
+                                'no remote mutation evidence was attached.'
+                            ),
+                            'finished_at': fields.Datetime.now(),
+                            'manual_review_subreason': False,
+                        })
+                        stale_job._log_transition(
+                            'manual_action',
+                            'Stale setup reconciliation retired before a '
+                            'fresh current-generation enqueue.',
+                            from_state=from_state,
+                            to_state='cancelled',
+                        )
                 if retry:
                     raise
                 candidate = canonical_sha256({
@@ -412,6 +533,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
 
     @api.model
     def _enqueue_subscription_mutation(self, subscription, action, source):
+        self._require_hmac_client_secret(subscription.store_id)
         job_type = (
             'webhook_subscription_create'
             if action == 'create' else 'webhook_subscription_delete'
@@ -450,6 +572,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     ):
         """Compare expected records with Shopify and enqueue safe mutations."""
         store.ensure_one()
+        self._require_hmac_client_secret(store)
         allowed_states = (
             ('setup_incomplete', 'reconnect_needed', 'connected')
             if bootstrap else ('connected',)
@@ -534,6 +657,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     def _enqueue_store_bootstrap(self, store):
         """Queue a read-only lifecycle bootstrap before ordinary connection."""
         store.ensure_one()
+        self._require_hmac_client_secret(store)
         if store.state not in (
             'setup_incomplete', 'reconnect_needed', 'connected',
         ):
@@ -560,6 +684,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     @api.model
     def _enqueue_store_reconcile(self, store, source='manual_sync'):
         store.ensure_one()
+        self._require_hmac_client_secret(store)
         if store.state != 'connected':
             raise ValidationError(
                 'Webhook subscription reconciliation requires a connected store.'
@@ -627,6 +752,20 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         processed = 0
         cron = self.env['ir.cron'].sudo() if self.env.context.get('cron_id') else False
         for store in stores:
+            if not self._has_hmac_client_secret(store):
+                # Keep the bounded fairness cursor moving, but admit no
+                # subscription work for an offline-token store without the
+                # app secret needed to verify Shopify deliveries.  The health
+                # projection explains the remediation to the operator.
+                store.sudo().write({
+                    'webhook_reconciliation_scheduled_at': fields.Datetime.now(),
+                })
+                processed += 1
+                if cron:
+                    remaining = _bounded_sweep_remaining(len(stores), processed)
+                    if cron._commit_progress(1, remaining=remaining) <= 0:
+                        break
+                continue
             try:
                 self._enqueue_store_reconcile(store, 'scheduled_sync')
             except IntegrityError:
@@ -1014,6 +1153,13 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     'active' if phase == 'reconciliation'
                     else 'pending_verification'
                 )
+                if phase == 'reconciliation':
+                    # The helper acquires the finalization fence and reads the
+                    # epoch from the locked current credential.  Payloads and
+                    # attempt snapshots are never trusted for HMAC evidence.
+                    values['hmac_credential_epoch'] = (
+                        self._hmac_epoch_for_admitted_job(job)
+                    )
             else:
                 values.update({
                     'state': 'missing',
@@ -1055,6 +1201,10 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
     @api.constrains('store_id', 'last_job_id')
     def _check_sec3_parent_scope(self):
         self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()
 
 
 class ShopifyConnectorWebhookSubscriptionStore(models.Model):
@@ -1118,6 +1268,15 @@ class ShopifyConnectorWebhookSubscriptionStore(models.Model):
                 store.webhook_health_reason = (
                     'Webhook proof is not applicable before activation. Use '
                     'Bootstrap / reconcile webhooks, then complete connection.'
+                )
+            elif not self.env[
+                'shopify.connector.webhook.secret'
+            ]._client_secret_for_store(store):
+                store.webhook_health = 'degraded'
+                store.webhook_health_reason = (
+                    'A Shopify app client secret is required for webhook HMAC '
+                    'verification. Use Client ID + Client secret token-exchange '
+                    'mode before reconciling subscriptions.'
                 )
             elif self.env[
                 'shopify.connector.webhook.secret'

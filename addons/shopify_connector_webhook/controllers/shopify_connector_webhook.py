@@ -46,10 +46,10 @@ class ShopifyConnectorWebhookController(http.Controller):
     def read_bounded_body(http_request):
         """Read at most ``MAX_WEBHOOK_BODY_BYTES + 1`` raw bytes.
 
-        ``get_data()`` would buffer an attacker-controlled chunked request
-        before the size check.  A declared oversized body is rejected before
-        reading, while an unknown/chunked body is consumed in fixed chunks and
-        rejected as soon as the bounded ceiling is crossed.
+        The framework's bulk-body helper would buffer an attacker-controlled
+        chunked request before the size check.  A declared oversized body is
+        rejected before reading, while an unknown/chunked body is consumed in
+        fixed chunks and rejected as soon as the bounded ceiling is crossed.
         """
         headers = http_request.headers
         declared = headers.get('Content-Length')

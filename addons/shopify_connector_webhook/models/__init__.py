@@ -6,3 +6,4 @@ from . import shopify_connector_webhook_subscription
 from . import shopify_connector_webhook_job
 from . import shopify_connector_webhook_dispatch
 from . import shopify_connector_webhook_readiness
+from . import shopify_connector_webhook_setup

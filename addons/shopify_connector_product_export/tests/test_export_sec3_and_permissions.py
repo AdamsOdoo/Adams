@@ -198,9 +198,10 @@ class TestExportSec3AndPermissions(ExportCase):
         readiness check is satisfied directly (this test's subject is the
         domain-flag recognition, not the credential/scope/cron plumbing
         already covered by core's own setup-wizard suite), and the
-        transport is a stand-in that fails the test if reached at all, so
-        neither a job nor a Shopify request can hide inside a passing
-        result.
+        transport is a stand-in that fails the test if reached at all.  With
+        W1 installed the first activation is intentionally a durable webhook
+        reconciliation hand-off, not setup completion; the fixture proves
+        that state before installing stored read-back evidence.
         """
         Check = self.env['shopify.connector.readiness.check']
         admin = new_test_user(
@@ -213,28 +214,82 @@ class TestExportSec3AndPermissions(ExportCase):
         self.env['ir.config_parameter'].sudo().set_param(
             'web.base.url', 'https://export-activate-test.example.test',
         )
-        self.store.sudo().write({
+        # W1 makes webhook proof fail closed once a store is connected.  This
+        # test is specifically the pre-activation Product-Export-only setup
+        # contract, so when the optional webhook addon is installed use a
+        # fresh setup-incomplete store (the model's default lifecycle state)
+        # rather than making a connected fixture look webhook-ready.  The
+        # setup wizard then evaluates webhook_hmac as truthful Not required;
+        # no readiness result or webhook evidence is force-written.
+        webhook_installed = (
+            'shopify.connector.webhook.registry' in self.env.registry.models
+        )
+        activation_store = self.store
+        activation_settings = self.settings
+        if webhook_installed:
+            activation_store = self.Store.sudo().create({
+                'name': 'Export Activation Only Store',
+                'shop_domain': 'export-activate-only-%s.myshopify.com'
+                % self.store.id,
+            })
+            self.env[
+                'shopify.connector.store.credential'
+            ].sudo()._credential_surface('_mutate_token').create({
+                'store_id': activation_store.id,
+                'access_token': DUMMY_TOKEN,
+                # W1 webhook readiness needs an app client secret even for
+                # this product-export-only journey.  Seed the same truthful
+                # non-secret test evidence before activation so the first
+                # stage can enqueue reconciliation and the second stage can
+                # prove completion; an offline token alone is intentionally
+                # gated by the installed webhook addon.
+                'client_secret': 'export-activation-client-secret',
+                'credential_state': 'present',
+                'credential_epoch': 1,
+            })
+            activation_settings = self.env[
+                'shopify.connector.store.settings'
+            ].sudo().create({
+                'store_id': activation_store.id,
+                'product_export_domain_enabled': True,
+                'price_source_of_truth': 'odoo_authoritative',
+            })
+        activation_store.sudo().write({
             # `ExportCase` creates the credential ROW directly (bypassing
             # `action_set_token`), so `credential_present` -- a plain
             # stored flag that service normally sets as a side effect --
             # stays at its default False unless set explicitly here.
             'credential_present': True,
+            # The separate setup-incomplete fixture must also carry the
+            # service's non-secret verification mirror: action_activate is
+            # allowed to consume only current stored evidence.
+            'credential_last_verified_at': fields.Datetime.now(),
             'last_test_connection_result': 'pass',
             'api_health_state': 'normal',
             'granted_scopes': json.dumps(sorted(
                 set(Check.REQUIRED_MVP_SCOPES) | {'write_products'}
             )),
         })
-        self.settings.sudo().write({
+        # The capability-aware fixture above already owns these values for a
+        # new setup store; writing them again is harmless and keeps the
+        # core-only path identical to the historical ExportCase fixture.
+        activation_settings.sudo().write({
             'product_export_domain_enabled': True,
             'product_domain_enabled': False,
             'sale_domain_enabled': False,
             'inventory_domain_enabled': False,
             'fulfillment_domain_enabled': False,
         })
+        if webhook_installed:
+            self.assertEqual(activation_store.state, 'setup_incomplete')
+            webhook_check = Check._check_webhook_hmac(activation_store)
+            self.assertEqual(webhook_check['result'], Check.RESULT_PASS)
+            self.assertTrue(webhook_check['not_applicable'])
+            self.assertIn('Bootstrap / reconcile webhooks', webhook_check['reason'])
         Setup = self.env['shopify.connector.setup.wizard']
+        setup_jobs = self.env['shopify.connector.job'].sudo()
         jobs_before = self.env['shopify.connector.job'].sudo().search_count([
-            ('store_id', '=', self.store.id),
+            ('store_id', '=', activation_store.id),
             ('state', 'in', ('queued', 'running')),
         ])
         Client = type(self.env['shopify.connector.api.client'])
@@ -245,22 +300,231 @@ class TestExportSec3AndPermissions(ExportCase):
             )
 
         with patch.object(Client, '_send', refuse):
-            Setup.with_user(admin).activate(self.store.id)
-        self.store.invalidate_recordset()
-        self.settings.invalidate_recordset()
-        self.assertEqual(self.store.last_readiness_result, 'pass')
-        self.assertTrue(self.settings.product_export_domain_enabled)
-        self.assertFalse(self.settings.product_domain_enabled)
-        self.assertFalse(self.settings.sale_domain_enabled)
-        self.assertFalse(self.settings.inventory_domain_enabled)
-        self.assertFalse(self.settings.fulfillment_domain_enabled)
+            Setup.with_user(admin).activate(activation_store.id)
+        activation_store.invalidate_recordset()
+        activation_settings.invalidate_recordset()
+        self.assertEqual(activation_store.last_readiness_result, 'pass')
+        self.assertTrue(activation_settings.product_export_domain_enabled)
+        self.assertFalse(activation_settings.product_domain_enabled)
+        self.assertFalse(activation_settings.sale_domain_enabled)
+        self.assertFalse(activation_settings.inventory_domain_enabled)
+        self.assertFalse(activation_settings.fulfillment_domain_enabled)
+        if webhook_installed:
+            # The first activation only changes the lifecycle state and
+            # admits one durable webhook reconciliation.  It must not write
+            # setup_completed_at or redirect the operator as though proof
+            # existed.  This is deliberately asserted through the production
+            # setup service, not by forcing a store state in the fixture.
+            self.assertEqual(activation_store.state, 'connected')
+            self.assertFalse(activation_settings.setup_completed_at)
+            pending_state = Setup.with_user(admin).get_setup_state(
+                store_id=activation_store.id,
+            )['store']
+            self.assertEqual(pending_state['setup_completion_state'], 'pending')
+            self.assertIn('read-back', pending_state['setup_completion_message'])
+            initial_reconcile_jobs = setup_jobs.search([
+                ('store_id', '=', activation_store.id),
+                ('job_type', '=', 'webhook_subscription_reconcile'),
+                ('job_source', '=', 'setup_readiness_check'),
+            ])
+            self.assertEqual(len(initial_reconcile_jobs), 1)
+
+            # Exercise the real parent -> Layer-2 child progression without a
+            # network call.  A terminal child failure is surfaced first, then
+            # a sanctioned retry creates a new lineage; its create result is
+            # pending until the final Shopify read-back evidence makes setup
+            # completable, and the parent is never duplicated.
+            from odoo.addons.shopify_connector_core.tools.api_version import (
+                SHOPIFY_API_VERSION,
+            )
+            Credential = self.env['shopify.connector.store.credential']
+            credential = Credential.sudo().search([
+                ('store_id', '=', activation_store.id),
+            ], limit=1)
+            Credential.sudo()._credential_surface('_mutate_token').browse(
+                credential.id,
+            ).write({'client_secret': 'export-activation-client-secret'})
+            Secret = self.env['shopify.connector.webhook.secret']
+            Subscription = self.env['shopify.connector.webhook.subscription']
+            Secret._ensure_for_store(activation_store)
+            expected = Subscription._ensure_expected_for_store(activation_store)
+            failed_child_job = Subscription._enqueue_subscription_mutation(
+                expected[0], 'create', 'setup_readiness_check',
+            )
+            initial_reconcile_jobs.sudo().write({
+                'state': 'running',
+                'started_at': fields.Datetime.now(),
+            })
+            initial_reconcile_jobs.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            failed_child_job.sudo().write({
+                'state': 'failed_final',
+                'finished_at': fields.Datetime.now(),
+            })
+            Subscription._apply_subscription_consequence(
+                failed_child_job, False, 'bootstrap', {
+                    'action': 'fail_final',
+                    'message': 'Controlled validation failure before retry.',
+                },
+            )
+            failed_state = Setup.with_user(admin).get_setup_state(
+                store_id=activation_store.id,
+            )['store']
+            self.assertEqual(
+                failed_state['setup_completion_state'], 'action_required',
+            )
+            self.assertEqual(
+                failed_state['setup_completion_code'], 'child_failed_final',
+            )
+            # The sanctioned subscription service creates a new bounded
+            # lineage after the terminal failure.  The old row remains audit
+            # evidence, but must not poison the retry or its later proof.
+            retry_child_job = Subscription._enqueue_subscription_mutation(
+                expected[0], 'create', 'setup_readiness_check',
+            )
+            self.assertNotEqual(retry_child_job.id, failed_child_job.id)
+            self.assertEqual(failed_child_job.state, 'failed_final')
+            self.assertEqual(expected[0].last_job_id, retry_child_job)
+            pending_state = Setup.with_user(admin).get_setup_state(
+                store_id=activation_store.id,
+            )['store']
+            self.assertEqual(
+                pending_state['setup_completion_state'], 'pending',
+            )
+            self.assertEqual(
+                pending_state['setup_completion_code'], 'child_work_pending',
+            )
+            self.assertIn('read-back', pending_state['setup_completion_message'])
+            self.assertEqual(
+                setup_jobs.search_count([
+                    ('store_id', '=', activation_store.id),
+                    ('job_type', '=', 'webhook_subscription_reconcile'),
+                    ('job_source', '=', 'setup_readiness_check'),
+                ]), 1,
+            )
+            retry_child_job.sudo().write({
+                'state': 'running',
+                'started_at': fields.Datetime.now(),
+            })
+            callback_digest = Secret._callback_url_digest_for_store(
+                activation_store,
+            )
+            Subscription._apply_subscription_consequence(
+                retry_child_job, False, 'bootstrap', {
+                    'action': 'succeed',
+                    'domain_payload': {
+                        'shopify_subscription_gid': (
+                            'gid://shopify/WebhookSubscription/export-%d'
+                            % expected[0].id
+                        ),
+                        'actual_topic': expected[0].topic_enum,
+                        'actual_uri_digest': callback_digest,
+                        'actual_api_version': SHOPIFY_API_VERSION,
+                        'actual_format': 'JSON',
+                    },
+                },
+            )
+            retry_child_job.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            pending_verification_state = Setup.with_user(admin).get_setup_state(
+                store_id=activation_store.id,
+            )['store']
+            self.assertEqual(
+                pending_verification_state['setup_completion_state'], 'pending',
+            )
+            self.assertEqual(
+                pending_verification_state['setup_completion_code'],
+                'child_work_pending',
+            )
+            # The dispatcher's reconciliation consequence is the local
+            # representation of a verified Shopify read-back.  It advances
+            # only the retried lineage to active; the remaining expected
+            # rows receive the same stored proof below.
+            Subscription._apply_subscription_consequence(
+                retry_child_job, False, 'reconciliation', {
+                    'action': 'succeed',
+                    'domain_payload': {
+                        'shopify_subscription_gid': (
+                            'gid://shopify/WebhookSubscription/export-%d'
+                            % expected[0].id
+                        ),
+                        'actual_topic': expected[0].topic_enum,
+                        'actual_uri_digest': callback_digest,
+                        'actual_api_version': SHOPIFY_API_VERSION,
+                        'actual_format': 'JSON',
+                    },
+                },
+            )
+            retry_child_job.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            expected[0].invalidate_recordset()
+            callback_digest = Secret._callback_url_digest_for_store(
+                activation_store,
+            )
+            epoch = Subscription._credential_epoch(activation_store)
+            self.assertEqual(
+                expected[0].hmac_credential_epoch,
+                epoch,
+                'reconciliation consequence must persist its fenced epoch',
+            )
+            for subscription in expected[1:]:
+                subscription._service_write({
+                    'state': 'active',
+                    'shopify_subscription_gid': (
+                        'gid://shopify/WebhookSubscription/export-%d'
+                        % subscription.id
+                    ),
+                    'actual_topic': subscription.topic_enum,
+                    'actual_uri_digest': callback_digest,
+                    'actual_api_version': SHOPIFY_API_VERSION,
+                    'actual_format': 'JSON',
+                    'last_reconciled_at': fields.Datetime.now(),
+                    'hmac_credential_epoch': epoch,
+                    'last_error': False,
+                })
+            # The fixture has now installed the worker's durable Shopify
+            # read-back proof through the subscription service; no state is
+            # force-written to hide an unfinished child.
+            post_activation_webhook = Check._check_webhook_hmac(
+                activation_store,
+            )
+            self.assertEqual(
+                post_activation_webhook['result'], Check.RESULT_PASS,
+            )
+            with patch.object(Client, '_send', refuse):
+                Setup.with_user(admin).activate(activation_store.id)
+            activation_store.invalidate_recordset()
+            activation_settings.invalidate_recordset()
+            self.assertTrue(activation_settings.setup_completed_at)
+            self.assertEqual(
+                Setup.with_user(admin).get_setup_state(
+                    store_id=activation_store.id,
+                )['store']['setup_completion_state'],
+                'complete',
+            )
+            self.assertEqual(
+                setup_jobs.search_count([
+                    ('store_id', '=', activation_store.id),
+                    ('job_type', '=', 'webhook_subscription_reconcile'),
+                    ('job_source', '=', 'setup_readiness_check'),
+                ]),
+                1,
+                'repeated activation must not admit a duplicate reconciliation',
+            )
         self.assertEqual(
             self.env['shopify.connector.job'].sudo().search_count([
-                ('store_id', '=', self.store.id),
+                ('store_id', '=', activation_store.id),
                 ('state', 'in', ('queued', 'running')),
             ]),
             jobs_before,
-            'activation must admit no export job',
+            'activation must admit no export job (the W1 reconciliation is '
+            'a separate setup-readiness hand-off)',
         )
 
     # ------------------------------------------------------------------

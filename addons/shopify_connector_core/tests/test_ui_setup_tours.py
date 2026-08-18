@@ -131,8 +131,27 @@ class TestUiSetupTours(HttpCase):
         settings = self.env['shopify.connector.store.settings'].sudo().search(
             [('store_id', '=', store.id)], limit=1,
         )
-        self.assertTrue(settings.setup_completed_at)
-        self.assertEqual(settings.setup_completed_uid.login, 's1_tour_admin')
+        webhook_installed = (
+            'shopify.connector.webhook.registry' in self.env.registry.models
+        )
+        if webhook_installed:
+            # W1 makes connection and setup completion two truthful stages:
+            # the browser's first activation leaves a durable reconciliation
+            # job and keeps the operator on setup until its Shopify read-back
+            # evidence exists.
+            self.assertFalse(settings.setup_completed_at)
+            self.assertEqual(store.state, 'connected')
+            self.assertEqual(
+                self.env['shopify.connector.job'].sudo().search_count([
+                    ('store_id', '=', store.id),
+                    ('job_type', '=', 'webhook_subscription_reconcile'),
+                    ('job_source', '=', 'setup_readiness_check'),
+                ]),
+                1,
+            )
+        else:
+            self.assertTrue(settings.setup_completed_at)
+            self.assertEqual(settings.setup_completed_uid.login, 's1_tour_admin')
         self.assertTrue(
             settings.sale_domain_enabled,
             'the direction chosen in the browser did not persist',
@@ -143,14 +162,17 @@ class TestUiSetupTours(HttpCase):
             settings.notification_default_enabled,
             'the notification default must stay off unless opted into',
         )
-        # Activation starts nothing.
-        self.assertFalse(
-            self.env['shopify.connector.job'].sudo().search([
-                ('store_id', '=', store.id),
-                ('state', 'in', ('queued', 'running')),
-            ]),
-            'activation enqueued a job',
-        )
+        # Core-only activation starts nothing.  W1's pending setup hand-off
+        # is the one intentional exception and is checked above by its exact
+        # job type/source, never mistaken for a domain sync.
+        if not webhook_installed:
+            self.assertFalse(
+                self.env['shopify.connector.job'].sudo().search([
+                    ('store_id', '=', store.id),
+                    ('state', 'in', ('queued', 'running')),
+                ]),
+                'activation enqueued a job',
+            )
         # And the credential never came back out.
         logs = self.env['shopify.connector.job.log'].sudo().search([
             ('store_id', '=', store.id),

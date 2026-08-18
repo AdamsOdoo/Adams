@@ -304,8 +304,12 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         },
         { trigger: `${CONTINUE}:contains('Activate')`, run: "click" },
         {
-            trigger: ".o_sc_dashboard",
-            content: "Activation hands off to the dashboard.",
+            // The optional W1 foundation deliberately keeps setup on this
+            // screen until its durable Shopify subscription read-back proof
+            // exists.  Core-only installations still hand off directly to
+            // the dashboard, so the tour accepts either truthful outcome.
+            trigger: ".o_sc_dashboard, .sc_setup__completion_pending",
+            content: "Activation either completes or truthfully waits for webhook proof.",
         },
     ],
 });

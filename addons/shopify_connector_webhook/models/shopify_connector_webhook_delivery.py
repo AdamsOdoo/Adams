@@ -38,6 +38,7 @@ class ShopifyConnectorWebhookDelivery(models.Model):
     """
 
     _name = 'shopify.connector.webhook.delivery'
+    _inherit = ['shopify.connector.scope.mixin']
     _description = 'Shopify Connector Webhook Delivery'
     _order = 'received_at desc, id desc'
 
@@ -135,6 +136,21 @@ class ShopifyConnectorWebhookDelivery(models.Model):
                 'retention service.'
             )
         return super().unlink()
+
+    # SEC-3: a delivery's diagnostic job must belong to the same Shopify
+    # store.  Company equality is not enough because one company may own
+    # several stores; the scope mixin also quarantines historic mismatches.
+    @api.model
+    def _sec3_parent_scope_relations(self):
+        return (('job_id', 'store'),)
+
+    @api.constrains('store_id', 'job_id')
+    def _check_sec3_parent_scope(self):
+        self._sec3_check_parent_scope()
+
+    def init(self):
+        super().init()
+        self._sec3_quarantine_scope_mismatches()
 
     @api.model
     def _safe_text(self, value, limit=256):

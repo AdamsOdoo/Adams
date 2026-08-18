@@ -118,6 +118,13 @@ SEC3_MODELS = (
     # points at a job and (once applied) at a binding, so it is in the matrix
     # rather than trusted to be safe by resemblance.
     ('shopify.connector.product.match.decision', '_row_match_decision'),
+    # W1 webhook evidence is control-plane data, not an unscoped transport
+    # detail.  Keep all three durable store-rooted rows in the same matrix so
+    # ACL/rule changes cannot make the public ingress leak another company's
+    # callback, delivery or subscription evidence.
+    ('shopify.connector.webhook.secret', '_row_webhook_secret'),
+    ('shopify.connector.webhook.delivery', '_row_webhook_delivery'),
+    ('shopify.connector.webhook.subscription', '_row_webhook_subscription'),
 )
 
 # Models that deliberately grant NO `ir.model.access.csv` permission, so no
@@ -152,6 +159,8 @@ SEC3_STORE_RELATIONS = (
     ('shopify.connector.product.match.decision', 'job_id'),
     ('shopify.connector.product.match.decision', 'resulting_template_binding_id'),
     ('shopify.connector.product.match.decision', 'resulting_variant_binding_id'),
+    ('shopify.connector.webhook.delivery', 'job_id'),
+    ('shopify.connector.webhook.subscription', 'last_job_id'),
 )
 
 # Relations whose scope disagreement is structurally impossible, because the
@@ -375,6 +384,55 @@ class Sec3Base(TransactionCase):
             return existing
         return Credential._credential_surface('_mutate_token').create({
             'store_id': store.id, 'credential_epoch': 1,
+        })
+
+    def _row_webhook_secret(self, store):
+        """Mint callback evidence through the W1 service surface."""
+        return self.env[
+            'shopify.connector.webhook.secret'
+        ].sudo()._ensure_for_store(store)
+
+    def _row_webhook_delivery(self, store):
+        """Use the verified-ingestion service, including its durable job."""
+        Delivery = self.env['shopify.connector.webhook.delivery']
+        raw_marker = 'sec3-webhook-%s-%s' % (self.tag, store.id)
+        return Delivery._ingest(
+            store,
+            delivery_id='sec3-delivery-%s-%s' % (self.tag, store.id),
+            event_id='sec3-event-%s-%s' % (self.tag, store.id),
+            topic='app/uninstalled',
+            shop_domain=store.shop_domain,
+            api_version=store.api_version,
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=fields.Datetime.now(),
+            payload_digest=hashlib.sha256(raw_marker.encode()).hexdigest(),
+            payload_size=0,
+            payload_identity={'id': str(store.id)},
+        )[0]
+
+    def _row_webhook_subscription(self, store):
+        """Create one active-registry row through the service sentinel."""
+        Subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ].sudo()
+        existing = Subscription.search([
+            ('store_id', '=', store.id),
+            ('topic', '=', 'app/uninstalled'),
+        ], limit=1)
+        if existing:
+            return existing
+        spec = self.env[
+            'shopify.connector.webhook.registry'
+        ].topic_spec('app/uninstalled')
+        return Subscription.with_context(
+            **Subscription._service_context()
+        ).create({
+            'store_id': store.id,
+            'topic': 'app/uninstalled',
+            'topic_enum': spec['enum'],
+            'expected': True,
+            'expected_api_version': store.api_version,
+            'state': 'expected',
         })
 
     def _row_access_token(self, store):
