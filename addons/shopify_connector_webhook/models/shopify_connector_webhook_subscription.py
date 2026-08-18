@@ -38,30 +38,6 @@ query ConnectorWebhookSubscriptions($first: Int!, $after: String) {
 }
 """
 
-SUBSCRIPTION_CREATE_MUTATION = """
-mutation ConnectorWebhookSubscriptionCreate(
-  $topic: WebhookSubscriptionTopic!,
-  $webhookSubscription: WebhookSubscriptionInput!
-) {
-  webhookSubscriptionCreate(
-    topic: $topic,
-    webhookSubscription: $webhookSubscription
-  ) {
-    userErrors { field message }
-    webhookSubscription { id topic uri apiVersion format }
-  }
-}
-"""
-
-SUBSCRIPTION_DELETE_MUTATION = """
-mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
-  webhookSubscriptionDelete(id: $id) {
-    deletedWebhookSubscriptionId
-    userErrors { field message }
-  }
-}
-"""
-
 _SUBSCRIPTION_SERVICE_CONTEXT = 'shopify_connector_webhook_subscription_service'
 _SUBSCRIPTION_SERVICE_SENTINEL = object()
 CREATE_RETRY_STATES = frozenset(
@@ -405,7 +381,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'id': str(node['id'])[:256],
                     'topic': str(node.get('topic') or '')[:128],
                     'uri_digest': _uri_digest(uri),
-                    'api_version': str(node.get('apiVersion') or '')[:32],
+                    'observed_api_version': str(
+                        node.get('apiVersion') or ''
+                    )[:32],
                     'format': str(node.get('format') or '')[:32],
                 })
             page_info = connection.get('pageInfo') or {}
@@ -496,7 +474,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             matches = [
                 item for item in by_topic.get(subscription.topic_enum, [])
                 if item['uri_digest'] == callback_digest
-                and item['api_version'] == SHOPIFY_API_VERSION
+                and item['observed_api_version'] == SHOPIFY_API_VERSION
                 and item['format'] == 'JSON'
             ]
             if matches:
@@ -506,7 +484,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'shopify_subscription_gid': item['id'],
                     'actual_topic': item['topic'],
                     'actual_uri_digest': item['uri_digest'],
-                    'actual_api_version': item['api_version'],
+                    'actual_api_version': item['observed_api_version'],
                     'actual_format': item['format'],
                     'last_reconciled_at': fields.Datetime.now(),
                     'hmac_credential_epoch': epoch,
@@ -729,7 +707,20 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'The callback token changed after the subscription job was '
                     'queued; the remote create was refused.'
                 )
-            operation = SUBSCRIPTION_CREATE_MUTATION
+            operation = """
+mutation ConnectorWebhookSubscriptionCreate(
+  $topic: WebhookSubscriptionTopic!,
+  $webhookSubscription: WebhookSubscriptionInput!
+) {
+  webhookSubscriptionCreate(
+    topic: $topic,
+    webhookSubscription: $webhookSubscription
+  ) {
+    userErrors { field message }
+    webhookSubscription { id topic uri apiVersion format }
+  }
+}
+"""
             variables = {
                 'topic': local_snapshot['topic_enum'],
                 'webhookSubscription': {
@@ -740,7 +731,14 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 },
             }
         else:
-            operation = SUBSCRIPTION_DELETE_MUTATION
+            operation = """
+mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
+  webhookSubscriptionDelete(id: $id) {
+    deletedWebhookSubscriptionId
+    userErrors { field message }
+  }
+}
+"""
             variables = {'id': local_snapshot['shopify_subscription_gid']}
         return {
             'mutation_domain': owner_context['mutation_domain'],
@@ -859,7 +857,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'shopify_subscription_gid': str(node['id'])[:256],
                     'actual_topic': str(node.get('topic') or '')[:128],
                     'actual_uri_digest': _uri_digest(node.get('uri') or node.get('callbackUrl') or ''),
-                    'actual_api_version': str(node.get('apiVersion') or '')[:32],
+                    'actual_api_version': str(
+                        node.get('apiVersion') or ''
+                    )[:32],
                     'actual_format': str(node.get('format') or '')[:32],
                 },
             }
@@ -934,7 +934,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 item for item in actual
                 if item['topic'] == intent.get('topic_enum')
                 and item['uri_digest'] == intent.get('callback_url_digest')
-                and item['api_version'] == SHOPIFY_API_VERSION
+                and item['observed_api_version'] == SHOPIFY_API_VERSION
                 and item['format'] == 'JSON'
             ), False)
             if found:
@@ -950,14 +950,14 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                         'shopify_subscription_gid': found['id'],
                         'actual_topic': found['topic'],
                         'actual_uri_digest': found['uri_digest'],
-                        'actual_api_version': found['api_version'],
+                        'actual_api_version': found['observed_api_version'],
                         'actual_format': found['format'],
                     },
                     'domain_payload': {
                         'shopify_subscription_gid': found['id'],
                         'actual_topic': found['topic'],
                         'actual_uri_digest': found['uri_digest'],
-                        'actual_api_version': found['api_version'],
+                        'actual_api_version': found['observed_api_version'],
                         'actual_format': found['format'],
                     },
                 }

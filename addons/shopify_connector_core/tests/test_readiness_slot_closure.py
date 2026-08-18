@@ -296,12 +296,18 @@ class TestReadinessSlotClosure(TransactionCase):
     # D-R1-3 -- webhook_hmac
     # ==================================================================
 
-    # 10. Webhook intake absent -> not-applicable pass with the EXACT
-    #     packet reason string.
-    def test_webhook_hmac_not_applicable_pass_exact_reason(self):
+    # 10. Webhook intake is capability-aware. Core alone keeps the historical
+    #     not-applicable reason; when the modular webhook addon is installed,
+    #     the merged readiness service truthfully points the operator to its
+    #     explicit bootstrap/reconcile path instead.
+    def test_webhook_hmac_not_applicable_reason_matches_capability(self):
         check = self.ReadinessCheck._check_webhook_hmac(self.store)
         self.assertEqual(check['result'], 'pass')
-        self.assertEqual(check['reason'], WEBHOOK_HMAC_NA_REASON)
+        if 'shopify.connector.webhook.registry' in self.env.registry.models:
+            self.assertIn('Bootstrap / reconcile webhooks', check['reason'])
+            self.assertNotEqual(check['reason'], WEBHOOK_HMAC_NA_REASON)
+        else:
+            self.assertEqual(check['reason'], WEBHOOK_HMAC_NA_REASON)
 
     # ==================================================================
     # D-R1-5 -- healthy API state write

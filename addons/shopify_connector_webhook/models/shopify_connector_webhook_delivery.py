@@ -6,6 +6,10 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 from psycopg2 import IntegrityError
 
+from odoo.addons.shopify_connector_core.tools.api_version import (
+    SHOPIFY_API_VERSION,
+)
+
 
 DELIVERY_STATES = [
     ('received', 'Received'),
@@ -215,6 +219,10 @@ class ShopifyConnectorWebhookDelivery(models.Model):
         store.ensure_one()
         if not delivery_id or not topic or not payload_digest:
             raise ValidationError('Verified webhook metadata is incomplete.')
+        if api_version != SHOPIFY_API_VERSION:
+            raise ValidationError(
+                'Verified webhook metadata used an unsupported API version.'
+            )
         identity = dict(payload_identity or {})
         Delivery = self.sudo().with_context(**self._service_context())
         values = {
@@ -223,7 +231,11 @@ class ShopifyConnectorWebhookDelivery(models.Model):
             'event_id': self._safe_text(event_id, 256),
             'topic': self._safe_text(topic, 128),
             'shop_domain': self._safe_text(shop_domain, 255),
-            'api_version': self._safe_text(api_version, 32),
+            # The controller has already compared the header to the
+            # centralized connector constant; record that verified value, not
+            # caller-supplied text that could make evidence disagree with the
+            # endpoint actually used.
+            'api_version': SHOPIFY_API_VERSION,
             'triggered_at': triggered_at or False,
             'source_updated_at': source_updated_at or False,
             'payload_digest': self._safe_text(payload_digest, 64),

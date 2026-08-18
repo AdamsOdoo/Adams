@@ -95,21 +95,38 @@ class TestUiInstallation(TransactionCase):
         if not all(self.env.ref(xmlid, False) for xmlid in required):
             self.skipTest('The cross-addon navigation contract needs all six addons.')
 
+        operations = [
+            'Orders', 'Product Imports/Exports', 'Inventory',
+            'Fulfillments', 'Runs & Recovery', 'Needs Attention',
+        ]
+        if self.env.ref(
+            'shopify_connector_webhook.menu_shopify_connector_webhook_deliveries',
+            False,
+        ):
+            # Webhook delivery evidence is an Operations surface only when
+            # the modular webhook addon is installed; core remains runnable
+            # without that optional dependency.
+            operations.insert(3, 'Webhook deliveries')
+        configuration = [
+            'Stores & Onboarding', 'Sync Rules', 'Mappings',
+            'Export Settings', 'Fulfillment Settings and Mode',
+        ]
+        if self.env.ref(
+            'shopify_connector_webhook.menu_shopify_connector_webhook_subscriptions',
+            False,
+        ):
+            # Sequence 35 keeps this after Mappings (30) and before Export
+            # Settings (40), avoiding a cross-addon sequence collision.
+            configuration.insert(3, 'Webhook subscriptions')
         expected = {
             'menu_shopify_connector_dashboard': [
                 'Sales Dashboard', 'Connector Health',
             ],
-            'menu_shopify_connector_operations': [
-                'Orders', 'Product Imports/Exports', 'Inventory',
-                'Fulfillments', 'Runs & Recovery', 'Needs Attention',
-            ],
+            'menu_shopify_connector_operations': operations,
             'menu_shopify_connector_reporting': [
                 'Sales Analysis', 'Sync Performance', 'Audit Trail',
             ],
-            'menu_shopify_connector_configuration': [
-                'Stores & Onboarding', 'Sync Rules', 'Mappings',
-                'Export Settings', 'Fulfillment Settings and Mode',
-            ],
+            'menu_shopify_connector_configuration': configuration,
         }
         for pillar_xmlid, labels in expected.items():
             pillar = self.env.ref(
