@@ -3331,6 +3331,16 @@ class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
         backend = {}
         second_ready = threading.Event()
         second_attempting = threading.Event()
+        # Odoo's post-install runner holds the framework registry lock on the
+        # main test thread.  A genuine worker must still build its own
+        # Environment, so use the same bounded fresh-RLock decoupling as the
+        # other independent-connection tests in this file.  This changes only
+        # the framework lock used to construct the already-loaded registry;
+        # the production lifecycle method and PostgreSQL row lock remain real.
+        registry_lock_patch = patch.object(
+            type(self.registry), '_lock', threading.RLock(),
+        )
+        registry_lock_patch.start()
         try:
             store_id, _domain, _job = self._commit_connected_fixture(dbname)
             # Turn the committed fixture into a genuinely activation-eligible
@@ -3427,18 +3437,32 @@ class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
                 'the waiting activation must not bump the connection epoch',
             )
         finally:
-            # Always release the holder before joining the worker.  This is a
-            # test-teardown guarantee, not a production timeout workaround.
-            if first is not None:
+            try:
+                # Always release the holder before joining the worker.  This
+                # teardown remains inside the fresh-RLock window, so even a
+                # failed assertion cannot restore Registry._lock while the
+                # worker is still constructing its Environment.  It is a
+                # test-teardown guarantee, not a production timeout
+                # workaround.
+                if first is not None:
+                    try:
+                        first.rollback()
+                    finally:
+                        first.close()
+                if second is not None and second.is_alive():
+                    second.join(timeout=self.BOUND_SECONDS)
+                if second is not None:
+                    self._assert_workers_dead([second])
+            finally:
                 try:
-                    first.rollback()
+                    # Durable cleanup also stays within the bounded patch
+                    # scope; the worker's own rollback/close has completed
+                    # before this fresh-connection teardown begins.
+                    self._cleanup(dbname, store_id)
                 finally:
-                    first.close()
-            if second is not None and second.is_alive():
-                second.join(timeout=self.BOUND_SECONDS)
-            if second is not None:
-                self._assert_workers_dead([second])
-            self._cleanup(dbname, store_id)
+                    # Restore the framework lock only after every worker and
+                    # pooled cursor has been released.
+                    registry_lock_patch.stop()
 
 
 @tagged('post_install', '-at_install')

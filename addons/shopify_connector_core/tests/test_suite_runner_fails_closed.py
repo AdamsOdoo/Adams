@@ -77,7 +77,7 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
         self.assertIn('PROBE_CLEANUP_ATTEMPTS=8', text)
         self.assertIn('rm -rf -- "$probe_dir"', text)
         self.assertIn('mktemp -d /tmp/shopify-connector-cdp.XXXXXX', text)
-        self.assertIn('relative != shopify-connector-cdp.*', text)
+        self.assertIn('"$relative" != shopify-connector-cdp.*', text)
         self.assertIn('cleanup_browser_probe_dir "/tmp"', text)
 
     def test_runner_selects_webhook_addon_for_fresh_warm_and_standard_passes(self):

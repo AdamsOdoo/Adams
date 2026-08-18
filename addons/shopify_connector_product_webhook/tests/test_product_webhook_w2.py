@@ -400,6 +400,17 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 shopify_target_gid=gid,
             )
             if state == 'skipped':
+                # A fixture must use the same sanctioned state machine as a
+                # production dispatch.  ``_transition_skipped`` is the
+                # checkpoint-3 outcome and therefore requires the claimed
+                # ``queued -> running`` transition first; writing ``skipped``
+                # directly from ``queued`` is intentionally rejected by the
+                # job model.
+                self.assertTrue(
+                    self.env[
+                        'shopify.connector.job.dispatch'
+                    ]._start_running(old),
+                )
                 old._transition_skipped('W2 generation regression fixture')
             elif state == 'failed_final':
                 old._transition_failed_final(
@@ -575,16 +586,16 @@ class TestShopifyConnectorProductWebhookGenerationRace(TransactionCase):
             cr.close()
 
     def test_lifecycle_lock_blocks_reconnect_until_child_admission(self):
-        store_id, delivery_id = self._committed_fixture()
         entered = threading.Event()
         release = threading.Event()
+        delivery_started = threading.Event()
         lifecycle_started = threading.Event()
         lifecycle_done = threading.Event()
         results = queue.Queue()
-        registry_cls = type(
+        webhook_registry_cls = type(
             self.env['shopify.connector.webhook.registry']
         )
-        original = registry_cls._enqueue_product_import
+        original = webhook_registry_cls._enqueue_product_import
 
         def parked_enqueue(registry, store, delivery, gid, generation=None):
             entered.set()
@@ -594,70 +605,121 @@ class TestShopifyConnectorProductWebhookGenerationRace(TransactionCase):
                 registry, store, delivery, gid, generation=generation,
             )
 
-        def run_delivery():
-            cr = None
-            try:
-                cr = self._open_cursor()
-                env = api.Environment(cr, SUPERUSER_ID, {})
-                env['shopify.connector.webhook.delivery'].browse(
-                    delivery_id,
-                )._process_queued()
-                cr.commit()
-                results.put(('delivery', None))
-            except BaseException as exc:
-                results.put(('delivery', type(exc).__name__))
-            finally:
-                if cr is not None:
-                    cr.rollback()
-                    cr.close()
+        started_threads = []
 
-        def run_lifecycle_probe():
-            cr = None
-            try:
-                cr = self._open_cursor()
-                env = api.Environment(cr, SUPERUSER_ID, {})
-                lifecycle_started.set()
-                env['shopify.connector.store'].browse(
-                    store_id,
-                )._lock_store_for_lifecycle()
-                cr.rollback()
-                lifecycle_done.set()
-                results.put(('lifecycle', None))
-            except BaseException as exc:
-                results.put(('lifecycle', type(exc).__name__))
-            finally:
-                if cr is not None:
-                    cr.rollback()
-                    cr.close()
+        # Odoo's post-install runner can hold Registry._lock around the test
+        # phase.  A worker creating its own Environment would then block before
+        # reaching the real webhook handler.  Replace only this process-local
+        # lock for the complete lifetime of both workers, including their
+        # bounded teardown and committed-fixture cleanup.  The production
+        # handler, lifecycle row lock, and each worker's own PostgreSQL cursor
+        # remain genuine; restoring the lock is the final operation.
+        with patch.object(
+            type(self.registry), '_lock', threading.RLock(),
+        ), patch.object(
+            webhook_registry_cls,
+            '_enqueue_product_import',
+            parked_enqueue,
+        ):
+            store_id, delivery_id = self._committed_fixture()
 
-        delivery_thread = threading.Thread(target=run_delivery, daemon=True)
-        lifecycle_thread = threading.Thread(
-            target=run_lifecycle_probe, daemon=True,
-        )
-        try:
-            with patch.object(
-                registry_cls, '_enqueue_product_import', parked_enqueue,
-            ):
-                delivery_thread.start()
-                self.assertTrue(entered.wait(self.BOUND_SECONDS))
-                lifecycle_thread.start()
-                self.assertTrue(lifecycle_started.wait(self.BOUND_SECONDS))
+            def run_delivery():
+                cr = None
+                try:
+                    delivery_started.set()
+                    cr = self._open_cursor()
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    env['shopify.connector.webhook.delivery'].browse(
+                        delivery_id,
+                    )._process_queued()
+                    cr.commit()
+                    results.put(('delivery', None))
+                except BaseException as exc:
+                    results.put(('delivery', type(exc).__name__))
+                finally:
+                    if cr is not None:
+                        cr.rollback()
+                        cr.close()
+
+            def run_lifecycle_probe():
+                cr = None
+                try:
+                    cr = self._open_cursor()
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    lifecycle_started.set()
+                    env['shopify.connector.store'].browse(
+                        store_id,
+                    )._lock_store_for_lifecycle()
+                    cr.rollback()
+                    lifecycle_done.set()
+                    results.put(('lifecycle', None))
+                except BaseException as exc:
+                    results.put(('lifecycle', type(exc).__name__))
+                finally:
+                    if cr is not None:
+                        cr.rollback()
+                        cr.close()
+
+            delivery_thread = threading.Thread(
+                target=run_delivery, daemon=True,
+            )
+            lifecycle_thread = threading.Thread(
+                target=run_lifecycle_probe, daemon=True,
+            )
+
+            def start_worker(thread):
+                """Start once and track only threads that really started.
+
+                ``Thread.join()`` raises when called before ``start()``.
+                Keeping an explicit started list lets a bounded assertion
+                fail while cleanup still joins every worker that actually
+                acquired an OS thread.
+                """
+                thread.start()
+                started_threads.append(thread)
+
+            try:
+                start_worker(delivery_thread)
+                self.assertTrue(
+                    delivery_started.wait(self.BOUND_SECONDS),
+                    'delivery worker did not enter its bounded cursor body',
+                )
+                self.assertTrue(
+                    entered.wait(self.BOUND_SECONDS),
+                    'delivery worker did not reach the real child-admission '
+                    'handler',
+                )
+                start_worker(lifecycle_thread)
+                self.assertTrue(
+                    lifecycle_started.wait(self.BOUND_SECONDS),
+                    'lifecycle worker did not enter its bounded cursor body',
+                )
                 time.sleep(0.2)
                 self.assertFalse(
                     lifecycle_done.is_set(),
                     'a concurrent lifecycle cursor must wait for the child '
                     'admission lock, not observe a stale generation',
                 )
+            finally:
+                # This nested ordering is deliberate: cleanup remains inside
+                # the fresh-RLock context even when the alive assertion fails,
+                # and the lock is restored only after every started worker is
+                # joined and the committed fixture is deleted.
                 release.set()
-                delivery_thread.join(self.BOUND_SECONDS)
-                lifecycle_thread.join(self.BOUND_SECONDS)
-        finally:
-            release.set()
-            delivery_thread.join(self.BOUND_SECONDS)
-            lifecycle_thread.join(self.BOUND_SECONDS)
-            self._cleanup_fixture(store_id)
-        self.assertFalse(delivery_thread.is_alive())
-        self.assertFalse(lifecycle_thread.is_alive())
+                for thread in started_threads:
+                    thread.join(self.BOUND_SECONDS)
+                alive = [
+                    thread.name
+                    for thread in started_threads if thread.is_alive()
+                ]
+                try:
+                    self.assertFalse(
+                        alive,
+                        'W2 lifecycle-race worker(s) survived the bounded '
+                        'join: %s' % ', '.join(alive),
+                    )
+                finally:
+                    self._cleanup_fixture(store_id)
         outcomes = [results.get_nowait(), results.get_nowait()]
         self.assertEqual(
             sorted(outcomes),
