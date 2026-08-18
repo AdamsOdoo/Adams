@@ -995,7 +995,13 @@ describe("shopify connector setup wizard", () => {
                     return server.page(kwargs);
                 }
                 if (method === "save_location_mapping") {
-                    return onSaveMapping ? onSaveMapping(kwargs) : state;
+                    // The production RPC returns the complete setup payload;
+                    // keep the callback as an observation hook, but do not
+                    // let a truthy sentinel replace that payload in `_adopt`.
+                    if (onSaveMapping) {
+                        onSaveMapping(kwargs);
+                    }
+                    return state;
                 }
                 return state;
             },
