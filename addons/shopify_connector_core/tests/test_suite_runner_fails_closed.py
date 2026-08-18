@@ -62,11 +62,23 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'a HOOT suite with no verified evidence line fails',
             'preflight aborts on an unresolvable browser',
             'preflight aborts when websocket-client is absent',
+            'browser probe cleanup is bounded and path-scoped',
+            'browser probe cleanup rejects broad paths',
         ):
             self.assertIn(
                 'self-test PASS: %s' % expected, result.stdout,
                 'the runner self-test no longer covers %r' % expected,
             )
+
+    def test_browser_probe_cleanup_is_bounded_and_path_scoped(self):
+        """CDP probe cleanup cannot race into an unsafe broad deletion."""
+        text = RUNNER.read_text()
+        self.assertIn('cleanup_browser_probe_dir', text)
+        self.assertIn('PROBE_CLEANUP_ATTEMPTS=8', text)
+        self.assertIn('rm -rf -- "$probe_dir"', text)
+        self.assertIn('mktemp -d /tmp/shopify-connector-cdp.XXXXXX', text)
+        self.assertIn('relative != shopify-connector-cdp.*', text)
+        self.assertIn('cleanup_browser_probe_dir "/tmp"', text)
 
     def test_runner_selects_webhook_addon_for_fresh_warm_and_standard_passes(self):
         """The W1 addon cannot disappear from a green suite by list drift."""

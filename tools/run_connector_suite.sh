@@ -298,6 +298,45 @@ resolve_browser() {
     return 1
 }
 
+# Chromium may still flush profile files for a short interval after its
+# process has been reaped.  Cleanup is intentionally scoped to the exact
+# mktemp template below and retried for a bounded interval; an unvalidated
+# `rm -rf` would make a browser probe failure an unsafe filesystem operation.
+PROBE_CLEANUP_ATTEMPTS=8
+PROBE_CLEANUP_DELAY_SECONDS="0.1"
+
+cleanup_browser_probe_dir() {
+    local probe_dir="${1:-}" relative suffix attempt
+    if [[ -z "$probe_dir" ]]; then
+        log "FATAL: refusing to clean an empty browser probe path"
+        return 1
+    fi
+    relative="${probe_dir#/tmp/}"
+    suffix="${relative#shopify-connector-cdp.}"
+    if [[ "$probe_dir" != /tmp/* \
+          || "$relative" == "$probe_dir" \
+          || "$relative" != shopify-connector-cdp.* \
+          || -z "$suffix" \
+          || "$relative" == */* ]]; then
+        log "FATAL: refusing to clean an untrusted browser probe path: ${probe_dir}"
+        return 1
+    fi
+    for ((attempt = 1; attempt <= PROBE_CLEANUP_ATTEMPTS; attempt++)); do
+        if [[ ! -e "$probe_dir" && ! -L "$probe_dir" ]]; then
+            return 0
+        fi
+        # A late Chromium profile writer can race the recursive walk.  Force
+        # removal and verify the exact path after every bounded attempt.
+        rm -rf -- "$probe_dir" 2>/dev/null || true
+        if [[ ! -e "$probe_dir" && ! -L "$probe_dir" ]]; then
+            return 0
+        fi
+        sleep "$PROBE_CLEANUP_DELAY_SECONDS"
+    done
+    log "FATAL: browser probe directory remained after bounded cleanup: ${probe_dir}"
+    return 1
+}
+
 # Prove the browser prerequisites BEFORE running anything that needs them.
 # A skip discovered afterwards is a green run that proved nothing; a failure
 # here is a red run that says exactly what is missing.
@@ -335,7 +374,7 @@ preflight_browser() {
     # alive, and `--dump-dom` can hang even when CDP is healthy, so capability
     # is proved through the same HTTP + WebSocket boundary HttpCase consumes.
     local probe_dir probe_log browser_pid port
-    probe_dir="$(mktemp -d)"
+    probe_dir="$(mktemp -d /tmp/shopify-connector-cdp.XXXXXX)"
     probe_log="$probe_dir/chromium.log"
     "$ODOO_BROWSER_BIN" --headless --no-sandbox --disable-gpu \
         --disable-dev-shm-usage --remote-debugging-address=127.0.0.1 \
@@ -386,12 +425,16 @@ PY
         wait "$browser_pid" 2>/dev/null || true
         log "FATAL: ${ODOO_BROWSER_BIN} did not expose a usable CDP endpoint."
         sed -n '1,40p' "$probe_log" >&2
-        rm -r -- "$probe_dir"
+        if ! cleanup_browser_probe_dir "$probe_dir"; then
+            exit 2
+        fi
         exit 2
     fi
     kill "$browser_pid" 2>/dev/null || true
     wait "$browser_pid" 2>/dev/null || true
-    rm -r -- "$probe_dir"
+    if ! cleanup_browser_probe_dir "$probe_dir"; then
+        exit 2
+    fi
 
     log "browser: ${ODOO_BROWSER_BIN} (${BROWSER_VERSION})"
     log "websocket-client: ${WEBSOCKET_VERSION}"
@@ -782,6 +825,27 @@ self_test() {
         failures=$((failures + 1))
     else
         log "self-test PASS: preflight aborts when websocket-client is absent"
+    fi
+
+    # 9. Probe cleanup must remove a nested profile with the bounded, exact
+    #     mktemp prefix and must reject broad paths such as /tmp.
+    local probe_cleanup_fixture
+    probe_cleanup_fixture="$(mktemp -d /tmp/shopify-connector-cdp.selftest.XXXXXX)"
+    mkdir -p "$probe_cleanup_fixture/profile/Default"
+    touch "$probe_cleanup_fixture/profile/Default/Preferences"
+    if cleanup_browser_probe_dir "$probe_cleanup_fixture" \
+       && [[ ! -e "$probe_cleanup_fixture" \
+             && ! -L "$probe_cleanup_fixture" ]]; then
+        log "self-test PASS: browser probe cleanup is bounded and path-scoped"
+    else
+        log "self-test FAIL: browser probe cleanup did not remove its fixture"
+        failures=$((failures + 1))
+    fi
+    if cleanup_browser_probe_dir "/tmp" >/dev/null 2>&1; then
+        log "self-test FAIL: browser probe cleanup accepted a broad path"
+        failures=$((failures + 1))
+    else
+        log "self-test PASS: browser probe cleanup rejects broad paths"
     fi
 
     if [[ "$failures" -ne 0 ]]; then
