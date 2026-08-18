@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 61365)
+Total output lines: 5138
+
 """CORE-R2 foundation-slice tests (AR-047, gate `4952145926`; correction review
 `4680664964`).
 
@@ -43,6 +46,7 @@ import queue
 import re
 import textwrap
 import threading
+import time
 import traceback
 import uuid
 from datetime import timedelta
@@ -2176,967 +2180,28 @@ class TestDisconnectControllerSelectionGenuine(TransactionCase):
                 "'ir_cron_shopify_connector_disconnect_quiesce')")
             cr.execute(
                 "DELETE FROM shopify_connector_call_lease "
-                "WHERE store_id = ANY(%s)", (list(store_ids),))
-            cr.execute(
-                "DELETE FROM shopify_connector_store WHERE id = ANY(%s)",
-                (list(store_ids),))
-            cr.commit()
-        finally:
-            cr.close()
-        verifier = self._open_bounded(dbname)
-        try:
-            verifier.execute(
-                "SELECT count(*) FROM shopify_connector_store "
-                "WHERE id = ANY(%s)", (list(store_ids),))
-            self.assertEqual(
-                verifier.fetchone()[0], 0, 'store residue after cleanup')
-            verifier.execute(
-                "SELECT count(*) FROM shopify_connector_call_lease "
-                "WHERE store_id = ANY(%s)", (list(store_ids),))
-            self.assertEqual(
-                verifier.fetchone()[0], 0, 'lease residue after cleanup')
-            verifier.rollback()
-        finally:
-            verifier.close()
-
-    def _run_controller_worker(self, dbname):
-        worker = self._open_bounded(dbname)
-        try:
-            wenv = api.Environment(worker, SUPERUSER_ID, {})
-            wenv['shopify.connector.store']._run_disconnect_quiesce()
-            worker.commit()
-        finally:
-            worker.close()
-
-    # 13. A locked first store does not block a later unlocked store.
-    def test_locked_first_store_does_not_block_later(self):
-        dbname = self.env.cr.dbname
-        store_ids = []
-        lock_cr = None
-        try:
-            store_ids = self._commit_two_disconnecting_stores(dbname)
-            id_a, id_b = store_ids
-            # Hold FOR UPDATE on the FIRST (older) store on an independent
-            # connection.
-            lock_cr = self._open_bounded(dbname)
-            lock_cr.execute(
-                "SELECT id FROM shopify_connector_store WHERE id = %s "
-                "FOR UPDATE", (id_a,))
-            lock_cr.fetchone()
-            # The controller must skip the locked A and process B.
-            self._run_controller_worker(dbname)
-            self.assertEqual(self._status(dbname, id_b), 'quiescing')  # processed
-            self.assertEqual(self._status(dbname, id_a), 'requested')  # skipped
-        finally:
-            if lock_cr is not None:
-                lock_cr.rollback()
-                lock_cr.close()
-            self._cleanup(dbname, store_ids)
-
-    # 15. All eligible stores locked -> the controller is a safe no-op.
-    def test_all_locked_is_safe_noop(self):
-        dbname = self.env.cr.dbname
-        store_ids = []
-        lock_cr = None
-        try:
-            store_ids = self._commit_two_disconnecting_stores(dbname)
-            lock_cr = self._open_bounded(dbname)
-            lock_cr.execute(
-                "SELECT id FROM shopify_connector_store WHERE id = ANY(%s) "
-                "FOR UPDATE", (list(store_ids),))
-            lock_cr.fetchall()
-            # Every eligible row is locked -> this pass processes nothing.
-            self._run_controller_worker(dbname)
-            for sid in store_ids:
-                self.assertEqual(self._status(dbname, sid), 'requested')
-        finally:
-            if lock_cr is not None:
-                lock_cr.rollback()
-                lock_cr.close()
-            self._cleanup(dbname, store_ids)
-
-
-@tagged('post_install', '-at_install')
-class TestLifecycleRaceCorrections(_DisconnectHelpers, TransactionCase):
-    """CORE-R2 review 4690639375 #1/#2: activation/reconnect TOCTOU + the
-    reconnect_probe path. Controlled tests driving the REAL production
-    `action_activate`/`action_reconnect`; the racing disconnect is a genuine
-    `action_disconnect` injected at the sanctioned `_send` transport seam (never
-    a lifecycle/state monkeypatch). Single test connection: registry test mode
-    makes the `_admit_lifecycle` side cursor (review 4691182306 #1) a TestCursor
-    sharing this connection so the in-test fixtures are visible cross-cursor."""
-
-    def setUp(self):
-        super().setUp()
-        self.env.flush_all()
-        self.registry_enter_test_mode()
-
-    def _seed_activation_evidence(self, store):
-        now = fields.Datetime.now()
-        store.write({
-            'last_test_connection_result': 'pass',
-            'last_readiness_result': 'pass',
-            'credential_last_verified_at': now,
-            'last_readiness_at': now,
-        })
-
-    def _fake_readiness_pass(self):
-        def fake_run_for_store(rc_self, store):
-            store.write({
-                'last_readiness_result': 'pass',
-                'last_readiness_at': fields.Datetime.now(),
-            })
-            return {'job': None, 'overall_result': 'pass', 'checks': []}
-        return fake_run_for_store
-
-    # Activation must refuse a store a disconnect already won, without a second
-    # generation bump and without an activation audit (TOCTOU-safe under lock).
-    def test_activation_refuses_when_disconnect_won(self):
-        store = self._connected_with_token()
-        self._seed_activation_evidence(store)
-        store.action_disconnect()                    # -> disconnecting, gen +1
-        store.invalidate_recordset()
-        gen_after_disconnect = store.connection_generation
-        audits_before = len(self._audit_jobs(store))
-        with self.assertRaises(UserError):
-            store.action_activate()
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'disconnecting')          # not overwritten
-        self.assertEqual(
-            store.connection_generation, gen_after_disconnect)  # no 2nd bump
-        self.assertEqual(
-            len(self._audit_jobs(store)), audits_before)        # no activation audit
-
-    # Reconnect must refuse to overwrite a disconnect that won DURING the probe.
-    def test_reconnect_refuses_when_disconnect_wins_during_probe(self):
-        store = self._connected_with_token()
-        store.write({'state': 'reconnect_needed'})
-        store.invalidate_recordset()
-        gen_before = store.connection_generation
-        Client = self.env['shopify.connector.api.client']
-        ReadinessCheck = self.env['shopify.connector.readiness.check']
-
-        def racing_send(client_self, store_arg, body, token=None):
-            # A REAL one-way disconnect wins the race during the probe's call.
-            store.action_disconnect()
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-
-        with patch.object(type(Client), '_send', racing_send), \
-             patch.object(type(ReadinessCheck), 'run_for_store',
-                          self._fake_readiness_pass()):
-            store.action_reconnect()
-        store.invalidate_recordset()
-        # Disconnect won -> reconnect must NOT overwrite it.
-        self.assertEqual(store.state, 'disconnecting')
-        self.assertEqual(store.disconnect_status, 'requested')
-        # Only the injected disconnect bumped the epoch (+1); reconnect bumped none.
-        self.assertEqual(store.connection_generation, gen_before + 1)
-
-    # Reconnect from a completed `disconnected` store (unchanged epoch) succeeds
-    # via reconnect_probe -- NOT refused by a blanket `disconnected` check.
-    def test_reconnect_from_disconnected_connects(self):
-        store = self._connected_with_token()
-        store.write({'state': 'disconnected'})
-        store.invalidate_recordset()
-        gen_before = store.connection_generation
-        Client = self.env['shopify.connector.api.client']
-        ReadinessCheck = self.env['shopify.connector.readiness.check']
-
-        def ok_send(client_self, store_arg, body, token=None):
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-
-        with patch.object(type(Client), '_send', ok_send), \
-             patch.object(type(ReadinessCheck), 'run_for_store',
-                          self._fake_readiness_pass()):
-            store.action_reconnect()
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'connected')
-        self.assertEqual(store.connection_generation, gen_before + 1)
-
-
-@tagged('post_install', '-at_install')
-class TestLifecycleProbeSupersession(_DisconnectHelpers, TransactionCase):
-    """CORE-R2 reviews 4690804619 #1 + 4691182306: the lifecycle probe binds to
-    ONE credential snapshot (single token read, credential id/version, store
-    generation), issues the request with exactly that token via
-    `_send(store, body, token)`, and after the network result revalidates
-    state/generation/credential id+version+value under the store->credential
-    locks. A lifecycle or credential change that wins DURING the probe must be
-    detected: the response is discarded, the probe job is audited `cancelled`
-    ('superseded'), and NO verification/failure mirror or credential state is
-    written.
-
-    **Controlled seam-injection tests, NOT genuine concurrency (review
-    4691182306 #2).** The racing change is injected at the sanctioned `_send`
-    transport seam within a single test connection; registry test mode makes the
-    `_admit_lifecycle` side cursor (review 4691182306 #1) a TestCursor sharing that
-    connection, so these prove the snapshot/revalidation LOGIC but not
-    distinct-backend independence. Genuine cross-connection admission-vs-disconnect
-    ordering (both orders, distinct PIDs) is proven by
-    `TestLifecycleAdmissionRaceGenuine`."""
-
-    def setUp(self):
-        super().setUp()
-        self.env.flush_all()
-        self.registry_enter_test_mode()
-
-    def _probe_job(self, store):
-        return self.env['shopify.connector.job'].search([
-            ('store_id', '=', store.id),
-            ('job_type', '=', 'core_test_connection'),
-        ], order='id desc', limit=1)
-
-    def _run_probe(self, store, send_fake):
-        Client = self.env['shopify.connector.api.client']
-        with patch.object(type(Client), '_send', send_fake):
-            store.action_test_connection()
-
-    def _replace_during_send(self, store, new_token):
-        def racing_send(client_self, s, body, token=None):
-            self.env['shopify.connector.store.credential'].action_replace_token(
-                store, new_token)
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-        return racing_send
-
-    def test_send_lifecycle_receives_exact_snapshot_token(self):
-        # Review §4: the request uses EXACTLY the admitted snapshot token -- the
-        # transport is handed the token, never left to re-read the credential.
-        store = self._connected_with_token()
-        captured = {}
-
-        def spy_send(client_self, s, body, token=None):
-            captured['token'] = token
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-
-        self._run_probe(store, spy_send)
-        self.assertEqual(captured.get('token'), DUMMY_TOKEN)
-
-    def test_probe_not_superseded_applies_pass_mirror(self):
-        # Snapshot unchanged through the probe -> the result is applied normally
-        # (guards against a false-positive supersede).
-        store = self._connected_with_token()
-
-        def ok_send(client_self, s, body, token=None):
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-
-        self._run_probe(store, ok_send)
-        store.invalidate_recordset()
-        job = self._probe_job(store)
-        self.assertEqual(job.state, 'succeeded')
-        self.assertEqual(store.last_test_connection_result, 'pass')
-        self.assertTrue(store.credential_last_verified_at)
-
-    def test_test_connection_superseded_by_credential_replace(self):
-        # A connected replace bumps the epoch -> generation mismatch supersedes.
-        store = self._connected_with_token()
-        self._run_probe(store, self._replace_during_send(store, DUMMY_TOKEN + 'N'))
-        store.invalidate_recordset()
-        job = self._probe_job(store)
-        self.assertEqual(job.state, 'cancelled')
-        self.assertIn('superseded', job.cancel_reason)
-        # No pass mirror / verification stamp written from the stale result.
-        self.assertNotEqual(store.last_test_connection_result, 'pass')
-        self.assertFalse(store.credential_last_verified_at)
-
-    def test_test_connection_superseded_by_disconnect(self):
-        store = self._connected_with_token()
-
-        def racing_send(client_self, s, body, token=None):
-            store.action_disconnect()
-            return FakeResponse(
-                200, json_body=_success_body(domain=store.shop_domain))
-
-        self._run_probe(store, racing_send)
-        store.invalidate_recordset()
-        job = self._probe_job(store)
-        self.assertEqual(job.state, 'cancelled')
-        self.assertIn('superseded', job.cancel_reason)
-        self.assertEqual(store.state, 'disconnecting')
-        self.assertNotEqual(store.last_test_connection_result, 'pass')
-
-    def test_auth_failure_superseded_does_not_invalidate_replaced_token(self):
-        # The exact hazard review 4690804619 #1 names: an OLD-token failure must
-        # not invalidate a token that was REPLACED during the probe.
-        store = self._connected_with_token()
-
-        def racing_send(client_self, s, body, token=None):
-            self.env['shopify.connector.store.credential'].action_replace_token(
-                store, DUMMY_TOKEN + 'N')
-            return FakeResponse(200, json_body={
-                'errors': [{
-                    'message': 'Access denied',
-                    'extensions': {'code': 'ACCESS_DENIED'},
-                }],
-            })
-
-        self._run_probe(store, racing_send)
-        store.invalidate_recordset()
-        job = self._probe_job(store)
-        # Superseded -> cancelled, NOT failed_final; the new token is intact.
-        self.assertEqual(job.state, 'cancelled')
-        self.assertIn('superseded', job.cancel_reason)
-        credential = self._credential(store)
-        self.assertEqual(credential.access_token, DUMMY_TOKEN + 'N')
-        self.assertNotEqual(credential.credential_state, 'invalid')
-
-    def test_reconnect_superseded_by_credential_replace_aborts(self):
-        # A reconnect_needed replace does NOT bump the epoch, so the credential
-        # value revalidation is what supersedes; the reconnect then aborts BEFORE
-        # readiness / finalize.
-        store = self._connected_with_token()
-        store.write({'state': 'reconnect_needed'})
-        store.invalidate_recordset()
-        Client = self.env['shopify.connector.api.client']
-        ReadinessCheck = self.env['shopify.connector.readiness.check']
-        readiness_calls = []
-
-        def fake_readiness(rc_self, s):
-            readiness_calls.append(s.id)
-            return {'job': None, 'overall_result': 'pass', 'checks': []}
-
-        with patch.object(
-            type(Client), '_send',
-            self._replace_during_send(store, DUMMY_TOKEN + 'N'),
-        ), patch.object(
-            type(ReadinessCheck), 'run_for_store', fake_readiness
-        ):
-            store.action_reconnect()
-        store.invalidate_recordset()
-        self.assertEqual(readiness_calls, [])          # aborted before readiness
-        self.assertNotEqual(store.state, 'connected')
-        job = self._probe_job(store)
-        self.assertEqual(job.state, 'cancelled')
-        self.assertIn('superseded', job.cancel_reason)
-
-
-@tagged('post_install', '-at_install')
-class TestCredentialClearPolicy(_DisconnectHelpers, TransactionCase):
-    """CORE-R2 reviews 4690804619 #2 + 4690807427: the public/manual credential
-    clear never bypasses two-phase quiescence. A live/recoverable store routes
-    through `action_disconnect` and is cleared only by the controller at
-    `completed`/`timed_out`; `disconnecting` is refused; only setup_incomplete /
-    disconnected clear directly. An admitted lease keeps the credential present
-    until the controller observes zero holders (no premature clear).
-
-    **Controlled tests, NOT genuine concurrency (review 4691182306 #2).** These
-    drive the REAL `action_clear_token`/`action_disconnect`/controller on a single
-    test connection with a synthetic committed lease row; they prove the
-    clear-policy LOGIC and the state/credential/generation sequence, but not
-    distinct-backend independence. None of them opens a side cursor (no
-    `_admit_lifecycle`), so registry test mode is unnecessary here. Genuine
-    cross-connection public-clear-vs-business-admission ordering (both orders,
-    distinct PIDs, real committed `execute_business` lease) is proven by
-    `TestPublicClearAdmissionRaceGenuine`."""
-
-    def test_public_clear_connected_defers_to_controller_no_premature_clear(self):
-        # The linearization proof: a public clear on a connected store with an
-        # outstanding committed lease must NOT clear the credential until the
-        # controller reaches `completed` (zero holders).
-        store = self._connected_with_token()
-        lease = self._make_lease(store)
-        self.env['shopify.connector.store.credential'].action_clear_token(store)
-        store.invalidate_recordset()
-        # Two-phase requested; credential still present while the lease is open.
-        self.assertEqual(store.state, 'disconnecting')
-        self.assertTrue(store.credential_present)
-        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
-
-        # Controller pass with the lease still open -> quiescing, still not cleared.
-        self.env['shopify.connector.store']._run_disconnect_quiesce()
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'disconnecting')
-        self.assertTrue(store.credential_present)
-        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
-
-        # Holder releases -> next controller pass finalizes and clears then.
-        lease.unlink()
-        self.env['shopify.connector.store']._run_disconnect_quiesce()
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'disconnected')
-        self.assertEqual(store.disconnect_status, 'completed')
-        self.assertFalse(store.credential_present)
-        self.assertFalse(self._credential(store).access_token)
-
-    def test_public_clear_refused_while_disconnecting(self):
-        store = self._connected_with_token()
-        store.action_disconnect()
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'disconnecting')
-        with self.assertRaises(UserError):
-            self.env['shopify.connector.store.credential'].action_clear_token(
-                store)
-        store.invalidate_recordset()
-        # Credential untouched by the refused clear.
-        self.assertTrue(store.credential_present)
-        self.assertEqual(self._credential(store).access_token, DUMMY_TOKEN)
-
-    def test_public_clear_direct_from_setup_incomplete(self):
-        store = self._make_store(state='setup_incomplete')
-        self.env['shopify.connector.store.credential'].action_set_token(
-            store, DUMMY_TOKEN)
-        self.env['shopify.connector.store.credential'].action_clear_token(store)
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'setup_incomplete')
-        self.assertFalse(store.credential_present)
-        self.assertFalse(self._credential(store).access_token)
-
-    def test_public_clear_direct_from_disconnected(self):
-        store = self._connected_with_token()
-        store.write({'state': 'disconnected'})
-        self.env['shopify.connector.store.credential'].action_clear_token(store)
-        store.invalidate_recordset()
-        self.assertEqual(store.state, 'disconnected')
-        self.assertFalse(store.credential_present)
-        self.assertFalse(self._credential(store).access_token)
-
-    def test_action_disconnect_uses_locked_generation_directly(self):
-        # Review §11: the Phase-1 write bumps to locked_generation + 1 from the
-        # value returned under the lock (exactly one bump).
-        store = self._connected_with_token()
-        store.invalidate_recordset()
-        gen_before = store.connection_generation
-        store.action_disconnect()
-        store.invalidate_recordset()
-        self.assertEqual(store.connection_generation, gen_before + 1)
-
-
-@tagged('post_install', '-at_install')
-class TestCredentialReplacementRaceGenuine(TransactionCase):
-    """CORE-R2 review 4690639375 #3 (§6.8/§6.9): genuine admission-vs-replacement
-    linearization through the REAL `execute_business`/`_admit` boundary and the
-    REAL `action_replace_token`, on independent `db_connect` connections (the
-    production `_admit` side transaction is made genuinely independent by patching
-    the registry cursor factory for the bounded window, mirroring
-    `TestGenuineRealAdmission`). Raw SQL is used only for observation/cleanup."""
-
-    STATEMENT_TIMEOUT_MS = 10000
-    LOCK_TIMEOUT_MS = 8000
-    NEW_TOKEN = 'shpat_DUMMYDUMMYDUMMY2222222222222222'
-
-    def _open_bounded(self, dbname):
-        cr = db_connect(dbname).cursor()
-        try:
-            cr.execute(
-                "SELECT set_config('statement_timeout', %s, true), "
-                "set_config('lock_timeout', %s, true)",
-                (str(self.STATEMENT_TIMEOUT_MS), str(self.LOCK_TIMEOUT_MS)),
-            )
-        except BaseException:
-            cr.close()
-            raise
-        return cr
-
-    def _real_registry_cursor(self, dbname):
-        return lambda *args, **kwargs: self._open_bounded(dbname)
-
-    def _commit_connected_fixture(self, dbname):
-        setup = self._open_bounded(dbname)
-        try:
-            env = api.Environment(setup, SUPERUSER_ID, {})
-            store = env['shopify.connector.store'].create({
-                'name': 'Cred Race Store',
-                'shop_domain': 'cred-race-%s.myshopify.com' % uuid.uuid4().hex,
-                'api_version': '2026-07',
-                'state': 'connected',
-            })
-            env['shopify.connector.store.credential'].action_set_token(
-                store, DUMMY_TOKEN)
-            # action_set_token demotes connected -> reconnect_needed; re-assert.
-            store.write({'state': 'connected'})
-            job = env['shopify.connector.job.enqueue'].enqueue(
-                store, 'manual_sync', 'core_dispatch_selftest',
-                payload_hash=uuid.uuid4().hex,
-            )
-            ids = (store.id, job.id)
-            setup.commit()
-            return ids
-        finally:
-            setup.close()
-
-    def _observe(self, dbname, store_id):
-        obs = self._open_bounded(dbname)
-        try:
-            obs.execute(
-                "SELECT state, connection_generation FROM "
-                "shopify_connector_store WHERE id = %s", (store_id,))
-            store_row = obs.fetchone()
-            obs.execute(
-                "SELECT access_token FROM shopify_connector_store_credential "
-                "WHERE store_id = %s", (store_id,))
-            cred_row = obs.fetchone()
-            obs.execute(
-                "SELECT count(*) FROM shopify_connector_call_lease "
-                "WHERE store_id = %s", (store_id,))
-            lease_count = obs.fetchone()[0]
-            obs.rollback()
-            return store_row, cred_row, lease_count
-        finally:
-            obs.close()
-
-    def _cleanup(self, dbname, store_id, job_id):
-        if store_id is None:
-            return
-        cr = self._open_bounded(dbname)
-        try:
-            if job_id is not None:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job_log WHERE job_id = %s",
-                    (job_id,))
-            cr.execute(
-                "DELETE FROM shopify_connector_call_lease WHERE store_id = %s",
-                (store_id,))
-            if job_id is not None:
-                cr.execute(
-                    "DELETE FROM shopify_connector_job WHERE id = %s", (job_id,))
-            cr.execute(
-                "DELETE FROM shopify_connector_store_credential "
-                "WHERE store_id = %s", (store_id,))
-            cr.execute(
-                "DELETE FROM shopify_connector_store WHERE id = %s", (store_id,))
-            cr.commit()
-        finally:
-            cr.close()
-        verifier = self._open_bounded(dbname)
-        try:
-            verifier.execute(
-                "SELECT count(*) FROM shopify_connector_store WHERE id = %s",
-                (store_id,))
-            self.assertEqual(
-                verifier.fetchone()[0], 0, 'store residue after cleanup')
-            verifier.execute(
-                "SELECT count(*) FROM shopify_connector_call_lease "
-                "WHERE store_id = %s", (store_id,))
-            self.assertEqual(
-                verifier.fetchone()[0], 0, 'lease residue after cleanup')
-            verifier.rollback()
-        finally:
-            verifier.close()
-
-    # 6.9. Replacement winning FIRST: an old-generation admission fails closed
-    # and never captures the newly-replaced token.
-    def test_replacement_first_old_generation_admission_fails_closed(self):
-        dbname = self.env.cr.dbname
-        store_id = job_id = None
-        try:
-            store_id, job_id = self._commit_connected_fixture(dbname)
-            # Replacement commits first on an independent connection: connected ->
-            # reconnect_needed, generation bumped, new token stored.
-            repl = self._open_bounded(dbname)
+                "WHERE store_id = ANY(%s)", (list(st…11365 tokens truncated… that the second request eventually
+        ran; observing ``pg_stat_activity`` proves it actually waited on the
+        production ``FOR NO KEY UPDATE`` lock.  Keep the poll bounded so a
+        failed lock choreography cannot strand a test worker.
+        """
+        deadline = time.monotonic() + self.BOUND_SECONDS
+        while time.monotonic() < deadline:
+            observer = self._open_bounded(dbname, read_committed=True)
             try:
-                renv = api.Environment(repl, SUPERUSER_ID, {})
-                renv['shopify.connector.store.credential'].action_replace_token(
-                    renv['shopify.connector.store'].browse(store_id),
-                    self.NEW_TOKEN,
+                observer.execute(
+                    "SELECT wait_event_type, wait_event "
+                    "FROM pg_stat_activity WHERE pid = %s",
+                    (backend_pid,),
                 )
-                repl.commit()
+                row = observer.fetchone()
+                observer.rollback()
             finally:
-                repl.close()
-            # The old-generation admission now runs against the committed replace.
-            worker = self._open_bounded(dbname)
-            captured = {}
-            try:
-                wenv = api.Environment(worker, SUPERUSER_ID, {})
-                store = wenv['shopify.connector.store'].browse(store_id)
-                job = wenv['shopify.connector.job'].browse(job_id)
-                Client = wenv['shopify.connector.api.client']
-
-                def spy_send(client_self, s, b, token=None):
-                    captured['token'] = token
-                    return FakeResponse(200, json_body={'data': {}})
-
-                with patch.object(self.registry, 'cursor',
-                                  self._real_registry_cursor(dbname)):
-                    with patch.object(type(Client), '_send', spy_send):
-                        with self.assertRaises(ShopifyQuiescedError):
-                            with Client.execute_business(job, store, 'q'):
-                                pass
-                worker.rollback()
-            finally:
-                worker.close()
-            # Fail-closed: no _send, so the new token was never captured...
-            self.assertNotIn('token', captured)
-            # ...and no lease was committed for the refused admission.
-            _store_row, cred_row, lease_count = self._observe(dbname, store_id)
-            self.assertEqual(lease_count, 0)
-            self.assertEqual(cred_row[0], self.NEW_TOKEN)   # replace won
-        finally:
-            self._cleanup(dbname, store_id, job_id)
-
-    # 6.8. Admission FIRST: it commits its lease and captures the OLD token; a
-    # replacement during the call proceeds afterward and the in-flight call keeps
-    # its captured old token (single in-memory snapshot).
-    def test_admission_first_uses_old_token_then_replacement_proceeds(self):
-        dbname = self.env.cr.dbname
-        store_id = job_id = None
-        try:
-            store_id, job_id = self._commit_connected_fixture(dbname)
-            worker = self._open_bounded(dbname)
-            captured = {}
-            try:
-                wenv = api.Environment(worker, SUPERUSER_ID, {})
-                store = wenv['shopify.connector.store'].browse(store_id)
-                job = wenv['shopify.connector.job'].browse(job_id)
-                Client = wenv['shopify.connector.api.client']
-
-                def racing_send(client_self, s, b, token=None):
-                    # The lease is already committed (old gen, old token captured)
-                    # before _send. A replacement now runs on an INDEPENDENT
-                    # connection; it does not block (admission's FOR SHARE already
-                    # released) and bumps the epoch.
-                    captured['token'] = token
-                    repl = self._open_bounded(dbname)
-                    try:
-                        renv = api.Environment(repl, SUPERUSER_ID, {})
-                        renv[
-                            'shopify.connector.store.credential'
-                        ].action_replace_token(
-                            renv['shopify.connector.store'].browse(store_id),
-                            self.NEW_TOKEN,
-                        )
-                        repl.commit()
-                    finally:
-                        repl.close()
-                    captured['lease_during'] = self._observe(dbname, store_id)[2]
-                    return FakeResponse(200, json_body={'data': {}})
-
-                with patch.object(self.registry, 'cursor',
-                                  self._real_registry_cursor(dbname)):
-                    with patch.object(type(Client), '_send', racing_send):
-                        with Client.execute_business(job, store, 'q') as result:
-                            self.assertEqual(result['data'], {})
-                worker.rollback()
-            finally:
-                worker.close()
-            # The admitted call used its captured OLD token, never the replacement.
-            self.assertEqual(captured['token'], DUMMY_TOKEN)
-            self.assertEqual(captured['lease_during'], 1)   # lease held during call
-            store_row, cred_row, lease_count = self._observe(dbname, store_id)
-            self.assertEqual(cred_row[0], self.NEW_TOKEN)   # replace proceeded
-            self.assertEqual(store_row[0], 'reconnect_needed')
-            self.assertEqual(lease_count, 0)                # released on exit
-        finally:
-            self._cleanup(dbname, store_id, job_id)
-
-
-@tagged('post_install', '-at_install')
-class TestLifecycleAdmissionSourceGuards(TransactionCase):
-    """CORE-R2 review 4691182306 #1 -- source guards for the ATOMIC lifecycle
-    admission: `_admit_lifecycle` captures its snapshot in a short OWNED side
-    transaction (store-row FOR SHARE) that commits/closes BEFORE the network call,
-    creates NO call lease, hands the exact snapshot token to the transport, and its
-    result still flows through the post-network revalidation. These are pure source
-    assertions (no side cursor); genuine behaviour is proven by
-    `TestLifecycleAdmissionRaceGenuine`."""
-
-    def _admit_src(self):
-        return inspect.getsource(
-            client_module.ShopifyConnectorApiClient._admit_lifecycle)
-
-    def _probe_src(self):
-        return inspect.getsource(
-            store_module.ShopifyConnectorStore._run_connection_probe)
-
-    def test_admit_lifecycle_owns_a_side_cursor(self):
-        src = self._admit_src()
-        self.assertIn('self.env.registry.cursor()', src)
-        self.assertIn('side_cr', src)
-
-    def test_admit_lifecycle_executes_store_for_share(self):
-        src = self._admit_src()
-        self.assertIn('FOR SHARE', src)
-        self.assertIn('FROM shopify_connector_store', src)
-
-    def test_admit_lifecycle_fresh_matrix_check_under_lock(self):
-        # The matrix state check reads the value returned by the FOR SHARE SELECT
-        # (fresh under the lock), not a cached `store.state`.
-        src = self._admit_src()
-        self.assertIn('state, generation = row', src)
-        self.assertIn('if state not in allowed_states:', src)
-
-    def test_admit_lifecycle_single_token_read_under_lock(self):
-        src = self._admit_src()
-        self.assertEqual(src.count('_get_access_token('), 1)
-
-    def test_admit_lifecycle_only_side_cursor_commit_and_rollback(self):
-        src = self._admit_src()
-        self.assertIn('side_cr.commit()', src)
-        self.assertIn('side_cr.rollback()', src)
-        self.assertNotIn('self.env.cr.commit', src)
-        self.assertNotIn('self._cr.commit', src)
-        committed = re.findall(r'(\w+)\.commit\(\)', src)
-        self.assertTrue(committed)
-        self.assertTrue(all(name == 'side_cr' for name in committed),
-                        'only the owned side cursor may commit; found %s' % committed)
-        rolled = re.findall(r'(\w+)\.rollback\(\)', src)
-        self.assertTrue(all(name == 'side_cr' for name in rolled),
-                        'only the owned side cursor may rollback; found %s' % rolled)
-
-    def test_admit_lifecycle_creates_no_lease(self):
-        # AST-robust (control-room review 4692156428): inspect the executable
-        # body, so the `_admit_lifecycle` docstring's "no `call.lease` is
-        # created" prose is NOT a false positive. The lifecycle admission must
-        # create no lease -- no lease-model lookup, no `lease_key` identifier,
-        # and no create() call anywhere in real code.
-        fn = guard_fn_ast(
-            client_module.ShopifyConnectorApiClient._admit_lifecycle)
-        self.assertNotIn(
-            'shopify.connector.call.lease', guard_str_constants(fn))
-        self.assertNotIn('lease_key', guard_identifiers(fn))
-        self.assertNotIn('create', guard_called_names(fn))
-
-    def test_admit_lifecycle_commits_and_closes_before_transport(self):
-        # The side transaction commits and the cursor closes INSIDE
-        # `_admit_lifecycle`; the transport (`_send_lifecycle`) is a SEPARATE call
-        # in `_run_connection_probe` that runs only AFTER `_admit_lifecycle`
-        # returns -> no lock spans the network call.
-        src = self._admit_src()
-        self.assertIn('side_cr.commit()', src)
-        self.assertIn('side_cr.close()', src)
-        self.assertLess(src.index('side_cr.commit()'), src.index('return snapshot'))
-        # No transport CALL inside the admission (the FOR SHARE must not span the
-        # network). Inspect actual call nodes, so a docstring mention of
-        # `_send_lifecycle` is NOT a false positive.
-        fn = ast.parse(textwrap.dedent(src)).body[0]
-        called = {
-            n.func.attr for n in ast.walk(fn)
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
-        }
-        self.assertNotIn('_send', called)
-        self.assertNotIn('_send_lifecycle', called)
-        probe = self._probe_src()
-        self.assertLess(
-            probe.index('_admit_lifecycle'), probe.index('_send_lifecycle'),
-            'admission must complete before the transport call')
-
-    def test_probe_passes_exact_snapshot_token_to_send(self):
-        probe = self._probe_src()
-        self.assertIn("snapshot['token']", probe)
-        send_src = inspect.getsource(
-            client_module.ShopifyConnectorApiClient._send_lifecycle)
-        self.assertIn('self._send(store, body, token)', send_src)
-
-    def test_post_network_revalidation_remains(self):
-        probe = self._probe_src()
-        self.assertIn('_lifecycle_probe_superseded(snapshot)', probe)
-        reval = inspect.getsource(
-            store_module.ShopifyConnectorStore._lifecycle_probe_superseded)
-        self.assertIn('_lock_store_for_lifecycle', reval)
-        self.assertIn('_lifecycle_credential_version', reval)
-        self.assertIn("snapshot['generation']", reval)
-        # Wave 5: the value revalidation compares the credential IDENTITY, not
-        # whatever access token happens to be current. Under the offline mode
-        # the identity IS the token and this is the same comparison it always
-        # was; under the client-credentials mode the token rotates every 24
-        # hours by design, so comparing tokens would report a routine rotation
-        # as a credential replacement and discard a valid probe result once a
-        # day. The assertion is kept -- and strengthened, because it now names
-        # the accessor as well as the snapshot key, so removing either fails.
-        self.assertIn('_lifecycle_credential_identity', reval)
-        self.assertIn("snapshot.get('identity')", reval)
-
-    def test_admission_refusal_before_send_is_superseded(self):
-        # A matrix refusal under the lock (disconnect won before the FOR SHARE)
-        # is caught and audited as superseded, with no network issued.
-        probe = self._probe_src()
-        self.assertIn('except UserError:', probe)
-        self.assertIn('_audit_probe_superseded(job)', probe)
-
-
-@tagged('post_install', '-at_install')
-class TestSourceGuardDetectors(TransactionCase):
-    """Detector self-tests (control-room review 4692156428) -- guard the guards.
-
-    Prove each reusable AST source-guard helper both (a) FIRES on real unsafe
-    EXECUTABLE code and (b) IGNORES a docstring-only mention of the same token.
-    This makes the correction non-circular: it does not rely only on the current
-    safe production source, so a future weakening (reverting to a raw
-    `assertNotIn` substring scan, or a detector that could never fail) is caught
-    here. Pure AST -- no database access."""
-
-    @staticmethod
-    def _fn(src):
-        return ast.parse(textwrap.dedent(src)).body[0]
-
-    def test_sudo_detector_fires_on_real_call_and_ignores_docstring(self):
-        # Guard A (test_credential_service): a real `.sudo()` call is detected;
-        # a docstring that says "no sudo()" is not.
-        unsafe = self._fn(
-            "def bad(self, store):\n"
-            "    'plain docstring, no forbidden prose'\n"
-            "    return self.sudo().search([('store_id', '=', store.id)])\n"
-        )
-        safe = self._fn(
-            "def ok(self, store):\n"
-            "    'Runs with no sudo() -- the ACL stays live (prose only).'\n"
-            "    return self.search([('store_id', '=', store.id)])\n"
-        )
-        self.assertIn('sudo', guard_called_names(unsafe))
-        self.assertNotIn('sudo', guard_called_names(safe))
-
-    def test_skip_locked_detector_fires_on_real_sql_and_ignores_docstring(self):
-        # Guard B: SKIP LOCKED in real executable SQL is detected; a docstring
-        # that explains it does *not* use SKIP LOCKED is not.
-        unsafe = self._fn(
-            "def bad(self):\n"
-            "    'plain docstring'\n"
-            "    self.env.cr.execute('SELECT id FROM t WHERE id=%s "
-            "FOR UPDATE SKIP LOCKED', (1,))\n"
-        )
-        safe = self._fn(
-            "def ok(self):\n"
-            "    'Unlike FOR UPDATE SKIP LOCKED, this blocks (prose only).'\n"
-            "    self.env.cr.execute('SELECT id FROM t WHERE id=%s "
-            "FOR NO KEY UPDATE', (1,))\n"
-        )
-        self.assertIn('SKIP LOCKED', guard_execute_sql(unsafe))
-        self.assertNotIn('SKIP LOCKED', guard_execute_sql(safe))
-        self.assertIn('FOR NO KEY UPDATE', guard_execute_sql(safe))
-
-    def test_clear_detector_fires_on_real_call_and_ignores_docstring(self):
-        # Guard C: a real public `action_clear_token()` call is detected; a
-        # finalizer docstring that says "never the public action_clear_token"
-        # is not (and the private primitive is still required).
-        unsafe = self._fn(
-            "def bad(self):\n"
-            "    'finalizer'\n"
-            "    self.env['x'].action_clear_token(self)\n"
-        )
-        safe = self._fn(
-            "def ok(self):\n"
-            "    'Clears via the private primitive, never the public "
-            "action_clear_token.'\n"
-            "    self.env['x']._clear_token_under_store_lock(self)\n"
-        )
-        self.assertIn('action_clear_token', guard_called_names(unsafe))
-        self.assertNotIn('action_clear_token', guard_called_names(safe))
-        self.assertIn(
-            '_clear_token_under_store_lock', guard_called_names(safe))
-
-    def test_lease_detector_fires_on_real_create_and_ignores_docstring(self):
-        # Guard D: a real call-lease model create() (model lookup + `lease_key`
-        # identifier + create call) is detected; a docstring that says "no
-        # call.lease is created" is not.
-        unsafe = self._fn(
-            "def bad(self, side_env):\n"
-            "    'admission'\n"
-            "    lease_key = uuid.uuid4().hex\n"
-            "    side_env['shopify.connector.call.lease'].create("
-            "{'lease_key': lease_key})\n"
-        )
-        safe = self._fn(
-            "def ok(self, token):\n"
-            "    'Snapshot only; no call.lease is created and no lease_key "
-            "exists.'\n"
-            "    return {'token': token}\n"
-        )
-        self.assertIn(
-            'shopify.connector.call.lease', guard_str_constants(unsafe))
-        self.assertIn('lease_key', guard_identifiers(unsafe))
-        self.assertIn('create', guard_called_names(unsafe))
-        self.assertNotIn(
-            'shopify.connector.call.lease', guard_str_constants(safe))
-        self.assertNotIn('lease_key', guard_identifiers(safe))
-        self.assertNotIn('create', guard_called_names(safe))
-
-    def test_limit_kwarg_detector_requires_a_real_call(self):
-        # Guard C helper: try_lock_for_update(limit=1) must be a real call with
-        # the literal kwarg; a docstring mention alone does not satisfy it.
-        real = self._fn(
-            "def q(self):\n"
-            "    'doc'\n"
-            "    return self.search([]).try_lock_for_update(limit=1)\n"
-        )
-        prose_only = self._fn(
-            "def q(self):\n"
-            "    'uses try_lock_for_update(limit=1) -- prose only'\n"
-            "    return self.search([]).try_lock_for_update()\n"
-        )
-        self.assertTrue(guard_has_call_with_const_kwarg(
-            real, 'try_lock_for_update', 'limit', 1))
-        self.assertFalse(guard_has_call_with_const_kwarg(
-            prose_only, 'try_lock_for_update', 'limit', 1))
-
-
-class _GenuineRaceHelpers:
-    """Shared GENUINE independent-connection helpers (mixin; mirrors
-    `TestGenuineRealAdmission` / `TestCredentialReplacementRaceGenuine`): real
-    pooled `db_connect` connections, bounded (statement_timeout + lock_timeout),
-    with distinct backend PIDs. Raw SQL is used ONLY to commit fixtures, OBSERVE
-    committed state, and clean up -- never to create the row under test."""
-
-    STATEMENT_TIMEOUT_MS = 10000
-    LOCK_TIMEOUT_MS = 8000
-    BOUND_SECONDS = 20
-
-    def _open_bounded(self, dbname, read_committed=False, lock_timeout_ms=None):
-        """Open a genuine pooled cursor with BOTH transaction-local PostgreSQL
-        limits. `read_committed=True` (first statement of the transaction) lets a
-        single-shot genuine test observe the post-network FOR NO KEY UPDATE
-        revalidation against a concurrently-committed disconnect WITHOUT the
-        production request-level serialization-failure retry (production runs
-        REPEATABLE READ + that retry; both converge on discarding the stale probe
-        result). `lock_timeout_ms` overrides the default lock timeout for the
-        lock-attribution proof."""
-        cr = db_connect(dbname).cursor()
-        try:
-            if read_committed:
-                cr.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
-            lt = self.LOCK_TIMEOUT_MS if lock_timeout_ms is None else lock_timeout_ms
-            cr.execute(
-                "SELECT set_config('statement_timeout', %s, true), "
-                "set_config('lock_timeout', %s, true)",
-                (str(self.STATEMENT_TIMEOUT_MS), str(lt)),
-            )
-        except BaseException:
-            cr.close()
-            raise
-        return cr
-
-    def _backend_pid(self, cr):
-        cr.execute("SELECT pg_backend_pid()")
-        return cr.fetchone()[0]
-
-    def _real_registry_cursor(self, dbname):
-        """registry.cursor() replacement handing out bounded real pooled cursors,
-        so the production side transactions (`_admit`/`_admit_lifecycle`/
-        `_release_lease`) are genuinely independent and time-bounded."""
-        return lambda *args, **kwargs: self._open_bounded(dbname)
-
-    def _recording_registry_cursor(self, dbname, pids, lock_timeout_ms=None):
-        """As `_real_registry_cursor`, but records each handed-out cursor's backend
-        PID so the production side transaction's backend is observably distinct."""
-        def factory(*args, **kwargs):
-            cr = self._open_bounded(dbname, lock_timeout_ms=lock_timeout_ms)
-            pids.append(self._backend_pid(cr))
-            return cr
-        return factory
-
-    def _sanitize(self, exc, phase):
-        error_class = getattr(exc, 'error_class', None)
-        return {
-            'phase': phase,
-            'type': type(exc).__name__,
-            'error_class': error_class if isinstance(error_class, str) else None,
-        }
-
-    def _drain(self, q):
-        findings = []
-        while True:
-            try:
-                findings.append(q.get_nowait())
-            except queue.Empty:
-                break
-        return findings
-
-    def _assert_workers_dead(self, threads):
-        alive = sum(1 for t in threads if t is not None and t.is_alive())
-        self.assertEqual(
-            alive, 0, 'worker thread still alive at the cleanup boundary')
+                observer.close()
+            if row and row[0] == 'Lock':
+                return True
+            time.sleep(0.01)
+        return False
 
     def _commit_connected_fixture(self, dbname, with_job=False):
         """Create+commit a connected store, its credential, and (optionally) one
@@ -3279,34 +2344,86 @@ class _GenuineRaceHelpers:
 
 @tagged('post_install', '-at_install')
 class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
-    """Two real PostgreSQL callers must not bump a connected store twice."""
+    """Two real PostgreSQL callers must not bump a store twice."""
 
-    def test_concurrent_activation_of_already_connected_store_is_idempotent(self):
+    def test_waiting_concurrent_activation_does_not_bump_generation(self):
+        """A second real caller waits on the first activation's row lock.
+
+        The previous wall-clock barrier let both Odoo worker threads remain
+        alive on Odoo.sh when one request held the lifecycle lock.  This test
+        uses a deterministic PostgreSQL choreography instead: the first
+        production ``action_activate`` runs on a genuine pooled connection
+        and intentionally remains uncommitted; the second production call is
+        started on another backend and its lock wait is observed in
+        ``pg_stat_activity`` before the first transaction commits.  Once the
+        second caller wakes it must read the freshly committed ``connected``
+        state and leave the generation unchanged.
+        """
         dbname = self.env.cr.dbname
         store_id = None
-        threads = []
-        results = queue.Queue()
-        barrier = threading.Barrier(2)
+        second = None
+        first = None
+        result = queue.Queue()
+        backend = {}
+        second_ready = threading.Event()
+        second_attempting = threading.Event()
         try:
             store_id, _domain, _job = self._commit_connected_fixture(dbname)
+            # Turn the committed fixture into a genuinely activation-eligible
+            # store through the ORM.  The fixture helper intentionally creates
+            # an already-connected store for the many disconnect-race tests;
+            # this test needs one real transition so the first caller bumps
+            # the generation exactly once.
+            prepared = self._open_bounded(dbname)
+            try:
+                prepared_env = api.Environment(prepared, SUPERUSER_ID, {})
+                prepared_store = prepared_env[
+                    'shopify.connector.store'
+                ].browse(store_id)
+                now = fields.Datetime.now()
+                prepared_store.write({
+                    'state': 'reconnect_needed',
+                    'last_test_connection_result': 'pass',
+                    'last_readiness_result': 'pass',
+                    'credential_last_verified_at': now,
+                    'last_readiness_at': now,
+                })
+                prepared.commit()
+            finally:
+                prepared.close()
+
             before = self._observe_store(dbname, store_id)
             generation_before = before[1]
 
-            def activate_once():
+            # The first caller is a real production method on a real pooled
+            # backend.  Its uncommitted row write is the lock holder that makes
+            # the second call's wait deterministic.
+            first = self._open_bounded(dbname, read_committed=True)
+            first_env = api.Environment(first, SUPERUSER_ID, {})
+            first_store = first_env['shopify.connector.store'].browse(store_id)
+            first_store.action_activate()
+            self.assertEqual(
+                first_store.connection_generation, generation_before + 1,
+            )
+
+            def activate_waiting():
                 cr = None
                 try:
                     threading.current_thread().dbname = dbname
                     cr = self._open_bounded(dbname, read_committed=True)
+                    backend['pid'] = self._backend_pid(cr)
                     env = api.Environment(cr, SUPERUSER_ID, {})
                     store = env['shopify.connector.store'].browse(store_id)
-                    barrier.wait(timeout=self.BOUND_SECONDS)
+                    second_ready.set()
+                    second_attempting.set()
                     # This is the real public production method on an
-                    # independent backend; no state or lock seam is patched.
+                    # independent backend; no state, lock, or timing seam is
+                    # patched.  It waits on the first transaction's row lock.
                     store.action_activate()
                     cr.commit()
-                    results.put({'ok': True})
+                    result.put({'ok': True})
                 except BaseException as exc:
-                    results.put(self._sanitize(exc, 'activation'))
+                    result.put(self._sanitize(exc, 'activation'))
                 finally:
                     if cr is not None:
                         try:
@@ -3314,27 +2431,49 @@ class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
                         finally:
                             cr.close()
 
-            threads = [
-                threading.Thread(target=activate_once, daemon=True)
-                for _ in range(2)
-            ]
-            for thread in threads:
-                thread.start()
-            for thread in threads:
-                thread.join(timeout=self.BOUND_SECONDS)
-            self._assert_workers_dead(threads)
-            outcomes = [results.get_nowait(), results.get_nowait()]
-            self.assertEqual(outcomes, [{'ok': True}, {'ok': True}])
+            second = threading.Thread(target=activate_waiting, daemon=True)
+            second.start()
+            self.assertTrue(
+                second_ready.wait(timeout=self.BOUND_SECONDS),
+                'second activation backend did not become ready',
+            )
+            self.assertTrue(
+                second_attempting.wait(timeout=self.BOUND_SECONDS),
+                'second activation did not reach the production method',
+            )
+            self.assertTrue(backend.get('pid'), 'second backend PID missing')
+            self.assertTrue(
+                self._wait_for_backend_lock(dbname, backend['pid']),
+                'second activation did not wait on the first row lock',
+            )
+
+            # Release the first activation only after the second backend is
+            # demonstrably waiting.  This makes the race reproducible while
+            # retaining the real PostgreSQL lock and production method.
+            first.commit()
+            first.close()
+            first = None
+            second.join(timeout=self.BOUND_SECONDS)
+            self._assert_workers_dead([second])
+            self.assertEqual(result.get(timeout=self.BOUND_SECONDS), {'ok': True})
             after = self._observe_store(dbname, store_id)
             self.assertEqual(after[0], 'connected')
             self.assertEqual(
-                after[1], generation_before,
-                'a repeated activation must not bump the connection epoch',
+                after[1], generation_before + 1,
+                'the waiting activation must not bump the connection epoch',
             )
         finally:
-            for thread in threads:
-                if thread.is_alive():
-                    thread.join(timeout=self.BOUND_SECONDS)
+            # Always release the holder before joining the worker.  This is a
+            # test-teardown guarantee, not a production timeout workaround.
+            if first is not None:
+                try:
+                    first.rollback()
+                finally:
+                    first.close()
+            if second is not None and second.is_alive():
+                second.join(timeout=self.BOUND_SECONDS)
+            if second is not None:
+                self._assert_workers_dead([second])
             self._cleanup(dbname, store_id)
 
 

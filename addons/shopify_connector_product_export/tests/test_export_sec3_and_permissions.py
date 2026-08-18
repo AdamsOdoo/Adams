@@ -12,7 +12,7 @@ from ..models.shopify_connector_product_export_seams import (
     REQUIRED_EXPORT_SCOPES,
     REQUIRED_MEDIA_SCOPES,
 )
-from .common import ExportCase, SHOP_DOMAIN
+from .common import DUMMY_TOKEN, ExportCase, SHOP_DOMAIN
 
 
 @tagged('post_install', '-at_install')

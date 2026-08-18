@@ -145,27 +145,17 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             content: "The Client secret is a password input on the default path.",
         },
         {
-            // Switch to the offline-token path the rest of this tour uses.
-            trigger: ".sc_setup__mode input[value='offline_access_token']",
-            run: "click",
+            // Keep this activation journey on the supported Dev Dashboard
+            // path.  The HttpCase fixture supplies a synthetic token-exchange
+            // response, so the tour proves the real client-credentials
+            // lifecycle without selecting a mode whose token would be
+            // rejected by W1's offline-token HMAC gate.
+            trigger: "#sc_setup_client_id",
+            run: "edit s1-tour-client-id",
         },
         {
-            // The three-value disclosure. An operator who pastes the Client
-            // ID gets an authentication failure one step later with no way to
-            // tell which of the three values was wrong, so the screen has to
-            // say which one it wants and what the other two are not.
-            trigger: ".sc_setup__panel:contains('not the Client ID')",
-            content: "The token guidance names the Client ID as NOT the token.",
-        },
-        {
-            trigger: ".sc_setup__panel:contains('Client Secret')",
-            content: "...and the Client Secret as NOT the token either.",
-        },
-        {
-            // The token field must be a password input: a plain text input is
-            // readable over a shoulder and captured by every screenshot tool.
-            trigger: "#sc_setup_token[type='password']",
-            run: "edit shpat_S1TOURDUMMY000000000000000000000",
+            trigger: "#sc_setup_client_secret[type='password']",
+            run: "edit s1-tour-client-secret",
         },
         { trigger: CONTINUE, run: "click" },
 
@@ -180,10 +170,12 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             trigger: ".sc_setup__panel:contains('does not grant anything')",
         },
         {
-            // The credential field is gone from the DOM, so nothing that
-            // walks the page afterwards can find the token in it.
-            trigger: "body:not(:has(#sc_setup_token))",
-            content: "The token input no longer exists once it is submitted.",
+            // Credential fields are gone from the DOM, so nothing that walks
+            // the page afterwards can find either client secret or token.
+            trigger:
+                "body:not(:has(#sc_setup_token)):not(:has(#sc_setup_client_id)):" +
+                "not(:has(#sc_setup_client_secret))",
+            content: "Credential inputs no longer exist once they are submitted.",
         },
         {
             // The action row is a separate visible row below the panel.
@@ -306,10 +298,14 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
         {
             // The optional W1 foundation deliberately keeps setup on this
             // screen until its durable Shopify subscription read-back proof
-            // exists.  Core-only installations still hand off directly to
-            // the dashboard, so the tour accepts either truthful outcome.
-            trigger: ".o_sc_dashboard, .sc_setup__completion_pending",
-            content: "Activation either completes or truthfully waits for webhook proof.",
+            // exists.  Core-only installations hand off directly to the
+            // dashboard.  With W1 installed, this successful client-
+            // credentials journey must show the pending hand-off; an
+            // action-required state is a failure handled by a separate
+            // refusal journey.
+            trigger:
+                ".o_sc_dashboard, .sc_setup__completion_pending",
+            content: "Activation completes or truthfully waits for webhook proof.",
         },
     ],
 });

@@ -9,11 +9,12 @@ fields and an activation contract were all present and correct, and there was
 no route through them. A browser is the only place "the operator can get from
 nothing to an activated store" is a testable claim.
 
-These tours contact no Shopify store. The full traversal's connection probe is
-answered at the existing `_send` transport seam. The two C4 refresh journeys
-use Odoo's real-request HttpCase mode, committed fixture cursors and an
-independent production dispatcher cursor, so browser RPCs and background work
-observe the same durable database state without sharing the test transaction.
+These tours contact no Shopify store. The full traversal's token exchange and
+connection probe are answered at the existing transport seams. The two C4
+refresh journeys use Odoo's real-request HttpCase mode, committed fixture
+cursors and an independent production dispatcher cursor, so browser RPCs and
+background work observe the same durable database state without sharing the
+test transaction.
 """
 
 import json
@@ -88,7 +89,25 @@ class TestUiSetupTours(HttpCase):
                       mutation_context=None):
             return response
 
-        return patch.object(Client, '_send', responder)
+        def token_exchange_responder(
+            _self, _store, _client_id, _client_secret,
+        ):
+            # The browser journey uses the supported Dev Dashboard path.  The
+            # values entered by the tour are synthetic and this response is
+            # the existing transport seam: no credential or Shopify network
+            # call is involved, while the real exchange/cache/readiness path
+            # still runs.
+            return FakeResponse(200, json_body={
+                'access_token': 'shpat_S1TOUR_EXCHANGED_DUMMY000000000000',
+                'expires_in': 86399,
+                'scope': ' '.join(scopes),
+            })
+
+        return patch.multiple(
+            Client,
+            _send=responder,
+            _send_token_exchange=token_exchange_responder,
+        )
 
     def _make_readiness_passable(self):
         """Satisfy the environment-owned essential checks.
@@ -128,6 +147,15 @@ class TestUiSetupTours(HttpCase):
             store.state, 'connected',
             'the traversal did not reach an activated store',
         )
+        credential = self.env[
+            'shopify.connector.store.credential'
+        ].sudo().search([('store_id', '=', store.id)], limit=1)
+        self.assertEqual(
+            credential.auth_mode, 'dev_dashboard_client_credentials',
+            'the activation tour must exercise the supported '
+            'client-credentials path',
+        )
+        self.assertEqual(credential.client_id, 's1-tour-client-id')
         settings = self.env['shopify.connector.store.settings'].sudo().search(
             [('store_id', '=', store.id)], limit=1,
         )
@@ -135,6 +163,18 @@ class TestUiSetupTours(HttpCase):
             'shopify.connector.webhook.registry' in self.env.registry.models
         )
         if webhook_installed:
+            setup_state = self.env[
+                'shopify.connector.setup.wizard'
+            ].sudo().get_setup_state(store_id=store.id)
+            self.assertEqual(
+                setup_state['store']['setup_completion_state'], 'pending',
+                'a successful W1 activation must remain pending until '
+                'subscription read-back proof exists',
+            )
+            self.assertNotEqual(
+                setup_state['store']['setup_completion_state'],
+                'action_required',
+            )
             # W1 makes connection and setup completion two truthful stages:
             # the browser's first activation leaves a durable reconciliation
             # job and keeps the operator on setup until its Shopify read-back

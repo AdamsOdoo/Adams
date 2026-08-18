@@ -8,9 +8,6 @@ from types import SimpleNamespace
 
 from odoo.tests.common import TransactionCase, tagged
 
-from odoo.addons.shopify_connector_core.tools.api_version import (
-    SHOPIFY_API_VERSION,
-)
 from odoo.addons.shopify_connector_webhook.controllers.shopify_connector_webhook import (
     MAX_WEBHOOK_BODY_BYTES,
     ShopifyConnectorWebhookController,
@@ -163,7 +160,31 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertNotIn('client.execute(store', subscription)
         self.assertIn('webhook_subscription_create', dispatch)
         self.assertIn('REPLAY_POLICY_REMOTE_EFFECT_NOT_REPLAY_SAFE', dispatch)
-        self.assertIn(SHOPIFY_API_VERSION, controller)
+        # The API version is owned by the core constant.  This guard must
+        # prove that the controller imports and compares that symbol rather
+        # than freezing a second literal in the public route.
+        self.assertIn(
+            'from odoo.addons.shopify_connector_core.tools.api_version import (\n'
+            '    SHOPIFY_API_VERSION,\n'
+            ')',
+            controller,
+        )
+        self.assertIn('if api_version != SHOPIFY_API_VERSION:', controller)
+        self.assertIn(
+            'store.api_version != SHOPIFY_API_VERSION', controller,
+        )
+        self.assertIn(
+            'delivered_api_version != SHOPIFY_API_VERSION', controller,
+        )
+        self.assertNotIn("'2026-07'", controller)
+        self.assertNotIn('"2026-07"', controller)
+        tour = (root.parent / 'shopify_connector_core' / 'static' / 'src' /
+                'js' / 'tours' / 'shopify_connector_s1_setup_tour.js').read_text()
+        self.assertIn('.sc_setup__completion_pending', tour)
+        self.assertNotIn('.sc_setup__completion_action', tour)
+        self.assertNotIn("value='offline_access_token'", tour)
+        self.assertIn('#sc_setup_client_id', tour)
+        self.assertIn('#sc_setup_client_secret[type=\'password\']', tour)
 
     def test_setup_activation_defers_completion_until_stored_webhook_proof(self):
         """The installed W1 hook cannot make the setup wizard false-green."""
