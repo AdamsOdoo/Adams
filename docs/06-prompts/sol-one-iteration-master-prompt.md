@@ -70,6 +70,43 @@ first via your cloud browser, together with
    read Claude's verdicts, drive live UAT in the Odoo.sh database with
    screenshots, and verify remote state in the Shopify dev-store admin.
    Always record which SHA the browser evidence belongs to.
+8. **Verify before implementing — no blind implementation (product-owner
+   directive, 2026-08-18).** Claude's review findings and packets are
+   *claims with evidence*, not orders. Before implementing any finding,
+   independently verify it: read the exact source at the cited file:line,
+   check the runtime behavior on Odoo.sh where relevant, and confirm every
+   version-dependent Shopify/Odoo fact against official docs or a live
+   dev-store read (the packets' OPEN QUESTIONS and pre-flight checks are
+   mandatory verification steps, not suggestions — resolve each one
+   *before* implementing the fix that depends on it). Implement only what
+   you have confirmed, with the architecture the verification supports —
+   if verification suggests a better fix shape than the packet's, take it
+   and record why. If you **refute** a finding, do not implement it:
+   record the refutation with evidence in the ledger and list it in the
+   `READY-FOR-CLAUDE-REVIEW` comment for adjudication in Claude's review.
+   Verification effort follows the same quota policy (medium default,
+   high only on the Tier-1 escalation list).
+
+## Task 0 — CI qualification recovery + W1 correction (do first)
+
+The exact-head Actions runs at `f62db111` (32127509348 / 32127506211) were
+both killed by the workflow's `timeout-minutes: 180` on 2026-08-18 — the
+suite no longer completes in 3 hours against a ~58-minute historical
+baseline. **No exact-head CI evidence can exist until this is fixed**, so it
+gates everything. Diagnose first (prime suspect: `f62db111` itself, the last
+commit, which changed `tools/run_connector_suite.sh` browser-probe cleanup —
+check for a wait/retry that can spin or block forever; second suspect: a hang
+in the new webhook test layers; genuine suite growth past 180m is least
+likely). Verify by reading the partial logs of the cancelled runs via your
+browser (visible on the run pages even though the API archive is
+unavailable), locating the last emitted line before silence. Fix the actual
+cause — never by skipping tests or blindly raising the timeout; a modest
+timeout increase is acceptable only alongside evidence of legitimate suite
+growth. Then fold in the **W1 webhook correction** (Claude review comment
+`5328283841` + `docs/06-prompts/w1-webhook-correction-packet.md` — verify
+each finding per rule 8 first) and get a green exact-head Actions run and
+Odoo.sh build at the corrected head. That green head is the base for
+Batch 1.
 
 ## Batch 1 — Core-vertical UAT completion (Tier 1)
 
