@@ -83,7 +83,10 @@ EXPECTED_SUITES = {
     # The location-discovery polish (2026-08-15) raised it to 34: opening the
     # required location step starts discovery automatically, and Continue
     # remains blocked until every active Shopify location is mapped.
-    'shopify connector setup wizard': 34,
+    # The explicit second-store setup path (2026-08-18) adds the 35th client
+    # assertion: switching to a new store clears store-scoped transient state
+    # and restores keyboard focus without mutating the existing store.
+    'shopify connector setup wizard': 35,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
