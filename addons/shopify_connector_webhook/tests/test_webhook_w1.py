@@ -98,12 +98,17 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
     def test_registry_separates_catalog_from_active_subscriptions(self):
         registry = self.env['shopify.connector.webhook.registry']
         active = set(registry.allowed_topics())
-        self.assertEqual(active, {'app/uninstalled'})
+        self.assertIn('app/uninstalled', active)
         self.assertIn('products/update', MVP_TOPIC_CATALOG)
-        self.assertNotIn('products/update', active)
-        self.assertEqual(
-            registry.topic_spec('products/update'), False,
-        )
+        if 'products/update' in active:
+            # The optional product-domain addon may extend the active registry
+            # after W1 is installed. Its bounded slice activates create/update
+            # only; delete remains catalogued but unsubscribable.
+            self.assertIn('products/create', active)
+            self.assertNotIn('products/delete', active)
+            self.assertTrue(registry.topic_spec('products/update'))
+        else:
+            self.assertEqual(registry.topic_spec('products/update'), False)
 
     def test_delivery_evidence_has_no_payload_field_and_allowlists_identity(self):
         delivery_model = self.env['shopify.connector.webhook.delivery']

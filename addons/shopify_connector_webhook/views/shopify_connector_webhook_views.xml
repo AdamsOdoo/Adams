@@ -135,6 +135,7 @@
                 <field name="shopify_subscription_gid"/>
                 <field name="actual_api_version" optional="show"/>
                 <field name="actual_format" optional="hide"/>
+                <field name="actual_include_fields" optional="hide"/>
                 <field name="last_reconciled_at"/>
                 <field name="last_job_id" optional="show"/>
                 <field name="last_error" optional="hide"/>
@@ -163,6 +164,7 @@
                             <field name="topic_enum"/>
                             <field name="expected"/>
                             <field name="expected_api_version"/>
+                            <field name="expected_include_fields"/>
                             <field name="expected_callback_url_digest"/>
                         </group>
                         <group string="Shopify read-back">
@@ -171,6 +173,7 @@
                             <field name="actual_uri_digest"/>
                             <field name="actual_api_version"/>
                             <field name="actual_format"/>
+                            <field name="actual_include_fields"/>
                             <field name="last_reconciled_at"/>
                             <field name="hmac_credential_epoch"/>
                         </group>

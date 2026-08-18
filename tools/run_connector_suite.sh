@@ -13,10 +13,11 @@
 #      verifies it on every run so a cached checkout can never silently execute
 #      a different Odoo
 #   2. installs the connector modules into a disposable PostgreSQL database
-#   3. runs THREE passes, each into its own database with its own log:
+#   3. runs FOUR passes, each into its own database with its own log:
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
 #        * the complete NON-STANDARD tag suite
+#        * W2-only install over an older installed W1 (no W1 upgrade)
 #   4. verifies the checked-out connector commit against the commit the caller
 #      says this run is testing ($SOURCE_HEAD_SHA), and ABORTS on a mismatch
 #   5. writes durable per-pass logs and a machine-readable summary under
@@ -42,6 +43,7 @@
 #
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
+#                                [--skip-w2-only-install]
 #                                [--tags <extra-test-tags>]
 #   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
 #
@@ -58,7 +60,12 @@
 
 set -euo pipefail
 
-MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook"
+W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
+W1_WEBHOOK_SCHEMA_VERSION="19.0.1.1.0"
+W2_PRODUCT_WEBHOOK_VERSION="19.0.0.2.0"
+W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
+W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -188,7 +195,7 @@ ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook,/shopify_connector_product_webhook"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"
@@ -201,6 +208,7 @@ export PGHOST PGPORT
 RUN_FRESH=1
 RUN_WARM=1
 RUN_NONSTANDARD=1
+RUN_W2_ONLY_INSTALL=1
 RUN_SELF_TEST=0
 TEST_TAGS=""
 # --- The migration passes (2026-07-30) ---------------------------------------
@@ -240,15 +248,16 @@ MIGRATION_FROM_REFS=(
 RUN_MIGRATION=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
-        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
+        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
         # Same rule, same reason: opt-OUT only. A run that skips the genuine
         # version-to-version upgrade must say so in the summary, which it does.
         --skip-migration)   RUN_MIGRATION=0; shift ;;
-        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; shift ;;
+        --skip-w2-only-install) RUN_W2_ONLY_INSTALL=0; shift ;;
+        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_ONLY_INSTALL=0; shift ;;
         # Override the upgrade origins (space-separated refs), for a one-off
         # check against some other ancestor.
         --migration-from)   read -r -a MIGRATION_FROM_REFS <<< "$2"; shift 2 ;;
@@ -414,6 +423,47 @@ verify_connector_module_inventory() {
     esac
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py" ]]; then
         evidence_fail "shopify_connector_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W1_WEBHOOK_SCHEMA_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_webhook manifest is not bumped for the includeFields schema"
+    fi
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/migrations/${W1_WEBHOOK_SCHEMA_VERSION}/post-migrate.py" ]]; then
+        evidence_fail "shopify_connector_webhook schema-verification migration is missing"
+    fi
+    case ",${MODULES}," in
+        *,shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_product_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_product_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_product_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W2_PRODUCT_WEBHOOK_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_product_webhook manifest version is not current"
+    elif ! grep -Fq "'pre_init_hook': 'pre_init_hook'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "product webhook W2-only install schema bridge is not registered"
+    fi
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_product_webhook/pre_init.py" ]]; then
+        evidence_fail "product webhook W2-only install schema bridge is missing"
+    fi
+    # W2 depends on W1's upgraded model.  Keep the dependency before the
+    # optional addon in every fresh/warm install set; a list edit that installs
+    # W2 first must fail the evidence gate instead of masking a missing schema.
+    case ",${MODULES}," in
+        *,shopify_connector_webhook,shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook must precede shopify_connector_product_webhook in MODULES" ;;
+    esac
+    if ! grep -Fq "'shopify_connector_webhook', 'shopify_connector_product'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "product webhook addon dependency closure is not W1 + product"
+    fi
+    if ! grep -Fq "${W2_ONLY_INSTALL_ORIGIN}" \
+        "${REPO_ROOT}/tools/run_connector_suite.sh"; then
+        evidence_fail "W2-only install phase does not use the durable old-W1 origin"
     fi
 }
 
@@ -911,6 +961,12 @@ run_odoo() {  # run_odoo <db> <logfile> <args...>
         --stop-after-init --log-level=test "$@" ) > "$logfile" 2>&1
 }
 
+run_odoo_with_conf() {  # run_odoo_with_conf <conf> <db> <logfile> <args...>
+    local conf="$1" db="$2" logfile="$3"; shift 3
+    ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$conf" -d "$db" \
+        --stop-after-init --log-level=test "$@" ) > "$logfile" 2>&1
+}
+
 # Odoo exits non-zero on test failure, so the result line is the source of
 # truth for *counts* and the exit code for pass/fail. Parse both.
 result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" | tail -1 || true; }
@@ -918,6 +974,11 @@ result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" 
 FRESH_STATUS="skipped"; FRESH_RESULT=""
 WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
+W2_ONLY_INSTALL_STATUS="skipped"; W2_ONLY_INSTALL_RESULT=""
+W2_ONLY_INSTALL_DB=""
+W2_ONLY_INSTALL_COLUMNS=""
+W2_ONLY_INSTALL_W1_VERSION=""
+W2_ONLY_INSTALL_W2_VERSION=""
 OVERALL=0
 
 # --- Pass 1: fresh install ---------------------------------------------------
@@ -969,6 +1030,107 @@ if [[ $RUN_WARM -eq 1 ]]; then
     # This pass is a SAME-VERSION update and must never be quoted as migration
     # evidence. Asserted, not assumed.
     verify_no_migration_ran "${ARTIFACT_DIR}/warm.log" "warm"
+fi
+
+# --- W2-only install over an older installed W1 -----------------------------
+# Odoo does not upgrade an already-installed dependency during `-i W2`.  This
+# is therefore a distinct install contract, not a combined `-u` migration:
+# install the durable old-W1 origin into a disposable database, switch the
+# addons path back to this candidate, and install ONLY W2.  The candidate's
+# pre-init bridge must make the W1-owned JSONB evidence columns available
+# before the current W1 registry is loaded, while the installed W1 version must
+# remain unchanged.  A missing origin, failed old install, failed W2 tests, or
+# wrong schema/version is evidence failure rather than a skipped scenario.
+if [[ $RUN_W2_ONLY_INSTALL -eq 1 ]]; then
+    bridge_short="${W2_ONLY_INSTALL_ORIGIN:0:8}"
+    bridge_tree="${ARTIFACT_DIR}/base-w2-only-${bridge_short}"
+    bridge_old_conf="${ARTIFACT_DIR}/odoo-w2-only-old-${bridge_short}.conf"
+    bridge_old_log="${ARTIFACT_DIR}/w2-only-old-w1-install.log"
+    bridge_log="${ARTIFACT_DIR}/w2-only-install.log"
+    W2_ONLY_INSTALL_DB="connector_w2_only_$$"
+    log "W2-only install bridge from ${bridge_short} -> ${W2_ONLY_INSTALL_DB}"
+    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
+        log "${bridge_short} is not in this clone; fetching durable W2-only origin"
+        git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin \
+            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 \
+            || git -C "$REPO_ROOT" fetch --no-tags origin \
+            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 || true
+    fi
+    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
+        W2_ONLY_INSTALL_STATUS="fail"
+        W2_ONLY_INSTALL_RESULT="durable W2-only origin is unavailable"
+        evidence_fail "w2-only: origin ${W2_ONLY_INSTALL_ORIGIN} is unavailable"
+    else
+        rm -rf "$bridge_tree"
+        mkdir -p "$bridge_tree"
+        git -C "$REPO_ROOT" archive "$W2_ONLY_INSTALL_ORIGIN" addons \
+            | tar -x -C "$bridge_tree"
+        sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${bridge_tree}/addons|" \
+            "$CONF" > "$bridge_old_conf"
+        dropdb --if-exists "$W2_ONLY_INSTALL_DB" 2>/dev/null || true
+        createdb "$W2_ONLY_INSTALL_DB"
+        if ! run_odoo_with_conf "$bridge_old_conf" "$W2_ONLY_INSTALL_DB" \
+                "$bridge_old_log" -i "${W1_ONLY_MODULES},${EXTRA_MODULES}"; then
+            W2_ONLY_INSTALL_STATUS="fail"
+            W2_ONLY_INSTALL_RESULT="old W1 install failed"
+            evidence_fail "w2-only: old W1 origin install failed"
+        else
+            W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
+                "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            bridge_before_w2="$(psql -tAc \
+                "SELECT count(*) FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            bridge_before_columns="$(psql -tAc \
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields')" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            log "w2-only old base: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2 rows=${bridge_before_w2}, includeFields columns=${bridge_before_columns}"
+            if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
+                  || "$bridge_before_w2" != "0" \
+                  || "$bridge_before_columns" != "0" ]]; then
+                W2_ONLY_INSTALL_STATUS="fail"
+                W2_ONLY_INSTALL_RESULT="old base was not W1-only with the pre-bridge schema"
+                evidence_fail "w2-only: old base identity/schema precondition failed"
+            elif run_odoo "$W2_ONLY_INSTALL_DB" "$bridge_log" \
+                    -i shopify_connector_product_webhook --test-enable \
+                    --test-tags "$W2_ONLY_INSTALL_TEST_TAGS"; then
+                W2_ONLY_INSTALL_STATUS="pass"
+                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
+            else
+                W2_ONLY_INSTALL_STATUS="fail"
+                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
+                evidence_fail "w2-only: installing W2 over old W1 failed"
+            fi
+            if [[ "$W2_ONLY_INSTALL_STATUS" == "pass" ]]; then
+                verify_no_unexpected_skips "$bridge_log" "w2-only"
+                verify_no_migration_ran "$bridge_log" "w2-only"
+                if ! grep -Eq '[0-9]+ failed, [0-9]+ error\(s\) of [1-9][0-9]* tests' \
+                    "$bridge_log"; then
+                    W2_ONLY_INSTALL_STATUS="fail"
+                    evidence_fail "w2-only: no installed W2 test result was recorded"
+                fi
+                W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
+                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                W2_ONLY_INSTALL_W2_VERSION="$(psql -tAc \
+                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                W2_ONLY_INSTALL_COLUMNS="$(psql -tAc \
+                    "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields') AND udt_name = 'jsonb'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                log "w2-only result: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2=${W2_ONLY_INSTALL_W2_VERSION}, JSONB columns=${W2_ONLY_INSTALL_COLUMNS}"
+                if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
+                      || "$W2_ONLY_INSTALL_W2_VERSION" != "$W2_PRODUCT_WEBHOOK_VERSION" \
+                      || "$W2_ONLY_INSTALL_COLUMNS" != "2" ]]; then
+                    W2_ONLY_INSTALL_STATUS="fail"
+                    evidence_fail "w2-only: W1 was upgraded or W2/schema verification failed"
+                fi
+            fi
+        fi
+    fi
+    if [[ "$W2_ONLY_INSTALL_STATUS" == "fail" ]]; then
+        OVERALL=1
+    fi
 fi
 
 # --- Pass 2b: genuine version-to-version migrations --------------------------
@@ -1185,6 +1347,7 @@ cat > "$SUMMARY" <<EOF
                                "kind": "SAME-VERSION module update",
                                "runs_migration_scripts": false,
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
+    "w2_only_install_over_old_w1": {"status": "${W2_ONLY_INSTALL_STATUS}", "result": "${W2_ONLY_INSTALL_RESULT}", "db": "${W2_ONLY_INSTALL_DB}", "origin": "${W2_ONLY_INSTALL_ORIGIN}", "w1_version_after": "${W2_ONLY_INSTALL_W1_VERSION}", "w2_version_after": "${W2_ONLY_INSTALL_W2_VERSION}", "jsonb_columns": "${W2_ONLY_INSTALL_COLUMNS}", "log": "w2-only-install.log", "kind": "W2 -i over installed old W1; W1 is not upgraded"},
     "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
   },
   "migration_passes": {

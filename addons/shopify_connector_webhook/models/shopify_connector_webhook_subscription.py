@@ -32,7 +32,7 @@ SUBSCRIPTION_LIST_QUERY = """
 query ConnectorWebhookSubscriptions($first: Int!, $after: String) {
   shop { myshopifyDomain }
   webhookSubscriptions(first: $first, after: $after) {
-    nodes { id topic uri apiVersion format }
+    nodes { id topic uri apiVersion format includeFields }
     pageInfo { hasNextPage endCursor }
   }
 }
@@ -111,12 +111,17 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     expected_api_version = fields.Char(
         required=True, default=SHOPIFY_API_VERSION, readonly=True,
     )
+    # A non-empty value is the minimum field contract required by a domain
+    # handler.  NULL/empty observed includeFields means Shopify returned an
+    # unfiltered subscription, which contains the full topic payload.
+    expected_include_fields = fields.Json(readonly=True)
     expected_callback_url_digest = fields.Char(readonly=True)
     shopify_subscription_gid = fields.Char(index=True, readonly=True)
     actual_topic = fields.Char(readonly=True)
     actual_uri_digest = fields.Char(readonly=True)
     actual_api_version = fields.Char(readonly=True)
     actual_format = fields.Char(readonly=True)
+    actual_include_fields = fields.Json(readonly=True)
     state = fields.Selection(
         selection=SUBSCRIPTION_STATES,
         required=True,
@@ -184,9 +189,11 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         self.ensure_one()
         allowed = {
             'topic_enum', 'expected', 'expected_api_version',
+            'expected_include_fields',
             'expected_callback_url_digest', 'shopify_subscription_gid',
             'actual_topic', 'actual_uri_digest', 'actual_api_version',
-            'actual_format', 'state', 'last_reconciled_at', 'last_action_at',
+            'actual_format', 'actual_include_fields', 'state',
+            'last_reconciled_at', 'last_action_at',
             'hmac_credential_epoch', 'last_job_id', 'last_error',
             'operator_note',
         }
@@ -290,6 +297,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 'topic_enum': spec['enum'],
                 'expected': True,
                 'expected_api_version': SHOPIFY_API_VERSION,
+                'expected_include_fields': list(
+                    spec.get('include_fields') or [],
+                ),
                 'expected_callback_url_digest': callback_digest,
                 'state': 'expected',
             }
@@ -307,6 +317,8 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 changed = (
                     record.topic_enum != values['topic_enum']
                     or record.expected_api_version != values['expected_api_version']
+                    or (record.expected_include_fields or [])
+                    != values['expected_include_fields']
                     or record.expected_callback_url_digest
                     != values['expected_callback_url_digest']
                 )
@@ -317,6 +329,8 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     record._service_write({
                         'topic_enum': values['topic_enum'],
                         'expected_api_version': values['expected_api_version'],
+                        'expected_include_fields':
+                            values['expected_include_fields'],
                         'expected_callback_url_digest':
                             values['expected_callback_url_digest'],
                         'state': 'expected',
@@ -498,6 +512,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 if not isinstance(node, dict) or not node.get('id'):
                     continue
                 uri = node.get('uri') or node.get('callbackUrl') or ''
+                include_fields = self._normalize_include_fields(
+                    node.get('includeFields'),
+                )
                 actual.append({
                     'id': str(node['id'])[:256],
                     'topic': str(node.get('topic') or '')[:128],
@@ -506,6 +523,11 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                         node.get('apiVersion') or ''
                     )[:32],
                     'format': str(node.get('format') or '')[:32],
+                    # Shopify returns an empty list for an unfiltered
+                    # subscription on some API revisions, and a null-like
+                    # value on others.  A non-empty list is an explicit
+                    # allowlist and must satisfy the domain contract.
+                    'include_fields': include_fields,
                 })
             page_info = connection.get('pageInfo') or {}
             if not page_info.get('hasNextPage'):
@@ -567,6 +589,207 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         return job
 
     @api.model
+    def _include_fields_match(self, expected, observed):
+        """Return whether a remote field filter satisfies a domain contract.
+
+        Shopify treats a null/empty includeFields value as the unfiltered
+        payload, so it contains every ordinary top-level field.  A non-empty
+        allowlist must explicitly contain every field required by the active
+        domain handler.  This prevents a pre-existing filtered subscription
+        that omits ``admin_graphql_api_id`` from being marked healthy.
+        """
+        expected = {
+            str(value) for value in (expected or [])
+            if isinstance(value, str) and value
+        }
+        if not expected:
+            return True
+        if observed in (False, None, []):
+            return True
+        if not isinstance(observed, list):
+            return False
+        return expected.issubset(set(observed))
+
+    @api.model
+    def _normalize_include_fields(self, raw):
+        """Normalize Shopify's nullable includeFields response safely."""
+        if raw is None:
+            return []
+        if not isinstance(raw, list):
+            return ['__malformed_include_fields__']
+        return sorted({
+            str(value)[:128] for value in raw
+            if isinstance(value, str) and value
+        })
+
+    @api.model
+    def _reconcile_registry_removed_subscriptions(
+        self, store, active_topics, actual, source='scheduled_sync',
+        epoch=False,
+    ):
+        """Retire domain rows removed by an optional addon safely.
+
+        Uninstalling a domain addon must not issue a remote delete inside the
+        uninstall transaction, and it must not leave the old Shopify
+        subscription falsely active.  A normal W1 reconciliation first reads
+        Shopify, then marks the row ``expected=False`` and queues a durable
+        Layer-2 delete only when the exact previously recorded subscription
+        GID is present in that fresh read-back.  Missing/unknown identities
+        stay manual-review evidence; no identity is guessed from a topic.
+        """
+        active_topics = tuple(active_topics or ())
+        removed = self.sudo().search([
+            ('store_id', '=', store.id),
+            ('expected', '=', True),
+            ('topic', 'not in', list(active_topics)),
+        ], order='id asc')
+        if not removed:
+            return removed
+        actual_by_gid = {
+            item.get('id'): item for item in actual
+            if isinstance(item, dict) and item.get('id')
+        }
+        Job = self.env['shopify.connector.job'].sudo()
+        terminal = ('succeeded', 'failed_final', 'skipped', 'cancelled')
+        now = fields.Datetime.now()
+        for subscription in removed:
+            gid = subscription.shopify_subscription_gid or False
+            base = {
+                'expected': False,
+                'last_reconciled_at': now,
+                'hmac_credential_epoch': epoch,
+            }
+            if not gid:
+                subscription._service_write(dict(
+                    base,
+                    state='manual_review',
+                    last_error=(
+                        'The webhook topic %s is no longer provided by an '
+                        'installed domain handler, but no stored Shopify '
+                        'subscription GID exists. No remote delete was issued; '
+                        'resolve the preserved evidence manually.'
+                        % subscription.topic
+                    ),
+                    operator_note=(
+                        'Domain capability removal requires an exact remote '
+                        'subscription GID before cleanup.'
+                    ),
+                ))
+                continue
+            remote = actual_by_gid.get(gid)
+            if not remote:
+                # A different remote GID for the retired topic is evidence of
+                # a second/unknown subscription, not proof that cleanup is
+                # complete.  Preserve that read-back for an operator instead
+                # of guessing which Shopify object may be deleted.
+                same_topic = [
+                    item for item in actual
+                    if isinstance(item, dict)
+                    and item.get('topic') == subscription.topic_enum
+                ]
+                if same_topic:
+                    observed = same_topic[0]
+                    subscription._service_write(dict(
+                        base,
+                        state='manual_review',
+                        actual_topic=observed.get('topic') or False,
+                        actual_uri_digest=observed.get('uri_digest') or False,
+                        actual_api_version=(
+                            observed.get('observed_api_version') or False
+                        ),
+                        actual_format=observed.get('format') or False,
+                        actual_include_fields=(
+                            observed.get('include_fields') or []
+                        ),
+                        last_error=(
+                            'The webhook topic %s is no longer provided by an '
+                            'installed domain handler, but Shopify returned a '
+                            'different subscription GID than the preserved '
+                            'record. No remote delete was issued; review the '
+                            'unknown subscription before cleanup.'
+                            % subscription.topic
+                        ),
+                        operator_note=(
+                            'A remote subscription remains under an unknown '
+                            'GID; identity must be resolved explicitly before '
+                            'any delete.'
+                        ),
+                    ))
+                    continue
+                subscription._service_write(dict(
+                    base,
+                    state='missing',
+                    actual_topic=False,
+                    actual_uri_digest=False,
+                    actual_api_version=False,
+                    actual_format=False,
+                    actual_include_fields=False,
+                    last_error=(
+                        'The webhook topic %s is no longer provided by an '
+                        'installed domain handler and its recorded Shopify '
+                        'subscription GID is absent on read-back; no delete '
+                        'was issued.' % subscription.topic
+                    ),
+                    operator_note=(
+                        'Remote cleanup is complete or the recorded GID is '
+                        'already absent; the historical row is retained.'
+                    ),
+                ))
+                continue
+            active_delete = Job.search([
+                ('store_id', '=', store.id),
+                ('job_type', '=', 'webhook_subscription_delete'),
+                ('res_model', '=', self._name),
+                ('res_id', '=', subscription.id),
+                ('expected_connection_generation', '=',
+                 store.connection_generation),
+                ('state', 'not in', terminal),
+            ], order='id asc', limit=1)
+            evidence = dict(
+                base,
+                state='manual_review',
+                shopify_subscription_gid=gid,
+                actual_topic=remote.get('topic') or False,
+                actual_uri_digest=remote.get('uri_digest') or False,
+                actual_api_version=remote.get('observed_api_version') or False,
+                actual_format=remote.get('format') or False,
+                actual_include_fields=remote.get('include_fields') or [],
+                last_error=(
+                    'The webhook topic %s is no longer provided by an '
+                    'installed domain handler. The exact Shopify subscription '
+                    'was found and is queued for asynchronous cleanup.'
+                    % subscription.topic
+                ),
+                operator_note=(
+                    'Cleanup is read-first and durable; no remote mutation ran '
+                    'in the uninstall transaction.'
+                ),
+            )
+            if active_delete:
+                evidence.update({
+                    'state': 'queued',
+                    'last_job_id': active_delete.id,
+                    'last_error': False,
+                })
+                subscription._service_write(evidence)
+                continue
+            subscription._service_write(evidence)
+            try:
+                self._enqueue_subscription_mutation(
+                    subscription, 'delete', source,
+                )
+            except (IntegrityError, ValidationError) as exc:
+                subscription._service_write({
+                    'state': 'manual_review',
+                    'last_error': (
+                        'Retired webhook topic cleanup could not be queued: '
+                        '%s. No remote delete was issued.'
+                        % str(exc)[:1000]
+                    ),
+                })
+        return removed
+
+    @api.model
     def _reconcile_store(
         self, store, source='scheduled_sync', job=None, bootstrap=False,
     ):
@@ -582,6 +805,8 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 'Webhook subscription reconciliation is not available while '
                 'the store is "%s".' % store.state
             )
+        Registry = self.env['shopify.connector.webhook.registry']
+        active_topics = Registry.allowed_topics()
         expected = self._ensure_expected_for_store(store)
         actual = self._read_actual_subscriptions(
             store, job, lifecycle=bootstrap,
@@ -590,6 +815,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         callback_url = Secret._callback_url_for_store(store)
         callback_digest = _uri_digest(callback_url)
         epoch = self._credential_epoch(store)
+        self._reconcile_registry_removed_subscriptions(
+            store, active_topics, actual, source=source, epoch=epoch,
+        )
         by_topic = {}
         for item in actual:
             by_topic.setdefault(item['topic'], []).append(item)
@@ -599,6 +827,10 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 if item['uri_digest'] == callback_digest
                 and item['observed_api_version'] == SHOPIFY_API_VERSION
                 and item['format'] == 'JSON'
+                and self._include_fields_match(
+                    subscription.expected_include_fields,
+                    item.get('include_fields'),
+                )
             ]
             if matches:
                 item = matches[0]
@@ -609,10 +841,46 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'actual_uri_digest': item['uri_digest'],
                     'actual_api_version': item['observed_api_version'],
                     'actual_format': item['format'],
+                    'actual_include_fields': item.get('include_fields'),
                     'last_reconciled_at': fields.Datetime.now(),
                     'hmac_credential_epoch': epoch,
                     'last_error': False,
                     'operator_note': False,
+                })
+                continue
+            filtered = [
+                item for item in by_topic.get(subscription.topic_enum, [])
+                if item['uri_digest'] == callback_digest
+                and item['observed_api_version'] == SHOPIFY_API_VERSION
+                and item['format'] == 'JSON'
+                and not self._include_fields_match(
+                    subscription.expected_include_fields,
+                    item.get('include_fields'),
+                )
+            ]
+            if filtered:
+                item = filtered[0]
+                required = ', '.join(
+                    str(value) for value in (
+                        subscription.expected_include_fields or []
+                    )
+                )
+                subscription._service_write({
+                    'state': 'manual_review',
+                    'shopify_subscription_gid': item['id'],
+                    'actual_topic': item['topic'],
+                    'actual_uri_digest': item['uri_digest'],
+                    'actual_api_version': item['observed_api_version'],
+                    'actual_format': item['format'],
+                    'actual_include_fields': item.get('include_fields'),
+                    'last_reconciled_at': fields.Datetime.now(),
+                    'hmac_credential_epoch': epoch,
+                    'last_error': (
+                        'Shopify has a subscription for this topic and callback '
+                        'but its includeFields filter omits the required '
+                        'domain field(s): %s. No duplicate subscription was '
+                        'created automatically.' % required
+                    ),
                 })
                 continue
             wrong_uri = by_topic.get(subscription.topic_enum, [])
@@ -621,6 +889,10 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'state': 'manual_review',
                     'last_reconciled_at': fields.Datetime.now(),
                     'hmac_credential_epoch': epoch,
+                    'actual_include_fields': (
+                        wrong_uri[0].get('include_fields')
+                        if wrong_uri else False
+                    ),
                     'last_error': (
                         'Shopify has a subscription for this topic, but its '
                         'callback endpoint is not this connector endpoint. '
@@ -632,6 +904,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 'state': 'missing',
                 'last_reconciled_at': fields.Datetime.now(),
                 'hmac_credential_epoch': epoch,
+                'actual_include_fields': False,
                 'last_error': False,
             })
             if _create_retry_allowed(subscription, store.state, bootstrap):
@@ -795,12 +1068,25 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     @api.model
     def _mutation_subscription(self, job):
         subscription = self.browse(job.res_id).exists()
+        action = (
+            'create' if job.job_type == 'webhook_subscription_create'
+            else 'delete'
+        )
+        active_topics = self.env[
+            'shopify.connector.webhook.registry'
+        ].allowed_topics()
+        removed_topic_cleanup = (
+            action == 'delete'
+            and not subscription.expected
+            and bool(subscription.shopify_subscription_gid)
+        )
         if (
             not subscription
             or subscription.store_id != job.store_id
-            or subscription.topic not in self.env[
-                'shopify.connector.webhook.registry'
-            ].allowed_topics()
+            or (
+                subscription.topic not in active_topics
+                and not removed_topic_cleanup
+            )
         ):
             raise ValidationError('Webhook subscription mutation target is invalid.')
         return subscription
@@ -826,6 +1112,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             'topic_enum': subscription.topic_enum,
             'callback_url_digest': subscription.expected_callback_url_digest,
             'expected_api_version': subscription.expected_api_version,
+            'expected_include_fields': list(
+                subscription.expected_include_fields or [],
+            ),
             'shopify_subscription_gid': subscription.shopify_subscription_gid or False,
             'expected_store_identity': subscription.store_id.shop_domain,
         }
@@ -856,7 +1145,7 @@ mutation ConnectorWebhookSubscriptionCreate(
     webhookSubscription: $webhookSubscription
   ) {
     userErrors { field message }
-    webhookSubscription { id topic uri apiVersion format }
+    webhookSubscription { id topic uri apiVersion format includeFields }
   }
 }
 """
@@ -867,6 +1156,10 @@ mutation ConnectorWebhookSubscriptionCreate(
                     # deprecated callbackUrl field is intentionally not used.
                     'uri': callback_url,
                     'format': 'JSON',
+                    'includeFields': (
+                        list(local_snapshot.get('expected_include_fields') or [])
+                        or None
+                    ),
                 },
             }
         else:
@@ -890,6 +1183,9 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                 'topic': local_snapshot['topic'],
                 'topic_enum': local_snapshot['topic_enum'],
                 'callback_url_digest': local_snapshot['callback_url_digest'],
+                'expected_include_fields': list(
+                    local_snapshot.get('expected_include_fields') or [],
+                ),
                 'target_gid': local_snapshot['shopify_subscription_gid'],
             },
             'remote_mutation_intent': {
@@ -897,6 +1193,9 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                 'subscription_id': local_snapshot['subscription_id'],
                 'topic_enum': local_snapshot['topic_enum'],
                 'callback_url_digest': local_snapshot['callback_url_digest'],
+                'expected_include_fields': list(
+                    local_snapshot.get('expected_include_fields') or [],
+                ),
                 'target_gid': local_snapshot['shopify_subscription_gid'],
             },
             'preconditions_snapshot': {
@@ -904,6 +1203,9 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     local_snapshot['expected_connection_generation'],
                 'expected_store_identity': local_snapshot['expected_store_identity'],
                 'expected_api_version': local_snapshot['expected_api_version'],
+                'expected_include_fields': list(
+                    local_snapshot.get('expected_include_fields') or [],
+                ),
             },
             'expected_connection_generation':
                 local_snapshot['expected_connection_generation'],
@@ -1000,6 +1302,9 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                         node.get('apiVersion') or ''
                     )[:32],
                     'actual_format': str(node.get('format') or '')[:32],
+                    'actual_include_fields': self._normalize_include_fields(
+                        node.get('includeFields'),
+                    ),
                 },
             }
         if 'webhookSubscriptionDelete' in data:
@@ -1075,6 +1380,10 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                 and item['uri_digest'] == intent.get('callback_url_digest')
                 and item['observed_api_version'] == SHOPIFY_API_VERSION
                 and item['format'] == 'JSON'
+                and self._include_fields_match(
+                    intent.get('expected_include_fields'),
+                    item.get('include_fields'),
+                )
             ), False)
             if found:
                 return {
@@ -1091,6 +1400,7 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                         'actual_uri_digest': found['uri_digest'],
                         'actual_api_version': found['observed_api_version'],
                         'actual_format': found['format'],
+                        'actual_include_fields': found.get('include_fields'),
                     },
                     'domain_payload': {
                         'shopify_subscription_gid': found['id'],
@@ -1098,6 +1408,39 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                         'actual_uri_digest': found['uri_digest'],
                         'actual_api_version': found['observed_api_version'],
                         'actual_format': found['format'],
+                        'actual_include_fields': found.get('include_fields'),
+                    },
+                }
+            filtered = next((
+                item for item in actual
+                if item['topic'] == intent.get('topic_enum')
+                and item['uri_digest'] == intent.get('callback_url_digest')
+                and item['observed_api_version'] == SHOPIFY_API_VERSION
+                and item['format'] == 'JSON'
+                and not self._include_fields_match(
+                    intent.get('expected_include_fields'),
+                    item.get('include_fields'),
+                )
+            ), False)
+            if filtered:
+                return {
+                    'verdict': 'not_applied',
+                    'observed_store_identity': store.shop_domain,
+                    'action': 'block_manual_review',
+                    'error_class': 'duplicate_risk',
+                    'manual_review_subreason': 'duplicate_risk',
+                    'message': (
+                        'Shopify has the expected callback subscription, but '
+                        'its includeFields filter omits a required domain '
+                        'field; automatic resend is blocked for review.'
+                    ),
+                    'evidence': {
+                        'subscription_found': True,
+                        'subscription_filter_mismatch': True,
+                        'shopify_subscription_gid': filtered['id'],
+                        'actual_include_fields': filtered.get(
+                            'include_fields',
+                        ),
                     },
                 }
             return {
@@ -1168,6 +1511,7 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     'actual_uri_digest': False,
                     'actual_api_version': False,
                     'actual_format': False,
+                    'actual_include_fields': False,
                 })
             if phase == 'reconciliation':
                 values['last_reconciled_at'] = fields.Datetime.now()
