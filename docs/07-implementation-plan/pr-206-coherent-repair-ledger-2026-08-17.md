@@ -432,3 +432,9 @@ Shopify mutation without a verified remote read.
   stop the create gate rather than look absent. The accepted correction adds
   that refusal and an executable regression. A corrected live read canary and
   exact-head requalification remain required.
+- While the review correction was being prepared, the shared PR branch advanced
+  with an independently authored webhook addon. Exact-head Odoo.sh build
+  `36558913` failed during addon installation because two Odoo 19 search views
+  used the obsolete `expand` attribute on `<group>`. The bounded integration
+  correction removes only those invalid attributes; it changes no webhook,
+  product, inventory, credential, or Shopify runtime behavior.
