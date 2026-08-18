@@ -113,3 +113,67 @@ quote). Stop condition: draft PR "W1: webhook receiver and
 subscription management"; gate closes on draft-open; no W2 topic
 handlers.
 ```
+
+## 7. W1 modular-addon implementation entry — 2026-08-18
+
+Implementation was opened on exact base `b9ff84ef47d8ed8c94bdfee7e22089e01c8ac8b8`
+in isolated branch `codex/pr206-webhook-w1` under the explicitly authorized
+W1 gate. The new addon is `addons/shopify_connector_webhook` and depends only
+on `shopify_connector_core`; core model files, domain modules, CI and tools
+were not changed.
+
+The addon provides raw-body HMAC verification, unguessable store-scoped
+callback tokens, delivery-ID deduplication, payload-free evidence envelopes,
+fast acknowledgement plus durable Odoo jobs, a topic registry seam, bounded
+subscription reconciliation, Layer-2 subscription create/delete strategies,
+fail-closed readiness evidence, ACL/company rules, operator views, 30-day
+retention and scheduled reconciliation. The active W1 subscription registry is
+limited to `app/uninstalled`, whose handler fences the store through the
+sanctioned `action_mark_reconnect_needed` lifecycle service. Product, inventory,
+order and fulfillment topics remain catalogued but unsubscribed until their
+authoritative read-first domain handlers are installed.
+
+Shopify GraphQL subscription reads use the core `execute_business` admission /
+lease context; creates and deletes use the core Layer-2 mutation protocol with
+read-before-retry reconciliation. The addon never claims real-time processing;
+scheduled reconciliation remains mandatory. Live Shopify/Odoo calls and
+Odoo.sh runtime qualification were not performed in this isolated worktree.
+
+## 8. Independent-review correction entry — 2026-08-18
+
+Corrections are prepared atop implementation commit
+`f6f4691e93a3f9ebd21f54f42362084b0bb1d3e7` on
+`codex/pr206-webhook-w1`. Bootstrap/reconcile now has an explicit
+pre-activation lifecycle-read job (`setup_readiness_check`) and does not
+create remote subscriptions until the store is connected. Reconciliation keys
+are bounded scheduled slots or a stable manual slot with one retry nonce only
+after terminal evidence, enqueue conflicts are savepoint-safe with terminal-job
+recovery, and stores advance through a
+persisted scheduling cursor with Odoo cron progress. Public ingestion rejects
+declared oversized bodies before reading and bounds unknown/chunked streams.
+Uncertain create reconciliation requires topic, URI digest, API version and
+JSON format and records the remote GID/fields as consequence evidence.
+
+Bootstrap pagination now holds one lifecycle credential snapshot and performs
+the core post-network `_lifecycle_probe_superseded(snapshot)` fence before any
+local subscription evidence write. A blocked/manual-review or duplicate-risk
+create is a hard no-resend case; scheduled and ordinary manual scans cannot
+authorize it. Cron progress reports the remaining rows in the selected bounded
+sweep and reaches zero at the final selected row, including when another fair
+page remains for the next interval.
+
+Callback-token rotation remains deliberately disabled: this foundation has no
+executable old/new callback overlap and subscription migration/read-back
+protocol. App client-secret replacement now has an addon-owned previous-secret
+field with a conservative two-hour HMAC grace; readiness is pending/degraded
+until its exact recorded expiry. Existing repository secret storage remains
+ACL-only/plaintext rather than encrypted at rest.
+The suite runner must install/select the new addon in fresh/warm and standard
+test passes. Runtime Odoo, Odoo.sh, HTTPS and live Shopify qualification remain
+required before any UAT decision.
+
+The second SOL correction pass is based on
+`8da1c979eb1590917af0b5b4ab8579be1cb0dad3` and is limited to snapshot
+fencing, duplicate-risk no-resend behavior, bounded cron progress, and
+addon-only app client-secret grace. It does not reintroduce callback-token
+rotation or add domain webhook handlers.

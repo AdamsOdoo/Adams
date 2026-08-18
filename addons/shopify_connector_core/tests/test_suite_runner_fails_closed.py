@@ -54,6 +54,7 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'assertions; it may have been short-circuited',
         )
         for expected in (
+            'webhook addon is installed and selected by the suite',
             'an unsanctioned skip is an evidence failure',
             'the sanctioned test skipping for a DIFFERENT reason still fails',
             'a required tour that never ran fails even when marker counts add up',
@@ -66,6 +67,20 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
                 'self-test PASS: %s' % expected, result.stdout,
                 'the runner self-test no longer covers %r' % expected,
             )
+
+    def test_runner_selects_webhook_addon_for_fresh_warm_and_standard_passes(self):
+        """The W1 addon cannot disappear from a green suite by list drift."""
+        text = RUNNER.read_text()
+        self.assertRegex(
+            text, r'(?m)^MODULES="[^"]*shopify_connector_webhook',
+        )
+        self.assertRegex(
+            text, r'(?m)^STANDARD_TAGS="[^"]*/shopify_connector_webhook',
+        )
+        self.assertIn(
+            'verify_connector_module_inventory', text,
+            'fresh/warm suite must fail closed when the addon is omitted',
+        )
 
     def test_runner_declares_exactly_one_sanctioned_skip(self):
         """The skip allowance is bound to an identity, not to a count.

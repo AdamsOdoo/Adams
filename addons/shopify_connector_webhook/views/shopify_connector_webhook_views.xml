@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_shopify_connector_webhook_delivery_search" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.delivery.search</field>
+        <field name="model">shopify.connector.webhook.delivery</field>
+        <field name="arch" type="xml">
+            <search string="Webhook deliveries">
+                <field name="store_id"/>
+                <field name="delivery_id"/>
+                <field name="event_id"/>
+                <field name="topic"/>
+                <field name="state"/>
+                <field name="resource_gid"/>
+                <filter name="failed" string="Failed or review"
+                        domain="[('state', 'in', ('failed', 'manual_review'))]"/>
+                <filter name="queued" string="Queued"
+                        domain="[('state', '=', 'queued')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
+                    <filter name="group_topic" string="Topic" context="{'group_by': 'topic'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_webhook_delivery_list" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.delivery.list</field>
+        <field name="model">shopify.connector.webhook.delivery</field>
+        <field name="arch" type="xml">
+            <list string="Webhook deliveries"
+                  decoration-danger="state in ('failed', 'manual_review')"
+                  decoration-warning="state in ('received', 'queued')">
+                <field name="received_at"/>
+                <field name="store_id"/>
+                <field name="topic"/>
+                <field name="delivery_id"/>
+                <field name="event_id" optional="hide"/>
+                <field name="state"/>
+                <field name="resource_gid" optional="show"/>
+                <field name="triggered_at" optional="hide"/>
+                <field name="source_updated_at" optional="hide"/>
+                <field name="job_id" optional="show"/>
+                <field name="processing_note" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_webhook_delivery_form" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.delivery.form</field>
+        <field name="model">shopify.connector.webhook.delivery</field>
+        <field name="arch" type="xml">
+            <form string="Webhook delivery" create="false" edit="false" delete="false">
+                <sheet>
+                    <group>
+                        <group string="Verified envelope">
+                            <field name="store_id"/>
+                            <field name="shop_domain"/>
+                            <field name="topic"/>
+                            <field name="api_version"/>
+                            <field name="delivery_id"/>
+                            <field name="event_id"/>
+                            <field name="state"/>
+                        </group>
+                        <group string="Evidence">
+                            <field name="received_at"/>
+                            <field name="triggered_at"/>
+                            <field name="source_updated_at"/>
+                            <field name="payload_digest"/>
+                            <field name="payload_size"/>
+                            <field name="resource_type"/>
+                            <field name="resource_gid"/>
+                            <field name="job_id"/>
+                        </group>
+                    </group>
+                    <group string="Processing">
+                        <field name="queued_at"/>
+                        <field name="processed_at"/>
+                        <field name="processing_note"/>
+                        <field name="last_error"/>
+                    </group>
+                    <group string="Minimal resource identity">
+                        <field name="resource_identity" nolabel="1"/>
+                    </group>
+                    <p class="text-muted">
+                        The request body is intentionally never stored. Shopify
+                        delivery ID and payload digest are the replay evidence.
+                    </p>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_webhook_delivery" model="ir.actions.act_window">
+        <field name="name">Webhook deliveries</field>
+        <field name="res_model">shopify.connector.webhook.delivery</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shopify_connector_webhook_delivery_search"/>
+    </record>
+
+    <record id="view_shopify_connector_webhook_subscription_search" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.subscription.search</field>
+        <field name="model">shopify.connector.webhook.subscription</field>
+        <field name="arch" type="xml">
+            <search string="Webhook subscriptions">
+                <field name="store_id"/>
+                <field name="topic"/>
+                <field name="state"/>
+                <field name="shopify_subscription_gid"/>
+                <filter name="attention" string="Needs attention"
+                        domain="[('state', 'in', ('missing', 'error', 'manual_review'))]"/>
+                <filter name="active" string="Active"
+                        domain="[('state', '=', 'active')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_webhook_subscription_list" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.subscription.list</field>
+        <field name="model">shopify.connector.webhook.subscription</field>
+        <field name="arch" type="xml">
+            <list string="Webhook subscriptions"
+                  decoration-success="state == 'active'"
+                  decoration-danger="state in ('error', 'manual_review')"
+                  decoration-warning="state in ('expected', 'missing', 'queued', 'pending_verification')">
+                <field name="store_id"/>
+                <field name="topic"/>
+                <field name="topic_enum" optional="hide"/>
+                <field name="expected"/>
+                <field name="state"/>
+                <field name="shopify_subscription_gid"/>
+                <field name="actual_api_version" optional="show"/>
+                <field name="actual_format" optional="hide"/>
+                <field name="last_reconciled_at"/>
+                <field name="last_job_id" optional="show"/>
+                <field name="last_error" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_shopify_connector_webhook_subscription_form" model="ir.ui.view">
+        <field name="name">shopify.connector.webhook.subscription.form</field>
+        <field name="model">shopify.connector.webhook.subscription</field>
+        <field name="arch" type="xml">
+            <form string="Webhook subscription" create="false" edit="false" delete="false">
+                <header>
+                    <button name="action_reconcile" type="object"
+                            string="Reconcile store webhooks"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="expected,queued,pending_verification,active,missing,manual_review"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Expected">
+                            <field name="store_id"/>
+                            <field name="topic"/>
+                            <field name="topic_enum"/>
+                            <field name="expected"/>
+                            <field name="expected_api_version"/>
+                            <field name="expected_callback_url_digest"/>
+                        </group>
+                        <group string="Shopify read-back">
+                            <field name="shopify_subscription_gid"/>
+                            <field name="actual_topic"/>
+                            <field name="actual_uri_digest"/>
+                            <field name="actual_api_version"/>
+                            <field name="actual_format"/>
+                            <field name="last_reconciled_at"/>
+                            <field name="hmac_credential_epoch"/>
+                        </group>
+                    </group>
+                    <group string="Operator evidence">
+                        <field name="last_job_id"/>
+                        <field name="last_action_at"/>
+                        <field name="last_error"/>
+                        <field name="operator_note"/>
+                    </group>
+                    <p class="text-muted">
+                        Subscription delivery is near-real-time only. Scheduled
+                        reconciliation remains mandatory and is bounded in small
+                        batches.
+                    </p>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_shopify_connector_webhook_subscription" model="ir.actions.act_window">
+        <field name="name">Webhook subscriptions</field>
+        <field name="res_model">shopify.connector.webhook.subscription</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_shopify_connector_webhook_subscription_search"/>
+    </record>
+
+    <menuitem id="menu_shopify_connector_webhook_subscriptions"
+              name="Webhook subscriptions"
+              parent="shopify_connector_core.menu_shopify_connector_configuration"
+              action="action_shopify_connector_webhook_subscription"
+              sequence="30"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
+    <menuitem id="menu_shopify_connector_webhook_deliveries"
+              name="Webhook deliveries"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              action="action_shopify_connector_webhook_delivery"
+              sequence="35"
+              groups="shopify_connector_core.group_shopify_connector_auditor,shopify_connector_core.group_shopify_connector_operator,shopify_connector_core.group_shopify_connector_reviewer,shopify_connector_core.group_shopify_connector_admin"/>
+
+    <record id="view_shopify_connector_store_form_webhook" model="ir.ui.view">
+        <field name="name">shopify.connector.store.form.webhook</field>
+        <field name="model">shopify.connector.store</field>
+        <field name="inherit_id" ref="shopify_connector_core.view_shopify_connector_store_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='webhook_ready']" position="after">
+                <field name="webhook_health" readonly="1"/>
+                <field name="webhook_callback_path" readonly="1"/>
+                <field name="webhook_last_reconciled_at" readonly="1"/>
+                <field name="webhook_client_secret_grace_expires_at" readonly="1"/>
+                <field name="webhook_health_reason" readonly="1"
+                       invisible="not webhook_health_reason"/>
+            </xpath>
+            <xpath expr="//button[@name='action_disconnect']" position="before">
+                <button name="action_reconcile_webhooks" type="object"
+                        string="Bootstrap / reconcile webhooks"
+                        class="btn-secondary"
+                        groups="shopify_connector_core.group_shopify_connector_admin"
+                        invisible="state not in ('connected', 'setup_incomplete', 'reconnect_needed')"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

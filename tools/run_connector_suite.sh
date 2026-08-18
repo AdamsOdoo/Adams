@@ -58,7 +58,7 @@
 
 set -euo pipefail
 
-MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -188,7 +188,7 @@ ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"
@@ -400,6 +400,23 @@ EVIDENCE_ERRORS=()
 
 evidence_fail() { EVIDENCE_ERRORS+=("$1"); log "EVIDENCE FAILURE: $1"; }
 
+# The addon must be present in both the install set and the standard selector.
+# Keeping this as a fail-closed runtime guard prevents a fresh/warm run from
+# silently omitting the modular webhook addon after a list-edit or rename.
+verify_connector_module_inventory() {
+    case ",${MODULES}," in
+        *,shopify_connector_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_webhook manifest is missing from the checkout"
+    fi
+}
+
 # Any skip that is not the single sanctioned one fails the run.
 verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
     local logfile="$1" label="$2" occurrence identity
@@ -542,6 +559,9 @@ self_test() {
         fi
         EVIDENCE_ERRORS=()
     }
+
+    verify_connector_module_inventory
+    _expect 0 "webhook addon is installed and selected by the suite"
 
     # A log with every required tour, both HOOT suites and only the sanctioned
     # skip is the one shape that must pass.
@@ -826,6 +846,13 @@ fi
 # once satisfied.
 "$VENV/bin/pip" install --quiet websocket-client
 WEBSOCKET_VERSION="$("$VENV/bin/python" -c 'import websocket; print(websocket.__version__)' 2>/dev/null || echo missing)"
+
+verify_connector_module_inventory
+if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then
+    log "FATAL: connector module inventory guard failed; refusing to run an incomplete suite."
+    exit 2
+fi
+EVIDENCE_ERRORS=()
 
 preflight_browser
 
