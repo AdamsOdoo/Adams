@@ -4,16 +4,16 @@
 
 **Prepared:** 2026-08-18
 
-**Exact implementation head:** `b9ff84ef47d8ed8c94bdfee7e22089e01c8ac8b8`
+**Current qualification head:** `2b8108b9b69ca70b20a3b705a82e167ea13bb98a`
 
-**Exact tree:** `7da2d8c678eeabd0325c6c7c892a019bcc657cee`
+**Current tree:** `522bcd01035cb44d241ff56c3deff3de272701c2`
 
 **Pull request / branch:** PR #206 / `codex/ui-restructure-implementation`
 
-**Odoo.sh:** exact-head build `36553922` reported successful. The exact-head
-database is fresh; its URL is retained in the control-room runtime ledger and
-is intentionally not duplicated here because this writer did not receive the
-URL. No Shopify secret is stored in this packet.
+**Odoo.sh:** exact-head qualification is blocked: permitted cloud-browser
+access was denied by automatic review, so no exact-head build/database or live
+Shopify qualification may be claimed. No Shopify secret is stored in this
+packet.
 
 **Shopify identity:** the only authorized development shop is
 `testin-lzhbzhtc.myshopify.com`. `mqiu21-yz.myshopify.com` is historical and
@@ -28,22 +28,47 @@ has been proven on this exact head. Product/inventory UI UAT and
 order/fulfillment UI UAT are both blocked.
 
 The current state is best described as a controlled-refactor candidate: retain
-the durable core and add a modular webhook/reconciliation ingress plus
-large-volume synchronization capability. Do not merge or mark PR #206 ready.
+the durable core and extend the bounded W1/W2 webhook foundation with the
+remaining domain ingress and large-volume synchronization capability. Do not
+merge or mark PR #206 ready.
+
+Actions run `32144921687` completed failure after approximately 48 minutes.
+Fresh and warm each reported `0 failed, 2 error(s)` from an unauthorized-admin
+actor fixture and a non-ISO webhook timestamp fixture. The W2-only schema
+install reached tests and failed only the same timestamp fixture. Migration
+reported `0 failed, 0 error(s)`, but the exact optional-W1 capability skip was
+initially rejected; non-standard reported `0 failed, 0 error(s)`.
+
+Luna Max corrections `0c7a064e…` and `daf6fd39…` were composed and published
+as test-only head `2b8108b9b69ca70b20a3b705a82e167ea13bb98a`, tree
+`522bcd01035cb44d241ff56c3deff3de272701c2`. SOL Medium initially found a
+trailing-space mismatch in the migration-skip guard, then accepted the amended
+correction. Exact-head Actions run `32152200822` / job `95760574305` then
+completed **success** against Odoo pin `30bde9…`: fresh and warm each ran 2,682
+tests with `0 failed, 0 error(s)`; fresh recorded 40 tour markers with all 39
+required, and warm ran zero same-version migrations. W2-only validated the old
+W1 `19.0.1.0.0` → W2 `19.0.0.2.0` schema bridge with both JSONB columns and W1
+unchanged. Migration bases `50b…` and `0a15…` each ran 2,647 tests twice with
+`0/0`, applying five and four scripts respectively on the first pass and zero
+on the second. Non-standard ran 62 tests `0/0` plus three HOOT suites. The
+narrow optional-W1 skip is permitted only in migration qualification.
+
+This is accepted exact-head CI evidence only. It does not supply an Odoo.sh
+build/database, live Shopify result, or Gate A–H proof.
 
 ## Plain answers
 
 | Question | Exact-head answer |
 | --- | --- |
 | Is the underlying architecture sound? | The durable Odoo-side substrate is promising and modular; the requested hybrid inbound architecture is incomplete. |
-| Does it function live against Shopify? | Not proven. No live Shopify mutation or fresh remote read is recorded for this exact head. |
-| Is synchronization near-real-time where required? | No. Current inbound work is scan/reconciliation based. |
-| Are webhooks and reconciliation both reliable? | Reconciliation code exists; webhooks do not exist, so the combined capability is not available or tested. |
+| Does it function live against Shopify? | Not proven. No exact-head live mutation or fresh remote read is recorded. |
+| Is synchronization near-real-time where required? | Only the bounded `app/uninstalled` and product create/update code paths are present; inventory, order, refund and fulfillment paths remain scheduled/reconciliation based. |
+| Are webhooks and reconciliation both reliable? | W1/W2 provide source-level webhook and reconciliation controls, but exact-head delivery, deduplication and repair are not live-passed; required domain slices remain incomplete. |
 | Can it recover safely from failures? | Code-level recovery controls are present; live transport, timeout and crash recovery remain unproven. |
 | Can it scale to the intended workload? | Not established. Product/order scan caps and absent Bulk Operations leave large-volume capacity unresolved. |
 | Are permissions secure? | ACL/company/boundary controls are substantial; exact-head external multi-user runtime evidence remains open. |
-| Is the UX understandable? | The organization is coherent, but setup direction copy and webhook status currently overstate or under-specify behavior. |
-| What remains before production? | Webhook capability, live Gates A–H, representative performance evidence, exact-head independent review, and UAT. |
+| Is the UX understandable? | The organization is coherent and the W1/W2 setup contract is source-reviewed, but exact-head backend qualification is still required before UI UAT. |
+| What remains before production? | Remaining domain webhooks, Odoo.sh/live Gates A–H, representative performance evidence, security proof, and UAT. |
 | Build, refactor, or replace? | Controlled refactor: preserve core job/mutation/recovery substrate; add bounded ingress and scale paths. |
 
 ## Evidence classification
@@ -57,6 +82,7 @@ large-volume synchronization capability. Do not merge or mark PR #206 ready.
 
 ## Contents
 
+- [Exact-head assurance addendum — current qualification candidate](./exact-head-addendum-2026-08-18-f62.md)
 - [Production-path inventory](./production-path-inventory.md)
 - [Synchronization ownership matrix](./synchronization-ownership-matrix.md)
 - [Official conformance matrix](./official-conformance-matrix.md)
@@ -78,7 +104,7 @@ large-volume synchronization capability. Do not merge or mark PR #206 ready.
 | B Read connectivity | **Not live-passed** | No exact-head fresh remote reads recorded. |
 | C Product lifecycle | **Not live-passed** | No exact-head remote create/update/read-back evidence. |
 | D Inventory lifecycle | **Not live-passed** | No exact-head remote InventoryItem/location/CAS evidence. |
-| E Webhook delivery | **Blocked by implementation** | No controller, subscription or delivery pipeline exists. |
+| E Webhook delivery | **Not live-passed / externally blocked** | W1/W2 source paths exist, but no exact-head Shopify subscription, delivery, HMAC, async-processing or reconciliation-repair evidence is available; Odoo.sh access is blocked. |
 | F Order/fulfillment | **Not live-passed** | No exact-head order/fulfillment remote evidence. |
 | G Failure/recovery | **Not live-passed** | Unit/runtime tests do not prove live transport outcomes. |
 | H Security | **Not live-passed** | Code controls exist; exact-head dedicated-user runtime proof is absent. |
