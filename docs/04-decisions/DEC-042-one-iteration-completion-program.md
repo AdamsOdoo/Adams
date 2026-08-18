@@ -85,15 +85,23 @@ OAuth install flow. Recorded so no batch silently expands.
 
 ## 5. Resource and effort policy (quota conservation)
 
-- **Sol main thread — high effort:** batch integration, all Tier-1
-  mutation-safety code, the B2 core seams, B3 webhook logic, live UAT
-  driving/verification.
-- **Sol subagents — low/medium effort:** mechanical sweeps (prose purge,
+> Calibrated by product-owner instruction, 2026-08-18: default the main
+> thread to medium effort; reserve high/max effort for the narrow Tier-1
+> escalation list below (~15% of the work).
+
+- **Sol main thread — medium effort by default:** batch integration, UI
+  code, tests, live UAT driving/verification. **Escalate to high effort
+  only for the Tier-1 escalation list:** B2 consolidation items 1–4 and 6
+  (core seams/admission gates), B3 webhook admission/dedup/subscription
+  logic, and any change touching the Layer-2 mutation attempt protocol.
+- **Sol subagents — light effort:** mechanical sweeps (prose purge,
   terminology, help text, fixture updates, SCSS token work, test
   scaffolding). Main Sol integrates and stays accountable for the result.
-- **Luna — medium effort, once per batch pre-push.** Escalate Luna to high
-  only for B2 core-seam commits and B3 mutation-adjacent code. Luna never
-  runs high-effort passes on documentation or UI copy.
+- **Luna — medium effort, once per batch pre-push.** Escalate Luna to
+  max only for the same Tier-1 escalation list. Luna is never spent on
+  mechanical/dirty work, documentation, or UI copy — defects there are
+  cheap and the Claude review catches them; Luna's value concentrates
+  where defects are expensive.
 - **Claude review is the expensive, binding gate** — protect it by making
   REVISE cycles rare: Luna catches cheap defects first, and corrections are
   always one consolidated pass, never dribbled.

@@ -38,16 +38,20 @@ first via your cloud browser, together with
    ledger carries record IDs, GIDs, job/attempt IDs, before/after values,
    and the exact SHA. If evidence is missing, say so; never substitute
    plausible text.
-4. **Effort/quota policy (binding):** your main thread at high effort handles
-   integration, mutation-safety code, core seams, webhook logic, and live
-   UAT. Delegate mechanical sweeps (prose purge, terminology, help text,
-   fixtures, SCSS tokens, test scaffolding) to subagents at low/medium
-   effort and integrate their output yourself. Run **Luna once per batch,
-   medium effort, pre-push** as a sanity gate (compile, contract adherence,
-   obvious defects) — Luna is advisory, not acceptance; escalate Luna to
-   high effort only for Batch 2 core-seam commits and Batch 3
-   mutation-adjacent code. Do not spend Luna on docs or UI copy. Corrections
-   are always one consolidated pass.
+4. **Effort/quota policy (binding; product-owner calibrated 2026-08-18):**
+   your main thread runs at **medium effort** for integration, UI code,
+   tests, and live UAT. Escalate the main thread to **high effort only**
+   for the Tier-1 escalation list: Batch 2 consolidation items 1–4 and 6
+   (core seams/admission gates), Batch 3 webhook admission/dedup/
+   subscription logic, and any change touching the Layer-2 mutation
+   attempt protocol. Delegate mechanical sweeps (prose purge, terminology,
+   help text, fixtures, SCSS tokens, test scaffolding) to subagents at
+   **light effort** and integrate their output yourself. Run **Luna once
+   per batch, medium effort, pre-push** as a sanity gate (compile,
+   contract adherence, obvious defects) — Luna is advisory, not
+   acceptance; escalate Luna to **max only** for the same Tier-1
+   escalation list. Never spend Luna on mechanical work, docs, or UI copy.
+   Corrections are always one consolidated pass.
 5. **Scope discipline:** the accepted contracts in ledger §4 and
    DEC-006/009/010/011 are settled — do not re-litigate them. The features
    listed as out-of-scope in DEC-042 §4 (refund accounting, cancellation
