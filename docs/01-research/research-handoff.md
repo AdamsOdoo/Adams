@@ -22414,3 +22414,61 @@ reviewer for the one-iteration completion program on draft PR #206. Check PR
 without a matching `CLAUDE INDEPENDENT REVIEW` verdict, then perform the
 memoryless exact-SHA review per DEC-040 scrutiny rules and post the complete
 verdict as a PR comment. Never implement program code in the reviewer role."
+
+### Addendum — same session, later phase (2026-08-18, pre-UAT review sweep)
+
+After the DEC-042 setup recorded above, the reviewer role executed a full
+adversarial pre-UAT sweep of every merchant-write surface at head
+`f62db111`, all posted durably to PR #206 and specified as correction
+packets:
+
+1. **W1 webhook foundation — REVISE** (comment 5328283841): 5 blocking
+   (constant-digest product dedup confirmed against Shopify docs;
+   unsigned-header `app/uninstalled` store fencing; `expected`-flag
+   reinstall regression; zero behavioral route tests; no token rotation)
+   + HIGH custom-ID first-run deadlock. Packet:
+   `docs/06-prompts/w1-webhook-correction-packet.md`.
+2. **B1 order/fulfillment pre-UAT** (comment 5328547742): 6 P0 (possibly
+   invalid order-header field; zero-tolerance tax-inclusive rounding;
+   invalid `Order.fulfillments` query — schema-validated; unpopulated
+   location cache; wrong-GID fulfillment reconcile adoption; Mode 2
+   unstartable) + 13 P1. Packet:
+   `docs/06-prompts/b1-pre-uat-review-packet.md`.
+3. **Export vertical pre-UAT** (comment 5328693083): 2 P0 (every update
+   silently emits `status: DRAFT`, unpublishing live merchant products;
+   direct-path variant-create binding raises after a successful write)
+   + 4 P1. **Export preview confirmations are FROZEN on all stores until
+   the P0s are fixed and qualified.** Packet:
+   `docs/06-prompts/export-pre-uat-review-packet.md`.
+4. A factual correction to the CI elapsed-time claim was posted
+   (comment 5328711835); exact-head Actions runs 32127509348/32127506211
+   remained in progress at ~2h41m vs ~58m baseline when last checked.
+
+**Learning-feedback loop (this phase):** the sweep validated the LL lesson
+at scale — three green-suite verticals carried 13 P0-class contact-with-
+reality defects because fixtures manufacture payload shapes the live API
+never produces (injected `updated_at`, round prices, empty shipping
+lines, mocked readers). Binding rule fed into every packet: behavioral
+tests must use production payload shapes, and a test that passes with the
+function body replaced by `pass` is not a test. Second lesson: reviewer
+evidence discipline applies to the reviewer — the CI elapsed-time error
+was corrected on the durable record, not silently.
+
+**State at session end:** implementation not started (Sol not engaged —
+product-owner action); monitoring loop live (PR #206 subscription +
+check-in `trig_01Vxg8QGVmUiQd6qcuQdBFD1` at 16:50Z, re-arming 6-hourly).
+Ordered work program for Sol on PR #206: W1 correction → B1 fixes + live
+vertical → export correction (before any export confirmation) → remaining
+DEC-042 batches → B5 full testing.
+
+**Next-session prompt (fresh reviewer session, if this one is lost):**
+"Read CLAUDE.md §13, DEC-042, and the three packets in docs/06-prompts/
+(w1-webhook-correction, b1-pre-uat-review, export-pre-uat-review). You
+are the independent reviewer on PR #206. Find the newest
+`READY-FOR-CLAUDE-REVIEW — <batch> — <SHA>` comment without a matching
+`CLAUDE INDEPENDENT REVIEW` verdict; review that exact SHA memorylessly
+per DEC-040 scrutiny (diff, tests, Actions, Odoo.sh, live evidence
+against the packet's definition-of-done) and post the complete verdict as
+a PR comment. The export-confirmation freeze stands until the export P0s
+are fixed and qualified. Never implement program code in the reviewer
+role."
