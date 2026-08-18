@@ -428,7 +428,9 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             })
             delivery = self._delivery(
                 store, 'generation-%s' % state, gid,
-                fields.Datetime.to_datetime(stamp.replace('Z', '')),
+                fields.Datetime.to_datetime(
+                    stamp.replace('T', ' ').replace('Z', ''),
+                ),
             )
             delivery._process_queued()
             current = Job.search([

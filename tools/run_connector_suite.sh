@@ -186,6 +186,13 @@ REQUIRED_HOOT_SUITES="shopify connector dashboard|shopify connector export diff|
 ALLOWED_SKIP_TEST="TestMutationRecovery.test_real_process_death_harness"
 ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 
+# Migration bases intentionally predate the optional W1 webhook addon.  Core's
+# activation guard therefore skips truthfully when that capability is absent;
+# unlike the opt-in process-death harness above, this allowance is valid only
+# for the runner's generated migration labels and this exact identity/reason.
+ALLOWED_MIGRATION_SKIP_TEST="TestSetupWizardActivation.test_w1_offline_token_without_app_secret_stops_before_activation"
+ALLOWED_MIGRATION_SKIP_REASON="shopify_connector_webhook is not installed"
+
 # Restrict the STANDARD passes to the connector modules.
 #
 # `--test-enable` with no selector runs every installed module's tests --
@@ -535,10 +542,21 @@ verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
     # old pattern did not match at all, so every subtest skip was invisible.
     while IFS= read -r occurrence; do
         [[ -z "$occurrence" ]] && continue
+        # Odoo's emitted occurrence can carry a trailing space before the
+        # newline.  Normalize only that boundary whitespace; an extra reason
+        # detail remains part of the occurrence and must still fail the exact
+        # migration allowance below.
+        occurrence="$(sed -E 's/[[:space:]]+$//' <<<"$occurrence")"
         identity="$(sed -E 's/^skipped (Subtest )?([A-Za-z0-9_]+\.[A-Za-z0-9_]+).*$/\2/' <<<"$occurrence")"
         if [[ "$identity" == "$ALLOWED_SKIP_TEST" \
               && "$occurrence" == *"$ALLOWED_SKIP_REASON"* ]]; then
             log "${label}: sanctioned skip ${identity}"
+            continue
+        fi
+        if [[ "$label" =~ ^migration-[0-9a-f]{8}(-again)?$ \
+              && "$identity" == "$ALLOWED_MIGRATION_SKIP_TEST" \
+              && "$occurrence" == *": ${ALLOWED_MIGRATION_SKIP_REASON}" ]]; then
+            log "${label}: sanctioned migration capability skip ${identity}"
             continue
         fi
         evidence_fail "${label}: unexpected skipped test -> ${occurrence#skipped }"
@@ -704,6 +722,30 @@ self_test() {
     EVIDENCE_ERRORS=()
     verify_no_unexpected_skips "$wrong_reason" self-test
     _expect 1 "the sanctioned test skipping for a DIFFERENT reason still fails"
+
+    # 2a. A migration base can truthfully lack the optional W1 addon.  Only
+    #     this exact capability absence, on a generated migration label, is
+    #     sanctioned; the same line must still fail in every other phase.
+    local migration_capability_skip="${tmp}/migration_capability_skip.log"
+    printf 'INFO db mod: skipped %s : %s \n' \
+        "$ALLOWED_MIGRATION_SKIP_TEST" "$ALLOWED_MIGRATION_SKIP_REASON" \
+        > "$migration_capability_skip"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_capability_skip" migration-50b770a3
+    _expect 0 "the migration capability-absence skip passes in a migration phase"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_capability_skip" self-test
+    _expect 1 "the migration capability-absence skip fails outside migration phases"
+
+    # 2b. The migration allowance is bound to the exact reason as well as the
+    #     exact test identity; a borrowed name cannot ride through.
+    local migration_wrong_reason="${tmp}/migration_wrong_reason.log"
+    printf 'INFO db mod: skipped %s : %s but with extra detail\n' \
+        "$ALLOWED_MIGRATION_SKIP_TEST" "$ALLOWED_MIGRATION_SKIP_REASON" \
+        > "$migration_wrong_reason"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_wrong_reason" migration-50b770a3
+    _expect 1 "the migration capability skip with a DIFFERENT reason fails"
 
     # 2b. Two skips on ONE line: a real skip followed by the sanctioned one.
     #     This is the shape that defeated the previous line-based check -- a

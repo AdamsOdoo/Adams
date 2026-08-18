@@ -57,6 +57,9 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'webhook addon is installed and selected by the suite',
             'an unsanctioned skip is an evidence failure',
             'the sanctioned test skipping for a DIFFERENT reason still fails',
+            'the migration capability-absence skip passes in a migration phase',
+            'the migration capability-absence skip fails outside migration phases',
+            'the migration capability skip with a DIFFERENT reason fails',
             'a required tour that never ran fails even when marker counts add up',
             'required tours with no success markers fail',
             'a HOOT suite with no verified evidence line fails',
@@ -94,12 +97,13 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'fresh/warm suite must fail closed when the addon is omitted',
         )
 
-    def test_runner_declares_exactly_one_sanctioned_skip(self):
-        """The skip allowance is bound to an identity, not to a count.
+    def test_runner_declares_exact_sanctioned_skips(self):
+        """Each skip allowance is bound to identity, reason and phase.
 
-        A "one skip is allowed" rule would let any test skip, which is the
-        hole TD-010 is about. The allowance must name the exact test and the
-        exact reason.
+        A count-based rule would let any test skip, which is the hole TD-010
+        is about. The migration exception is additionally phase-scoped because
+        its optional capability is absent only in the intentionally older
+        migration bases.
         """
         text = RUNNER.read_text()
         self.assertIn(
@@ -111,6 +115,21 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'ALLOWED_SKIP_REASON="real process-death harness is opt-in '
             'outside Odoo.sh"', text,
             'the sanctioned skip must be bound to that exact reason',
+        )
+        self.assertIn(
+            'ALLOWED_MIGRATION_SKIP_TEST="TestSetupWizardActivation.'
+            'test_w1_offline_token_without_app_secret_stops_before_activation"',
+            text,
+            'the migration skip must be bound to that exact test identity',
+        )
+        self.assertIn(
+            'ALLOWED_MIGRATION_SKIP_REASON="shopify_connector_webhook is not installed"',
+            text,
+            'the migration skip must be bound to that exact reason',
+        )
+        self.assertIn(
+            'migration-[0-9a-f]{8}(-again)?', text,
+            'the migration skip must be bound to generated migration phases',
         )
 
     def test_runner_installs_websocket_client_on_every_run(self):

@@ -131,7 +131,7 @@ class TestUiSetupTours(HttpCase):
         step is rendered as Not required rather than removed, and that
         readiness runs after the choices it reads rather than before them.
         """
-        self._admin('s1_tour_admin')
+        tour_admin = self._admin('s1_tour_admin')
         self._make_readiness_passable()
         self.env.flush_all()
         with self._transport(TOUR_SHOP_DOMAIN):
@@ -165,7 +165,9 @@ class TestUiSetupTours(HttpCase):
         if webhook_installed:
             setup_state = self.env[
                 'shopify.connector.setup.wizard'
-            ].sudo().get_setup_state(store_id=store.id)
+            ].with_user(tour_admin).with_context(
+                allowed_company_ids=tour_admin.company_ids.ids,
+            ).get_setup_state(store_id=store.id)
             self.assertEqual(
                 setup_state['store']['setup_completion_state'], 'pending',
                 'a successful W1 activation must remain pending until '
