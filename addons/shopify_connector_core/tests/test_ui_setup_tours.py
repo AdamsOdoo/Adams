@@ -34,6 +34,7 @@ from ..models.shopify_connector_api_client import (
 TOUR_SHOP_DOMAIN = 's1-tour.myshopify.com'
 RESUME_SHOP_DOMAIN = 's1-resume.myshopify.com'
 NEW_STORE_EXISTING_DOMAIN = 's1-existing.myshopify.com'
+NEW_STORE_OTHER_DOMAIN = 's1-other-existing.myshopify.com'
 NEW_STORE_DOMAIN = 's1-second.myshopify.com'
 REFRESH_SHOP_DOMAIN = 's1-refresh.myshopify.com'
 REFRESH_FAILURE_SHOP_DOMAIN = 's1-refresh-failure.myshopify.com'
@@ -226,6 +227,11 @@ class TestUiSetupTours(HttpCase):
             'shop_domain': NEW_STORE_EXISTING_DOMAIN,
             'company_id': self.env.company.id,
         })
+        other = self.env['shopify.connector.store'].sudo().create({
+            'name': 'S1 Other Existing Store',
+            'shop_domain': NEW_STORE_OTHER_DOMAIN,
+            'company_id': self.env.company.id,
+        })
         self.env.flush_all()
         self.start_tour(
             '/odoo', 'shopify_connector_s1_new_store_tour',
@@ -233,16 +239,24 @@ class TestUiSetupTours(HttpCase):
         )
         stores = self.env['shopify.connector.store'].sudo().search([
             ('shop_domain', 'in', (
-                NEW_STORE_EXISTING_DOMAIN, NEW_STORE_DOMAIN,
+                NEW_STORE_EXISTING_DOMAIN, NEW_STORE_OTHER_DOMAIN,
+                NEW_STORE_DOMAIN,
             )),
         ], order='id asc')
         self.assertEqual(
             stores.mapped('shop_domain'),
-            [NEW_STORE_EXISTING_DOMAIN, NEW_STORE_DOMAIN],
+            [
+                NEW_STORE_EXISTING_DOMAIN,
+                NEW_STORE_OTHER_DOMAIN,
+                NEW_STORE_DOMAIN,
+            ],
         )
         existing.invalidate_recordset()
+        other.invalidate_recordset()
         self.assertEqual(existing.name, 'S1 Existing Store')
         self.assertEqual(existing.shop_domain, NEW_STORE_EXISTING_DOMAIN)
+        self.assertEqual(other.name, 'S1 Other Existing Store')
+        self.assertEqual(other.shop_domain, NEW_STORE_OTHER_DOMAIN)
 
     def test_setup_is_operable_by_keyboard_alone(self):
         """Full keyboard traversal, and focus moves to the step heading.

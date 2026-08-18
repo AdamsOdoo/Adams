@@ -162,7 +162,10 @@ export class ShopifyConnectorSetupWizard extends Component {
                     this.headingRef.el.focus();
                 }
             },
-            () => [this.state.stepKey]
+            // A store swap can leave the semantic step key unchanged (both
+            // flows start on Welcome), so the store identity belongs in the
+            // dependency list too.
+            () => [this.state.stepKey, this.store.id]
         );
     }
 
@@ -490,8 +493,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (this.state.busy) {
             return;
         }
-        this.locationRefreshFollowGeneration += 1;
-        this._cancelLocationRefreshTimer();
+        this._resetLocationTransientState();
         this.state.busy = true;
         try {
             const data = await this.orm.call(MODEL, "get_setup_state", [], {
@@ -622,6 +624,28 @@ export class ShopifyConnectorSetupWizard extends Component {
     /** The final-readiness step's explicit "run again". */
     async runReadiness() {
         await this._call("run_readiness", { store_id: this.store.id });
+    }
+
+    _resetLocationTransientState() {
+        // A store swap must not carry a search result, server continuation,
+        // mapping choice or poll handle into the new store's identity flow.
+        // Advance the follower generation before cancelling its timer so an
+        // already-resolving old-store request cannot resume polling.
+        this.locationRefreshFollowGeneration += 1;
+        this._cancelLocationRefreshTimer();
+        this.locationRefreshJobId = null;
+        this.state.locationRefreshStillRunning = false;
+        this.state.locationMappingChoices = {};
+        this.state.locationSearch = {
+            shopify: {
+                query: "", items: null, total: 0, offset: 0,
+                nextOffset: false, continuation: null, emptyReason: "",
+            },
+            odoo: {
+                query: "", items: null, total: 0, offset: 0,
+                nextOffset: false, continuation: null, emptyReason: "",
+            },
+        };
     }
 
     _waitForLocationRefresh(delay, generation) {

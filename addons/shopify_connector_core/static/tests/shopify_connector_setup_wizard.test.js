@@ -203,6 +203,72 @@ describe("shopify connector setup wizard", () => {
         expect(queryText(".sc_setup__heading")).toInclude("Welcome");
     });
 
+    test("starting another store clears location transients and refocuses the heading", async () => {
+        const existing = payload({
+            store: Object.assign(payload().store, {
+                id: 9,
+                name: "Existing store",
+                shop_domain: "existing.myshopify.com",
+            }),
+            stores: [{ id: 9, name: "Existing store" }],
+        });
+        const blank = payload({
+            stores: [{ id: 9, name: "Existing store" }],
+        });
+        mockOrm((method, kwargs) =>
+            method === "get_setup_state" && kwargs.new_store
+                ? blank
+                : existing
+        );
+        const component = await mount();
+
+        for (const side of ["shopify", "odoo"]) {
+            Object.assign(component.state.locationSearch[side], {
+                query: "old-store-search",
+                items: [{ id: "old" }],
+                total: 8,
+                offset: 4,
+                nextOffset: 6,
+                continuation: "old-store-continuation",
+                emptyReason: "old-store-reason",
+            });
+        }
+        component.state.locationMappingChoices["old-store-gid"] = "12";
+        component.state.locationRefreshStillRunning = true;
+        component.locationRefreshJobId = 44;
+        component.locationRefreshFollowGeneration = 7;
+        const poll = component._waitForLocationRefresh(
+            10000,
+            component.locationRefreshFollowGeneration
+        );
+
+        await component.startNewStore();
+        await poll;
+        await animationFrame();
+
+        expect(queryFirst(".o_sc_setup").getAttribute("data-store-id")).toBe(
+            "new"
+        );
+        for (const side of ["shopify", "odoo"]) {
+            const search = component.state.locationSearch[side];
+            expect(search.query).toBe("");
+            expect(search.items).toBe(null);
+            expect(search.total).toBe(0);
+            expect(search.offset).toBe(0);
+            expect(search.nextOffset).toBe(false);
+            expect(search.continuation).toBe(null);
+            expect(search.emptyReason).toBe("");
+        }
+        expect(
+            Object.keys(component.state.locationMappingChoices)
+        ).toHaveLength(0);
+        expect(component.locationRefreshJobId).toBe(null);
+        expect(component.state.locationRefreshStillRunning).toBe(false);
+        expect(component.locationRefreshTimer).toBe(null);
+        expect(component.locationRefreshTimerResolve).toBe(null);
+        expect(document.activeElement).toBe(queryFirst(".sc_setup__heading"));
+    });
+
     test("it opens at the resume step key, not always at the first step", async () => {
         mockOrm(() => payload({ resume_step_key: "directions", resume_step: 6 }));
         await mount();

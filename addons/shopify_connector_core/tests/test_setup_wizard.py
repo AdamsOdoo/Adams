@@ -483,6 +483,29 @@ class TestSetupWizardSteps(SetupWizardCase):
         self.assertEqual(existing.name, 'Existing store')
         self.assertEqual(existing.shop_domain, 'existing-store.myshopify.com')
 
+    def test_multiple_stores_resume_the_oldest_unless_new_store_is_explicit(self):
+        first = self._make_store(
+            name='First store', domain='first-store.myshopify.com',
+        )
+        second_state = self._as(self.admin_a).save_store_identity(
+            'Second existing store', 'second-existing.myshopify.com',
+        )
+        second = self.Store.browse(second_state['store']['id'])
+
+        resumed = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(resumed['store']['id'], first.id)
+        self.assertEqual(
+            [row['id'] for row in resumed['stores']],
+            [first.id, second.id],
+        )
+
+        blank = self._as(self.admin_a).get_setup_state(new_store=True)
+        self.assertFalse(blank['store']['id'])
+        self.assertEqual(
+            [row['id'] for row in blank['stores']],
+            [first.id, second.id],
+        )
+
     def test_identity_does_not_assert_what_readiness_confirms(self):
         """Shape only. The store-identity check confirms it against Shopify."""
         store = self._make_store()

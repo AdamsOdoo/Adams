@@ -352,6 +352,14 @@ registry.category("web_tour.tours").add("shopify_connector_s1_new_store_tour", {
         {
             trigger: ".o_sc_setup[data-store-id='new']",
             content: "The new-store flow has no selected existing store.",
+            run() {
+                const heading = document.querySelector(".sc_setup__heading");
+                if (document.activeElement !== heading) {
+                    throw new Error(
+                        "focus did not return to the new store's step heading"
+                    );
+                }
+            },
         },
         { trigger: CONTINUE, run: "click" },
         {

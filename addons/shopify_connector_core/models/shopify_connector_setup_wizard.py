@@ -597,8 +597,11 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         candidates = self.env['shopify.connector.store'].search(
             [], order='id asc', limit=20,
         )
-        if not store and not new_store and len(candidates) == 1:
-            store = candidates
+        if not store and not new_store and candidates:
+            # Keep ordinary entry deterministic when more than one store is
+            # visible too. Only the explicit `new_store` intent suppresses
+            # resume and leaves the identity step blank.
+            store = candidates[0]
 
         settings = self._settings_for(store) if store else False
         resume_key = self._resume_key(settings)
