@@ -15,7 +15,7 @@
                         domain="[('state', 'in', ('failed', 'manual_review'))]"/>
                 <filter name="queued" string="Queued"
                         domain="[('state', '=', 'queued')]"/>
-                <group string="Group By">
+                <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
                     <filter name="group_topic" string="Topic" context="{'group_by': 'topic'}"/>
                     <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
@@ -111,7 +111,7 @@
                         domain="[('state', 'in', ('missing', 'error', 'manual_review'))]"/>
                 <filter name="active" string="Active"
                         domain="[('state', '=', 'active')]"/>
-                <group string="Group By">
+                <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
                     <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
                 </group>

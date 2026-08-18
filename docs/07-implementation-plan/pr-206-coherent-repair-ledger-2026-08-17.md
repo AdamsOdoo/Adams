@@ -435,6 +435,9 @@ Shopify mutation without a verified remote read.
 - While the review correction was being prepared, the shared PR branch advanced
   with an independently authored webhook addon. Exact-head Odoo.sh build
   `36558913` failed during addon installation because two Odoo 19 search views
-  used the obsolete `expand` attribute on `<group>`. The bounded integration
-  correction removes only those invalid attributes; it changes no webhook,
-  product, inventory, credential, or Shopify runtime behavior.
+  used obsolete attributes on search-view `<group>` elements. Build `36559160`
+  proved that `string` is invalid there as well; the accepted Odoo 19 shape is
+  a bare `<group>`, as used throughout the installed connector views. The
+  bounded integration correction removes only those invalid attributes; it
+  changes no webhook, product, inventory, credential, or Shopify runtime
+  behavior.
