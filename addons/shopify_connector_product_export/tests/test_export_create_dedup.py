@@ -120,7 +120,7 @@ class TestExportCreateDedup(ExportCase):
                     self.store, job, self.template.id,
                 )
         self.assertEqual(raised.exception.error_class, ERROR_CLASS_VALIDATION)
-        self.assertIn('duplicate gate is closed', raised.exception.message)
+        self.assertIn('duplicate gate is closed', raised.exception.reason)
 
     # ------------------------------------------------------------------
     # Reconciliation by custom id, before any retry
