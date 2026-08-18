@@ -4,7 +4,9 @@ from odoo.tests.common import tagged
 
 from ..models.shopify_connector_product_export_service import (
     BINDING_METAFIELD_KEY,
+    ERROR_CLASS_VALIDATION,
     JOB_TYPE_CREATE,
+    JobHandlerError,
 )
 from .common import ExportCase, FakeSendResponse, PRODUCT_GID
 
@@ -67,8 +69,12 @@ class TestExportCreateDedup(ExportCase):
             )
 
         self.assertEqual(result['nodes'], [])
-        self.assertIn('productByIdentifier', sent[-1]['query'])
-        self.assertNotIn('products(first:', sent[-1]['query'])
+        self.assertEqual(sent[-1]['query'], (
+            'query ProductExportFindByCustomId('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title updatedAt } shop { myshopifyDomain } }'
+        ))
         self.assertEqual(sent[-1]['variables'], {
             'identifier': {'customId': {
                 'key': BINDING_METAFIELD_KEY,
@@ -96,6 +102,25 @@ class TestExportCreateDedup(ExportCase):
                 self.store, job, self.template.id,
             )
         self.assertEqual([node['id'] for node in result['nodes']], [PRODUCT_GID])
+
+    def test_preflight_fails_closed_on_a_malformed_identifier_result(self):
+        body = {'data': {
+            'product': [{'id': PRODUCT_GID}],
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+        job = self.make_job(
+            'product_export_preview', 'product.template', self.template.id,
+        )
+        with self.send_patch(
+            lambda self, store, request, token=None,
+            mutation_context=None: FakeSendResponse(body)
+        ):
+            with self.assertRaises(JobHandlerError) as raised:
+                self.Service._search_remote_by_custom_id(
+                    self.store, job, self.template.id,
+                )
+        self.assertEqual(raised.exception.error_class, ERROR_CLASS_VALIDATION)
+        self.assertIn('duplicate gate is closed', raised.exception.message)
 
     # ------------------------------------------------------------------
     # Reconciliation by custom id, before any retry
@@ -162,7 +187,16 @@ class TestExportCreateDedup(ExportCase):
             verdict = self.Service._reconcile_create(_Attempt())
 
         self.assertEqual(verdict['verdict'], 'not_applied')
-        self.assertIn('productByIdentifier', sent[-1]['query'])
+        self.assertEqual(sent[-1]['query'], (
+            'query ProductExportReconcileCreate('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title status descriptionHtml vendor productType tags updatedAt '
+            'variants(first: 100) { nodes { id sku barcode price '
+            'compareAtPrice selectedOptions { name value } '
+            'inventoryItem { id sku tracked } } } } '
+            'shop { myshopifyDomain } }'
+        ))
         self.assertEqual(sent[-1]['variables']['identifier']['customId'], {
             'key': BINDING_METAFIELD_KEY,
             'value': str(self.template.id),

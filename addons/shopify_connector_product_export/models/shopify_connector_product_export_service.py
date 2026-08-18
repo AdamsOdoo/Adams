@@ -590,6 +590,12 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         ) as result:
             data = (result or {}).get('data') or {}
         product = data.get('product')
+        if product is not None and not isinstance(product, dict):
+            raise JobHandlerError(
+                ERROR_CLASS_VALIDATION,
+                'Shopify returned an invalid productByIdentifier payload; '
+                'the create-path duplicate gate is closed.',
+            )
         return {
             'store_identity': (data.get('shop') or {}).get('myshopifyDomain'),
             'nodes': [product] if isinstance(product, dict) else [],

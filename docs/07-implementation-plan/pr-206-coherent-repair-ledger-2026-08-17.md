@@ -426,4 +426,9 @@ Shopify mutation without a verified remote read.
   The identifier continues to omit namespace intentionally so Shopify resolves
   the app-reserved namespace, matching the `productSet` identifier contract.
   Behavioral regressions assert the exact on-wire query and variables for
-  both production reads and prove zero-or-one result normalization.
+  both production reads and prove zero-or-one result normalization. Independent
+  review confirmed the GraphQL shape and replay contract, then identified one
+  valid fail-closed hardening: a malformed non-object identifier result must
+  stop the create gate rather than look absent. The accepted correction adds
+  that refusal and an executable regression. A corrected live read canary and
+  exact-head requalification remain required.
