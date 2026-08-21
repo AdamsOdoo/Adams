@@ -355,6 +355,69 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         ).strftime('%Y%m%d%H%M')
 
     @api.model
+    def _preflight_enqueue_job(
+        self, store, job_type, payload_hash, res_model, res_id,
+        shopify_target_gid=False,
+    ):
+        """Find a visible duplicate before asking PostgreSQL to reject it.
+
+        The job table keeps the database unique constraints as the final
+        cross-worker guard.  A normal sequential retry, however, should not
+        deliberately execute a statement known to violate one of those
+        constraints: Odoo logs the rejected SQL at ERROR level even when the
+        caller catches the ``IntegrityError`` inside a savepoint.
+
+        The two identities have different meanings and are checked
+        separately:
+
+        * an active row with the same job/target operation identity is the
+          in-flight work to coalesce with (the operation-scope constraint is
+          independent of the payload hash); and
+        * a terminal row with the same payload is immutable evidence, so a
+          fresh bounded nonce is returned to permit an explicit retry without
+          colliding with its lifetime idempotency key.
+
+        The SQL constraints and the savepoint/``IntegrityError`` recovery in
+        ``_enqueue_job_with_recovery`` remain mandatory for the narrow window
+        in which another transaction inserts after this read.  This method is
+        only a read-side fast path for already-visible rows.
+        """
+        Job = self.env['shopify.connector.job'].sudo()
+        # ``operation_scope_key`` and the computed idempotency key are stored
+        # computes.  Flush the model so a sibling job admitted earlier in this
+        # transaction is visible to this read; the unique indexes remain the
+        # authoritative guard for independent workers.
+        Job.flush_model()
+        identity = [
+            ('store_id', '=', store.id),
+            ('job_type', '=', job_type),
+            ('res_model', '=', res_model or False),
+            ('res_id', '=', res_id or False),
+            ('shopify_target_gid', '=', shopify_target_gid or False),
+        ]
+        active = Job.search(
+            identity + [
+                ('expected_connection_generation', '=',
+                 store.connection_generation),
+                ('state', 'not in', tuple(CREATE_RETRY_STATES)),
+            ],
+            order='id asc', limit=1,
+        )
+        if active:
+            return active, payload_hash
+
+        terminal = Job.search(
+            identity + [('payload_hash', '=', payload_hash)],
+            order='id desc', limit=1,
+        )
+        if terminal:
+            return self.env['shopify.connector.job'].browse(), canonical_sha256({
+                'base_payload_hash': payload_hash,
+                'terminal_retry_nonce': uuid.uuid4().hex,
+            })
+        return self.env['shopify.connector.job'].browse(), payload_hash
+
+    @api.model
     def _enqueue_job_with_recovery(
         self, store, source, job_type, payload_hash, res_model, res_id,
         shopify_target_gid=False,
@@ -371,6 +434,16 @@ class ShopifyConnectorWebhookSubscription(models.Model):
         Enqueue = self.env['shopify.connector.job.enqueue'].sudo()
         Job = self.env['shopify.connector.job'].sudo()
         candidate = payload_hash
+        existing, candidate = self._preflight_enqueue_job(
+            store,
+            job_type,
+            candidate,
+            res_model,
+            res_id,
+            shopify_target_gid,
+        )
+        if existing:
+            return existing
         for retry in range(2):
             try:
                 with self.env.cr.savepoint():

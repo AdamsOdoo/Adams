@@ -58,10 +58,12 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
                 spec,
                 domain='product',
                 handler='product_import_sync',
-                # The W2 handler requires Shopify's explicit Product GID.
-                # An empty includeFields list means an unfiltered payload;
-                # this field is the minimum filtered contract we accept.
-                include_fields=['admin_graphql_api_id'],
+                # The W2 handler requires Shopify's explicit Product GID and
+                # the raw snake_case `updated_at` change stamp.  Keeping the
+                # latter in the allowlist also prevents Shopify from
+                # debouncing consecutive updates whose reduced payload would
+                # otherwise be identical.
+                include_fields=['admin_graphql_api_id', 'updated_at'],
             )
         return registry
 
@@ -135,6 +137,13 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
     @api.model
     def _find_existing_product_job(self, store, gid, payload_hash):
         Job = self.env['shopify.connector.job'].sudo()
+        # ``operation_scope_key`` is a stored compute.  Flush before the
+        # read-side coalescing check so a sibling admitted earlier in this
+        # transaction is visible without deliberately executing a statement
+        # that the unique index would reject.  The unique constraints and the
+        # savepoint/IntegrityError branch below remain the cross-worker race
+        # guard when another transaction inserts after this read.
+        Job.flush_model()
         generation = int(store.connection_generation or 0)
         domain = [
             ('store_id', '=', store.id),
@@ -195,6 +204,11 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
         if int(store.connection_generation or 0) != int(generation):
             return self.env['shopify.connector.job'].browse(), 'stale_generation'
         payload_hash = self._product_payload_hash(delivery, generation)
+        existing, disposition = self._find_existing_product_job(
+            store, gid, payload_hash,
+        )
+        if existing:
+            return existing, disposition
         Enqueue = self.env['shopify.connector.job.enqueue'].sudo()
         try:
             with self.env.cr.savepoint():

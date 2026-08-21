@@ -82,7 +82,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         )
         self.assertEqual(
             registry.topic_spec('products/update')['include_fields'],
-            ['admin_graphql_api_id'],
+            ['admin_graphql_api_id', 'updated_at'],
         )
 
     def test_registry_extension_is_add_only_and_fails_closed_on_collision(self):
@@ -336,7 +336,18 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
     def test_delivery_processing_enqueues_one_child_and_records_correlation(self):
         store = self._store('enqueue')
         gid = 'gid://shopify/Product/788032119674292922'
-        first = self._delivery(store, 'one', gid)
+        # This is the actual filtered Shopify products/update shape retained
+        # by the public controller: the explicit Product GID plus the raw
+        # snake_case updated_at field.  The production parser normalizes that
+        # field before the evidence envelope reaches the handler.
+        filtered_updated_at = '2026-08-22T12:00:00Z'
+        source_updated_at = self.env[
+            'shopify.connector.webhook.delivery'
+        ]._parse_datetime(filtered_updated_at)
+        self.assertTrue(source_updated_at)
+        first = self._delivery(
+            store, 'one', gid, source_updated_at=source_updated_at,
+        )
         # A webhook handler is enqueue-only. If it attempted a remote read,
         # this production client seam would fail the test immediately.
         Client = type(self.env['shopify.connector.api.client'])
@@ -367,8 +378,13 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         self.assertIn(str(child.id), first.processing_note)
         self.assertIn('authoritative Shopify read', first.processing_note)
 
+        # A repeated delivery with the same filtered payload is a normal
+        # sequential duplicate.  The handler must coalesce from its
+        # read-side preflight, without asking PostgreSQL to reject a known
+        # operation-scope duplicate (and without an ERROR-level SQL log).
         second = self._delivery(store, 'two', gid)
-        second._process_queued()
+        with self.assertNoLogs('odoo.sql_db', level='ERROR'):
+            second._process_queued()
         self.assertEqual(second.state, 'processed')
         self.assertEqual(Job.search_count([
             ('store_id', '=', store.id),
@@ -380,6 +396,86 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         ]), 1)
         self.assertIn(str(child.id), second.processing_note)
         self.assertIn('coalesced', second.processing_note)
+
+        # Once the prior import is terminal, a later Shopify updated_at value
+        # is a new logical import.  This simulates the actual filtered
+        # products/update payload shape: the explicit Product GID and the raw
+        # snake_case updated_at stamp are both present in the subscription
+        # contract, while the importer still reads authoritative data in the
+        # child job.  A terminal retry must take the new idempotency key path
+        # without an exception-driven duplicate INSERT.
+        child._transition_failed_final(
+            'data_shape_schema_mismatch',
+            'W2 later-update idempotency regression fixture',
+        )
+        later = fields.Datetime.add(first.source_updated_at, seconds=1)
+        third = self._delivery(store, 'three', gid, later)
+        with self.assertNoLogs('odoo.sql_db', level='ERROR'):
+            third._process_queued()
+        self.assertEqual(third.state, 'processed')
+        all_jobs = Job.search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'product_import_sync'),
+            ('shopify_target_gid', '=', gid),
+        ], order='id asc')
+        self.assertEqual(len(all_jobs), 2)
+        successor = all_jobs.filtered(lambda job: job.id != child.id)
+        self.assertEqual(len(successor), 1)
+        self.assertNotEqual(successor.payload_hash, child.payload_hash)
+        self.assertEqual(
+            successor.payload_hash,
+            '%sZ' % fields.Datetime.to_string(later).replace(' ', 'T'),
+        )
+        self.assertIn('enqueued', third.processing_note)
+
+    def test_subscription_admission_coalesces_visible_duplicates_before_insert(self):
+        """The setup mutation seam does not use SQL exceptions as coalescing."""
+        store = self._store('subscription-coalesce')
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        service = Subscription.sudo().with_context(
+            **Subscription._service_context(),
+        )
+        subscription = service.create({
+            'store_id': store.id,
+            'topic': 'products/update',
+            'topic_enum': 'PRODUCTS_UPDATE',
+            'expected': True,
+            'expected_api_version': SHOPIFY_API_VERSION,
+            'expected_include_fields': [
+                'admin_graphql_api_id', 'updated_at',
+            ],
+            'expected_callback_url_digest': 'callback-digest',
+            'state': 'missing',
+        })
+        with patch.object(
+            type(Subscription), '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            with self.assertNoLogs('odoo.sql_db', level='ERROR'):
+                first = Subscription._enqueue_subscription_mutation(
+                    subscription, 'create', 'setup_readiness_check',
+                )
+                second = Subscription._enqueue_subscription_mutation(
+                    subscription, 'create', 'setup_readiness_check',
+                )
+            self.assertEqual(first, second)
+            self.assertEqual(subscription.last_job_id, first)
+
+            # A terminal row is immutable evidence.  An explicit retry gets a
+            # bounded nonce preflight, so it does not first execute the
+            # duplicate INSERT that the lifetime idempotency key would reject.
+            first._transition_failed_final(
+                'shopify_user_errors_validation',
+                'W1 visible-terminal retry regression fixture',
+            )
+            with self.assertNoLogs('odoo.sql_db', level='ERROR'):
+                retry = Subscription._enqueue_subscription_mutation(
+                    subscription, 'create', 'setup_readiness_check',
+                )
+        self.assertNotEqual(retry.id, first.id)
+        self.assertNotEqual(retry.payload_hash, first.payload_hash)
+        self.assertEqual(first.state, 'failed_final')
+        self.assertEqual(subscription.last_job_id, retry)
 
     def test_terminal_old_generation_does_not_suppress_current_import(self):
         """Skipped/cancelled/final-failed old rows never block reconnect work."""
