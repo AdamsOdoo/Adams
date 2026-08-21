@@ -1,6 +1,7 @@
 """Durable, payload-free Shopify webhook delivery evidence."""
 
-from datetime import timedelta, timezone
+import re
+from datetime import datetime, timedelta, timezone
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
@@ -27,6 +28,17 @@ _DELIVERY_SERVICE_CONTEXT = 'shopify_connector_webhook_delivery_service'
 _DELIVERY_SERVICE_SENTINEL = object()
 _DELIVERY_RETENTION_CONTEXT = 'shopify_connector_webhook_delivery_retention'
 _DELIVERY_RETENTION_SENTINEL = object()
+
+# Shopify documents ``X-Shopify-Triggered-At`` as an RFC 3339 timestamp and
+# currently shows nanosecond precision in its webhook examples.  Odoo's
+# ``fields.Datetime`` is a timezone-naive UTC value, so accept the complete
+# timestamp shape that can be represented by Python's datetime parser and
+# normalize it before handing it to the ORM.  Requiring a timezone prevents a
+# locale/server-timezone interpretation of a source watermark.
+_SHOPIFY_WEBHOOK_DATETIME = re.compile(
+    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    r'(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$'
+)
 
 
 class ShopifyConnectorWebhookDelivery(models.Model):
@@ -161,15 +173,22 @@ class ShopifyConnectorWebhookDelivery(models.Model):
 
     @api.model
     def _parse_datetime(self, value):
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str) or not value:
+            return False
+        if not _SHOPIFY_WEBHOOK_DATETIME.fullmatch(value):
             return False
         try:
-            parsed = fields.Datetime.to_datetime(
-                value.strip().replace('Z', '+00:00')
+            # ``datetime.fromisoformat`` on the supported Python runtime
+            # accepts the RFC 3339 offset after the terminal ``Z`` is mapped
+            # to its explicit UTC spelling.  It truncates any nanoseconds
+            # beyond Python's microsecond precision, which is the precision
+            # available to Odoo/PostgreSQL datetime values.
+            parsed = datetime.fromisoformat(
+                value[:-1] + '+00:00' if value.endswith('Z') else value,
             )
-            if parsed.tzinfo:
-                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-            return parsed
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                return False
+            return parsed.astimezone(timezone.utc).replace(tzinfo=None)
         except (TypeError, ValueError, OverflowError):
             return False
 

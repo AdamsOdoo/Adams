@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import hmac
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -132,6 +133,50 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             {'received', 'queued', 'processed', 'ignored', 'failed', 'manual_review'},
         )
         self.assertEqual(WEBHOOK_RETENTION_DAYS, 30)
+
+    def test_shopify_webhook_datetime_is_strict_utc_and_payload_free(self):
+        """The production parser handles Shopify RFC 3339 watermarks safely."""
+        delivery_model = self.env['shopify.connector.webhook.delivery']
+        expected = datetime(2026, 8, 22, 12, 0, 0)
+
+        self.assertEqual(
+            delivery_model._parse_datetime('2026-08-22T12:00:00Z'),
+            expected,
+        )
+        self.assertEqual(
+            delivery_model._parse_datetime('2026-08-22T16:00:00+04:00'),
+            expected,
+        )
+        self.assertEqual(
+            delivery_model._parse_datetime('2026-08-22T06:30:00-05:30'),
+            expected,
+        )
+        # Shopify documents nanosecond precision for the triggered-at header;
+        # Odoo retains the representable microsecond prefix.
+        self.assertEqual(
+            delivery_model._parse_datetime(
+                '2026-08-22T12:00:00.123456789Z',
+            ),
+            datetime(2026, 8, 22, 12, 0, 0, 123456),
+        )
+
+        for malformed in (
+            None,
+            1724328000,
+            '',
+            '2026-08-22 12:00:00Z',
+            '2026-08-22T12:00:00',
+            '2026-08-22T12:00:00z',
+            '2026-02-30T12:00:00Z',
+            '2026-08-22T12:00:00+25:00',
+            '2026-08-22T12:00:00.1234567890Z',
+        ):
+            self.assertFalse(delivery_model._parse_datetime(malformed))
+
+        # The parser receives only a scalar timestamp.  Delivery evidence
+        # remains payload-free; identity allowlisting is tested independently
+        # above and no request body is accepted by this production entry point.
+        self.assertNotIn('payload', delivery_model._fields)
 
     def test_callback_token_digest_is_not_a_sequential_store_id(self):
         from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_secret import (
