@@ -1169,7 +1169,7 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             base.append(('company_id', 'in', self.env.companies.ids))
         null_rows = Settings.search(
             base + [
-                ('store_id.inventory_observation_scheduled_at', '=', False),
+                ('inventory_observation_scheduled_at', '=', False),
             ],
             order='store_id asc', limit=store_limit,
         )
@@ -1178,10 +1178,10 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
         if remaining:
             dated_rows = Settings.search(
                 base + [
-                    ('store_id.inventory_observation_scheduled_at', '!=', False),
+                    ('inventory_observation_scheduled_at', '!=', False),
                 ],
                 order=(
-                    'store_id.inventory_observation_scheduled_at asc, '
+                    'inventory_observation_scheduled_at asc, '
                     'store_id asc'
                 ),
                 limit=remaining,

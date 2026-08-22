@@ -779,6 +779,29 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertIn(own_store, stores)
         self.assertNotIn(other_store, stores)
 
+    def test_scheduler_store_page_is_sql_bounded_and_null_oldest_fair(self):
+        stores = [self._store('fair-%s' % index) for index in range(4)]
+        stores[0].sudo().write({
+            'inventory_observation_scheduled_at': '2026-08-22 10:00:00',
+        })
+        stores[1].sudo().write({
+            'inventory_observation_scheduled_at': '2026-08-22 08:00:00',
+        })
+        settings = self.env['shopify.connector.store.settings']
+        checkpoint = settings._fields['inventory_observation_scheduled_at']
+        self.assertTrue(checkpoint.store)
+        self.assertTrue(checkpoint.index)
+
+        service = self.env[
+            'shopify.connector.inventory.observation.service'
+        ]
+        selected = service._scheduled_observation_stores(3)
+        selected_ids = [store.id for store in selected]
+        null_ids = sorted(store.id for store in stores[2:])
+        self.assertEqual(selected_ids[:2], null_ids)
+        self.assertEqual(selected_ids[2], stores[1].id)
+        self.assertLessEqual(len(selected), 3)
+
     def test_dispatch_routes_missing_binding_to_manual_fix_retryable(self):
         store = self._store('handler-retry')
         level_gid = 'gid://shopify/InventoryLevel/7001?inventory_item_id=8001'
