@@ -2,6 +2,7 @@
 
 import hashlib
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -198,7 +199,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         )
         self.assertEqual(
             _parse_remote_datetime('2026-08-22T08:00:00.123456789Z'),
-            fields.Datetime.to_datetime('2026-08-22 08:00:00.123456'),
+            datetime(2026, 8, 22, 8, 0, 0, 123456),
         )
         for invalid in (
             '2026-08-22 08:00:00',
