@@ -80,6 +80,14 @@ CLASSIFIED_MODULES = frozenset({
     'shopify_connector_inventory_webhook',
 })
 
+# Optional domain addons are classified when installed, but are not part of
+# the core module closure on historical migration databases.  Their absence
+# must not make this core guard fail; an installed optional addon still has
+# to run its own exact field-classification test.
+OPTIONAL_CLASSIFIED_MODULES = frozenset({
+    'shopify_connector_inventory_webhook',
+})
+
 UNCLASSIFIED_CONTRIBUTING_MODULES = frozenset({
     'shopify_connector_fulfillment',
     'shopify_connector_product_export',

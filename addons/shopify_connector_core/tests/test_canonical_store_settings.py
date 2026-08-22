@@ -20,6 +20,7 @@ from odoo.addons.shopify_connector_core.tests.canonical_settings_classification 
     CANONICAL_LIST_XMLID,
     CANONICAL_READONLY,
     CLASSIFIED_MODULES,
+    OPTIONAL_CLASSIFIED_MODULES,
     INTERNAL_PROTECTED,
     OWNED_BY_SURFACE,
     SETTINGS_MODEL,
@@ -177,10 +178,22 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
         them.
         """
         live = contributing_modules(self.env)
+        required_classified = CLASSIFIED_MODULES - OPTIONAL_CLASSIFIED_MODULES
         self.assertEqual(
-            live & CLASSIFIED_MODULES, CLASSIFIED_MODULES,
-            'a module with a classification test no longer contributes '
-            'settings fields; the guard has drifted from the registry',
+            live & required_classified, required_classified,
+            'a required module with a classification test no longer '
+            'contributes settings fields; the guard has drifted from the '
+            'registry',
+        )
+        installed_optional = set(self.env['ir.module.module'].search([
+            ('name', 'in', list(OPTIONAL_CLASSIFIED_MODULES)),
+            ('state', '=', 'installed'),
+        ]).mapped('name'))
+        self.assertEqual(
+            live & OPTIONAL_CLASSIFIED_MODULES,
+            installed_optional,
+            'classified optional addons must contribute fields exactly when '
+            'they are installed; absent migration-era addons are explicit',
         )
         self.assertEqual(
             live & UNCLASSIFIED_CONTRIBUTING_MODULES,
