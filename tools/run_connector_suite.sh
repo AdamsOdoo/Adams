@@ -460,10 +460,58 @@ EVIDENCE_ERRORS=()
 
 evidence_fail() { EVIDENCE_ERRORS+=("$1"); log "EVIDENCE FAILURE: $1"; }
 
+# Check addon-local constant imports before booting Odoo.  Registry loading
+# happens before any test can run, so a typo in a relative import otherwise
+# turns into an Odoo.sh-only failure with no actionable suite evidence.
+verify_inventory_webhook_import_contract() {
+    local addon_dir="${REPO_ROOT}/addons/shopify_connector_inventory_webhook"
+    local contract_error
+    if ! contract_error="$(python3 - "$addon_dir" <<'PY'
+import ast
+import pathlib
+import sys
+
+addon = pathlib.Path(sys.argv[1])
+constants = ast.parse(
+    (addon / 'models' / 'constants.py').read_text(encoding='utf-8'),
+    filename=str(addon / 'models' / 'constants.py'),
+)
+exported = {
+    node.id
+    for node in constants.body
+    if isinstance(node, (ast.Assign, ast.AnnAssign, ast.FunctionDef,
+                         ast.AsyncFunctionDef, ast.ClassDef))
+    for node in (
+        node.targets if isinstance(node, ast.Assign) else
+        [node.target] if isinstance(node, ast.AnnAssign) else [node]
+    )
+    if isinstance(node, ast.Name)
+}
+registry_path = addon / 'models' / 'shopify_connector_inventory_webhook.py'
+registry = ast.parse(registry_path.read_text(encoding='utf-8'),
+                     filename=str(registry_path))
+missing = []
+for node in ast.walk(registry):
+    if not isinstance(node, ast.ImportFrom) or node.module != 'constants':
+        continue
+    if not node.level:
+        continue
+    missing.extend(alias.name for alias in node.names if alias.name not in exported)
+if missing:
+    print('missing constants imported by inventory webhook registry: %s' %
+          ', '.join(sorted(set(missing))))
+    raise SystemExit(1)
+PY
+    )"; then
+        evidence_fail "inventory webhook import contract: ${contract_error}"
+    fi
+}
+
 # The addon must be present in both the install set and the standard selector.
 # Keeping this as a fail-closed runtime guard prevents a fresh/warm run from
 # silently omitting the modular webhook addon after a list-edit or rename.
 verify_connector_module_inventory() {
+    verify_inventory_webhook_import_contract
     case ",${MODULES}," in
         *,shopify_connector_webhook,*) ;;
         *) evidence_fail "shopify_connector_webhook is absent from MODULES" ;;

@@ -6,7 +6,7 @@ from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
 from .constants import (
-    INVENTORY_OBSERVATION_HANDLER,
+    INVENTORY_WEBHOOK_HANDLER,
     INVENTORY_OBSERVATION_JOB_TYPE,
     INVENTORY_WEBHOOK_INCLUDE_FIELDS,
     INVENTORY_WEBHOOK_TOPIC,
@@ -35,7 +35,7 @@ class ShopifyConnectorInventoryWebhookRegistry(models.AbstractModel):
         registry[INVENTORY_WEBHOOK_TOPIC] = dict(
             spec,
             domain='inventory',
-            handler=INVENTORY_OBSERVATION_HANDLER,
+            handler=INVENTORY_WEBHOOK_HANDLER,
             include_fields=list(INVENTORY_WEBHOOK_INCLUDE_FIELDS),
         )
         return registry

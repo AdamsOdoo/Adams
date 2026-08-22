@@ -17,6 +17,7 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
 from ..models.constants import (
     INVENTORY_OBSERVATION_JOB_TYPE,
     INVENTORY_WEBHOOK_INCLUDE_FIELDS,
+    INVENTORY_WEBHOOK_HANDLER,
     INVENTORY_WEBHOOK_TOPIC,
     fair_rotation,
 )
@@ -54,6 +55,10 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_scheduled_sync_enabled': True,
         })
         return store
+
+    def test_webhook_registry_contract_exports_handler_constant(self):
+        """The registry's imported handler name must be an exported contract."""
+        self.assertEqual(INVENTORY_WEBHOOK_HANDLER, INVENTORY_OBSERVATION_JOB_TYPE)
 
     def _delivery(self, store, suffix, level_gid, source_updated_at):
         digest = hashlib.sha256(
