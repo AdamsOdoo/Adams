@@ -773,7 +773,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertIn(own_store, stores)
         self.assertNotIn(other_store, stores)
 
-    def test_dispatch_executes_observation_handler_and_routes_retryable_error(self):
+    def test_dispatch_routes_missing_binding_to_manual_fix_retryable(self):
         store = self._store('handler-retry')
         level_gid = 'gid://shopify/InventoryLevel/7001?inventory_item_id=8001'
         job = self.env['shopify.connector.job'].sudo().create({
@@ -788,8 +788,15 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         })
         self.env['shopify.connector.job.dispatch']._dispatch_one(job)
         job.invalidate_recordset()
-        self.assertEqual(job.state, 'blocked_manual_review')
+        # Missing binding is a manual-fix-then-retry classification.  It is
+        # deliberately not an automatic replay: no retry timestamp is set and
+        # the attempt budget remains untouched until an operator repairs the
+        # pair and explicitly requeues the job.
+        self.assertEqual(job.state, 'failed_retryable')
         self.assertEqual(job.error_class, 'shopify_user_errors_validation')
+        self.assertEqual(job.retry_count, 0)
+        self.assertFalse(job.next_retry_at)
+        self.assertTrue(job.finished_at)
 
     def test_dispatch_retries_remote_read_then_replays_to_success(self):
         """A temporary remote read is retried through the real job entry point."""
