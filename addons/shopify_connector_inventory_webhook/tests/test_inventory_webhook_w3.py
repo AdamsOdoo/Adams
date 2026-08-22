@@ -367,6 +367,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             def __init__(self):
                 self.writes = []
 
+            def __len__(self):
+                # The production handler requires an exact singleton binding
+                # recordset before it performs any read or freeze action.
+                return 1
+
             def try_lock_for_update(self):
                 return self
 
