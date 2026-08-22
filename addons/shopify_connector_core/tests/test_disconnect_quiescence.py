@@ -3474,10 +3474,13 @@ class TestSetupCredentialRetainRaceGenuine(
                     )
                     cursor.commit()
                     findings.put(('retain', 'advanced'))
-                except UserError:
+                except UserError as exc:
                     if cursor is not None:
                         cursor.rollback()
-                    findings.put(('retain', 'refused'))
+                    # UserError messages here are fixed, secret-free refusal
+                    # reasons; retain the classification to diagnose a
+                    # pre-lock refusal without ever exposing credentials.
+                    findings.put(('retain', 'refused:%s' % str(exc)))
                 except BaseException as exc:
                     if cursor is not None:
                         cursor.rollback()
@@ -3531,10 +3534,11 @@ class TestSetupCredentialRetainRaceGenuine(
                 self._assert_workers_dead((mutation_thread, retain_thread))
 
             self.assertNotEqual(pids['mutation'], pids['retain'])
-            self.assertEqual(
-                sorted(self._drain(findings)),
-                [('mutation', 'committed'), ('retain', 'refused')],
-            )
+            outcomes = sorted(self._drain(findings))
+            self.assertEqual(len(outcomes), 2)
+            self.assertEqual(outcomes[0], ('mutation', 'committed'))
+            self.assertEqual(outcomes[1][0], 'retain')
+            self.assertTrue(outcomes[1][1].startswith('refused:'))
             present, state, mode, progress = self._observe_retain_fixture(
                 dbname, store_id,
             )
