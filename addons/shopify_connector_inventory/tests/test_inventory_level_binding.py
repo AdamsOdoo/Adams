@@ -205,19 +205,39 @@ class TestInventoryLevelBinding(TransactionCase):
         self.assertNotIn('last_push_params_hash', stored_fields)
 
     def test_exact_stored_field_classification(self):
-        self.assertEqual(
-            self.Binding._protected_binding_fields(),
-            self.EXPECTED_PROTECTED_FIELDS,
-        )
+        protected_fields = self.Binding._protected_binding_fields()
         automatic = frozenset((
             'id', 'display_name', 'create_uid', 'create_date',
             'write_uid', 'write_date',
         ))
+        base_closure = frozenset((
+            'shopify_connector_core',
+            'shopify_connector_inventory',
+        ))
+        base_stored_fields = {
+            name for name, field in self.Binding._fields.items()
+            if field.store
+            and name not in automatic
+            and base_closure.intersection(field._modules or ())
+        }
+        # Field._modules is Odoo 19's live provenance for declarations and
+        # extensions. This keeps the base assertion exact without naming an
+        # optional addon that may extend the concrete model.
+        self.assertEqual(
+            base_stored_fields, self.EXPECTED_PROTECTED_FIELDS,
+        )
         stored_fields = {
             name for name, field in self.Binding._fields.items()
             if field.store and name not in automatic
         }
-        self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+        self.assertEqual(stored_fields, protected_fields)
+        extension_stored_fields = (
+            stored_fields - self.EXPECTED_PROTECTED_FIELDS
+        )
+        self.assertTrue(
+            extension_stored_fields <=
+            self.Binding._additional_protected_binding_fields()
+        )
 
     def test_protected_fields_cannot_be_written_generically(self):
         binding = self._make_binding('gid://shopify/InventoryItem/107')

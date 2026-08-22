@@ -61,6 +61,23 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         """The registry's imported handler name must be an exported contract."""
         self.assertEqual(INVENTORY_WEBHOOK_HANDLER, INVENTORY_OBSERVATION_JOB_TYPE)
 
+    def test_observation_fields_use_protected_binding_extension_seam(self):
+        binding = self.env['shopify.connector.inventory.level.binding']
+        observation_fields = frozenset((
+            'last_observed_updated_at',
+            'last_observed_available',
+            'last_observation_delivery_id',
+            'last_observation_event_id',
+            'last_observation_state',
+            'last_observed_at',
+        ))
+        self.assertTrue(
+            observation_fields <= binding._additional_protected_binding_fields()
+        )
+        self.assertTrue(
+            observation_fields <= binding._protected_binding_fields()
+        )
+
     def _delivery(self, store, suffix, level_gid, source_updated_at):
         digest = hashlib.sha256(
             ('w3-inventory-body-%s' % suffix).encode('utf-8'),
