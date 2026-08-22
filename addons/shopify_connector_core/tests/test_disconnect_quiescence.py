@@ -3334,6 +3334,7 @@ class TestSetupCredentialRetainRaceGenuine(
 
     def _commit_retain_fixture(self, dbname):
         setup = self._open_bounded(dbname)
+        admin = None
         try:
             env = api.Environment(setup, SUPERUSER_ID, {})
             store = env['shopify.connector.store'].create({
@@ -3346,6 +3347,18 @@ class TestSetupCredentialRetainRaceGenuine(
                 'store_id': store.id,
                 'setup_wizard_step_key': 'welcome',
             })
+            admin = env['res.users'].create({
+                'name': 'Retain Race Connector Administrator',
+                'login': 'retain-race-admin-%s' % uuid.uuid4().hex,
+                'company_id': store.company_id.id,
+                'company_ids': [(6, 0, [store.company_id.id])],
+                'group_ids': [(6, 0, [env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin',
+                ).id])],
+            })
+            self.assertTrue(admin.has_group(
+                'shopify_connector_core.group_shopify_connector_admin',
+            ))
             env[
                 'shopify.connector.store.credential'
             ].action_set_client_credentials(
@@ -3353,9 +3366,34 @@ class TestSetupCredentialRetainRaceGenuine(
             )
             store_id = store.id
             setup.commit()
-            return store_id
+            return store_id, admin.id, store.company_id.id
+        except BaseException:
+            setup.rollback()
+            if admin:
+                env = api.Environment(setup, SUPERUSER_ID, {})
+                env['res.users'].browse(admin.id).unlink()
+                setup.commit()
+            raise
         finally:
             setup.close()
+
+    def _cleanup_retain_admin(self, dbname, user_id):
+        if not user_id:
+            return
+        cleanup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(cleanup, SUPERUSER_ID, {})
+            env['res.users'].browse(user_id).unlink()
+            cleanup.commit()
+        finally:
+            cleanup.close()
+        verify = self._open_bounded(dbname, read_committed=True)
+        try:
+            env = api.Environment(verify, SUPERUSER_ID, {})
+            self.assertFalse(env['res.users'].browse(user_id).exists())
+            verify.rollback()
+        finally:
+            verify.close()
 
     def _observe_retain_fixture(self, dbname, store_id):
         observer = self._open_bounded(dbname, read_committed=True)
@@ -3410,6 +3448,7 @@ class TestSetupCredentialRetainRaceGenuine(
     def _assert_mutation_wins_before_retain(self, mutation):
         dbname = self.env.cr.dbname
         store_id = None
+        retain_uid = None
         mutation_holds = threading.Event()
         release_mutation = threading.Event()
         retain_started = threading.Event()
@@ -3419,7 +3458,7 @@ class TestSetupCredentialRetainRaceGenuine(
         mutation_thread = retain_thread = None
         probe_observer = None
         try:
-            store_id = self._commit_retain_fixture(dbname)
+            store_id, retain_uid, company_id = self._commit_retain_fixture(dbname)
             Store = type(self.env['shopify.connector.store'])
             original_lock = Store._lock_store_for_lifecycle
 
@@ -3465,7 +3504,9 @@ class TestSetupCredentialRetainRaceGenuine(
                 try:
                     cursor = self._open_bounded(dbname, read_committed=True)
                     pids['retain'] = self._backend_pid(cursor)
-                    env = api.Environment(cursor, SUPERUSER_ID, {})
+                    env = api.Environment(cursor, retain_uid, {
+                        'allowed_company_ids': [company_id],
+                    })
                     retain_started.set()
                     env[
                         'shopify.connector.setup.wizard'
@@ -3556,7 +3597,10 @@ class TestSetupCredentialRetainRaceGenuine(
                     worker.join(timeout=self.BOUND_SECONDS)
             if probe_observer is not None:
                 probe_observer.close()
-            self._cleanup(dbname, store_id)
+            try:
+                self._cleanup(dbname, store_id)
+            finally:
+                self._cleanup_retain_admin(dbname, retain_uid)
 
     def test_clear_cannot_race_retain_into_false_advancement(self):
         self._assert_mutation_wins_before_retain('clear')
