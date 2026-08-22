@@ -192,7 +192,8 @@
                         <t t-if="state.stepKey === 'credential'">
                             <p class="sc_setup__lead">
                                 Choose how this store authenticates with Shopify, then
-                                enter that path's credentials once.
+                                enter that path's credentials. If a credential is already
+                                on record, leave the fields blank to keep it.
                             </p>
                             <!--
                                 TWO REAL PATHS, STATED AS WHAT THE MERCHANT HAS.
@@ -359,8 +360,9 @@
                                 A credential is already on record for this store
                                 <t t-if="store.auth_mode === 'dev_dashboard_client_credentials'">(Dev Dashboard app)</t>
                                 <t t-else="">(access token)</t>.
-                                Saving new values replaces it, and the connection has to be
-                                tested again.
+                                Leave this path's fields blank to keep it. Enter new values
+                                to replace it; changing the path also requires new values,
+                                and the connection has to be tested again.
                             </p>
                             <div class="sc-band sc-band--info" role="note">
                                 <i class="fa fa-lock sc-band__icon" aria-hidden="true"/>

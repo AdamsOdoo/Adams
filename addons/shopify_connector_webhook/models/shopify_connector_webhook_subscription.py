@@ -10,6 +10,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attemp
     canonical_sha256,
 )
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
+    ShopifyClientError,
     ShopifyQuiescedError,
 )
 from odoo.addons.shopify_connector_core.tools.api_version import (
@@ -32,7 +33,11 @@ SUBSCRIPTION_LIST_QUERY = """
 query ConnectorWebhookSubscriptions($first: Int!, $after: String) {
   shop { myshopifyDomain }
   webhookSubscriptions(first: $first, after: $after) {
-    nodes { id topic uri apiVersion format includeFields }
+    nodes {
+      id topic uri
+      apiVersion { handle displayName supported }
+      format includeFields
+    }
     pageInfo { hasNextPage endCursor }
   }
 }
@@ -87,6 +92,41 @@ def _uri_digest(uri):
     if not isinstance(uri, str) or not uri:
         return False
     return hashlib.sha256(uri.encode('utf-8')).hexdigest()
+
+
+class ShopifyWebhookSchemaError(Exception):
+    """Shopify returned a response shape this webhook domain cannot trust."""
+
+
+def _api_version_handle(value):
+    """Validate Shopify's 2026-07 ``ApiVersion`` object and return its handle.
+
+    In the current Admin GraphQL schema ``WebhookSubscription.apiVersion`` is
+    an object, not a scalar string.  The handle is the only value used for
+    subscription comparison/evidence, but the complete selected object is
+    checked so a partial or silently changed schema cannot be treated as a
+    healthy subscription.
+    """
+    if not isinstance(value, dict):
+        raise ShopifyWebhookSchemaError(
+            'Shopify returned a malformed webhook API version object.'
+        )
+    handle = value.get('handle')
+    display_name = value.get('displayName')
+    supported = value.get('supported')
+    if not isinstance(handle, str) or not handle.strip():
+        raise ShopifyWebhookSchemaError(
+            'Shopify returned a webhook API version without a handle.'
+        )
+    if not isinstance(display_name, str) or not display_name.strip():
+        raise ShopifyWebhookSchemaError(
+            'Shopify returned a webhook API version without a display name.'
+        )
+    if not isinstance(supported, bool):
+        raise ShopifyWebhookSchemaError(
+            'Shopify returned a webhook API version with an invalid support flag.'
+        )
+    return handle.strip()[:32]
 
 
 class ShopifyConnectorWebhookSubscription(models.Model):
@@ -592,9 +632,9 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'id': str(node['id'])[:256],
                     'topic': str(node.get('topic') or '')[:128],
                     'uri_digest': _uri_digest(uri),
-                    'observed_api_version': str(
-                        node.get('apiVersion') or ''
-                    )[:32],
+                    'observed_api_version': _api_version_handle(
+                        node.get('apiVersion')
+                    ),
                     'format': str(node.get('format') or '')[:32],
                     # Shopify returns an empty list for an unfiltered
                     # subscription on some API revisions, and a null-like
@@ -1218,7 +1258,11 @@ mutation ConnectorWebhookSubscriptionCreate(
     webhookSubscription: $webhookSubscription
   ) {
     userErrors { field message }
-    webhookSubscription { id topic uri apiVersion format includeFields }
+    webhookSubscription {
+      id topic uri
+      apiVersion { handle displayName supported }
+      format includeFields
+    }
   }
 }
 """
@@ -1301,14 +1345,32 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
         job = self.env['shopify.connector.job'].browse(
             attempt_context['job_id']
         )
-        with client.execute_business(
-            job,
-            store,
-            request['operation'],
-            request['variables'],
-            mutation_context=attempt_context,
-        ) as result:
-            return {'outcome': 'succeeded', 'result': result}
+        try:
+            with client.execute_business(
+                job,
+                store,
+                request['operation'],
+                request['variables'],
+                mutation_context=attempt_context,
+            ) as result:
+                return {'outcome': 'succeeded', 'result': result}
+        except ShopifyClientError as exc:
+            # The core Layer-2 wrapper intentionally turns post-C2 transport
+            # exceptions into an uncertain result. Preserve the client's
+            # existing safe error class here so a deterministic GraphQL schema
+            # selection error is not demoted to a generic temporary outcome.
+            # Never copy technical detail or response bodies into mutation
+            # evidence; the exception's redacted reason is sufficient for the
+            # operator-facing consequence.
+            return {
+                'outcome': 'uncertain',
+                'error_class': exc.error_class,
+                'message': exc.reason,
+                'evidence': {
+                    'exception_class': type(exc).__name__,
+                    'transport': 'exception_after_c2',
+                },
+            }
 
     @api.model
     def _classify_subscription_mutation(self, raw_result):
@@ -1322,12 +1384,19 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                 'evidence': {'response_shape': 'not_a_mapping'},
             }
         if raw_result.get('outcome') != 'succeeded':
+            error_class = raw_result.get('error_class') or (
+                'shopify_temporary_server_network'
+            )
+            message = raw_result.get('message') or (
+                'The subscription mutation outcome is uncertain; read Shopify '
+                'before any retry.'
+            )
             return {
                 'observed_outcome': 'uncertain',
-                'error_class': 'shopify_temporary_server_network',
+                'error_class': error_class,
                 'manual_review_subreason': False,
                 'action': 'reconcile',
-                'message': 'The subscription mutation outcome is uncertain; read Shopify before any retry.',
+                'message': message,
                 'evidence': dict(raw_result.get('evidence') or {}),
             }
         result = raw_result.get('result') or {}
@@ -1360,6 +1429,24 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     'message': 'Shopify did not return a subscription identity; read Shopify before retrying.',
                     'evidence': {'response_shape': 'missing_subscription_id'},
                 }
+            try:
+                actual_api_version = _api_version_handle(
+                    node.get('apiVersion')
+                )
+            except ShopifyWebhookSchemaError:
+                return {
+                    'observed_outcome': 'uncertain',
+                    'error_class': 'data_shape_schema_mismatch',
+                    'manual_review_subreason': False,
+                    'action': 'reconcile',
+                    'message': (
+                        'Shopify returned an unsupported webhook API version '
+                        'shape; read Shopify before retrying.'
+                    ),
+                    'evidence': {
+                        'response_shape': 'invalid_api_version_object',
+                    },
+                }
             return {
                 'observed_outcome': 'succeeded',
                 'error_class': False,
@@ -1371,9 +1458,7 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     'shopify_subscription_gid': str(node['id'])[:256],
                     'actual_topic': str(node.get('topic') or '')[:128],
                     'actual_uri_digest': _uri_digest(node.get('uri') or node.get('callbackUrl') or ''),
-                    'actual_api_version': str(
-                        node.get('apiVersion') or ''
-                    )[:32],
+                    'actual_api_version': actual_api_version,
                     'actual_format': str(node.get('format') or '')[:32],
                     'actual_include_fields': self._normalize_include_fields(
                         node.get('includeFields'),
@@ -1435,6 +1520,12 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
         store = attempt.store_id
         try:
             actual = self._read_actual_subscriptions(store, reconciliation_job)
+        except ShopifyWebhookSchemaError:
+            # Let the core mutation-reconciliation wrapper route this as the
+            # existing data-shape/schema error class.  Treating a malformed
+            # ApiVersion object as an ordinary inconclusive network read would
+            # hide a deterministic schema defect behind repeated retries.
+            raise
         except Exception as exc:  # read failure is intentionally inconclusive
             return {
                 'verdict': 'inconclusive',

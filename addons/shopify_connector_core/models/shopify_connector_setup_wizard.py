@@ -54,6 +54,11 @@ import re
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, MissingError, UserError
 
+from .shopify_connector_store_credential import (
+    AUTH_MODE_CLIENT_CREDENTIALS,
+    AUTH_MODE_OFFLINE,
+)
+
 #: A Shopify permanent shop domain, matched WHOLE. Shopify's shop handle is
 #: lowercase alphanumerics and hyphens; anything else -- a scheme, a path, a
 #: space, a subdomain -- is not a shop domain, and this value becomes the host
@@ -1423,6 +1428,69 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             store, client_id.strip(), client_secret.strip(),
         )
         client_secret = None
+        settings = self._settings_for(store)
+        self._record_progress(settings, 'credential')
+        return self.get_setup_state(store_id=store.id)
+
+    @api.model
+    def retain_existing_credential(self, store_id, auth_mode):
+        """Confirm a blank credential step against current non-secret state.
+
+        A browser's setup payload is only a snapshot. Another session may
+        clear or replace the write-only credential while this step remains
+        open, so the client must not advance merely because its old payload
+        said ``credential_present``. This action-time check reads only the
+        governed presence/mode mirrors, never a token, client ID or secret,
+        and refuses a mode change so replacement still requires fresh values.
+        """
+        store = self._resolve_store(store_id)
+        if auth_mode not in (
+            AUTH_MODE_OFFLINE,
+            AUTH_MODE_CLIENT_CREDENTIALS,
+        ):
+            raise UserError(_('Choose a supported credential method.'))
+        # Linearize against clear/replacement using the credential lifecycle's
+        # established global lock order. The locks remain held through the
+        # progress write and the response projection, so a concurrent lifecycle
+        # mutation either commits first (and this fresh read refuses it) or
+        # waits until this validated retention has committed. No Shopify call
+        # occurs and no secret leaves the write-only credential service.
+        store._lock_store_for_lifecycle()
+        Credential = self.env['shopify.connector.store.credential']
+        locked_version = Credential._lifecycle_credential_version(
+            store, lock=True,
+        )
+        credential = Credential._credential_for(store)
+        if credential:
+            credential.invalidate_recordset([
+                'auth_mode',
+                'client_credentials_present',
+                'credential_state',
+            ])
+        present = bool(
+            store.credential_present
+            and locked_version
+            and credential
+            and credential.credential_state != 'absent'
+        )
+        if not present:
+            raise UserError(_(
+                'The stored credential is no longer present. Enter it again '
+                'to continue.'
+            ))
+        if credential.auth_mode != auth_mode:
+            raise UserError(_(
+                'The stored credential method changed. Enter new values for '
+                'the selected method to continue.'
+            ))
+        if (
+            auth_mode == AUTH_MODE_CLIENT_CREDENTIALS
+            and not credential.client_credentials_present
+        ):
+            raise UserError(_(
+                'The stored credential is no longer present. Enter it again '
+                'to continue.'
+            ))
         settings = self._settings_for(store)
         self._record_progress(settings, 'credential')
         return self.get_setup_state(store_id=store.id)

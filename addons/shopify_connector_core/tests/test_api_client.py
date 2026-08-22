@@ -12,6 +12,7 @@ from ..models import shopify_connector_api_client as client_module
 from ..models.shopify_connector_api_client import (
     ERROR_API_VERSION,
     ERROR_AUTH,
+    ERROR_DATA_SHAPE,
     ERROR_TEMPORARY,
     ERROR_THROTTLE,
     ERROR_UNKNOWN,
@@ -211,6 +212,24 @@ class TestApiClient(TransactionCase):
             }],
         }))
         self.assertEqual(exc.error_class, ERROR_UNKNOWN)
+
+    def test_graphql_selection_mismatch_maps_to_existing_data_shape_class(self):
+        exc = self._raises_with(FakeResponse(200, json_body={
+            'errors': [{
+                'message': (
+                    "Field 'apiVersion' must have a selection of subfields."
+                ),
+                'extensions': {
+                    'code': 'selectionMismatch',
+                    'typeName': 'WebhookSubscription',
+                    'fieldName': 'apiVersion',
+                },
+            }],
+        }))
+        self.assertEqual(exc.error_class, ERROR_DATA_SHAPE)
+        self.assertFalse(exc.credential_invalid)
+        self.assertNotIn('shpat_', exc.reason)
+        self.assertIn('HTTP 200', exc.technical_detail)
 
     # 5. INTERNAL_SERVER_ERROR + requestId -> requestId in technical_detail.
     def test_internal_server_error_includes_request_id(self):

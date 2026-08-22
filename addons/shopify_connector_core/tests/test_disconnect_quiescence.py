@@ -3278,6 +3278,12 @@ class _GenuineRaceHelpers:
             cr.execute(
                 "DELETE FROM shopify_connector_job WHERE store_id = %s", (store_id,))
             cr.execute(
+                "DELETE FROM shopify_connector_store_access_token "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_settings "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
                 "DELETE FROM shopify_connector_store_credential WHERE store_id = %s",
                 (store_id,))
             cr.execute(
@@ -3294,6 +3300,7 @@ class _GenuineRaceHelpers:
                 ('shopify_connector_call_lease', 'store_id', 'lease'),
                 ('shopify_connector_store', 'id', 'store'),
                 ('shopify_connector_store_credential', 'store_id', 'credential'),
+                ('shopify_connector_store_settings', 'store_id', 'settings'),
                 ('shopify_connector_job', 'store_id', 'job'),
             ):
                 v.execute(
@@ -3304,6 +3311,228 @@ class _GenuineRaceHelpers:
             v.rollback()
         finally:
             v.close()
+
+
+@tagged('post_install', '-at_install')
+class TestSetupCredentialRetainRaceGenuine(
+    _GenuineRaceHelpers, TransactionCase,
+):
+    """Retain-existing linearizes with clear and mode replacement.
+
+    The mutation worker parks only after the real lifecycle store lock has
+    been acquired. A second independent backend then calls the real public
+    setup RPC. PostgreSQL lock observation proves that retain waits on the
+    production lock; after the mutation commits, retain must refuse and must
+    not advance durable setup progress from its older browser intent.
+    """
+
+    CLIENT_ID = 'retain-race-client-id'
+    CLIENT_SECRET = 'retain-race-synthetic-secret'
+    OFFLINE_TOKEN = 'retain-race-synthetic-offline-token'
+
+    def _commit_retain_fixture(self, dbname):
+        setup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Credential Retain Race Store',
+                'shop_domain': 'retain-race-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07',
+                'state': 'setup_incomplete',
+            })
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id,
+                'setup_wizard_step_key': 'welcome',
+            })
+            env[
+                'shopify.connector.store.credential'
+            ].action_set_client_credentials(
+                store, self.CLIENT_ID, self.CLIENT_SECRET,
+            )
+            store_id = store.id
+            setup.commit()
+            return store_id
+        finally:
+            setup.close()
+
+    def _observe_retain_fixture(self, dbname, store_id):
+        observer = self._open_bounded(dbname, read_committed=True)
+        try:
+            observer.execute(
+                "SELECT s.credential_present, c.credential_state, "
+                "c.auth_mode, x.setup_wizard_step_key "
+                "FROM shopify_connector_store s "
+                "LEFT JOIN shopify_connector_store_credential c "
+                "ON c.store_id = s.id "
+                "LEFT JOIN shopify_connector_store_settings x "
+                "ON x.store_id = s.id WHERE s.id = %s",
+                (store_id,),
+            )
+            row = observer.fetchone()
+            observer.rollback()
+            return row
+        finally:
+            observer.close()
+
+    def _wait_for_lock_or_finish(self, dbname, backend_pid, finished):
+        deadline = time.monotonic() + self.BOUND_SECONDS
+        while time.monotonic() < deadline:
+            if finished.is_set():
+                return False
+            observer = self._open_bounded(dbname, read_committed=True)
+            try:
+                observer.execute(
+                    "SELECT wait_event_type FROM pg_stat_activity "
+                    "WHERE pid = %s", (backend_pid,),
+                )
+                row = observer.fetchone()
+                observer.rollback()
+            finally:
+                observer.close()
+            if row and row[0] == 'Lock':
+                return True
+            time.sleep(0.01)
+        return False
+
+    def _assert_mutation_wins_before_retain(self, mutation):
+        dbname = self.env.cr.dbname
+        store_id = None
+        mutation_holds = threading.Event()
+        release_mutation = threading.Event()
+        retain_started = threading.Event()
+        retain_finished = threading.Event()
+        findings = queue.Queue()
+        pids = {}
+        mutation_thread = retain_thread = None
+        try:
+            store_id = self._commit_retain_fixture(dbname)
+            Store = type(self.env['shopify.connector.store'])
+            original_lock = Store._lock_store_for_lifecycle
+
+            def gated_lifecycle_lock(store_record):
+                result = original_lock(store_record)
+                if getattr(
+                    threading.current_thread(), 'retain_race_mutation', False,
+                ):
+                    mutation_holds.set()
+                    if not release_mutation.wait(timeout=self.BOUND_SECONDS):
+                        raise AssertionError(
+                            'retain race mutation gate was not released'
+                        )
+                return result
+
+            def mutate_worker():
+                cursor = None
+                try:
+                    threading.current_thread().retain_race_mutation = True
+                    cursor = self._open_bounded(dbname)
+                    pids['mutation'] = self._backend_pid(cursor)
+                    env = api.Environment(cursor, SUPERUSER_ID, {})
+                    store = env['shopify.connector.store'].browse(store_id)
+                    Credential = env[
+                        'shopify.connector.store.credential'
+                    ]
+                    if mutation == 'clear':
+                        Credential.action_clear_token(store)
+                    else:
+                        Credential.action_set_token(store, self.OFFLINE_TOKEN)
+                    cursor.commit()
+                    findings.put(('mutation', 'committed'))
+                except BaseException as exc:
+                    if cursor is not None:
+                        cursor.rollback()
+                    findings.put(('mutation', type(exc).__name__))
+                finally:
+                    if cursor is not None:
+                        cursor.close()
+
+            def retain_worker():
+                cursor = None
+                try:
+                    cursor = self._open_bounded(dbname, read_committed=True)
+                    pids['retain'] = self._backend_pid(cursor)
+                    env = api.Environment(cursor, SUPERUSER_ID, {})
+                    retain_started.set()
+                    env[
+                        'shopify.connector.setup.wizard'
+                    ].retain_existing_credential(
+                        store_id, 'dev_dashboard_client_credentials',
+                    )
+                    cursor.commit()
+                    findings.put(('retain', 'advanced'))
+                except UserError:
+                    if cursor is not None:
+                        cursor.rollback()
+                    findings.put(('retain', 'refused'))
+                except BaseException as exc:
+                    if cursor is not None:
+                        cursor.rollback()
+                    findings.put(('retain', type(exc).__name__))
+                finally:
+                    retain_finished.set()
+                    if cursor is not None:
+                        cursor.close()
+
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                 patch.object(Store, '_lock_store_for_lifecycle',
+                              gated_lifecycle_lock):
+                mutation_thread = threading.Thread(
+                    target=mutate_worker, daemon=True,
+                )
+                mutation_thread.start()
+                try:
+                    self.assertTrue(
+                        mutation_holds.wait(timeout=self.BOUND_SECONDS),
+                        'credential mutation did not acquire the lifecycle lock',
+                    )
+                    retain_thread = threading.Thread(
+                        target=retain_worker, daemon=True,
+                    )
+                    retain_thread.start()
+                    self.assertTrue(
+                        retain_started.wait(timeout=self.BOUND_SECONDS),
+                        'retain worker did not start',
+                    )
+                    self.assertTrue(
+                        self._wait_for_lock_or_finish(
+                            dbname, pids['retain'], retain_finished,
+                        ),
+                        'retain did not wait on the credential lifecycle lock',
+                    )
+                finally:
+                    release_mutation.set()
+                    mutation_thread.join(timeout=self.BOUND_SECONDS)
+                    if retain_thread is not None:
+                        retain_thread.join(timeout=self.BOUND_SECONDS)
+                self._assert_workers_dead((mutation_thread, retain_thread))
+
+            self.assertNotEqual(pids['mutation'], pids['retain'])
+            self.assertEqual(
+                sorted(self._drain(findings)),
+                [('mutation', 'committed'), ('retain', 'refused')],
+            )
+            present, state, mode, progress = self._observe_retain_fixture(
+                dbname, store_id,
+            )
+            self.assertEqual(progress, 'welcome')
+            if mutation == 'clear':
+                self.assertFalse(present)
+                self.assertEqual(state, 'absent')
+            else:
+                self.assertTrue(present)
+                self.assertEqual(mode, 'offline_access_token')
+        finally:
+            release_mutation.set()
+            for worker in (mutation_thread, retain_thread):
+                if worker is not None:
+                    worker.join(timeout=self.BOUND_SECONDS)
+            self._cleanup(dbname, store_id)
+
+    def test_clear_cannot_race_retain_into_false_advancement(self):
+        self._assert_mutation_wins_before_retain('clear')
+
+    def test_mode_replace_cannot_race_retain_into_false_advancement(self):
+        self._assert_mutation_wins_before_retain('replace')
 
 
 @tagged('post_install', '-at_install')

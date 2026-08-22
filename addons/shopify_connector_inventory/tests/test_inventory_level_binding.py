@@ -252,7 +252,7 @@ class TestInventoryLevelBinding(TransactionCase):
         # The location-mapping's _check_location_company_consistency guard is
         # the enforcement point for a cross-company Odoo location: a binding
         # can only ever reference a company-consistent mapping, so mapping a
-        # location owned by a different company than the current company must
+        # location owned by a different company than the owning store must
         # be rejected outright.
         with self.assertRaises(UserError):
             with self.env.cr.savepoint():

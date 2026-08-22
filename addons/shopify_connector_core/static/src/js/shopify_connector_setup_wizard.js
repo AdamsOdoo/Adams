@@ -371,6 +371,29 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.errorMessage = "";
     }
 
+    /**
+     * A setup rerun must not turn a stored write-only credential into a
+     * mandatory re-entry.  The server deliberately returns only a boolean
+     * presence mirror and the non-secret auth mode, so blank fields are the
+     * operator's explicit choice to keep the existing credential. The boolean
+     * only decides whether to request an action-time, non-secret server check;
+     * it never authorizes reuse by itself. Supplying replacement values (or
+     * choosing another mode) still takes the normal write-only path below.
+     */
+    _canReuseStoredCredential() {
+        return Boolean(
+            this.store.credential_present &&
+            this.store.auth_mode === this.state.form.credentialMode
+        );
+    }
+
+    async _retainExistingCredential() {
+        return this._call("retain_existing_credential", {
+            store_id: this.store.id,
+            auth_mode: this.state.form.credentialMode,
+        });
+    }
+
     _message(error) {
         return (
             (error && error.data && error.data.message) ||
@@ -1076,6 +1099,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         const input = document.querySelector(".sc_setup_token");
         const value = input ? input.value : "";
+        if (!value && this._canReuseStoredCredential()) {
+            return this._retainExistingCredential();
+        }
         if (!value) {
             this.state.errorMessage = _t(
                 "Paste the Admin API access token to continue."
@@ -1102,30 +1128,39 @@ export class ShopifyConnectorSetupWizard extends Component {
         const secretInput = document.querySelector(".sc_setup_client_secret");
         const clientId = idInput ? idInput.value : "";
         const clientSecret = secretInput ? secretInput.value : "";
-        if (!clientId) {
-            this.state.errorMessage = _t(
-                "Enter the app's Client ID to continue."
-            );
-            return false;
+        if (!clientId && !clientSecret && this._canReuseStoredCredential()) {
+            return this._retainExistingCredential();
         }
-        if (!clientSecret) {
-            this.state.errorMessage = _t(
-                "Enter the app's Client secret to continue."
-            );
-            return false;
+        try {
+            if (!clientId) {
+                this.state.errorMessage = _t(
+                    "Enter the app's Client ID to continue."
+                );
+                return false;
+            }
+            if (!clientSecret) {
+                this.state.errorMessage = _t(
+                    "Enter the app's Client secret to continue."
+                );
+                return false;
+            }
+            const ok = await this._call("save_client_credentials", {
+                store_id: this.store.id,
+                client_id: clientId,
+                client_secret: clientSecret,
+            });
+            if (ok && idInput) {
+                idInput.value = "";
+            }
+            return ok;
+        } finally {
+            // Clear on every non-reuse path, including local validation. A
+            // secret must not remain in a password input just because another
+            // field was missing and no RPC was issued.
+            if (secretInput) {
+                secretInput.value = "";
+            }
         }
-        const ok = await this._call("save_client_credentials", {
-            store_id: this.store.id,
-            client_id: clientId,
-            client_secret: clientSecret,
-        });
-        if (secretInput) {
-            secretInput.value = "";
-        }
-        if (ok && idInput) {
-            idInput.value = "";
-        }
-        return ok;
     }
 
     toggleDomain(key) {

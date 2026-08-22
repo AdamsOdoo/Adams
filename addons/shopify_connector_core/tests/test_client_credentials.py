@@ -31,7 +31,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
 from ..models import shopify_connector_store_credential as credential_module
@@ -626,6 +626,69 @@ class TestEndToEndAndLeakage(ClientCredentialsCase):
         self.assertNotIn(DUMMY_CLIENT_ID, flat)
         self.assertNotIn(DUMMY_EXCHANGED_TOKEN, flat)
         self.assertTrue(state['store']['token_expires_at'])
+
+    def test_server_rerun_payload_is_non_secret_and_blank_replacement_is_refused(self):
+        """The client may keep a stored credential, but the write service
+        never treats blank values as a replacement or exposes the old pair."""
+        self._set_client_credentials()
+        Wizard = self.env['shopify.connector.setup.wizard'].with_user(
+            self.user_admin,
+        )
+        state = Wizard.get_setup_state(store_id=self.store.id)
+        flat = json.dumps(state)
+        self.assertTrue(state['store']['credential_present'])
+        self.assertEqual(
+            state['store']['auth_mode'], 'dev_dashboard_client_credentials',
+        )
+        self.assertNotIn(DUMMY_CLIENT_ID, flat)
+        self.assertNotIn(DUMMY_CLIENT_SECRET, flat)
+        with self.assertRaises(UserError):
+            Wizard.save_client_credentials(self.store.id, '', '')
+
+        self.Credential.with_user(self.user_admin).action_set_token(
+            self.store, DUMMY_OFFLINE_TOKEN,
+        )
+        state = Wizard.get_setup_state(store_id=self.store.id)
+        self.assertTrue(state['store']['credential_present'])
+        self.assertEqual(state['store']['auth_mode'], 'offline_access_token')
+        self.assertNotIn(DUMMY_OFFLINE_TOKEN, json.dumps(state))
+        with self.assertRaises(UserError):
+            Wizard.save_credential(self.store.id, '')
+
+    def test_retain_existing_credential_rechecks_mode_and_presence_without_secret(self):
+        self._set_client_credentials()
+        Wizard = self.env['shopify.connector.setup.wizard'].with_user(
+            self.user_admin,
+        )
+        state = Wizard.retain_existing_credential(
+            self.store.id, 'dev_dashboard_client_credentials',
+        )
+        flat = json.dumps(state)
+        self.assertTrue(state['store']['credential_present'])
+        self.assertEqual(
+            state['store']['auth_mode'], 'dev_dashboard_client_credentials',
+        )
+        self.assertNotIn(DUMMY_CLIENT_ID, flat)
+        self.assertNotIn(DUMMY_CLIENT_SECRET, flat)
+        with self.assertRaises(UserError):
+            Wizard.retain_existing_credential(
+                self.store.id, 'offline_access_token',
+            )
+
+        self.Credential.with_user(self.user_admin).action_set_token(
+            self.store, DUMMY_OFFLINE_TOKEN,
+        )
+        state = Wizard.retain_existing_credential(
+            self.store.id, 'offline_access_token',
+        )
+        self.assertNotIn(DUMMY_OFFLINE_TOKEN, json.dumps(state))
+        self.Credential.with_user(self.user_admin).action_clear_token(
+            self.store,
+        )
+        with self.assertRaises(UserError):
+            Wizard.retain_existing_credential(
+                self.store.id, 'offline_access_token',
+            )
 
     def test_no_group_reads_the_token_cache_over_rpc(self):
         """The cache model grants no ACL permission: even the Administrator

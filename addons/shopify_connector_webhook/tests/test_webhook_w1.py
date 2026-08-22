@@ -24,6 +24,9 @@ from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_cred
     WEBHOOK_CLIENT_SECRET_GRACE_HOURS,
 )
 from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subscription import (
+    SUBSCRIPTION_LIST_QUERY,
+    ShopifyWebhookSchemaError,
+    _api_version_handle,
     _bounded_sweep_remaining,
     _create_retry_allowed,
     _scheduled_reconciliation_bucket_ids,
@@ -110,6 +113,109 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             self.assertTrue(registry.topic_spec('products/update'))
         else:
             self.assertEqual(registry.topic_spec('products/update'), False)
+
+    def test_shopify_api_version_is_validated_as_an_object_handle(self):
+        version = {
+            'handle': '2026-07',
+            'displayName': '2026-07',
+            'supported': True,
+        }
+        self.assertEqual(_api_version_handle(version), '2026-07')
+        for malformed in (
+            '2026-07',
+            {'handle': '2026-07'},
+            {'handle': '2026-07', 'displayName': '2026-07', 'supported': 'yes'},
+        ):
+            with self.assertRaises(ShopifyWebhookSchemaError):
+                _api_version_handle(malformed)
+
+    def test_subscription_queries_select_the_api_version_object(self):
+        self.assertIn(
+            'apiVersion { handle displayName supported }',
+            SUBSCRIPTION_LIST_QUERY,
+        )
+        subscription = (
+            Path(__file__).resolve().parents[1] / 'models' /
+            'shopify_connector_webhook_subscription.py'
+        ).read_text()
+        self.assertIn(
+            'apiVersion { handle displayName supported }', subscription,
+        )
+        self.assertNotIn('apiVersion format includeFields', subscription)
+
+    def test_invalid_create_shape_is_data_shape_not_unknown(self):
+        subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        outcome = subscription._classify_subscription_mutation({
+            'outcome': 'succeeded',
+            'result': {
+                'data': {
+                    'webhookSubscriptionCreate': {
+                        'userErrors': [],
+                        'webhookSubscription': {
+                            'id': 'gid://shopify/WebhookSubscription/1',
+                            'apiVersion': '2026-07',
+                        },
+                    },
+                },
+            },
+        })
+        self.assertEqual(
+            outcome['error_class'], 'data_shape_schema_mismatch',
+        )
+        self.assertEqual(outcome['action'], 'reconcile')
+
+    def test_transport_schema_error_preserves_data_shape_class_for_reconcile(self):
+        subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        outcome = subscription._classify_subscription_mutation({
+            'outcome': 'uncertain',
+            'error_class': 'data_shape_schema_mismatch',
+            'message': 'Shopify returned a schema selection mismatch.',
+            'evidence': {
+                'exception_class': 'ShopifyClientError',
+                'transport': 'exception_after_c2',
+            },
+        })
+        self.assertEqual(
+            outcome['error_class'], 'data_shape_schema_mismatch',
+        )
+        self.assertEqual(outcome['action'], 'reconcile')
+        self.assertEqual(
+            outcome['evidence']['transport'], 'exception_after_c2',
+        )
+
+    def test_valid_create_shape_records_only_the_api_version_handle(self):
+        subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        outcome = subscription._classify_subscription_mutation({
+            'outcome': 'succeeded',
+            'result': {
+                'data': {
+                    'webhookSubscriptionCreate': {
+                        'userErrors': [],
+                        'webhookSubscription': {
+                            'id': 'gid://shopify/WebhookSubscription/2',
+                            'topic': 'APP_UNINSTALLED',
+                            'uri': 'https://example.invalid/webhook',
+                            'apiVersion': {
+                                'handle': '2026-07',
+                                'displayName': '2026-07',
+                                'supported': True,
+                            },
+                            'format': 'JSON',
+                            'includeFields': [],
+                        },
+                    },
+                },
+            },
+        })
+        self.assertEqual(
+            outcome['domain_payload']['actual_api_version'], '2026-07',
+        )
 
     def test_delivery_evidence_has_no_payload_field_and_allowlists_identity(self):
         delivery_model = self.env['shopify.connector.webhook.delivery']
@@ -204,7 +310,9 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('UNIQUE(store_id, delivery_id)', delivery)
         self.assertIn('if api_version != SHOPIFY_API_VERSION:', delivery)
         self.assertIn("'api_version': SHOPIFY_API_VERSION", delivery)
-        self.assertIn("'observed_api_version': str(", subscription)
+        self.assertIn(
+            "'observed_api_version': _api_version_handle(", subscription,
+        )
         self.assertNotIn("'api_version': str(node.get('apiVersion')", subscription)
         self.assertIn('execute_business(', subscription)
         self.assertNotIn('client.execute(store', subscription)

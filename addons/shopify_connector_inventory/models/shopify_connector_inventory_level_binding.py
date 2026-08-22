@@ -141,27 +141,28 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
     def _check_company_consistency(self):
         """SEC-1 composite-binding company rule (PR #182 comment
         5025803697 item 21): any non-empty company on the product
-        variant or the mapped location must equal `env.company`, and
+        variant or the mapped location must equal the owning store company, and
         when both are non-empty they must equal each other.
         Company-neutral product/location records remain valid. Runs on
         every create/write of this binding regardless of caller (the
         sanctioned service included) -- never bypassed by `sudo()`,
-        since `@api.constrains` always evaluates on the base record
-        visible to the current environment's company context.
+        since `@api.constrains` compares persistent record ownership rather
+        than the operator's currently active company.
         """
         for binding in self:
             product = binding.product_variant_binding_id.product_variant_id
             location = binding.location_mapping_id.odoo_location_id
             product_company = product.company_id if product else False
             location_company = location.company_id if location else False
+            store_company = binding.store_id.company_id
             for label, company in (
                 ('product variant', product_company),
                 ('mapped location', location_company),
             ):
-                if company and company != self.env.company:
+                if company and company != store_company:
                     raise UserError(
                         "The %s belongs to a different company than the "
-                        "current company." % label
+                        "Shopify store." % label
                     )
             if (
                 product_company and location_company

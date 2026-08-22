@@ -60,10 +60,11 @@
 
 set -euo pipefail
 
-MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
 W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
 W1_WEBHOOK_SCHEMA_VERSION="19.0.1.1.0"
 W2_PRODUCT_WEBHOOK_VERSION="19.0.0.2.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.1.0"
 W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
 W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
@@ -202,7 +203,7 @@ ALLOWED_MIGRATION_SKIP_REASON="shopify_connector_webhook is not installed"
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook,/shopify_connector_product_webhook"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook,/shopify_connector_product_webhook,/shopify_connector_inventory_webhook,/shopify_connector_sale_webhook,/shopify_connector_fulfillment_webhook"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"
@@ -515,6 +516,44 @@ verify_connector_module_inventory() {
         "${REPO_ROOT}/tools/run_connector_suite.sh"; then
         evidence_fail "W2-only install phase does not use the durable old-W1 origin"
     fi
+    case ",${MODULES}," in
+        *,shopify_connector_inventory_webhook,*) ;;
+        *) evidence_fail "shopify_connector_inventory_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_inventory_webhook,*) ;;
+        *) evidence_fail "shopify_connector_inventory_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_inventory_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W3_INVENTORY_WEBHOOK_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_inventory_webhook manifest version is not current"
+    elif ! grep -Fq "'shopify_connector_webhook'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py" \
+        || ! grep -Fq "'shopify_connector_inventory'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py"; then
+        evidence_fail "inventory webhook addon dependency closure is not W1 + inventory"
+    fi
+    # W3 order/fulfillment acceleration addons are optional at product level,
+    # but this candidate's CI contract is not optional: fresh/warm passes must
+    # install them and select their production-path tests explicitly.
+    local domain_webhook
+    for domain_webhook in \
+        shopify_connector_sale_webhook \
+        shopify_connector_fulfillment_webhook; do
+        case ",${MODULES}," in
+            *,${domain_webhook},*) ;;
+            *) evidence_fail "${domain_webhook} is absent from MODULES" ;;
+        esac
+        case ",${STANDARD_TAGS}," in
+            *,/${domain_webhook},*) ;;
+            *) evidence_fail "${domain_webhook} is absent from STANDARD_TAGS" ;;
+        esac
+        if [[ ! -f "${REPO_ROOT}/addons/${domain_webhook}/__manifest__.py" ]]; then
+            evidence_fail "${domain_webhook} manifest is missing from the checkout"
+        fi
+    done
 }
 
 # Any skip that is not the single sanctioned one fails the run.

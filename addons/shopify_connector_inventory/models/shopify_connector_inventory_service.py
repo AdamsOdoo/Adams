@@ -2761,9 +2761,13 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             raise UserError(
                 "Only an internal Odoo stock location can be mapped."
             )
-        if odoo_location.company_id and odoo_location.company_id != self.env.company:
+        if (
+            odoo_location.company_id
+            and odoo_location.company_id != store.company_id
+        ):
             raise UserError(
-                "The Odoo location belongs to a different company."
+                "The Odoo location belongs to a different company than the "
+                "Shopify store."
             )
         Mapping = self.env['shopify.connector.location.mapping']
         existing = Mapping.search([
@@ -2940,10 +2944,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
         if (
             odoo_location.company_id
-            and odoo_location.company_id != self.env.company
+            and odoo_location.company_id != store.company_id
         ):
             raise UserError(
-                "The Odoo location belongs to a different company."
+                "The Odoo location belongs to a different company than the "
+                "Shopify store."
             )
         if odoo_location == mapping.odoo_location_id:
             raise UserError(

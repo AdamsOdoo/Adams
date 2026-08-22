@@ -15,6 +15,7 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
     API_VERSION_RESPONSE_HEADER,
     SHOPIFY_API_VERSION,
 )
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 
@@ -135,6 +136,134 @@ class TestInventoryPairBootstrap(TransactionCase):
         self.assertTrue(pair)
         self.assertEqual(pair.shopify_inventory_item_gid, gid)
         self.assertEqual(pair.first_push_state, 'pending')
+
+    def test_active_other_company_bootstraps_store_company_pair(self):
+        """A real variant/mapping hook creates the pair for store company.
+
+        This deliberately supplies both sides while a different allowed
+        company is active, so the production loop and level-binding create
+        cannot pass vacuously.
+        """
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Pair Bootstrap Active Other Company',
+        })
+        OtherService = self.Service.sudo().with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        ).with_company(other_company)
+        self.assertEqual(OtherService.env.company, other_company)
+
+        template = self.env['product.template'].sudo().create({
+            'name': 'Pair Bootstrap Store Company Product',
+            'company_id': self.store.company_id.id,
+        })
+        template_binding = self.env[
+            'shopify.connector.product.template.binding'
+        ].sudo().with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        ).with_company(other_company).create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/ACTIVE-OTHER-PAIR',
+            'product_template_id': template.id,
+        })
+        gid = 'gid://shopify/InventoryItem/ACTIVE-OTHER-PAIR'
+        variant = self.VariantBinding.sudo().with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        ).with_company(other_company).create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/ACTIVE-OTHER-PAIR',
+            'product_variant_id': template.product_variant_id.id,
+            'product_template_binding_id': template_binding.id,
+            'shopify_inventory_item_gid': gid,
+        })
+        mapping = self.Mapping.sudo().with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        ).with_company(other_company).create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Location/ACTIVE-OTHER-PAIR',
+            'odoo_location_id': self.location.id,
+            'match_key': 'manual',
+        })
+
+        pair = self._pair(variant, mapping)
+        self.assertTrue(pair)
+        self.assertEqual(pair.shopify_inventory_item_gid, gid)
+        self.assertEqual(
+            pair.product_variant_binding_id.product_variant_id.company_id,
+            self.store.company_id,
+        )
+        self.assertEqual(
+            pair.location_mapping_id.odoo_location_id.company_id,
+            self.store.company_id,
+        )
+
+    def test_foreign_location_is_skipped_and_level_binding_refused(self):
+        """Bootstrap and its persistence constraint both fail closed."""
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Pair Bootstrap Truly Foreign Company',
+        })
+        OtherService = self.Service.sudo().with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        ).with_company(other_company)
+        self.assertEqual(OtherService.env.company, other_company)
+
+        _template, variant, valid_mapping = self._new_chain(
+            'FOREIGN-PAIR-GUARD',
+            gid='gid://shopify/InventoryItem/FOREIGN-PAIR-GUARD',
+            push_enabled=False,
+        )
+        self.assertFalse(self._pair(variant, valid_mapping))
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Pair Bootstrap Truly Foreign Location',
+            'usage': 'internal',
+            'company_id': other_company.id,
+        })
+        # Plant a historical corrupt mapping and enable it without invoking
+        # the ORM constraint. The production bootstrap must inspect this real
+        # pair and skip it based on the owning store's company.
+        self.env.cr.execute(
+            'UPDATE shopify_connector_location_mapping '
+            'SET odoo_location_id = %s, push_enabled = TRUE WHERE id = %s',
+            (foreign.id, valid_mapping.id),
+        )
+        valid_mapping.invalidate_recordset([
+            'odoo_location_id', 'push_enabled',
+        ])
+        self.assertEqual(valid_mapping.odoo_location_id, foreign)
+        ensured = OtherService._bootstrap_inventory_level_bindings(
+            variant_bindings=variant,
+            location_mappings=valid_mapping,
+        )
+        self.assertFalse(ensured)
+        self.assertFalse(self._pair(variant, valid_mapping))
+
+        # Defense in depth: even a direct elevated create cannot persist the
+        # invalid pair. This invokes the level-binding company constraint,
+        # not merely the bootstrap's pre-check.
+        with self.assertRaises(UserError):
+            with self.env.cr.savepoint():
+                self.LevelBinding.sudo().with_context(
+                    allowed_company_ids=[
+                        other_company.id, self.store.company_id.id,
+                    ],
+                ).with_company(other_company).create({
+                    'store_id': self.store.id,
+                    'product_variant_binding_id': variant.id,
+                    'location_mapping_id': valid_mapping.id,
+                    'shopify_inventory_item_gid': (
+                        variant.shopify_inventory_item_gid
+                    ),
+                })
+        self.assertFalse(self._pair(variant, valid_mapping))
 
     def test_mapping_then_variant_identity_write_creates_pair(self):
         gid = 'gid://shopify/InventoryItem/BOOTSTRAP-REVERSE'

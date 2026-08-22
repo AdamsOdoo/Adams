@@ -33,8 +33,8 @@ _READ_TIMEOUT_SECONDS = 20
 # slice, so no logic in this slice depends on the exact value.
 _CALL_LEASE_LIFETIME_SECONDS = 300
 
-# The fixed 16-class error_class registry (DEC-009) -- only the four
-# classes below are ever raised by this client; identity-mismatch
+# The fixed error_class registry (DEC-009) -- only existing job classes are
+# raised by this client; identity-mismatch
 # (`odoo_validation_configuration`) is interpreted by
 # `action_test_connection()` from a successful `execute()` response, not
 # raised here.
@@ -42,6 +42,11 @@ ERROR_TEMPORARY = 'shopify_temporary_server_network'
 ERROR_AUTH = 'shopify_permission_scope_auth'
 ERROR_THROTTLE = 'shopify_throttling_rate_limit'
 ERROR_UNKNOWN = 'unknown_system_error'
+# Shopify can return HTTP 200 for a GraphQL selection/schema mismatch.  This
+# is an existing job error class, not a new taxonomy value: callers must be
+# told that the response shape is incompatible rather than encouraged to
+# retry an otherwise unknown system failure.
+ERROR_DATA_SHAPE = 'data_shape_schema_mismatch'
 # The API-version block. Classified as a configuration/API-compatibility
 # problem, which is exactly what it is: an operator fixes it (by correcting
 # the store's recorded version, or by the connector being upgraded to a
@@ -72,6 +77,10 @@ REASON_THROTTLED = 'Shopify is asking us to slow down — try again shortly.'
 REASON_UNKNOWN = (
     'Shopify returned a response we could not interpret — try again, '
     'and contact support if it persists.'
+)
+REASON_DATA_SHAPE = (
+    'Shopify returned a data shape the connector does not support — '
+    'check the configured API version and connector compatibility.'
 )
 # Deliberately names no header value, no token and no domain: an
 # operator-facing reason has to be safe to paste into a support ticket.
@@ -115,7 +124,7 @@ SETUP_BUSINESS_READ_JOBS = frozenset({
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
 
-    Attributes: `error_class` (one of the fixed 16), `reason` (the
+    Attributes: `error_class` (one of the fixed job classes), `reason` (the
     plain-language safe message), `technical_detail` (redacted; carries
     `extensions.requestId` when present, otherwise a redacted status/body
     excerpt), and `credential_invalid` (bool, default False -- set only
@@ -1418,10 +1427,11 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         first_error = errors[0] if errors else {}
         extensions = first_error.get('extensions') or {}
         code = extensions.get('code')
+        message = first_error.get('message') or ''
         request_id = extensions.get('requestId')
         extra = (
             'requestId=%s' % request_id
-            if request_id else first_error.get('message')
+            if request_id else message
         )
         technical_detail = self._technical_detail(response, extra=extra)
         if code == 'ACCESS_DENIED':
@@ -1444,9 +1454,31 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 ERROR_TEMPORARY, REASON_TEMPORARY, technical_detail,
                 credential_invalid=False,
             )
+        # Shopify's GraphQL layer reports an HTTP-200 response for an invalid
+        # field selection in some Admin API revisions.  ``selectionMismatch``
+        # is the documented extension code seen for an object selected as a
+        # scalar (for example ``WebhookSubscription.apiVersion`` in 2026-07).
+        # Keep the response redacted through the same technical-detail path,
+        # but use the already-supported data-shape job class so operators do
+        # not retry a schema defect as an unknown transport outage.  The
+        # message fallback covers schema-selection errors from revisions that
+        # omit the extension code entirely.
+        normalized_code = str(code or '').replace('_', '').lower()
+        normalized_message = str(message).lower()
+        if (
+            normalized_code in {
+                'selectionmismatch', 'schemaselection', 'undefinedfield',
+            }
+            or 'must have a selection of subfields' in normalized_message
+            or 'selection mismatch' in normalized_message
+        ):
+            return ShopifyClientError(
+                ERROR_DATA_SHAPE, REASON_DATA_SHAPE, technical_detail,
+                credential_invalid=False,
+            )
         # MAX_COST_EXCEEDED on this tiny query, and anything unclassifiable
         # (incl. an unknown extensions.code), fall to the single
-        # safety-net path per DEC-009 -- no 17th class is introduced.
+        # safety-net path per DEC-009.
         return ShopifyClientError(
             ERROR_UNKNOWN, REASON_UNKNOWN, technical_detail,
             credential_invalid=False,

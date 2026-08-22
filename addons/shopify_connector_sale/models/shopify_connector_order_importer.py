@@ -41,8 +41,13 @@ SOLVER_MAX_DEPENDENT_LINES = 2
 SOLVER_MAX_CANDIDATE_VECTORS = 25
 PENDING_RECHECK_MINUTES = 15
 ORDER_LINE_DESCRIPTION_MAX_LEN = 512
+ORDER_CANCELLED_PAYLOAD_PREFIX = 'webhook_cancelled|'
 _EMAIL_RE = re.compile(r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b')
 _PHONE_RE = re.compile(r'(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)')
+_RFC3339_RE = re.compile(
+    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    r'(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$'
+)
 REDACTION_EXTENSION = frozenset((
     'address', 'address1', 'address2', 'billingAddress', 'city', 'company',
     'display_name', 'displayName', 'email', 'first_name', 'firstName',
@@ -2250,7 +2255,9 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             'shopify_order_name': payload.get('name') or False,
             'shopify_legacy_resource_id': payload.get('legacyResourceId') or False,
             'shopify_processed_at': self._to_odoo_datetime(payload.get('processedAt')),
-            'shopify_updated_at_snapshot': self._to_odoo_datetime(payload.get('updatedAt')),
+            'shopify_updated_at_snapshot': self._strict_updated_at(
+                payload.get('updatedAt'),
+            ),
             'shopify_created_at': self._to_odoo_datetime(payload.get('createdAt')),
             'shopify_currency_code': payload.get('currencyCode'),
             'shopify_presentment_currency_code': payload.get(
@@ -2304,6 +2311,98 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
     @api.model
     def _refresh_existing(self, binding, payload, settings, job):
         self._validate_refresh_evidence(payload)
+        # Scheduled scans and webhook-triggered reads can complete out of
+        # order.  Serialize the final snapshot comparison with a database row
+        # lock so an older Shopify read can never overwrite a newer one.  The
+        # non-blocking ORM lock is intentional: a genuine race is classified
+        # for the durable job retry path instead of waiting while a sibling
+        # importer holds the binding transaction.
+        binding = binding.sudo().try_lock_for_update()
+        if not binding:
+            raise JobHandlerError(
+                'concurrency_race_conflict',
+                'The Shopify order binding is being refreshed by another '
+                'importer; retry the durable order job.',
+            )
+        binding.invalidate_recordset()
+        if not binding.exists():
+            raise JobHandlerError(
+                'concurrency_race_conflict',
+                'The Shopify order binding was deleted while its refresh was '
+                'being serialized; no snapshot update was claimed.',
+            )
+        refreshed_at = self._strict_updated_at(payload.get('updatedAt'))
+        if (
+            binding.shopify_updated_at_snapshot
+            and refreshed_at
+            and refreshed_at < binding.shopify_updated_at_snapshot
+        ):
+            if job:
+                self.env['shopify.connector.job.log']._system_append(
+                    job,
+                    'note',
+                    'Ignored stale Shopify order snapshot; no commercial or '
+                    'binding evidence was overwritten.',
+                    technical_detail=json.dumps({
+                        'order_binding_id': binding.id,
+                        'shopify_order_gid': binding.shopify_gid,
+                        'incoming_updated_at': fields.Datetime.to_string(
+                            refreshed_at,
+                        ),
+                        'stored_updated_at': fields.Datetime.to_string(
+                            binding.shopify_updated_at_snapshot,
+                        ),
+                    }, sort_keys=True),
+                )
+            return binding
+        if (
+            job
+            and job.job_source == 'webhook'
+            and binding.shopify_updated_at_snapshot
+            and refreshed_at == binding.shopify_updated_at_snapshot
+        ):
+            same_snapshot = bool(
+                binding.shopify_financial_status_snapshot
+                == payload.get('displayFinancialStatus')
+                and binding.shopify_fulfillment_status_snapshot
+                == payload.get('displayFulfillmentStatus')
+                and binding.shopify_cancelled_at
+                == self._to_odoo_datetime(payload.get('cancelledAt'))
+                and (binding.shopify_cancel_reason or False)
+                == (payload.get('cancelReason') or False)
+                and self._binding_financial_evidence_matches(binding, payload)
+            )
+            if not same_snapshot:
+                # Two changed webhook bodies can carry the same source second.
+                # Refuse to overwrite committed evidence without an ordering
+                # proof.  The delivery and blocked child remain durable, while
+                # the overlapping scheduled scan/manual refresh can perform a
+                # fresh read outside the webhook equal-timestamp ambiguity.
+                raise JobHandlerError(
+                    'ambiguous_match',
+                    'Shopify returned changed order evidence at the same '
+                    'updatedAt already stored on the binding. The webhook '
+                    'refresh was held for manual review; run scheduled order '
+                    'reconciliation to obtain a fresh ordering signal.',
+                    json.dumps({
+                        'order_binding_id': binding.id,
+                        'shopify_order_gid': binding.shopify_gid,
+                        'incoming_job_payload_hash': job.payload_hash,
+                        'updated_at': fields.Datetime.to_string(refreshed_at),
+                    }, sort_keys=True),
+                )
+            self.env['shopify.connector.job.log']._system_append(
+                job,
+                'note',
+                'Equal-timestamp Shopify order evidence matched the stored '
+                'snapshot exactly; treated as an idempotent no-op.',
+                technical_detail=json.dumps({
+                    'order_binding_id': binding.id,
+                    'shopify_order_gid': binding.shopify_gid,
+                    'updated_at': fields.Datetime.to_string(refreshed_at),
+                }, sort_keys=True),
+            )
+            return binding
         previous = binding.shopify_financial_status_snapshot
         previous_fulfillment = binding.shopify_fulfillment_status_snapshot
         previous_cancelled = bool(binding.shopify_cancelled_at)
@@ -2344,8 +2443,12 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 'cod_commercial_state': 'review',
             })
         approved_at_evidence = binding.manual_gateway_approved_shopify_updated_at
-        refreshed_at = self._to_odoo_datetime(payload.get('updatedAt'))
         if binding.manual_gateway_approval_state == 'pending':
+            cancellation_signal = bool(
+                job
+                and isinstance(job.payload_hash, str)
+                and job.payload_hash.startswith(ORDER_CANCELLED_PAYLOAD_PREFIX)
+            )
             eligible = (
                 binding.sale_order_id.state == 'draft'
                 and settings.manual_gateway_policy == 'require_approval'
@@ -2362,6 +2465,7 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 approval_was_recorded
                 and eligible
                 and refreshed_at == approved_at_evidence
+                and not cancellation_signal
             ):
                 binding.sale_order_id.action_confirm()
                 values.update({
@@ -2396,6 +2500,12 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             ) != 'pending'
             and values.get('status', binding.status) != 'review'
             and financial_evidence_matches
+            and not payload.get('cancelledAt')
+            and not (
+                job
+                and isinstance(job.payload_hash, str)
+                and job.payload_hash.startswith(ORDER_CANCELLED_PAYLOAD_PREFIX)
+            )
         )
         if transition_to_paid:
             binding.sale_order_id.action_confirm()
@@ -2696,6 +2806,32 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
         if parsed.tzinfo:
             parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
         return parsed
+
+    @api.model
+    def _strict_updated_at(self, value):
+        """Parse Shopify Order.updatedAt only when it is strict RFC3339.
+
+        A timezone-less value is not orderable across workers or stores and
+        therefore cannot participate in the binding's monotonic watermark.
+        Other evidence timestamps retain the connector's existing tolerant
+        parser because they do not fence snapshot replacement.
+        """
+        if not isinstance(value, str) or not _RFC3339_RE.fullmatch(value):
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify Order.updatedAt must be a timezone-qualified RFC3339 '
+                'timestamp; the order snapshot was not applied.',
+            )
+        try:
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError as exc:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify Order.updatedAt is not a valid RFC3339 timestamp; '
+                'the order snapshot was not applied.',
+                type(exc).__name__,
+            ) from exc
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class ShopifyConnectorJobOrderExtension(models.Model):

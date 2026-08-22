@@ -16,6 +16,7 @@ from unittest.mock import patch
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.safe_eval import safe_eval
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see
@@ -214,6 +215,46 @@ class TestSetupLocationStep(TransactionCase):
             self.assertIn(
                 location.company_id.id,
                 (False, self.store.company_id.id),
+            )
+
+    def test_map_wizard_domain_follows_store_company_and_keeps_server_fence(self):
+        """The modal must not offer an allowed-but-foreign internal location.
+
+        The service remains the authority: this test evaluates the actual
+        field domain used by the modal and then proves the same foreign target
+        is still rejected by the governed save path.
+        """
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Wizard Foreign Company Location',
+            'usage': 'internal',
+            'company_id': self.company_b.id,
+        })
+        Wizard = self.env['shopify.connector.location.map.wizard']
+        wizard = Wizard.with_user(self.admin).with_context(
+            default_store_id=self.store.id,
+        ).new({'store_id': self.store.id})
+        self.assertEqual(wizard.store_company_id, self.store.company_id)
+        domain = safe_eval(
+            Wizard._fields['odoo_location_id'].domain,
+            {'store_company_id': self.store.company_id.id},
+        )
+        # Evaluate as sudo so record rules cannot make a missing company
+        # predicate look correct by hiding the foreign row first.
+        candidates = self.env['stock.location'].sudo().search(domain)
+        self.assertIn(self.location_a, candidates)
+        self.assertNotIn(foreign, candidates)
+        Remap = self.env['shopify.connector.location.remap.wizard']
+        self.assertIn(
+            'store_company_id',
+            Remap._fields['new_location_id'].domain,
+        )
+
+        self._cache('gid://shopify/Location/WIZARD-COMPANY', 'Wizard company')
+        with self.assertRaises(UserError):
+            self._as().save_location_mapping(
+                self.store.id,
+                'gid://shopify/Location/WIZARD-COMPANY',
+                foreign.id,
             )
 
     def test_a_foreign_company_odoo_location_is_not_offered(self):

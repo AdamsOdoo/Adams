@@ -404,6 +404,178 @@ describe("shopify connector setup wizard", () => {
         expect(Boolean(queryFirst(".sc_setup_token"))).toBe(true);
     });
 
+    test("a stored client credential is retained through a non-secret check", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 9,
+                    credential_present: true,
+                    auth_mode: "dev_dashboard_client_credentials",
+                    client_credentials_present: true,
+                }),
+            })
+        );
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(calls[0].kwargs.auth_mode).toBe(
+            "dev_dashboard_client_credentials"
+        );
+        expect(queryText(".sc_setup__heading")).toInclude("Permissions");
+    });
+
+    test("a stored offline token is retained through a non-secret check", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 10,
+                    credential_present: true,
+                    auth_mode: "offline_access_token",
+                }),
+            })
+        );
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(calls[0].kwargs.auth_mode).toBe("offline_access_token");
+        expect(queryText(".sc_setup__heading")).toInclude("Permissions");
+    });
+
+    test("a stale stored-credential snapshot is refused by the action-time check", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, {
+                        id: 12,
+                        credential_present: true,
+                        auth_mode: "dev_dashboard_client_credentials",
+                        client_credentials_present: true,
+                    }),
+                });
+            }
+            const error = new Error("stale credential");
+            error.data = {
+                message: "The stored credential is no longer present.",
+            };
+            throw error;
+        });
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(queryText(".sc_setup__error")).toInclude("no longer present");
+        expect(queryText(".sc_setup__heading")).toInclude("Credentials");
+    });
+
+    test("a client secret is cleared when Client ID validation fails locally", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, { id: 13 }),
+                });
+            }
+            return payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 13,
+                    credential_present: true,
+                    auth_mode: "dev_dashboard_client_credentials",
+                    client_credentials_present: true,
+                }),
+            });
+        });
+        const component = await mount();
+        const canary = "HOOT_EARLY_VALIDATION_SECRET_LEAKCANARY";
+        const secretInput = queryFirst(".sc_setup_client_secret");
+        secretInput.value = canary;
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+
+        expect(queryText(".sc_setup__error")).toInclude("Client ID");
+        expect(secretInput.value).toBe("");
+        expect(calls).toHaveLength(0);
+        expect(JSON.stringify(component.state)).not.toInclude(canary);
+        expect(JSON.stringify(component.props)).not.toInclude(canary);
+        expect(document.body.innerHTML).not.toInclude(canary);
+
+        // Prove a later request cannot inherit the rejected value.
+        queryFirst(".sc_setup_client_id").value = "replacement-client-id";
+        queryFirst(".sc_setup_client_secret").value =
+            "replacement-secret-without-canary";
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        expect(JSON.stringify(calls)).not.toInclude(canary);
+        expect(JSON.stringify(component.state)).not.toInclude(canary);
+        expect(JSON.stringify(component.props)).not.toInclude(canary);
+        expect(document.body.innerHTML).not.toInclude(canary);
+        for (const element of document.querySelectorAll("*")) {
+            for (const attribute of element.attributes) {
+                expect(attribute.value).not.toInclude(canary);
+            }
+            if ("value" in element) {
+                expect(String(element.value)).not.toInclude(canary);
+            }
+        }
+    });
+
+    test("changing credential mode still requires replacement values", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, {
+                        id: 11,
+                        credential_present: true,
+                        auth_mode: "dev_dashboard_client_credentials",
+                        client_credentials_present: true,
+                    }),
+                });
+            }
+            return payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 11,
+                    credential_present: true,
+                    auth_mode: "offline_access_token",
+                }),
+            });
+        });
+        const component = await mount();
+        queryFirst(".sc_setup__mode input[value='offline_access_token']").click();
+        await animationFrame();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(0);
+        expect(queryText(".sc_setup__error")).toInclude("Paste the Admin API access token");
+
+        queryFirst(".sc_setup_token").value = "shpat_HOOT_MODE_SWITCH_LEAKCANARY";
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        const sent = calls.find((call) => call.method === "save_credential");
+        expect(Boolean(sent)).toBe(true);
+        expect(sent.kwargs.token).toBe("shpat_HOOT_MODE_SWITCH_LEAKCANARY");
+        expect(JSON.stringify(component.state)).not.toInclude(
+            "shpat_HOOT_MODE_SWITCH_LEAKCANARY"
+        );
+    });
+
     test("the client secret is never held in component state", async () => {
         mockOrm((method) => {
             if (method === "get_setup_state") {

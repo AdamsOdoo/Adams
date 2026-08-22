@@ -14,6 +14,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
 from odoo.addons.shopify_connector_core.tools.redaction import redact
+from .shopify_connector_webhook_subscription import ShopifyWebhookSchemaError
 
 
 class ShopifyConnectorWebhookDispatch(models.AbstractModel):
@@ -155,6 +156,12 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
                 'Webhook reconciliation was refused by store quiescence.',
                 type(exc).__name__,
             )
+        except ShopifyWebhookSchemaError as exc:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify returned an unsupported webhook response shape.',
+                type(exc).__name__,
+            )
         except (ValidationError, UserError) as exc:
             raise JobHandlerError(
                 'odoo_validation_configuration',
@@ -179,6 +186,12 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
             raise JobHandlerError(
                 'shopify_temporary_server_network',
                 'Webhook bootstrap was refused by store quiescence.',
+                type(exc).__name__,
+            )
+        except ShopifyWebhookSchemaError as exc:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify returned an unsupported webhook response shape.',
                 type(exc).__name__,
             )
         except (ValidationError, UserError) as exc:

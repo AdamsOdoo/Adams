@@ -129,10 +129,11 @@ class ShopifyConnectorLocationMapping(models.Model):
     def _check_location_company_consistency(self):
         for mapping in self:
             location_company = mapping.odoo_location_id.company_id
-            if location_company and location_company != self.env.company:
+            store_company = mapping.store_id.company_id
+            if location_company and location_company != store_company:
                 raise UserError(
                     "The mapped Odoo location belongs to a different "
-                    "company than the current company."
+                    "company than the Shopify store."
                 )
 
     def action_set_push_enabled(self, enabled):
@@ -186,6 +187,9 @@ class ShopifyConnectorLocationOdooResolution(models.Model):
             return False
         if location.usage != 'internal':
             return False
-        if location.company_id and location.company_id != self.env.company:
+        if (
+            location.company_id
+            and location.company_id != mapping.store_id.company_id
+        ):
             return False
         return location

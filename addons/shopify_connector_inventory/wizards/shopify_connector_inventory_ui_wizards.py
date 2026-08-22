@@ -235,6 +235,15 @@ class ShopifyConnectorLocationMapWizard(models.TransientModel):
         comodel_name='shopify.connector.store',
         required=True,
     )
+    # Keep the client-side candidate domain tied to the store's owning
+    # company.  The service below still performs the fail-closed company check;
+    # this mirror only prevents an administrator allowed in multiple companies
+    # from being offered a foreign internal location in the first place.
+    store_company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='store_id.company_id',
+        readonly=True,
+    )
     # The Shopify side is CHOSEN FROM THE CACHE, never typed. That is the
     # whole point of this control existing: a free-text GID field would be
     # the arbitrary-identity hole the creation service now refuses anyway,
@@ -250,7 +259,8 @@ class ShopifyConnectorLocationMapWizard(models.TransientModel):
         comodel_name='stock.location',
         required=True,
         string='Odoo location',
-        domain="[('usage', '=', 'internal')]",
+        domain="[('usage', '=', 'internal'),"
+               " ('company_id', 'in', [False, store_company_id])]",
     )
     push_enabled = fields.Boolean(
         string='Push stock for this location',
@@ -507,7 +517,13 @@ class ShopifyConnectorLocationRemapWizard(models.TransientModel):
         comodel_name='stock.location',
         required=True,
         string='New Odoo location',
-        domain="[('usage', '=', 'internal')]",
+        domain="[('usage', '=', 'internal'),"
+               " ('company_id', 'in', [False, store_company_id])]",
+    )
+    store_company_id = fields.Many2one(
+        comodel_name='res.company',
+        related='mapping_id.store_id.company_id',
+        readonly=True,
     )
     reason = fields.Char(
         required=True,

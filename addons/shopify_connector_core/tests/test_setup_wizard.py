@@ -436,6 +436,9 @@ class TestSetupWizardAuthorization(SetupWizardCase):
             lambda: setup.get_setup_state(new_store=True),
             lambda: setup.save_store_identity('x', 'y.myshopify.com'),
             lambda: setup.save_credential(store.id, DUMMY_TOKEN),
+            lambda: setup.retain_existing_credential(
+                store.id, 'offline_access_token',
+            ),
             lambda: setup.acknowledge_scopes(store.id),
             lambda: setup.run_test_connection(store.id),
             lambda: setup.run_readiness(store.id),
@@ -465,6 +468,9 @@ class TestSetupWizardAuthorization(SetupWizardCase):
         for call in (
             lambda: setup.get_setup_state(store.id),
             lambda: setup.save_credential(store.id, DUMMY_TOKEN),
+            lambda: setup.retain_existing_credential(
+                store.id, 'offline_access_token',
+            ),
             lambda: setup.run_readiness(store.id),
             lambda: setup.save_directions(store.id, ['sale']),
             lambda: setup.activate(store.id),

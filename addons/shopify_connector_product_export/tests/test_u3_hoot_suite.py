@@ -86,7 +86,11 @@ EXPECTED_SUITES = {
     # The explicit second-store setup path (2026-08-18) adds the 35th client
     # assertion: switching to a new store clears store-scoped transient state
     # and restores keyboard focus without mutating the existing store.
-    'shopify connector setup wizard': 35,
+    # The onboarding runtime correction (2026-08-22) adds five assertions:
+    # stored client credentials and offline tokens can be retained on rerun,
+    # a mode switch still requires a replacement value, stale browser
+    # presence is checked at action time, and early validation clears secrets.
+    'shopify connector setup wizard': 40,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
