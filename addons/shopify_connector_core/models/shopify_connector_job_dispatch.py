@@ -1833,7 +1833,14 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         job.sudo().write({
-            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+            'state': 'succeeded',
+            # A retrying job's prior failure remains durably visible in its
+            # transition log, but the current terminal state must not retain
+            # stale error/retry metadata after the handler succeeds.
+            'error_class': False,
+            'manual_review_subreason': False,
+            'next_retry_at': False,
+            'finished_at': fields.Datetime.now(),
         })
         JobLog._system_append(
             job, 'attempt', 'Dispatch succeeded.',
