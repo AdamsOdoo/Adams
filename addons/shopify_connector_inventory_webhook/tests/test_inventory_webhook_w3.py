@@ -742,6 +742,9 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'shopify.connector.inventory.observation.service'
         ].sudo().with_context(
             _inventory_observation_cron=_CRON_CONTEXT_SENTINEL,
+            cron_id=self.env.ref(
+                'shopify_connector_inventory_webhook.ir_cron_shopify_connector_inventory_observation'
+            ).id,
         )
 
         class FakeStore:
@@ -1240,6 +1243,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                    'shopify_connector_inventory_observation.py').read_text()
         handler = (root / 'models' /
                    'shopify_connector_inventory_webhook.py').read_text()
+        constants = (root / 'models' / 'constants.py').read_text()
         runner = (root.parents[1] / 'tools' /
                   'run_connector_suite.sh').read_text()
         manifest = (root / '__manifest__.py').read_text()
@@ -1262,7 +1266,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertNotIn('inventory_set_quantities', child)
         self.assertIn("job_source='webhook'", handler)
         self.assertIn(INVENTORY_OBSERVATION_JOB_TYPE, handler)
-        self.assertIn('inventory_levels/update', handler)
+        self.assertIn('INVENTORY_WEBHOOK_TOPIC', handler)
+        self.assertIn(
+            "INVENTORY_WEBHOOK_TOPIC = 'inventory_levels/update'",
+            constants,
+        )
         self.assertIn("'shopify_connector_webhook'", manifest)
         self.assertIn("'shopify_connector_inventory'", manifest)
         self.assertIn('shopify_connector_inventory_webhook', runner)

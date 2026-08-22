@@ -319,7 +319,12 @@ class TestOrderImportMappingStatic(TransactionCase):
     def test_exact_sudo_inventory_and_dispatch_create_guard(self):
         expected = {
             'shopify_connector_order_binding.py': 2,
-            'shopify_connector_order_importer.py': 2,
+            # The importer has three deliberately narrow technical-sudo
+            # boundaries: binding creation under the permanent uniqueness
+            # race, the non-blocking binding row lock used to serialize
+            # refreshes, and the locked binding evidence write.  Keep the
+            # explicit count so a future privilege expansion is visible.
+            'shopify_connector_order_importer.py': 3,
             # Store 360 slice 1 raised the order-scan inventory from 1 to 3:
             # the checkpoint/lineage settings write (pre-existing), plus the
             # two minimal technical-sudo READS in the cancelled-import

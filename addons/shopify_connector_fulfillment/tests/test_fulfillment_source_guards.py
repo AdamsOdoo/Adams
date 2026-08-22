@@ -26,6 +26,16 @@ TEN_JOB_TYPES = frozenset((
     'fulfillment_mode_switch_scan', 'fulfillment_mode2_evaluation',
 ))
 
+# The core fulfillment addon freezes the ten values above. Optional domain
+# addons may extend the shared dispatcher; the installed fulfillment-webhook
+# addon contributes this one read-only resolver job and no other fulfillment
+# job type. Keep it separate from the core taxonomy so the guard catches an
+# accidental production registration without rejecting a deliberate module
+# extension.
+OPTIONAL_FULFILLMENT_JOB_TYPES = frozenset((
+    'fulfillment_webhook_resolve',
+))
+
 # The exact enumerated production + test file allowlist (§2/§5).
 ALLOWED_MODEL_FILES = frozenset((
     '__init__.py', 'shopify_connector_fulfillment_binding.py',
@@ -265,7 +275,19 @@ class TestFulfillmentSourceGuards(TransactionCase):
         handlers = set(Dispatch._get_handlers())
         replay = set(Dispatch._get_replay_policies())
         fulfillment_handlers = {h for h in handlers if h.startswith('fulfillment_')}
-        self.assertEqual(fulfillment_handlers, TEN_JOB_TYPES)
+        # The frozen core contract remains exactly ten. An optional webhook
+        # addon is allowed to add only its explicitly named resolver; an
+        # unknown `fulfillment_*` registration is still a hard failure.
+        self.assertEqual(fulfillment_handlers & TEN_JOB_TYPES, TEN_JOB_TYPES)
+        self.assertTrue(
+            fulfillment_handlers <= (
+                TEN_JOB_TYPES | OPTIONAL_FULFILLMENT_JOB_TYPES
+            ),
+            fulfillment_handlers - (
+                TEN_JOB_TYPES | OPTIONAL_FULFILLMENT_JOB_TYPES
+            ),
+        )
+        self.assertTrue(fulfillment_handlers <= replay)
         self.assertTrue(TEN_JOB_TYPES <= replay)
         # No per-domain reconcile, no review-release job type.
         self.assertNotIn('fulfillment_create_reconcile', handlers)

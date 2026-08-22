@@ -1300,7 +1300,9 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
                 OBSERVATION_FALLBACK_MAX_BATCH),
         )
         cron = (
-            self.env['ir.cron'].sudo()
+            self.env['ir.cron'].sudo().browse(
+                self.env.context.get('cron_id'),
+            )
             if (
                 self.env.context.get(self._CRON_CONTEXT_KEY)
                 is _CRON_CONTEXT_SENTINEL
