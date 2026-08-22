@@ -106,6 +106,7 @@ SEC3_MODELS = (
     ('shopify.connector.product.variant.binding', '_row_variant_binding'),
     ('shopify.connector.location.mapping', '_row_location_mapping'),
     ('shopify.connector.inventory.level.binding', '_row_inventory_binding'),
+    ('shopify.connector.inventory.observation', '_row_inventory_observation'),
     ('shopify.connector.tax.mapping', '_row_tax_mapping'),
     ('shopify.connector.fulfillment.binding', '_row_fulfillment_binding'),
     ('shopify.connector.fulfillment.inbound.evidence', '_row_evidence'),
@@ -627,6 +628,32 @@ class Sec3Base(TransactionCase):
             'location_mapping_id': mapping.id,
             'shopify_inventory_item_gid':
                 self._gid('InventoryItem', store),
+        })
+
+    def _row_inventory_observation(self, store):
+        Observation = self.env[
+            'shopify.connector.inventory.observation'
+        ].sudo().with_context(
+            **self.env[
+                'shopify.connector.inventory.observation'
+            ]._service_context()
+        )
+        job = self._job(store)
+        return Observation.create({
+            'store_id': store.id,
+            'job_id': job.id,
+            'inventory_level_gid': (
+                'gid://shopify/InventoryLevel/%s?inventory_item_id=%s' %
+                (store.id + 1000, store.id + 2000)
+            ),
+            'inventory_item_gid': 'gid://shopify/InventoryItem/%s' % (
+                store.id + 2000,
+            ),
+            'location_gid': 'gid://shopify/Location/%s' % (store.id + 1000),
+            'available': 1,
+            'source_updated_at': fields.Datetime.now(),
+            'source': 'scheduled_sync',
+            'state': 'accepted',
         })
 
     def _row_tax_mapping(self, store):

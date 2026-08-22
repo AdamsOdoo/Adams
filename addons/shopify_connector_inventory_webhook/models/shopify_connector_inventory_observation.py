@@ -13,7 +13,7 @@ import re
 
 from psycopg2 import IntegrityError
 
-from odoo import api, fields, models
+from odoo import SUPERUSER_ID, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
@@ -55,6 +55,7 @@ _logger = logging.getLogger(__name__)
 
 _OBSERVATION_SERVICE_CONTEXT = 'shopify_connector_inventory_observation_service'
 _OBSERVATION_SERVICE_SENTINEL = object()
+_CRON_CONTEXT_SENTINEL = object()
 
 
 # RFC3339 is deliberately narrower than ``fields.Datetime.to_datetime``.
@@ -360,6 +361,15 @@ class ShopifyConnectorInventoryObservation(models.Model):
             'shopify.connector.inventory.observation.service'
         ].run_scheduled_observation_fallback(limit=limit)
 
+    @api.model
+    def _run_scheduled_observation_fallback(self, limit=20):
+        """Root-only cron entry matching the cron's model_id."""
+        if self.env.uid != SUPERUSER_ID:
+            raise AccessError('Only the root cron may run inventory observation.')
+        return self.env[
+            'shopify.connector.inventory.observation.service'
+        ]._run_scheduled_observation_fallback(limit=limit)
+
 
 class ShopifyConnectorInventoryBindingObservationFields(models.Model):
     """Monotonic current watermark projected onto the pair binding."""
@@ -394,6 +404,18 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
 
     _name = 'shopify.connector.inventory.observation.service'
     _description = 'Shopify Inventory Observation Service'
+
+    _CRON_CONTEXT_KEY = '_inventory_observation_cron'
+
+    @api.model
+    def _run_scheduled_observation_fallback(self, limit=OBSERVATION_FALLBACK_BATCH):
+        """Private cron entry; public callers cannot self-select all companies."""
+        if self.env.uid != SUPERUSER_ID:
+            raise AccessError('Only the root cron may run inventory observation.')
+        context = {self._CRON_CONTEXT_KEY: _CRON_CONTEXT_SENTINEL}
+        return self.with_context(**context).run_scheduled_observation_fallback(
+            limit=limit,
+        )
 
     INVENTORY_OBSERVATION_QUERY = (
         'query InventoryObservation($levelId: ID!) { '
@@ -1154,6 +1176,7 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             min(int(limit or OBSERVATION_FALLBACK_STORE_LIMIT),
                 OBSERVATION_FALLBACK_STORE_LIMIT),
         )
+        company_ids = self.env.companies.ids
         Settings = self.env['shopify.connector.store.settings'].sudo()
         base = [
             ('inventory_domain_enabled', '=', True),
@@ -1165,8 +1188,12 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
         # scanner.  A real cron runs as superuser and is deliberately allowed
         # to service every company; user-triggered runs stay within the
         # caller's active company switcher.
-        if not self.env.su:
-            base.append(('company_id', 'in', self.env.companies.ids))
+        is_cron = (
+            self.env.context.get(self._CRON_CONTEXT_KEY)
+            is _CRON_CONTEXT_SENTINEL
+        )
+        if not is_cron:
+            base.append(('company_id', 'in', company_ids))
         null_rows = Settings.search(
             base + [
                 ('inventory_observation_scheduled_at', '=', False),
@@ -1274,7 +1301,10 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
         )
         cron = (
             self.env['ir.cron'].sudo()
-            if self.env.context.get('cron_id') else False
+            if (
+                self.env.context.get(self._CRON_CONTEXT_KEY)
+                is _CRON_CONTEXT_SENTINEL
+            ) else False
         )
         # Do not even perform the bounded store-page reads after Odoo has
         # declared the cron budget exhausted.  The store ceiling is included

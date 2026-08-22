@@ -77,6 +77,7 @@ CLASSIFIED_MODULES = frozenset({
     'shopify_connector_product',
     'shopify_connector_sale',
     'shopify_connector_inventory',
+    'shopify_connector_inventory_webhook',
 })
 
 UNCLASSIFIED_CONTRIBUTING_MODULES = frozenset({

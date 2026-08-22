@@ -8,7 +8,7 @@
             <field name="model_id" ref="model_shopify_connector_inventory_observation"/>
             <field name="user_id" ref="base.user_root"/>
             <field name="state">code</field>
-            <field name="code">model.run_scheduled_observation_fallback(limit=20)</field>
+            <field name="code">model._run_scheduled_observation_fallback(limit=20)</field>
             <field name="interval_number">15</field>
             <field name="interval_type">minutes</field>
             <field name="priority">7</field>

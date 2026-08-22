@@ -1,6 +1,7 @@
 """Installed W3 inventory webhook contracts; no Shopify network calls."""
 
 import hashlib
+import importlib.util
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from ..models.constants import (
     fair_rotation,
 )
 from ..models.shopify_connector_inventory_observation import (
+    _CRON_CONTEXT_SENTINEL,
     _parse_inventory_level_gid,
     _parse_remote_datetime,
 )
@@ -37,6 +39,19 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     ERROR_CLASS_DATA_SHAPE,
     ERROR_CLASS_TEMPORARY,
 )
+from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
+    INTERNAL_PROTECTED,
+    assert_module_classification,
+)
+
+MODULE = 'shopify_connector_inventory_webhook'
+WEBHOOK_SETTINGS_CLASSIFICATION = {
+    'inventory_observation_scheduled_at': (
+        INTERNAL_PROTECTED,
+        'Bounded scheduler checkpoint; written by the observer cron, never a '
+        'merchant configuration decision.',
+    ),
+}
 
 
 @tagged('post_install', '-at_install')
@@ -56,6 +71,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'inventory_scheduled_sync_enabled': True,
         })
         return store
+
+    def test_webhook_settings_fields_have_canonical_classification(self):
+        assert_module_classification(
+            self, MODULE, WEBHOOK_SETTINGS_CLASSIFICATION,
+        )
 
     def test_webhook_registry_contract_exports_handler_constant(self):
         """The registry's imported handler name must be an exported contract."""
@@ -720,7 +740,9 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
     def test_scheduler_uses_real_cron_commit_progress_for_cursor_admission(self):
         service = self.env[
             'shopify.connector.inventory.observation.service'
-        ].sudo().with_context(cron_id=1)
+        ].sudo().with_context(
+            _inventory_observation_cron=_CRON_CONTEXT_SENTINEL,
+        )
 
         class FakeStore:
             id = 88
@@ -791,10 +813,90 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         own_store = self._store('allowed-company')
         service = self.env[
             'shopify.connector.inventory.observation.service'
-        ].with_context(allowed_company_ids=[self.env.company.id])
+        ].sudo().with_context(allowed_company_ids=[self.env.company.id])
         stores = service._scheduled_observation_stores(10)
         self.assertIn(own_store, stores)
         self.assertNotIn(other_store, stores)
+        spoofed = service.with_context(
+            _inventory_observation_cron=True,
+        )._scheduled_observation_stores(10)
+        self.assertNotIn(other_store, spoofed)
+        spoofed_string = service.with_context(
+            _inventory_observation_cron='true',
+        )._scheduled_observation_stores(10)
+        self.assertNotIn(other_store, spoofed_string)
+        cron_stores = service.with_context(
+            _inventory_observation_cron=_CRON_CONTEXT_SENTINEL,
+        )._scheduled_observation_stores(10)
+        self.assertIn(other_store, cron_stores)
+
+    def test_root_observation_cron_entry_sets_private_identity_sentinel(self):
+        observation = self.env[
+            'shopify.connector.inventory.observation'
+        ].sudo()
+        service_model = type(self.env[
+            'shopify.connector.inventory.observation.service'
+        ])
+
+        def guarded_service_run(service, limit):
+            self.assertIs(
+                service.env.context.get('_inventory_observation_cron'),
+                _CRON_CONTEXT_SENTINEL,
+            )
+            return limit
+
+        with patch.object(
+            service_model, 'run_scheduled_observation_fallback',
+            new=guarded_service_run,
+        ):
+            self.assertEqual(
+                observation._run_scheduled_observation_fallback(limit=7), 7,
+            )
+
+    def test_non_root_cannot_enter_either_cron_wrapper(self):
+        user = self.env['res.users'].create({
+            'name': 'W3 Non Root Cron User',
+            'login': 'w3_non_root_cron_user',
+            'group_ids': [(6, 0, [self.env.ref('base.group_user').id])],
+        })
+        observation = self.env[
+            'shopify.connector.inventory.observation'
+        ].with_user(user)
+        service = self.env[
+            'shopify.connector.inventory.observation.service'
+        ].with_user(user)
+        with self.assertRaises(AccessError):
+            observation._run_scheduled_observation_fallback(limit=1)
+        with self.assertRaises(AccessError):
+            service._run_scheduled_observation_fallback(limit=1)
+
+    def test_cron_migration_updates_existing_noupdate_row_idempotently(self):
+        path = Path(__file__).resolve().parents[1] / 'migrations' / '19.0.0.3.0' / 'post-migrate.py'
+        spec = importlib.util.spec_from_file_location('w3_cron_migration', path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        cron = self.env.ref(
+            'shopify_connector_inventory_webhook.ir_cron_shopify_connector_inventory_observation',
+        ).sudo()
+        cron.write({'code': 'model.run_scheduled_observation_fallback(limit=20)'})
+        cron.invalidate_recordset()
+        self.assertEqual(
+            cron.code, 'model.run_scheduled_observation_fallback(limit=20)',
+        )
+        before = (cron.active, cron.interval_number, cron.interval_type,
+                  cron.user_id.id, cron.model_id.id)
+        migration.migrate(self.env.cr, '19.0.0.2.0')
+        cron.invalidate_recordset()
+        self.assertEqual(
+            cron.code, 'model._run_scheduled_observation_fallback(limit=20)',
+        )
+        migration.migrate(self.env.cr, '19.0.0.3.0')
+        cron.invalidate_recordset()
+        self.assertEqual(
+            before,
+            (cron.active, cron.interval_number, cron.interval_type,
+             cron.user_id.id, cron.model_id.id),
+        )
 
     def test_scheduler_store_page_is_sql_bounded_and_null_oldest_fair(self):
         stores = [self._store('fair-%s' % index) for index in range(4)]
@@ -1141,6 +1243,8 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         runner = (root.parents[1] / 'tools' /
                   'run_connector_suite.sh').read_text()
         manifest = (root / '__manifest__.py').read_text()
+        cron = (root / 'data' /
+                'shopify_connector_inventory_webhook_cron.xml').read_text()
         acl = (root / 'security' / 'ir.model.access.csv').read_text()
         rule = (root / 'security' /
                 'shopify_connector_inventory_webhook_company_rules.xml').read_text()
@@ -1163,6 +1267,12 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertIn("'shopify_connector_inventory'", manifest)
         self.assertIn('shopify_connector_inventory_webhook', runner)
         self.assertIn('W3_INVENTORY_WEBHOOK_VERSION', runner)
+        self.assertIn(
+            'model_shopify_connector_inventory_observation', cron,
+        )
+        self.assertIn(
+            'model._run_scheduled_observation_fallback(limit=20)', cron,
+        )
         self.assertIn(',1,0,0,0', acl)
         self.assertIn("('company_id', 'in', company_ids)", rule)
         self.assertIn("('sec3_scope_quarantined', '=', False)", rule)

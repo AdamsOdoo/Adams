@@ -3070,6 +3070,8 @@ class _GenuineRaceHelpers:
     with distinct backend PIDs. Raw SQL is used ONLY to commit fixtures, OBSERVE
     committed state, and clean up -- never to create the row under test."""
 
+    PROBE_TIMEOUT_SECONDS = 6.0
+
     STATEMENT_TIMEOUT_MS = 10000
     LOCK_TIMEOUT_MS = 8000
     BOUND_SECONDS = 20
@@ -3374,22 +3376,33 @@ class TestSetupCredentialRetainRaceGenuine(
         finally:
             observer.close()
 
-    def _wait_for_lock_or_finish(self, dbname, backend_pid, finished):
-        deadline = time.monotonic() + self.BOUND_SECONDS
+    def _wait_for_lock_or_finish(
+        self, observer, backend_pid, expected_blocker_pid, finished,
+    ):
+        """Prove retain is blocked by the exact mutation backend.
+
+        ``wait_event_type`` alone is insufficient: a worker can be waiting on
+        an unrelated lock, and ``transactionid`` is a ``wait_event`` value,
+        not a wait type.  PostgreSQL exposes the precise blocker through
+        ``pg_blocking_pids``; require the mutation PID before releasing it.
+        """
+        deadline = time.monotonic() + self.PROBE_TIMEOUT_SECONDS
         while time.monotonic() < deadline:
             if finished.is_set():
                 return False
-            observer = self._open_bounded(dbname, read_committed=True)
-            try:
-                observer.execute(
-                    "SELECT wait_event_type FROM pg_stat_activity "
-                    "WHERE pid = %s", (backend_pid,),
-                )
-                row = observer.fetchone()
-                observer.rollback()
-            finally:
-                observer.close()
-            if row and row[0] == 'Lock':
+            observer.execute(
+                "SELECT wait_event_type, wait_event, state, "
+                "pg_blocking_pids(pid) FROM pg_stat_activity "
+                "WHERE pid = %s", (backend_pid,),
+            )
+            row = observer.fetchone()
+            observer.rollback()
+            if (
+                row and row[0] == 'Lock'
+                and row[1] in ('transactionid', 'tuple')
+                and row[2] == 'active'
+                and expected_blocker_pid in (row[3] or [])
+            ):
                 return True
             time.sleep(0.01)
         return False
@@ -3404,6 +3417,7 @@ class TestSetupCredentialRetainRaceGenuine(
         findings = queue.Queue()
         pids = {}
         mutation_thread = retain_thread = None
+        probe_observer = None
         try:
             store_id = self._commit_retain_fixture(dbname)
             Store = type(self.env['shopify.connector.store'])
@@ -3485,6 +3499,9 @@ class TestSetupCredentialRetainRaceGenuine(
                         mutation_holds.wait(timeout=self.BOUND_SECONDS),
                         'credential mutation did not acquire the lifecycle lock',
                     )
+                    probe_observer = self._open_bounded(
+                        dbname, read_committed=True,
+                    )
                     retain_thread = threading.Thread(
                         target=retain_worker, daemon=True,
                     )
@@ -3495,15 +3512,22 @@ class TestSetupCredentialRetainRaceGenuine(
                     )
                     self.assertTrue(
                         self._wait_for_lock_or_finish(
-                            dbname, pids['retain'], retain_finished,
+                            probe_observer, pids['retain'], pids['mutation'],
+                            retain_finished,
                         ),
-                        'retain did not wait on the credential lifecycle lock',
+                        'retain did not wait on the credential lifecycle lock '
+                        '(finished=%s outcome=%s)' % (
+                            retain_finished.is_set(), self._drain(findings),
+                        ),
                     )
                 finally:
                     release_mutation.set()
                     mutation_thread.join(timeout=self.BOUND_SECONDS)
                     if retain_thread is not None:
                         retain_thread.join(timeout=self.BOUND_SECONDS)
+                    if probe_observer is not None:
+                        probe_observer.close()
+                        probe_observer = None
                 self._assert_workers_dead((mutation_thread, retain_thread))
 
             self.assertNotEqual(pids['mutation'], pids['retain'])
@@ -3526,6 +3550,8 @@ class TestSetupCredentialRetainRaceGenuine(
             for worker in (mutation_thread, retain_thread):
                 if worker is not None:
                     worker.join(timeout=self.BOUND_SECONDS)
+            if probe_observer is not None:
+                probe_observer.close()
             self._cleanup(dbname, store_id)
 
     def test_clear_cannot_race_retain_into_false_advancement(self):
