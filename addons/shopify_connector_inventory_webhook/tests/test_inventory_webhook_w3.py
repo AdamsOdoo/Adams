@@ -589,6 +589,9 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         service = self.env[
             'shopify.connector.inventory.observation.service'
         ]
+        inventory_service = self.env[
+            'shopify.connector.inventory.service'
+        ]
         stamp = fields.Datetime.to_datetime('2026-08-22 08:00:00')
         snapshot = {
             'source_updated_at': stamp,
@@ -658,14 +661,15 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                 ), patch.object(
                     type(service), '_record_observation',
                 ) as record, patch.object(
-                    type(service), '_refresh_pending_target',
+                    type(inventory_service), '_refresh_pending_target',
                     return_value=(target, 0),
-                ):
+                ) as refresh_target:
                     service._apply_snapshot(
                         job, binding, mapping, snapshot,
                     )
                 self.assertTrue(record.called)
                 self.assertEqual(record.call_args.args[4], state)
+                refresh_target.assert_not_called()
                 if freezes:
                     self.assertEqual(binding.status, 'review')
                     self.assertTrue(job.transitions)
@@ -681,10 +685,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         ), patch.object(
             type(service), '_record_observation',
         ) as record, patch.object(
-            type(service), '_refresh_pending_target',
+            type(inventory_service), '_refresh_pending_target',
             return_value=(6, 0),
-        ):
+        ) as refresh_target:
             service._apply_snapshot(drift_job, drift_binding, mapping, snapshot)
+        refresh_target.assert_called_once_with(drift_binding)
         self.assertEqual(record.call_args.args[4], 'manual_review')
         self.assertEqual(drift_binding.status, 'review')
         self.assertTrue(drift_job.transitions)
