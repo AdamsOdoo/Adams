@@ -893,12 +893,42 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertEqual(
             cron.code, 'model._run_scheduled_observation_fallback(limit=20)',
         )
+        action = cron.ir_actions_server_id.sudo()
+        action_audit = (action.write_date, action.write_uid.id)
         migration.migrate(self.env.cr, '19.0.0.3.0')
         cron.invalidate_recordset()
+        action.invalidate_recordset()
         self.assertEqual(
             before,
             (cron.active, cron.interval_number, cron.interval_type,
              cron.user_id.id, cron.model_id.id),
+        )
+        self.assertEqual(cron.code, migration.TARGET_CODE)
+        self.assertEqual(action_audit, (action.write_date, action.write_uid.id))
+
+    def test_cron_migration_missing_xmlid_is_a_bounded_noop(self):
+        path = Path(__file__).resolve().parents[1] / 'migrations' / '19.0.0.3.0' / 'post-migrate.py'
+        spec = importlib.util.spec_from_file_location('w3_missing_cron_migration', path)
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+
+        class MissingXmlidEnv:
+            def ref(self, xmlid, raise_if_not_found=False):
+                self.request = (xmlid, raise_if_not_found)
+                return None
+
+        fake_env = MissingXmlidEnv()
+        with patch.object(
+            migration.api, 'Environment', return_value=fake_env,
+        ):
+            migration.migrate(object(), '19.0.0.2.0')
+        self.assertEqual(
+            fake_env.request,
+            (
+                'shopify_connector_inventory_webhook.'
+                'ir_cron_shopify_connector_inventory_observation',
+                False,
+            ),
         )
 
     def test_scheduler_store_page_is_sql_bounded_and_null_oldest_fair(self):
