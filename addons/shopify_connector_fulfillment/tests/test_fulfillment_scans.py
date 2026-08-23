@@ -73,11 +73,11 @@ class TestFulfillmentScans(TransactionCase):
     # Fixture builders
     # ------------------------------------------------------------------
 
-    def _fulfillment_binding(self, fulfillment_gid):
+    def _fulfillment_binding(self, fulfillment_gid, picking=None):
         return self.Binding.sudo().create({
             'store_id': self.store.id,
             'shopify_gid': fulfillment_gid,
-            'picking_id': self.picking.id,
+            'picking_id': (picking or self.picking).id,
             'order_binding_id': self.order_binding.id,
             'status': 'active',
         })
@@ -231,8 +231,15 @@ class TestFulfillmentScans(TransactionCase):
         first = self._fulfillment_binding(
             'gid://shopify/Fulfillment/RC-BATCH-1'
         )
+        second_picking = self.env['stock.picking'].create({
+            'picking_type_id': self.pt_out.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_id': self.sale.id,
+        })
         second = self._fulfillment_binding(
-            'gid://shopify/Fulfillment/RC-BATCH-2'
+            'gid://shopify/Fulfillment/RC-BATCH-2',
+            picking=second_picking,
         )
         job = self._scan_job('fulfillment_reconciliation_check')
         observed = {
@@ -379,8 +386,15 @@ class TestFulfillmentScans(TransactionCase):
             'odoo.addons.shopify_connector_fulfillment.models.'
             'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 2,
         ), patch.object(
-            type(self.Service), '_read_fulfillment',
-            return_value={'id': 'x', 'status': 'SUCCESS', 'trackingInfo': []},
+            type(self.Service), '_read_fulfillments_batch',
+            side_effect=lambda _job, _store, gids: {
+                gid: {
+                    'id': gid,
+                    'status': 'SUCCESS',
+                    'trackingInfo': [],
+                }
+                for gid in gids
+            },
         ):
             with self.assertRaises(JobHandlerError):
                 self.Service._handle_fulfillment_reconciliation_check(job)
