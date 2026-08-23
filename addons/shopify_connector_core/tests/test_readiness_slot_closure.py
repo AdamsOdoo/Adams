@@ -511,6 +511,26 @@ class TestReadinessSlotClosure(TransactionCase):
                 ),
                 (
                     'shopify_connector_readiness_check.py',
+                    '_supported_scale_counts',
+                    "self.env['shopify.connector.job']", 1,
+                    'Bounded supported-scale health counts across protected '
+                    'connector records.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
+                    '_supported_scale_counts',
+                    "self.env['shopify.connector.store']", 1,
+                    'Bounded supported-scale health counts across protected '
+                    'connector records.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
+                    '_supported_scale_counts', 'self.env[model_name]', 1,
+                    'Bounded supported-scale health counts across protected '
+                    'connector records.',
+                ),
+                (
+                    'shopify_connector_readiness_check.py',
                     'run_for_store', 'Job', 1,
                     'Readiness audit job lifecycle.',
                 ),

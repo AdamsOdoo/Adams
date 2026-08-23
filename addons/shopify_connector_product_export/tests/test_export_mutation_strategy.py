@@ -186,10 +186,7 @@ class TestExportMutationStrategy(ExportCase):
 
     def test_variant_create_preserves_the_standalone_variant(self):
         binding = self.bind_template()
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-2',
-        })
+        extra = self.add_template_variant('WIDGET-2')
         preview = self.make_preview(
             export_path='update', binding=binding, state='applying',
             steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
@@ -226,10 +223,7 @@ class TestExportMutationStrategy(ExportCase):
 
     def test_variant_create_refuses_skuless_new_variant_before_remote_read(self):
         binding = self.bind_template()
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': False,
-        })
+        extra = self.add_template_variant(False)
         preview = self.make_preview(
             export_path='update', binding=binding, state='applying',
             steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
@@ -250,10 +244,7 @@ class TestExportMutationStrategy(ExportCase):
 
     def test_variant_create_fresh_remote_sku_collision_fails_before_c2(self):
         binding = self.bind_template()
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-2',
-        })
+        extra = self.add_template_variant('WIDGET-2')
         preview = self.make_preview(
             export_path='update', binding=binding, state='applying',
             steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
@@ -282,10 +273,7 @@ class TestExportMutationStrategy(ExportCase):
         # A SKU-less existing sibling was the original defect trigger: the
         # old finalizer iterated it even though the mutation did not create it.
         self.variant.write({'default_code': False})
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-2',
-        })
+        extra = self.add_template_variant('WIDGET-2')
         preview = self.make_preview(
             export_path='update', binding=binding, state='applying',
             steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
@@ -322,10 +310,7 @@ class TestExportMutationStrategy(ExportCase):
 
     def test_variant_finalization_refuses_conflicting_existing_binding(self):
         binding = self.bind_template()
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-2',
-        })
+        extra = self.add_template_variant('WIDGET-2')
         self.VariantBinding.create({
             'store_id': self.store.id,
             'product_variant_id': extra.id,

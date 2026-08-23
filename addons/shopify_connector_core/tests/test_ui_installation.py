@@ -97,7 +97,8 @@ class TestUiInstallation(TransactionCase):
 
         operations = [
             'Orders', 'Product Imports/Exports', 'Inventory',
-            'Fulfillments', 'Runs & Recovery', 'Needs Attention',
+            'Fulfillments', 'Fulfillment Review', 'Runs & Recovery',
+            'Needs Attention',
         ]
         if self.env.ref(
             'shopify_connector_webhook.menu_shopify_connector_webhook_deliveries',

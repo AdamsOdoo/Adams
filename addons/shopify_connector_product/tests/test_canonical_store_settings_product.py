@@ -37,6 +37,30 @@ PRODUCT_CLASSIFICATION = {
         CANONICAL_READONLY,
         'When a product scan last completed; written by the scan service.',
     ),
+    'product_scan_window_start_at': (
+        CANONICAL_READONLY,
+        'Durable lower boundary of the active resumable scan window.',
+    ),
+    'product_scan_window_end_at': (
+        CANONICAL_READONLY,
+        'Durable upper boundary of the active resumable scan window.',
+    ),
+    'product_scan_cursor': (
+        CANONICAL_READONLY,
+        'Opaque Shopify cursor for the active resumable scan window.',
+    ),
+    'product_scan_generation': (
+        CANONICAL_READONLY,
+        'Connection generation fencing the active scan checkpoint.',
+    ),
+    'product_scan_page_count': (
+        CANONICAL_READONLY,
+        'Bounded progress evidence for the active scan window.',
+    ),
+    'product_scan_latest_at': (
+        CANONICAL_READONLY,
+        'Latest observed record timestamp inside the active scan window.',
+    ),
 }
 
 
