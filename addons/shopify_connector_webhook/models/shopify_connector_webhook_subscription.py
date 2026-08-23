@@ -355,7 +355,8 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                         raise
             else:
                 changed = (
-                    record.topic_enum != values['topic_enum']
+                    not record.expected
+                    or record.topic_enum != values['topic_enum']
                     or record.expected_api_version != values['expected_api_version']
                     or (record.expected_include_fields or [])
                     != values['expected_include_fields']
@@ -367,6 +368,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     # a stale callback and route it for safe manual review;
                     # never silently delete an unknown remote subscription.
                     record._service_write({
+                        'expected': True,
                         'topic_enum': values['topic_enum'],
                         'expected_api_version': values['expected_api_version'],
                         'expected_include_fields':
@@ -1088,6 +1090,28 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             source,
             'webhook_subscription_reconcile',
             payload_hash,
+            'shopify.connector.store',
+            store.id,
+        )
+
+    @api.model
+    def _enqueue_store_retire_all(self, store):
+        """Admit one read-first uninstall-preparation parent job."""
+        store.ensure_one()
+        self._require_hmac_client_secret(store)
+        if store.state != 'connected':
+            raise ValidationError(
+                'Webhook uninstall preparation requires a connected store.'
+            )
+        return self._enqueue_job_with_recovery(
+            store,
+            'manual_sync',
+            'webhook_subscription_retire_all',
+            canonical_sha256({
+                'store_id': store.id,
+                'action': 'retire_all_for_uninstall',
+                'run_key': self._reconciliation_run_key('manual_sync'),
+            }),
             'shopify.connector.store',
             store.id,
         )
@@ -1842,6 +1866,28 @@ class ShopifyConnectorWebhookSubscriptionStore(models.Model):
         return {
             'type': 'ir.actions.act_window',
             'name': 'Webhook reconciliation',
+            'res_model': 'shopify.connector.job',
+            'view_mode': 'form',
+            'res_id': job.id,
+            'target': 'current',
+        }
+
+    def action_prepare_webhook_uninstall(self):
+        """Delete exact remote subscriptions through the normal safe queue."""
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may prepare webhook '
+                'uninstall.'
+            )
+        job = self.env[
+            'shopify.connector.webhook.subscription'
+        ]._enqueue_store_retire_all(self)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Webhook uninstall preparation',
             'res_model': 'shopify.connector.job',
             'view_mode': 'form',
             'res_id': job.id,

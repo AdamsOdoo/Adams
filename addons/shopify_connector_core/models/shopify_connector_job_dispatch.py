@@ -5,7 +5,7 @@ import random
 import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from ..tools.redaction import redact
@@ -323,6 +323,13 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         Returns the number of jobs dispatched in this pass.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may drain connector '
+                'jobs outside the root cron environment.'
+            )
         cap = (
             self._resolve_drain_batch_size() if limit is None
             else limit

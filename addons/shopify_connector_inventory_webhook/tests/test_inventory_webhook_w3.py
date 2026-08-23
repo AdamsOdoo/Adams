@@ -98,9 +98,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             observation_fields <= binding._protected_binding_fields()
         )
 
-    def _delivery(self, store, suffix, level_gid, source_updated_at):
+    def _delivery(
+        self, store, suffix, level_gid, source_updated_at, body_suffix=None,
+    ):
         digest = hashlib.sha256(
-            ('w3-inventory-body-%s' % suffix).encode('utf-8'),
+            ('w3-inventory-body-%s' % (body_suffix or suffix)).encode('utf-8'),
         ).hexdigest()
         return self.env[
             'shopify.connector.webhook.delivery'
@@ -179,6 +181,13 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             'data_shape_schema_mismatch',
             'W3 later-update admission fixture; child was not read.',
         )
+        failed_duplicate = self._delivery(
+            store, 'failed-terminal-duplicate', level_gid, first_at,
+            body_suffix='first',
+        )
+        failed_duplicate._process_queued()
+        self.assertEqual(failed_duplicate.state, 'manual_review')
+        self.assertIn('unsafe state failed_final', failed_duplicate.processing_note)
         later_at = fields.Datetime.add(first_at, seconds=1)
         later = self._delivery(store, 'later', level_gid, later_at)
         with self.assertNoLogs('odoo.sql_db', level='ERROR'):

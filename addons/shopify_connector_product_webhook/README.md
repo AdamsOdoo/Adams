@@ -5,9 +5,10 @@ pipeline. It activates exactly:
 
 - `products/create`
 - `products/update`
+- `products/delete`
 
-`products/delete` is deliberately not subscribed in W2. The generic webhook
-addon verifies the HTTPS request, HMAC, shop identity, delivery ID and raw
+The generic webhook addon verifies the HTTPS request, HMAC, shop identity,
+delivery ID and raw
 payload digest before persisting a payload-free evidence envelope. The W2
 handler then:
 
@@ -21,6 +22,10 @@ handler then:
    scoped so duplicate or overlapping deliveries coalesce;
 5. returns operator evidence that the child job will perform the authoritative
    Shopify read.
+
+For `products/delete`, that read returns no Shopify node; the existing importer
+marks the product and variant bindings stale for review and never deletes or
+archives the Odoo product.
 
 No Shopify API call is made while processing a webhook. The child importer is
 the only remote-read path, and the scheduled product scan remains the fallback

@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import patch
 
+from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
@@ -108,6 +109,20 @@ class TestInventoryTriggers(TransactionCase):
                 ).id,
             ])],
         })
+        cls.user_reviewer = cls.env['res.users'].create({
+            'name': 'Trigger Test Reviewer',
+            'login': 'trigger_test_reviewer',
+            'group_ids': [(6, 0, [
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_reviewer'
+                ).id,
+            ])],
+        })
+        cls.user_plain = cls.env['res.users'].create({
+            'name': 'Trigger Test Plain User',
+            'login': 'trigger_test_plain',
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
+        })
 
     def _open_push_jobs_for_binding(self, binding):
         return self.env['shopify.connector.job'].search([
@@ -189,6 +204,19 @@ class TestInventoryTriggers(TransactionCase):
         self.settings.invalidate_recordset()
         self.assertFalse(self.settings.inventory_last_push_scan_at)
         self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+
+    def test_inventory_scan_rpc_requires_connector_administrator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        for user in (
+            self.user_plain, self.user_auditor, self.user_operator,
+            self.user_reviewer,
+        ):
+            with self.assertRaises(AccessError, msg=user.login):
+                Service.with_user(user).run_inventory_push_scan()
+        self.assertTrue(
+            Service.with_user(self.user_admin).run_inventory_push_scan(),
+        )
+        self.assertTrue(Service.sudo().run_inventory_push_scan())
 
     def _make_scan_job(self):
         return self.env['shopify.connector.job'].sudo().create({

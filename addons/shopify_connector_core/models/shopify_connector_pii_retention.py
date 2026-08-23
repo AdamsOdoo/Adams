@@ -2,6 +2,7 @@ import json
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 MASKED_PII_VALUE = '***'
@@ -117,6 +118,13 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
         redaction of *evidence*, which stays mandatory; neither touches a
         binding's stored business fields.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may run PII '
+                'retention maintenance.'
+            )
         settings_records = self.env[
             'shopify.connector.store.settings'
         ].sudo().search([('log_redaction_retention_days', '>', 0)])

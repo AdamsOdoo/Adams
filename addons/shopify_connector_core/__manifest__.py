@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.24.0',
+    'version': '19.0.1.25.0',
     'summary': (
         'Shared Odoo <-> Shopify connector runtime and operator app: '
         'stores, guarded credentials, job dispatch and recovery, guided '
@@ -154,4 +154,5 @@ pipeline and no OAuth flow.
     'installable': True,
     'application': True,
     'auto_install': False,
+    'uninstall_hook': 'uninstall_hook',
 }

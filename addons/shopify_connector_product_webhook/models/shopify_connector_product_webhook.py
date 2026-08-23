@@ -13,11 +13,14 @@ from odoo import api, fields, models
 from odoo.exceptions import ValidationError
 
 
-PRODUCT_WEBHOOK_TOPICS = ('products/create', 'products/update')
+PRODUCT_WEBHOOK_TOPICS = (
+    'products/create', 'products/update', 'products/delete',
+)
 PRODUCT_IMPORT_JOB_TYPE = 'product_import_sync'
 TERMINAL_JOB_STATES = (
     'succeeded', 'failed_final', 'skipped', 'cancelled',
 )
+SAFE_ACTIVE_JOB_STATES = ('queued', 'running', 'retry_waiting')
 
 
 def generation_aware_product_payload_hash(updated_at, generation):
@@ -58,11 +61,9 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
                 spec,
                 domain='product',
                 handler='product_import_sync',
-                # The W2 handler requires Shopify's explicit Product GID and
-                # the raw snake_case `updated_at` change stamp.  Keeping the
-                # latter in the allowlist also prevents Shopify from
-                # debouncing consecutive updates whose reduced payload would
-                # otherwise be identical.
+                # Every product topic requires Shopify's explicit Product GID.
+                # Create/update also provide the raw snake_case `updated_at`
+                # stamp; delete safely falls back to the verified body digest.
                 include_fields=['admin_graphql_api_id', 'updated_at'],
             )
         return registry
@@ -160,7 +161,9 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
             order='id asc', limit=1,
         )
         if active:
-            return active, 'coalesced'
+            if active.state in SAFE_ACTIVE_JOB_STATES:
+                return active, 'coalesced'
+            return active, 'unsafe_existing'
         stale_active = Job.search(
             domain + [
                 ('expected_connection_generation', '!=', generation),
@@ -178,7 +181,9 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
             order='id desc', limit=1,
         )
         if duplicate:
-            return duplicate, 'duplicate'
+            if duplicate.state == 'succeeded':
+                return duplicate, 'duplicate_succeeded'
+            return duplicate, 'unsafe_terminal'
         return self.env['shopify.connector.job'].browse(), False
 
     @api.model
@@ -355,18 +360,30 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
                     'created. Reconcile after reconnect.' % job.id
                 ),
             }
-        if job.state == 'blocked_manual_review':
+        if disposition == 'unsafe_existing':
             return {
                 'state': 'manual_review',
                 'message': (
-                    'Product importer job %s is blocked for manual review; '
-                    'the webhook delivery did not create a replacement.' % job.id
+                    'Product importer job %s is in unsafe active state %s; '
+                    'the webhook delivery did not create a replacement or '
+                    'claim success.' % (job.id, job.state)
+                ),
+            }
+        if disposition == 'unsafe_terminal':
+            return {
+                'state': 'manual_review',
+                'message': (
+                    'Product webhook matched prior importer job %s, which '
+                    'ended in unsafe state %s. The delivery remains visible; '
+                    'use the product import recovery route or scheduled '
+                    'reconciliation rather than claiming success.'
+                    % (job.id, job.state)
                 ),
             }
         if disposition == 'enqueued':
             action = 'enqueued'
-        elif disposition == 'duplicate':
-            action = 'matched the existing terminal job in this connection generation'
+        elif disposition == 'duplicate_succeeded':
+            action = 'matched the existing succeeded job in this connection generation'
         else:
             action = 'coalesced with active job'
         return {

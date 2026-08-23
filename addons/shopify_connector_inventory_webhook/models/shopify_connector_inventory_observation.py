@@ -1237,7 +1237,9 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             # A same-generation active job is already accountable.  A stale
             # generation owner is not: leaving the cursor unchanged lets the
             # next scheduled repair revisit it after lifecycle recovery.
-            return disposition in ('coalesced', 'duplicate'), disposition
+            return disposition in (
+                'coalesced', 'duplicate_succeeded',
+            ), disposition
         Enqueue = self.env['shopify.connector.job.enqueue'].sudo()
         try:
             # Keep a racing unique-key failure inside a savepoint.  Without
@@ -1269,7 +1271,9 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             existing, disposition = self._find_existing_observation_job(
                 store, binding.shopify_gid, False,
             )
-            if existing and disposition in ('coalesced', 'duplicate'):
+            if existing and disposition in (
+                'coalesced', 'duplicate_succeeded',
+            ):
                 return True, disposition
             _logger.warning(
                 'Inventory observation fallback could not resolve a '
@@ -1431,7 +1435,9 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             ], order='id asc', limit=1,
         )
         if active:
-            return active, 'coalesced'
+            if active.state in ('queued', 'running', 'retry_waiting'):
+                return active, 'coalesced'
+            return active, 'unsafe_existing'
         stale = Job.search(
             domain + [
                 ('expected_connection_generation', '!=', generation),
@@ -1448,5 +1454,7 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
                 ], order='id desc', limit=1,
             )
             if duplicate:
-                return duplicate, 'duplicate'
+                if duplicate.state == 'succeeded':
+                    return duplicate, 'duplicate_succeeded'
+                return duplicate, 'unsafe_terminal'
         return Job.browse(), False

@@ -42,7 +42,10 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         })
         return store
 
-    def _delivery(self, store, suffix, gid, source_updated_at=None):
+    def _delivery(
+        self, store, suffix, gid, source_updated_at=None,
+        topic='products/update',
+    ):
         digest = hashlib.sha256(
             ('w2-product-body-%s' % suffix).encode('utf-8')
         ).hexdigest()
@@ -53,7 +56,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             store,
             delivery_id='w2-product-delivery-%s' % suffix,
             event_id='w2-product-event-%s' % suffix,
-            topic='products/update',
+            topic=topic,
             shop_domain=store.shop_domain,
             api_version=SHOPIFY_API_VERSION,
             triggered_at=fields.Datetime.now(),
@@ -68,11 +71,27 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         delivery.invalidate_recordset()
         return delivery
 
-    def test_registry_activates_only_product_create_and_update(self):
+    def test_registry_activates_product_create_update_and_safe_delete(self):
         registry = self.env['shopify.connector.webhook.registry']
         active = set(registry.allowed_topics())
         self.assertTrue(set(PRODUCT_WEBHOOK_TOPICS).issubset(active))
-        self.assertNotIn('products/delete', active)
+        self.assertIn('products/delete', active)
+
+    def test_delete_delivery_admits_read_first_stale_binding_path(self):
+        store = self._store('delete')
+        gid = 'gid://shopify/Product/788032119674292999'
+        delivery = self._delivery(
+            store, 'delete', gid, topic='products/delete',
+        )
+        delivery._process_queued()
+        self.assertEqual(delivery.state, 'processed')
+        child = self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', PRODUCT_IMPORT_JOB_TYPE),
+            ('shopify_target_gid', '=', gid),
+        ])
+        self.assertEqual(len(child), 1)
+        self.assertIn('authoritative Shopify read', delivery.processing_note)
         self.assertEqual(
             registry.topic_spec('products/update')['handler'],
             'product_import_sync',
@@ -118,8 +137,8 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             w1_root / 'migrations' / '19.0.1.1.0' / 'post-migrate.py'
         ).read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
-        self.assertIn("'version': '19.0.1.1.0'", w1_manifest)
-        self.assertIn("'version': '19.0.0.2.0'", w2_manifest)
+        self.assertIn("'version': '19.0.1.2.0'", w1_manifest)
+        self.assertIn("'version': '19.0.0.3.0'", w2_manifest)
         self.assertIn('information_schema.columns', migration)
         self.assertIn('expected_include_fields', migration)
         self.assertIn('actual_include_fields', migration)
@@ -408,6 +427,12 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             'data_shape_schema_mismatch',
             'W2 later-update idempotency regression fixture',
         )
+        failed_duplicate = self._delivery(
+            store, 'failed-terminal-duplicate', gid, source_updated_at,
+        )
+        failed_duplicate._process_queued()
+        self.assertEqual(failed_duplicate.state, 'manual_review')
+        self.assertIn('unsafe state failed_final', failed_duplicate.processing_note)
         later = fields.Datetime.add(first.source_updated_at, seconds=1)
         third = self._delivery(store, 'three', gid, later)
         with self.assertNoLogs('odoo.sql_db', level='ERROR'):
@@ -578,8 +603,8 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         manifest = (root.parent / 'shopify_connector_product_webhook' /
                     '__manifest__.py').read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
-        self.assertIn("'products/create', 'products/update'", handler)
-        self.assertNotIn('products/delete', handler)
+        self.assertIn("'products/create', 'products/update', 'products/delete'", handler)
+        self.assertIn('products/delete', handler)
         self.assertIn('admin_graphql_api_id', handler)
         self.assertIn("job_source='webhook'", handler)
         self.assertIn("job_type=PRODUCT_IMPORT_JOB_TYPE", handler)

@@ -67,7 +67,7 @@ import requests
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
@@ -1148,6 +1148,13 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
     @api.model
     def run_media_status_poll(self):
         """Cron: enqueue one poll job per non-terminal media row."""
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may start the media '
+                'status poll outside the root cron environment.'
+            )
         MediaBinding = self.env['shopify.connector.product.media.binding']
         Service = self.env['shopify.connector.product.export.service']
         rows = MediaBinding.sudo().search([

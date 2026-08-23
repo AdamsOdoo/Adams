@@ -1406,6 +1406,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         cron thread, so retry/lifecycle/domain-gating/audit for the scan
         itself all use the job substrate like every other inventory job.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may start the '
+                'scheduled inventory push scan outside the root cron '
+                'environment.'
+            )
         Settings = self.env['shopify.connector.store.settings']
         enqueued = self.env['shopify.connector.job']
         for settings in Settings.search([

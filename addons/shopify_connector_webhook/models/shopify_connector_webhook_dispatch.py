@@ -31,6 +31,8 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
                 self._handle_webhook_subscription_bootstrap,
             'webhook_subscription_reconcile':
                 self._handle_webhook_subscription_reconcile,
+            'webhook_subscription_retire_all':
+                self._handle_webhook_subscription_retire_all,
             'webhook_subscription_create':
                 self._handle_webhook_subscription_mutation_placeholder,
             'webhook_subscription_delete':
@@ -48,6 +50,8 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
             'webhook_subscription_bootstrap':
                 REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             'webhook_subscription_reconcile':
+                REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
+            'webhook_subscription_retire_all':
                 REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             # Core's generic reconciliation handler performs read-only
             # verification and is safe to replay within its bounded job policy.
@@ -168,6 +172,36 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
                 'Webhook reconciliation could not complete safely.',
                 type(exc).__name__,
             )
+
+    @api.model
+    def _handle_webhook_subscription_retire_all(self, job):
+        """Fresh-read then retire every exact subscription for uninstall."""
+        subscription = self.env['shopify.connector.webhook.subscription']
+        try:
+            actual = subscription._read_actual_subscriptions(
+                job.store_id, job,
+            )
+            subscription._reconcile_registry_removed_subscriptions(
+                job.store_id, (), actual, source='manual_sync',
+                epoch=subscription._credential_epoch(job.store_id),
+            )
+        except ShopifyClientError as exc:
+            raise JobHandlerError(
+                exc.error_class, exc.reason, exc.technical_detail,
+            ) from exc
+        except ShopifyQuiescedError as exc:
+            raise JobHandlerError(
+                'shopify_temporary_server_network',
+                'Webhook uninstall preparation was refused by store '
+                'quiescence.',
+                type(exc).__name__,
+            ) from exc
+        except (ValidationError, UserError, ShopifyWebhookSchemaError) as exc:
+            raise JobHandlerError(
+                'odoo_validation_configuration',
+                'Webhook uninstall preparation could not complete safely.',
+                type(exc).__name__,
+            ) from exc
 
     @api.model
     def _handle_webhook_subscription_bootstrap(self, job):
