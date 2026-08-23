@@ -63,6 +63,18 @@ def _bounded_sweep_remaining(selected_count, processed):
     return max(int(selected_count or 0) - int(processed or 0), 0)
 
 
+def _latest_reconciled_at(values):
+    """Return the latest persisted reconciliation timestamp, if any.
+
+    New expected subscription rows legitimately have no reconciliation
+    timestamp yet. Filter those falsey placeholders before comparing
+    datetimes so a mixed registry remains safely observable while work is
+    admitted.
+    """
+    reconciled = [value for value in (values or ()) if value]
+    return max(reconciled) if reconciled else False
+
+
 def _scheduled_reconciliation_bucket_limits(limit, null_cursor_count):
     """Return the bounded NULL-first selection plan.
 
@@ -1759,8 +1771,8 @@ class ShopifyConnectorWebhookSubscriptionStore(models.Model):
             store.webhook_callback_path = self.env[
                 'shopify.connector.webhook.secret'
             ]._callback_path_label()
-            store.webhook_last_reconciled_at = max(
-                subscriptions.mapped('last_reconciled_at') or [False]
+            store.webhook_last_reconciled_at = _latest_reconciled_at(
+                subscriptions.mapped('last_reconciled_at')
             )
             credential = self.env[
                 'shopify.connector.store.credential'
