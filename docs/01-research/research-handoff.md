@@ -1,3 +1,65 @@
+### PR #206 independent review — exact head 6bb05c0c — REVISE — compact handoff (2026-08-23)
+
+- **Branch / PR:** review of `codex/ui-restructure-implementation` @
+  `6bb05c0cb0a91be856d9066451f292d5b1a7c791` (draft PR #206, base
+  `fable/wave-5-completion@49cfffbd`); this handoff lives on
+  `claude/connector-ui-config-design-ks0avb`; no code changed by this session.
+- **Files changed:** this handoff only. The complete review report was posted
+  verbatim to PR #206 as comment
+  [`5383360935`](https://github.com/AdamsOdoo/Adams/pull/206#issuecomment-5383360935)
+  (+ SHA-footer correction `5383361779`) — the durable record per §13.
+- **What changed / verdict:** first recorded independent review of the
+  correction range `9819b84…6bb05c0c` and consolidated verification of the
+  2026-08-18 agreed finding sets. **Verdict: REVISE — one consolidated
+  correction.** CI green at the exact head (runs 32594700478/32594702709)
+  under the fail-closed runner (self-test verified locally). Confirmed
+  genuinely fixed: all four C6 mode-switch defects; C4 refresh follow-through
+  with genuine-dispatcher tours; A3 sales-metric truth on all rendered paths;
+  dashboard split; C5 acknowledgement ladder; B2 read seam 13/13 migrated;
+  every C8 contract intact or strengthened; base webhook module passes
+  security review; domain webhook add-ons no P0/P1; evidence corpus honest,
+  recovery forensics clean. REVISE drivers: 11 of 13 blocking findings from
+  the 2026-08-18 reviews remain open (both invalid GraphQL documents
+  re-validated against the live Shopify Admin schema this session — order
+  import and all fulfillment reads fail on live contact; export status-DRAFT
+  unpublish + variant-bind break keep the export-confirmation freeze in
+  force; app/uninstalled fencing, expected-flag restore, behavioral route
+  tests, token rotation still missing) + 4 new P1s (watermark stamped on
+  read-failure-blocked scans; legacy `get_store_360_data` still serves the
+  review-inclusive per-store aggregate; unratified C2 rewiring with false
+  in-tree comments; Sync Rules navigation dead-end in full-suite install) +
+  material P2 set incl. mission bookkeeping (stale PR body, this previously
+  frozen handoff, stale program-state, C–F ledger gaps).
+- **Items deferred:** the consolidated correction (implementer);
+  verification-only re-review at the corrected head; two product-owner
+  decisions (ratify tightened C2 model — recommended; webhook menu
+  placement); Odoo.sh exact-head + controlled live campaign remain the
+  release gates after ACCEPT.
+- **Learning feedback loop:** *New issue:* a "one consolidated correction"
+  loop silently degrades when new scope (webhook family) lands before the
+  agreed finding set is cleared — carried-over P0s coexisted with green CI
+  for four days because CI has no live Shopify; finding-set closure must be
+  tracked in a register, not in comment threads. *Repeated pattern:*
+  contract-locked artifacts (C2 graph, C1 tree) were amended in code without
+  a recorded amendment — same class as the earlier role/process drift; locked
+  artifacts need a conformance test that fails on unratified change (the
+  menu test existed and was edited to pass — the register entry is the
+  missing half). *Rules updated:* none. *Rejected approaches:* none.
+  *Technical debt:* Part C/D of the posted review. *Architecture concerns:*
+  none beyond the posted findings.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked
+  YES · learning captured YES · rejected approach logged N/A · technical
+  debt logged YES (in the PR review, Parts C/D) · repeated-issue escalation
+  YES (locked-artifact drift flagged above and in the review's B-3/C-6).
+- **Next recommended session:** after the implementer posts
+  `READY-FOR-CLAUDE-REVIEW` at the corrected head: verification-only
+  re-review against the posted finding set (Parts A+B+C), then — on ACCEPT —
+  the browser-driven E2E campaign and the Odoo.sh/live gates with
+  product-owner-provided access.
+- **Stop condition:** review-and-report only; no acceptance, no
+  ready-marking, no merge, no code change, no live Shopify mutation
+  (schema validation only), no Odoo runtime.
+
 ### UI restructure — product-owner sign-off + ChatGPT implementation mission — compact handoff (2026-08-02, continuation)
 
 - **Branch / PR:** `claude/connector-ui-config-design-ks0avb` (same session,
