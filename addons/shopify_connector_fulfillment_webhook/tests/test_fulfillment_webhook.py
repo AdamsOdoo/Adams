@@ -1,9 +1,11 @@
 import hashlib
+import json
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from odoo import fields
+from odoo.exceptions import ValidationError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.tools.api_version import (
@@ -12,11 +14,18 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
+from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subscription import (
+    _SUBSCRIPTION_SERVICE_CONTEXT,
+    _SUBSCRIPTION_SERVICE_SENTINEL,
+)
 
 from ..models.shopify_connector_fulfillment_webhook import (
     FULFILLMENT_WEBHOOK_RESOLVE_JOB_TYPE,
     FULFILLMENT_WEBHOOK_TOPICS,
     canonical_shopify_gid,
+)
+from ..models.shopify_connector_fulfillment_webhook_readiness import (
+    FULFILLMENT_WEBHOOK_READ_SCOPE,
 )
 
 
@@ -38,6 +47,38 @@ class TestShopifyConnectorFulfillmentWebhook(TransactionCase):
             'fulfillment_domain_enabled': True,
         })
         return store
+
+    def _subscription(self, store, topic, state='expected', gid=False):
+        topic_enum = topic.upper().replace('/', '_')
+        values = {
+            'store_id': store.id,
+            'topic': topic,
+            'topic_enum': topic_enum,
+            'expected': True,
+            'expected_api_version': SHOPIFY_API_VERSION,
+            'state': state,
+        }
+        if gid:
+            values['shopify_subscription_gid'] = gid
+        return self.env[
+            'shopify.connector.webhook.subscription'
+        ].sudo().with_context(
+            **{_SUBSCRIPTION_SERVICE_CONTEXT: _SUBSCRIPTION_SERVICE_SENTINEL},
+        ).create(values)
+
+    def _mutation_job(self, store, action, topic):
+        return self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': (
+                'webhook_subscription_create'
+                if action == 'create' else 'webhook_subscription_delete'
+            ),
+            'state': 'queued',
+            'payload_hash': 'scope-gate-%s-%s-%s' % (
+                store.id, action, topic.replace('/', '_'),
+            ),
+        })
 
     def _delivery(
         self, store, suffix, fulfillment_gid,
@@ -77,6 +118,201 @@ class TestShopifyConnectorFulfillmentWebhook(TransactionCase):
             registry.topic_spec('fulfillments/update')['include_fields'],
             ['admin_graphql_api_id'],
         )
+
+    def test_fulfillment_webhook_scope_is_catalogued_and_essential(self):
+        store = self._store('scope-check')
+        Check = self.env['shopify.connector.readiness.check']
+        catalog = Check._governed_scope_catalog()
+        entry = next(
+            item for item in catalog
+            if item['scope'] == FULFILLMENT_WEBHOOK_READ_SCOPE
+        )
+        self.assertIn('fulfillments/create', entry['reason'])
+        self.assertIn('fulfillments/update', entry['reason'])
+
+        store.write({'granted_scopes': json.dumps(['read_inventory'])})
+        result = Check._check_fulfillment_webhook_read_scope(store)
+        self.assertEqual(result['tier'], Check.ESSENTIAL)
+        self.assertEqual(result['result'], Check.RESULT_FAIL)
+
+        store.write({
+            'granted_scopes': json.dumps([
+                'read_inventory', FULFILLMENT_WEBHOOK_READ_SCOPE,
+            ]),
+        })
+        result = Check._check_fulfillment_webhook_read_scope(store)
+        self.assertEqual(result['result'], Check.RESULT_PASS)
+
+        self.env['shopify.connector.store.settings'].search([
+            ('store_id', '=', store.id),
+        ], limit=1).write({'fulfillment_domain_enabled': False})
+        result = Check._check_fulfillment_webhook_read_scope(store)
+        self.assertTrue(result['not_applicable'])
+        self.assertEqual(result['result'], Check.RESULT_PASS)
+
+    def test_missing_fulfillment_webhook_scope_blocks_subscription_mutation(self):
+        store = self._store('scope-mutation-block')
+        store.write({'granted_scopes': json.dumps(['read_inventory'])})
+        subscriptions = [
+            self._subscription(store, 'fulfillments/create'),
+            self._subscription(store, 'fulfillments/update'),
+        ]
+        Job = self.env['shopify.connector.job']
+        before_jobs = Job.search_count([('store_id', '=', store.id)])
+        SubscriptionModel = type(subscriptions[0])
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel,
+            '_enqueue_job_with_recovery',
+            side_effect=AssertionError('blocked create must not enqueue a job'),
+        ) as enqueue:
+            for subscription in subscriptions:
+                with self.assertRaises(ValidationError):
+                    self.env[
+                        'shopify.connector.webhook.subscription'
+                    ]._enqueue_subscription_mutation(
+                        subscription, 'create', 'scheduled_sync',
+                    )
+        after_jobs = Job.search_count([('store_id', '=', store.id)])
+        self.assertEqual(after_jobs, before_jobs)
+        enqueue.assert_not_called()
+        for subscription in subscriptions:
+            self.assertFalse(subscription.last_job_id)
+
+    def test_malformed_fulfillment_webhook_scope_blocks_subscription_create(self):
+        store = self._store('scope-malformed-block')
+        subscriptions = [
+            self._subscription(store, 'fulfillments/create'),
+            self._subscription(store, 'fulfillments/update'),
+        ]
+        malformed_snapshots = ('not-json', json.dumps({}), json.dumps([]))
+        Job = self.env['shopify.connector.job']
+        before_jobs = Job.search_count([('store_id', '=', store.id)])
+        SubscriptionModel = type(subscriptions[0])
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel,
+            '_enqueue_job_with_recovery',
+            side_effect=AssertionError('blocked create must not enqueue a job'),
+        ) as enqueue:
+            for snapshot in malformed_snapshots:
+                store.write({'granted_scopes': snapshot})
+                for subscription in subscriptions:
+                    with self.assertRaises(ValidationError):
+                        self.env[
+                            'shopify.connector.webhook.subscription'
+                        ]._enqueue_subscription_mutation(
+                            subscription, 'create', 'scheduled_sync',
+                        )
+        after_jobs = Job.search_count([('store_id', '=', store.id)])
+        self.assertEqual(after_jobs, before_jobs)
+        enqueue.assert_not_called()
+        for subscription in subscriptions:
+            self.assertFalse(subscription.last_job_id)
+
+    def test_unrelated_subscription_create_is_not_blocked_by_scope_gate(self):
+        store = self._store('scope-unrelated-create')
+        store.write({'granted_scopes': 'not-json'})
+        subscription = self._subscription(store, 'products/create')
+        job = self._mutation_job(store, 'create', subscription.topic)
+        SubscriptionModel = type(subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel, '_enqueue_job_with_recovery', return_value=job,
+        ):
+            result = self.env[
+                'shopify.connector.webhook.subscription'
+            ]._enqueue_subscription_mutation(
+                subscription, 'create', 'scheduled_sync',
+            )
+        subscription.invalidate_recordset()
+        self.assertEqual(result, job)
+        self.assertEqual(subscription.last_job_id, job)
+
+    def test_cleanup_delete_is_not_blocked_by_scope_gate(self):
+        store = self._store('scope-cleanup-delete')
+        store.write({'granted_scopes': 'not-json'})
+        subscription = self._subscription(
+            store,
+            'fulfillments/update',
+            state='active',
+            gid='gid://shopify/WebhookSubscription/cleanup-1',
+        )
+        job = self._mutation_job(store, 'delete', subscription.topic)
+        SubscriptionModel = type(subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel, '_enqueue_job_with_recovery', return_value=job,
+        ):
+            result = self.env[
+                'shopify.connector.webhook.subscription'
+            ]._enqueue_subscription_mutation(
+                subscription, 'delete', 'scheduled_sync',
+            )
+        subscription.invalidate_recordset()
+        self.assertEqual(result, job)
+        self.assertEqual(subscription.last_job_id, job)
+
+    def test_fulfillment_subscription_create_rejects_disabled_domain(self):
+        store = self._store('scope-domain-disabled')
+        self.env['shopify.connector.store.settings'].search([
+            ('store_id', '=', store.id),
+        ], limit=1).write({'fulfillment_domain_enabled': False})
+        store.write({'granted_scopes': json.dumps([
+            FULFILLMENT_WEBHOOK_READ_SCOPE,
+        ])})
+        subscription = self._subscription(store, 'fulfillments/create')
+        Job = self.env['shopify.connector.job']
+        before_jobs = Job.search_count([('store_id', '=', store.id)])
+        SubscriptionModel = type(subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel,
+            '_enqueue_job_with_recovery',
+            side_effect=AssertionError('disabled domain must not enqueue a job'),
+        ) as enqueue, self.assertRaises(ValidationError):
+            self.env[
+                'shopify.connector.webhook.subscription'
+            ]._enqueue_subscription_mutation(
+                subscription, 'create', 'scheduled_sync',
+            )
+        after_jobs = Job.search_count([('store_id', '=', store.id)])
+        self.assertEqual(after_jobs, before_jobs)
+        enqueue.assert_not_called()
+        self.assertFalse(subscription.last_job_id)
+
+    def test_present_fulfillment_webhook_scope_allows_subscription_create(self):
+        store = self._store('scope-create-allowed')
+        store.write({'granted_scopes': json.dumps([
+            FULFILLMENT_WEBHOOK_READ_SCOPE,
+        ])})
+        subscription = self._subscription(store, 'fulfillments/update')
+        job = self._mutation_job(store, 'create', subscription.topic)
+        SubscriptionModel = type(subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), patch.object(
+            SubscriptionModel, '_enqueue_job_with_recovery', return_value=job,
+        ):
+            result = self.env[
+                'shopify.connector.webhook.subscription'
+            ]._enqueue_subscription_mutation(
+                subscription, 'create', 'scheduled_sync',
+            )
+        subscription.invalidate_recordset()
+        self.assertEqual(result, job)
+        self.assertEqual(subscription.last_job_id, job)
 
     def test_numeric_order_id_is_never_used_and_exact_fulfillment_gid_is_required(self):
         fulfillment_gid = 'gid://shopify/Fulfillment/7001'
