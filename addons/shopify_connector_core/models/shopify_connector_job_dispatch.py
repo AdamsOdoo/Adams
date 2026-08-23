@@ -344,6 +344,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         report_progress = self._concurrency_retry_supported()
         Job = self.env['shopify.connector.job']
         processed = 0
+        served_stores = set()
         for _slot in range(cap):
             # TD-014 correction. The deferred set used to be computed ONCE,
             # here, before the loop -- so throttle pressure a job in THIS
@@ -375,15 +376,26 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                         "rest of it.", len(newly),
                     )
                     deferred |= newly
-            exclude = tuple(sorted(deferred))
-            if not self._drain_one(exclude_store_ids=exclude):
+            fair_exclude = tuple(sorted(deferred | served_stores))
+            claimed_store_id = self._drain_one(
+                exclude_store_ids=fair_exclude,
+            )
+            if not claimed_store_id and served_stores:
+                # Every currently eligible store received one slot. Begin a
+                # new round without lifting rate-limit deferrals.
+                served_stores.clear()
+                claimed_store_id = self._drain_one(
+                    exclude_store_ids=tuple(sorted(deferred)),
+                )
+            if not claimed_store_id:
                 break
+            served_stores.add(claimed_store_id)
             processed += 1
             if not report_progress:
                 continue
             remaining = self.env['ir.cron']._commit_progress(
                 1,
-                remaining=Job._claimable_count(exclude),
+                remaining=Job._claimable_count(tuple(sorted(deferred))),
             )
             if remaining <= 0:
                 _logger.info(
@@ -427,7 +439,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         for ``local_only``/``remote_read_replay_safe`` jobs, manual review
         for ``remote_effect_not_replay_safe``/undeclared ones).
 
-        Returns ``True`` when a job was claimed and handled (whether it
+        Returns the claimed store id when a job was handled (whether it
         succeeded, was refused, routed, recovered, or left to another worker),
         ``False`` when no claimable job remains so ``run_drain`` can stop early.
         """
@@ -437,6 +449,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         if not claimed:
             return False
         job_id = claimed.id
+        claimed_store_id = claimed.store_id.id
 
         if self._is_mutation_job_type(claimed.job_type):
             if not self._concurrency_retry_supported():
@@ -445,7 +458,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                     'real commit boundaries.'
                 )
             self._drain_mutation_one(claimed)
-            return True
+            return claimed_store_id
 
         if not self._concurrency_retry_supported():
             # The shared in-test transaction cursor forbids commit/rollback, so
@@ -456,7 +469,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # independent-connection lifecycle tests drive the real boundary
             # below on real pooled cursors.
             self._dispatch_one(claimed)
-            return True
+            return claimed_store_id
 
         try:
             # Dispatch the claimed job ONCE, under the currently-held claim.
@@ -488,7 +501,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # Commit this job's own outcome so a later job's rollback can never
             # undo it and it is never re-exposed to a duplicate call.
             self.env.cr.commit()
-        return True
+        return claimed_store_id
 
     @api.model
     def _recover_after_concurrency_conflict(self, job_id):

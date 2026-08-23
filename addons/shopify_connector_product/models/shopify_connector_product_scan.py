@@ -30,17 +30,13 @@ whole catalog. §8.1.8 forbids a default that silently omits old or unchanged
 products, and the surest way to honour it is to ask for no narrowing at all
 and let the checkpoint -- not a status guess -- decide what is new work.
 
-THE BOUND, STATED RATHER THAN DISCOVERED (TD-024). One scan reads
-`PRODUCT_SCAN_PAGE_SIZE` (100) products per page and refuses beyond
-`PRODUCT_SCAN_PAGE_LIMIT` (200) pages, so a single run covers at most
-`PRODUCT_SCAN_MAX_PRODUCTS` (20,000) products in the window it is scanning.
-Above that it FAILS CLOSED: no checkpoint advance, no partial success, no
-silent truncation -- and no progress either, because the next run restarts the
-same window and stops in the same place. A catalog larger than the ceiling
-therefore cannot complete an initial import at all. The fix is bounded
-RESUMABLE enumeration through the existing job mechanism, which is recorded as
-technical debt rather than built here; the controlled-Shopify/UAT preflight
-must confirm the target store is under the ceiling before that campaign runs.
+THE BOUND AND RESUMPTION CONTRACT (WP-6). Each job reads at most
+`PRODUCT_SCAN_SLICE_PAGES` pages. The fixed lower/upper window, server cursor,
+latest observed timestamp, connection generation, and page count are durable
+on Store Settings. A terminal successor resumes that exact window; only its
+final page advances the public checkpoint. The legacy 200-page ceiling remains
+solely as a defensive bound for explicitly non-resumable internal callers and
+is no longer a catalog-size ceiling for scheduled or manual product scans.
 """
 
 import hashlib
@@ -67,8 +63,9 @@ _logger = logging.getLogger(__name__)
 PRODUCT_SCAN_TARGET = 'scan:product'
 PRODUCT_SCAN_PAGE_SIZE = 100
 PRODUCT_SCAN_PAGE_LIMIT = 200
-# The single scan's hard ceiling, stated once so the operator-facing refusal
-# and the technical-debt register cannot drift from the code.
+PRODUCT_SCAN_SLICE_PAGES = 10
+# A non-resumable caller's defensive ceiling. Scheduled/import scans use
+# durable bounded slices and therefore continue beyond this legacy ceiling.
 PRODUCT_SCAN_MAX_PRODUCTS = PRODUCT_SCAN_PAGE_SIZE * PRODUCT_SCAN_PAGE_LIMIT
 
 # The exact cron this module installs. Named as a constant so the truthful
@@ -111,17 +108,67 @@ class ShopifyConnectorProductScan(models.AbstractModel):
         store = job.store_id
         settings = self._settings(store)
         self._assert_import_direction_permits_scan(settings)
-        # A FIXED upper bound, captured once, before the first page. Without
-        # it a long enumeration would keep sliding its own ceiling forward and
-        # the checkpoint would end up describing a moment the scan never
-        # actually reached consistently.
-        scan_upper_bound = fields.Datetime.now()
-        start = self._incremental_start(settings)
-        counts, latest = self._enumerate(
+        generation = job.expected_connection_generation
+        if (
+            settings.product_scan_window_end_at
+            and settings.product_scan_generation == generation
+        ):
+            start = settings.product_scan_window_start_at or False
+            scan_upper_bound = settings.product_scan_window_end_at
+            cursor = settings.product_scan_cursor or None
+            prior_latest = settings.product_scan_latest_at or False
+            prior_pages = settings.product_scan_page_count or 0
+        else:
+            # A fixed durable window is captured once and reused by every
+            # continuation job. A restart can never slide either boundary.
+            scan_upper_bound = fields.Datetime.now()
+            start = self._incremental_start(settings)
+            cursor = None
+            prior_latest = False
+            prior_pages = 0
+            settings.sudo().write({
+                'product_scan_window_start_at': start,
+                'product_scan_window_end_at': scan_upper_bound,
+                'product_scan_cursor': False,
+                'product_scan_latest_at': False,
+                'product_scan_page_count': 0,
+                'product_scan_generation': generation,
+            })
+        counts, latest, next_cursor, complete = self._enumerate(
             job, store,
             query_filter=self._range_filter(start, scan_upper_bound),
             job_source=job.job_source,
+            start_cursor=cursor,
+            page_limit=PRODUCT_SCAN_SLICE_PAGES,
+            resumable=True,
         )
+        latest = max(filter(None, (prior_latest, latest)), default=False)
+        total_pages = prior_pages + counts['pages']
+        if not complete:
+            settings.sudo().write({
+                'product_scan_cursor': next_cursor,
+                'product_scan_latest_at': latest,
+                'product_scan_page_count': total_pages,
+            })
+            job.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            self.env['shopify.connector.job.log']._system_append(
+                job, 'state_change',
+                'Product scan slice completed; durable cursor saved and the '
+                'next bounded slice was queued.',
+                from_state='running', to_state='succeeded',
+                technical_detail=json.dumps(counts, sort_keys=True),
+            )
+            successor = store._enqueue_product_scan(job.job_source)
+            if not successor:
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'Product scan cursor was saved but no continuation job '
+                    'could be admitted.',
+                )
+            return counts
         checkpoint = settings.product_last_import_checkpoint_at
         next_checkpoint = latest
         if not next_checkpoint or (
@@ -136,6 +183,12 @@ class ShopifyConnectorProductScan(models.AbstractModel):
         settings.sudo().write({
             'product_last_import_checkpoint_at': next_checkpoint,
             'product_last_import_success_at': scan_upper_bound,
+            'product_scan_window_start_at': False,
+            'product_scan_window_end_at': False,
+            'product_scan_cursor': False,
+            'product_scan_latest_at': False,
+            'product_scan_page_count': 0,
+            'product_scan_generation': 0,
         })
         self.env['shopify.connector.job.log']._system_append(
             job,
@@ -203,13 +256,16 @@ class ShopifyConnectorProductScan(models.AbstractModel):
         return fields.Datetime.to_string(value).replace(' ', 'T') + 'Z'
 
     @api.model
-    def _enumerate(self, job, store, query_filter, job_source):
+    def _enumerate(
+        self, job, store, query_filter, job_source, start_cursor=None,
+        page_limit=PRODUCT_SCAN_PAGE_LIMIT, resumable=False,
+    ):
         client = self.env['shopify.connector.api.client']
         # GraphQL nullable String variables must use JSON null on the first
         # page.  Python ``False`` serializes as JSON false, which Shopify
         # correctly refuses to coerce to ``String`` before executing the
         # query.
-        cursor = None
+        cursor = start_cursor
         page_count = 0
         seen_cursors = set()
         seen_gids = set()
@@ -221,7 +277,9 @@ class ShopifyConnectorProductScan(models.AbstractModel):
             'pages': 0,
         }
         while True:
-            if page_count >= PRODUCT_SCAN_PAGE_LIMIT:
+            if page_count >= page_limit:
+                if resumable:
+                    return counts, latest, cursor, False
                 # §8.1.15: visible, never a silent truncation. Stopping here
                 # and reporting success would advance the checkpoint past
                 # products this scan never looked at.
@@ -292,6 +350,8 @@ class ShopifyConnectorProductScan(models.AbstractModel):
                 else:
                     counts['collided'] += 1
             if not page['has_next']:
+                if resumable:
+                    return counts, latest, False, True
                 return counts, latest
             if not page['end_cursor'] or page['end_cursor'] == cursor:
                 raise JobHandlerError(

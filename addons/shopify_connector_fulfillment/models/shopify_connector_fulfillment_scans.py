@@ -15,6 +15,7 @@ from .shopify_connector_job import (
     JOB_TYPE_INBOUND_OBSERVATION,
     JOB_TYPE_MODE2_EVALUATION,
     JOB_TYPE_MODE_SWITCH_SCAN,
+    JOB_TYPE_RECONCILIATION_CHECK,
 )
 
 _logger = logging.getLogger(__name__)
@@ -116,15 +117,34 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         # Coverage instant for the generation-bound completion stamp: the
         # pass proves fulfillment evidence observed through the moment the
         # traversal STARTED (a conservative claim — reads happen after it).
-        observed_through = fields.Datetime.now()
+        settings = self._settings(store)
+        generation = job.expected_connection_generation
+        if (
+            settings.fulfillment_reconciliation_generation == generation
+            and settings.fulfillment_reconciliation_observed_through_at
+        ):
+            cursor_id = settings.fulfillment_reconciliation_cursor_id or 0
+            observed_through = (
+                settings.fulfillment_reconciliation_observed_through_at
+                or fields.Datetime.now()
+            )
+        else:
+            cursor_id = 0
+            observed_through = fields.Datetime.now()
+            settings.sudo().write({
+                'fulfillment_reconciliation_cursor_id': 0,
+                'fulfillment_reconciliation_generation': generation,
+                'fulfillment_reconciliation_observed_through_at':
+                    observed_through,
+            })
         Binding = self.env['shopify.connector.fulfillment.binding'].sudo()
-        # Theme E: paginate the COMPLETE current population every run (never a
-        # fixed 200-row window) so a store's reconciliation coverage never
-        # permanently stops growing beyond an arbitrary cutoff. The watermark
-        # below is stamped only once this full pass has genuinely completed.
-        bindings = self._paginate_local_to_completion(
-            Binding, [('store_id', '=', store.id)],
-        )
+        # One bounded keyset page per job keeps the cron window predictable.
+        # The cursor belongs to the connection generation and a successor job
+        # resumes it; only the final page advances the coverage watermark.
+        bindings = Binding.search([
+            ('store_id', '=', store.id),
+            ('id', '>', cursor_id),
+        ], order='id asc', limit=RECONCILE_BATCH)
         # Correction P1-2: a binding read that cannot complete is collected,
         # not silently skipped-and-forgotten -- the pass still processes
         # every OTHER binding it can, but a decision-critical read failure
@@ -163,7 +183,39 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
                 'binding(s); the watermark was not advanced and this pass '
                 'is not reported as complete.' % (read_failures, len(bindings)),
             )
-        self._settings(store).sudo().write({
+        has_more = bool(bindings) and Binding.search_count([
+            ('store_id', '=', store.id),
+            ('id', '>', max(bindings.ids)),
+        ], limit=1)
+        if has_more:
+            settings.sudo().write({
+                'fulfillment_reconciliation_cursor_id': max(bindings.ids),
+            })
+            job.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            job._log_transition(
+                'state_change',
+                'Fulfillment reconciliation slice completed; the durable '
+                'cursor was saved and a continuation was queued.',
+                from_state='running', to_state='succeeded',
+            )
+            successor = self._enqueue_once(
+                store, 'reconciliation', JOB_TYPE_RECONCILIATION_CHECK,
+                'reconciliation_check:%d:%s' % (
+                    store.id, uuid.uuid4().hex[:8],
+                ),
+                'shopify.connector.store', store.id,
+            )
+            if not successor:
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'Fulfillment reconciliation cursor was saved but no '
+                    'continuation job could be admitted.',
+                )
+            return
+        settings.sudo().write({
             'fulfillment_last_reconciliation_at': fields.Datetime.now(),
             # Store 360 / R-4 pending catch-up lineage: a genuinely complete
             # pass over the known fulfillment population, admitted at this
@@ -178,6 +230,9 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
             'fulfillment_catchup_pending_observed_through_at':
                 observed_through,
             'fulfillment_catchup_pending_job_id': job.id,
+            'fulfillment_reconciliation_cursor_id': 0,
+            'fulfillment_reconciliation_generation': 0,
+            'fulfillment_reconciliation_observed_through_at': False,
         })
 
     @api.model

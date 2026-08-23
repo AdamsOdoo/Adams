@@ -85,6 +85,35 @@ class TestOrderScanTriggers(OrderImportCase):
             'the second page must use the cursor Shopify returned',
         )
 
+    def test_scan_persists_cursor_and_resumes_in_successor_job(self):
+        job = self._job(
+            job_type='order_import_scan', target='scan:order', state='running',
+        )
+        first_sent = []
+        first_slice = [
+            self._scan_body([], has_next=True, end_cursor='CUR-%d' % index)
+            for index in range(10)
+        ]
+        with self._patch_scan(first_slice, sent=first_sent):
+            self.env['shopify.connector.order.scan'].run_scan(job)
+        self.settings.invalidate_recordset()
+        self.assertEqual(self.settings.sale_order_scan_cursor, 'CUR-9')
+        self.assertFalse(self.settings.sale_order_last_import_checkpoint_at)
+        successor = self.env['shopify.connector.job'].search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'order_import_scan'),
+            ('id', '>', job.id),
+        ], limit=1)
+        self.assertTrue(successor)
+        successor.sudo().write({'state': 'running'})
+        second_sent = []
+        with self._patch_scan([self._scan_body([])], sent=second_sent):
+            self.env['shopify.connector.order.scan'].run_scan(successor)
+        self.assertEqual(second_sent[0]['after'], 'CUR-9')
+        self.settings.invalidate_recordset()
+        self.assertTrue(self.settings.sale_order_last_import_checkpoint_at)
+        self.assertFalse(self.settings.sale_order_scan_cursor)
+
     def test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent(self):
         for role in ('auditor', 'reviewer'):
             with self.assertRaises(AccessError, msg=role):

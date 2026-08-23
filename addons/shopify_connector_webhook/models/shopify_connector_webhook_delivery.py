@@ -22,7 +22,7 @@ DELIVERY_STATES = [
 ]
 TERMINAL_DELIVERY_STATES = ('processed', 'ignored', 'failed', 'manual_review')
 WEBHOOK_RETENTION_DAYS = 30
-WEBHOOK_RETENTION_BATCH = 500
+WEBHOOK_RETENTION_BATCH = 2000
 
 _DELIVERY_SERVICE_CONTEXT = 'shopify_connector_webhook_delivery_service'
 _DELIVERY_SERVICE_SENTINEL = object()

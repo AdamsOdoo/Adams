@@ -161,7 +161,7 @@ class ShopifyConnectorMutationAttempt(models.Model):
         readonly=True,
     )
     transport_at = fields.Datetime(readonly=True)
-    resolved_at = fields.Datetime(readonly=True)
+    resolved_at = fields.Datetime(readonly=True, index=True)
     business_object = fields.Char(
         compute='_compute_business_presentation', readonly=True,
     )

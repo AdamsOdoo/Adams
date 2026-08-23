@@ -201,6 +201,32 @@ class TestFulfillmentScans(TransactionCase):
         self.settings.invalidate_recordset()
         self.assertTrue(self.settings.fulfillment_last_reconciliation_at)
 
+    def test_reconciliation_check_is_bounded_and_resumable(self):
+        first = self._fulfillment_binding(
+            'gid://shopify/Fulfillment/RC-SLICE-1'
+        )
+        self._fulfillment_binding('gid://shopify/Fulfillment/RC-SLICE-2')
+        job = self._scan_job('fulfillment_reconciliation_check')
+        job.sudo().write({'state': 'running'})
+        node = {'id': first.shopify_gid, 'status': 'SUCCESS',
+                'trackingInfo': []}
+        with patch(
+            'odoo.addons.shopify_connector_fulfillment.models.'
+            'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 1,
+        ), patch.object(
+            type(self.Service), '_read_fulfillment', return_value=node,
+        ):
+            self.Service._handle_fulfillment_reconciliation_check(job)
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.fulfillment_reconciliation_cursor_id, first.id,
+        )
+        self.assertFalse(self.settings.fulfillment_last_reconciliation_at)
+        successor = self._reconciliation_check_jobs().filtered(
+            lambda row: row.id > job.id and row.state == 'queued'
+        )
+        self.assertEqual(len(successor), 1)
+
     # ------------------------------------------------------------------
     # Reconnect catch-up: gap-period externals -> review in BOTH modes
     # ------------------------------------------------------------------

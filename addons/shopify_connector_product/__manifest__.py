@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product',
-    'version': '19.0.2.13.0',
+    'version': '19.0.2.14.0',
     'summary': (
         'Read-only Shopify product and variant import with scheduled scans, '
         'bindings, attributes, prices, images, explicit match decisions, '

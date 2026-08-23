@@ -128,6 +128,8 @@ class TestProductScanProducer(TransactionCase):
         job = job or self.store.with_user(
             self.roles['operator']
         ).action_sync_products_now()
+        if job.state == 'queued':
+            job.sudo().write({'state': 'running'})
         patcher, sent = self._patch_scan(bodies)
         with patcher:
             self.Dispatch._handle_product_import_scan(job)
@@ -345,35 +347,37 @@ class TestProductScanProducer(TransactionCase):
                 reason='malformed-shape fixture cleanup',
             )
 
-    def test_page_ceiling_fails_visibly(self):
+    def test_resumable_scan_continues_beyond_legacy_page_ceiling(self):
         pages = [
-            self._page([self._node(str(index))], has_next=True,
+            self._page([self._node(str(index))], has_next=(
+                index < PRODUCT_SCAN_PAGE_LIMIT
+            ),
                        end_cursor='CUR-%d' % index,
                        cursor_prefix='p%d' % index)
             for index in range(PRODUCT_SCAN_PAGE_LIMIT + 1)
         ]
-        with self.assertRaises(JobHandlerError) as ceiling:
-            self._run_scan(pages)
-        reason = ceiling.exception.reason
-        # Batch 2 correction (F11): the refusal must state the LIMIT, its
-        # CONSEQUENCE and the fact that retrying will not help. "The product
-        # scan page ceiling was exceeded" told an operator none of those, and
-        # the honest answer is not obtainable from anywhere else on screen.
-        self.assertIn(str(PRODUCT_SCAN_PAGE_SIZE), reason)
-        self.assertIn(str(PRODUCT_SCAN_PAGE_LIMIT), reason)
-        self.assertIn(str(PRODUCT_SCAN_MAX_PRODUCTS), reason)
-        self.assertIn('NOTHING WAS IMPORTED', reason)
-        self.assertIn('has NOT moved', reason)
-        self.assertIn('same place', reason)
+        job = None
+        sent = []
+        while pages:
+            chunk, pages = pages[:10], pages[10:]
+            job, slice_sent = self._run_scan(chunk, job=job)
+            sent.extend(slice_sent)
+            if pages:
+                job = self._scans().filtered(
+                    lambda row: row.id > job.id and row.state == 'queued'
+                )[-1]
+        self.assertEqual(len(sent), PRODUCT_SCAN_PAGE_LIMIT + 1)
+        self.assertEqual(sent[10]['after'], 'CUR-9')
+        self.assertEqual(sent[-1]['after'], 'CUR-199')
         self.assertEqual(
             PRODUCT_SCAN_MAX_PRODUCTS,
             PRODUCT_SCAN_PAGE_SIZE * PRODUCT_SCAN_PAGE_LIMIT,
         )
-        self.assertEqual(PRODUCT_SCAN_MAX_PRODUCTS, 20000)
-        # ...and it really is a fail-closed refusal: no checkpoint moved.
         self.settings.invalidate_recordset()
-        self.assertFalse(self.settings.product_last_import_checkpoint_at)
-        self.assertFalse(self.settings.product_last_import_success_at)
+        self.assertTrue(self.settings.product_last_import_checkpoint_at)
+        self.assertTrue(self.settings.product_last_import_success_at)
+        self.assertFalse(self.settings.product_scan_cursor)
+        self.assertFalse(self.settings.product_scan_window_end_at)
 
     # ------------------------------------------------------------------
     # Batch 2 correction (F7): "scheduled" means the real cron is on.

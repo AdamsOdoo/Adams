@@ -111,6 +111,16 @@ class TestReadinessCheck(TransactionCase):
         ]
         self.assertEqual(self.ReadinessCheck._aggregate(checks), 'fail')
 
+    def test_supported_scale_is_an_essential_fail_closed_check(self):
+        with patch.object(
+            type(self.ReadinessCheck), '_supported_scale_counts',
+            return_value=[('products', 100001, 100000)],
+        ):
+            result = self.ReadinessCheck._check_supported_scale(self.store)
+        self.assertEqual(result['tier'], 'essential')
+        self.assertEqual(result['result'], 'fail')
+        self.assertIn('100001 > 100000', result['reason'])
+
     def test_aggregate_all_pass_yields_overall_pass(self):
         checks = [
             self._check('essential', 'pass', 'a'),

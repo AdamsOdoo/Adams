@@ -41,6 +41,7 @@ _logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------
 JOB_TYPE_PUSH_SYNC = 'inventory_push_sync'
 JOB_TYPE_PUSH_SCAN = 'inventory_push_scan'
+INVENTORY_PUSH_SCAN_BATCH = 200
 JOB_TYPE_FIRST_PUSH_PREVIEW = 'inventory_first_push_preview'
 JOB_TYPE_LOCATION_SYNC = 'inventory_location_sync'
 JOB_TYPE_ACTIVATE = 'inventory_activate'
@@ -1952,20 +1953,34 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'The inventory domain is no longer enabled for this store.'
             )
             return
+        generation = job.expected_connection_generation
+        if settings.inventory_push_scan_generation == generation:
+            cursor_id = settings.inventory_push_scan_cursor_id or 0
+        else:
+            cursor_id = 0
+            settings.sudo().write({
+                'inventory_push_scan_cursor_id': 0,
+                'inventory_push_scan_generation': generation,
+            })
         # Legacy rows can pre-date the inventory-level pair table, and a
         # product binding and a location mapping are allowed to arrive in
         # either order.  Reconcile that durable identity before taking the
         # scan snapshot so the first-push ceremony is reachable from this
         # production entry point as well as from the write hooks below.
-        self._bootstrap_inventory_level_bindings(store=store)
+        if not cursor_id:
+            self._bootstrap_inventory_level_bindings(store=store)
         Binding = self.env['shopify.connector.inventory.level.binding']
-        bindings = Binding.search([
+        scan_domain = [
             ('store_id', '=', store.id),
             ('location_mapping_id.push_enabled', '=', True),
             ('status', '=', 'active'),
             ('product_variant_binding_id.status', '=', 'active'),
             ('location_mapping_id.status', '=', 'active'),
-        ])
+        ]
+        bindings = Binding.search(
+            scan_domain + [('id', '>', cursor_id)],
+            order='id asc', limit=INVENTORY_PUSH_SCAN_BATCH,
+        )
         mapped = len(bindings)
         enqueued_count = 0
         coalesced_count = 0
@@ -2016,9 +2031,19 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 enqueued_count += 1
             else:
                 coalesced_count += 1
-        settings.sudo().write({
-            'inventory_last_push_scan_at': fields.Datetime.now(),
-        })
+        has_more = bool(bindings) and Binding.search_count(
+            scan_domain + [('id', '>', max(bindings.ids))], limit=1,
+        )
+        if has_more:
+            settings.sudo().write({
+                'inventory_push_scan_cursor_id': max(bindings.ids),
+            })
+        else:
+            settings.sudo().write({
+                'inventory_last_push_scan_at': fields.Datetime.now(),
+                'inventory_push_scan_cursor_id': 0,
+                'inventory_push_scan_generation': 0,
+            })
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
         job._log_transition(
             'state_change',
@@ -2029,6 +2054,17 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             ),
             from_state='running', to_state='succeeded',
         )
+        if has_more:
+            successor = self.env['shopify.connector.job.enqueue'].enqueue(
+                store, job.job_source, JOB_TYPE_PUSH_SCAN,
+                payload_hash=uuid.uuid4().hex,
+            )
+            if not successor:
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'Inventory scan cursor was saved but no continuation '
+                    'job could be admitted.',
+                )
 
     @api.model
     def _handle_inventory_first_push_preview(self, job):
