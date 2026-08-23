@@ -561,6 +561,63 @@ class TestProductImportMatching(TransactionCase):
             result['variant_bindings'].shopify_inventory_tracked_known
         )
 
+    def test_later_imported_variant_initializes_identity_once(self):
+        """A variant added after product birth receives its own identity.
+
+        Template birth completion must not suppress the per-variant birth
+        contract, and an already-owned non-empty SKU/barcode remains local.
+        """
+        first = self.Importer._apply_import(
+            self.store,
+            self._product_payload(
+                gid='gid://shopify/Product/905-later-variant',
+                title='Later Variant Product',
+                variants=[self._variant_payload(
+                    'gid://shopify/ProductVariant/905-later-original',
+                    sku='ORIGINAL-SKU', barcode='ORIGINAL-BARCODE',
+                )],
+            ),
+        )
+        template_binding = first['template_binding']
+        original_binding = first['variant_bindings']
+        original = original_binding.product_variant_id
+        original.write({
+            'default_code': 'LOCALLY-OWNED-SKU',
+            'barcode': 'LOCALLY-OWNED-BARCODE',
+        })
+        extra = self.env['product.product'].create({
+            'product_tmpl_id': template_binding.product_template_id.id,
+        })
+        extra_binding = self.VariantBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/905-later-new',
+            'product_template_binding_id': template_binding.id,
+            'product_variant_id': extra.id,
+            'shopify_birth_initialized': False,
+        })
+        payload = {
+            'gid': template_binding.shopify_gid,
+            'variants': [
+                self._variant_payload(
+                    original_binding.shopify_gid,
+                    sku='REMOTE-CHANGED-SKU', barcode='REMOTE-CHANGED-BARCODE',
+                ),
+                self._variant_payload(
+                    extra_binding.shopify_gid,
+                    sku='LATER-SKU', barcode='LATER-BARCODE',
+                ),
+            ],
+        }
+        self.Importer._apply_birth_initialization(
+            payload, template_binding, 'existing_binding',
+            original_binding | extra_binding,
+        )
+        self.assertEqual(extra.default_code, 'LATER-SKU')
+        self.assertEqual(extra.barcode, 'LATER-BARCODE')
+        self.assertTrue(extra_binding.shopify_birth_initialized)
+        self.assertEqual(original.default_code, 'LOCALLY-OWNED-SKU')
+        self.assertEqual(original.barcode, 'LOCALLY-OWNED-BARCODE')
+
     def test_legacy_candidate_binding_does_not_take_birth_ownership(self):
         """An upgrade-era candidate match is an existing Odoo product.
 

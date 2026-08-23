@@ -1,5 +1,6 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.tools.float_utils import float_compare
 
 
 FIRST_PUSH_STATE_SELECTION = [
@@ -74,6 +75,11 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
         readonly=True,
     )
     first_push_preview_qty = fields.Float(readonly=True)
+    # Presence distinguishes a preview produced by the guarded service from
+    # legacy/manual preview rows created before the stale-preview contract.
+    # New confirmations compare the live quantity only when this durable
+    # evidence exists, preserving warm-upgrade compatibility.
+    first_push_previewed_at = fields.Datetime(readonly=True)
     first_push_confirmed_at = fields.Datetime(readonly=True)
     first_push_confirmed_by_uid = fields.Many2one(
         comodel_name='res.users', readonly=True,
@@ -108,6 +114,7 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
             'pending_target_available',
             'first_push_state',
             'first_push_preview_qty',
+            'first_push_previewed_at',
             'first_push_confirmed_at',
             'first_push_confirmed_by_uid',
         ))
@@ -196,6 +203,19 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
             raise UserError(
                 "A first push can only be confirmed after its preview has "
                 "run."
+            )
+        current_target = self.env[
+            'shopify.connector.inventory.service'
+        ]._current_odoo_available(self)
+        if self.first_push_previewed_at and float_compare(
+            current_target, self.first_push_preview_qty, precision_digits=4,
+        ):
+            raise UserError(
+                'Odoo available quantity changed from %.4f to %.4f after '
+                'this preview. Run or refresh the first-push preview and '
+                'review the new quantity before confirming.' % (
+                    self.first_push_preview_qty, current_target,
+                )
             )
         self.sudo().write({
             'first_push_state': 'confirmed',
