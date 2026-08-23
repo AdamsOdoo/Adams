@@ -29,6 +29,7 @@ from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subs
     _api_version_handle,
     _bounded_sweep_remaining,
     _create_retry_allowed,
+    _latest_reconciled_at,
     _scheduled_reconciliation_bucket_ids,
     _scheduled_reconciliation_bucket_limits,
 )
@@ -113,6 +114,16 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             self.assertTrue(registry.topic_spec('products/update'))
         else:
             self.assertEqual(registry.topic_spec('products/update'), False)
+
+    def test_latest_reconciled_at_ignores_unreconciled_rows(self):
+        older = datetime(2026, 8, 23, 18, 4, 19)
+        newer = datetime(2026, 8, 23, 19, 40, 3)
+        self.assertEqual(
+            _latest_reconciled_at([older, False, newer, None]),
+            newer,
+        )
+        self.assertFalse(_latest_reconciled_at([False, None]))
+        self.assertFalse(_latest_reconciled_at([]))
 
     def test_shopify_api_version_is_validated_as_an_object_handle(self):
         version = {
