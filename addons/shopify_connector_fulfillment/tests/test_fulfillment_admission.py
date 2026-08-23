@@ -6,7 +6,6 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
-from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -268,14 +267,13 @@ class TestFulfillmentPickingAdmission(TransactionCase):
     # Theme A — centralized `_enqueue_once` collision recovery
     # ------------------------------------------------------------------
 
-    @mute_logger('odoo.sql_db')
-    def test_duplicate_admission_enqueue_collision_returns_existing_job(self):
+    def test_duplicate_admission_enqueue_coalesces_visible_scope_owner(self):
         # Two _enqueue_once calls for the SAME picking under the SAME
-        # job_type but with different payload_hash: the fast idempotency-key
-        # search misses (different hash), so the DB-level operation-scope-
-        # key collision genuinely fires -- the loser must recover by
-        # returning the winner's existing job, with the caller's cursor
-        # remaining fully usable afterward (never a poisoned transaction).
+        # job_type but with different payload_hash: the idempotency-key search
+        # misses, but the visible operation-scope owner is coalesced without
+        # emitting an expected SQL ERROR. The process-level concurrency harness
+        # separately proves the DB unique-index loser recovery when two
+        # sessions race and both miss this optimization.
         picking = self._picking([('gid://shopify/LineItem/111', 2.0)])
         first = self.Service._enqueue_once(
             self.store, 'odoo_event', 'fulfillment_picking_admission',
