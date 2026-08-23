@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.26.0',
+    'version': '19.0.1.27.0',
     'summary': (
         'Shared Odoo <-> Shopify connector runtime and operator app: '
         'stores, guarded credentials, job dispatch and recovery, guided '
@@ -45,6 +45,9 @@ pipeline and no OAuth flow.
     # 'web' is required by the U0 operator UI (menus, views, the Owl dashboard
     # client action, SCSS/JS assets, and browser tours).
     'depends': ['base', 'web'],
+    'external_dependencies': {
+        'python': ['graphql'],
+    },
     'data': [
         'security/shopify_connector_security.xml',
         'security/ir.model.access.csv',

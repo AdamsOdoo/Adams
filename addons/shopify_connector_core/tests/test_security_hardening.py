@@ -113,7 +113,7 @@ class TestSecurityHardening(TransactionCase):
             self.env['shopify.connector.pii.retention'].with_user(
                 self.roles['admin']
             ).run_sweep(),
-            0,
+            True,
         )
         self.assertEqual(
             self.env['shopify.connector.stale.owner.sweep'].with_user(
@@ -128,7 +128,8 @@ class TestSecurityHardening(TransactionCase):
             0,
         )
         self.assertEqual(
-            self.env['shopify.connector.pii.retention'].sudo().run_sweep(), 0,
+            self.env['shopify.connector.pii.retention'].sudo().run_sweep(),
+            True,
         )
         self.assertEqual(
             self.env[

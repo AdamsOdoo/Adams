@@ -1,5 +1,10 @@
 # Setup runbook
 
+Before installing the addons, install the pinned Python dependency from the
+repository-root `requirements.txt`. Odoo.sh installs this file during the
+branch build; other deployments must install it into the Odoo Python
+environment.
+
 1. Install the connector addons appropriate to the selected domains. Use the pinned Odoo 19 source and upgrade all installed connector addons together.
 2. In Shopify Admin, create a merchant-managed custom app for the exact permanent `*.myshopify.com` store. This module is not installed through the Shopify App Store.
 3. Grant the scopes shown by the connector. The baseline read set is `read_products`, `read_customers`, `read_orders`, `read_inventory`, `read_locations`, and `read_merchant_managed_fulfillment_orders`; enabled write domains additionally require their displayed write scopes.
