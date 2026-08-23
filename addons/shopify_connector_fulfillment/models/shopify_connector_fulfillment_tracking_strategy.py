@@ -40,6 +40,20 @@ FULFILLMENT_NODE_QUERY = (
     '}'
 )
 
+FULFILLMENT_NODES_QUERY = (
+    'query ConnectorFulfillmentNodes($ids: [ID!]!) {\n'
+    '  nodes(ids: $ids) {\n'
+    '    ... on Fulfillment {\n'
+    '      id\n'
+    '      status\n'
+    '      displayStatus\n'
+    '      trackingInfo { number url company }\n'
+    '    }\n'
+    '  }\n'
+    '}'
+)
+FULFILLMENT_NODES_BATCH = 50
+
 
 class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     """The 7-callback Layer 2 strategy for `fulfillment_tracking_update` plus the
@@ -57,6 +71,35 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
         )
         node = data.get('fulfillment')
         return node if isinstance(node, dict) else None
+
+    @api.model
+    def _read_fulfillments_batch(self, job, store, fulfillment_gids):
+        """Read bounded Node batches and prove exact identity coverage."""
+        requested = list(dict.fromkeys(fulfillment_gids))
+        result = {}
+        for offset in range(0, len(requested), FULFILLMENT_NODES_BATCH):
+            ids = requested[offset:offset + FULFILLMENT_NODES_BATCH]
+            data = self._read_data(
+                job, store, FULFILLMENT_NODES_QUERY, {'ids': ids},
+            )
+            nodes = data.get('nodes')
+            if not isinstance(nodes, list) or len(nodes) != len(ids):
+                raise FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'Shopify returned an invalid fulfillment nodes batch.',
+                )
+            for expected_gid, node in zip(ids, nodes):
+                if node is None:
+                    result[expected_gid] = None
+                    continue
+                if not isinstance(node, dict) or node.get('id') != expected_gid:
+                    raise FulfillmentReadError(
+                        'data_shape_schema_mismatch',
+                        'A fulfillment nodes batch did not preserve exact '
+                        'requested identity.',
+                    )
+                result[expected_gid] = node
+        return result
 
     # ------------------------------------------------------------------
     # Callback 2: prepare_local

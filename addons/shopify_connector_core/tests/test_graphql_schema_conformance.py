@@ -24,7 +24,7 @@ class TestGraphqlSchemaConformance(TransactionCase):
         validator = _validator_module()
         documents = validator.discover_documents(REPO_ROOT)
         self.assertGreaterEqual(
-            len(documents), 47,
+            len(documents), 48,
             'Document discovery unexpectedly shrank; no GraphQL operation '
             'may disappear from the schema gate silently.',
         )

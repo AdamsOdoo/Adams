@@ -227,6 +227,60 @@ class TestFulfillmentScans(TransactionCase):
         )
         self.assertEqual(len(successor), 1)
 
+    def test_reconciliation_batches_multiple_fulfillment_reads(self):
+        first = self._fulfillment_binding(
+            'gid://shopify/Fulfillment/RC-BATCH-1'
+        )
+        second = self._fulfillment_binding(
+            'gid://shopify/Fulfillment/RC-BATCH-2'
+        )
+        job = self._scan_job('fulfillment_reconciliation_check')
+        observed = {
+            first.shopify_gid: {
+                'id': first.shopify_gid, 'status': 'SUCCESS',
+                'trackingInfo': [],
+            },
+            second.shopify_gid: {
+                'id': second.shopify_gid, 'status': 'SUCCESS',
+                'trackingInfo': [],
+            },
+        }
+        with patch.object(
+            type(self.Service), '_read_fulfillments_batch',
+            return_value=observed,
+        ) as batched, patch.object(
+            type(self.Service), '_read_fulfillment',
+            side_effect=AssertionError('per-binding read must not run'),
+        ):
+            self.Service._handle_fulfillment_reconciliation_check(job)
+        batched.assert_called_once()
+
+    def test_batched_reader_requires_exact_requested_identity(self):
+        gids = [
+            'gid://shopify/Fulfillment/BATCH-1',
+            'gid://shopify/Fulfillment/BATCH-2',
+        ]
+        nodes = [
+            {'id': gid, 'status': 'SUCCESS', 'trackingInfo': []}
+            for gid in gids
+        ]
+        job = self._scan_job('fulfillment_reconciliation_check')
+        with patch.object(
+            type(self.Service), '_read_data', return_value={'nodes': nodes},
+        ):
+            result = self.Service._read_fulfillments_batch(
+                job, self.store, gids,
+            )
+        self.assertEqual(set(result), set(gids))
+        with patch.object(
+            type(self.Service), '_read_data',
+            return_value={'nodes': list(reversed(nodes))},
+        ):
+            with self.assertRaises(FulfillmentReadError):
+                self.Service._read_fulfillments_batch(
+                    job, self.store, gids,
+                )
+
     # ------------------------------------------------------------------
     # Reconnect catch-up: gap-period externals -> review in BOTH modes
     # ------------------------------------------------------------------

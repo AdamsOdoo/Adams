@@ -150,14 +150,23 @@ class ShopifyConnectorFulfillmentScans(models.AbstractModel):
         # every OTHER binding it can, but a decision-critical read failure
         # must never let this handler report a successful, complete pass.
         read_failures = 0
-        for binding in bindings:
+        nodes_by_gid = {}
+        if len(bindings) == 1:
             try:
-                node = self._read_fulfillment(
-                    job, store, binding.shopify_gid,
+                nodes_by_gid[bindings.shopify_gid] = self._read_fulfillment(
+                    job, store, bindings.shopify_gid,
                 )
             except FulfillmentReadError:
-                read_failures += 1
-                continue
+                read_failures = 1
+        elif bindings:
+            try:
+                nodes_by_gid = self._read_fulfillments_batch(
+                    job, store, bindings.mapped('shopify_gid'),
+                )
+            except FulfillmentReadError:
+                read_failures = len(bindings)
+        for binding in bindings:
+            node = nodes_by_gid.get(binding.shopify_gid)
             if not node:
                 continue
             self._refresh_binding_snapshot(binding, node)
