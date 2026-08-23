@@ -315,6 +315,73 @@ class TestUiDashboard(TransactionCase):
             for row in payload['mappings']['rows']
         ))
 
+    def test_connected_cannot_be_ready_before_required_domain_evidence(self):
+        store = self._make_store(api_health_state='normal')
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        # A successful setup/audit job is activity, not catalog completion.
+        self._make_job(store, 'succeeded')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(
+            row['operational_state'], 'connected_initial_sync_pending',
+        )
+        self.assertEqual(row['domains_selected'], 1)
+        self.assertEqual(row['domains_completed'], 0)
+        self.assertEqual(
+            payload['health']['state'], 'connected_initial_sync_pending',
+        )
+
+    def test_ready_requires_fresh_completion_and_no_blocking_work(self):
+        store = self._make_store(api_health_state='normal')
+        settings = self.env[
+            'shopify.connector.store.settings'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        settings.sudo().write({
+            'product_last_import_success_at': fields.Datetime.now(),
+        })
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'ready')
+        self.assertEqual(row['domains_completed'], 1)
+        self.assertEqual(row['tone'], 'healthy')
+
+    def test_completion_anchor_with_pending_child_is_still_running(self):
+        store = self._make_store(api_health_state='normal')
+        settings = self.env[
+            'shopify.connector.store.settings'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        settings.sudo().write({
+            'product_last_import_success_at': fields.Datetime.now(),
+        })
+        self._make_job(store, 'queued', job_type='product_import_sync')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'initial_sync_running')
+        self.assertEqual(row['initial_child_pending'], 1)
+        self.assertNotEqual(row['operational_state'], 'ready')
+
+    def test_initial_sync_running_exposes_bounded_progress(self):
+        store = self._make_store(api_health_state='normal')
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        self._make_job(store, 'queued', job_type='product_import_scan')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'initial_sync_running')
+        self.assertEqual(row['initial_child_pending'], 1)
+        self.assertIn('Monitor progress', row['next_action'])
+
     def test_health_oldest_blocked_ignores_queue_and_drills_to_same_scope(self):
         store = self._make_store()
         other_store = self._make_store()

@@ -62,8 +62,17 @@ class TestExportActionViewBinding(TransactionCase):
         self.assertFalse(flow.action)
         self.assertEqual(
             flow.child_id.filtered('active').sorted('sequence').mapped('name'),
-            ['Product Export Reviews', 'Media Exports'],
+            [
+                'Product Export Reviews', 'Media Exports',
+                'Reconnect and Backfill',
+            ],
         )
+        backfill = self.env.ref(
+            'shopify_connector_product_export.'
+            'menu_shopify_connector_product_export_backfill'
+        )
+        self.assertTrue(backfill.active)
+        self.assertTrue(backfill.action)
         self.assertEqual(settings.parent_id, configuration)
 
     def test_export_settings_action_is_administrator_only(self):

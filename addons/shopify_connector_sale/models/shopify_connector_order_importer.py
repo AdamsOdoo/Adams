@@ -3007,9 +3007,20 @@ class ShopifyConnectorJobDispatchOrderExtension(models.AbstractModel):
     @api.model
     def _handle_order_import_sync(self, job):
         try:
-            self.env['shopify.connector.order.importer'].import_order_sync(
+            binding = self.env[
+                'shopify.connector.order.importer'
+            ].import_order_sync(
                 job.store_id, job.shopify_target_gid, job=job,
             )
+            if binding and binding.status == 'review':
+                job._transition_blocked_manual_review(
+                    'destructive_write_guard_blocked',
+                    'destructive_write_guard_blocked',
+                    binding.review_reason or (
+                        'The imported Shopify order requires a business '
+                        'decision before automatic processing can continue.'
+                    ),
+                )
         except OrderPolicySkip as exc:
             detail = json.dumps({
                 'skip_reason': exc.skip_reason,

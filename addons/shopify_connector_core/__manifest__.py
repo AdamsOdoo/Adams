@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Core',
-    'version': '19.0.1.23.0',
+    'version': '19.0.1.24.0',
     'summary': (
         'Shared Odoo <-> Shopify connector runtime and operator app: '
         'stores, guarded credentials, job dispatch and recovery, guided '

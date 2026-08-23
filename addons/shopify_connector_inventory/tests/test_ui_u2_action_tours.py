@@ -412,6 +412,29 @@ class TestUiU2InventoryActionTours(HttpCase):
             'attempt, and certainly no Shopify request',
         )
 
+    def test_failed_clean_attention_route_reaches_inventory_pair(self):
+        binding, job = self._blocked_pair(
+            'gid://shopify/InventoryItem/U2FAILED-CLEAN'
+        )
+        evidence_action = job.with_user(
+            self.reviewer
+        ).action_open_attention_case()
+        self.assertEqual(
+            evidence_action['res_model'],
+            'shopify.connector.mutation.attempt',
+        )
+        attempt = self.env[evidence_action['res_model']].browse(
+            evidence_action['res_id']
+        )
+        business_action = attempt.with_user(
+            self.reviewer
+        ).action_open_business_record()
+        self.assertEqual(
+            business_action['res_model'],
+            'shopify.connector.inventory.level.binding',
+        )
+        self.assertEqual(business_action['res_id'], binding.id)
+
     def test_recheck_blank_reason_is_refused_in_the_browser(self):
         """A blank reason is refused, and nothing is enqueued."""
         binding, job = self._blocked_pair('gid://shopify/InventoryItem/U2BLANK')

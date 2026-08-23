@@ -141,6 +141,35 @@ class TestOrderConfirmationPolicy(OrderImportCase):
         self.assertEqual(len(logs), 1)
         self.assertIn('routed for review', logs.message)
 
+        # The business context projection resolves the order binding from the
+        # immutable Shopify target even though the scan job itself is scoped
+        # to the store.
+        job.invalidate_recordset()
+        self.assertEqual(job.attention_business_object, binding.display_name)
+        self.assertIn('cancelled', job.attention_event.lower())
+        self.assertIn('cancelled=yes', job.attention_shopify_state)
+        self.assertEqual(job.attention_odoo_state, order.state)
+        self.assertIn('Stop shipment', job.attention_next_action)
+
+    def test_reviewed_order_handler_enters_main_needs_attention_state(self):
+        payload = self._payload('gid://shopify/Order/HandlerReview')
+        binding = self.Importer._apply_import(self.store, payload)
+        binding.sudo().write({
+            'status': 'review',
+            'review_reason_code': 'cancelled_on_shopify',
+            'review_reason': 'Shopify cancelled this imported order.',
+            'review_required_action': 'Stop shipment and review cancellation.',
+        })
+        job = self._job(target=payload['id'], state='running')
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        with patch.object(
+            type(self.Importer), 'import_order_sync', return_value=binding,
+        ):
+            Dispatch._handle_order_import_sync(job)
+        self.assertEqual(job.state, 'blocked_manual_review')
+        self.assertFalse(job.superseded_by_job_id)
+        self.assertIn('Stop shipment', job.attention_next_action)
+
     def test_unsafe_post_import_financial_states_route_to_review(self):
         for index, status in enumerate((
             'VOIDED', 'EXPIRED', 'PARTIALLY_REFUNDED', 'REFUNDED',

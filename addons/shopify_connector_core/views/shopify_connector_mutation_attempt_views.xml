@@ -79,6 +79,9 @@
                             groups="shopify_connector_core.group_shopify_connector_admin"
                             invisible="observed_outcome != 'uncertain' or resolution_disposition"
                             help="Record an administrator decision. This is audited and cannot be undone."/>
+                    <button name="action_open_business_record" type="object"
+                            string="Open affected Odoo record"
+                            help="Open the linked business record. This changes neither Odoo nor Shopify."/>
                 </header>
                 <sheet>
                     <widget name="web_ribbon" title="Waiting on a decision"
@@ -107,6 +110,20 @@
                                    invisible="not resolution_uid"/>
                             <field name="resolution_at" readonly="1"
                                    invisible="not resolution_at"/>
+                        </group>
+                    </group>
+                    <group string="Business effect and recovery">
+                        <group>
+                            <field name="business_object" readonly="1"/>
+                            <field name="shopify_effect" readonly="1"/>
+                            <field name="odoo_effect" readonly="1"/>
+                            <field name="remote_result_certain" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="automatic_stop_reason" readonly="1"/>
+                            <field name="required_user_action" readonly="1"/>
+                            <field name="action_consequence" readonly="1"/>
+                            <field name="shopify_reread_plan" readonly="1"/>
                         </group>
                     </group>
                     <group>

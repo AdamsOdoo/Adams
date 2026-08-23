@@ -241,9 +241,12 @@
                      groups="shopify_connector_core.group_shopify_connector_user">
                     <strong>This store's API health is degraded.</strong>
                     Exports stay reviewable, but a confirmation taken now may
-                    be refused at apply time. Open
-                    <em>Export &gt; Reconnect and Backfill</em> to see what is
-                    waiting.
+                    be refused at apply time.
+                    <button type="action"
+                            name="%(action_shopify_connector_export_backfill)d"
+                            string="Review reconnect and backfill"
+                            class="btn-link"
+                            groups="shopify_connector_core.group_shopify_connector_user"/>
                 </div>
                 <div class="alert alert-info" role="alert"
                      invisible="state == 'connected'"

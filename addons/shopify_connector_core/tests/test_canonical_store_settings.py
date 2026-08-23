@@ -293,6 +293,11 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
                 'shopify_connector_core.menu_shopify_connector_configuration'
             ).group_ids,
         )
+        self.assertTrue(menu.active)
+        self.assertFalse(
+            menu.child_id.filtered('active'),
+            'Sync Rules must remain a clickable route, not a menu heading.',
+        )
 
     # ------------------------------------------------------------------
     # §6.7 / §11.1 -- the seam is authorized on the server

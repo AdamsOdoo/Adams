@@ -4,7 +4,7 @@
 # accepted DEC-036/DEC-031 Layer 2 substrate.
 {
     'name': 'Shopify Connector - Fulfillment',
-    'version': '19.0.1.7.0',
+    'version': '19.0.1.8.0',
     'category': 'Connector',
     'summary': (
         'Guarded Odoo <-> Shopify fulfillment and tracking synchronization: '

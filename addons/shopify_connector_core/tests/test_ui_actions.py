@@ -30,6 +30,8 @@ class TestUiActions(TransactionCase):
         cls.operator = new_test_user(
             cls.env, login='u0_act_op',
             groups='base.group_user,shopify_connector_core.group_shopify_connector_operator')
+        cls.no_access = new_test_user(
+            cls.env, login='u0_act_none', groups='base.group_user')
         cls.store = cls._make_store()
 
     @classmethod
@@ -150,12 +152,43 @@ class TestUiActions(TransactionCase):
         )
         self.assertEqual(
             eval(attention.domain),  # noqa: S307 -- static XML literal
-            [(
-                'state', 'in',
-                ('blocked_manual_review', 'failed_final', 'failed_retryable'),
-            )],
+            [
+                ('state', 'in', (
+                    'blocked_manual_review', 'failed_final',
+                    'failed_retryable',
+                )),
+                ('superseded_by_job_id', '=', False),
+            ],
         )
         self.assertNotIn('retry_waiting', attention.domain)
+
+    def test_mutation_attempt_explains_business_effect_and_recovery(self):
+        job = self._make_job(
+            'blocked_manual_review',
+            error_class='mapping_missing',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        attempt = self._make_attempt(job, observed_outcome='uncertain')
+        self.assertEqual(attempt.business_object, self.store.display_name)
+        self.assertIn('Unknown', attempt.shopify_effect)
+        self.assertIn('No completed', attempt.odoo_effect)
+        self.assertFalse(attempt.remote_result_certain)
+        self.assertIn('Re-read', attempt.required_user_action)
+        self.assertIn('re-reads Shopify', attempt.shopify_reread_plan)
+        action = attempt.with_user(self.admin).action_open_business_record()
+        self.assertEqual(action['res_model'], self.store._name)
+        self.assertEqual(action['res_id'], self.store.id)
+
+    def test_mutation_business_link_denied_without_connector_access(self):
+        job = self._make_job(
+            'blocked_manual_review',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        attempt = self._make_attempt(job, observed_outcome='uncertain')
+        with self.assertRaises(AccessError):
+            attempt.with_user(self.no_access).action_open_business_record()
 
     # ------------------------------------------------------------------ #
     #  cancel wizard

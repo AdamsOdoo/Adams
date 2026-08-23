@@ -113,6 +113,7 @@
                 <field name="store_id"/>
                 <field name="job_type" string="Run type"/>
                 <field name="attention_reason" string="Reason"/>
+                <field name="attention_business_object" string="Affected object"/>
                 <field name="attention_owner" string="Owner"/>
                 <field name="attention_next_action" string="Next action"/>
                 <field name="state" string="Case state"/>
@@ -213,6 +214,20 @@
                     <group string="Cancellation" invisible="not cancel_reason">
                         <field name="cancel_reason" readonly="1"/>
                     </group>
+                    <group string="Business context"
+                           invisible="state not in ('blocked_manual_review', 'failed_final', 'failed_retryable')">
+                        <group>
+                            <field name="attention_business_object" readonly="1"/>
+                            <field name="attention_event" readonly="1"/>
+                            <field name="attention_shopify_state" readonly="1"/>
+                            <field name="attention_odoo_state" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="attention_effect" readonly="1"/>
+                            <field name="attention_next_action" readonly="1"/>
+                            <field name="attention_consequence" readonly="1"/>
+                        </group>
+                    </group>
                     <div class="text-muted"
                          invisible="not operator_has_mutation_evidence">
                         This run carries Shopify write evidence. It is resolved only through the
@@ -255,7 +270,7 @@
                               'view_id': ref('view_shopify_connector_attention_list')}),
                       (0, 0, {'view_mode': 'form', 'sequence': 20,
                               'view_id': ref('view_shopify_connector_job_form')})]"/>
-        <field name="domain">[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable'))]</field>
+        <field name="domain">[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable')), ('superseded_by_job_id', '=', False)]</field>
         <field name="context">{}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">No one needs to act</p>

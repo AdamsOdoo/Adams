@@ -332,6 +332,25 @@ class TestUiSourceGuards(TransactionCase):
                 "The dashboard service must be read-only; found %r." % forbidden,
             )
 
+    def test_setup_activation_and_inventory_copy_are_truthful(self):
+        setup_js = self._read(
+            'static', 'src', 'js', 'shopify_connector_setup_wizard.js',
+        )
+        setup_xml = self._read(
+            'static', 'src', 'xml', 'shopify_connector_setup_wizard.xml',
+        )
+        self.assertNotIn('Nothing is syncing yet', setup_js)
+        self.assertNotIn('Activating does not start a sync', setup_xml)
+        self.assertIn(
+            'Activation starts the selected read and import scans', setup_xml,
+        )
+        setup_copy = ' '.join(setup_xml.split())
+        self.assertIn('Odoo is the inventory authority', setup_copy)
+        self.assertIn('Shopify stock is never imported into Odoo', setup_copy)
+        self.assertIn(
+            'reads Shopify available quantity only for comparison', setup_copy,
+        )
+
     def test_wizards_call_sanctioned_methods_only(self):
         """Wizards call the sanctioned methods and never write protected state."""
         cancel = self._read('models', 'shopify_connector_job_cancel_wizard.py')

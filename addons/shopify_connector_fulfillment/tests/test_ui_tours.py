@@ -101,6 +101,18 @@ class TestUiTours(TransactionCase):
             self.env.ref('shopify_connector_core.menu_shopify_connector_operations'),
             'Fulfillment must live under Operations.',
         )
+        review = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'menu_shopify_connector_fulfillment_review'
+        )
+        self.assertTrue(review.active)
+        self.assertEqual(
+            review.parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_operations'
+            ),
+        )
+        self.assertTrue(review.action)
         self.assertEqual(
             branch.action,
             self.env.ref(

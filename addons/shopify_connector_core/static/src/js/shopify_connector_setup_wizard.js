@@ -626,7 +626,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                         return;
                     }
                     this.notification.add(
-                        _t("Your store is set up. Nothing is syncing yet — the dashboard shows what to do next."),
+                        _t("Activation started the selected read and import scans. Shopify writes still require their protected confirmation path; the dashboard shows progress and exceptions."),
                         { type: "success" }
                     );
                     this.action.doAction(
