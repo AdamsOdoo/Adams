@@ -243,7 +243,7 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 'discountedTotalSet': {
                     'shopMoney': {'amount': '100.00'},
                 },
-                'priceAfterAllDiscountsBeforeTaxesSet': total,
+                'discountedUnitPriceAfterAllDiscountsSet': total,
                 'discountAllocations': [],
                 'taxLines': [],
             }],

@@ -1087,8 +1087,14 @@ fi
 # created, because a cached venv from before this change would otherwise keep
 # silently skipping every browser test. This is idempotent and near-instant
 # once satisfied.
-"$VENV/bin/pip" install --quiet websocket-client
+"$VENV/bin/pip" install --quiet websocket-client "graphql-core==3.2.6"
 WEBSOCKET_VERSION="$("$VENV/bin/python" -c 'import websocket; print(websocket.__version__)' 2>/dev/null || echo missing)"
+
+# WP-1: validate every production GraphQL document against the vendored,
+# immutable Shopify Admin API 2026-07 introspection snapshot before Odoo can
+# execute any test. The final release gate separately repeats this against the
+# live schema; this offline gate prevents a store outage from disabling CI.
+"$VENV/bin/python" "${REPO_ROOT}/tools/validate_shopify_graphql.py"
 
 verify_connector_module_inventory
 if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then

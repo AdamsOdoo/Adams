@@ -66,3 +66,4 @@ from . import canonical_settings_classification
 from . import test_canonical_store_settings
 from . import test_batch2_journeys_core
 from . import test_ui_b2_settings_tours
+from . import test_graphql_schema_conformance

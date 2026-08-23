@@ -112,7 +112,7 @@ query ConnectorOrderHeader($id: ID!) {
         originalTotalSet { shopMoney { amount } }
         discountedUnitPriceSet { shopMoney { amount } }
         discountedTotalSet { shopMoney { amount } }
-        priceAfterAllDiscountsBeforeTaxesSet {
+        discountedUnitPriceAfterAllDiscountsSet {
           shopMoney { amount currencyCode }
           presentmentMoney { amount currencyCode }
         }
@@ -165,7 +165,7 @@ query ConnectorOrderLineItemsPage($id: ID!, $after: String!) {
         originalTotalSet { shopMoney { amount } }
         discountedUnitPriceSet { shopMoney { amount } }
         discountedTotalSet { shopMoney { amount } }
-        priceAfterAllDiscountsBeforeTaxesSet {
+        discountedUnitPriceAfterAllDiscountsSet {
           shopMoney { amount currencyCode }
           presentmentMoney { amount currencyCode }
         }
@@ -728,9 +728,9 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             )
         for line in payload.get('line_items') or []:
             self._validate_money_bag_currency(
-                line.get('priceAfterAllDiscountsBeforeTaxesSet'),
+                line.get('discountedUnitPriceAfterAllDiscountsSet'),
                 currency,
-                'lineItems.priceAfterAllDiscountsBeforeTaxesSet',
+                'lineItems.discountedUnitPriceAfterAllDiscountsSet',
             )
             if line.get('quantity') != line.get('currentQuantity'):
                 raise OrderPolicySkip(
@@ -1310,9 +1310,13 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                     'A Shopify line item had an invalid quantity.',
                 )
             product = self._resolve_product(store, item, settings)
+            # Shopify 2026-07 exposes the after-all-discounts value as a
+            # unit price.  The projection below compares a whole-line amount,
+            # so derive it explicitly instead of silently treating the unit
+            # value as a line total.
             source_target = self._money_decimal(
-                item.get('priceAfterAllDiscountsBeforeTaxesSet'),
-            )
+                item.get('discountedUnitPriceAfterAllDiscountsSet'),
+            ) * quantity
             taxes, rate_total, signature = self._resolve_taxes(
                 order, store, item.get('taxLines') or [],
                 payload.get('taxesIncluded'), settings,

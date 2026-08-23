@@ -224,7 +224,7 @@ class OrderImportCase(TransactionCase):
                 'discountedTotalSet': {
                     'shopMoney': {'amount': '100.00'},
                 },
-                'priceAfterAllDiscountsBeforeTaxesSet': total,
+                'discountedUnitPriceAfterAllDiscountsSet': total,
                 'discountAllocations': [],
                 'taxLines': [],
             }],
@@ -248,6 +248,16 @@ class OrderImportCase(TransactionCase):
 
 @tagged('post_install', '-at_install')
 class TestOrderImportMappingStatic(TransactionCase):
+
+    def test_order_documents_use_2026_07_discounted_unit_price_field(self):
+        documents = (ORDER_HEADER_QUERY, ORDER_LINE_ITEMS_PAGE_QUERY)
+        for document in documents:
+            self.assertIn(
+                'discountedUnitPriceAfterAllDiscountsSet', document,
+            )
+            self.assertNotIn(
+                'priceAfterAllDiscountsBeforeTaxesSet', document,
+            )
 
     def _source(self, filename):
         return (MODELS_ROOT / filename).read_text(encoding='utf-8')
