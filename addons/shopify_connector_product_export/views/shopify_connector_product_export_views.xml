@@ -402,6 +402,8 @@
                         <field name="shopify_export_enabled"/>
                         <field name="shopify_export_status"
                                invisible="not shopify_export_enabled"/>
+                        <field name="shopify_export_status_managed"
+                               invisible="not shopify_export_enabled"/>
                     </group>
                     <group invisible="not shopify_export_enabled">
                         <field name="shopify_export_vendor"/>
@@ -417,8 +419,9 @@
                          invisible="not shopify_export_enabled">
                         Only these fields, the product's options and its
                         variants are ever exported. Collections, merchant
-                        metafields, existing media and publication state are
-                        never touched. Every change needs a reviewed,
+                        metafields and existing media are never touched.
+                        Shopify status is omitted for imported products until
+                        Manage Shopify Status is explicitly enabled. Every change needs a reviewed,
                         confirmed preview. Leave a Manage checkbox off to
                         omit an empty local value; enable it and clear the
                         value only when the empty value is an explicit

@@ -111,6 +111,8 @@
                        optional="hide"/>
                 <field name="shopify_created_at" optional="show"/>
                 <field name="shopify_cancelled_at" optional="hide"/>
+                <field name="review_reason_code" string="Attention reason"
+                       optional="show"/>
                 <field name="sec3_scope_quarantined" string="Quarantined"
                        widget="boolean_toggle" readonly="1" optional="show"/>
                 <field name="store_id" optional="hide"/>
@@ -151,10 +153,13 @@
                         evidence below before approving.
                     </div>
                     <div class="alert alert-danger" role="alert"
-                         invisible="not shopify_cancelled_at">
-                        <strong>Cancelled on Shopify.</strong>
-                        <field name="shopify_cancel_reason" readonly="1"
-                               nolabel="1" class="oe_inline"/>
+                         invisible="status != 'review'">
+                        <strong>Stop shipment — this order needs review.</strong>
+                        <div><field name="review_reason" readonly="1"
+                                    nolabel="1"/></div>
+                        <div><strong>Required action:</strong>
+                            <field name="review_required_action" readonly="1"
+                                   nolabel="1"/></div>
                     </div>
                     <div class="oe_title">
                         <h1><field name="shopify_order_name" readonly="1"
@@ -188,6 +193,8 @@
                             <field name="match_key" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="company_id" readonly="1"/>
+                            <field name="review_reason_code" readonly="1"
+                                   invisible="status != 'review'"/>
                         </group>
                     </group>
 

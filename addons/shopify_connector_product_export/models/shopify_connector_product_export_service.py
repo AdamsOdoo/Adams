@@ -293,11 +293,10 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         value. Explicit clears require a managed field/intent and are not
         inferred from the absence of a local value.
         """
-        status = template.shopify_export_status or 'draft'
-        desired = {
-            'title': template.name or '',
-            'status': EXPORT_STATUS_TO_SHOPIFY[status],
-        }
+        desired = {'title': template.name or ''}
+        if template.shopify_export_status_managed:
+            status = template.shopify_export_status or 'draft'
+            desired['status'] = EXPORT_STATUS_TO_SHOPIFY[status]
         optional_fields = (
             ('descriptionHtml', template.description_sale,
              'shopify_export_description_managed'),

@@ -34,6 +34,26 @@ class TestExportAllowlist(ExportCase):
                 shopify_value,
             )
 
+    def test_imported_active_status_is_seeded_but_omitted_until_managed(self):
+        self.template.with_context(shopify_seed_remote_status=True).write({
+            'shopify_export_status': 'active',
+            'shopify_export_status_managed': False,
+        })
+        desired = self.Service._desired_scalars(self.template)
+        self.assertEqual(self.template.shopify_export_status, 'active')
+        self.assertNotIn('status', desired)
+
+    def test_explicit_status_change_reenables_status_ownership(self):
+        self.template.with_context(shopify_seed_remote_status=True).write({
+            'shopify_export_status': 'active',
+            'shopify_export_status_managed': False,
+        })
+        self.template.write({'shopify_export_status': 'archived'})
+        self.assertTrue(self.template.shopify_export_status_managed)
+        self.assertEqual(
+            self.Service._desired_scalars(self.template)['status'], 'ARCHIVED',
+        )
+
     def test_variant_fields_are_within_the_allowlist(self):
         desired = self.Service._desired_variant(self.store, self.variant, True)
         self.assertTrue(set(desired) <= set(VARIANT_FIELD_ALLOWLIST))

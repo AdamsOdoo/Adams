@@ -243,6 +243,15 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
                 'mapping_missing',
                 'The picking has no resolvable Shopify order binding.',
             )
+        if binding.status == 'review':
+            raise JobHandlerError(
+                'financial_total_mismatch',
+                'Fulfillment stopped because the Shopify order is in Needs '
+                'Attention: %s' % (
+                    binding.review_reason
+                    or 'its post-import commercial evidence changed',
+                ),
+            )
         # Idempotent: a picking is one fulfillment event.
         if self.env['shopify.connector.fulfillment.binding'].search_count([
             ('store_id', '=', store.id), ('picking_id', '=', picking.id),

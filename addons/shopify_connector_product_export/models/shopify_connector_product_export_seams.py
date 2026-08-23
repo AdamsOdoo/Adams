@@ -237,6 +237,13 @@ class ProductTemplateProductExport(models.Model):
              'them to be. Publication is a separate, explicit action and is '
              'never a side effect of export.',
     )
+    shopify_export_status_managed = fields.Boolean(
+        string='Manage Shopify Status',
+        default=True,
+        help='When disabled, product updates omit Shopify status entirely. '
+             'Imports disable this after seeding the remote status; an '
+             'explicit status change enables it again.',
+    )
     shopify_export_vendor = fields.Char(string='Shopify Vendor')
     shopify_export_vendor_managed = fields.Boolean(
         string='Manage Shopify Vendor',
@@ -259,6 +266,17 @@ class ProductTemplateProductExport(models.Model):
         help='When enabled, an empty tag list is an explicit Shopify clear. '
              'A non-empty legacy value is managed automatically.',
     )
+
+    def write(self, vals):
+        vals = dict(vals)
+        if (
+            'shopify_export_status' in vals
+            and 'shopify_export_status_managed' not in vals
+            and not self.env.context.get('shopify_seed_remote_status')
+        ):
+            vals['shopify_export_status_managed'] = True
+        return super().write(vals)
+
     shopify_export_description_managed = fields.Boolean(
         string='Manage Shopify Description',
         help='When enabled, an empty description is an explicit Shopify '
@@ -323,7 +341,21 @@ class ShopifyConnectorProductImporterExportExtension(models.AbstractModel):
             store, payload, settings, media, notes, job,
         )
         template = result['template_binding'].product_template_id
-        template.sudo().write({'shopify_export_enabled': True})
+        remote_status = (
+            result['template_binding'].shopify_status or ''
+        ).lower()
+        values = {
+            'shopify_export_enabled': True,
+            # An imported product's status remains Shopify-owned until an
+            # operator intentionally edits this field. This prevents a safe
+            # title update from carrying an ACTIVE -> DRAFT side effect.
+            'shopify_export_status_managed': False,
+        }
+        if remote_status in ('active', 'draft', 'archived'):
+            values['shopify_export_status'] = remote_status
+        template.with_context(
+            shopify_seed_remote_status=True,
+        ).sudo().write(values)
         return result
 
 

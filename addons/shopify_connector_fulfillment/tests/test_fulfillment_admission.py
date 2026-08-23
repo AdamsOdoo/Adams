@@ -167,6 +167,30 @@ class TestFulfillmentPickingAdmission(TransactionCase):
             created.trigger_origin, 'fulfillment_picking_validation',
         )
 
+    def test_order_in_needs_attention_cannot_admit_fulfillment(self):
+        picking = self._picking([('gid://shopify/LineItem/Review', 1.0)])
+        job = self._admission_job(picking)
+        self.order_binding.sudo().write({
+            'status': 'review',
+            'review_reason': 'Shopify cancelled this imported order.',
+        })
+        try:
+            with patch.object(
+                type(self.Service), '_read_fulfillment_orders',
+            ) as remote_read:
+                with self.assertRaises(JobHandlerError) as caught:
+                    self.Service._handle_fulfillment_picking_admission(job)
+            self.assertEqual(
+                caught.exception.error_class, 'financial_total_mismatch',
+            )
+            self.assertEqual(remote_read.call_count, 0)
+            self.assertFalse(self._create_jobs(picking))
+        finally:
+            self.order_binding.sudo().write({
+                'status': 'active',
+                'review_reason': False,
+            })
+
     def test_two_fos_one_location_yield_single_create_with_min_gid(self):
         # Two FOs at one location, each shipping one line on this picking:
         # still ONE create job spanning them, with the representative

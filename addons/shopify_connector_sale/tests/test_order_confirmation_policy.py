@@ -109,7 +109,7 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             'product_id', 'product_uom_qty', 'price_unit', 'discount', 'tax_ids',
         ]), line_before)
 
-    def test_post_confirmation_cancellation_is_evidence_only(self):
+    def test_post_confirmation_cancellation_routes_to_review_without_rewrite(self):
         payload = self._payload('gid://shopify/Order/CancelledAfter')
         binding = self.Importer._apply_import(self.store, payload)
         order = binding.sale_order_id
@@ -131,10 +131,78 @@ class TestOrderConfirmationPolicy(OrderImportCase):
             binding.shopify_cancelled_at,
             fields.Datetime.to_datetime('2026-07-17 12:00:00'),
         )
+        self.assertEqual(binding.status, 'review')
+        self.assertEqual(binding.review_reason_code, 'cancelled_on_shopify')
+        self.assertIn('Stop shipment', binding.review_required_action)
+        self.assertTrue(order.shopify_connector_review)
         logs = self.JobLog.search([
             ('job_id', '=', job.id), ('event_type', '=', 'note'),
         ])
         self.assertEqual(len(logs), 1)
+        self.assertIn('routed for review', logs.message)
+
+    def test_unsafe_post_import_financial_states_route_to_review(self):
+        for index, status in enumerate((
+            'VOIDED', 'EXPIRED', 'PARTIALLY_REFUNDED', 'REFUNDED',
+        ), start=1):
+            with self.subTest(status=status):
+                payload = self._payload(
+                    'gid://shopify/Order/Unsafe/%s' % status,
+                )
+                binding = self.Importer._apply_import(self.store, payload)
+                order = binding.sale_order_id
+                line_before = order.order_line.read([
+                    'product_uom_qty', 'price_unit', 'discount', 'tax_ids',
+                ])
+                payload['displayFinancialStatus'] = status
+                payload['updatedAt'] = '2026-07-17T12:%02d:00Z' % index
+                self.Importer._apply_import(self.store, payload)
+                binding.invalidate_recordset()
+                self.assertEqual(binding.status, 'review')
+                self.assertEqual(
+                    binding.review_reason_code,
+                    'unsafe_financial_%s' % status.lower(),
+                )
+                self.assertIn('Stop shipment', binding.review_required_action)
+                self.assertEqual(order.state, 'sale')
+                self.assertEqual(order.order_line.read([
+                    'product_uom_qty', 'price_unit', 'discount', 'tax_ids',
+                ]), line_before)
+
+    def test_price_neutral_line_composition_change_routes_to_review(self):
+        payload = self._payload('gid://shopify/Order/Composition')
+        binding = self.Importer._apply_import(self.store, payload)
+        original_fingerprint = binding.shopify_line_composition_fingerprint
+        payload['line_items'][0]['sku'] = 'DIFFERENT-SKU-SAME-TOTAL'
+        payload['line_items'][0]['variant'] = {
+            'id': 'gid://shopify/ProductVariant/999999',
+        }
+        payload['updatedAt'] = '2026-07-17T12:20:00Z'
+        self.Importer._apply_import(self.store, payload)
+        binding.invalidate_recordset()
+        self.assertEqual(binding.status, 'review')
+        self.assertEqual(
+            binding.review_reason_code, 'line_composition_changed',
+        )
+        self.assertNotEqual(
+            binding.shopify_line_composition_fingerprint,
+            original_fingerprint,
+        )
+
+    def test_divergence_log_does_not_claim_review_without_transition(self):
+        payload = self._payload(
+            'gid://shopify/Order/FulfillmentOnlyChange',
+        )
+        binding = self.Importer._apply_import(self.store, payload)
+        job = self._job(target=payload['id'])
+        payload['displayFulfillmentStatus'] = 'PARTIALLY_FULFILLED'
+        payload['updatedAt'] = '2026-07-17T12:25:00Z'
+        self.Importer._apply_import(self.store, payload, job=job)
+        self.assertNotEqual(binding.status, 'review')
+        log = self.JobLog.search([
+            ('job_id', '=', job.id), ('event_type', '=', 'note'),
+        ], limit=1)
+        self.assertNotIn('routed for review', log.message)
 
     def test_post_confirmation_payment_evidence_loss_is_note_only(self):
         payload = self._payload('gid://shopify/Order/EvidenceLoss')
