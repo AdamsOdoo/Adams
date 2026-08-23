@@ -350,6 +350,7 @@ class TestFulfillmentScans(TransactionCase):
                 'order_binding_id': self.order_binding.id,
             })
         job = self._scan_job('fulfillment_reconciliation_check')
+        job.sudo().write({'state': 'running'})
         with patch.object(
             type(self.Service), '_read_fulfillments_batch',
             side_effect=lambda _job, _store, gids: {
@@ -402,6 +403,7 @@ class TestFulfillmentScans(TransactionCase):
                 'order_binding_id': self.order_binding.id,
             })
         job = self._scan_job('fulfillment_reconciliation_check')
+        job.sudo().write({'state': 'running'})
         before = self.settings.sudo().fulfillment_last_reconciliation_at
         with patch(
             'odoo.addons.shopify_connector_fulfillment.models.'
