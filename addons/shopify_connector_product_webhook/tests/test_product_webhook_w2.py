@@ -78,6 +78,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         self.assertIn('products/delete', active)
 
     def test_delete_delivery_admits_read_first_stale_binding_path(self):
+        registry = self.env['shopify.connector.webhook.registry']
         store = self._store('delete')
         gid = 'gid://shopify/Product/788032119674292999'
         delivery = self._delivery(

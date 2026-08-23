@@ -5,6 +5,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
     CANONICAL_EDITABLE,
     CANONICAL_READONLY,
+    INTERNAL_PROTECTED,
     SETTINGS_MODEL,
     assert_module_classification,
     canonical_form_field_nodes,
@@ -19,6 +20,14 @@ INVENTORY_CLASSIFICATION = {
         'Scan watermark written by the inventory service; an observation, '
         'not a decision.',
     ),
+    'inventory_push_scan_cursor_id': (
+        INTERNAL_PROTECTED,
+        'Durable pair cursor for the active bounded inventory scan.',
+    ),
+    'inventory_push_scan_generation': (
+        INTERNAL_PROTECTED,
+        'Connection generation fencing the active inventory scan cursor.',
+    ),
 }
 
 
@@ -30,8 +39,11 @@ class TestCanonicalStoreSettingsInventory(TransactionCase):
 
     def test_the_inventory_section_reaches_the_canonical_form(self):
         nodes = canonical_form_field_nodes(self.env)
-        for name in INVENTORY_CLASSIFICATION:
-            self.assertIn(name, nodes)
+        for name, (kind, _why) in INVENTORY_CLASSIFICATION.items():
+            if kind in (CANONICAL_EDITABLE, CANONICAL_READONLY):
+                self.assertIn(name, nodes)
+            else:
+                self.assertNotIn(name, nodes)
 
     def test_scheduled_stock_sync_is_the_field_the_service_selects_on(self):
         """Rendered as a decision because it genuinely is one.
