@@ -62,9 +62,9 @@ set -euo pipefail
 
 MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
 W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
-W1_WEBHOOK_SCHEMA_VERSION="19.0.1.1.0"
-W2_PRODUCT_WEBHOOK_VERSION="19.0.0.2.0"
-W3_INVENTORY_WEBHOOK_VERSION="19.0.0.3.0"
+W1_WEBHOOK_SCHEMA_VERSION="19.0.1.3.0"
+W2_PRODUCT_WEBHOOK_VERSION="19.0.0.3.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.4.0"
 W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
 W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
