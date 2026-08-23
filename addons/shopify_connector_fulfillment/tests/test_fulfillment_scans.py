@@ -82,6 +82,14 @@ class TestFulfillmentScans(TransactionCase):
             'status': 'active',
         })
 
+    def _picking(self):
+        return self.env['stock.picking'].create({
+            'picking_type_id': self.pt_out.id,
+            'location_id': self.stock_loc.id,
+            'location_dest_id': self.customer_loc.id,
+            'sale_id': self.sale.id,
+        })
+
     def _scan_job(self, job_type):
         return self.Job.sudo().create({
             'store_id': self.store.id,
@@ -205,7 +213,9 @@ class TestFulfillmentScans(TransactionCase):
         first = self._fulfillment_binding(
             'gid://shopify/Fulfillment/RC-SLICE-1'
         )
-        self._fulfillment_binding('gid://shopify/Fulfillment/RC-SLICE-2')
+        self._fulfillment_binding(
+            'gid://shopify/Fulfillment/RC-SLICE-2', picking=self._picking(),
+        )
         job = self._scan_job('fulfillment_reconciliation_check')
         job.sudo().write({'state': 'running'})
         node = {'id': first.shopify_gid, 'status': 'SUCCESS',
@@ -231,15 +241,9 @@ class TestFulfillmentScans(TransactionCase):
         first = self._fulfillment_binding(
             'gid://shopify/Fulfillment/RC-BATCH-1'
         )
-        second_picking = self.env['stock.picking'].create({
-            'picking_type_id': self.pt_out.id,
-            'location_id': self.stock_loc.id,
-            'location_dest_id': self.customer_loc.id,
-            'sale_id': self.sale.id,
-        })
         second = self._fulfillment_binding(
             'gid://shopify/Fulfillment/RC-BATCH-2',
-            picking=second_picking,
+            picking=self._picking(),
         )
         job = self._scan_job('fulfillment_reconciliation_check')
         observed = {
@@ -347,10 +351,30 @@ class TestFulfillmentScans(TransactionCase):
             })
         job = self._scan_job('fulfillment_reconciliation_check')
         with patch.object(
+            type(self.Service), '_read_fulfillments_batch',
+            side_effect=lambda _job, _store, gids: {
+                gid: {
+                    'id': gid,
+                    'status': 'SUCCESS',
+                    'trackingInfo': [],
+                }
+                for gid in gids
+            },
+        ), patch.object(
             type(self.Service), '_read_fulfillment',
-            return_value={'id': 'x', 'status': 'SUCCESS', 'trackingInfo': []},
+            side_effect=lambda _job, _store, gid: {
+                'id': gid,
+                'status': 'SUCCESS',
+                'trackingInfo': [],
+            },
         ):
             self.Service._handle_fulfillment_reconciliation_check(job)
+            successor = self._reconciliation_check_jobs().filtered(
+                lambda row: row.id > job.id and row.state == 'queued'
+            )
+            self.assertEqual(len(successor), 1)
+            successor.sudo().write({'state': 'running'})
+            self.Service._handle_fulfillment_reconciliation_check(successor)
         self.settings.invalidate_recordset()
         self.assertTrue(self.settings.fulfillment_last_reconciliation_at)
         # Every binding's snapshot was refreshed -- not just the first 200 of
@@ -361,9 +385,9 @@ class TestFulfillmentScans(TransactionCase):
         ])
         self.assertGreaterEqual(refreshed, 201)
 
-    def test_reconciliation_check_incomplete_pass_fails_closed_never_advances_watermark(self):
-        # A safety-cap-exceeding pass must fail closed (raise), never
-        # advance the watermark and never be silently reported as complete.
+    def test_reconciliation_check_incomplete_pass_saves_cursor_never_advances_watermark(self):
+        # A bounded incomplete slice persists its cursor and admits exactly
+        # one successor. It never advances the completion watermark early.
         for i in range(3):
             picking = self.env['stock.picking'].create({
                 'picking_type_id': self.pt_out.id,
@@ -381,9 +405,6 @@ class TestFulfillmentScans(TransactionCase):
         before = self.settings.sudo().fulfillment_last_reconciliation_at
         with patch(
             'odoo.addons.shopify_connector_fulfillment.models.'
-            'shopify_connector_fulfillment_scans.MAX_SCAN_PAGES', 1,
-        ), patch(
-            'odoo.addons.shopify_connector_fulfillment.models.'
             'shopify_connector_fulfillment_scans.RECONCILE_BATCH', 2,
         ), patch.object(
             type(self.Service), '_read_fulfillments_batch',
@@ -396,12 +417,16 @@ class TestFulfillmentScans(TransactionCase):
                 for gid in gids
             },
         ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._handle_fulfillment_reconciliation_check(job)
+            self.Service._handle_fulfillment_reconciliation_check(job)
         self.settings.invalidate_recordset()
         self.assertEqual(
             self.settings.sudo().fulfillment_last_reconciliation_at, before,
         )
+        self.assertTrue(self.settings.fulfillment_reconciliation_cursor_id)
+        successor = self._reconciliation_check_jobs().filtered(
+            lambda row: row.id > job.id and row.state == 'queued'
+        )
+        self.assertEqual(len(successor), 1)
 
     def test_reconnect_catchup_processes_more_than_200_order_bindings(self):
         OrderBinding = self.env['shopify.connector.order.binding']

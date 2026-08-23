@@ -187,6 +187,34 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 'actual_include_fields': 'jsonb',
             },
         )
+        self.env.cr.execute(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = %s AND column_name = ANY(%s)",
+            (
+                'shopify_connector_store_settings',
+                [
+                    'fulfillment_reconciliation_cursor_id',
+                    'inventory_push_scan_cursor_id',
+                    'product_scan_cursor',
+                    'sale_order_scan_cursor',
+                ],
+            ),
+        )
+        self.assertEqual(
+            {row[0] for row in self.env.cr.fetchall()},
+            {
+                'fulfillment_reconciliation_cursor_id',
+                'inventory_push_scan_cursor_id',
+                'product_scan_cursor',
+                'sale_order_scan_cursor',
+            },
+        )
+        self.env.cr.execute(
+            "SELECT shopify_export_status_managed FROM product_template "
+            "WHERE id = %s",
+            (self.env['product.template'].create({'name': 'Bridge seed'}).id,),
+        )
+        self.assertTrue(self.env.cr.fetchone()[0])
 
     def test_registry_removed_product_topic_queues_exact_gid_cleanup(self):
         """W2 removal leaves no active evidence and queues read-first delete."""
