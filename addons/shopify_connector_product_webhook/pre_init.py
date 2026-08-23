@@ -92,6 +92,13 @@ def pre_init_hook(env):
         )
 
     for table, columns_to_add in _ADDITIVE_COLUMNS.items():
+        cr.execute('SELECT to_regclass(%s)', (table,))
+        if not cr.fetchone()[0]:
+            # A full fresh install may load this optional addon before an
+            # unrelated W1 owner has created its table. That owner will then
+            # create the current schema normally. In the W2-over-old-W1 path
+            # every W1 table exists and is bridged and verified below.
+            continue
         for column, sql_type in columns_to_add:
             cr.execute(
                 'ALTER TABLE IF EXISTS "%s" '
