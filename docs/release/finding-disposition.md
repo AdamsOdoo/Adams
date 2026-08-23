@@ -86,6 +86,54 @@ The local execution host has Python 3.12.13 but no PostgreSQL server/client, Chr
 
 The review's remaining P3 groups are not release scope unless a gate makes one material. They remain explicitly tracked: O-3 must be closed before the latent customer-import path is enabled; O-7 through O-10, PR-7 and PR-9 through PR-15, I-6 and I-9 through I-11, W-9 and W-11, U-5 and U-11 through U-20, S-6 and S-8 through S-10, and P-10 through P-15 are deferred to `docs/release/post-v1-backlog.md`. O-3's PII redaction is included in WP-5 despite the affected path remaining disabled. S-4 and S-5 have the explicit release dispositions above.
 
+Every deferred identifier is expanded below so no shorthand range can be
+mistaken for an unreviewed or silently waived finding. `Not a v1 gate` means
+there is deliberately no v1 commit, migration, backend scenario, browser
+scenario, or acceptance gate to cite; promotion requires a separately scoped
+post-v1 change with its own complete trace.
+
+| Finding | Disposition | Work package | Owner | Regression / migration | Backend / browser UAT | Commit | Final gate |
+|---|---|---|---|---|---|---|---|
+| O-7 | Deferred outside v1 — dead COD-field refresh polish. | Post-v1 | Sale importer | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| O-8 | Deferred outside v1 — minor order-lifecycle polish. | Post-v1 | Sale importer | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| O-9 | Deferred outside v1 — minor order-lifecycle polish. | Post-v1 | Sale importer | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| O-10 | Deferred outside v1 — minor order-lifecycle polish. | Post-v1 | Sale importer | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-7 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-9 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-10 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-11 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-12 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-13 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-14 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| PR-15 | Deferred outside v1 — non-blocking product edge/polish finding. | Post-v1 | Product importer/export | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| I-6 | Deferred outside v1 — configuration-change edge case. | Post-v1 | Inventory/configuration | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| I-9 | Deferred outside v1 — remap/configuration ergonomics. | Post-v1 | Inventory/configuration | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| I-10 | Deferred outside v1 — preview/configuration lifecycle edge case. | Post-v1 | Inventory/configuration | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| I-11 | Deferred outside v1 — preview/configuration lifecycle edge case. | Post-v1 | Inventory/configuration | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| W-9 | Deferred outside v1 — non-blocking webhook/reconciliation polish. | Post-v1 | Webhook/reconciliation | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| W-11 | Deferred outside v1 — non-blocking webhook/reconciliation polish. | Post-v1 | Webhook/reconciliation | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-5 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-11 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-12 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-13 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-14 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-15 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-16 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-17 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-18 | Implemented in WP-4; authoritative release disposition remains in the release-findings table above. | WP-4 | Inventory/core UI | Failed-clean recovery regression | Journey 4/8 | `17a1467` | G-14 |
+| U-19 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| U-20 | Deferred outside v1 — non-blocking UX polish. | Post-v1 | Connector UI | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| S-6 | Deferred outside v1 — credential-rotation ergonomics. | Post-v1 | Core security | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| S-8 | Deferred outside v1 — defense-in-depth log-field review. | Post-v1 | Core security | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| S-9 | Deferred outside v1 — defense-in-depth hardening. | Post-v1 | Core security | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| S-10 | Deferred outside v1 — defense-in-depth hardening. | Post-v1 | Core security | Future scoped change | Not a v1 gate | None | Not a v1 gate |
+| P-10 | Deferred outside v1 — performance beyond published limits. | Post-v1 | Capacity layer | Future supported-limit benchmark | Not a v1 gate | None | Not a v1 gate |
+| P-11 | Deferred outside v1 — performance beyond published limits. | Post-v1 | Capacity layer | Future supported-limit benchmark | Not a v1 gate | None | Not a v1 gate |
+| P-12 | Deferred outside v1 — expire orphaned call leases in a separately qualified lifecycle change. | Post-v1 | API call lease | Future lease-expiry regression/migration | Not a v1 gate | None | Not a v1 gate |
+| P-13 | Deferred outside v1 — performance beyond published limits. | Post-v1 | Capacity layer | Future supported-limit benchmark | Not a v1 gate | None | Not a v1 gate |
+| P-14 | Deferred outside v1 — remove the store-lifecycle row lock from the order-webhook transaction in a separate concurrency change. | Post-v1 | Sale webhook/capacity | Future concurrency regression | Not a v1 gate | None | Not a v1 gate |
+| P-15 | Deferred outside v1 — performance beyond published limits. | Post-v1 | Capacity layer | Future supported-limit benchmark | Not a v1 gate | None | Not a v1 gate |
+
 ## Governance boundary
 
 This branch implements and qualifies the product-owner-authorized closure. It does not merge, mark ready, or self-accept. The final candidate still requires exact-SHA CI, Odoo.sh and two-run UAT evidence plus independent acceptance under DEC-041.
