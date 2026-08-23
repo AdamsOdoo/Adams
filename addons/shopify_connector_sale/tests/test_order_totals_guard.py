@@ -385,6 +385,13 @@ class TestOrderTotalsGuard(OrderImportCase):
                 'targetSelection': 'ALL',
             },
         }]
+        payload['discount_applications'] = [{
+            '__typename': 'DiscountCodeApplication',
+            'index': 0,
+            'allocationMethod': 'ACROSS',
+            'targetType': 'LINE_ITEM',
+            'targetSelection': 'ALL',
+        }]
         binding = self.Importer._apply_import(self.store, payload)
         line = binding.sale_order_id.order_line.filtered(
             lambda candidate: candidate.shopify_line_item_gid

@@ -335,15 +335,11 @@ class TestOrderImportMappingStatic(TransactionCase):
             # refreshes, and the locked binding evidence write.  Keep the
             # explicit count so a future privilege expansion is visible.
             'shopify_connector_order_importer.py': 3,
-            # Store 360 slice 1 raised the order-scan inventory from 1 to 3:
-            # the checkpoint/lineage settings write (pre-existing), plus the
-            # two minimal technical-sudo READS in the cancelled-import
-            # resume path (`_resume_cancelled_order_import`: the prior-job
-            # lookup and the binding-evidence lookup) — the same P1-3
-            # posture as `_enqueue_once`'s technical-sudo job handle. Job
-            # creation itself still flows only through the sanctioned
-            # `job.enqueue` service.
-            'shopify_connector_order_scan.py': 3,
+            # The resumable scan owns three protected checkpoint writes and
+            # one terminal job transition. The cancelled-import resume path
+            # adds two narrow protected evidence reads. Job creation still
+            # flows only through the sanctioned `job.enqueue` service.
+            'shopify_connector_order_scan.py': 6,
             'shopify_connector_tax_mapping.py': 0,
         }
         for filename, count in expected.items():
