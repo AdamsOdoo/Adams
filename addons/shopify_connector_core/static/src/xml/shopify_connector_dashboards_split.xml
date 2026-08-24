@@ -256,22 +256,22 @@
                         <section class="sc360-section sc360-stores" aria-label="Store health">
                             <h2 class="sc-section__title">Store health</h2>
                             <div class="sc360-kpis">
-                                <div class="sc360-kpi"><div class="sc360-kpi__label">Healthy stores</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.healthy)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Ready stores</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.healthy)"/></div>
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Work in progress</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.working)"/></div>
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Stores needing attention</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.attention)"/></div>
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Unknown state</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.unknown)"/></div>
                             </div>
                             <table class="sc360-table sc360-stores-table">
-                                <thead><tr><th scope="col">Store</th><th scope="col">Health</th><th scope="col">Connection</th><th scope="col" class="sc360-table__num">Queue</th><th scope="col" class="sc360-table__num">Attention</th><th scope="col" class="sc360-table__num">Ambiguous changes</th><th scope="col">Last activity</th></tr></thead>
+                                <thead><tr><th scope="col">Store</th><th scope="col">Operational state</th><th scope="col">Initial progress</th><th scope="col" class="sc360-table__num">Pending work</th><th scope="col" class="sc360-table__num">Attention</th><th scope="col">Next action</th><th scope="col">Last connector activity</th></tr></thead>
                                 <tbody>
                                     <t t-foreach="data.stores_region.rows" t-as="row" t-key="row.id">
                                         <tr t-att-data-store="row.id">
                                             <th scope="row" t-esc="row.name"/>
-                                            <td t-esc="healthToneLabel(row.tone)"/>
-                                            <td t-esc="storeStateLabel(row.state)"/>
+                                            <td><strong t-esc="row.operational_label"/><div class="text-muted" t-esc="row.operational_reason"/></td>
+                                            <td><bdi t-esc="formatNumber(row.domains_completed)"/> / <bdi t-esc="formatNumber(row.domains_selected)"/> domains</td>
                                             <td class="sc360-table__num" t-esc="formatNumber(row.backlog)"/>
                                             <td t-att-class="'sc360-table__num' + (row.attention ? ' sc360-table__num--danger' : '')" t-esc="formatNumber(row.attention)"/>
-                                            <td class="sc360-table__num" t-esc="formatNumber(row.ambiguous_mutations)"/>
+                                            <td t-esc="row.next_action"/>
                                             <td><t t-if="row.last_activity"><bdi t-esc="formatInstant(row.last_activity)"/><t t-if="row.last_activity_relative"> · <bdi t-esc="row.last_activity_relative"/></t></t><t t-else="">Unknown</t></td>
                                         </tr>
                                     </t>
@@ -330,6 +330,7 @@
 
                         <section class="sc360-section" aria-label="Reconciliation evidence">
                             <h2 class="sc-section__title">Reconciliation evidence</h2>
+                            <p class="sc360-scope-note">Last successful reconciliation: <t t-if="data.reconciliation.last_success"><bdi t-esc="formatInstant(data.reconciliation.last_success)"/></t><t t-else="">not yet</t></p>
                             <div class="sc360-kpis">
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Pending reconciliation runs</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.pending_runs)"/></div>
                                 <div class="sc360-kpi"><div class="sc360-kpi__label">Failed reconciliation runs</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.failed_runs)"/></div>

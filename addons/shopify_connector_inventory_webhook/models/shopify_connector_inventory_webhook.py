@@ -261,10 +261,29 @@ class ShopifyConnectorInventoryWebhookRegistry(models.AbstractModel):
                     'generation exists; no duplicate child was created.'
                 ),
             }
+        if disposition == 'unsafe_existing':
+            return {
+                'state': 'manual_review',
+                'message': (
+                    'Inventory observation job %s is in unsafe active state '
+                    '%s; the delivery did not create a replacement or claim '
+                    'success.' % (job.id, job.state)
+                ),
+            }
+        if disposition == 'unsafe_terminal':
+            return {
+                'state': 'manual_review',
+                'message': (
+                    'Inventory webhook matched prior observation job %s, '
+                    'which ended in unsafe state %s. The delivery remains '
+                    'visible and scheduled observation is the recovery path.'
+                    % (job.id, job.state)
+                ),
+            }
         if disposition == 'enqueued':
             action = 'enqueued'
-        elif disposition == 'duplicate':
-            action = 'matched the existing terminal observation job'
+        elif disposition == 'duplicate_succeeded':
+            action = 'matched the existing succeeded observation job'
         else:
             action = 'coalesced with the active observation job'
         return {

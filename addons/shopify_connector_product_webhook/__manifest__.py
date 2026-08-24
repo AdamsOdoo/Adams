@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Product Webhooks',
-    'version': '19.0.0.2.0',
+    'version': '19.0.0.3.0',
     'summary': (
         'Read-first Shopify product webhook acceleration for the product '
         'importer.'
@@ -8,15 +8,16 @@
     'description': """
 Shopify Connector Product Webhooks
 
-This optional domain addon activates only Shopify ``products/create`` and
-``products/update`` after the generic webhook addon has installed its verified
+This optional domain addon activates Shopify ``products/create``,
+``products/update`` and ``products/delete`` after the generic webhook addon has installed its verified
 delivery envelope.  It never performs a Shopify request in the webhook
 handler: the handler validates the exact ``admin_graphql_api_id`` identity,
 then admits the existing ``product_import_sync`` job.  The child job performs
 the authoritative Shopify GraphQL read and the scheduled product scan remains
 the loss-recovery path.
 
-Product delete webhooks are intentionally not activated in this slice.
+Product deletion is represented by a stale binding for review; no Odoo product
+is deleted or archived.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',

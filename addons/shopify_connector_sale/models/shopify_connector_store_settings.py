@@ -93,6 +93,12 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
         comodel_name='account.payment.term', ondelete='restrict',
     )
     sale_order_last_import_checkpoint_at = fields.Datetime()
+    sale_order_scan_window_start_at = fields.Datetime(readonly=True)
+    sale_order_scan_window_end_at = fields.Datetime(readonly=True)
+    sale_order_scan_cursor = fields.Char(readonly=True)
+    sale_order_scan_latest_at = fields.Datetime(readonly=True)
+    sale_order_scan_page_count = fields.Integer(default=0, readonly=True)
+    sale_order_scan_generation = fields.Integer(default=0, readonly=True)
     # --- Store 360 / R-4: generation-bound order catch-up stamps ---------
     # A successful connection probe alone must never mark Shopify-derived
     # order data current (spec §9.3/§9.5, R-4). These stamps record the one

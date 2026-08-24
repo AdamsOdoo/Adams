@@ -11,11 +11,11 @@
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_review"
-              name="Review Workspace"
-              parent="menu_shopify_connector_fulfillment"
+              name="Fulfillment Review"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
               action="action_shopify_connector_fulfillment_review"
-              sequence="10"
-              active="False"/>
+              sequence="45"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_binding"
               name="Fulfillments"

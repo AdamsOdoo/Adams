@@ -74,6 +74,15 @@ class ShopifyConnectorFulfillmentCreateStrategy(models.AbstractModel):
         settings = self.env['shopify.connector.store.settings'].search(
             [('store_id', '=', job.store_id.id)], limit=1,
         )
+        if binding.status == 'review':
+            self._fail_closed_pre_c2(
+                'financial_total_mismatch',
+                'Fulfillment stopped before mutation because the Shopify '
+                'order is in Needs Attention: %s' % (
+                    binding.review_reason
+                    or 'its post-import commercial evidence changed',
+                ),
+            )
         return {
             'job_id': job.id,
             'store_id': job.store_id.id,

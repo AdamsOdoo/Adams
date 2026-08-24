@@ -44,16 +44,18 @@ class TestSecurityHardening(TransactionCase):
                 ('admin', 'group_shopify_connector_admin'),
             )
         }
+        cls.plain_user = cls._role_user(False, False)
 
     @classmethod
     def _role_user(cls, label, group_xmlid):
-        groups = [
-            cls.env.ref('base.group_user').id,
-            cls.env.ref('shopify_connector_core.%s' % group_xmlid).id,
-        ]
+        groups = [cls.env.ref('base.group_user').id]
+        if group_xmlid:
+            groups.append(
+                cls.env.ref('shopify_connector_core.%s' % group_xmlid).id,
+            )
         return cls.env['res.users'].create({
-            'name': 'SEC-1 core %s' % label,
-            'login': 'sec1_core_%s' % label,
+            'name': 'SEC-1 core %s' % (label or 'plain'),
+            'login': 'sec1_core_%s' % (label or 'plain'),
             'group_ids': [(6, 0, groups)],
         })
 
@@ -79,6 +81,62 @@ class TestSecurityHardening(TransactionCase):
         if event_type:
             domain.append(('event_type', '=', event_type))
         return self.JobLog.search(domain)
+
+    def test_privileged_cron_services_refuse_direct_rpc_by_non_admin(self):
+        services = (
+            self.env['shopify.connector.job.dispatch'],
+            self.env['shopify.connector.pii.retention'],
+            self.env['shopify.connector.stale.owner.sweep'],
+        )
+        denied = [self.plain_user] + [
+            self.roles[label]
+            for label in ('auditor', 'operator', 'reviewer')
+        ]
+        for service in services:
+            for user in denied:
+                with self.assertRaises(
+                    AccessError, msg=(service._name, user.login),
+                ):
+                    caller = service.with_user(user)
+                    if service._name == 'shopify.connector.job.dispatch':
+                        caller.run_drain(limit=1)
+                    else:
+                        caller.run_sweep()
+
+        self.assertEqual(
+            self.env['shopify.connector.job.dispatch'].with_user(
+                self.roles['admin']
+            ).run_drain(limit=1),
+            0,
+        )
+        self.assertEqual(
+            self.env['shopify.connector.pii.retention'].with_user(
+                self.roles['admin']
+            ).run_sweep(),
+            True,
+        )
+        self.assertEqual(
+            self.env['shopify.connector.stale.owner.sweep'].with_user(
+                self.roles['admin']
+            ).run_sweep(),
+            0,
+        )
+        self.assertEqual(
+            self.env['shopify.connector.job.dispatch'].sudo().run_drain(
+                limit=1,
+            ),
+            0,
+        )
+        self.assertEqual(
+            self.env['shopify.connector.pii.retention'].sudo().run_sweep(),
+            True,
+        )
+        self.assertEqual(
+            self.env[
+                'shopify.connector.stale.owner.sweep'
+            ].sudo().run_sweep(),
+            0,
+        )
 
     def test_protected_job_write_denied_for_all_four_roles(self):
         for label, user in self.roles.items():

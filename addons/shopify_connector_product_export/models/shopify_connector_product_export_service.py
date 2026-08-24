@@ -293,11 +293,10 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         value. Explicit clears require a managed field/intent and are not
         inferred from the absence of a local value.
         """
-        status = template.shopify_export_status or 'draft'
-        desired = {
-            'title': template.name or '',
-            'status': EXPORT_STATUS_TO_SHOPIFY[status],
-        }
+        desired = {'title': template.name or ''}
+        if template.shopify_export_status_managed:
+            status = template.shopify_export_status or 'draft'
+            desired['status'] = EXPORT_STATUS_TO_SHOPIFY[status]
         optional_fields = (
             ('descriptionHtml', template.description_sale,
              'shopify_export_description_managed'),
@@ -2890,20 +2889,36 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             local_snapshot['store_id']
         )
         include_price = self._price_export_allowed(store)
-        confirmed_ids = []
-        for step in (preview.apply_plan or {}).get('steps') or []:
-            if step['step'] == JOB_TYPE_VARIANTS_CREATE:
-                confirmed_ids = list(step.get('variant_ids') or [])
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
         if not confirmed_ids:
             self._fail_closed_pre_c2(
                 ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
                 'No variant creation was confirmed for this product.',
+            )
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; no mutation was sent.',
             )
         variants = self.env['product.product'].browse(confirmed_ids).exists()
         if len(variants) != len(set(confirmed_ids)):
             self._fail_closed_pre_c2(
                 ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
                 'A confirmed new variant no longer exists in Odoo.',
+            )
+        skus = [variant.default_code for variant in variants]
+        if any(not sku for sku in skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'Every confirmed new variant requires a non-empty SKU before '
+                'Shopify mutation so its response can be bound without guessing.',
+            )
+        if len(set(skus)) != len(skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'Confirmed new variants contain duplicate SKUs; no Shopify '
+                'mutation was sent.',
             )
         VariantBinding = self.env[
             'shopify.connector.product.variant.binding'
@@ -2917,6 +2932,42 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
                 'A confirmed new variant became bound after the preview; '
                 'creating it again would duplicate it.',
+            )
+        # Re-read immediately before C2. A merchant or a prior uncertain
+        # attempt may have created the SKU after preview; local validation
+        # alone cannot prove remote absence.
+        remote = self._read_remote_product(
+            store,
+            self.env['shopify.connector.job'].browse(local_snapshot['job_id']),
+            local_snapshot['remote_product_gid'],
+        )
+        if remote.get('store_identity') != store.shop_domain:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'The fresh variant-create preflight observed a different '
+                'Shopify store identity; no mutation was sent.',
+            )
+        if not remote.get('exists'):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'The bound Shopify product no longer exists; a new variant '
+                'cannot be created safely.',
+            )
+        remote_skus = {}
+        for entry in remote.get('variants') or []:
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                remote_skus.setdefault(sku, []).append(entry.get('id'))
+        collisions = sorted(set(skus) & set(remote_skus))
+        if collisions:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'A confirmed variant SKU now exists on Shopify (%s). The '
+                'fresh pre-mutation identity check stopped duplicate creation.'
+                % ', '.join(collisions),
             )
         options = self._desired_options(preview.product_template_id)
         variants_input = []
@@ -3131,6 +3182,19 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         binding = preview.product_template_binding_id
         if not binding:
             return
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; binding finalization stopped.',
+            )
+        variants = self.env['product.product'].browse(confirmed_ids).exists()
+        if len(variants) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'A confirmed new variant disappeared before binding finalization.',
+            )
         by_sku = {}
         for entry in remote_variants:
             if not isinstance(entry, dict):
@@ -3141,7 +3205,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             )
             if sku:
                 by_sku.setdefault(sku, []).append(entry)
-        for variant in preview.product_template_id.product_variant_ids:
+        for variant in variants:
             if not variant.default_code:
                 raise JobHandlerError(
                     ERROR_CLASS_BINDING_CONFLICT,
@@ -3157,6 +3221,12 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 )
             remote = candidates[0]
             gid = remote.get('id')
+            if not gid:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Shopify returned a created variant without an identity; '
+                    'binding finalization stopped.',
+                )
             existing = VariantBinding.sudo().search([
                 ('store_id', '=', store.id),
                 ('product_variant_id', '=', variant.id),
@@ -3203,8 +3273,23 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             if existing:
                 if existing.shopify_gid == gid:
                     existing.sudo().write(variant_values)
-                continue
+                    continue
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'The confirmed Odoo variant is already bound to a '
+                    'different Shopify variant; finalization stopped.',
+                )
             VariantBinding.sudo().create(variant_values)
+
+    @api.model
+    def _confirmed_variant_create_ids(self, preview):
+        ids = []
+        for step in (preview.apply_plan or {}).get('steps') or []:
+            if step.get('step') == JOB_TYPE_VARIANTS_CREATE:
+                ids.extend(step.get('variant_ids') or [])
+        # Preserve the immutable confirmation order. Callers explicitly reject
+        # duplicate plan entries instead of silently normalizing evidence.
+        return ids
 
     # ------------------------------------------------------------------
     # Shared reconciliation helpers and the reconciliation handler

@@ -49,12 +49,10 @@ FULFILLMENT_ORDER_LINES_QUERY = (
 ) % {'page': PAGE_SIZE}
 
 ORDER_FULFILLMENTS_QUERY = (
-    'query($orderId: ID!, $fCursor: String) {\n'
+    'query($orderId: ID!) {\n'
     '  order(id: $orderId) {\n'
     '    id\n'
-    '    fulfillments(first: %(page)d, after: $fCursor) {\n'
-    '      pageInfo { hasNextPage endCursor }\n'
-    '      nodes {\n'
+    '    fulfillments(first: 250) {\n'
     '        id\n'
     '        status\n'
     '        displayStatus\n'
@@ -63,11 +61,10 @@ ORDER_FULFILLMENTS_QUERY = (
     '          pageInfo { hasNextPage endCursor }\n'
     '          nodes { id quantity lineItem { id } }\n'
     '        }\n'
-    '      }\n'
     '    }\n'
     '  }\n'
     '}'
-) % {'page': PAGE_SIZE}
+)
 
 LOCATIONS_QUERY = (
     'query($cursor: String) {\n'
@@ -194,8 +191,6 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
             return 'foCursor'
         if connection_path.endswith('lineItems'):
             return 'lineCursor'
-        if connection_path.endswith('fulfillments'):
-            return 'fCursor'
         return 'cursor'
 
     @api.model
@@ -238,16 +233,38 @@ class ShopifyConnectorFulfillmentService(models.AbstractModel):
 
     @api.model
     def _read_order_fulfillments(self, job, store, order_gid):
-        """Return every Fulfillment for an order (cursor-paginated). Used by the
-        reconcile reads, inbound observation, and Mode 2. The nested
+        """Return every Fulfillment for an order from Shopify's list field.
+
+        Shopify Admin API 2026-07 exposes ``Order.fulfillments`` as a list,
+        not a connection: it has no ``nodes``, ``pageInfo`` or ``after``.
+        The nested
         fulfillmentLineItems connection is fetched in one page; if any
         fulfillment has more line items than one page, decision-critical
         completeness cannot be proven — fail closed (§11.4)."""
-        fulfillments = self._paginate(
+        data = self._read_data(
             job, store, ORDER_FULFILLMENTS_QUERY, {'orderId': order_gid},
-            'order.fulfillments',
         )
+        order = data.get('order') if isinstance(data, dict) else None
+        fulfillments = order.get('fulfillments') if isinstance(order, dict) else None
+        if not isinstance(fulfillments, list):
+            raise FulfillmentReadError(
+                'data_shape_schema_mismatch',
+                'Shopify returned an invalid Order.fulfillments list shape.',
+            )
+        # The list field accepts only a first-count, not a cursor. Reaching the
+        # requested bound cannot prove that another row was not truncated.
+        if len(fulfillments) >= 250:
+            raise FulfillmentReadError(
+                'data_shape_schema_mismatch',
+                'An order reached the supported 249-fulfillment read limit; '
+                'decision-critical completeness cannot be proven.',
+            )
         for node in fulfillments:
+            if not isinstance(node, dict) or not node.get('id'):
+                raise FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'Shopify returned a malformed fulfillment list entry.',
+                )
             line_conn = (node or {}).get('fulfillmentLineItems') or {}
             page_info = line_conn.get('pageInfo') or {}
             if page_info.get('hasNextPage'):

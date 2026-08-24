@@ -115,8 +115,8 @@ class TestUiU2Inventory(TransactionCase):
         mappings = self.env.ref(
             'shopify_connector_product.menu_shopify_connector_catalog'
         )
-        sync_rules = self.env.ref(
-            'shopify_connector_core.menu_shopify_connector_store_settings'
+        configuration = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_configuration'
         )
         inventory = self.env.ref(
             'shopify_connector_inventory.menu_shopify_connector_inventory'
@@ -136,7 +136,7 @@ class TestUiU2Inventory(TransactionCase):
         self.assertEqual(self.env.ref(
             'shopify_connector_inventory.'
             'menu_shopify_connector_inventory_first_push'
-        ).parent_id, sync_rules)
+        ).parent_id, configuration)
         self.assertEqual(self.env.ref(
             'shopify_connector_inventory.'
             'menu_shopify_connector_location_mapping'

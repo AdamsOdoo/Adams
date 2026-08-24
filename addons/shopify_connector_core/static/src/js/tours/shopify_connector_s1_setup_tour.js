@@ -291,8 +291,8 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             content: "The summary is in plain words, and it is this store's.",
         },
         {
-            trigger: ".sc_setup__panel:contains('does not start a sync')",
-            content: "Activation states plainly that it starts nothing.",
+            trigger: ".sc_setup__panel:contains('starts the selected read and import scans')",
+            content: "Activation truthfully states which synchronization starts.",
         },
         { trigger: `${CONTINUE}:contains('Activate')`, run: "click" },
         {

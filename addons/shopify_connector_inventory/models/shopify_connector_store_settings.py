@@ -16,3 +16,5 @@ class ShopifyConnectorStoreSettingsInventoryExtension(models.Model):
     # own last-run marker for this store, independent of any other
     # domain's scan checkpoint.
     inventory_last_push_scan_at = fields.Datetime(readonly=True)
+    inventory_push_scan_cursor_id = fields.Integer(default=0, readonly=True)
+    inventory_push_scan_generation = fields.Integer(default=0, readonly=True)

@@ -65,3 +65,9 @@ class ShopifyConnectorStoreSettingsProduct(models.Model):
     # advances neither.
     product_last_import_checkpoint_at = fields.Datetime(readonly=True)
     product_last_import_success_at = fields.Datetime(readonly=True)
+    product_scan_window_start_at = fields.Datetime(readonly=True)
+    product_scan_window_end_at = fields.Datetime(readonly=True)
+    product_scan_cursor = fields.Char(readonly=True)
+    product_scan_latest_at = fields.Datetime(readonly=True)
+    product_scan_page_count = fields.Integer(default=0, readonly=True)
+    product_scan_generation = fields.Integer(default=0, readonly=True)

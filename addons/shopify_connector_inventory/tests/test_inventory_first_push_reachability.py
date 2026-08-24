@@ -228,6 +228,20 @@ class TestInventoryFirstPushReachability(TransactionCase):
             'scan must coalesce, not stack previews.',
         )
 
+    def test_scan_refreshes_previewed_pair_without_admitting_push(self):
+        binding = self._pending_binding()
+        self._run_scan()
+        first = self._preview_jobs(binding)
+        first.sudo().write({'state': 'running'})
+        self.Service._handle_inventory_first_push_preview(first)
+        self.assertEqual(binding.first_push_state, 'previewed')
+
+        self._run_scan()
+        previews = self._preview_jobs(binding)
+        self.assertEqual(len(previews), 2)
+        self.assertEqual(len(previews.filtered(lambda job: job.state == 'queued')), 1)
+        self.assertFalse(self._push_sync_jobs(binding))
+
     def test_the_preview_job_moves_a_pending_pair_to_previewed(self):
         """The production handler, on a production-admitted job."""
         binding = self._pending_binding()

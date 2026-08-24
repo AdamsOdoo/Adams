@@ -62,9 +62,9 @@ set -euo pipefail
 
 MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
 W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
-W1_WEBHOOK_SCHEMA_VERSION="19.0.1.1.0"
-W2_PRODUCT_WEBHOOK_VERSION="19.0.0.2.0"
-W3_INVENTORY_WEBHOOK_VERSION="19.0.0.3.0"
+W1_WEBHOOK_SCHEMA_VERSION="19.0.1.3.0"
+W2_PRODUCT_WEBHOOK_VERSION="19.0.0.3.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.4.0"
 W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
 W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
@@ -1087,8 +1087,14 @@ fi
 # created, because a cached venv from before this change would otherwise keep
 # silently skipping every browser test. This is idempotent and near-instant
 # once satisfied.
-"$VENV/bin/pip" install --quiet websocket-client
+"$VENV/bin/pip" install --quiet websocket-client "graphql-core==3.2.6"
 WEBSOCKET_VERSION="$("$VENV/bin/python" -c 'import websocket; print(websocket.__version__)' 2>/dev/null || echo missing)"
+
+# WP-1: validate every production GraphQL document against the vendored,
+# immutable Shopify Admin API 2026-07 introspection snapshot before Odoo can
+# execute any test. The final release gate separately repeats this against the
+# live schema; this offline gate prevents a store outage from disabling CI.
+"$VENV/bin/python" "${REPO_ROOT}/tools/validate_shopify_graphql.py"
 
 verify_connector_module_inventory
 if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then

@@ -238,7 +238,7 @@ class ShopifyConnectorJob(models.Model):
     )
     cancel_reason = fields.Char(readonly=True)
     started_at = fields.Datetime(readonly=True)
-    finished_at = fields.Datetime(readonly=True)
+    finished_at = fields.Datetime(readonly=True, index=True)
     # CORE-R2 (AR-047) connection epoch captured at business-job enqueue
     # (`shopify.connector.job.enqueue`). `execute_business` admission compares it
     # against the store's live `connection_generation` under a `FOR SHARE` lock
@@ -650,11 +650,42 @@ class ShopifyConnectorJob(models.Model):
         (`test_dispatch_throughput.py::test_claim_lock_and_recheck_unchanged`).
         """
         now = fields.Datetime.now()
-        candidates = self.search(
-            self._claimable_domain(now, exclude_store_ids),
-            limit=limit,
-            order='id asc',
+        domain = self._claimable_domain(now, exclude_store_ids)
+        # One bounded round-robin over stores prevents an old backlog in one
+        # shop from monopolising every claim slot.  The grouped read discovers
+        # each visible store's oldest candidate; subsequent rounds select the
+        # next id for that store.  Scope locks and the post-lock state recheck
+        # below remain unchanged.
+        store_heads = self._read_group(
+            domain,
+            groupby=['store_id'],
+            aggregates=['id:min'],
         )
+        ordered_stores = [
+            store for store, _oldest in sorted(
+                store_heads, key=lambda row: (row[1], row[0].id),
+            )
+        ]
+        candidates = self.browse()
+        after_by_store = {store.id: 0 for store in ordered_stores}
+        while ordered_stores and len(candidates) < limit:
+            next_round = []
+            for store in ordered_stores:
+                if len(candidates) >= limit:
+                    break
+                candidate = self.search(
+                    domain + [
+                        ('store_id', '=', store.id),
+                        ('id', '>', after_by_store[store.id]),
+                    ],
+                    limit=1,
+                    order='id asc',
+                )
+                if candidate:
+                    candidates |= candidate
+                    after_by_store[store.id] = candidate.id
+                    next_round.append(store)
+            ordered_stores = next_round
         if not candidates:
             return candidates
         locked = candidates.try_lock_for_update()

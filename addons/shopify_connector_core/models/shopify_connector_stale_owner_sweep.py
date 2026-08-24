@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 STALE_OWNER_TIMEOUT_MINUTES = 30
@@ -28,6 +29,13 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
 
     @api.model
     def run_sweep(self):
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may run the stale '
+                'Layer-2 owner sweep.'
+            )
         timeout = self._positive_int_parameter(
             STALE_OWNER_TIMEOUT_PARAM, STALE_OWNER_TIMEOUT_MINUTES,
         )

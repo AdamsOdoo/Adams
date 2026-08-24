@@ -26,8 +26,7 @@
               name="Reconnect and Backfill"
               parent="menu_shopify_connector_product_export"
               action="action_shopify_connector_export_backfill"
-              sequence="25"
-              active="False"/>
+              sequence="25"/>
 
     <menuitem id="menu_shopify_connector_product_export_settings"
               name="Export Settings"

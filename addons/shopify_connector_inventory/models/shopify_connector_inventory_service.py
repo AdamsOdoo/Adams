@@ -41,6 +41,7 @@ _logger = logging.getLogger(__name__)
 # ----------------------------------------------------------------------
 JOB_TYPE_PUSH_SYNC = 'inventory_push_sync'
 JOB_TYPE_PUSH_SCAN = 'inventory_push_scan'
+INVENTORY_PUSH_SCAN_BATCH = 200
 JOB_TYPE_FIRST_PUSH_PREVIEW = 'inventory_first_push_preview'
 JOB_TYPE_LOCATION_SYNC = 'inventory_location_sync'
 JOB_TYPE_ACTIVATE = 'inventory_activate'
@@ -1270,6 +1271,15 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding rule, PR #182 comment 5025765389 §16) -- never silently
         dropped.
         """
+        target, free_qty = self._current_odoo_available(
+            binding, include_unclamped=True,
+        )
+        binding.sudo().write({'pending_target_available': target})
+        return target, free_qty
+
+    @api.model
+    def _current_odoo_available(self, binding, include_unclamped=False):
+        """Read the pair's current Odoo-authoritative available quantity."""
         product = binding.product_variant_binding_id.product_variant_id
         location = binding.location_mapping_id.odoo_location_id
         # Deriving the Odoo-side available quantity is an internal system
@@ -1289,8 +1299,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 binding.shopify_inventory_item_gid,
                 binding.location_mapping_id.shopify_gid,
             )
-        binding.sudo().write({'pending_target_available': target})
-        return target, free_qty
+        return (target, free_qty) if include_unclamped else target
 
     @api.model
     def _fail_closed_pre_c2(self, job_id, error_class, subreason, message):
@@ -1363,6 +1372,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             if not settings or not settings.inventory_domain_enabled:
                 continue
             self._refresh_pending_target(binding)
+            if binding.first_push_state != 'confirmed':
+                self._admit_first_push_preview(binding)
+                continue
             self._try_enqueue_push_sync(
                 binding.store_id, binding, 'odoo_event',
                 trigger_origin='inventory_stock_change',
@@ -1389,6 +1401,9 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             if not self._binding_operationally_eligible(binding):
                 continue
             self._refresh_pending_target(binding)
+            if binding.first_push_state != 'confirmed':
+                enqueued |= self._admit_first_push_preview(binding)
+                continue
             job = self._try_enqueue_push_sync(store, binding, 'manual_sync')
             enqueued |= job
         return enqueued
@@ -1405,6 +1420,14 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         cron thread, so retry/lifecycle/domain-gating/audit for the scan
         itself all use the job substrate like every other inventory job.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may start the '
+                'scheduled inventory push scan outside the root cron '
+                'environment.'
+            )
         Settings = self.env['shopify.connector.store.settings']
         enqueued = self.env['shopify.connector.job']
         for settings in Settings.search([
@@ -1475,11 +1498,12 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         # First-push guard (D-013-4): never enqueue any mutation for an
         # unconfirmed pair.
         if binding.first_push_state != 'confirmed':
-            job._transition_blocked_manual_review(
-                ERROR_CLASS_VALIDATION, SUBREASON_DESTRUCTIVE_WRITE,
-                'First push has not been confirmed for this pair; no '
-                'mutation may be enqueued.',
+            self._refresh_pending_target(binding)
+            job._transition_skipped(
+                'First push is not confirmed; this push request ended '
+                'without Shopify work and returned the pair to preview.',
             )
+            self._admit_first_push_preview(binding)
             return
 
         if not binding.location_mapping_id.push_enabled:
@@ -1942,20 +1966,34 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 'The inventory domain is no longer enabled for this store.'
             )
             return
+        generation = job.expected_connection_generation
+        if settings.inventory_push_scan_generation == generation:
+            cursor_id = settings.inventory_push_scan_cursor_id or 0
+        else:
+            cursor_id = 0
+            settings.sudo().write({
+                'inventory_push_scan_cursor_id': 0,
+                'inventory_push_scan_generation': generation,
+            })
         # Legacy rows can pre-date the inventory-level pair table, and a
         # product binding and a location mapping are allowed to arrive in
         # either order.  Reconcile that durable identity before taking the
         # scan snapshot so the first-push ceremony is reachable from this
         # production entry point as well as from the write hooks below.
-        self._bootstrap_inventory_level_bindings(store=store)
+        if not cursor_id:
+            self._bootstrap_inventory_level_bindings(store=store)
         Binding = self.env['shopify.connector.inventory.level.binding']
-        bindings = Binding.search([
+        scan_domain = [
             ('store_id', '=', store.id),
             ('location_mapping_id.push_enabled', '=', True),
             ('status', '=', 'active'),
             ('product_variant_binding_id.status', '=', 'active'),
             ('location_mapping_id.status', '=', 'active'),
-        ])
+        ]
+        bindings = Binding.search(
+            scan_domain + [('id', '>', cursor_id)],
+            order='id asc', limit=INVENTORY_PUSH_SCAN_BATCH,
+        )
         mapped = len(bindings)
         enqueued_count = 0
         coalesced_count = 0
@@ -1984,7 +2022,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             # admitting both would collide on the unique constraint and one
             # would be swallowed as a coalesce -- silently, and not always
             # the same one.
-            if binding.first_push_state == 'pending':
+            if binding.first_push_state != 'confirmed':
                 if self._admit_first_push_preview(binding):
                     previewed_count += 1
                 else:
@@ -2006,9 +2044,19 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 enqueued_count += 1
             else:
                 coalesced_count += 1
-        settings.sudo().write({
-            'inventory_last_push_scan_at': fields.Datetime.now(),
-        })
+        has_more = bool(bindings) and Binding.search_count(
+            scan_domain + [('id', '>', max(bindings.ids))], limit=1,
+        )
+        if has_more:
+            settings.sudo().write({
+                'inventory_push_scan_cursor_id': max(bindings.ids),
+            })
+        else:
+            settings.sudo().write({
+                'inventory_last_push_scan_at': fields.Datetime.now(),
+                'inventory_push_scan_cursor_id': 0,
+                'inventory_push_scan_generation': 0,
+            })
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
         job._log_transition(
             'state_change',
@@ -2019,14 +2067,25 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             ),
             from_state='running', to_state='succeeded',
         )
+        if has_more:
+            successor = self.env['shopify.connector.job.enqueue'].enqueue(
+                store, job.job_source, JOB_TYPE_PUSH_SCAN,
+                payload_hash=uuid.uuid4().hex,
+            )
+            if not successor:
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'Inventory scan cursor was saved but no continuation '
+                    'job could be admitted.',
+                )
 
     @api.model
     def _handle_inventory_first_push_preview(self, job):
         """Compute and store the first-push preview quantity for a pair.
 
-        Never writes to Shopify. Sets `first_push_state='previewed'`
-        only from `pending` -- an already-previewed or confirmed row is
-        left untouched (idempotent re-run).
+        Never writes to Shopify. A pending pair enters `previewed`; an
+        unconfirmed preview is refreshed so confirmation always has current
+        service-produced quantity evidence. Confirmed rows remain untouched.
         """
         Binding = self.env['shopify.connector.inventory.level.binding']
         binding = Binding.browse(job.res_id).exists()
@@ -2045,10 +2104,11 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             )
             return
         target, _free_qty = self._refresh_pending_target(binding)
-        if binding.first_push_state == 'pending':
+        if binding.first_push_state in ('pending', 'previewed'):
             binding.sudo().write({
                 'first_push_state': 'previewed',
                 'first_push_preview_qty': target,
+                'first_push_previewed_at': fields.Datetime.now(),
             })
         job.sudo().write({'state': 'succeeded', 'finished_at': fields.Datetime.now()})
         job._log_transition(
@@ -3158,6 +3218,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         binding.sudo().write({
             'first_push_state': 'pending',
             'first_push_preview_qty': False,
+            'first_push_previewed_at': False,
             'first_push_confirmed_at': False,
             'first_push_confirmed_by_uid': False,
         })
@@ -3366,6 +3427,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             binding.sudo().write({
                 'first_push_state': 'pending',
                 'first_push_preview_qty': False,
+                'first_push_previewed_at': False,
                 'first_push_confirmed_at': False,
                 'first_push_confirmed_by_uid': False,
             })

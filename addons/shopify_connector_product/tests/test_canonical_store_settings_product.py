@@ -16,6 +16,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.tests.canonical_settings_classification import (
     CANONICAL_EDITABLE,
     CANONICAL_READONLY,
+    INTERNAL_PROTECTED,
     SETTINGS_MODEL,
     assert_module_classification,
     canonical_form_field_nodes,
@@ -37,6 +38,30 @@ PRODUCT_CLASSIFICATION = {
         CANONICAL_READONLY,
         'When a product scan last completed; written by the scan service.',
     ),
+    'product_scan_window_start_at': (
+        INTERNAL_PROTECTED,
+        'Durable lower boundary of the active resumable scan window.',
+    ),
+    'product_scan_window_end_at': (
+        INTERNAL_PROTECTED,
+        'Durable upper boundary of the active resumable scan window.',
+    ),
+    'product_scan_cursor': (
+        INTERNAL_PROTECTED,
+        'Opaque Shopify cursor for the active resumable scan window.',
+    ),
+    'product_scan_generation': (
+        INTERNAL_PROTECTED,
+        'Connection generation fencing the active scan checkpoint.',
+    ),
+    'product_scan_page_count': (
+        INTERNAL_PROTECTED,
+        'Bounded progress evidence for the active scan window.',
+    ),
+    'product_scan_latest_at': (
+        INTERNAL_PROTECTED,
+        'Latest observed record timestamp inside the active scan window.',
+    ),
 }
 
 
@@ -48,12 +73,15 @@ class TestCanonicalStoreSettingsProduct(TransactionCase):
 
     def test_the_product_section_reaches_the_canonical_form(self):
         nodes = canonical_form_field_nodes(self.env)
-        for name in PRODUCT_CLASSIFICATION:
-            self.assertIn(
-                name, nodes,
-                'The product-import section must be contributed to the '
-                'canonical Store Settings form by inheritance.',
-            )
+        for name, (kind, _why) in PRODUCT_CLASSIFICATION.items():
+            if kind in (CANONICAL_EDITABLE, CANONICAL_READONLY):
+                self.assertIn(
+                    name, nodes,
+                    'The product-import section must be contributed to the '
+                    'canonical Store Settings form by inheritance.',
+                )
+            else:
+                self.assertNotIn(name, nodes)
 
     def test_the_scheduled_setting_is_the_field_the_cron_selects_on(self):
         """The inverse of checkpoint 1's guard, now that the producer exists.

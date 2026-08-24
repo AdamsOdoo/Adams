@@ -40,6 +40,7 @@ class TestInventoryLevelBinding(TransactionCase):
         'pending_target_available',
         'first_push_state',
         'first_push_preview_qty',
+        'first_push_previewed_at',
         'first_push_confirmed_at',
         'first_push_confirmed_by_uid',
     ))

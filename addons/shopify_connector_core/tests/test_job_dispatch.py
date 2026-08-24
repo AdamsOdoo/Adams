@@ -696,6 +696,7 @@ class TestJobDispatch(TransactionCase):
         expected = sorted([
             ('shopify_connector_job_enqueue.py', 'enqueue',
              "self.env['shopify.connector.job']"),
+            ('shopify_connector_job_enqueue.py', 'enqueue', 'cron'),
             ('shopify_connector_job_dispatch.py', '_block_original_job', 'job'),
             ('shopify_connector_job_dispatch.py',
              '_apply_validated_consequence', 'job'),

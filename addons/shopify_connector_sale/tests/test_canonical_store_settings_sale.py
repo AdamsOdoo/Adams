@@ -40,6 +40,30 @@ SALE_CLASSIFICATION = {
         'Discovery watermark written by the order scan; an observation, not '
         'a decision.',
     ),
+    'sale_order_scan_window_start_at': (
+        INTERNAL_PROTECTED,
+        'Durable lower boundary of the active resumable order scan window.',
+    ),
+    'sale_order_scan_window_end_at': (
+        INTERNAL_PROTECTED,
+        'Durable upper boundary of the active resumable order scan window.',
+    ),
+    'sale_order_scan_cursor': (
+        INTERNAL_PROTECTED,
+        'Opaque Shopify cursor for the active resumable order scan.',
+    ),
+    'sale_order_scan_latest_at': (
+        INTERNAL_PROTECTED,
+        'Latest observed order timestamp inside the active scan window.',
+    ),
+    'sale_order_scan_page_count': (
+        INTERNAL_PROTECTED,
+        'Bounded progress evidence for the active order scan window.',
+    ),
+    'sale_order_scan_generation': (
+        INTERNAL_PROTECTED,
+        'Connection generation fencing the active order scan checkpoint.',
+    ),
     # Store 360 / R-4 generation-bound catch-up stamps: connector system
     # state written only by run_scan (pending lineage) and the job-terminal
     # promotion hook. Observations of completed work, never merchant

@@ -128,12 +128,45 @@ class ShopifyConnectorWebhookRegistry(models.AbstractModel):
     def _handle_app_uninstalled(self, delivery):
         """Fence the store into the sanctioned reconnect-needed state."""
         store = delivery.store_id.sudo()
-        if store.state in ('connected', 'reconnect_needed'):
+        parent_job = delivery.job_id.sudo()
+        try:
+            locked_state, locked_generation = store._lock_store_for_lifecycle()
+            store.invalidate_recordset()
+        except Exception as exc:
+            return {
+                'state': 'manual_review',
+                'message': (
+                    'App-uninstalled evidence could not acquire the store '
+                    'lifecycle fence (%s); no connection state changed.'
+                    % type(exc).__name__
+                ),
+            }
+        if (
+            not parent_job
+            or parent_job.store_id != store
+            or delivery.company_id != store.company_id
+            or parent_job.company_id != store.company_id
+            or delivery.shop_domain != store.shop_domain
+            or delivery.api_version != store.api_version
+            or parent_job.expected_connection_generation != locked_generation
+        ):
+            return {
+                'state': 'manual_review',
+                'message': (
+                    'App-uninstalled evidence belongs to a stale or mismatched '
+                    'connection generation; the current connection was not '
+                    'fenced. Inspect the delivery and reconcile subscriptions.'
+                ),
+            }
+        if locked_state in ('connected', 'reconnect_needed'):
             # This is the existing lifecycle service, which takes the store
             # row lock, preserves one-way disconnects, and writes an audited
             # lifecycle job.  No payload identity is trusted here.
             store.action_mark_reconnect_needed(
-                reason='Shopify reported app/uninstalled; reconnect required.',
+                reason=(
+                    'Shopify reported app/uninstalled for connection '
+                    'generation %s; reconnect required.' % locked_generation
+                ),
             )
             return {
                 'state': 'processed',

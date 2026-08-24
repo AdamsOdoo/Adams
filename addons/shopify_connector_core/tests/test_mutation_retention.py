@@ -167,3 +167,27 @@ class TestMutationRetention(TransactionCase):
             'shopify_connector.layer2_attempt_evidence_retention_days', '7'
         )
         self.assertEqual(self.Retention._attempt_evidence_retention_days(), 7)
+
+    def test_terminal_job_retention_drains_more_than_legacy_daily_inflow(self):
+        finished = fields.Datetime.now() - timedelta(days=91)
+        jobs = self.Job.sudo().create([{
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_readiness_check',
+            'state': 'succeeded',
+            'payload_hash': uuid.uuid4().hex,
+            'finished_at': finished,
+        } for _index in range(501)])
+        removed = self.Retention.sudo()._run_terminal_job_retention()
+        self.assertEqual(removed, 501)
+        self.assertFalse(jobs.exists())
+
+    def test_terminal_job_retention_preserves_every_attempt_job(self):
+        attempt = self._attempt('succeeded')
+        attempt.job_id.sudo().write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now() - timedelta(days=91),
+        })
+        self.Retention.sudo()._run_terminal_job_retention()
+        self.assertTrue(attempt.exists())
+        self.assertTrue(attempt.job_id.exists())

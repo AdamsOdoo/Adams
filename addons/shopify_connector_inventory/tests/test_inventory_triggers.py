@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import patch
 
+from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
@@ -108,6 +109,20 @@ class TestInventoryTriggers(TransactionCase):
                 ).id,
             ])],
         })
+        cls.user_reviewer = cls.env['res.users'].create({
+            'name': 'Trigger Test Reviewer',
+            'login': 'trigger_test_reviewer',
+            'group_ids': [(6, 0, [
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_reviewer'
+                ).id,
+            ])],
+        })
+        cls.user_plain = cls.env['res.users'].create({
+            'name': 'Trigger Test Plain User',
+            'login': 'trigger_test_plain',
+            'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
+        })
 
     def _open_push_jobs_for_binding(self, binding):
         return self.env['shopify.connector.job'].search([
@@ -151,6 +166,30 @@ class TestInventoryTriggers(TransactionCase):
         jobs_after = self._open_push_jobs_for_binding(self.binding)
         self.assertEqual(len(jobs_after), before_count)
 
+    def test_stock_move_before_first_preview_admits_preview_not_push(self):
+        """An early stock event cannot seize the pair scope with push work."""
+        self.binding.sudo().write({'first_push_state': 'pending'})
+        supplier_location = self.env.ref('stock.stock_location_suppliers')
+        move = self.env['stock.move'].create({
+            'product_id': self.template.product_variant_id.id,
+            'product_uom_qty': 2.0,
+            'product_uom': self.template.uom_id.id,
+            'location_id': supplier_location.id,
+            'location_dest_id': self.mapped_location.id,
+        })
+        move._action_confirm()
+        move._action_assign()
+        for line in move.move_line_ids:
+            line.quantity = 2.0
+        move._action_done()
+        self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+        preview = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_first_push_preview'),
+            ('res_id', '=', self.binding.id),
+            ('state', '=', 'queued'),
+        ])
+        self.assertEqual(len(preview), 1)
+
     def test_cron_enqueues_one_typed_scan_job_per_eligible_store(self):
         """Corrected D-013-6b/item 13: the cron entry point only enqueues
         a typed `inventory_push_scan` job per eligible connected store --
@@ -165,6 +204,19 @@ class TestInventoryTriggers(TransactionCase):
         self.settings.invalidate_recordset()
         self.assertFalse(self.settings.inventory_last_push_scan_at)
         self.assertFalse(self._open_push_jobs_for_binding(self.binding))
+
+    def test_inventory_scan_rpc_requires_connector_administrator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        for user in (
+            self.user_plain, self.user_auditor, self.user_operator,
+            self.user_reviewer,
+        ):
+            with self.assertRaises(AccessError, msg=user.login):
+                Service.with_user(user).run_inventory_push_scan()
+        self.assertTrue(
+            Service.with_user(self.user_admin).run_inventory_push_scan(),
+        )
+        self.assertTrue(Service.sudo().run_inventory_push_scan())
 
     def _make_scan_job(self):
         return self.env['shopify.connector.job'].sudo().create({

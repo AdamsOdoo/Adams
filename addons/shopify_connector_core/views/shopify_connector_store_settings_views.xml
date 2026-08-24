@@ -3,7 +3,7 @@
     <!--
         Batch 2 checkpoint 1: the canonical per-store configuration surface.
 
-        Shopify Connector -> Configuration -> Store Settings.
+        Shopify Connector -> Configuration -> Sync Rules.
 
         WHAT THIS IS, AND WHAT IT IS NOT. It is the one place a merchant can
         reach the store-scoped configuration that until now existed only as

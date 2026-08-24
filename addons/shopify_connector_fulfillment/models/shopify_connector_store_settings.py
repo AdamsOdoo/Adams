@@ -104,6 +104,15 @@ class ShopifyConnectorStoreSettingsFulfillment(models.Model):
     fulfillment_notification_confirmed = fields.Boolean(default=False)
     # Reconciliation-scan watermark (D-014-8) + Mode-2 switch-scan boundary.
     fulfillment_last_reconciliation_at = fields.Datetime()
+    fulfillment_reconciliation_cursor_id = fields.Integer(
+        default=0, readonly=True,
+    )
+    fulfillment_reconciliation_generation = fields.Integer(
+        default=0, readonly=True,
+    )
+    fulfillment_reconciliation_observed_through_at = fields.Datetime(
+        readonly=True,
+    )
     # --- Store 360 / R-4: generation-bound fulfillment catch-up stamps ---
     # Same contract as the sale-side order stamps: a successful connection
     # probe never marks fulfillment-derived data current; only a COMPLETE

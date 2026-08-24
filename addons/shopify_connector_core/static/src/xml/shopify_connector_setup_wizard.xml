@@ -784,8 +784,8 @@
                         <t t-if="state.stepKey === 'notification'">
                             <p class="sc_setup__lead">
                                 Right now, <strong>customers will not be emailed</strong> when
-                                a delivery is fulfilled. You can change this any time in Store
-                                Settings.
+                                a delivery is fulfilled. Re-run guided Setup to change this
+                                explicitly confirmed choice.
                             </p>
                             <label class="sc_setup__choice">
                                 <input type="checkbox" id="sc_setup_notify"
@@ -827,10 +827,12 @@
                                     <div class="sc-band__body">
                                         <div class="sc-band__text">First stock push is protected</div>
                                         <div class="sc-band__hint">
-                                            The connector prepares the exact Odoo and Shopify
-                                            quantities for each mapped product and location. A
-                                            reviewer must confirm every first push before any
-                                            inventory quantity can be sent.
+                                            Odoo is the inventory authority. The connector reads
+                                            Shopify available quantity only for comparison and
+                                            prepares the exact Odoo quantity that would be written
+                                            for each mapped product and location. Shopify stock is
+                                            never imported into Odoo. An Administrator must confirm
+                                            every first push before any quantity can be sent.
                                         </div>
                                     </div>
                                 </div>
@@ -976,8 +978,10 @@
                                 </div>
                             </div>
                             <p class="sc_setup__note">
-                                Activating does not start a sync. Nothing is written to Shopify.
-                                The dashboard shows you the next explicit action.
+                                Activation starts the selected read and import scans. Nothing is
+                                written to Shopify until a protected preview or review is explicitly
+                                confirmed. The dashboard shows initial synchronization progress,
+                                exceptions, and the next required action.
                             </p>
                         </t>
 

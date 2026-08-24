@@ -132,6 +132,47 @@ class TestDispatchThroughput(TransactionCase):
         )
         self.assertEqual(self.Dispatch.run_drain(), 2)
 
+    def test_claim_round_robins_across_stores(self):
+        first = self._queue(4, self.store)
+        second = self._queue(1, self.other_store)
+        claimed = self.Job._claim_for_dispatch(2)
+        self.assertEqual(set(claimed.store_id.ids), {
+            self.store.id, self.other_store.id,
+        })
+        self.assertIn(first[0], claimed)
+        self.assertIn(second, claimed)
+
+    def test_drain_gives_each_store_a_slot_before_second_round(self):
+        self._queue(4, self.store)
+        self._queue(1, self.other_store)
+        observed = []
+
+        def record_dispatch(_service, job):
+            observed.append(job.store_id.id)
+            job.sudo().write({'state': 'cancelled'})
+
+        with patch.object(
+            type(self.Dispatch), '_dispatch_one', record_dispatch,
+        ):
+            self.Dispatch.run_drain(limit=3)
+        self.assertEqual(observed, [
+            self.store.id, self.other_store.id, self.store.id,
+        ])
+
+    def test_successful_enqueue_wakes_the_normal_drain_cron(self):
+        cron = self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain'
+        )
+        Cron = type(cron)
+        with patch.object(Cron, '_trigger', autospec=True) as trigger:
+            self.env['shopify.connector.job.enqueue'].enqueue(
+                self.store,
+                'setup_readiness_check',
+                'core_dispatch_selftest',
+                payload_hash=str(uuid.uuid4()),
+            )
+        trigger.assert_called_once()
+
     # ------------------------------------------------------------------
     # Cron progress + time budget (D-PERF1-1)
     # ------------------------------------------------------------------

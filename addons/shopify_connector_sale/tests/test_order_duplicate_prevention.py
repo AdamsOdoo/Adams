@@ -21,6 +21,30 @@ from odoo.tools import mute_logger
 
 class TestOrderDuplicatePrevention(OrderImportCase):
 
+    def test_same_second_changed_webhook_fails_closed(self):
+        payload = self._payload('gid://shopify/Order/SameSecond')
+        binding = self.Importer._apply_import(self.store, payload)
+        fingerprint = binding.shopify_line_composition_fingerprint
+        job = self.Job.sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'webhook',
+            'job_type': 'order_import_sync',
+            'state': 'queued',
+            'payload_hash': 'same-second-changed-body',
+            'res_model': 'shopify.connector.store',
+            'res_id': self.store.id,
+            'shopify_target_gid': payload['id'],
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        payload['line_items'][0]['sku'] = 'CHANGED-SAME-SECOND'
+        with self.assertRaises(JobHandlerError) as caught:
+            self.Importer._apply_import(self.store, payload, job=job)
+        self.assertEqual(caught.exception.error_class, 'ambiguous_match')
+        binding.invalidate_recordset()
+        self.assertEqual(
+            binding.shopify_line_composition_fingerprint, fingerprint,
+        )
+
     def test_repeat_import_refreshes_one_permanent_binding_and_order(self):
         payload = self._payload('gid://shopify/Order/Repeat')
         orders_before = self.env['sale.order'].search_count([])
@@ -243,7 +267,7 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 'discountedTotalSet': {
                     'shopMoney': {'amount': '100.00'},
                 },
-                'priceAfterAllDiscountsBeforeTaxesSet': total,
+                'discountedUnitPriceAfterAllDiscountsSet': total,
                 'discountAllocations': [],
                 'taxLines': [],
             }],

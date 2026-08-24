@@ -97,7 +97,8 @@ class TestUiInstallation(TransactionCase):
 
         operations = [
             'Orders', 'Product Imports/Exports', 'Inventory',
-            'Fulfillments', 'Runs & Recovery', 'Needs Attention',
+            'Fulfillments', 'Fulfillment Review', 'Runs & Recovery',
+            'Needs Attention',
         ]
         if self.env.ref(
             'shopify_connector_webhook.menu_shopify_connector_webhook_deliveries',
@@ -108,7 +109,8 @@ class TestUiInstallation(TransactionCase):
             # without that optional dependency.
             operations.insert(3, 'Webhook deliveries')
         configuration = [
-            'Stores & Onboarding', 'Sync Rules', 'Mappings',
+            'Stores & Onboarding', 'Sync Rules', 'Inventory Safeguards',
+            'Mappings',
             'Export Settings', 'Fulfillment Settings and Mode',
         ]
         if self.env.ref(
@@ -117,7 +119,7 @@ class TestUiInstallation(TransactionCase):
         ):
             # Sequence 35 keeps this after Mappings (30) and before Export
             # Settings (40), avoiding a cross-addon sequence collision.
-            configuration.insert(3, 'Webhook subscriptions')
+            configuration.insert(4, 'Webhook subscriptions')
         expected = {
             'menu_shopify_connector_dashboard': [
                 'Sales Dashboard', 'Connector Health',

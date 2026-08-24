@@ -270,7 +270,7 @@ class TestCustomerImportMatching(TransactionCase):
         self.assertEqual(
             set(detail.keys()),
             {
-                'kind', 'shopify_customer_gid', 'incoming_email_normalized',
+                'kind', 'shopify_customer_gid', 'incoming_email_sha256',
                 'candidate_count', 'candidates',
             },
         )
@@ -283,9 +283,11 @@ class TestCustomerImportMatching(TransactionCase):
         for candidate in detail['candidates']:
             self.assertEqual(
                 set(candidate.keys()),
-                {'partner_id', 'display_name', 'email', 'active'},
+                {'partner_id', 'active'},
             )
             self.assertTrue(candidate['active'])
+        self.assertNotIn('dup@example.com', ctx.exception.technical_detail)
+        self.assertNotIn('Dup A', ctx.exception.technical_detail)
         # message is human-readable prose, never JSON.
         self.assertNotIn('{', ctx.exception.reason)
 

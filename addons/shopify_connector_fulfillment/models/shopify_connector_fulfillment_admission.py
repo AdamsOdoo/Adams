@@ -158,9 +158,9 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
 
         Centralizes the expected `(store_id, operation_scope_key)` collision
         recovery once, here, for every one of this addon's call sites
-        (decision-lock Decision D.1): the fast idempotency-key search above is
-        a plain optimization keyed on payload_hash; the actual serialization
-        guard is the DB-level `_store_operation_scope_key_uniq` constraint,
+        (decision-lock Decision D.1): fast idempotency-key and visible-live-
+        scope searches are plain optimizations; the actual serialization guard
+        remains the DB-level `_store_operation_scope_key_uniq` constraint,
         which does not depend on payload_hash. The create attempt below runs
         inside a savepoint (mirroring the established
         `shopify_connector_inventory_service.py::_try_enqueue_push_sync`
@@ -198,6 +198,22 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
         ], limit=1)
         if existing:
             return existing
+        scope_domain = [
+            ('store_id', '=', store.id),
+            ('job_type', '=', job_type),
+            ('res_model', '=', res_model),
+            ('res_id', '=', res_id),
+            ('shopify_target_gid', '=', shopify_target_gid),
+            ('state', 'not in', list(TERMINAL_JOB_STATES)),
+        ]
+        # A sequential continuation commonly revisits the same resource while
+        # its prior child remains queued. Coalesce that visible owner without
+        # manufacturing an expected SQL ERROR. Two concurrent sessions can
+        # still both miss here; the unique index and recovery below remain the
+        # authoritative race boundary.
+        scope_holder = Job.search(scope_domain, limit=1)
+        if scope_holder:
+            return scope_holder
         try:
             with self.env.cr.savepoint():
                 return self.env['shopify.connector.job.enqueue'].enqueue(
@@ -214,14 +230,7 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
                 and OPERATION_SCOPE_CONSTRAINT_NAME not in message
             ):
                 raise
-            scope_holder = Job.search([
-                ('store_id', '=', store.id),
-                ('job_type', '=', job_type),
-                ('res_model', '=', res_model),
-                ('res_id', '=', res_id),
-                ('shopify_target_gid', '=', shopify_target_gid),
-                ('state', 'not in', list(TERMINAL_JOB_STATES)),
-            ], limit=1)
+            scope_holder = Job.search(scope_domain, limit=1)
             if not scope_holder:
                 raise
             return scope_holder
@@ -242,6 +251,15 @@ class ShopifyConnectorFulfillmentAdmission(models.AbstractModel):
             raise JobHandlerError(
                 'mapping_missing',
                 'The picking has no resolvable Shopify order binding.',
+            )
+        if binding.status == 'review':
+            raise JobHandlerError(
+                'financial_total_mismatch',
+                'Fulfillment stopped because the Shopify order is in Needs '
+                'Attention: %s' % (
+                    binding.review_reason
+                    or 'its post-import commercial evidence changed',
+                ),
             )
         # Idempotent: a picking is one fulfillment event.
         if self.env['shopify.connector.fulfillment.binding'].search_count([

@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Webhooks',
-    'version': '19.0.1.1.0',
+    'version': '19.0.1.3.0',
     'summary': 'Secure Shopify webhook intake and subscription health',
     'description': """
 Shopify Connector Webhooks
@@ -29,4 +29,5 @@ does not claim real-time processing.
     'installable': True,
     'application': False,
     'auto_install': False,
+    'uninstall_hook': 'uninstall_hook',
 }

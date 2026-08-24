@@ -952,9 +952,6 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             and not template_binding.shopify_birth_initialized
             and not template_binding.match_key
         )
-        if not created_source and not legacy_import_source:
-            return False
-
         template = template_binding.product_template_id
         template_values = {}
         if created_source or legacy_import_source:
@@ -1001,6 +998,8 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
             if variant.get('gid')
         }
         for gid, binding in by_gid.items():
+            if binding.shopify_birth_initialized:
+                continue
             variant_payload = payload_by_gid.get(gid)
             if not variant_payload:
                 continue
@@ -1014,7 +1013,8 @@ class ShopifyConnectorProductImporter(models.AbstractModel):
                 product.sudo().write(values)
             binding.sudo().write({'shopify_birth_initialized': True})
 
-        template_binding.sudo().write({'shopify_birth_initialized': True})
+        if created_source or legacy_import_source:
+            template_binding.sudo().write({'shopify_birth_initialized': True})
         return price_repaired
 
     @api.model

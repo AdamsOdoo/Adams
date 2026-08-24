@@ -1,7 +1,18 @@
 import json
 import uuid
+from datetime import timedelta
 
 from odoo import _, api, fields, models
+
+
+SUPPORTED_STORES_PER_DATABASE = 10
+SUPPORTED_JOBS_PER_MINUTE = 1000
+SUPPORTED_STORE_POPULATIONS = (
+    ('shopify.connector.product.template.binding', 100000, 'products'),
+    ('shopify.connector.order.binding', 100000, 'orders'),
+    ('shopify.connector.inventory.level.binding', 100000, 'inventory pairs'),
+    ('shopify.connector.fulfillment.binding', 100000, 'fulfillments'),
+)
 
 
 class ShopifyConnectorReadinessCheck(models.AbstractModel):
@@ -193,6 +204,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             self._check_mapped_location(store),
             self._check_cron_queue_health(store),
             self._check_domain_flag_enablement(store),
+            self._check_supported_scale(store),
         ]
 
     @api.model
@@ -218,6 +230,55 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             'code': code, 'tier': tier, 'result': result, 'reason': reason,
             'not_applicable': bool(not_applicable),
         }
+
+    @api.model
+    def _supported_scale_counts(self, store):
+        """Bounded local counts; no Shopify request and no credential read."""
+        counts = [(
+            'stores',
+            self.env['shopify.connector.store'].sudo().search_count(
+                [], limit=SUPPORTED_STORES_PER_DATABASE + 1,
+            ),
+            SUPPORTED_STORES_PER_DATABASE,
+        )]
+        counts.append((
+            'jobs in the latest minute',
+            self.env['shopify.connector.job'].sudo().search_count([
+                ('store_id', '=', store.id),
+                (
+                    'create_date', '>=',
+                    fields.Datetime.now() - timedelta(minutes=1),
+                ),
+            ], limit=SUPPORTED_JOBS_PER_MINUTE + 1),
+            SUPPORTED_JOBS_PER_MINUTE,
+        ))
+        for model_name, limit, label in SUPPORTED_STORE_POPULATIONS:
+            if model_name not in self.env.registry.models:
+                continue
+            count = self.env[model_name].sudo().search_count([
+                ('store_id', '=', store.id),
+            ], limit=limit + 1)
+            counts.append((label, count, limit))
+        return counts
+
+    @api.model
+    def _check_supported_scale(self, store):
+        exceeded = [
+            (label, count, limit)
+            for label, count, limit in self._supported_scale_counts(store)
+            if count > limit
+        ]
+        if exceeded:
+            return self._check_result(
+                'supported_scale', self.ESSENTIAL, self.RESULT_FAIL,
+                'Supported boundary exceeded: %s.' % '; '.join(
+                    '%s %d > %d' % item for item in exceeded
+                ),
+            )
+        return self._check_result(
+            'supported_scale', self.ESSENTIAL, self.RESULT_PASS,
+            'Connector populations are within the enforced public limits.',
+        )
 
     @api.model
     def _accepted_domain_flags(self):

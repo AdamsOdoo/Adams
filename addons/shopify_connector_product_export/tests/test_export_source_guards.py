@@ -308,6 +308,10 @@ class TestExportSourceGuards(TransactionCase):
             # surface had acquired an elevation, which is exactly the thing
             # this inventory exists to make impossible to add quietly.
             'shopify_connector_product_export_ui.py': 0,
+            # Migration scripts are deliberately scanned with production
+            # sources. This one uses SQL through the supplied cursor and has
+            # no ORM elevation.
+            'post-migrate.py': 0,
             '__init__.py': 0,
             '__manifest__.py': 0,
         }

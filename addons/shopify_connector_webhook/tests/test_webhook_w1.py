@@ -6,8 +6,11 @@ import hmac
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
+from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
+from odoo.exceptions import UserError
 
 from odoo.addons.shopify_connector_webhook.controllers.shopify_connector_webhook import (
     MAX_WEBHOOK_BODY_BYTES,
@@ -22,6 +25,9 @@ from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_regi
 )
 from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_credential import (
     WEBHOOK_CLIENT_SECRET_GRACE_HOURS,
+)
+from odoo.addons.shopify_connector_webhook.hooks import (
+    uninstall_hook as webhook_uninstall_hook,
 )
 from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subscription import (
     SUBSCRIPTION_LIST_QUERY,
@@ -107,10 +113,10 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('products/update', MVP_TOPIC_CATALOG)
         if 'products/update' in active:
             # The optional product-domain addon may extend the active registry
-            # after W1 is installed. Its bounded slice activates create/update
-            # only; delete remains catalogued but unsubscribable.
+            # after W1 is installed. Its bounded slice activates create,
+            # update and deletion-as-stale-binding handling.
             self.assertIn('products/create', active)
-            self.assertNotIn('products/delete', active)
+            self.assertIn('products/delete', active)
             self.assertTrue(registry.topic_spec('products/update'))
         else:
             self.assertEqual(registry.topic_spec('products/update'), False)
@@ -124,6 +130,156 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         )
         self.assertFalse(_latest_reconciled_at([False, None]))
         self.assertFalse(_latest_reconciled_at([]))
+
+    def test_stale_app_uninstalled_delivery_cannot_fence_new_generation(self):
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 stale uninstall store',
+            'shop_domain': 'w1-stale-uninstall.myshopify.com',
+            'api_version': '2026-07',
+        })
+        store.write({'state': 'connected'})
+        delivery, duplicate = self.env[
+            'shopify.connector.webhook.delivery'
+        ]._ingest(
+            store,
+            delivery_id='w1-stale-uninstall-delivery',
+            event_id='w1-stale-uninstall-event',
+            topic='app/uninstalled',
+            shop_domain=store.shop_domain,
+            api_version='2026-07',
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=False,
+            payload_digest=hashlib.sha256(b'app-uninstalled').hexdigest(),
+            payload_size=32,
+            payload_identity={},
+        )
+        self.assertFalse(duplicate)
+        old_generation = delivery.job_id.expected_connection_generation
+        store.sudo().write({
+            'connection_generation': old_generation + 1,
+            'state': 'connected',
+        })
+        delivery._process_queued()
+        delivery.invalidate_recordset()
+        store.invalidate_recordset()
+        self.assertEqual(delivery.state, 'manual_review')
+        self.assertEqual(store.state, 'connected')
+        self.assertIn('stale or mismatched', delivery.processing_note)
+
+    def test_retired_topic_becomes_expected_when_registry_returns(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://connector.example.invalid',
+        )
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 topic resurrection store',
+            'shop_domain': 'w1-topic-return.myshopify.com',
+            'api_version': '2026-07',
+        })
+        Subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        expected = Subscription._ensure_expected_for_store(store)
+        row = expected.filtered(lambda item: item.topic == 'app/uninstalled')
+        self.assertEqual(len(row), 1)
+        row._service_write({
+            'expected': False,
+            'state': 'manual_review',
+            'last_error': 'retired topic fixture',
+        })
+        revived = Subscription._ensure_expected_for_store(store).filtered(
+            lambda item: item.topic == 'app/uninstalled'
+        )
+        self.assertEqual(revived, row)
+        self.assertTrue(revived.expected)
+        self.assertEqual(revived.state, 'expected')
+        self.assertFalse(revived.last_error)
+
+    def test_webhook_uninstall_blocks_until_all_remote_identities_retired(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://connector.example.invalid',
+        )
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 uninstall boundary store',
+            'shop_domain': 'w1-uninstall-boundary.myshopify.com',
+            'api_version': '2026-07',
+        })
+        Subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        rows = Subscription._ensure_expected_for_store(store)
+        with self.assertRaises(UserError):
+            webhook_uninstall_hook(self.env)
+        for row in rows:
+            row._service_write({
+                'expected': False,
+                'state': 'missing',
+                'shopify_subscription_gid': False,
+            })
+        webhook_uninstall_hook(self.env)
+
+    def test_uninstall_preparation_fresh_reads_then_queues_exact_delete(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://connector.example.invalid',
+        )
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 uninstall preparation store',
+            'shop_domain': 'w1-uninstall-prepare.myshopify.com',
+            'api_version': '2026-07',
+        })
+        store.write({'state': 'connected'})
+        Subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ]
+        rows = Subscription._ensure_expected_for_store(store)
+        row = rows.filtered(lambda item: item.topic == 'app/uninstalled')
+        gid = 'gid://shopify/WebhookSubscription/88001'
+        row._service_write({
+            'state': 'active',
+            'shopify_subscription_gid': gid,
+            'actual_topic': row.topic_enum,
+            'actual_uri_digest': row.expected_callback_url_digest,
+            'actual_api_version': '2026-07',
+            'actual_format': 'JSON',
+            'actual_include_fields': [],
+        })
+        parent = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'webhook_subscription_retire_all',
+            'state': 'running',
+            'payload_hash': 'w1-retire-all-parent',
+            'res_model': 'shopify.connector.store',
+            'res_id': store.id,
+            'expected_connection_generation': store.connection_generation,
+        })
+        actual = [{
+            'id': gid,
+            'topic': row.topic_enum,
+            'uri_digest': row.expected_callback_url_digest,
+            'observed_api_version': '2026-07',
+            'format': 'JSON',
+            'include_fields': [],
+        }]
+        SubscriptionModel = type(Subscription)
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=actual,
+        ), patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            self.env[
+                'shopify.connector.job.dispatch'
+            ]._handle_webhook_subscription_retire_all(parent)
+        row.invalidate_recordset()
+        self.assertFalse(row.expected)
+        delete = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'webhook_subscription_delete'),
+            ('res_model', '=', row._name),
+            ('res_id', '=', row.id),
+            ('shopify_target_gid', '=', gid),
+        ])
+        self.assertEqual(len(delete), 1)
 
     def test_shopify_api_version_is_validated_as_an_object_handle(self):
         version = {

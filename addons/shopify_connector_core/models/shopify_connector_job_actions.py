@@ -51,6 +51,24 @@ class ShopifyConnectorJobActions(models.Model):
         compute='_compute_operator_presentation',
         readonly=True,
     )
+    attention_business_object = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
+    attention_event = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
+    attention_shopify_state = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
+    attention_odoo_state = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
+    attention_effect = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
+    attention_consequence = fields.Char(
+        compute='_compute_operator_presentation', readonly=True,
+    )
 
     @api.depends('state')
     def _compute_attention_priority(self):
@@ -64,7 +82,7 @@ class ShopifyConnectorJobActions(models.Model):
 
     @api.depends(
         'state', 'error_class', 'manual_review_subreason', 'next_retry_at',
-        'mutation_attempt_id',
+        'mutation_attempt_id', 'res_model', 'res_id',
     )
     def _compute_operator_presentation(self):
         """Project existing run facts into calm, human-owned recovery copy.
@@ -82,6 +100,45 @@ class ShopifyConnectorJobActions(models.Model):
             attempts_by_job = {
                 attempt.job_id.id: attempt for attempt in attempts
             }
+        order_bindings_by_job = {}
+        if 'shopify.connector.order.binding' in self.env:
+            order_jobs = self.filtered(
+                lambda row: row.job_type == 'order_import_sync'
+                and row.shopify_target_gid
+            )
+            if order_jobs:
+                bindings = self.env[
+                    'shopify.connector.order.binding'
+                ].search([
+                    ('store_id', 'in', order_jobs.store_id.ids),
+                    ('shopify_gid', 'in', order_jobs.mapped(
+                        'shopify_target_gid'
+                    )),
+                ])
+                by_identity = {
+                    (binding.store_id.id, binding.shopify_gid): binding
+                    for binding in bindings
+                }
+                order_bindings_by_job = {
+                    job.id: by_identity.get((
+                        job.store_id.id, job.shopify_target_gid,
+                    ))
+                    for job in order_jobs
+                }
+        targets = {}
+        grouped_targets = {}
+        for job in self:
+            if job.res_model and job.res_id and job.res_model in self.env:
+                grouped_targets.setdefault(job.res_model, set()).add(job.res_id)
+        for model_name, ids in grouped_targets.items():
+            try:
+                records = self.env[model_name].browse(list(ids)).exists()
+                records.check_access('read')
+            except AccessError:
+                continue
+            targets.update({
+                (model_name, record.id): record for record in records
+            })
         error_labels = dict(
             self._fields['error_class']._description_selection(self.env)
         )
@@ -156,6 +213,75 @@ class ShopifyConnectorJobActions(models.Model):
             job.recovery_owner = owner
             job.recovery_next_action = next_action
             job.operator_has_mutation_evidence = has_evidence
+            target = (
+                order_bindings_by_job.get(job.id)
+                or targets.get((job.res_model, job.res_id))
+            )
+            job.attention_business_object = (
+                target.display_name if target else
+                ('%s #%s' % (job.res_model, job.res_id)
+                 if job.res_model and job.res_id else 'Connector operation')
+            )
+            target_reason = (
+                target.review_reason
+                if target and 'review_reason' in target._fields else False
+            )
+            target_action = (
+                target.review_required_action
+                if target and 'review_required_action' in target._fields
+                else False
+            )
+            job.attention_event = target_reason or reason
+            financial = (
+                target.shopify_financial_status_snapshot
+                if target and 'shopify_financial_status_snapshot' in target._fields
+                else False
+            )
+            fulfillment = (
+                target.shopify_fulfillment_status_snapshot
+                if target and 'shopify_fulfillment_status_snapshot' in target._fields
+                else False
+            )
+            cancelled = (
+                target.shopify_cancelled_at
+                if target and 'shopify_cancelled_at' in target._fields else False
+            )
+            shopify_parts = []
+            if financial:
+                shopify_parts.append('financial=%s' % financial)
+            if fulfillment:
+                shopify_parts.append('fulfillment=%s' % fulfillment)
+            if cancelled:
+                shopify_parts.append('cancelled=yes')
+            job.attention_shopify_state = (
+                ', '.join(shopify_parts)
+                or ('Write outcome is shown in preserved evidence.'
+                    if has_evidence else 'No Shopify write was attempted.')
+            )
+            business = (
+                target.sale_order_id
+                if target and 'sale_order_id' in target._fields else target
+            )
+            business_state = (
+                business.state
+                if business and 'state' in business._fields else False
+            )
+            job.attention_odoo_state = business_state or job.state
+            job.attention_effect = (
+                'Shopify may have changed; Odoo finalization is not proven.'
+                if has_evidence and job.state != 'succeeded' else
+                ('Shopify evidence and Odoo finalization are complete.'
+                 if has_evidence else
+                 'Shopify was read only; Odoo recorded this review case.')
+            )
+            job.attention_next_action = target_action or next_action
+            job.attention_consequence = (
+                'Shipment or mutation processing remains stopped until this '
+                'case is resolved through its linked business record.'
+                if job.state == 'blocked_manual_review' else
+                'Correcting the cause permits a new read-safe run; no unsafe '
+                'Shopify write is replayed automatically.'
+            )
 
     def _operator_mutation_attempt(self):
         """Return caller-visible evidence for this exact run, if any."""
