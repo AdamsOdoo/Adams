@@ -1013,8 +1013,20 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             wrong_uri = by_topic.get(subscription.topic_enum, [])
             if wrong_uri:
                 item = wrong_uri[0]
-                subscription._service_write({
-                    'state': 'manual_review',
+                active_delete = self.env[
+                    'shopify.connector.job'
+                ].sudo().search([
+                    ('store_id', '=', store.id),
+                    ('job_type', '=', 'webhook_subscription_delete'),
+                    ('res_model', '=', self._name),
+                    ('res_id', '=', subscription.id),
+                    ('shopify_target_gid', '=', item['id']),
+                    ('expected_connection_generation', '=',
+                     store.connection_generation),
+                    ('state', 'not in', tuple(CREATE_RETRY_STATES)),
+                ], order='id asc', limit=1)
+                values = {
+                    'state': 'queued' if active_delete else 'manual_review',
                     'shopify_subscription_gid': item['id'],
                     'actual_topic': item['topic'],
                     'actual_uri_digest': item['uri_digest'],
@@ -1023,12 +1035,15 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'last_reconciled_at': fields.Datetime.now(),
                     'hmac_credential_epoch': epoch,
                     'actual_include_fields': item.get('include_fields'),
-                    'last_error': (
+                    'last_error': False if active_delete else (
                         'Shopify has a subscription for this topic, but its '
                         'callback endpoint is not this connector endpoint. '
                         'No remote subscription was deleted automatically.'
                     ),
-                })
+                }
+                if active_delete:
+                    values['last_job_id'] = active_delete.id
+                subscription._service_write(values)
                 continue
             subscription._service_write({
                 'state': 'missing',

@@ -413,6 +413,34 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertEqual(row.state, 'queued')
         self.assertEqual(Subscription._mutation_subscription(job), row)
 
+        # A reconciliation may overlap the delete's retry window. The fresh
+        # read still sees the stale callback, but must preserve the exact
+        # active delete's queued state so its next attempt passes local C1
+        # preparation instead of being invalidated before any Shopify call.
+        job.write({'state': 'retry_waiting'})
+        reconcile_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'webhook_subscription_reconcile',
+            'state': 'running',
+            'payload_hash': 'w1-stale-callback-overlap',
+            'res_model': 'shopify.connector.store',
+            'res_id': store.id,
+            'expected_connection_generation': store.connection_generation,
+        })
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=actual,
+        ), patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            Subscription._reconcile_store(store, job=reconcile_job)
+        row.invalidate_recordset()
+        self.assertEqual(row.state, 'queued')
+        self.assertEqual(row.last_job_id, job)
+        self.assertEqual(Subscription._mutation_subscription(job), row)
+
         row._service_write({
             'state': 'manual_review',
             'last_job_id': False,
