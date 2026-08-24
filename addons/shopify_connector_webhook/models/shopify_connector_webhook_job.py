@@ -1,6 +1,6 @@
 """Webhook-owned job lineage values."""
 
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 WEBHOOK_JOB_TYPES = (
@@ -41,3 +41,27 @@ class ShopifyConnectorWebhookJob(models.Model):
             for job_type in WEBHOOK_JOB_TYPES
         },
     )
+
+    @api.depends(
+        'state', 'store_id', 'job_type', 'res_model', 'res_id',
+        'shopify_target_gid', 'superseded_by_job_id',
+    )
+    def _compute_operation_scope_key(self):
+        """Keep the read-first replacement distinct from its delete successor.
+
+        The parent must pin the same exact Shopify GID that its mutation
+        successor will delete, but it is a remote-read admission job rather
+        than the mutation itself. Giving only that parent type a namespaced
+        scope preserves one-parent-per-target serialization while leaving the
+        shared mutation scope and every existing job type unchanged.
+        """
+        super()._compute_operation_scope_key()
+        for job in self.filtered(
+            lambda item: (
+                item.operation_scope_key
+                and item.job_type == 'webhook_subscription_replace_stale'
+            )
+        ):
+            job.operation_scope_key = '%s|read-first-replacement' % (
+                job.operation_scope_key,
+            )
