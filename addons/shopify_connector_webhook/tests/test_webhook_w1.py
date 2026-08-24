@@ -308,6 +308,21 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'format': 'JSON',
             'include_fields': [],
         }
+        # Model every unrelated expected topic as already correct so this test
+        # exercises wrong-callback evidence only; it must not depend on whether
+        # optional domains admit creation of their missing subscriptions.
+        actual = [stale] + [{
+            'id': (
+                'gid://shopify/WebhookSubscription/'
+                f'{99100 + subscription.id}'
+            ),
+            'topic': subscription.topic_enum,
+            'uri_digest': subscription.expected_callback_url_digest,
+            'observed_api_version': '2026-07',
+            'format': 'JSON',
+            'include_fields': [],
+        } for subscription in Subscription._ensure_expected_for_store(store)
+          if subscription != row]
         reconcile_job = self.env['shopify.connector.job'].sudo().create({
             'store_id': store.id,
             'job_source': 'manual_sync',
@@ -321,7 +336,7 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         SubscriptionModel = type(Subscription)
         with patch.object(
             SubscriptionModel, '_read_actual_subscriptions',
-            return_value=[stale],
+            return_value=actual,
         ), patch.object(
             SubscriptionModel, '_require_hmac_client_secret',
             return_value=True,
@@ -369,6 +384,9 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'include_fields': [],
         }]
         SubscriptionModel = type(Subscription)
+        self.env.user.write({'group_ids': [(4, self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ).id)]})
         with patch.object(
             SubscriptionModel, '_require_hmac_client_secret',
             return_value=True,
