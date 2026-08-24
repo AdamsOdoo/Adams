@@ -90,7 +90,7 @@ EXPECTED_SUITES = {
     # stored client credentials and offline tokens can be retained on rerun,
     # a mode switch still requires a replacement value, stale browser
     # presence is checked at action time, and early validation clears secrets.
-    'shopify connector setup wizard': 40,
+    'shopify connector setup wizard': 41,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so
