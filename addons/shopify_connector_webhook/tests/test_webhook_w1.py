@@ -382,7 +382,20 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             'observed_api_version': '2026-07',
             'format': 'JSON',
             'include_fields': [],
-        }]
+        }] + [{
+            'id': (
+                'gid://shopify/WebhookSubscription/'
+                f'{99200 + subscription.id}'
+            ),
+            'topic': subscription.topic_enum,
+            'uri_digest': subscription.expected_callback_url_digest,
+            'observed_api_version': '2026-07',
+            'format': 'JSON',
+            'include_fields': list(
+                subscription.expected_include_fields or [],
+            ),
+        } for subscription in Subscription._ensure_expected_for_store(store)
+          if subscription != row]
         SubscriptionModel = type(Subscription)
         self.env.user.write({'group_ids': [(4, self.env.ref(
             'shopify_connector_core.group_shopify_connector_admin'
