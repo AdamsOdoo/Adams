@@ -50,6 +50,9 @@ class TestExportCreateDedup(ExportCase):
         self.assertIn('synchronous: true', request['operation'])
 
     def test_preflight_uses_the_exact_custom_id_lookup(self):
+        self.settings.sudo().write(
+            {'product_export_binding_namespace_ready': True}
+        )
         sent = []
         body = {'data': {
             'product': None,
@@ -116,6 +119,9 @@ class TestExportCreateDedup(ExportCase):
         self.assertEqual(BINDING_METAFIELD_TYPE, 'id')
 
     def test_preflight_returns_only_the_exact_identifier_product(self):
+        self.settings.sudo().write(
+            {'product_export_binding_namespace_ready': True}
+        )
         body = {'data': {
             'product': {
                 'id': PRODUCT_GID,
@@ -137,6 +143,9 @@ class TestExportCreateDedup(ExportCase):
         self.assertEqual([node['id'] for node in result['nodes']], [PRODUCT_GID])
 
     def test_preflight_fails_closed_on_a_malformed_identifier_result(self):
+        self.settings.sudo().write(
+            {'product_export_binding_namespace_ready': True}
+        )
         body = {'data': {
             'product': [{'id': PRODUCT_GID}],
             'shop': {'myshopifyDomain': self.store.shop_domain},
