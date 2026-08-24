@@ -1,22 +1,22 @@
-"""SQL-searchable store checkpoint for the bounded observer scheduler."""
+"""Compatibility projection for the inventory-observation checkpoint."""
 
 from odoo import fields, models
 
 
 class ShopifyConnectorInventoryObservationSettings(models.Model):
-    """Expose the store checkpoint on the one-row settings relation.
+    """Expose the store checkpoint without persisting a second copy.
 
-    Odoo cannot order a settings search by an unstored dotted related path.
-    Keeping this related value stored and indexed makes NULL-first/oldest-first
-    selection a bounded SQL operation while retaining the store as its sole
-    source of truth.
+    The scheduler now performs its bounded eligibility join against the owning
+    store.  Keeping this projection non-stored prevents an inventory checkpoint
+    advance from rewriting the shared settings row used by product and order
+    scan windows, while preserving read compatibility for existing callers.
+    A warm upgrade may leave the historic database column in place; it is no
+    longer a field source and no recomputation writes it.
     """
 
     _inherit = 'shopify.connector.store.settings'
 
     inventory_observation_scheduled_at = fields.Datetime(
         related='store_id.inventory_observation_scheduled_at',
-        store=True,
-        index=True,
         readonly=True,
     )

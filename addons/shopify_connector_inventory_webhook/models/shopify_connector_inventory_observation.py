@@ -1165,60 +1165,63 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
 
     @api.model
     def _scheduled_observation_stores(self, limit):
-        """Select a bounded, fair page of eligible stores.
+        """Select one bounded, fair page without touching the settings row.
 
-        NULL checkpoints get their first chance; after that the oldest store
-        checkpoint wins.  Both searches are limited, so a database with many
-        stores is never materialized into one cron invocation.
+        The scheduler checkpoint belongs to the store.  A formerly stored
+        related mirror on the one-row settings relation made every checkpoint
+        advance update that shared configuration row.  Product/order scan
+        windows use the same row, so independently scheduled domains could
+        deterministically abort each other with PostgreSQL 40001.
+
+        Join the eligibility flags to their owning store instead.  The LIMIT is
+        applied in SQL, NULL checkpoints remain first, and interactive calls
+        retain the explicit active-company boundary while the root cron may
+        service every company.
         """
         store_limit = max(
             1,
             min(int(limit or OBSERVATION_FALLBACK_STORE_LIMIT),
                 OBSERVATION_FALLBACK_STORE_LIMIT),
         )
-        company_ids = self.env.companies.ids
-        Settings = self.env['shopify.connector.store.settings'].sudo()
-        base = [
-            ('inventory_domain_enabled', '=', True),
-            ('inventory_scheduled_sync_enabled', '=', True),
-            ('store_id.state', '=', 'connected'),
-        ]
-        # ``sudo()`` is needed for the cron's service writes, but it must not
-        # turn an administrator's interactive call into a cross-company
-        # scanner.  A real cron runs as superuser and is deliberately allowed
-        # to service every company; user-triggered runs stay within the
-        # caller's active company switcher.
         is_cron = (
             self.env.context.get(self._CRON_CONTEXT_KEY)
             is _CRON_CONTEXT_SENTINEL
         )
+        company_sql = ''
+        params = []
         if not is_cron:
-            base.append(('company_id', 'in', company_ids))
-        null_rows = Settings.search(
-            base + [
-                ('inventory_observation_scheduled_at', '=', False),
-            ],
-            order='store_id asc', limit=store_limit,
+            company_sql = 'AND store.company_id = ANY(%s)'
+            params.append(self.env.companies.ids)
+
+        Store = self.env['shopify.connector.store'].sudo()
+        Settings = self.env['shopify.connector.store.settings'].sudo()
+        Store.flush_model([
+            'state', 'company_id', 'inventory_observation_scheduled_at',
+        ])
+        Settings.flush_model([
+            'store_id', 'inventory_domain_enabled',
+            'inventory_scheduled_sync_enabled',
+        ])
+        params.append(store_limit)
+        self.env.cr.execute(
+            """
+                SELECT store.id
+                  FROM shopify_connector_store AS store
+                  JOIN shopify_connector_store_settings AS settings
+                    ON settings.store_id = store.id
+                 WHERE settings.inventory_domain_enabled IS TRUE
+                   AND settings.inventory_scheduled_sync_enabled IS TRUE
+                   AND store.state = 'connected'
+                   %s
+                 ORDER BY
+                       store.inventory_observation_scheduled_at ASC NULLS FIRST,
+                       store.id ASC
+                 LIMIT %%s
+            """ % company_sql,
+            params,
         )
-        remaining = store_limit - len(null_rows)
-        dated_rows = Settings.browse()
-        if remaining:
-            dated_rows = Settings.search(
-                base + [
-                    ('inventory_observation_scheduled_at', '!=', False),
-                ],
-                order=(
-                    'inventory_observation_scheduled_at asc, '
-                    'store_id asc'
-                ),
-                limit=remaining,
-            )
-        # Keep the scheduler order explicit; a recordset union may normalize
-        # ids and erase NULL-first/oldest-first ordering.
-        return tuple(
-            row.store_id for row in (list(null_rows) + list(dated_rows))
-            if row.store_id
-        )
+        # Preserve SQL fairness order; browse() keeps the supplied id order.
+        return tuple(Store.browse([row[0] for row in self.env.cr.fetchall()]))
 
     @api.model
     def _cron_has_time(self, cron, remaining):

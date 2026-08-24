@@ -950,8 +950,11 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         })
         settings = self.env['shopify.connector.store.settings']
         checkpoint = settings._fields['inventory_observation_scheduled_at']
-        self.assertTrue(checkpoint.store)
-        self.assertTrue(checkpoint.index)
+        # The checkpoint remains readable for compatibility, but must never
+        # become a stored related mirror: that mirror made an independent
+        # inventory cron rewrite the shared product/order settings row.
+        self.assertFalse(checkpoint.store)
+        self.assertFalse(checkpoint.index)
 
         service = self.env[
             'shopify.connector.inventory.observation.service'
