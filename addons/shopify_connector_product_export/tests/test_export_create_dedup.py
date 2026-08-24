@@ -4,6 +4,7 @@ from odoo.tests.common import tagged
 
 from ..models.shopify_connector_product_export_service import (
     BINDING_METAFIELD_KEY,
+    BINDING_METAFIELD_TYPE,
     ERROR_CLASS_VALIDATION,
     JOB_TYPE_CREATE,
     JobHandlerError,
@@ -81,6 +82,38 @@ class TestExportCreateDedup(ExportCase):
                 'value': str(self.template.id),
             }},
         })
+
+    def test_preflight_without_definition_skips_invalid_custom_id_lookup(self):
+        self.settings.sudo().write(
+            {'product_export_binding_namespace_ready': False}
+        )
+        sent = []
+        body = {'data': {
+            'metafieldDefinitions': {'nodes': []},
+            'shop': {'myshopifyDomain': self.store.shop_domain},
+        }}
+
+        def responder(client_self, store, request, token=None,
+                      mutation_context=None):
+            sent.append(request)
+            return FakeSendResponse(body)
+
+        job = self.make_job(
+            'product_export_preview', 'product.template', self.template.id,
+        )
+        with self.send_patch(responder):
+            result = self.Service._search_remote_by_custom_id(
+                self.store, job, self.template.id,
+            )
+
+        self.assertEqual(result, {
+            'store_identity': self.store.shop_domain,
+            'nodes': [],
+        })
+        self.assertEqual(len(sent), 1)
+        self.assertIn('metafieldDefinitions', sent[0]['query'])
+        self.assertNotIn('productByIdentifier', sent[0]['query'])
+        self.assertEqual(BINDING_METAFIELD_TYPE, 'id')
 
     def test_preflight_returns_only_the_exact_identifier_product(self):
         body = {'data': {

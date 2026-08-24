@@ -185,8 +185,8 @@ REMOTE_MEDIA_PAGE_SIZE = 250
 # `UniqueMetafieldValueInput` on purpose: the 2026-07 reference states
 # "If omitted, the app-reserved namespace will be used", which is exactly
 # the namespace a connector should own and a merchant should not.
-BINDING_METAFIELD_KEY = 'odoo_template_id'
-BINDING_METAFIELD_TYPE = 'single_line_text_field'
+BINDING_METAFIELD_KEY = 'odoo_template_custom_id_v2'
+BINDING_METAFIELD_TYPE = 'id'
 BINDING_METAFIELD_OWNER = 'PRODUCT'
 
 EXPORT_STATUS_TO_SHOPIFY = {
@@ -573,6 +573,50 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         instead of a second one.
         """
         client = self.env['shopify.connector.api.client']
+        settings = self._settings(store)
+        if not (
+            settings and settings.product_export_binding_namespace_ready
+        ):
+            definition_query = (
+                'query ProductExportBindingDefinition($key: String!) { '
+                'metafieldDefinitions(first: 1, ownerType: PRODUCT, '
+                'key: $key) { '
+                'nodes { id key type { name } } } shop { myshopifyDomain } }'
+            )
+            with client.execute_business(
+                job, store, definition_query,
+                {'key': BINDING_METAFIELD_KEY},
+            ) as result:
+                definition_data = (result or {}).get('data') or {}
+            identity = (
+                definition_data.get('shop') or {}
+            ).get('myshopifyDomain')
+            definitions = (
+                (definition_data.get('metafieldDefinitions') or {})
+                .get('nodes') or []
+            )
+            if identity != store.shop_domain:
+                raise JobHandlerError(
+                    ERROR_CLASS_STORE_IDENTITY,
+                    'The binding-definition preflight observed a different '
+                    'Shopify store identity.',
+                )
+            if not definitions:
+                # The confirmed apply plan creates the definition before the
+                # product mutation. productByIdentifier cannot be queried
+                # before that definition exists: Shopify rejects the lookup
+                # instead of returning a null product.
+                return {'store_identity': identity, 'nodes': []}
+            definition = definitions[0]
+            if (
+                (definition.get('type') or {}).get('name')
+                != BINDING_METAFIELD_TYPE
+            ):
+                raise JobHandlerError(
+                    ERROR_CLASS_CONFIGURATION,
+                    'The connector binding metafield definition exists with '
+                    'an incompatible type; product creation is blocked.',
+                )
         query = (
             'query ProductExportFindByCustomId('
             '$identifier: ProductIdentifierInput!) { '
@@ -1750,7 +1794,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'mutation ProductExportBindingNamespace('
             '$definition: MetafieldDefinitionInput!) { '
             'metafieldDefinitionCreate(definition: $definition) { '
-            'createdDefinition { id key namespace } '
+            'createdDefinition { id key namespace type { name } } '
             'userErrors { code field message } } }'
         )
         variables = {
@@ -1790,6 +1834,11 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 return 'no created definition id'
             if created.get('key') != BINDING_METAFIELD_KEY:
                 return 'definition key mismatch'
+            if (
+                (created.get('type') or {}).get('name')
+                != BINDING_METAFIELD_TYPE
+            ):
+                return 'definition type mismatch'
             return True
 
         return self._classify_user_errors(
@@ -1809,7 +1858,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         query = (
             'query ProductExportBindingDefinition($key: String!) { '
             'metafieldDefinitions(first: 1, ownerType: PRODUCT, key: $key) { '
-            'nodes { id key } } shop { myshopifyDomain } }'
+            'nodes { id key type { name } } } shop { myshopifyDomain } }'
         )
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
@@ -1827,7 +1876,11 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         if identity != attempt.expected_store_identity:
             return self._reconcile_identity_mismatch(identity)
         nodes = ((data.get('metafieldDefinitions') or {}).get('nodes')) or []
-        if nodes:
+        if (
+            nodes
+            and (nodes[0].get('type') or {}).get('name')
+            == BINDING_METAFIELD_TYPE
+        ):
             return {
                 'verdict': 'applied',
                 'observed_store_identity': identity,
@@ -1843,8 +1896,9 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'action': 'block_manual_review',
             'error_class': ERROR_CLASS_CONFIGURATION,
             'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
-            'message': 'The binding-metafield definition does not exist; the '
-                       'create path stays closed until it does.',
+            'message': 'The binding-metafield definition is missing or has '
+                       'an incompatible type; the create path stays closed '
+                       'until an ID definition exists.',
             'evidence': {},
         }
 

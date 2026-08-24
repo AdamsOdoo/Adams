@@ -848,6 +848,35 @@ describe("shopify connector setup wizard", () => {
         expect(row).not.toInclude("Passed");
     });
 
+    test("activation is disabled while an essential readiness check blocks", async () => {
+        const blocking = [{
+            code: "catalog_export_permissions",
+            label: "Catalog export permissions",
+            reason: "A forbidden scope is granted.",
+        }];
+        mockOrm(() =>
+            payload({
+                resume_step_key: "review",
+                store: Object.assign(payload().store, { id: 5 }),
+                readiness: {
+                    ran: true,
+                    overall: "fail",
+                    stale: false,
+                    checks: [],
+                    blocking,
+                    waiting: [],
+                },
+                summary: Object.assign(payload().summary, {
+                    can_activate: false,
+                    blocking,
+                }),
+            })
+        );
+        await mount();
+        expect(queryFirst(".sc_setup_continue").disabled).toBe(true);
+        expect(queryText(".sc_setup__summary")).toInclude("Blocked: 1 essential");
+    });
+
     test("a pending location refresh is not reported as an empty Shopify store", async () => {
         mockOrm(() =>
             payload({

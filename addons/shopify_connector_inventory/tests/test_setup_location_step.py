@@ -149,6 +149,15 @@ class TestSetupLocationStep(TransactionCase):
 
     # --- the payload ----------------------------------------------------
 
+    def test_permissions_catalog_names_inventory_write_scope(self):
+        scopes = {
+            entry['scope']
+            for entry in self.env[
+                'shopify.connector.readiness.check'
+            ]._governed_scope_catalog()
+        }
+        self.assertIn('write_inventory', scopes)
+
     def test_zero_one_and_many_cached_locations(self):
         payload = self._as().get_setup_state(self.store.id)['location_mapping']
         self.assertTrue(payload['available'])

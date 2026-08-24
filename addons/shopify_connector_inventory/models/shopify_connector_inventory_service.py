@@ -446,6 +446,19 @@ class ShopifyConnectorReadinessCheckInventoryExtension(models.AbstractModel):
     _inherit = 'shopify.connector.readiness.check'
 
     @api.model
+    def _governed_scope_catalog(self):
+        catalog = super()._governed_scope_catalog()
+        if not any(entry['scope'] == 'write_inventory' for entry in catalog):
+            catalog.append({
+                'scope': 'write_inventory',
+                'reason': (
+                    'so reviewed Odoo stock changes can be sent to mapped '
+                    'Shopify locations'
+                ),
+            })
+        return catalog
+
+    @api.model
     def _check_mapped_location(self, store):
         """Real mapped-location + write_inventory-scope readiness (D-013-5).
 

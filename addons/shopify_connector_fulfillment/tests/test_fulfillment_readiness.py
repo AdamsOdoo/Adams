@@ -60,6 +60,12 @@ class TestFulfillmentReadiness(TransactionCase):
         ):
             self.assertIn(code, codes)
 
+    def test_permissions_catalog_names_fulfillment_write_scope(self):
+        scopes = {
+            entry['scope'] for entry in self.Check._governed_scope_catalog()
+        }
+        self.assertIn(WRITE_SCOPE, scopes)
+
     # ------------------------------------------------------------------
     # Disabled -> all three not-applicable (pass)
     # ------------------------------------------------------------------

@@ -30,6 +30,19 @@ class ShopifyConnectorReadinessCheckFulfillmentExtension(models.AbstractModel):
         return checks
 
     @api.model
+    def _governed_scope_catalog(self):
+        catalog = super()._governed_scope_catalog()
+        if not any(entry['scope'] == WRITE_SCOPE for entry in catalog):
+            catalog.append({
+                'scope': WRITE_SCOPE,
+                'reason': (
+                    'so reviewed Odoo deliveries can create and update '
+                    'merchant-managed Shopify fulfillments'
+                ),
+            })
+        return catalog
+
+    @api.model
     def _fulfillment_enabled(self, store):
         settings = self.env['shopify.connector.store.settings'].search(
             [('store_id', '=', store.id)], limit=1,

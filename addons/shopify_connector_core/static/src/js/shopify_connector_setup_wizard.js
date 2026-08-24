@@ -271,6 +271,13 @@ export class ShopifyConnectorSetupWizard extends Component {
 
     /** One navigation rule, mirrored by the server-side Continue guard. */
     get canContinue() {
+        if (this.state.stepKey === "review") {
+            // The server re-runs readiness and remains the authoritative
+            // activation fence.  Mirror that decision in the client so a
+            // screen which says "Blocked" never presents an enabled primary
+            // action that is guaranteed to be refused.
+            return Boolean(this.summary.can_activate);
+        }
         if (
             this.state.stepKey === "location_mapping" &&
             this.currentStepApplies
