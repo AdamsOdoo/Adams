@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 
 from odoo.addons.shopify_connector_webhook.controllers.shopify_connector_webhook import (
     MAX_WEBHOOK_BODY_BYTES,
@@ -38,6 +38,9 @@ from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subs
     _latest_reconciled_at,
     _scheduled_reconciliation_bucket_ids,
     _scheduled_reconciliation_bucket_limits,
+)
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
 )
 
 
@@ -280,6 +283,138 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             ('shopify_target_gid', '=', gid),
         ])
         self.assertEqual(len(delete), 1)
+
+    def test_wrong_callback_preserves_exact_identity_for_operator_review(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://connector.example.invalid',
+        )
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 stale callback evidence store',
+            'shop_domain': 'w1-stale-callback.myshopify.com',
+            'api_version': '2026-07',
+        })
+        store.write({'state': 'connected'})
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        row = Subscription._ensure_expected_for_store(store).filtered(
+            lambda item: item.topic == 'app/uninstalled'
+        )
+        stale = {
+            'id': 'gid://shopify/WebhookSubscription/99001',
+            'topic': row.topic_enum,
+            'uri_digest': hashlib.sha256(
+                b'https://old.example.invalid/webhook'
+            ).hexdigest(),
+            'observed_api_version': '2026-07',
+            'format': 'JSON',
+            'include_fields': [],
+        }
+        reconcile_job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'manual_sync',
+            'job_type': 'webhook_subscription_reconcile',
+            'state': 'running',
+            'payload_hash': 'w1-stale-callback-reconcile',
+            'res_model': 'shopify.connector.store',
+            'res_id': store.id,
+            'expected_connection_generation': store.connection_generation,
+        })
+        SubscriptionModel = type(Subscription)
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=[stale],
+        ), patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            Subscription._reconcile_store(store, job=reconcile_job)
+        row.invalidate_recordset()
+        self.assertEqual(row.state, 'manual_review')
+        self.assertEqual(row.shopify_subscription_gid, stale['id'])
+        self.assertEqual(row.actual_uri_digest, stale['uri_digest'])
+        self.assertIn('not this connector endpoint', row.last_error)
+
+    def test_admin_replacement_is_fresh_read_exact_gid_and_durable_delete(self):
+        self.env['ir.config_parameter'].sudo().set_param(
+            'web.base.url', 'https://connector.example.invalid',
+        )
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 guarded callback replacement store',
+            'shop_domain': 'w1-guarded-replace.myshopify.com',
+            'api_version': '2026-07',
+        })
+        store.write({'state': 'connected'})
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        row = Subscription._ensure_expected_for_store(store).filtered(
+            lambda item: item.topic == 'app/uninstalled'
+        )
+        gid = 'gid://shopify/WebhookSubscription/99002'
+        stale_digest = hashlib.sha256(
+            b'https://old.example.invalid/webhook'
+        ).hexdigest()
+        row._service_write({
+            'state': 'manual_review',
+            'shopify_subscription_gid': gid,
+            'actual_topic': row.topic_enum,
+            'actual_uri_digest': stale_digest,
+            'actual_api_version': '2026-07',
+            'actual_format': 'JSON',
+            'actual_include_fields': [],
+        })
+        actual = [{
+            'id': gid,
+            'topic': row.topic_enum,
+            'uri_digest': stale_digest,
+            'observed_api_version': '2026-07',
+            'format': 'JSON',
+            'include_fields': [],
+        }]
+        SubscriptionModel = type(Subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            parent_id = row.action_replace_stale_callback()
+        parent = self.env['shopify.connector.job'].browse(parent_id)
+        self.assertEqual(
+            parent.job_type, 'webhook_subscription_replace_stale',
+        )
+        parent.write({'state': 'running'})
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=actual,
+        ), patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            self.env['shopify.connector.job.dispatch']._handle_webhook_subscription_replace_stale(parent)
+        row.invalidate_recordset()
+        job = row.last_job_id
+        row.invalidate_recordset()
+        self.assertEqual(job.job_type, 'webhook_subscription_delete')
+        self.assertEqual(job.shopify_target_gid, gid)
+        self.assertEqual(row.state, 'queued')
+        self.assertEqual(Subscription._mutation_subscription(job), row)
+
+        row._service_write({
+            'state': 'manual_review',
+            'last_job_id': False,
+        })
+        changed = dict(actual[0], uri_digest=row.expected_callback_url_digest)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            changed_parent_id = row.action_replace_stale_callback()
+        changed_parent = self.env['shopify.connector.job'].browse(
+            changed_parent_id
+        )
+        changed_parent.write({'state': 'running'})
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=[changed],
+        ):
+            with self.assertRaises(JobHandlerError):
+                self.env['shopify.connector.job.dispatch']._handle_webhook_subscription_replace_stale(changed_parent)
 
     def test_shopify_api_version_is_validated_as_an_object_handle(self):
         version = {

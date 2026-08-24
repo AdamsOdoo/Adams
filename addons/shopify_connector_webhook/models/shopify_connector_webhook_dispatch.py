@@ -33,6 +33,8 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
                 self._handle_webhook_subscription_reconcile,
             'webhook_subscription_retire_all':
                 self._handle_webhook_subscription_retire_all,
+            'webhook_subscription_replace_stale':
+                self._handle_webhook_subscription_replace_stale,
             'webhook_subscription_create':
                 self._handle_webhook_subscription_mutation_placeholder,
             'webhook_subscription_delete':
@@ -52,6 +54,8 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
             'webhook_subscription_reconcile':
                 REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             'webhook_subscription_retire_all':
+                REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
+            'webhook_subscription_replace_stale':
                 REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
             # Core's generic reconciliation handler performs read-only
             # verification and is safe to replay within its bounded job policy.
@@ -200,6 +204,36 @@ class ShopifyConnectorWebhookDispatch(models.AbstractModel):
             raise JobHandlerError(
                 'odoo_validation_configuration',
                 'Webhook uninstall preparation could not complete safely.',
+                type(exc).__name__,
+            ) from exc
+
+    @api.model
+    def _handle_webhook_subscription_replace_stale(self, job):
+        """Fresh-read one reviewed wrong callback, then queue its exact delete."""
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        subscription = Subscription.browse(job.res_id).exists()
+        if not subscription or subscription.store_id != job.store_id:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Stale callback replacement has no matching subscription.',
+            )
+        try:
+            actual = Subscription._read_actual_subscriptions(job.store_id, job)
+            subscription._replace_stale_callback_from_read(job, actual)
+        except ShopifyClientError as exc:
+            raise JobHandlerError(
+                exc.error_class, exc.reason, exc.technical_detail,
+            ) from exc
+        except ShopifyQuiescedError as exc:
+            raise JobHandlerError(
+                'shopify_temporary_server_network',
+                'Stale callback replacement was refused by store quiescence.',
+                type(exc).__name__,
+            ) from exc
+        except (ValidationError, UserError, ShopifyWebhookSchemaError) as exc:
+            raise JobHandlerError(
+                'odoo_validation_configuration',
+                'Stale callback replacement could not complete safely.',
                 type(exc).__name__,
             ) from exc
 

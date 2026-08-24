@@ -1012,14 +1012,17 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                 continue
             wrong_uri = by_topic.get(subscription.topic_enum, [])
             if wrong_uri:
+                item = wrong_uri[0]
                 subscription._service_write({
                     'state': 'manual_review',
+                    'shopify_subscription_gid': item['id'],
+                    'actual_topic': item['topic'],
+                    'actual_uri_digest': item['uri_digest'],
+                    'actual_api_version': item['observed_api_version'],
+                    'actual_format': item['format'],
                     'last_reconciled_at': fields.Datetime.now(),
                     'hmac_credential_epoch': epoch,
-                    'actual_include_fields': (
-                        wrong_uri[0].get('include_fields')
-                        if wrong_uri else False
-                    ),
+                    'actual_include_fields': item.get('include_fields'),
                     'last_error': (
                         'Shopify has a subscription for this topic, but its '
                         'callback endpoint is not this connector endpoint. '
@@ -1139,6 +1142,112 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             )
         return self._enqueue_store_reconcile(self.store_id, 'manual_sync').id
 
+    def action_replace_stale_callback(self):
+        """Queue read-first replacement of one reviewed stale callback.
+
+        This is an explicit administrator remediation, never an automatic
+        reconciliation side effect.  A new Shopify read must still contain
+        the exact stored GID with the same topic and the wrong callback before
+        the durable delete is admitted.  Normal reconciliation creates and
+        verifies the replacement only after Shopify proves that GID absent.
+        """
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may replace a stale '
+                'webhook callback.'
+            )
+        if (
+            self.state != 'manual_review'
+            or not self.expected
+            or not self.shopify_subscription_gid
+            or not self.actual_uri_digest
+            or self.actual_uri_digest == self.expected_callback_url_digest
+        ):
+            raise ValidationError(
+                'This subscription does not contain a verified stale callback '
+                'identity that can be replaced.'
+            )
+        payload_hash = canonical_sha256({
+            'action': 'replace_stale_callback',
+            'subscription_id': self.id,
+            'target_gid': self.shopify_subscription_gid,
+            'actual_uri_digest': self.actual_uri_digest,
+            'expected_callback_url_digest':
+                self.expected_callback_url_digest,
+            'run_key': self._reconciliation_run_key('manual_sync'),
+        })
+        job = self._enqueue_job_with_recovery(
+            self.store_id,
+            'manual_sync',
+            'webhook_subscription_replace_stale',
+            payload_hash,
+            self._name,
+            self.id,
+            self.shopify_subscription_gid,
+        )
+        self._service_write({
+            'state': 'queued',
+            'last_job_id': job.id,
+            'last_action_at': fields.Datetime.now(),
+            'last_error': False,
+            'operator_note': (
+                'An administrator requested replacement of the preserved '
+                'stale callback. A durable worker must fresh-read Shopify '
+                'before any delete is admitted.'
+            ),
+        })
+        return job.id
+
+    def _replace_stale_callback_from_read(self, job, actual):
+        """Admit the exact delete after the durable parent fresh read."""
+        self.ensure_one()
+        if (
+            job.res_model != self._name
+            or job.res_id != self.id
+            or job.store_id != self.store_id
+            or job.shopify_target_gid != self.shopify_subscription_gid
+            or not self.expected
+            or not self.shopify_subscription_gid
+            or not self.actual_uri_digest
+            or self.actual_uri_digest == self.expected_callback_url_digest
+        ):
+            raise ValidationError(
+                'The stale callback replacement target changed before its '
+                'fresh Shopify read; no delete was admitted.'
+            )
+        matches = [
+            item for item in actual
+            if item.get('id') == self.shopify_subscription_gid
+            and item.get('topic') == self.topic_enum
+        ]
+        if len(matches) != 1:
+            raise ValidationError(
+                'Shopify no longer returns exactly the preserved stale '
+                'subscription identity. Reconcile again before cleanup.'
+            )
+        observed = matches[0]
+        if (
+            observed.get('uri_digest') != self.actual_uri_digest
+            or observed.get('uri_digest') == self.expected_callback_url_digest
+        ):
+            raise ValidationError(
+                'The Shopify callback changed after review. Reconcile again; '
+                'no remote delete was queued.'
+            )
+        self._service_write({
+            'operator_note': (
+                'An administrator approved replacement of the exact stale '
+                'callback identity after a fresh Shopify read. Deletion is '
+                'durable and the replacement remains read-back verified.'
+            ),
+        })
+        return self._enqueue_subscription_mutation(
+            self, 'delete', 'manual_sync',
+        ).id
+
     @api.model
     def run_scheduled_reconciliation(self, limit=20):
         """Enqueue a bounded number of connected-store reconciliations."""
@@ -1217,6 +1326,10 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     @api.model
     def _mutation_subscription(self, job):
         subscription = self.browse(job.res_id).exists()
+        if not subscription:
+            raise ValidationError(
+                'Webhook subscription mutation target is invalid.'
+            )
         action = (
             'create' if job.job_type == 'webhook_subscription_create'
             else 'delete'
@@ -1229,13 +1342,24 @@ class ShopifyConnectorWebhookSubscription(models.Model):
             and not subscription.expected
             and bool(subscription.shopify_subscription_gid)
         )
+        stale_callback_cleanup = (
+            action == 'delete'
+            and subscription.expected
+            and subscription.state == 'queued'
+            and bool(subscription.shopify_subscription_gid)
+            and bool(subscription.actual_uri_digest)
+            and subscription.actual_uri_digest
+            != subscription.expected_callback_url_digest
+        )
         if (
-            not subscription
-            or subscription.store_id != job.store_id
+            subscription.store_id != job.store_id
             or (
                 subscription.topic not in active_topics
                 and not removed_topic_cleanup
             )
+            or (action == 'delete' and not (
+                removed_topic_cleanup or stale_callback_cleanup
+            ))
         ):
             raise ValidationError('Webhook subscription mutation target is invalid.')
         return subscription

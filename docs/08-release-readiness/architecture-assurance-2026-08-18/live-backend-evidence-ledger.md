@@ -67,3 +67,20 @@ watermark and reconciliation repair result.
 3. No live Shopify credential, subscription, remote GID, job/attempt or fresh
    remote read is recorded for the exact candidate. The published
    `2b8108b9…` correction is test-only and does not supply live evidence.
+
+## 2026-08-24 exact-head continuation
+
+| Timestamp / source | Head/tree | Build/database | Store and actor | Evidence/result |
+| --- | --- | --- | --- | --- |
+| 2026-08-24 Actions | `c40c0f2e` / `696cd26a` | [run `32697134497`](https://github.com/AdamsOdoo/Adams/actions/runs/32697134497) **SUCCESS** | CI only | Exact-head automated qualification passed; this is not Shopify business-outcome proof. |
+| 2026-08-24 Odoo.sh | Same | Development build `36848469`, deployed | `Adams validation UAT`; `testin-lzhbzhtc.myshopify.com`; Mitchell Admin / Connector Administrator | Credential path passed with ten least-privilege scopes; three current-generation location mappings were preserved. |
+| 2026-08-24 activation | Same | Same | Same | Reconciliation job `3684` succeeded without retry. Shopify read-back proved `products/delete`, `fulfillments/create`, and `fulfillments/update` active on API `2026-07`. Seven expected topics remained `Manual review` because Shopify held subscriptions for older callback endpoints. Setup correctly remained blocked. |
+| 2026-08-24 current-generation location read | Same | Same | Same | A new `Inventory Location Sync` manual job succeeded at 12:08 with all three active Shopify locations mapped. The location readiness check then passed. |
+
+Current Gate E verdict remains **PARTIAL / NOT RELEASE-READY**: HMAC-capable
+subscription lifecycle is live for three topics, but seven expected topics are
+not bound to the exact-build callback. The user explicitly approved deletion
+and replacement of those seven stale development-store subscriptions. The
+connector currently has no supported guarded operator action for that cleanup;
+ONB-002 and ONB-003 must be corrected and independently qualified before the
+remote mutation is performed.

@@ -153,6 +153,12 @@
                             string="Reconcile store webhooks"
                             class="btn-primary"
                             groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    <button name="action_replace_stale_callback" type="object"
+                            string="Replace stale callback"
+                            class="btn-secondary"
+                            invisible="state != 'manual_review' or not shopify_subscription_gid or not actual_uri_digest or actual_uri_digest == expected_callback_url_digest"
+                            confirm="Shopify will delete this exact stale development callback subscription after a fresh identity check. A later reconciliation will create and verify the replacement. Continue?"
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="expected,queued,pending_verification,active,missing,manual_review"/>
                 </header>
