@@ -978,9 +978,11 @@
                                 </div>
                             </div>
                             <p class="sc_setup__note">
-                                Activation starts the selected read and import scans. Nothing is
-                                written to Shopify until a protected preview or review is explicitly
-                                confirmed. The dashboard shows initial synchronization progress,
+                                Activation starts the selected read and import scans and reconciles
+                                Shopify webhook subscriptions. It does not itself export catalog,
+                                inventory, or fulfillment business data. Later writes follow each
+                                domain's safeguards, including preview and confirmation where
+                                applicable. The dashboard shows initial synchronization progress,
                                 exceptions, and the next required action.
                             </p>
                         </t>

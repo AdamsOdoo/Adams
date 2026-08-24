@@ -333,6 +333,9 @@ class TestUiSourceGuards(TransactionCase):
             )
 
     def test_setup_activation_and_inventory_copy_are_truthful(self):
+        setup_model = self._read(
+            'models', 'shopify_connector_setup_wizard.py',
+        )
         setup_js = self._read(
             'static', 'src', 'js', 'shopify_connector_setup_wizard.js',
         )
@@ -345,6 +348,19 @@ class TestUiSourceGuards(TransactionCase):
             'Activation starts the selected read and import scans', setup_xml,
         )
         setup_copy = ' '.join(setup_xml.split())
+        self.assertIn(
+            'reconciles Shopify webhook subscriptions', setup_copy,
+        )
+        self.assertNotIn(
+            'Shopify to Odoo, then Odoo to Shopify', setup_model,
+        )
+        self.assertIn(
+            'Odoo to Shopify; Shopify read-only comparison', setup_model,
+        )
+        self.assertIn(
+            'available quantity is read only to detect drift', setup_model,
+        )
+        self.assertIn('never imported into Odoo', setup_model)
         self.assertIn('Odoo is the inventory authority', setup_copy)
         self.assertIn('Shopify stock is never imported into Odoo', setup_copy)
         self.assertIn(

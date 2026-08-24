@@ -236,9 +236,10 @@ SETUP_DOMAINS = (
         'key': 'inventory',
         'field': 'inventory_domain_enabled',
         'label': 'Inventory',
-        'direction': 'Shopify to Odoo, then Odoo to Shopify',
-        'happens': 'Stock levels are read in as a baseline, and later Odoo '
-                   'stock changes are pushed back.',
+        'direction': 'Odoo to Shopify; Shopify read-only comparison',
+        'happens': 'Odoo stock changes can be pushed to Shopify. Shopify '
+                   'available quantity is read only to detect drift and is '
+                   'never imported into Odoo.',
         'withheld': 'The first push always waits for a preview you confirm.',
     },
     {
