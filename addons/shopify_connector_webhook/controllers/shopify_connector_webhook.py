@@ -46,10 +46,11 @@ class ShopifyConnectorWebhookController(http.Controller):
     def read_bounded_body(http_request):
         """Read at most ``MAX_WEBHOOK_BODY_BYTES + 1`` raw bytes.
 
-        The framework's bulk-body helper would buffer an attacker-controlled
-        chunked request before the size check.  A declared oversized body is
-        rejected before reading, while an unknown/chunked body is consumed in
-        fixed chunks and rejected as soon as the bounded ceiling is crossed.
+        A declared oversized body is rejected before reading.  For a bounded
+        declared body, use Werkzeug's cached raw bytes: Odoo routing may have
+        consumed the underlying stream before this controller runs.  An
+        unknown/chunked body is still consumed in fixed chunks and rejected
+        as soon as the bounded ceiling is crossed.
         """
         headers = http_request.headers
         declared = headers.get('Content-Length')
@@ -62,6 +63,14 @@ class ShopifyConnectorWebhookController(http.Controller):
                 return False, 400
             if declared > MAX_WEBHOOK_BODY_BYTES:
                 return False, 413
+            cached_body = getattr(http_request, '_cached_data', None)
+            if cached_body is not None:
+                if not isinstance(cached_body, (bytes, bytearray)):
+                    return False, 400
+                cached_body = bytes(cached_body)
+                if len(cached_body) != declared:
+                    return False, 400
+                return cached_body, 0
         stream = getattr(http_request, 'stream', None)
         if stream is None or not hasattr(stream, 'read'):
             return False, 400
@@ -80,7 +89,7 @@ class ShopifyConnectorWebhookController(http.Controller):
             total += len(chunk)
             if total > MAX_WEBHOOK_BODY_BYTES:
                 return False, 413
-        if declared is not None and total < declared:
+        if declared is not None and total != declared:
             return False, 400
         return b''.join(chunks), 0
 

@@ -109,6 +109,40 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertTrue(stream.calls)
         self.assertLessEqual(max(stream.calls), 64 * 1024)
 
+    def test_declared_body_uses_framework_cached_raw_bytes(self):
+        raw = b'{"id": 6649454297273}'
+
+        class ExplodingStream:
+            def read(self, _size):
+                raise AssertionError(
+                    'Odoo may already have consumed the WSGI stream'
+                )
+
+        class CachedRequest:
+            headers = {'Content-Length': str(len(raw))}
+            stream = ExplodingStream()
+            _cached_data = raw
+
+        self.assertEqual(
+            ShopifyConnectorWebhookController.read_bounded_body(
+                CachedRequest(),
+            ),
+            (raw, 0),
+        )
+
+    def test_declared_body_rejects_cached_length_mismatch(self):
+        class CachedRequest:
+            headers = {'Content-Length': '5'}
+            stream = None
+            _cached_data = b'four'
+
+        self.assertEqual(
+            ShopifyConnectorWebhookController.read_bounded_body(
+                CachedRequest(),
+            ),
+            (False, 400),
+        )
+
     def test_registry_separates_catalog_from_active_subscriptions(self):
         registry = self.env['shopify.connector.webhook.registry']
         active = set(registry.allowed_topics())
