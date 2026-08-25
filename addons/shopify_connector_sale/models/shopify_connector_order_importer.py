@@ -1356,6 +1356,14 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 order, store, item.get('taxLines') or [],
                 payload.get('taxesIncluded'), settings,
             )
+            # Shopify reports this after-discount amount in the order's
+            # tax-inclusion posture.  The comparison and residual projection
+            # below are tax-excluded, so remove Shopify's authoritative tax
+            # amount for included orders just as the shipping-line path does.
+            if payload.get('taxesIncluded'):
+                source_target -= self._tax_source_total(
+                    item.get('taxLines') or [],
+                )
             original_unit = self._money_decimal(item.get('originalUnitPriceSet'))
             original_base = self._raw_excluded_for_values(
                 order, product, taxes, original_unit, quantity,
