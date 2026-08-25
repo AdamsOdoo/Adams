@@ -4,6 +4,7 @@ from odoo.tests.common import tagged
 
 from ..models.shopify_connector_product_export_service import (
     BINDING_METAFIELD_KEY,
+    BINDING_METAFIELD_OWNER,
     BINDING_METAFIELD_TYPE,
     ERROR_CLASS_VALIDATION,
     JOB_TYPE_CREATE,
@@ -36,6 +37,30 @@ class TestExportCreateDedup(ExportCase):
     # ------------------------------------------------------------------
     # The custom-id upsert identity
     # ------------------------------------------------------------------
+
+    def test_binding_definition_uses_id_type_without_unique_capability(self):
+        """ID definitions are already unique in Shopify's live contract."""
+        preview = self.make_preview(
+            export_path='create', state='applying',
+            steps=[{'step': 'product_export_binding_namespace',
+                    'state': 'pending'}],
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        job = self.make_job(
+            'product_export_binding_namespace', preview._name, preview.id,
+        )
+        snapshot = self.Service._prepare_local_binding_namespace(job)
+        request = self.Service._prepare_preconditions_binding_namespace(
+            snapshot, {},
+        )
+        definition = request['variables']['definition']
+
+        self.assertEqual(definition['type'], BINDING_METAFIELD_TYPE)
+        self.assertEqual(definition['ownerType'], BINDING_METAFIELD_OWNER)
+        self.assertNotIn('capabilities', definition)
 
     def test_create_carries_the_custom_id_identifier(self):
         preview = self._confirmed_create_preview()

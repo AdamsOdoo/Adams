@@ -1806,11 +1806,10 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                     'Connector-owned binding identity written by the Odoo '
                     'Shopify connector. Do not edit.'
                 ),
-                # `identifier.customId` takes a `UniqueMetafieldValueInput`,
-                # which only resolves against a definition whose values are
-                # unique. That is what makes this bootstrap a genuine
-                # prerequisite of the create path rather than a nicety.
-                'capabilities': {'uniqueValues': {'enabled': True}},
+                # Shopify's `id` metafield type is intrinsically unique. Do
+                # not also send the general-purpose `uniqueValues`
+                # capability: the live Admin API rejects that redundant
+                # capability for an ID definition before any product write.
             },
         }
         return self._mutation_request(
