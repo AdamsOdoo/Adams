@@ -67,6 +67,12 @@ class TestProductContractRepair(ExportCase):
             self.Service._prepare_local_create(job), {},
         )
         entry = request['variables']['input']['variants'][0]
+        self.assertEqual(
+            request['variables']['input']['productOptions'], [{
+                'name': 'Title',
+                'values': [{'name': 'Default Title'}],
+            }],
+        )
         self.assertEqual(entry['sku'], 'WIDGET-1')
         self.assertNotIn('inventoryItem', entry)
         self.assertEqual(
