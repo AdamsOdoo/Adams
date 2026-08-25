@@ -1042,7 +1042,36 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             source_tax_lines, payload.get('taxesIncluded'),
             require_presentment=False,
         )
-        if source_by_fingerprint != order_by_fingerprint:
+        fingerprints_reconcile = (
+            source_by_fingerprint == order_by_fingerprint
+        )
+        # Shopify can expose ``channelLiable=null`` on an order-level
+        # aggregate while the contributing line TaxLine carries a known
+        # Boolean.  ``null`` means unknown, not a third contradictory
+        # liability value.  In that narrowly-defined case compare the same
+        # rate/title/source/inclusion identities and amounts without the
+        # unknown aggregate dimension.  A known order-level True/False still
+        # has to match the source lines exactly and therefore continues to
+        # fail closed on disagreement.
+        if (
+            not fingerprints_reconcile
+            and order_tax_lines
+            and all(
+                evidence.get('channelLiable') is None
+                for evidence in order_tax_lines
+                if isinstance(evidence, dict)
+            )
+        ):
+            order_comparison = self._tax_fingerprint_amounts(
+                order_tax_lines, payload.get('taxesIncluded'),
+                require_presentment=True, ignore_channel_liability=True,
+            )
+            source_comparison = self._tax_fingerprint_amounts(
+                source_tax_lines, payload.get('taxesIncluded'),
+                require_presentment=False, ignore_channel_liability=True,
+            )
+            fingerprints_reconcile = source_comparison == order_comparison
+        if not fingerprints_reconcile:
             raise JobHandlerError(
                 'financial_total_mismatch',
                 'Order-level and source-line tax fingerprints do not '
@@ -1052,6 +1081,7 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
     @api.model
     def _tax_fingerprint_amounts(
         self, tax_lines, price_included, require_presentment,
+        ignore_channel_liability=False,
     ):
         totals = {}
         for evidence in tax_lines:
@@ -1064,7 +1094,11 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 fingerprint = build_tax_fingerprint(
                     evidence.get('rate'), evidence.get('ratePercentage'),
                     evidence.get('title'), evidence.get('source'),
-                    evidence.get('channelLiable'), price_included,
+                    (
+                        None if ignore_channel_liability
+                        else evidence.get('channelLiable')
+                    ),
+                    price_included,
                 )
                 price = evidence.get('priceSet')
                 shop = self._money_side_decimal(price, 'shopMoney')

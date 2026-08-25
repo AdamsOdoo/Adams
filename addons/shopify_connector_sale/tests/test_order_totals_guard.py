@@ -472,6 +472,28 @@ class TestOrderTotalsGuard(OrderImportCase):
         self.assertEqual(caught.exception.error_class, 'financial_total_mismatch')
         self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
 
+    def test_unknown_order_liability_accepts_known_line_liability(self):
+        payload = self._taxed_payload(
+            'gid://shopify/Order/TaxAggregateUnknownLiability',
+            included=True,
+        )
+        self.assertIsNone(payload['taxLines'][0]['channelLiable'])
+        payload['line_items'][0]['taxLines'][0]['channelLiable'] = False
+        binding = self.Importer._apply_import(self.store, payload)
+        self.assertEqual(binding.sale_order_id.amount_tax, 5.0)
+
+    def test_known_order_liability_still_rejects_known_line_disagreement(self):
+        payload = self._taxed_payload(
+            'gid://shopify/Order/TaxKnownLiabilityMismatch', included=False,
+        )
+        payload['taxLines'][0]['channelLiable'] = True
+        payload['line_items'][0]['taxLines'][0]['channelLiable'] = False
+        orders_before = self.env['sale.order'].search_count([])
+        with self.assertRaises(JobHandlerError) as caught:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(caught.exception.error_class, 'financial_total_mismatch')
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
+
     def test_high_value_discount_uses_exact_negative_tax_preserving_residual(self):
         payload = self._payload('gid://shopify/Order/DiscountResidual')
         payload['totalPriceSet'] = self._money('666.67')
