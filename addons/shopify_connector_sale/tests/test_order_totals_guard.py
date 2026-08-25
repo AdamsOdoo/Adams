@@ -103,6 +103,9 @@ class TestOrderTotalsGuard(OrderImportCase):
                 payload['line_items'][0][field_name]['shopMoney'][
                     'amount'
                 ] = '105.00'
+            payload['line_items'][0][
+                'discountedUnitPriceAfterAllDiscountsSet'
+            ] = self._money('105.00')
         return payload
 
     def _assert_precreation_failure(self, payload, exception, reason=False):
