@@ -478,7 +478,24 @@ class TestOrderTotalsGuard(OrderImportCase):
             included=True,
         )
         self.assertIsNone(payload['taxLines'][0]['channelLiable'])
-        payload['line_items'][0]['taxLines'][0]['channelLiable'] = False
+        line_evidence = payload['line_items'][0]['taxLines'][0]
+        line_evidence['channelLiable'] = False
+        aggregate_mapping = self.env['shopify.connector.tax.mapping'].search([
+            ('store_id', '=', self.store.id),
+            ('shopify_price_included', '=', True),
+        ], limit=1)
+        self.assertTrue(aggregate_mapping)
+        self.env['shopify.connector.tax.mapping'].create({
+            'store_id': self.store.id,
+            'shopify_tax_evidence_key': build_tax_fingerprint(
+                line_evidence['rate'], line_evidence['ratePercentage'],
+                line_evidence['title'], line_evidence['source'],
+                line_evidence['channelLiable'], True,
+            ),
+            'shopify_tax_fingerprint_version': SHOPIFY_TAX_FINGERPRINT_VERSION,
+            'shopify_price_included': True,
+            'account_tax_id': aggregate_mapping.account_tax_id.id,
+        })
         binding = self.Importer._apply_import(self.store, payload)
         self.assertEqual(binding.sale_order_id.amount_tax, 5.0)
 
