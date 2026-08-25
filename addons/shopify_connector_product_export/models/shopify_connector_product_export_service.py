@@ -2598,3 +2598,854 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             query,
             {'id': product_gid},
             purpose='product_export',
+        ) as result:
+            return self._reconcile_update_result(attempt, expected, result)
+
+    @api.model
+    def _reconcile_update_result(self, attempt, expected, result):
+        data = (result or {}).get('data') or {}
+        identity = (data.get('shop') or {}).get('myshopifyDomain')
+        if identity != attempt.expected_store_identity:
+            return self._reconcile_identity_mismatch(identity)
+        product = data.get('product')
+        if not isinstance(product, dict):
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity or '',
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_BINDING_CONFLICT,
+                'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+                'message': 'The bound product could not be read during '
+                           'reconciliation.',
+                'evidence': {},
+            }
+        matches = all(
+            (sorted(product.get(name) or []) == sorted(value))
+            if name == 'tags' else ((product.get(name) or '') == value)
+            for name, value in expected.items()
+        )
+        if matches:
+            return {
+                'verdict': 'applied',
+                'observed_store_identity': identity,
+                'action': 'succeed',
+                'error_class': False,
+                'manual_review_subreason': False,
+                'message': 'Every requested scalar matches Shopify.',
+                'evidence': {'updated_at': product.get('updatedAt')},
+            }
+        return {
+            'verdict': 'not_applied',
+            'observed_store_identity': identity,
+            'action': 'block_manual_review',
+            'error_class': ERROR_CLASS_VALIDATION,
+            'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+            'message': 'Shopify does not carry the requested scalar values. '
+                       'A reviewer decides whether to re-preview.',
+            'evidence': {'updated_at': product.get('updatedAt')},
+        }
+
+    @api.model
+    def _apply_consequence_update(
+        self, job, attempt, phase, consequence, reconciliation_job=False,
+    ):
+        preview = self._preview_for_job(job)
+        succeeded = consequence['action'] == 'succeed'
+        if succeeded:
+            binding = preview.product_template_binding_id
+            if binding:
+                updated_at = (consequence.get('evidence') or {}).get(
+                    'updated_at'
+                )
+                if updated_at:
+                    binding.sudo().write({'shopify_updated_at': updated_at})
+        self._advance_plan(preview, JOB_TYPE_UPDATE, succeeded)
+
+    # ------------------------------------------------------------------
+    # Mutation domain: variant update (productVariantsBulkUpdate)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _prepare_local_variants_update(self, job):
+        return self._prepare_local_common(job)
+
+    @api.model
+    def _prepare_preconditions_variants_update(
+        self, local_snapshot, owner_context,
+    ):
+        preview = self._assert_confirmed_preview_pre_c2(local_snapshot)
+        store = self.env['shopify.connector.store'].browse(
+            local_snapshot['store_id']
+        )
+        include_price = self._price_export_allowed(store)
+        confirmed_gids = []
+        for step in (preview.apply_plan or {}).get('steps') or []:
+            if step['step'] == JOB_TYPE_VARIANTS_UPDATE:
+                confirmed_gids = list(step.get('variant_gids') or [])
+        if not confirmed_gids:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
+                'No variant update was confirmed for this product.',
+            )
+        VariantBinding = self.env[
+            'shopify.connector.product.variant.binding'
+        ]
+        rows = VariantBinding.sudo().search([
+            ('store_id', '=', store.id),
+            ('shopify_gid', 'in', confirmed_gids),
+        ])
+        if len(rows) != len(set(confirmed_gids)):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'A confirmed variant is no longer bound; refusing to write '
+                'variants whose identity changed since the preview.',
+            )
+        variants_input = []
+        for row in rows:
+            desired = self._desired_variant(
+                store, row.product_variant_id, include_price,
+            )
+            entry = {'id': row.shopify_gid}
+            if 'barcode' in desired:
+                entry['barcode'] = desired['barcode']
+            if 'inventoryItem' in desired:
+                entry['inventoryItem'] = {
+                    'sku': desired['inventoryItem']['sku'],
+                }
+            if include_price:
+                entry['price'] = desired['price']
+                if 'compareAtPrice' in desired:
+                    entry['compareAtPrice'] = desired['compareAtPrice']
+            # `optionValues` is deliberately NOT sent on an update: the
+            # preview refuses to plan a variant update while the option
+            # structure diverges, and re-asserting option values against a
+            # structure this connector did not author is how a variant ends
+            # up describing something else.
+            variants_input.append(entry)
+        variables = {
+            'productId': local_snapshot['remote_product_gid'],
+            'variants': variants_input,
+            # All-or-nothing. A partially applied variant batch is the
+            # hardest state to reason about afterwards, so it is refused at
+            # the API level rather than reconciled later.
+            'allowPartialUpdates': False,
+        }
+        # `variants` here is the mutation's own required argument, not a
+        # declarative product-input list, so the forbidden-key guard is run
+        # on the ENTRIES rather than the envelope.
+        for entry in variants_input:
+            assert_no_forbidden_keys(
+                {key: value for key, value in entry.items() if key != 'id'},
+                'variants[]',
+            )
+        operation = (
+            'mutation ProductExportVariantsUpdate($productId: ID!, '
+            '$variants: [ProductVariantsBulkInput!]!, '
+            '$allowPartialUpdates: Boolean) { '
+            'productVariantsBulkUpdate(productId: $productId, '
+            'variants: $variants, '
+            'allowPartialUpdates: $allowPartialUpdates) { '
+            'productVariants { id barcode price compareAtPrice '
+            'inventoryItem { id sku } } '
+            'userErrors { code field message } } }'
+        )
+        self._assert_no_product_set_on_existing(operation, local_snapshot)
+        return self._mutation_request(
+            JOB_TYPE_VARIANTS_UPDATE, local_snapshot, operation, variables,
+            {'product_gid': local_snapshot['remote_product_gid'],
+             'variant_gids': sorted(confirmed_gids)},
+            {'product_gid': local_snapshot['remote_product_gid'],
+             'expected_variants': variants_input,
+             'price_exported': include_price,
+             'snapshot_taken_at': fields.Datetime.to_string(
+                 fields.Datetime.now()
+             )},
+        )
+
+    @api.model
+    def _transport_variants_update(self, request, attempt_context):
+        return self._transport(
+            request, attempt_context, 'productVariantsBulkUpdate',
+        )
+
+    @api.model
+    def _classify_direct_variants_update(self, result):
+        def success(payload):
+            variants = payload.get('productVariants')
+            if not isinstance(variants, list) or not variants:
+                return 'no updated variants returned'
+            return True
+
+        return self._classify_user_errors(result, success, 'Variant update')
+
+    @api.model
+    def _reconcile_variants_update(self, attempt, reconciliation_job=None):
+        store = attempt.store_id
+        snapshot = attempt.preconditions_snapshot or {}
+        expected = snapshot.get('expected_variants') or []
+        client = self.env['shopify.connector.api.client']
+        query = (
+            'query ProductExportReconcileVariants($id: ID!) { '
+            'product(id: $id) { id variants(first: %d) { nodes { id barcode '
+            'price compareAtPrice inventoryItem { id sku } } } } '
+            'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
+        )
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_update_result(
+                attempt, expected, result,
+            )
+
+    @api.model
+    def _reconcile_variants_update_result(self, attempt, expected, result):
+        data = (result or {}).get('data') or {}
+        identity = (data.get('shop') or {}).get('myshopifyDomain')
+        if identity != attempt.expected_store_identity:
+            return self._reconcile_identity_mismatch(identity)
+        product = data.get('product')
+        if not isinstance(product, dict):
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity or '',
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_BINDING_CONFLICT,
+                'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+                'message': 'The bound product could not be read during '
+                           'variant reconciliation.',
+                'evidence': {},
+            }
+        current = {
+            entry.get('id'): entry
+            for entry in ((product.get('variants') or {}).get('nodes')) or []
+            if isinstance(entry, dict)
+        }
+        applied = True
+        for entry in expected:
+            observed = current.get(entry.get('id'))
+            if not observed:
+                applied = False
+                break
+            if 'barcode' in entry and (
+                (observed.get('barcode') or '') != entry['barcode']
+            ):
+                applied = False
+                break
+            observed_sku = (
+                observed.get('sku')
+                or (observed.get('inventoryItem') or {}).get('sku')
+            )
+            expected_sku = (
+                (entry.get('inventoryItem') or {}).get('sku')
+                if 'inventoryItem' in entry else None
+            )
+            if expected_sku is not None and observed_sku != expected_sku:
+                applied = False
+                break
+            if 'price' in entry and _money(
+                float(observed.get('price') or 0.0)
+            ) != entry['price']:
+                applied = False
+                break
+        if applied:
+            return {
+                'verdict': 'applied',
+                'observed_store_identity': identity,
+                'action': 'succeed',
+                'error_class': False,
+                'manual_review_subreason': False,
+                'message': 'Every confirmed variant matches Shopify.',
+                'evidence': {},
+            }
+        return {
+            'verdict': 'not_applied',
+            'observed_store_identity': identity,
+            'action': 'block_manual_review',
+            'error_class': ERROR_CLASS_VALIDATION,
+            'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+            'message': 'Shopify does not carry the confirmed variant values.',
+            'evidence': {},
+        }
+
+    @api.model
+    def _apply_consequence_variants_update(
+        self, job, attempt, phase, consequence, reconciliation_job=False,
+    ):
+        preview = self._preview_for_job(job)
+        self._advance_plan(
+            preview, JOB_TYPE_VARIANTS_UPDATE,
+            consequence['action'] == 'succeed',
+        )
+
+    # ------------------------------------------------------------------
+    # Mutation domain: variant create (productVariantsBulkCreate)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _prepare_local_variants_create(self, job):
+        return self._prepare_local_common(job)
+
+    @api.model
+    def _prepare_preconditions_variants_create(
+        self, local_snapshot, owner_context,
+    ):
+        preview = self._assert_confirmed_preview_pre_c2(local_snapshot)
+        store = self.env['shopify.connector.store'].browse(
+            local_snapshot['store_id']
+        )
+        include_price = self._price_export_allowed(store)
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
+        if not confirmed_ids:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
+                'No variant creation was confirmed for this product.',
+            )
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; no mutation was sent.',
+            )
+        variants = self.env['product.product'].browse(confirmed_ids).exists()
+        if len(variants) != len(set(confirmed_ids)):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'A confirmed new variant no longer exists in Odoo.',
+            )
+        skus = [variant.default_code for variant in variants]
+        if any(not sku for sku in skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'Every confirmed new variant requires a non-empty SKU before '
+                'Shopify mutation so its response can be bound without guessing.',
+            )
+        if len(set(skus)) != len(skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'Confirmed new variants contain duplicate SKUs; no Shopify '
+                'mutation was sent.',
+            )
+        VariantBinding = self.env[
+            'shopify.connector.product.variant.binding'
+        ]
+        already = VariantBinding.sudo().search_count([
+            ('store_id', '=', store.id),
+            ('product_variant_id', 'in', variants.ids),
+        ])
+        if already:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'A confirmed new variant became bound after the preview; '
+                'creating it again would duplicate it.',
+            )
+        # Re-read immediately before C2. A merchant or a prior uncertain
+        # attempt may have created the SKU after preview; local validation
+        # alone cannot prove remote absence.
+        remote = self._read_remote_product(
+            store,
+            self.env['shopify.connector.job'].browse(local_snapshot['job_id']),
+            local_snapshot['remote_product_gid'],
+        )
+        if remote.get('store_identity') != store.shop_domain:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'The fresh variant-create preflight observed a different '
+                'Shopify store identity; no mutation was sent.',
+            )
+        if not remote.get('exists'):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'The bound Shopify product no longer exists; a new variant '
+                'cannot be created safely.',
+            )
+        remote_skus = {}
+        for entry in remote.get('variants') or []:
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                remote_skus.setdefault(sku, []).append(entry.get('id'))
+        collisions = sorted(set(skus) & set(remote_skus))
+        if collisions:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'A confirmed variant SKU now exists on Shopify (%s). The '
+                'fresh pre-mutation identity check stopped duplicate creation.'
+                % ', '.join(collisions),
+            )
+        options = self._desired_options(preview.product_template_id)
+        variants_input = []
+        for variant in variants:
+            desired = self._desired_variant(store, variant, include_price)
+            entry = {}
+            if 'barcode' in desired:
+                entry['barcode'] = desired['barcode']
+            if 'inventoryItem' in desired:
+                entry['inventoryItem'] = {
+                    'sku': desired['inventoryItem']['sku'],
+                }
+            if options:
+                if not desired.get('optionValues'):
+                    self._fail_closed_pre_c2(
+                        ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
+                        'A structured product variant has no option values; '
+                        'the Shopify variant-create input would be invalid.',
+                    )
+                entry['optionValues'] = desired['optionValues']
+            if include_price:
+                entry['price'] = desired['price']
+                if 'compareAtPrice' in desired:
+                    entry['compareAtPrice'] = desired['compareAtPrice']
+            variants_input.append(entry)
+        variables = {
+            'productId': local_snapshot['remote_product_gid'],
+            'variants': variants_input,
+            # PRESERVE_STANDALONE_VARIANT, never DEFAULT: 2026-07 documents
+            # that DEFAULT "Deletes the standalone default ("Default Title")
+            # variant when it's the only variant on the product". A remote
+            # deletion is not available to this module, so the strategy that
+            # performs one is not either.
+            'strategy': 'PRESERVE_STANDALONE_VARIANT',
+        }
+        for entry in variants_input:
+            assert_no_forbidden_keys(entry, 'variants[]')
+        operation = (
+            'mutation ProductExportVariantsCreate($productId: ID!, '
+            '$variants: [ProductVariantsBulkInput!]!, '
+            '$strategy: ProductVariantsBulkCreateStrategy) { '
+            'productVariantsBulkCreate(productId: $productId, '
+            'variants: $variants, strategy: $strategy) { '
+            'productVariants { id sku barcode price compareAtPrice '
+            'selectedOptions { name value } '
+            'inventoryItem { id sku tracked } } '
+            'userErrors { code field message } } }'
+        )
+        self._assert_no_product_set_on_existing(operation, local_snapshot)
+        return self._mutation_request(
+            JOB_TYPE_VARIANTS_CREATE, local_snapshot, operation, variables,
+            {'product_gid': local_snapshot['remote_product_gid'],
+             'odoo_variant_ids': sorted(variants.ids)},
+            {'product_gid': local_snapshot['remote_product_gid'],
+             'odoo_variant_ids': sorted(variants.ids),
+             'expected_skus': sorted(
+                 entry['inventoryItem']['sku']
+                 for entry in variants_input
+                 if 'inventoryItem' in entry
+             ),
+             'snapshot_taken_at': fields.Datetime.to_string(
+                 fields.Datetime.now()
+             )},
+        )
+
+    @api.model
+    def _transport_variants_create(self, request, attempt_context):
+        return self._transport(
+            request, attempt_context, 'productVariantsBulkCreate',
+        )
+
+    @api.model
+    def _classify_direct_variants_create(self, result):
+        def success(payload):
+            variants = payload.get('productVariants')
+            if not isinstance(variants, list) or not variants:
+                return 'no created variants returned'
+            return True
+
+        return self._classify_user_errors(
+            result, success, 'Variant create',
+            lambda payload: {'variants': payload.get('productVariants')},
+        )
+
+    @api.model
+    def _reconcile_variants_create(self, attempt, reconciliation_job=None):
+        """Adopt-if-found by SKU on the variants this attempt authored."""
+        store = attempt.store_id
+        snapshot = attempt.preconditions_snapshot or {}
+        expected_skus = set(snapshot.get('expected_skus') or [])
+        client = self.env['shopify.connector.api.client']
+        query = (
+            'query ProductExportReconcileVariantCreate($id: ID!) { '
+            'product(id: $id) { id variants(first: %d) { nodes { id '
+            'sku barcode price compareAtPrice '
+            'inventoryItem { id sku tracked } } } } '
+            'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
+        )
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_create_result(
+                attempt, expected_skus, result,
+            )
+
+    @api.model
+    def _reconcile_variants_create_result(
+        self, attempt, expected_skus, result,
+    ):
+        data = (result or {}).get('data') or {}
+        identity = (data.get('shop') or {}).get('myshopifyDomain')
+        if identity != attempt.expected_store_identity:
+            return self._reconcile_identity_mismatch(identity)
+        product = data.get('product')
+        if not isinstance(product, dict):
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity or '',
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_BINDING_CONFLICT,
+                'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+                'message': 'The bound product could not be read during '
+                           'variant-create reconciliation.',
+                'evidence': {},
+            }
+        nodes = ((product.get('variants') or {}).get('nodes')) or []
+        observed = {}
+        for entry in nodes:
+            if not isinstance(entry, dict):
+                continue
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                observed.setdefault(sku, []).append(entry)
+        duplicate_skus = {
+            sku for sku in expected_skus if len(observed.get(sku) or []) != 1
+        }
+        if duplicate_skus:
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity,
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_DUPLICATE,
+                'manual_review_subreason': SUBREASON_DUPLICATE,
+                'message': 'Variant-create reconciliation found a missing or '
+                           'duplicate SKU identity; a reviewer must resolve '
+                           'the response before binding.',
+                'evidence': {'ambiguous_skus': sorted(duplicate_skus)},
+            }
+        found = {
+            sku for sku in expected_skus
+            if (observed.get(sku) or [{}])[0].get('id')
+        }
+        if expected_skus and found == expected_skus:
+            return {
+                'verdict': 'applied',
+                'observed_store_identity': identity,
+                'action': 'succeed',
+                'error_class': False,
+                'manual_review_subreason': False,
+                'message': 'Every confirmed new variant exists on Shopify; '
+                           'adopting them.',
+                'evidence': {'variants': nodes},
+            }
+        if found:
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity,
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_VALIDATION,
+                'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+                'message': 'Only some confirmed variants exist on Shopify. A '
+                           'reviewer resolves the partial state; this '
+                           'connector will not guess the rest.',
+                'evidence': {'found_skus': sorted(found)},
+            }
+        return {
+            'verdict': 'not_applied',
+            'observed_store_identity': identity,
+            'action': 'block_manual_review',
+            'error_class': ERROR_CLASS_VALIDATION,
+            'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
+            'message': 'None of the confirmed variants exist on Shopify; the '
+                       'create did not apply.',
+            'evidence': {},
+        }
+
+    @api.model
+    def _apply_consequence_variants_create(
+        self, job, attempt, phase, consequence, reconciliation_job=False,
+    ):
+        preview = self._preview_for_job(job)
+        succeeded = consequence['action'] == 'succeed'
+        if succeeded:
+            self._bind_created_variants(
+                job.store_id, preview,
+                (consequence.get('evidence') or {}).get('variants') or [],
+            )
+        self._advance_plan(preview, JOB_TYPE_VARIANTS_CREATE, succeeded)
+
+    @api.model
+    def _bind_created_variants(self, store, preview, remote_variants):
+        VariantBinding = self.env[
+            'shopify.connector.product.variant.binding'
+        ]
+        binding = preview.product_template_binding_id
+        if not binding:
+            return
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; binding finalization stopped.',
+            )
+        variants = self.env['product.product'].browse(confirmed_ids).exists()
+        if len(variants) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'A confirmed new variant disappeared before binding finalization.',
+            )
+        by_sku = {}
+        for entry in remote_variants:
+            if not isinstance(entry, dict):
+                continue
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                by_sku.setdefault(sku, []).append(entry)
+        for variant in variants:
+            if not variant.default_code:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'A newly created Odoo variant has no SKU; its Shopify '
+                    'identity cannot be bound without guessing.',
+                )
+            candidates = by_sku.get(variant.default_code) or []
+            if len(candidates) != 1:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Variant-create finalization could not map Odoo variant '
+                    '%s by SKU exactly once.' % variant.display_name,
+                )
+            remote = candidates[0]
+            gid = remote.get('id')
+            if not gid:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Shopify returned a created variant without an identity; '
+                    'binding finalization stopped.',
+                )
+            existing = VariantBinding.sudo().search([
+                ('store_id', '=', store.id),
+                ('product_variant_id', '=', variant.id),
+            ], limit=1)
+            remote_inventory_item = remote.get('inventoryItem') or {}
+            inventory_tracked = remote_inventory_item.get('tracked')
+            inventory_tracked_known = isinstance(inventory_tracked, bool)
+            selected_options = normalize_selected_options(
+                remote.get('selectedOptions')
+            )
+            variant_values = {
+                'store_id': store.id,
+                'product_variant_id': variant.id,
+                'product_template_binding_id': binding.id,
+                'shopify_gid': gid,
+                'shopify_option_values': (
+                    ' / '.join(
+                        '%s: %s' % (option.get('name'), option.get('value'))
+                        for option in selected_options
+                    ) or False
+                ),
+                'shopify_price_snapshot': self._safe_float(
+                    remote.get('price')
+                ),
+                'shopify_compare_at_price_snapshot': self._safe_float(
+                    remote.get('compareAtPrice')
+                ),
+                'shopify_sku_snapshot': (
+                    remote.get('sku')
+                    or remote_inventory_item.get('sku')
+                    or False
+                ),
+                'shopify_barcode_snapshot': remote.get('barcode') or False,
+                'shopify_inventory_item_gid': remote_inventory_item.get('id') or False,
+                'shopify_inventory_tracked': (
+                    inventory_tracked if inventory_tracked_known else False
+                ),
+                'shopify_inventory_tracked_known': inventory_tracked_known,
+                'shopify_last_imported_at': fields.Datetime.now(),
+                'shopify_birth_initialized': True,
+                'status': 'active',
+                'match_key': 'existing_binding',
+            }
+            if existing:
+                if existing.shopify_gid == gid:
+                    existing.sudo().write(variant_values)
+                    continue
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'The confirmed Odoo variant is already bound to a '
+                    'different Shopify variant; finalization stopped.',
+                )
+            VariantBinding.sudo().create(variant_values)
+
+    @api.model
+    def _confirmed_variant_create_ids(self, preview):
+        ids = []
+        for step in (preview.apply_plan or {}).get('steps') or []:
+            if step.get('step') == JOB_TYPE_VARIANTS_CREATE:
+                ids.extend(step.get('variant_ids') or [])
+        # Preserve the immutable confirmation order. Callers explicitly reject
+        # duplicate plan entries instead of silently normalizing evidence.
+        return ids
+
+    # ------------------------------------------------------------------
+    # Shared reconciliation helpers and the reconciliation handler
+    # ------------------------------------------------------------------
+
+    @api.model
+    def _reconcile_identity_mismatch(self, observed_identity):
+        return {
+            'verdict': 'not_applied',
+            'observed_store_identity': observed_identity or '',
+            'action': 'block_manual_review',
+            'error_class': ERROR_CLASS_STORE_IDENTITY,
+            'manual_review_subreason': SUBREASON_STORE_IDENTITY,
+            'message': 'Reconciliation observed a different Shopify store '
+                       'identity than the attempt expected.',
+            'evidence': {},
+        }
+
+    @api.model
+    def _handle_product_export_mutation_reconcile(self, job):
+        """The shared read-only reconciliation handler for every export
+        mutation domain.
+
+        Dispatches purely on `attempt.mutation_domain`, mirroring core's own
+        generic reconciliation-handler shape and the Task 013 precedent. The
+        exception ordering below is deliberate and matches LL-013: a failure
+        *executing* the read retries through the ordinary read-safe path,
+        while only a result the strategy actually returned but that fails
+        schema validation blocks the original job. Conflating the two would
+        let a transient read error masquerade as malformed evidence and
+        block a mutation that may well have applied.
+        """
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        attempt = job.mutation_attempt_id
+        if not attempt:
+            job._transition_failed_final(
+                'unknown_system_error',
+                'The reconciliation job has no mutation-attempt link.',
+            )
+            return
+        original = attempt.job_id
+        if attempt.observed_outcome == 'pending':
+            Dispatch._block_original_job(
+                original, ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE,
+                'Pending attempt reached reconciliation without recovery.',
+            )
+            Dispatch._complete_reconciliation_job(
+                job, 'Pending reconciliation attempt was refused.',
+            )
+            return
+        if attempt.effective_disposition() != 'unresolved':
+            Dispatch._complete_reconciliation_job(
+                job, 'Mutation attempt was already resolved.',
+            )
+            return
+        try:
+            strategy = Dispatch._validated_mutation_strategy(
+                attempt.mutation_domain
+            )
+        except ValidationError:
+            Dispatch._block_original_job(
+                original, 'no_reconciliation_strategy',
+                'no_reconciliation_strategy',
+                'No valid reconciliation strategy is registered.',
+            )
+            Dispatch._complete_reconciliation_job(
+                job, 'Missing strategy was routed to the original job.',
+            )
+            return
+        try:
+            result = strategy['reconcile'](attempt, job)
+        except JobHandlerError:
+            raise
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception as exc:
+            raise JobHandlerError(
+                ERROR_CLASS_TEMPORARY,
+                'The export reconciliation read failed transiently; retry '
+                'required.',
+                type(exc).__name__,
+            ) from exc
+        try:
+            normalized = Dispatch._validate_reconciliation_result(result)
+        except Exception:
+            Dispatch._block_original_job(
+                original, ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE,
+                'The reconciliation result was malformed; no resend '
+                'occurred.',
+            )
+            Dispatch._complete_reconciliation_job(
+                job, 'Malformed read result was routed to the original job.',
+            )
+            return
+        if normalized['observed_store_identity'] != (
+            attempt.expected_store_identity
+        ):
+            Dispatch._block_original_job(
+                original, ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'Reconciliation observed a different Shopify store identity.',
+            )
+            Dispatch._complete_reconciliation_job(
+                job, 'Store-identity mismatch was routed without a verdict.',
+            )
+            return
+        if normalized['verdict'] == 'inconclusive':
+            count = attempt._record_inconclusive_reconciliation(
+                normalized['evidence']
+            )
+            if count >= INCONCLUSIVE_RECONCILIATION_CAP:
+                Dispatch._block_original_job(
+                    original, ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE,
+                    'Reconciliation remained inconclusive at the safety cap.',
+                )
+                Dispatch._complete_reconciliation_job(
+                    job, 'Inconclusive reconciliation reached its safety cap.',
+                )
+            else:
+                job._transition_retry_waiting(
+                    fields.Datetime.now() + timedelta(minutes=5),
+                    job.retry_count + 1,
+                    ERROR_CLASS_TEMPORARY,
+                    normalized['message'],
+                )
+            return
+        disposition = (
+            'applied' if normalized['verdict'] == 'applied' else 'not_applied'
+        )
+        try:
+            with self.env.cr.savepoint():
+                attempt._record_reconciliation_result(
+                    disposition, normalized['evidence'],
+                )
+                Dispatch._apply_validated_consequence(
+                    original, attempt, 'reconciliation',
+                    normalized['consequence'], strategy,
+                    reconciliation_job=job,
+                )
+                Dispatch._complete_reconciliation_job(
+                    job, 'Read-only export reconciliation completed.',
+                )
+        except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:
+            raise
+        except Exception as exc:
+            raise JobHandlerError(
+                ERROR_CLASS_TEMPORARY,
+                'Atomic reconciliation consequence failed; read retry '
+                'required.',
+                type(exc).__name__,
+            ) from exc
