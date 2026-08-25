@@ -102,11 +102,16 @@ class ShopifyConnectorWebhookController(http.Controller):
         """Verify the envelope before JSON parsing and return a fast ACK."""
         request = http.request
         http_request = request.httprequest
-        forwarded_proto = self._header(
-            http_request.headers, 'X-Forwarded-Proto',
-        )
-        if http_request.scheme != 'https' and forwarded_proto != 'https':
-            return self._response(400)
+        # TLS is terminated before Odoo on managed Odoo.sh builds.  The WSGI
+        # request therefore legitimately arrives with an internal HTTP scheme,
+        # and proxy metadata is not a trustworthy application-layer security
+        # boundary.  Enforcing either value here rejects genuine Shopify HTTPS
+        # deliveries before callback-token lookup and HMAC verification.
+        #
+        # Transport confidentiality is enforced when the connector constructs
+        # and registers the HTTPS-only callback URL.  Ingress authenticity is
+        # then enforced below over the exact raw body by the opaque callback
+        # token, API-version/store-identity gates and constant-time HMAC check.
         if api_version != SHOPIFY_API_VERSION:
             return self._response(404)
 
