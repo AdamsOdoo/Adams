@@ -664,6 +664,13 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertLess(
             controller.index('verify_hmac'), controller.index('json.loads'),
         )
+        # Managed Odoo.sh terminates TLS before the Odoo worker.  Ingress must
+        # not reject a genuine external HTTPS delivery from the internal WSGI
+        # scheme or caller-controlled forwarding metadata; the registered
+        # HTTPS callback plus token/API/store/HMAC gates are authoritative.
+        self.assertNotIn('http_request.scheme', controller)
+        self.assertNotIn('X-Forwarded-Proto', controller)
+        self.assertIn('TLS is terminated before Odoo', controller)
         self.assertIn('read_bounded_body', controller)
         self.assertNotIn('get_data(', controller)
         self.assertIn('Delivery._ingest(', controller)
