@@ -101,7 +101,14 @@ class ShopifyConnectorWebhookController(http.Controller):
 
     @http.route(
         '/shopify/webhook/<string:callback_token>/<string:api_version>',
-        type='http',
+        # Odoo 19's HTTP dispatcher calls get_http_params() before the
+        # controller. Werkzeug's form parser consumes a JSON webhook body
+        # there and leaves only an empty cache sentinel, so the exact bytes
+        # required for Shopify HMAC verification are irretrievable.
+        # JSON2 parses through get_json_data() instead; Werkzeug caches the
+        # original bytes before decoding and a plain Response stays valid.
+        # Decoded kwargs remain untrusted and are ignored until HMAC passes.
+        type='json2',
         auth='public',
         methods=['POST'],
         csrf=False,
