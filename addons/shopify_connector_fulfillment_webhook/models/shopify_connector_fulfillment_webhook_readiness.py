@@ -106,11 +106,8 @@ class ShopifyConnectorFulfillmentWebhookSubscription(models.Model):
     _inherit = 'shopify.connector.webhook.subscription'
 
     @api.model
-    def _enqueue_subscription_mutation(self, subscription, action, source):
-        if (
-            action == 'create'
-            and subscription.topic in FULFILLMENT_WEBHOOK_SCOPE_TOPICS
-        ):
+    def _validate_subscription_create_preconditions(self, subscription):
+        if subscription.topic in FULFILLMENT_WEBHOOK_SCOPE_TOPICS:
             Readiness = self.env['shopify.connector.readiness.check']
             if not Readiness._fulfillment_webhook_domain_enabled(
                 subscription.store_id,
@@ -134,6 +131,6 @@ class ShopifyConnectorFulfillmentWebhookSubscription(models.Model):
                     'until the fulfillment webhook read-scope readiness '
                     'check passes.'
                 )
-        return super()._enqueue_subscription_mutation(
-            subscription, action, source,
+        return super()._validate_subscription_create_preconditions(
+            subscription,
         )

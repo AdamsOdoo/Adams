@@ -12,6 +12,7 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
 )
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
 from odoo.addons.shopify_connector_webhook.models.shopify_connector_webhook_subscription import (
@@ -290,6 +291,85 @@ class TestShopifyConnectorFulfillmentWebhook(TransactionCase):
         self.assertEqual(after_jobs, before_jobs)
         enqueue.assert_not_called()
         self.assertFalse(subscription.last_job_id)
+
+    def test_stale_replacement_rejects_disabled_fulfillment_domain(self):
+        store = self._store('stale-replacement-domain-disabled')
+        self.env['shopify.connector.store.settings'].search([
+            ('store_id', '=', store.id),
+        ], limit=1).write({'fulfillment_domain_enabled': False})
+        subscription = self._subscription(
+            store,
+            'fulfillments/create',
+            state='manual_review',
+            gid='gid://shopify/WebhookSubscription/stale-disabled',
+        )
+        subscription._service_write({
+            'actual_uri_digest': hashlib.sha256(b'stale').hexdigest(),
+        })
+        self.env.user.write({'group_ids': [(4, self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ).id)]})
+        Job = self.env['shopify.connector.job']
+        before_jobs = Job.search_count([('store_id', '=', store.id)])
+
+        with self.assertRaises(ValidationError):
+            subscription.action_replace_stale_callback()
+
+        self.assertEqual(
+            Job.search_count([('store_id', '=', store.id)]),
+            before_jobs,
+        )
+
+    def test_stale_replacement_rechecks_domain_before_delete(self):
+        store = self._store('stale-replacement-domain-race')
+        store.write({'granted_scopes': json.dumps([
+            FULFILLMENT_WEBHOOK_READ_SCOPE,
+        ])})
+        gid = 'gid://shopify/WebhookSubscription/stale-domain-race'
+        subscription = self._subscription(
+            store, 'fulfillments/update', state='manual_review', gid=gid,
+        )
+        stale_digest = hashlib.sha256(b'stale-race').hexdigest()
+        subscription._service_write({'actual_uri_digest': stale_digest})
+        self.env.user.write({'group_ids': [(4, self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ).id)]})
+        SubscriptionModel = type(subscription)
+        with patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ):
+            parent_id = subscription.action_replace_stale_callback()
+        parent = self.env['shopify.connector.job'].browse(parent_id)
+        parent.write({'state': 'running'})
+        self.env['shopify.connector.store.settings'].search([
+            ('store_id', '=', store.id),
+        ], limit=1).write({'fulfillment_domain_enabled': False})
+        actual = [{
+            'id': gid,
+            'topic': subscription.topic_enum,
+            'uri_digest': stale_digest,
+            'observed_api_version': SHOPIFY_API_VERSION,
+            'format': 'JSON',
+            'include_fields': ['admin_graphql_api_id'],
+        }]
+
+        with patch.object(
+            SubscriptionModel, '_read_actual_subscriptions',
+            return_value=actual,
+        ), patch.object(
+            SubscriptionModel, '_require_hmac_client_secret',
+            return_value=True,
+        ), self.assertRaises(JobHandlerError):
+            self.env[
+                'shopify.connector.job.dispatch'
+            ]._handle_webhook_subscription_replace_stale(parent)
+
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'webhook_subscription_delete'),
+            ('res_id', '=', subscription.id),
+        ], limit=1))
 
     def test_present_fulfillment_webhook_scope_allows_subscription_create(self):
         store = self._store('scope-create-allowed')
