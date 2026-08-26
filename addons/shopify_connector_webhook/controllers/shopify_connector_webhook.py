@@ -7,7 +7,6 @@ import json
 import logging
 
 from odoo import http
-from werkzeug.wrappers import Response
 
 from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
@@ -63,14 +62,20 @@ class ShopifyConnectorWebhookController(http.Controller):
                 return False, 400
             if declared > MAX_WEBHOOK_BODY_BYTES:
                 return False, 413
-            cached_body = getattr(http_request, '_cached_data', None)
-            if cached_body is not None:
-                if not isinstance(cached_body, (bytes, bytearray)):
-                    return False, 400
-                cached_body = bytes(cached_body)
-                if len(cached_body) != declared:
-                    return False, 400
-                return cached_body, 0
+            # ``type='http'`` leaves an application/json payload untouched by
+            # form parsing.  Read it through Werkzeug's public cache-aware API
+            # rather than depending on its private ``_cached_data`` layout.
+            # The declared-size ceiling above makes this read bounded.
+            get_data = getattr(http_request, 'get_data', None)
+            if not callable(get_data):
+                return False, 400
+            cached_body = get_data(cache=True, as_text=False)
+            if not isinstance(cached_body, (bytes, bytearray)):
+                return False, 400
+            cached_body = bytes(cached_body)
+            if len(cached_body) != declared:
+                return False, 400
+            return cached_body, 0
         stream = getattr(http_request, 'stream', None)
         if stream is None or not hasattr(stream, 'read'):
             return False, 400
@@ -97,18 +102,20 @@ class ShopifyConnectorWebhookController(http.Controller):
     def _response(status):
         # No diagnostic body is returned: Shopify only needs the status and
         # operators use the durable delivery/job evidence after verification.
-        return Response('', status=status, headers={'Content-Type': 'text/plain'})
+        # Return Odoo's Response subclass.  The dispatcher recognises this
+        # exact class and preserves its status; a bare Werkzeug Response is
+        # coerced to a string by the route wrapper and falsely returned as 200.
+        return http.Response(
+            '', status=status, headers={'Content-Type': 'text/plain'},
+        )
 
     @http.route(
         '/shopify/webhook/<string:callback_token>/<string:api_version>',
-        # Odoo 19's HTTP dispatcher calls get_http_params() before the
-        # controller. Werkzeug's form parser consumes a JSON webhook body
-        # there and leaves only an empty cache sentinel, so the exact bytes
-        # required for Shopify HMAC verification are irretrievable.
-        # JSON2 parses through get_json_data() instead; Werkzeug caches the
-        # original bytes before decoding and a plain Response stays valid.
-        # Decoded kwargs remain untrusted and are ignored until HMAC passes.
-        type='json2',
+        # This is an ordinary external HTTP callback, not an Odoo JSON API.
+        # With application/json, the HTTP dispatcher's form lookup does not
+        # consume the body; ``read_bounded_body`` obtains the exact bytes from
+        # Werkzeug's public cache-aware API before HMAC verification.
+        type='http',
         auth='public',
         methods=['POST'],
         csrf=False,

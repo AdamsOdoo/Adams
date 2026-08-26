@@ -121,7 +121,12 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         class CachedRequest:
             headers = {'Content-Length': str(len(raw))}
             stream = ExplodingStream()
-            _cached_data = raw
+
+            @staticmethod
+            def get_data(cache=True, as_text=False):
+                self.assertTrue(cache)
+                self.assertFalse(as_text)
+                return raw
 
         self.assertEqual(
             ShopifyConnectorWebhookController.read_bounded_body(
@@ -134,7 +139,12 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         class CachedRequest:
             headers = {'Content-Length': '5'}
             stream = None
-            _cached_data = b'four'
+
+            @staticmethod
+            def get_data(cache=True, as_text=False):
+                self.assertTrue(cache)
+                self.assertFalse(as_text)
+                return b'four'
 
         self.assertEqual(
             ShopifyConnectorWebhookController.read_bounded_body(
@@ -706,13 +716,15 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertNotIn('X-Forwarded-Proto', controller)
         self.assertIn('TLS is terminated before Odoo', controller)
         self.assertIn('read_bounded_body', controller)
-        self.assertNotIn('get_data(', controller)
-        # Odoo 19's HTTP dispatcher eagerly reads httprequest.form before
-        # the route and destroys the raw JSON bytes needed for Shopify HMAC.
-        # JSON2 caches exact bytes through get_json_data() before decoding
-        # and accepts a plain Response from this endpoint.
-        self.assertIn("type='json2'", controller)
-        self.assertNotIn("type='http'", controller)
+        self.assertIn('get_data(cache=True, as_text=False)', controller)
+        # Shopify sends an ordinary application/json HTTP callback.  The
+        # controller must use Odoo's HTTP dispatcher and Odoo Response class;
+        # a JSON2 route serializes a non-Odoo Werkzeug response and can turn an
+        # internal rejection into a misleading outer HTTP 200.
+        self.assertIn("type='http'", controller)
+        self.assertNotIn("type='json2'", controller)
+        self.assertIn('return http.Response(', controller)
+        self.assertNotIn('from werkzeug.wrappers import Response', controller)
         self.assertIn('Delivery._ingest(', controller)
         self.assertNotIn('process_delivery(', controller)
         self.assertIn('UNIQUE(store_id, delivery_id)', delivery)
