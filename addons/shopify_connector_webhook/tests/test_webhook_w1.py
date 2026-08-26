@@ -707,6 +707,12 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('TLS is terminated before Odoo', controller)
         self.assertIn('read_bounded_body', controller)
         self.assertNotIn('get_data(', controller)
+        # Odoo 19's HTTP dispatcher eagerly reads httprequest.form before
+        # the route and destroys the raw JSON bytes needed for Shopify HMAC.
+        # JSON2 caches exact bytes through get_json_data() before decoding
+        # and accepts a plain Response from this endpoint.
+        self.assertIn("type='json2'", controller)
+        self.assertNotIn("type='http'", controller)
         self.assertIn('Delivery._ingest(', controller)
         self.assertNotIn('process_delivery(', controller)
         self.assertIn('UNIQUE(store_id, delivery_id)', delivery)
