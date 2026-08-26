@@ -1,29 +1,24 @@
 /** @odoo-module **/
-// Part of the Shopify Connector (Store 360 dashboard).
-//
-// HOOT unit tests for the Store 360 client action. Covers the render states
-// (empty / healthy commercial / no-permission), server-built drill-down
-// navigation, the truthful bridge and comparison captions, the two distinct
-// header timestamps, server-validated period filtering, and the failed-RPC
-// band. The >=30s refresh floor and the visibility-aware background-tab
-// pause are implemented in the client action (see
-// shopify_connector_dashboard.js) and are covered by source review plus the
-// driven runtime walkthrough, not asserted here. Reduced-motion and
-// responsive behaviour are CSS-only (media queries), covered by the SCSS +
-// the runtime walkthrough.
-//
-// EXACT COUNT CONTRACT: this suite carries exactly 8 tests — the executor
-// (`test_u3_hoot_suite.py` EXPECTED_SUITES) asserts equality.
+// C7 split-dashboard HOOT coverage. EXACT COUNT CONTRACT: 8 tests.
 
 import { expect, test, describe, beforeEach } from "@odoo/hoot";
 import { queryFirst, queryText } from "@odoo/hoot-dom";
 import { animationFrame } from "@odoo/hoot-mock";
 import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
-import { ShopifyConnectorDashboard } from "@shopify_connector_core/js/shopify_connector_dashboard";
+import {
+    ShopifyConnectorDashboard,
+    ShopifyConnectorHealth,
+} from "@shopify_connector_core/js/shopify_connector_dashboard";
 
-const CURRENCY = { id: 1, name: "EUR", symbol: "€", decimal_places: 2, position: "after" };
+const CURRENCY = {
+    id: 1,
+    name: "EUR",
+    symbol: "€",
+    decimal_places: 2,
+    position: "after",
+};
 
-function payload(overrides = {}) {
+function salesPayload(overrides = {}) {
     return Object.assign(
         {
             meta: {
@@ -35,48 +30,201 @@ function payload(overrides = {}) {
                 store_id: 7,
                 stores: [{ id: 7, name: "Aurora Home Goods", state: "connected" }],
             },
-            health: {
-                state: "healthy",
-                lead: { severity: "success", icon: "fa-check-circle", text: "All systems normal", hint: "ok" },
-                jobs: {},
-                needs_review: 0,
-                backlog: 0,
-                oldest_waiting: false,
-                week: { succeeded: 12, failed: 0 },
-                exceptions: [],
-                activity: [],
-            },
-            flows: [
-                { id: "orders", label: "Orders", backlog: 0, failures: 0,
-                  last_success: "2026-07-30 10:00:00", last_success_relative: "1 h ago", tone: "neutral" },
-            ],
-            stores_region: { available: false, rows: [] },
             commercial: {
                 available: true,
-                blocks: [{
-                    currency: CURRENCY, sales: 18432.5, orders: 26, aov: 708.9,
-                    previous: { sales: 15000.0, orders: 20, aov: 750.0 },
-                }],
+                blocks: [
+                    {
+                        currency: CURRENCY,
+                        sales: 18432.5,
+                        gross: 18432.5,
+                        refunds: 0,
+                        net: 18432.5,
+                        orders: 26,
+                        aov: 708.9,
+                        previous: {
+                            sales: 15000,
+                            gross: 15000,
+                            refunds: 0,
+                            net: 15000,
+                            orders: 20,
+                            aov: 750,
+                        },
+                    },
+                ],
                 orders_total: 26,
                 units: 61,
                 previous_units: 50,
-                orders_target: { res_model: "sale.order", domain: [["shopify_connector_store_id", "=", 7]], name: "Imported Shopify orders" },
-                units_target: { res_model: "sale.order.line", domain: [["shopify_line_item_gid", "!=", false]], name: "Lines" },
+                orders_target: {
+                    res_model: "sale.order",
+                    domain: [["shopify_connector_store_id", "=", 7]],
+                    name: "Imported Odoo orders",
+                },
+                units_target: {
+                    res_model: "sale.order.line",
+                    domain: [["shopify_line_item_gid", "!=", false]],
+                    name: "Imported Odoo order lines",
+                },
+                awaiting_review: {
+                    count: 3,
+                    blocks: [
+                        {
+                            currency: CURRENCY,
+                            value: 275.5,
+                            count: 3,
+                            target: {
+                                res_model: "sale.order",
+                                domain: [
+                                    ["shopify_connector_review", "=", true],
+                                    ["currency_id", "=", 2],
+                                ],
+                                name: "Awaiting data review — EUR",
+                            },
+                        },
+                    ],
+                    target: {
+                        res_model: "sale.order",
+                        domain: [["shopify_connector_review", "=", true]],
+                        name: "Awaiting data review",
+                    },
+                },
+                refund_scope_note:
+                    "Refunded or divergent imported orders are excluded from reconciled figures.",
                 trend: { available: false, buckets: [] },
-                products: { available: false, rows: [] },
             },
             bridge: {
-                available: true, state: "complete_current",
-                text: "Complete & current — every discoverable importable order has landed.",
+                available: true,
+                state: "complete_current",
+                text: "Complete & current",
                 synced_through: "2026-07-31 09:45:00",
-                checkpoint: "2026-07-31 09:50:00",
-                scheduled: true, g2: 0, g3: 0, reconciling: false, disconnected: false,
-                g2_target: { res_model: "shopify.connector.job", domain: [], name: "g2" },
-                g3_target: { res_model: "shopify.connector.job", domain: [], name: "g3" },
             },
             lifecycle: { available: false, reason: "no_permission" },
-            dispatch: { available: false, reason: "no_permission" },
             critical: { active: false, causes: [] },
+            refresh_interval_seconds: 30,
+            generated_at: "2026-07-31 10:00:00",
+        },
+        overrides
+    );
+}
+
+function healthPayload(overrides = {}) {
+    return Object.assign(
+        {
+            meta: {
+                store_id: false,
+                stores: [
+                    { id: 7, name: "Aurora", state: "connected" },
+                    { id: 8, name: "Borealis", state: "reconnect_needed" },
+                ],
+            },
+            health: {
+                state: "degraded",
+                lead: {
+                    severity: "danger",
+                    icon: "fa-exclamation-triangle",
+                    text: "Connector attention required",
+                    hint: "One store is failing.",
+                },
+                jobs: { retry_waiting: 2, failed_final: 1 },
+                needs_review: 1,
+                backlog: 4,
+                oldest_blocked: {
+                    age: "2 h ago",
+                    target: {
+                        res_model: "shopify.connector.job",
+                        domain: [["state", "=", "blocked_manual_review"]],
+                        name: "Blocked connector cases",
+                    },
+                },
+                week: { succeeded: 12, failed: 1 },
+                exceptions: [],
+                activity: [],
+            },
+            stores_region: {
+                available: true,
+                summary: { healthy: 1, working: 0, attention: 1, unknown: 0 },
+                rows: [
+                    {
+                        id: 7,
+                        name: "Aurora",
+                        state: "connected",
+                        tone: "healthy",
+                        operational_state: "ready",
+                        operational_label: "Ready",
+                        operational_reason: "All required evidence is fresh.",
+                        next_action: "No action is required.",
+                        domains_selected: 2,
+                        domains_completed: 2,
+                        backlog: 0,
+                        attention: 0,
+                        ambiguous_mutations: 0,
+                        last_activity_relative: "1 h ago",
+                    },
+                    {
+                        id: 8,
+                        name: "Borealis",
+                        state: "reconnect_needed",
+                        tone: "attention",
+                        operational_state: "reconnect_required",
+                        operational_label: "Reconnect Required",
+                        operational_reason: "The connection needs attention.",
+                        next_action: "Reconnect the store.",
+                        domains_selected: 2,
+                        domains_completed: 1,
+                        backlog: 4,
+                        attention: 1,
+                        ambiguous_mutations: 1,
+                        last_activity_relative: false,
+                    },
+                ],
+            },
+            flows: [
+                {
+                    id: "orders",
+                    label: "Orders",
+                    backlog: 0,
+                    failures: 0,
+                    last_success_relative: false,
+                    tone: "unknown",
+                },
+            ],
+            throttle: {
+                rows: [
+                    {
+                        store_id: 7,
+                        store: "Aurora",
+                        headroom_ratio: null,
+                        observed_at: false,
+                    },
+                ],
+            },
+            mappings: {
+                rows: [
+                    {
+                        id: "products",
+                        label: "Product mappings",
+                        state: "unknown",
+                        count: 0,
+                    },
+                ],
+            },
+            reconciliation: {
+                pending_runs: 1,
+                failed_runs: 0,
+                ambiguous_mutations: 1,
+                verified_mutations: 4,
+            },
+            mode_switch: {
+                rows: [
+                    {
+                        store_id: 7,
+                        store: "Aurora",
+                        effective_mode: false,
+                        requested_mode: false,
+                        state: "unknown",
+                        stale: false,
+                    },
+                ],
+            },
             setup_available: true,
             refresh_interval_seconds: 30,
             generated_at: "2026-07-31 10:00:00",
@@ -85,23 +233,12 @@ function payload(overrides = {}) {
     );
 }
 
-function emptyPayload() {
-    return payload({
-        health: {
-            state: "empty",
-            lead: { severity: "info", icon: "fa-plug", text: "Store setup is incomplete", hint: "Connect your store." },
-            jobs: {}, needs_review: 0, backlog: 0, oldest_waiting: false,
-            week: { succeeded: 0, failed: 0 }, exceptions: [], activity: [],
-        },
-    });
-}
-
-function mockOrm(getData, capture) {
+function mockOrm(expectedMethod, getData, capture) {
     let calls = 0;
     mockService("orm", {
         call: async (model, method, args) => {
             expect(model).toBe("shopify.connector.ui.dashboard");
-            expect(method).toBe("get_store_360_data");
+            expect(method).toBe(expectedMethod);
             calls += 1;
             if (capture) {
                 capture(args, calls);
@@ -114,100 +251,94 @@ function mockOrm(getData, capture) {
 let lastAction = null;
 
 describe("shopify connector dashboard", () => {
-    // `mockService` must be called per-test (module scope mutates the
-    // services registry while HOOT is still registering the suite).
     beforeEach(() => {
         lastAction = null;
-        mockService("action", { doAction: async (action) => { lastAction = action; } });
+        mockService("action", {
+            doAction: async (action) => {
+                lastAction = action;
+            },
+        });
     });
 
-    test("healthy payload renders the KPI cards and the success band", async () => {
-        mockOrm(() => payload());
+    test("sales renders per-currency figures and the separate review population", async () => {
+        mockOrm("get_sales_dashboard_data", () => salesPayload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc-band--success").toHaveCount(1);
-        expect(".sc360-kpi").toHaveCount(4);
-        expect(queryText(".sc360-kpi[data-kpi='orders'] .sc360-kpi__value")).toBe("26");
-        // truthful comparison caption present on the sales card
-        expect(queryText(".sc360-kpi[data-kpi='sales'] .sc360-kpi__delta")).toInclude("vs previous period");
+        expect(".sc360-sales-currencies tbody tr").toHaveCount(1);
+        expect(queryText(".sc360-sales-currencies tbody")).toInclude("EUR");
+        expect(queryText(".sc360-commercial")).toInclude("Awaiting data review");
+        expect(queryText(".sc360-review-currencies tbody")).toInclude("275.50");
+        expect(".o_sc_connector_health").toHaveCount(0);
     });
 
-    test("empty state renders the guided setup card", async () => {
-        mockOrm(() => emptyPayload());
-        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc-band--info").toHaveCount(1);
-        expect(".sc-empty").toHaveCount(1);
-        expect(".sc_dashboard_setup").toHaveCount(1);
-    });
-
-    test("no-permission commercial variant renders the note, never zeros", async () => {
-        mockOrm(() => payload({
-            commercial: { available: false, reason: "no_permission" },
-        }));
-        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        // Notes are PER SECTION by design: the default payload also carries a
-        // no-permission lifecycle section, so scope the assertions to the
-        // commercial section this test is about.
-        expect(".sc360-commercial .sc360-no-permission").toHaveCount(1);
-        expect(".sc360-lifecycle .sc360-no-permission").toHaveCount(1);
-        expect(".sc360-kpi").toHaveCount(0);
-        expect(queryText(".sc360-commercial .sc360-no-permission")).toInclude(
-            "connector health is unaffected"
+    test("sales no-permission variant never renders invented zero KPIs", async () => {
+        mockOrm("get_sales_dashboard_data", () =>
+            salesPayload({ commercial: { available: false, reason: "no_permission" } })
         );
+        await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
+        expect(".sc360-commercial .sc360-no-permission").toHaveCount(1);
+        expect(".sc360-kpi").toHaveCount(0);
     });
 
-    test("clicking the orders KPI opens the server-built native action verbatim", async () => {
-        mockOrm(() => payload());
+    test("sales order KPI opens the server-built native action verbatim", async () => {
+        mockOrm("get_sales_dashboard_data", () => salesPayload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        queryFirst(".sc360-kpi[data-kpi='orders']").click();
+        queryFirst(".sc360-kpi:first-child").click();
         await animationFrame();
-        expect(lastAction).not.toBe(null);
-        expect(lastAction.type).toBe("ir.actions.act_window");
         expect(lastAction.res_model).toBe("sale.order");
         expect(JSON.stringify(lastAction.domain)).toBe(
             JSON.stringify([["shopify_connector_store_id", "=", 7]])
         );
     });
 
-    test("bridge renders its state label and copy", async () => {
-        mockOrm(() => payload({
-            bridge: Object.assign(payload().bridge, {
-                state: "processing",
-                text: "Reconciliation in progress — figures may rise shortly.",
-                reconciling: true,
-            }),
-        }));
+    test("sales bridge renders freshness without a connector-health KPI", async () => {
+        mockOrm("get_sales_dashboard_data", () =>
+            salesPayload({
+                bridge: Object.assign(salesPayload().bridge, {
+                    state: "processing",
+                    text: "Reconciliation in progress",
+                }),
+            })
+        );
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
         expect(".sc-bridge--processing").toHaveCount(1);
         expect(queryText(".sc-bridge__state")).toBe("Reconciliation in progress");
+        expect(queryText(".o_sc_dashboard")).not.toInclude("Queue depth");
     });
 
-    test("failed RPC renders an error band with a retry control", async () => {
-        mockOrm(() => { throw new Error("boom"); });
+    test("failed sales RPC renders an error band with retry", async () => {
+        mockOrm("get_sales_dashboard_data", () => {
+            throw new Error("boom");
+        });
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
         expect(".sc-band--danger").toHaveCount(1);
-        expect(".sc-btn").toHaveCount(1); // "Try again"
+        expect(".sc-btn").toHaveCount(1);
     });
 
-    test("the two header timestamps are distinct: page updated vs Shopify source", async () => {
-        mockOrm(() => payload());
+    test("sales timestamps distinguish page refresh from source freshness", async () => {
+        mockOrm("get_sales_dashboard_data", () => salesPayload());
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc360-ts-page").toHaveCount(1);
-        expect(".sc360-ts-source").toHaveCount(1);
         expect(queryText(".sc360-ts-page")).toInclude("Page updated");
         expect(queryText(".sc360-ts-source")).toInclude("synchronized through");
-        // the lead band stays a polite live region
-        expect(queryFirst(".sc-band").getAttribute("aria-live")).toBe("polite");
     });
 
-    test("period buttons come from the server registry and re-query with the key", async () => {
+    test("sales period buttons re-query with a server-provided key", async () => {
         const seen = [];
-        mockOrm(() => payload(), (args) => seen.push(args));
+        mockOrm("get_sales_dashboard_data", () => salesPayload(), (args) => seen.push(args));
         await mountWithCleanup(ShopifyConnectorDashboard, { props: {} });
-        expect(".sc360-period__btn").toHaveCount(4);
-        const first = queryFirst(".sc360-period__btn"); // "24h"
-        first.click();
+        queryFirst(".sc360-period__btn").click();
         await animationFrame();
         expect(seen.length).toBe(2);
-        expect(seen[1][1]).toBe("24h"); // period KEY, never a domain
+        expect(seen[1][1]).toBe("24h");
+    });
+
+    test("health preserves the failing store and explicit unknown evidence without sales", async () => {
+        mockOrm("get_connector_health_data", () => healthPayload());
+        await mountWithCleanup(ShopifyConnectorHealth, { props: {} });
+        expect(".sc360-stores-table tbody tr").toHaveCount(2);
+        expect(queryText(".sc360-stores-table tbody")).toInclude("Borealis");
+        expect(queryText(".o_sc_connector_health")).toInclude("Unknown");
+        expect(queryText(".o_sc_connector_health")).toInclude("Queue depth");
+        expect(queryText(".o_sc_connector_health")).toInclude("Oldest blocked case");
+        expect(queryText(".o_sc_connector_health")).not.toInclude("Imported Odoo order value");
     });
 });

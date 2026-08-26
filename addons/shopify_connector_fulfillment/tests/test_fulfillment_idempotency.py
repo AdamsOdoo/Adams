@@ -103,7 +103,7 @@ class TestFulfillmentIdempotency(TransactionCase):
         }
         if verdict == 'applied':
             result['domain_payload'] = {'adopted_fulfillment_gid': 'gid://shopify/Fulfillment/1'}
-        strat['reconcile'] = lambda attempt: result
+        strat['reconcile'] = lambda _attempt, _reconciliation_job: result
         return strat
 
     # ------------------------------------------------------------------
@@ -250,6 +250,10 @@ class TestFulfillmentIdempotency(TransactionCase):
         evidence.shopify_fulfillment_gid = 'gid://shopify/Fulfillment/1'
         return {
             'store': self.store,
+            # Direct condition tests patch the read helpers below this seam;
+            # production reaches C14 through ``_evaluate_mode2`` with the
+            # claimed job that owns both reads.
+            'job': False,
             'order_binding': order_binding,
             'evidence': evidence,
             'line_mapping': {

@@ -73,13 +73,24 @@ EXPECTED_SUITES = {
     # the Dev Dashboard default with its same-organization/24-hour copy, the
     # offline path's three-value disclosure, the stored-mode reopen, and the
     # client-secret never-in-state proof -- are each client-rendered too.
-    # The Batch 1 UI completion (2026-07-30) raises it to 30: the location
+    # The Batch 1 UI completion (2026-07-30) raised it to 30: the location
     # step's bounded search is a CLIENT protocol -- busy discipline, the
     # server-issued continuation and `next_offset`, per-identity
     # deduplication, revalidation of an off-screen selection, the in-place
     # row update after a mapping, and four distinct empty states -- and none
-    # of those properties is observable from the server or from a tour.
-    'shopify connector setup wizard': 30,
+    # of those properties is observable from the server or from a tour. The
+    # first-run Sales Dashboard setup CTA adds the 31st client assertion.
+    # The location-discovery polish (2026-08-15) raised it to 34: opening the
+    # required location step starts discovery automatically, and Continue
+    # remains blocked until every active Shopify location is mapped.
+    # The explicit second-store setup path (2026-08-18) adds the 35th client
+    # assertion: switching to a new store clears store-scoped transient state
+    # and restores keyboard focus without mutating the existing store.
+    # The onboarding runtime correction (2026-08-22) adds five assertions:
+    # stored client credentials and offline tokens can be retained on rerun,
+    # a mode switch still requires a replacement value, stale browser
+    # presence is checked at action time, and early validation clears secrets.
+    'shopify connector setup wizard': 41,
 }
 
 #: Maps a `.test.js` file to the suite name it is expected to contribute, so

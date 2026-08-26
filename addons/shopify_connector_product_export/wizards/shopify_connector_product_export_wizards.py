@@ -195,12 +195,20 @@ class ShopifyConnectorProductExportConfirmWizard(models.TransientModel):
 
     def action_confirm(self):
         self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may use the '
+                'no-JavaScript export confirmation fallback. Use the '
+                'Review Export screen instead.'
+            )
         if not self.acknowledged:
             raise UserError(
                 'Tick the acknowledgement to confirm this export. Nothing has '
                 'been exported.'
             )
-        return self.preview_id.action_confirm_export_preview()
+        return self.preview_id._confirm_export_preview_fallback()
 
 
 class ShopifyConnectorExportChecksumAckWizard(models.TransientModel):

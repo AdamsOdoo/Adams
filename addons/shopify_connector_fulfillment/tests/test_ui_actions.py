@@ -4,7 +4,9 @@ wizards delegate without deciding anything.
 
 import uuid
 
-from odoo.exceptions import UserError
+from lxml import etree
+
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
 USER_ROLE = 'shopify_connector_core.group_shopify_connector_user'
@@ -43,6 +45,7 @@ class TestUiActions(TransactionCase):
         Settings = self.env['shopify.connector.store.settings']
         for model, method in (
             (Settings, 'action_start_mode2_switch'),
+            (Settings, 'action_retry_mode2_switch'),
             (Settings, 'action_rollback_to_mode1'),
             (Binding, 'action_release_fulfillment_review'),
             (Evidence, 'action_import_tracking'),
@@ -53,6 +56,69 @@ class TestUiActions(TransactionCase):
                 callable(getattr(model, method, None)),
                 'Sanctioned action %s is missing -- U1 wires to it.' % method,
             )
+
+    def test_import_tracking_button_is_administrator_only(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_fulfillment_evidence_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        buttons = arch.xpath(
+            "//button[@name='action_import_tracking' and @type='object']"
+        )
+        self.assertEqual(len(buttons), 1)
+        self.assertEqual(buttons[0].get('groups'), ADMIN_ROLE)
+
+    def test_failed_or_running_switch_has_a_direct_return_to_mode1_control(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_store_settings_fulfillment_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        buttons = arch.xpath(
+            "//button[@name='action_rollback_to_mode1' and @type='object']"
+        )
+        self.assertEqual(
+            len(buttons), 1,
+            'A failed/running switch must expose the sanctioned server '
+            'rollback directly; the effective-Mode-derived wizard would '
+            'request Mode 2 again while Mode 1 is still effective.',
+        )
+        invisible = buttons[0].get('invisible') or ''
+        self.assertIn('fulfillment_switch_in_progress', invisible)
+        self.assertIn('fulfillment_mode_switch_state', invisible)
+        self.assertNotEqual(
+            invisible.strip(), "fulfillment_operating_mode != 'mode2'",
+            'Return to Mode 1 must not disappear merely because the failed '
+            'switch correctly kept Mode 1 effective.',
+        )
+        self.assertTrue(buttons[0].get('confirm'))
+
+    def test_mode_panel_names_every_c6_fact_and_discloses_remote_read(self):
+        view = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'view_shopify_connector_store_settings_fulfillment_form'
+        )
+        arch = etree.fromstring(view.arch_db.encode())
+        expected_labels = {
+            'fulfillment_operating_mode': 'Effective mode',
+            'fulfillment_requested_mode': 'Requested mode',
+            'fulfillment_mode_switch_state': 'Scan state',
+            'fulfillment_mode_switch_job_id': 'Transition run',
+            'fulfillment_mode_switch_failure_reason': 'Blocker or reason',
+            'fulfillment_mode_switch_next_action': 'Next action',
+            'fulfillment_mode_switch_verified_at': 'Last verified',
+        }
+        for field_name, label in expected_labels.items():
+            nodes = arch.xpath("//field[@name='%s']" % field_name)
+            self.assertTrue(nodes, field_name)
+            self.assertTrue(
+                any(node.get('string') == label for node in nodes),
+                '%s must render as %s' % (field_name, label),
+            )
+        text = ' '.join(arch.itertext())
+        self.assertIn('Queues a Shopify reconciliation read', text)
+        self.assertIn('does not change the effective mode immediately', text)
 
     def test_all_u1_act_windows_resolve_to_an_existing_model(self):
         for xmlid in (
@@ -124,24 +190,25 @@ class TestUiActions(TransactionCase):
     def test_release_wizard_requires_a_non_empty_reason(self):
         binding = self._make_binding()
         Wizard = self.env['shopify.connector.fulfillment.review.release.wizard']
-        wizard = Wizard.with_user(self.plain_user).create({
+        wizard = Wizard.with_user(self.admin_user).create({
             'binding_id': binding.id, 'reason': '   ',
         })
         with self.assertRaises(UserError):
             wizard.action_confirm()
 
     def test_release_wizard_delegates_and_lets_the_server_refuse(self):
-        """There is no blocked mutation, so the SERVER refuses. The wizard must
-        surface that refusal rather than pre-judging eligibility itself."""
+        """The ACL refuses User; Admin reaches the sanctioned server action."""
         binding = self._make_binding()
         Wizard = self.env['shopify.connector.fulfillment.review.release.wizard']
-        wizard = Wizard.with_user(self.plain_user).create({
-            'binding_id': binding.id, 'reason': 'operator decided',
+        with self.assertRaises(AccessError):
+            Wizard.with_user(self.plain_user).create({
+                'binding_id': binding.id, 'reason': 'operator decided',
+            })
+        wizard = Wizard.with_user(self.admin_user).create({
+            'binding_id': binding.id, 'reason': 'administrator decided',
         })
-        # `plain_user` holds the Connector User role, which resolves to
-        # Reviewer, so the ROLE check passes and the server refuses on the
-        # precondition instead: there is no blocked mutation for this binding.
-        # (Odoo's assertRaises does not accept a tuple of exception types.)
+        # There is no blocked mutation. Reaching the binding's sanctioned
+        # action is therefore proved by its domain-level refusal.
         with self.assertRaises(UserError):
             wizard.action_confirm()
 

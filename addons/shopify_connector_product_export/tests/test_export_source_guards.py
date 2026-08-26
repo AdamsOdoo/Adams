@@ -26,6 +26,35 @@ def _python_sources(include_tests=False):
 @tagged('post_install', '-at_install')
 class TestExportSourceGuards(TransactionCase):
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        legacy = []
+        read_calls = []
+        for path in _python_sources():
+            tree = ast.parse(path.read_text())
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                ):
+                    continue
+                if (
+                    node.func.attr == 'execute'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'client'
+                ):
+                    legacy.append((path.name, node.lineno))
+                if node.func.attr == 'execute_business_read':
+                    read_calls.append((path.name, node))
+        self.assertFalse(legacy, legacy)
+        self.assertEqual(len(read_calls), 9)
+        for path, call in read_calls:
+            purpose = next(
+                (kw.value for kw in call.keywords if kw.arg == 'purpose'),
+                None,
+            )
+            self.assertIsInstance(purpose, ast.Constant, path)
+            self.assertEqual(purpose.value, 'product_export', path)
+
     # ------------------------------------------------------------------
     # The UI layer delegates and does nothing else
     # ------------------------------------------------------------------
@@ -142,7 +171,13 @@ class TestExportSourceGuards(TransactionCase):
             # and it exposes no new operator-facing surface. Authorisation
             # and company access were established upstream at enqueue
             # (`enqueue_preview` / `action_confirm_export_preview`).
-            'shopify_connector_product_export_service.py': 21,
+            # 21 -> 22 (PR #206 product contract repair). Create
+            # finalization now writes a fully evidenced variant binding when
+            # Shopify returns the durable variant identity. The
+            # binding fields are connector-protected, the path is reachable
+            # only from an admitted create job, and omitting this elevation
+            # would leave the create replay boundary incomplete.
+            'shopify_connector_product_export_service.py': 22,
             # 20 -> 26 (TD-011, authorised deliberately). Six elevations,
             # each reviewed:
             #   `_admit_media_job`      1 - reads the connector's own job
@@ -175,10 +210,16 @@ class TestExportSourceGuards(TransactionCase):
             #                                the three above.
             'shopify_connector_media_export_service.py': 28,
             'shopify_connector_product_export_preview.py': 2,
-            # TD-015 moved the PD-PX-7 stub out of the seams file into
-            # `shopify_connector_export_reconnect.py`, where the pass now
-            # lives, so this file's one elevation went with it.
-            'shopify_connector_product_export_seams.py': 0,
+            # PR #206 product contract repair adds two reviewed elevations:
+            #   create recovery preview 1 - after Administrator, company,
+            #                               state and definitely-not-applied
+            #                               evidence checks, read the protected
+            #                               preview that owns the source product;
+            #   import finalization      1 - mark the imported product eligible
+            #                               for safe preview-based updates. The
+            #                               field is connector-owned and this is
+            #                               the production importer transition.
+            'shopify_connector_product_export_seams.py': 2,
             # PD-PX-7 (TD-015). Eleven elevations, all on connector-owned
             # rows and none reachable by an unauthorised user:
             #   store state           4 - `export_reconcile_*` are readonly
@@ -267,6 +308,10 @@ class TestExportSourceGuards(TransactionCase):
             # surface had acquired an elevation, which is exactly the thing
             # this inventory exists to make impossible to add quietly.
             'shopify_connector_product_export_ui.py': 0,
+            # Migration scripts are deliberately scanned with production
+            # sources. This one uses SQL through the supplied cursor and has
+            # no ORM elevation.
+            'post-migrate.py': 0,
             '__init__.py': 0,
             '__manifest__.py': 0,
         }

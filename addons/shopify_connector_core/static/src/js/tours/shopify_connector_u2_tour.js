@@ -1,10 +1,8 @@
 /** @odoo-module **/
 // Part of the Shopify Connector (U2 domain operator surfaces).
 //
-// Browser tour for the U2 surfaces — orders, COD reconciliation, customer and
-// catalog matching, inventory. U2 shipped with server-side visibility and
-// wiring tests but with NO driven-browser evidence at all, which its own
-// acceptance matrix requires; this closes that.
+// Browser tour for the C1 split: routine domain work under Operations and
+// durable mappings/safeguards under Administrator-only Configuration.
 //
 // WHY IT LIVES IN CORE. The surfaces it walks belong to four different
 // addons (`shopify_connector_sale`, `_product`, `_inventory`, and the core
@@ -27,14 +25,38 @@ import { stepUtils } from "@web_tour/tour_utils";
 
 const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 const menu = (module, xmlid) => `[data-menu-xmlid="${module}.${xmlid}"]`;
+const topMenu = {
+    Operations: coreMenu("menu_shopify_connector_operations"),
+    Configuration: coreMenu("menu_shopify_connector_configuration"),
+};
+
+const openPath = (labels, content) => ({
+    trigger: topMenu[labels[0]] || ".o_menu_sections",
+    content,
+    async run() {
+        for (const label of labels) {
+            const topEntry = [...document.querySelectorAll(
+                topMenu[label] || "__missing__"
+            )].find((candidate) => candidate.getClientRects().length);
+            const textNode = [...document.querySelectorAll(
+                ".o_menu_sections *, .o-dropdown--menu *"
+            )].find((candidate) => candidate.textContent.trim() === label);
+            const entry = topEntry || (textNode && (
+                textNode.closest("a, button, [role='menuitem'], [data-menu-xmlid]")
+                || textNode
+            ));
+            if (!entry) {
+                throw new Error(`${label} is absent from the operator menu tree`);
+            }
+            entry.click();
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+    },
+});
 
 // The connector's top-level branches collapse on navigation, so a child menu
 // click needs its parent re-opened first. Expressed once here rather than
 // repeated at every step.
-const openBranch = (trigger, content) => [
-    { trigger, content, run: "click" },
-];
-
 registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
     url: "/odoo",
     steps: () => [
@@ -48,115 +70,59 @@ registry.category("web_tour.tours").add("shopify_connector_u2_nav_tour", {
             run: "click",
         },
 
-        // --- Orders (S9 family) ---
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_orders"),
-            "Open the Orders branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_order_workspace"),
-            "Orders workspace."
+        // --- Operations ---
+        openPath(["Operations", "Orders"],
+            "Open Orders."
         ),
         {
             trigger: ".o_list_view",
-            content: "The orders workspace renders.",
+            content: "The orders surface renders.",
+        },
+        openPath(["Operations", "Inventory"],
+            "Open Inventory."
+        ),
+        {
+            trigger: ".o_list_view",
+            content: "The inventory surface renders.",
         },
 
-        // --- COD reconciliation ---
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_orders"),
-            "Re-open the Orders branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_cod_reconciliation"),
-            "COD reconciliation."
+        // --- Configuration / Mappings ---
+        openPath(["Configuration", "Customer Mappings"],
+            "Customer mappings."
         ),
         {
             trigger: ".o_list_view",
-            content: "The COD reconciliation surface renders.",
+            content: "The customer mappings render.",
         },
-
-        // --- Catalog matching (S6/S8), including customer matching ---
-        // Customer Matching is parented to the CATALOG branch, not Orders
-        // (`shopify_connector_sale_menus.xml` sets
-        // `parent="shopify_connector_product.menu_shopify_connector_catalog"`),
-        // even though the menu is declared in the sale addon. Walking it from
-        // the branch it actually renders under is the point of a browser tour.
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Open the Catalog branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_sale", "menu_shopify_connector_customer_binding"),
-            "Customer matching."
+        openPath(["Configuration", "Product Mappings"],
+            "Product mappings."
         ),
         {
             trigger: ".o_list_view",
-            content: "The customer-binding surface renders.",
+            content: "The product mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Re-open the Catalog branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_product_binding"),
-            "Product matching."
+        openPath(["Configuration", "Variant Mappings"],
+            "Variant mappings."
         ),
         {
             trigger: ".o_list_view",
-            content: "The product-binding surface renders.",
+            content: "The variant mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_catalog"),
-            "Re-open the Catalog branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_product", "menu_shopify_connector_product_variant_binding"),
-            "Variant matching."
-        ),
-        {
-            trigger: ".o_list_view",
-            content: "The variant-binding surface renders.",
-        },
-
-        // --- Inventory (S10-S12) ---
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
-            "Open the Inventory branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory_workspace"),
-            "Inventory workspace."
-        ),
-        {
-            trigger: ".o_list_view",
-            content: "The inventory workspace renders.",
-        },
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
-            "Re-open the Inventory branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory_first_push"),
-            "First-push guard."
+        openPath(["Configuration", "Location Mappings"],
+            "Location mappings."
         ),
         {
             trigger: ".o_list_view, .o_nocontent_help",
-            content:
-                "The first-push guard surface renders — rows, or the empty state " +
-                "that says there are none.",
+            content: "The location mappings render.",
         },
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_inventory"),
-            "Re-open the Inventory branch."
-        ),
-        ...openBranch(
-            menu("shopify_connector_inventory", "menu_shopify_connector_location_mapping"),
-            "Location mapping."
+
+        // --- Configuration / Sync Rules ---
+        openPath(["Configuration", "Inventory Safeguards"],
+            "Inventory safeguards."
         ),
         {
             trigger: ".o_list_view, .o_nocontent_help",
-            content: "The location-mapping surface renders.",
+            content: "The inventory safeguards render.",
         },
     ],
 });

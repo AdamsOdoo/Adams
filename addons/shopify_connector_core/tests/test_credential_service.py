@@ -59,6 +59,8 @@ CORE_SUDO_SITES = [
      'action_override_binding', 'self', 1),
     ('shopify_connector_job.py', '_has_mutation_attempt_evidence',
      "self.env['shopify.connector.mutation.attempt']", 1),
+    ('shopify_connector_job.py', '_compute_merchant_write_status',
+     "self.env['shopify.connector.mutation.attempt']", 1),
     ('shopify_connector_job.py', '_reassign_to_historic_job_type',
      'job', 1),
     ('shopify_connector_job.py', '_reassign_to_historic_job_type',
@@ -98,6 +100,7 @@ CORE_SUDO_SITES = [
     ('shopify_connector_job_dispatch.py', '_start_running', 'job', 1),
     ('shopify_connector_job_enqueue.py', 'enqueue',
      "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_job_enqueue.py', 'enqueue', 'cron', 1),
     ('shopify_connector_job_log.py', '_system_append', 'self', 1),
     ('shopify_connector_mutation_attempt.py', '_surface', 'self', 1),
     ('shopify_connector_mutation_attempt.py',
@@ -111,6 +114,18 @@ CORE_SUDO_SITES = [
     ('shopify_connector_pii_retention.py',
      '_attempt_evidence_retention_days',
      "self.env['ir.config_parameter']", 1),
+    ('shopify_connector_pii_retention.py',
+     '_terminal_job_retention_days',
+     "self.env['ir.config_parameter']", 1),
+    ('shopify_connector_pii_retention.py',
+     '_run_terminal_job_retention',
+     "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_pii_retention.py',
+     '_run_terminal_job_retention',
+     "self.env['shopify.connector.job.log']", 1),
+    ('shopify_connector_pii_retention.py',
+     '_run_terminal_job_retention',
+     "self.env['shopify.connector.mutation.attempt']", 1),
     ('shopify_connector_pii_retention.py', 'run_sweep',
      "self.env['shopify.connector.store.settings']", 1),
     ('shopify_connector_pii_retention.py', 'run_sweep', 'JobLog', 1),
@@ -123,6 +138,14 @@ CORE_SUDO_SITES = [
     # `action_reconnect` could already reach in production.
     ('shopify_connector_readiness_check.py',
      '_web_base_url', "self.env['ir.config_parameter']", 1),
+    ('shopify_connector_readiness_check.py',
+     '_supported_scale_counts',
+     "self.env['shopify.connector.job']", 1),
+    ('shopify_connector_readiness_check.py',
+     '_supported_scale_counts',
+     "self.env['shopify.connector.store']", 1),
+    ('shopify_connector_readiness_check.py',
+     '_supported_scale_counts', 'self.env[model_name]', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'Job', 1),
     ('shopify_connector_readiness_check.py', 'run_for_store', 'job', 1),
     # ------------------------------------------------------------------
@@ -177,6 +200,11 @@ CORE_SUDO_SITES = [
     ('shopify_connector_setup_wizard.py', 'save_first_push_schedule',
      'settings', 1),
     ('shopify_connector_setup_wizard.py', 'activate', 'settings', 1),
+    # Activation triggers only the already-declared enqueue crons for the
+    # workflows the administrator selected.  The cron methods retain their
+    # own eligibility and mutation guards; this elevation merely avoids
+    # making a newly activated store wait for the next clock boundary.
+    ('shopify_connector_setup_wizard.py', 'activate', 'cron', 1),
     ('shopify_connector_setup_wizard.py', 'restart_setup', 'settings', 1),
     # SEC-3 (#197) scope-mixin seams. The upgrade sweep must see rows that the
     # fail-closed rules hide from every ordinary reader -- including, by
@@ -222,6 +250,10 @@ CORE_SUDO_SITES = [
     # recorded exactly like every other one instead of escaping as an unhandled
     # error. Same store, same scope, same audit shape as ordinal 1.
     ('shopify_connector_store.py', '_run_connection_probe', 'Job', 2),
+    # A later successful probe keeps the historic failed rows for audit but
+    # links them to the success so current-health projections stop treating
+    # recovered credential failures as active work.
+    ('shopify_connector_store.py', '_run_connection_probe', 'Job', 3),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 1),
     ('shopify_connector_store.py', '_run_connection_probe', 'job', 2),
     ('shopify_connector_store.py',
@@ -258,6 +290,8 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
      'action_override_binding'): 'Audited binding override.',
     ('shopify_connector_job.py',
      '_has_mutation_attempt_evidence'): 'Protected evidence read.',
+    ('shopify_connector_job.py',
+     '_compute_merchant_write_status'): 'Protected acknowledgement read.',
     ('shopify_connector_job.py',
      '_reassign_to_historic_job_type'): 'Historic conversion.',
     ('shopify_connector_job.py',
@@ -300,7 +334,7 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
     ('shopify_connector_job_dispatch.py',
      '_start_running'): 'Claim transition.',
     ('shopify_connector_job_enqueue.py',
-     'enqueue'): 'Protected job creation.',
+     'enqueue'): 'Protected job creation and module-owned cron wakeup.',
     ('shopify_connector_job_log.py',
      '_system_append'): 'System audit-log append.',
     ('shopify_connector_mutation_attempt.py',
@@ -312,11 +346,23 @@ CORE_SUDO_PURPOSE_BY_OWNER = {
     ('shopify_connector_pii_retention.py',
      '_attempt_evidence_retention_days'): 'Retention configuration.',
     ('shopify_connector_pii_retention.py',
+     '_terminal_job_retention_days'): 'Terminal-job retention configuration.',
+    ('shopify_connector_pii_retention.py',
+     '_run_terminal_job_retention'): (
+        'Bounded terminal-job retention over protected jobs, logs, and '
+        'resolved mutation evidence.'
+    ),
+    ('shopify_connector_pii_retention.py',
      'run_sweep'): 'Retention sweep and audit.',
     ('shopify_connector_readiness_check.py',
      '_drain_cron_active_state'): 'Read cron configuration.',
     ('shopify_connector_readiness_check.py',
      '_web_base_url'): 'Read public base-URL configuration.',
+    ('shopify_connector_readiness_check.py',
+     '_supported_scale_counts'): (
+        'Bounded supported-scale health counts across protected connector '
+        'records.'
+    ),
     ('shopify_connector_readiness_check.py',
      'run_for_store'): 'Readiness audit job lifecycle.',
     ('shopify_connector_setup_wizard.py',

@@ -103,6 +103,9 @@ class TestOrderTotalsGuard(OrderImportCase):
                 payload['line_items'][0][field_name]['shopMoney'][
                     'amount'
                 ] = '105.00'
+            payload['line_items'][0][
+                'discountedUnitPriceAfterAllDiscountsSet'
+            ] = self._money('105.00')
         return payload
 
     def _assert_precreation_failure(self, payload, exception, reason=False):
@@ -335,7 +338,7 @@ class TestOrderTotalsGuard(OrderImportCase):
         payload['subtotalPriceSet'] = self._money('90.00')
         payload['totalDiscountsSet'] = self._money('10.00')
         line = payload['line_items'][0]
-        line['priceAfterAllDiscountsBeforeTaxesSet'] = self._money('90.00')
+        line['discountedUnitPriceAfterAllDiscountsSet'] = self._money('90.00')
         line['discountedTotalSet']['shopMoney']['amount'] = '100.00'
         line['discountedUnitPriceSet']['shopMoney']['amount'] = '100.00'
         line['discountAllocations'] = [{
@@ -362,6 +365,45 @@ class TestOrderTotalsGuard(OrderImportCase):
         self.assertEqual(binding.sale_order_id.amount_untaxed, 90.0)
         self.assertEqual(binding.sale_order_id.amount_total, 90.0)
 
+    def test_discounted_unit_price_is_derived_to_the_whole_line(self):
+        payload = self._payload('gid://shopify/Order/TwoUnits')
+        payload['name'] = '#TWO-UNITS'
+        payload['totalPriceSet'] = self._money('180.00')
+        payload['subtotalPriceSet'] = self._money('180.00')
+        payload['currentTotalPriceSet'] = self._money('180.00')
+        payload['totalDiscountsSet'] = self._money('20.00')
+        line = payload['line_items'][0]
+        line['quantity'] = 2
+        line['currentQuantity'] = 2
+        line['originalTotalSet'] = self._money('200.00')
+        line['discountedTotalSet'] = self._money('180.00')
+        line['discountedUnitPriceAfterAllDiscountsSet'] = self._money('90.00')
+        line['discountAllocations'] = [{
+            'allocatedAmountSet': self._money('20.00'),
+            'discountApplication': {
+                '__typename': 'DiscountCodeApplication',
+                'index': 0,
+                'allocationMethod': 'ACROSS',
+                'targetType': 'LINE_ITEM',
+                'targetSelection': 'ALL',
+            },
+        }]
+        payload['discount_applications'] = [{
+            '__typename': 'DiscountCodeApplication',
+            'index': 0,
+            'allocationMethod': 'ACROSS',
+            'targetType': 'LINE_ITEM',
+            'targetSelection': 'ALL',
+        }]
+        binding = self.Importer._apply_import(self.store, payload)
+        line = binding.sale_order_id.order_line.filtered(
+            lambda candidate: candidate.shopify_line_item_gid
+        )
+        self.assertEqual(line.product_uom_qty, 2.0)
+        self.assertEqual(line.price_unit, 100.0)
+        self.assertEqual(line.discount, 10.0)
+        self.assertEqual(binding.sale_order_id.amount_total, 180.0)
+
     def test_financial_mismatch_rolls_back_order_and_binding(self):
         payload = self._payload('gid://shopify/Order/BadTotal')
         payload['totalPriceSet'] = self._money('101.00')
@@ -369,7 +411,7 @@ class TestOrderTotalsGuard(OrderImportCase):
         payload['subtotalPriceSet'] = self._money('90.00')
         payload['totalDiscountsSet'] = self._money('10.00')
         line = payload['line_items'][0]
-        line['priceAfterAllDiscountsBeforeTaxesSet'] = self._money('90.00')
+        line['discountedUnitPriceAfterAllDiscountsSet'] = self._money('90.00')
         line['discountAllocations'] = [{
             'allocatedAmountSet': {
                 'shopMoney': {'amount': '10.00'},
@@ -433,6 +475,45 @@ class TestOrderTotalsGuard(OrderImportCase):
         self.assertEqual(caught.exception.error_class, 'financial_total_mismatch')
         self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
 
+    def test_unknown_order_liability_accepts_known_line_liability(self):
+        payload = self._taxed_payload(
+            'gid://shopify/Order/TaxAggregateUnknownLiability',
+            included=True,
+        )
+        self.assertIsNone(payload['taxLines'][0]['channelLiable'])
+        line_evidence = payload['line_items'][0]['taxLines'][0]
+        line_evidence['channelLiable'] = False
+        aggregate_mapping = self.env['shopify.connector.tax.mapping'].search([
+            ('store_id', '=', self.store.id),
+            ('shopify_price_included', '=', True),
+        ], limit=1)
+        self.assertTrue(aggregate_mapping)
+        self.env['shopify.connector.tax.mapping'].create({
+            'store_id': self.store.id,
+            'shopify_tax_evidence_key': build_tax_fingerprint(
+                line_evidence['rate'], line_evidence['ratePercentage'],
+                line_evidence['title'], line_evidence['source'],
+                line_evidence['channelLiable'], True,
+            ),
+            'shopify_tax_fingerprint_version': SHOPIFY_TAX_FINGERPRINT_VERSION,
+            'shopify_price_included': True,
+            'account_tax_id': aggregate_mapping.account_tax_id.id,
+        })
+        binding = self.Importer._apply_import(self.store, payload)
+        self.assertEqual(binding.sale_order_id.amount_tax, 5.0)
+
+    def test_known_order_liability_still_rejects_known_line_disagreement(self):
+        payload = self._taxed_payload(
+            'gid://shopify/Order/TaxKnownLiabilityMismatch', included=False,
+        )
+        payload['taxLines'][0]['channelLiable'] = True
+        payload['line_items'][0]['taxLines'][0]['channelLiable'] = False
+        orders_before = self.env['sale.order'].search_count([])
+        with self.assertRaises(JobHandlerError) as caught:
+            self.Importer._apply_import(self.store, payload)
+        self.assertEqual(caught.exception.error_class, 'financial_total_mismatch')
+        self.assertEqual(self.env['sale.order'].search_count([]), orders_before)
+
     def test_high_value_discount_uses_exact_negative_tax_preserving_residual(self):
         payload = self._payload('gid://shopify/Order/DiscountResidual')
         payload['totalPriceSet'] = self._money('666.67')
@@ -445,7 +526,7 @@ class TestOrderTotalsGuard(OrderImportCase):
             'discountedUnitPriceSet', 'discountedTotalSet',
         ):
             line[field_name]['shopMoney']['amount'] = '1000.00'
-        line['priceAfterAllDiscountsBeforeTaxesSet'] = self._money('666.67')
+        line['discountedUnitPriceAfterAllDiscountsSet'] = self._money('666.67')
         line['discountAllocations'] = [{
             'allocatedAmountSet': {
                 'shopMoney': {'amount': '333.33'},
@@ -512,7 +593,7 @@ class TestOrderTotalsGuard(OrderImportCase):
             'discountedUnitPriceSet', 'discountedTotalSet',
         ):
             line[field_name]['shopMoney']['amount'] = '3000'
-        line['priceAfterAllDiscountsBeforeTaxesSet'] = self._money('3000', 'JPY')
+        line['discountedUnitPriceAfterAllDiscountsSet'] = self._money('3000', 'JPY')
         binding = self.Importer._apply_import(self.store, payload)
         self.assertEqual(binding.sale_order_id.amount_total, 3000.0)
 

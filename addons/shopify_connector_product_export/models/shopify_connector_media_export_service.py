@@ -67,7 +67,7 @@ import requests
 from psycopg2 import IntegrityError
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
@@ -734,7 +734,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_media_stage(self, attempt):
+    def _reconcile_media_stage(self, attempt, reconciliation_job=None):
         """A staged upload target creates nothing in the store.
 
         There is no remote state to read back and no way for a lost
@@ -750,12 +750,21 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         dispatcher can compare what was SEEN against what was expected.
         """
         client = self.env['shopify.connector.api.client']
-        result = client.execute(
-            attempt.store_id,
+        query = (
             'query ProductExportMediaStageIdentity { '
-            'shop { myshopifyDomain } }',
-            {},
+            'shop { myshopifyDomain } }'
         )
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            attempt.store_id,
+            query,
+            {},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_media_stage_result(attempt, result)
+
+    @api.model
+    def _reconcile_media_stage_result(self, attempt, result):
         identity = (
             ((result or {}).get('data') or {}).get('shop') or {}
         ).get('myshopifyDomain')
@@ -951,7 +960,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_media_file_create(self, attempt):
+    def _reconcile_media_file_create(self, attempt, reconciliation_job=None):
         """Verification read by the connector's own filename.
 
         The deterministic filename is the only durable handle on a File whose
@@ -973,9 +982,17 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         # so this is not a live defect -- it is the same missing encoding as
         # the SKU gate, and it goes through the same helper so it cannot
         # become one if the filename scheme ever admits a wider charset.
-        result = client.execute(
-            store, query, {'query': search_term('filename', filename)},
-        )
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'query': search_term('filename', filename)},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_media_file_create_result(attempt, result)
+
+    @api.model
+    def _reconcile_media_file_create_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -1065,7 +1082,17 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
             'fileErrors { code details message } } } '
             'shop { myshopifyDomain } }'
         )
-        result = client.execute(job.store_id, query, {'id': row.shopify_gid})
+        with client.execute_business_read(
+            job,
+            job.store_id,
+            query,
+            {'id': row.shopify_gid},
+            purpose='product_export',
+        ) as result:
+            return self._apply_media_poll_result(job, row, result)
+
+    @api.model
+    def _apply_media_poll_result(self, job, row, result):
         data = (result or {}).get('data') or {}
         if (data.get('shop') or {}).get(
             'myshopifyDomain'
@@ -1121,6 +1148,13 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
     @api.model
     def run_media_status_poll(self):
         """Cron: enqueue one poll job per non-terminal media row."""
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may start the media '
+                'status poll outside the root cron environment.'
+            )
         MediaBinding = self.env['shopify.connector.product.media.binding']
         Service = self.env['shopify.connector.product.export.service']
         rows = MediaBinding.sudo().search([
@@ -1244,7 +1278,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_media_associate(self, attempt):
+    def _reconcile_media_associate(self, attempt, reconciliation_job=None):
         """Read the product's media and look for this exact File GID."""
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
@@ -1255,7 +1289,17 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
             '... on MediaImage { id fileStatus } } } } '
             'shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'id': snapshot.get('product_gid')})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_media_associate_result(attempt, result)
+
+    @api.model
+    def _reconcile_media_associate_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         Service = self.env['shopify.connector.product.export.service']

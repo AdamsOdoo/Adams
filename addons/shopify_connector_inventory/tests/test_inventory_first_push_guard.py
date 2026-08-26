@@ -73,7 +73,7 @@ class TestInventoryFirstPushGuard(TransactionCase):
             'login': 'first_push_guard_reviewer',
             'group_ids': [(6, 0, [
                 cls.env.ref(
-                    'shopify_connector_core.group_shopify_connector_reviewer'
+                    'shopify_connector_core.group_shopify_connector_admin'
                 ).id,
             ])],
         })
@@ -103,9 +103,8 @@ class TestInventoryFirstPushGuard(TransactionCase):
             'expected_connection_generation': self.store.connection_generation,
         })
 
-    def test_push_blocked_before_confirm_never_reads_shopify(self):
-        """An unconfirmed pair is blocked before any Shopify read is
-        attempted -- the guard is checked first."""
+    def test_push_before_confirm_terminally_skips_and_returns_to_preview(self):
+        """An unconfirmed push owns no permanent blocked pair scope."""
         job = self._make_push_sync_job()
         Service = self.env['shopify.connector.inventory.service']
         with patch.object(
@@ -113,10 +112,14 @@ class TestInventoryFirstPushGuard(TransactionCase):
         ) as mocked_read:
             Service._handle_inventory_push_sync(job)
         mocked_read.assert_not_called()
-        self.assertEqual(job.state, 'blocked_manual_review')
-        self.assertEqual(
-            job.manual_review_subreason, 'destructive_write_guard_blocked',
-        )
+        self.assertEqual(job.state, 'skipped')
+        self.assertFalse(job.operation_scope_key)
+        preview = self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_first_push_preview'),
+            ('res_id', '=', self.binding.id),
+            ('state', '=', 'queued'),
+        ])
+        self.assertEqual(len(preview), 1)
 
     def test_preview_job_records_quantity(self):
         preview_job = self.env['shopify.connector.job'].sudo().create({
@@ -139,8 +142,12 @@ class TestInventoryFirstPushGuard(TransactionCase):
         self.assertEqual(preview_job.state, 'succeeded')
 
     def test_confirm_permission_matrix(self):
+        current = self.env[
+            'shopify.connector.inventory.service'
+        ]._current_odoo_available(self.binding)
         self.binding.sudo().write({
-            'first_push_state': 'previewed', 'first_push_preview_qty': 5.0,
+            'first_push_state': 'previewed',
+            'first_push_preview_qty': current,
         })
         with self.assertRaises(Exception):
             self.binding.with_user(
@@ -151,15 +158,60 @@ class TestInventoryFirstPushGuard(TransactionCase):
         ).action_confirm_first_push()
         self.assertEqual(self.binding.first_push_state, 'confirmed')
 
-    def test_guard_error_class_and_subreason(self):
+    def test_guard_leaves_no_blocked_scope_owner(self):
         job = self._make_push_sync_job()
         self.env['shopify.connector.inventory.service']._handle_inventory_push_sync(
             job
         )
-        self.assertEqual(job.error_class, 'shopify_user_errors_validation')
-        self.assertEqual(
-            job.manual_review_subreason, 'destructive_write_guard_blocked',
-        )
+        self.assertEqual(job.state, 'skipped')
+        self.assertFalse(job.error_class)
+        self.assertFalse(job.manual_review_subreason)
+        self.assertFalse(job.operation_scope_key)
+
+    def test_stale_preview_confirmation_is_refused(self):
+        current = self.env[
+            'shopify.connector.inventory.service'
+        ]._current_odoo_available(self.binding)
+        self.binding.sudo().write({
+            'first_push_state': 'previewed',
+            'first_push_preview_qty': current + 1.0,
+            'first_push_previewed_at': '2026-08-23 00:00:00',
+        })
+        with self.assertRaises(Exception) as caught:
+            self.binding.with_user(
+                self.user_reviewer
+            ).action_confirm_first_push()
+        self.assertIn('quantity changed', str(caught.exception))
+        self.assertEqual(self.binding.first_push_state, 'previewed')
+
+    def test_previewed_pair_preview_refreshes_quantity(self):
+        current = self.env[
+            'shopify.connector.inventory.service'
+        ]._current_odoo_available(self.binding)
+        self.binding.sudo().write({
+            'first_push_state': 'previewed',
+            'first_push_preview_qty': current + 1.0,
+            'first_push_previewed_at': '2026-08-23 00:00:00',
+        })
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'export_preview_dry_run',
+            'job_type': 'inventory_first_push_preview',
+            'state': 'running',
+            'res_model': 'shopify.connector.inventory.level.binding',
+            'res_id': self.binding.id,
+            'shopify_target_gid': 'inventory_pair:%s:%s:%s' % (
+                self.store.id,
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            ),
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        self.env[
+            'shopify.connector.inventory.service'
+        ]._handle_inventory_first_push_preview(job)
+        self.assertEqual(self.binding.first_push_state, 'previewed')
+        self.assertEqual(self.binding.first_push_preview_qty, current)
 
     def test_enqueue_first_push_preview_admission_service(self):
         """Sanctioned admission path (PR #182 comment 5025803697 item

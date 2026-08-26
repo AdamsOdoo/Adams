@@ -38,6 +38,14 @@ OBSERVED_OUTCOME_SELECTION = [
     ('failed_clean', 'Failed Clean'),
     ('uncertain', 'Uncertain'),
 ]
+MERCHANT_WRITE_STATUS_SELECTION = [
+    ('queued', 'Queued'),
+    ('sending', 'Sending'),
+    ('accepted', 'Accepted by Shopify'),
+    ('verified', 'Verified in Shopify'),
+    ('needs_attention', 'Needs attention'),
+    ('rejected', 'Rejected'),
+]
 RESOLUTION_DISPOSITION_SELECTION = [
     ('applied', 'Applied'),
     ('not_applied', 'Not Applied'),
@@ -118,6 +126,19 @@ class ShopifyConnectorMutationAttempt(models.Model):
         default='pending',
         readonly=True,
     )
+    merchant_write_status = fields.Selection(
+        MERCHANT_WRITE_STATUS_SELECTION,
+        string='Shopify acknowledgement',
+        compute='_compute_merchant_write_status',
+        store=True,
+        index=True,
+        readonly=True,
+        help=(
+            'Merchant-facing acknowledgement derived from immutable mutation '
+            'evidence. Accepted means Shopify returned affirmative success; '
+            'Verified requires an independent reconciliation read.'
+        ),
+    )
     resolution_disposition = fields.Selection(
         RESOLUTION_DISPOSITION_SELECTION,
         readonly=True,
@@ -140,7 +161,31 @@ class ShopifyConnectorMutationAttempt(models.Model):
         readonly=True,
     )
     transport_at = fields.Datetime(readonly=True)
-    resolved_at = fields.Datetime(readonly=True)
+    resolved_at = fields.Datetime(readonly=True, index=True)
+    business_object = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    shopify_effect = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    odoo_effect = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    remote_result_certain = fields.Boolean(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    automatic_stop_reason = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    required_user_action = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    action_consequence = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
+    shopify_reread_plan = fields.Char(
+        compute='_compute_business_presentation', readonly=True,
+    )
 
     _attempt_token_unique = models.UniqueIndex(
         '(job_id, attempt_token)',
@@ -154,6 +199,197 @@ class ShopifyConnectorMutationAttempt(models.Model):
         'CHECK(inconclusive_reconciliation_count >= 0)',
         'The inconclusive reconciliation count cannot be negative.',
     )
+
+    @api.model
+    def _merchant_write_status_from_evidence(
+        self, observed_outcome, resolution_disposition=False,
+        resolution_source=False,
+    ):
+        """Project immutable Layer 2 evidence onto the locked C5 ladder.
+
+        Direct success is acceptance evidence, not independent verification.
+        Only a reconciliation read can promote an applied disposition to
+        ``verified``. A manual disposition remains ``needs_attention`` here:
+        it resolves the recovery workflow, but it is deliberately not
+        presented as machine verification of Shopify state.
+        """
+        if observed_outcome == 'pending':
+            return 'sending'
+        if observed_outcome == 'succeeded':
+            return 'accepted'
+        if observed_outcome == 'failed_clean':
+            return 'rejected'
+        if observed_outcome != 'uncertain':
+            return 'needs_attention'
+        if resolution_source != 'reconciliation_read':
+            return 'needs_attention'
+        if resolution_disposition == 'applied':
+            return 'verified'
+        if resolution_disposition == 'not_applied':
+            return 'rejected'
+        return 'needs_attention'
+
+    @api.depends(
+        'observed_outcome', 'resolution_disposition', 'resolution_source',
+    )
+    def _compute_merchant_write_status(self):
+        for attempt in self:
+            attempt.merchant_write_status = (
+                attempt._merchant_write_status_from_evidence(
+                    attempt.observed_outcome,
+                    attempt.resolution_disposition,
+                    attempt.resolution_source,
+                )
+            )
+
+    @api.depends(
+        'observed_outcome', 'resolution_disposition', 'resolution_source',
+        'job_id.state', 'job_id.error_class',
+        'job_id.manual_review_subreason', 'job_id.res_model', 'job_id.res_id',
+    )
+    def _compute_business_presentation(self):
+        """Translate immutable evidence into business-facing recovery facts."""
+        error_labels = dict(
+            self.env['shopify.connector.job']._fields[
+                'error_class'
+            ]._description_selection(self.env)
+        )
+        review_labels = dict(
+            self.env['shopify.connector.job']._fields[
+                'manual_review_subreason'
+            ]._description_selection(self.env)
+        )
+        target_names = {}
+        grouped = {}
+        for attempt in self:
+            job = attempt.job_id
+            if job.res_model and job.res_id and job.res_model in self.env:
+                grouped.setdefault(job.res_model, set()).add(job.res_id)
+        for model_name, ids in grouped.items():
+            try:
+                records = self.env[model_name].browse(list(ids)).exists()
+                records.check_access('read')
+            except AccessError:
+                continue
+            target_names.update({
+                (model_name, record.id): record.display_name
+                for record in records
+            })
+        for attempt in self:
+            job = attempt.job_id
+            attempt.business_object = target_names.get(
+                (job.res_model, job.res_id),
+                '%s #%s' % (job.res_model, job.res_id)
+                if job.res_model and job.res_id else 'Connector operation',
+            )
+            disposition = attempt.resolution_disposition
+            if disposition == 'applied' or attempt.observed_outcome == 'succeeded':
+                attempt.shopify_effect = (
+                    'Yes — Shopify accepted or reconciliation proved the change.'
+                )
+                certain = bool(
+                    attempt.observed_outcome == 'succeeded'
+                    or attempt.resolution_source == 'reconciliation_read'
+                )
+            elif disposition == 'not_applied' or attempt.observed_outcome == 'failed_clean':
+                attempt.shopify_effect = (
+                    'No — Shopify rejected it or reconciliation proved no change.'
+                )
+                certain = True
+            else:
+                attempt.shopify_effect = (
+                    'Unknown — the transport may have reached Shopify.'
+                )
+                certain = False
+            attempt.remote_result_certain = certain
+            attempt.odoo_effect = (
+                'Yes — local finalization completed.'
+                if job.state == 'succeeded' else
+                'No completed local finalization is recorded.'
+            )
+            attempt.automatic_stop_reason = (
+                review_labels.get(job.manual_review_subreason)
+                or error_labels.get(job.error_class)
+                or ('The remote result is uncertain; automatic replay is unsafe.'
+                    if not certain else
+                    'Automatic processing reached its recorded terminal result.')
+            )
+            action, consequence = self._business_recovery_action(attempt)
+            attempt.required_user_action = action
+            attempt.action_consequence = consequence
+            attempt.shopify_reread_plan = (
+                'Yes — reconciliation re-reads Shopify before any decision.'
+                if not certain else
+                'No additional re-read is required by the current evidence.'
+            )
+
+    @api.model
+    def _business_recovery_action(self, attempt):
+        job = attempt.job_id
+        cause = ' '.join(filter(None, (
+            job.error_class, job.manual_review_subreason,
+        ))).lower()
+        if not attempt.remote_result_certain:
+            return (
+                'Re-read the uncertain mutation; do not retry the write.',
+                'Reconciliation will adopt a proven change or prove that it '
+                'did not apply; an inconclusive result remains blocked.',
+            )
+        if 'location' in cause or 'mapping' in cause:
+            return (
+                'Map the Shopify location, then release the reviewed run.',
+                'The next run re-derives the mapped target before any write.',
+            )
+        if 'ambiguous' in cause or 'duplicate' in cause:
+            return (
+                'Choose the correct product match.',
+                'The connector records that choice and resumes without guessing.',
+            )
+        if 'scope' in cause or 'permission' in cause:
+            return (
+                'Grant the missing Shopify custom-app scope and reconnect.',
+                'Identity and scopes are verified before work resumes.',
+            )
+        if 'credential' in cause or 'auth' in cause or 'token' in cause:
+            return (
+                'Reconnect with a valid custom-app credential.',
+                'The connection generation changes and stale work stays fenced.',
+            )
+        if 'drift' in cause or 'conflict' in cause:
+            return (
+                'Review the remote drift and choose the safe business result.',
+                'No unexplained Shopify state is overwritten automatically.',
+            )
+        if 'cancel' in cause or 'void' in cause or 'refund' in cause:
+            return (
+                'Review the unsafe order transition before shipment.',
+                'The order remains stopped until the business decision is made.',
+            )
+        return (
+            'Review the linked business object and preserved evidence.',
+            'Only the sanctioned cause-specific recovery route can resume work.',
+        )
+
+    def action_open_business_record(self):
+        """Open the affected Odoo record without changing either system."""
+        self.ensure_one()
+        self.check_access('read')
+        job = self.job_id
+        if not job.res_model or not job.res_id or job.res_model not in self.env:
+            raise UserError('This evidence has no linked Odoo business record.')
+        target = self.env[job.res_model].browse(job.res_id).exists()
+        if not target:
+            raise UserError('The linked Odoo business record no longer exists.')
+        target.check_access('read')
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Affected Odoo record',
+            'res_model': target._name,
+            'res_id': target.id,
+            'view_mode': 'form',
+            'views': [(False, 'form')],
+            'target': 'current',
+        }
 
     @api.model
     def _surface(self, name):

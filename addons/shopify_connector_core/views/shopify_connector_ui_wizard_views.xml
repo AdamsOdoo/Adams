@@ -10,23 +10,23 @@
         <field name="name">shopify.connector.job.cancel.wizard.form</field>
         <field name="model">shopify.connector.job.cancel.wizard</field>
         <field name="arch" type="xml">
-            <form string="Cancel job">
+            <form string="Cancel run">
                 <group>
                     <field name="job_id" readonly="1"/>
                     <field name="job_state" readonly="1"/>
                     <field name="reason" placeholder="Why is this being cancelled? This is recorded."/>
                 </group>
                 <footer>
-                    <button name="action_confirm" type="object" string="Cancel this job"
+                    <button name="action_confirm" type="object" string="Cancel this run"
                             class="btn-primary"/>
-                    <button string="Keep job" class="btn-secondary" special="cancel"/>
+                    <button string="Keep run" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
         </field>
     </record>
 
     <record id="action_shopify_connector_job_cancel_wizard" model="ir.actions.act_window">
-        <field name="name">Cancel job</field>
+        <field name="name">Cancel run</field>
         <field name="res_model">shopify.connector.job.cancel.wizard</field>
         <field name="view_mode">form</field>
         <field name="view_id" ref="view_shopify_connector_job_cancel_wizard_form"/>

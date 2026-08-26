@@ -23,6 +23,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -305,6 +306,7 @@ class TestOrderReconnectCatchup(OrderImportCase):
     # ------------------------------------------------------------------
     # resume of cancelled work (the disconnect-quiesce shape)
     # ------------------------------------------------------------------
+    @mute_logger('odoo.sql_db')
     def test_cancelled_import_resumes_exactly_once_with_a_deterministic_key(self):
         node = self._node('Resume1')
         scan_service = self.env['shopify.connector.order.scan']
@@ -394,6 +396,7 @@ class TestOrderReconnectCatchup(OrderImportCase):
                     updated_at_iso),
         })
 
+    @mute_logger('odoo.sql_db')
     def test_cancelled_import_blocks_until_linked_replacement_succeeds(self):
         """The reproduced P1-1 and its fix, end to end through the real
         `action_cancel` operator route and the real deterministic resume."""
@@ -697,6 +700,7 @@ class TestOrderReconnectCatchup(OrderImportCase):
             vals['finished_at'] = fields.Datetime.now()
         return self.Job.sudo().create(vals)
 
+    @mute_logger('odoo.sql_db')
     def test_skipped_and_failed_final_priors_do_not_auto_resume(self):
         scan_service = self.env['shopify.connector.order.scan']
         for suffix, terminal_state in (

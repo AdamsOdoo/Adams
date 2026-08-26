@@ -21,10 +21,8 @@ a real UI/server disagreement that only pressing the control could find:
      `pending` alone -- so the sanctioned confirmation was unreachable. Every
      pre-existing server test writes `first_push_state = 'previewed'` itself
      before calling the method, which is exactly why none of them saw it.
-  2. `Verify Now` was gated on Operator; its service admits Reviewer or
-     Administrator only.
-  3. `Change Push` was gated on Operator while its transient wizard was ACL'd
-     to Administrator alone, so a Connector User was refused at the dialog.
+  2. `Verify Now` is a privileged recovery action and is Administrator-only.
+  3. `Change Push` changes connector configuration and is Administrator-only.
 
 NO SHOPIFY. Nothing here holds a credential or reaches the network. The two
 enqueueing paths create a `shopify.connector.job` ROW; job execution is a
@@ -47,6 +45,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attemp
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
 )
+from odoo.tools import mute_logger
 
 GUARD_ACTION = (
     'shopify_connector_inventory.action_shopify_connector_inventory_first_push'
@@ -108,9 +107,14 @@ class TestUiU2InventoryActionTours(HttpCase):
             'product_template_binding_id': template_binding.id,
         })
 
-        # Two roles, both real customer-facing SEC-2 roles.
+        # Administrator is the customer-facing role allowed to confirm,
+        # recover, and change location configuration. Auditor proves denial.
         cls.reviewer = cls._connector_user(
             'u2act_reviewer',
+            'shopify_connector_core.group_shopify_connector_admin',
+        )
+        cls.connector_user = cls._connector_user(
+            'u2act_user',
             'shopify_connector_core.group_shopify_connector_user',
         )
         # Auditor implies read everywhere and act nowhere: the role the
@@ -301,12 +305,10 @@ class TestUiU2InventoryActionTours(HttpCase):
     # ------------------------------------------------------------------
 
     def test_push_toggle_tour(self):
-        """A Connector User opens the dialog and applies the change.
+        """An Administrator opens the dialog and applies the change.
 
-        Before the ACL correction this failed at the DIALOG rather than at
-        the control: the button was gated on Operator, the transient wizard
-        was ACL'd to Administrator alone, and a Connector User was refused
-        on `create()` after pressing a control the UI had offered them.
+        The server and transient wizard agree on the Administrator-only
+        configuration boundary.
         """
         self.assertTrue(self.mapping.push_enabled)
         self.env.flush_all()
@@ -409,6 +411,29 @@ class TestUiU2InventoryActionTours(HttpCase):
             'a release is orchestration only -- it must create no transport '
             'attempt, and certainly no Shopify request',
         )
+
+    def test_failed_clean_attention_route_reaches_inventory_pair(self):
+        binding, job = self._blocked_pair(
+            'gid://shopify/InventoryItem/U2FAILED-CLEAN'
+        )
+        evidence_action = job.with_user(
+            self.reviewer
+        ).action_open_attention_case()
+        self.assertEqual(
+            evidence_action['res_model'],
+            'shopify.connector.mutation.attempt',
+        )
+        attempt = self.env[evidence_action['res_model']].browse(
+            evidence_action['res_id']
+        )
+        business_action = attempt.with_user(
+            self.reviewer
+        ).action_open_business_record()
+        self.assertEqual(
+            business_action['res_model'],
+            'shopify.connector.inventory.level.binding',
+        )
+        self.assertEqual(business_action['res_id'], binding.id)
 
     def test_recheck_blank_reason_is_refused_in_the_browser(self):
         """A blank reason is refused, and nothing is enqueued."""
@@ -652,6 +677,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             ('job_id', 'in', jobs.ids),
         ]), jobs
 
+    @mute_logger('odoo.http')
     def test_location_withdraw_all_tour_returns_every_pair_to_pending(self):
         """The whole mapping-level closure, driven through the real chain.
 
@@ -762,6 +788,7 @@ class TestUiU2InventoryActionTours(HttpCase):
         for binding in (previewed, confirmed_live, confirmed_dry):
             self.assertNotEqual(binding.first_push_state, 'confirmed')
 
+    @mute_logger('odoo.http')
     def test_location_withdraw_all_refuses_a_decision_made_against_stale_state(self):
         """A pair confirmed while the dialog is open voids the decision.
 
@@ -826,13 +853,13 @@ class TestUiU2InventoryActionTours(HttpCase):
         self.start_tour(
             self._url(MAPPING_ACTION),
             'shopify_connector_u2_location_withdraw_all_denied_tour',
-            login='u2act_reviewer',
+            login='u2act_user',
         )
 
         # And the server refuses the same role at every layer beneath it, so
         # the hidden control is a courtesy rather than the protection.
         Service = self.env['shopify.connector.inventory.service'].with_user(
-            self.reviewer)
+            self.connector_user)
         with self.assertRaises(AccessError):
             Service.first_push_withdrawal_preview(self.mapping)
         with self.assertRaises(AccessError):
@@ -841,7 +868,9 @@ class TestUiU2InventoryActionTours(HttpCase):
         with self.assertRaises(AccessError):
             self.env[
                 'shopify.connector.location.withdraw.all.wizard'
-            ].with_user(self.reviewer).create({'mapping_id': self.mapping.id})
+            ].with_user(self.connector_user).create({
+                'mapping_id': self.mapping.id,
+            })
 
     def test_location_withdrawal_performs_no_shopify_request(self):
         """The mapping-level route reaches no transport, and enqueues nothing.
@@ -896,6 +925,7 @@ class TestUiU2InventoryActionTours(HttpCase):
             'no Shopify mutation may be attempted by a withdrawal',
         )
 
+    @mute_logger('odoo.http')
     def test_single_pair_withdrawal_refuses_a_decision_made_against_stale_state(self):
         """The same snapshot defect, on the single-pair route.
 

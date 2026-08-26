@@ -43,7 +43,18 @@ class ShopifyConnectorProductTemplateBinding(models.Model):
         readonly=True,
     )
     shopify_primary_image_url = fields.Char(readonly=True)
+    # Complete Shopify source evidence. These are snapshots, not a second
+    # matching source of truth; the importer remains the only sanctioned
+    # writer and preserves null/empty values exactly enough for safe refresh.
+    shopify_description_html = fields.Text(readonly=True)
+    shopify_vendor = fields.Char(readonly=True)
+    shopify_product_type = fields.Char(readonly=True)
+    shopify_tags = fields.Json(readonly=True)
     shopify_last_imported_at = fields.Datetime(readonly=True)
+    # False on legacy rows means the old importer never completed the birth
+    # phase. The next valid import may initialize missing Odoo values once;
+    # subsequent refreshes follow configured ownership instead.
+    shopify_birth_initialized = fields.Boolean(readonly=True)
     # D-010B-7 safe-refresh short-circuit: the exact Shopify `updatedAt`
     # timestamp string of the last fully-successful import for this product.
     # Stored verbatim (Char, not Datetime) so the remote value round-trips
@@ -70,7 +81,12 @@ class ShopifyConnectorProductTemplateBinding(models.Model):
             'shopify_title',
             'shopify_status',
             'shopify_primary_image_url',
+            'shopify_description_html',
+            'shopify_vendor',
+            'shopify_product_type',
+            'shopify_tags',
             'shopify_last_imported_at',
+            'shopify_birth_initialized',
             'shopify_updated_at',
             'shopify_image_checksum',
         ))

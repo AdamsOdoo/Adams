@@ -77,6 +77,16 @@ class TestLocationMapping(TransactionCase):
                 ).id,
             ])],
         })
+        cls.user_admin = cls.env['res.users'].create({
+            'name': 'Location Mapping Administrator',
+            'login': 'location_mapping_administrator',
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     def _make_mapping(self, location, gid):
         return self.Mapping.sudo().create({
@@ -94,6 +104,7 @@ class TestLocationMapping(TransactionCase):
             'shopify_location_active': active,
         })
 
+    @mute_logger('odoo.sql_db')
     def test_explicit_identity_no_name_inference(self):
         """Creation requires an explicit Shopify Location GID and Odoo
         location -- there is no name-matching creation path at all."""
@@ -154,9 +165,13 @@ class TestLocationMapping(TransactionCase):
             self.internal_location, 'gid://shopify/Location/8',
         )
         self.assertTrue(mapping.push_enabled)
-        mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        with self.assertRaises(AccessError):
+            mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        mapping.invalidate_recordset(['push_enabled'])
+        self.assertTrue(mapping.push_enabled)
+        mapping.with_user(self.user_admin).action_set_push_enabled(False)
         self.assertFalse(mapping.push_enabled)
-        with self.assertRaises(Exception):
+        with self.assertRaises(AccessError):
             mapping.with_user(self.user_auditor).action_set_push_enabled(True)
 
     def test_odoo_binding_field_name(self):
@@ -173,11 +188,22 @@ class TestLocationMapping(TransactionCase):
     # binding mixin; only this narrow service method may create/update.
     # ------------------------------------------------------------------
 
-    def test_sanctioned_service_creates_mapping_for_operator(self):
+    def test_sanctioned_service_creates_mapping_for_administrator(self):
         self._cache_location('gid://shopify/Location/900', name='Warehouse 900')
         Service = self.env['shopify.connector.inventory.service']
+        with self.assertRaises(AccessError):
+            Service.with_user(
+                self.user_operator
+            ).create_or_update_location_mapping(
+                self.store, self.internal_location,
+                'gid://shopify/Location/900',
+            )
+        self.assertFalse(self.Mapping.search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=', 'gid://shopify/Location/900'),
+        ]))
         mapping = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/900',
         )
@@ -187,17 +213,65 @@ class TestLocationMapping(TransactionCase):
         self.assertTrue(mapping.push_enabled)
         self.assertEqual(mapping.shopify_location_name_snapshot, 'Warehouse 900')
 
+    def test_create_uses_store_company_when_another_allowed_company_is_active(self):
+        """Visibility is not authority for a store-scoped location mapping."""
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Location Mapping Active Other Company',
+        })
+        self.user_admin.sudo().write({
+            'company_id': other_company.id,
+            'company_ids': [(6, 0, [
+                self.store.company_id.id, other_company.id,
+            ])],
+        })
+        Service = self.env[
+            'shopify.connector.inventory.service'
+        ].with_user(self.user_admin).with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        )
+        self.assertEqual(Service.env.company, other_company)
+
+        self._cache_location('gid://shopify/Location/ACTIVE-OTHER-OK')
+        mapping = Service.create_or_update_location_mapping(
+            self.store,
+            self.internal_location,
+            'gid://shopify/Location/ACTIVE-OTHER-OK',
+        )
+        self.assertEqual(mapping.odoo_location_id, self.internal_location)
+        self.assertEqual(mapping.store_id.company_id, self.store.company_id)
+
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Readable But Foreign Mapping Location',
+            'usage': 'internal',
+            'company_id': other_company.id,
+        })
+        foreign.with_env(Service.env).check_access('read')
+        self._cache_location('gid://shopify/Location/ACTIVE-OTHER-FOREIGN')
+        with self.assertRaises(UserError):
+            Service.create_or_update_location_mapping(
+                self.store,
+                foreign,
+                'gid://shopify/Location/ACTIVE-OTHER-FOREIGN',
+            )
+        self.assertFalse(self.Mapping.sudo().search([
+            ('store_id', '=', self.store.id),
+            ('shopify_gid', '=',
+             'gid://shopify/Location/ACTIVE-OTHER-FOREIGN'),
+        ]))
+
     def test_sanctioned_service_updates_existing_mapping_idempotently(self):
         self._cache_location('gid://shopify/Location/901', name='Warehouse 901')
         Service = self.env['shopify.connector.inventory.service']
         first = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/901',
             push_enabled=True,
         )
         second = Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/901',
             push_enabled=False,
@@ -208,7 +282,7 @@ class TestLocationMapping(TransactionCase):
     def test_sanctioned_service_denied_for_auditor(self):
         self._cache_location('gid://shopify/Location/902')
         Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(Exception):
+        with self.assertRaises(AccessError):
             Service.with_user(
                 self.user_auditor
             ).create_or_update_location_mapping(
@@ -223,7 +297,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.customer_location,
                 'gid://shopify/Location/903',
@@ -233,7 +307,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location, '',
             )
@@ -244,7 +318,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/NEVER-CACHED',
@@ -263,7 +337,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/FOREIGN',
@@ -277,7 +351,7 @@ class TestLocationMapping(TransactionCase):
         Service = self.env['shopify.connector.inventory.service']
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/INACTIVE',
@@ -291,13 +365,13 @@ class TestLocationMapping(TransactionCase):
         self._cache_location('gid://shopify/Location/DIFFERENT')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/910',
         )
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location,
                 'gid://shopify/Location/DIFFERENT',
@@ -314,13 +388,13 @@ class TestLocationMapping(TransactionCase):
         self._cache_location('gid://shopify/Location/911')
         Service = self.env['shopify.connector.inventory.service']
         Service.with_user(
-            self.user_operator
+            self.user_admin
         ).create_or_update_location_mapping(
             self.store, self.internal_location, 'gid://shopify/Location/911',
         )
         with self.assertRaises(UserError):
             Service.with_user(
-                self.user_operator
+                self.user_admin
             ).create_or_update_location_mapping(
                 self.store, self.internal_location_b,
                 'gid://shopify/Location/911',
@@ -352,6 +426,52 @@ class TestLocationMapping(TransactionCase):
         )
         self.assertEqual(result, self.internal_location)
 
+    def test_resolver_uses_store_company_when_another_company_is_active(self):
+        """The fulfillment seam is store-scoped, not worker-company scoped.
+
+        Invoke the real resolver with another allowed company active, then
+        corrupt a second historical mapping at SQL level to prove the same
+        seam rejects a genuinely foreign target rather than merely relying on
+        the mapping model's create constraint.
+        """
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Resolver Active Other Company',
+        })
+        LocationResolver = self.env[
+            'shopify.connector.location'
+        ].sudo().with_context(allowed_company_ids=[
+            other_company.id, self.store.company_id.id,
+        ]).with_company(other_company)
+        self.assertEqual(LocationResolver.env.company, other_company)
+
+        valid_gid = 'gid://shopify/Location/F4-ACTIVE-OTHER-OK'
+        self._make_mapping(self.internal_location, valid_gid)
+        resolved = LocationResolver._resolve_odoo_location(
+            self.store, valid_gid,
+        )
+        self.assertEqual(resolved, self.internal_location)
+
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Resolver Truly Foreign Location',
+            'usage': 'internal',
+            'company_id': other_company.id,
+        })
+        foreign_gid = 'gid://shopify/Location/F4-ACTIVE-OTHER-FOREIGN'
+        corrupt = self._make_mapping(self.internal_location_b, foreign_gid)
+        # Simulate a row written before company fencing existed. ORM create
+        # correctly refuses this shape; the resolver must still fail closed
+        # when reading persistent historical corruption.
+        self.env.cr.execute(
+            'UPDATE shopify_connector_location_mapping '
+            'SET odoo_location_id = %s WHERE id = %s',
+            (foreign.id, corrupt.id),
+        )
+        corrupt.invalidate_recordset(['odoo_location_id'])
+        self.assertEqual(corrupt.odoo_location_id, foreign)
+        self.assertFalse(LocationResolver._resolve_odoo_location(
+            self.store, foreign_gid,
+        ))
+
     def test_resolve_odoo_location_returns_false_for_unmapped_gid(self):
         Location = self.env['shopify.connector.location']
         result = Location._resolve_odoo_location(
@@ -363,7 +483,7 @@ class TestLocationMapping(TransactionCase):
         mapping = self._make_mapping(
             self.internal_location, 'gid://shopify/Location/F4-2',
         )
-        mapping.with_user(self.user_operator).action_set_push_enabled(False)
+        mapping.with_user(self.user_admin).action_set_push_enabled(False)
         Location = self.env['shopify.connector.location']
         result = Location._resolve_odoo_location(
             self.store, 'gid://shopify/Location/F4-2',
@@ -590,6 +710,50 @@ class TestLocationRemap(TransactionCase):
             self.mapping.shopify_location_name_snapshot, 'Remap Warehouse',
         )
         self.assertEqual(self.mapping.status, 'manually_overridden')
+
+    def test_remap_uses_store_company_when_another_allowed_company_is_active(self):
+        """A visible foreign target stays foreign; a store target stays valid."""
+        other_company = self.env['res.company'].sudo().create({
+            'name': 'Location Remap Active Other Company',
+        })
+        self.user_admin.sudo().write({
+            'company_id': other_company.id,
+            'company_ids': [(6, 0, [
+                self.store.company_id.id, other_company.id,
+            ])],
+        })
+        Service = self.env[
+            'shopify.connector.inventory.service'
+        ].with_user(self.user_admin).with_context(
+            allowed_company_ids=[
+                other_company.id, self.store.company_id.id,
+            ],
+        )
+        self.assertEqual(Service.env.company, other_company)
+        Service.remap_location_mapping(
+            self.mapping,
+            self.location_b,
+            'Store-company target while another company is active',
+            confirmed=True,
+        )
+        self.mapping.invalidate_recordset()
+        self.assertEqual(self.mapping.odoo_location_id, self.location_b)
+
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Readable But Foreign Remap Target',
+            'usage': 'internal',
+            'company_id': other_company.id,
+        })
+        foreign.with_env(Service.env).check_access('read')
+        with self.assertRaises(UserError):
+            Service.remap_location_mapping(
+                self.mapping,
+                foreign,
+                'Visible foreign target must still fail',
+                confirmed=True,
+            )
+        self.mapping.invalidate_recordset()
+        self.assertEqual(self.mapping.odoo_location_id, self.location_b)
 
     def test_remapping_to_the_same_location_is_refused(self):
         with self.assertRaises(UserError):

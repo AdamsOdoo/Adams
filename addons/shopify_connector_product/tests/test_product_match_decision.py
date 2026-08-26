@@ -318,7 +318,7 @@ class TestProductMatchDecision(TransactionCase):
         return job, template, variants
 
     def _confirm(self, decision, chosen, user=None):
-        user = user or self.roles['reviewer']
+        user = user or self.roles['admin']
         wizard = self.Wizard.with_user(user).with_context(
             default_decision_id=decision.id,
         ).create({})
@@ -501,7 +501,7 @@ class TestProductMatchDecision(TransactionCase):
         self.assertFalse(job.product_match_decision_pending)
         # ...and the generic route is NOT refused, because nothing better is
         # on offer.
-        job.with_user(self.roles['reviewer']).action_resolve_manual_review()
+        job.with_user(self.roles['admin']).action_resolve_manual_review()
         job.invalidate_recordset()
         self.assertEqual(job.state, 'queued')
 
@@ -513,7 +513,7 @@ class TestProductMatchDecision(TransactionCase):
         job, _first, _second, _sent = self._ambiguous_template_run()
         with self.assertRaises(UserError) as ctx:
             job.with_user(
-                self.roles['reviewer']
+                self.roles['admin']
             ).action_resolve_manual_review()
         self.assertIn('match decision', str(ctx.exception))
         job.invalidate_recordset()
@@ -521,6 +521,17 @@ class TestProductMatchDecision(TransactionCase):
             job.state, 'blocked_manual_review',
             'the refusal must leave the job exactly where it was',
         )
+
+    def test_needs_attention_opens_the_product_match_decision(self):
+        job, _first, _second, _sent = self._ambiguous_template_run()
+        action = job.with_user(
+            self.roles['admin']
+        ).action_open_attention_case()
+        self.assertEqual(
+            action['res_model'],
+            'shopify.connector.product.match.decision.wizard',
+        )
+        self.assertEqual(action['target'], 'new')
 
     def test_generic_resolve_review_is_allowed_once_the_decision_is_made(self):
         job, first, _second, _sent = self._ambiguous_template_run()
@@ -533,7 +544,7 @@ class TestProductMatchDecision(TransactionCase):
         self.assertEqual(job.state, 'queued')
         with self.assertRaises(UserError):
             job.with_user(
-                self.roles['reviewer']
+                self.roles['admin']
             ).action_resolve_manual_review()
 
     # ==================================================================
@@ -566,9 +577,8 @@ class TestProductMatchDecision(TransactionCase):
                 self.roles['auditor']
             ).action_open_product_match_decision()
 
-    def test_a_reviewer_and_an_administrator_may_both_decide(self):
+    def test_only_an_administrator_may_decide(self):
         for role, gid, sku in (
-            ('reviewer', 'gid://shopify/Product/8401', 'ROLE-DUP-1'),
             ('admin', 'gid://shopify/Product/8402', 'ROLE-DUP-2'),
         ):
             job, first, _second, _sent = self._ambiguous_template_run(
@@ -732,7 +742,7 @@ class TestProductMatchDecision(TransactionCase):
         self.assertFalse(job.manual_review_subreason)
         self.assertEqual(decision.state, 'confirmed')
         self.assertEqual(decision.selected_template_id, first)
-        self.assertEqual(decision.resolved_uid, self.roles['reviewer'])
+        self.assertEqual(decision.resolved_uid, self.roles['admin'])
         self.assertTrue(decision.resolved_at)
         self.assertEqual(decision.resumed_job_state, 'queued')
         # No OTHER job was touched.
@@ -743,7 +753,7 @@ class TestProductMatchDecision(TransactionCase):
         job, first, second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
         wizard_one = self.Wizard.with_user(
-            self.roles['reviewer']
+            self.roles['admin']
         ).with_context(default_decision_id=decision.id).create({})
         wizard_two = self.Wizard.with_user(
             self.roles['admin']
@@ -763,7 +773,7 @@ class TestProductMatchDecision(TransactionCase):
     def test_a_decision_whose_job_moved_on_refuses(self):
         job, first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({'selected_template_id': first.id})
         # Somebody cancels the job while the dialog is open.
@@ -781,7 +791,7 @@ class TestProductMatchDecision(TransactionCase):
         """§8.2.9: the remote/payload identity must be unchanged at confirm."""
         job, first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({'selected_template_id': first.id})
         job.sudo().write({'payload_hash': 'a-different-remote-version'})
@@ -795,7 +805,7 @@ class TestProductMatchDecision(TransactionCase):
         """A candidate that stopped carrying the identifier is not a choice."""
         job, first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({'selected_template_id': first.id})
         first.product_variant_ids.write({'default_code': 'CHANGED-SKU'})
@@ -806,7 +816,7 @@ class TestProductMatchDecision(TransactionCase):
     def test_a_candidate_bound_meanwhile_refuses(self):
         job, first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({'selected_template_id': first.id})
         # A concurrent import binds that very product to this store.
@@ -833,7 +843,7 @@ class TestProductMatchDecision(TransactionCase):
     def test_an_empty_choice_refuses(self):
         job, _first, _second, _sent = self._ambiguous_template_run()
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({})
         with self.assertRaises(UserError):
@@ -857,7 +867,7 @@ class TestProductMatchDecision(TransactionCase):
         job_b.invalidate_recordset()
         decision_b = self.Decision.search([('job_id', '=', job_b.id)])
         self.assertTrue(decision_b)
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision_b.id,
         ).create({'selected_template_id': first.id})
         with self.assertRaises(UserError) as ctx:
@@ -889,7 +899,7 @@ class TestProductMatchDecision(TransactionCase):
         self.assertEqual(len(binding), 1)
         self.assertEqual(binding.product_template_id, first)
         self.assertEqual(binding.match_key, 'manual')
-        self.assertEqual(binding.matched_by_uid, self.roles['reviewer'])
+        self.assertEqual(binding.matched_by_uid, self.roles['admin'])
         self.assertEqual(decision.state, 'consumed')
         self.assertEqual(decision.resulting_template_binding_id, binding)
         self.assertTrue(decision.consumed_at)
@@ -919,7 +929,7 @@ class TestProductMatchDecision(TransactionCase):
         self.assertEqual(variant_binding.product_variant_id, chosen)
         self.assertEqual(variant_binding.match_key, 'manual')
         self.assertEqual(
-            variant_binding.matched_by_uid, self.roles['reviewer'],
+            variant_binding.matched_by_uid, self.roles['admin'],
         )
         self.assertEqual(
             variant_binding.product_template_binding_id.product_template_id,
@@ -1725,7 +1735,7 @@ class TestProductMatchDecision(TransactionCase):
         )
         with self.assertRaises(UserError) as ctx:
             job.with_user(
-                self.roles['reviewer']
+                self.roles['admin']
             ).action_resolve_manual_review()
         self.assertIn('match decision', str(ctx.exception))
         job.invalidate_recordset()

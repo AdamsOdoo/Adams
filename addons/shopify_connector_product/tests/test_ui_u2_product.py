@@ -22,6 +22,7 @@ import os
 
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.convert import convert_file
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see the core suites.
@@ -79,22 +80,31 @@ class TestUiU2Product(TransactionCase):
                 'shopify_connector_product.%s is missing' % name,
             )
 
-    def test_branch_hangs_off_the_existing_u0_root(self):
-        """One connector app, not a second one."""
+    def test_branch_is_administrator_configuration(self):
+        """Durable mappings are not routine operations navigation."""
         branch = self.env.ref(
             'shopify_connector_product.menu_shopify_connector_catalog'
         )
         self.assertEqual(
             branch.parent_id,
-            self.env.ref('shopify_connector_core.menu_shopify_connector_root'),
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_configuration'
+            ),
+        )
+        self.assertEqual(branch.name, 'Mappings')
+        self.assertEqual(
+            branch.group_ids,
+            self.env.ref(
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
         )
 
     def test_branch_sequence_does_not_collide_with_a_sibling(self):
         """A duplicate sequence makes menu order undefined.
 
         This is a real defect this suite caught during development: the
-        Inventory branch was first placed at 30, the same sequence U0 gave
-        Sync Center, so their rendered order depended on insertion id.
+        The signed IA has exactly four top-level pillars with deterministic
+        order.
         """
         root = self.env.ref(
             'shopify_connector_core.menu_shopify_connector_root'
@@ -113,6 +123,110 @@ class TestUiU2Product(TransactionCase):
             self.assertTrue(
                 menu.action or menu.child_id,
                 '%s is a dead menu entry' % name,
+            )
+
+    def test_mapping_actions_are_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        for name in self.ACTIONS:
+            action = self.env.ref('shopify_connector_product.%s' % name)
+            self.assertEqual(action.group_ids, admin)
+
+    def test_product_mappings_open_without_hiding_healthy_rows(self):
+        """The default action must show all mappings, not only attention rows."""
+        action = self.env.ref(
+            'shopify_connector_product.action_shopify_connector_product_template_binding'
+        )
+        self.assertNotIn(
+            'search_default_filter_needs_attention', action.context or '',
+            'healthy mappings must not be hidden by the default action',
+        )
+        self.assertIn('No product mappings match the current view', action.help)
+        self.assertIn('clear it', action.help)
+        self.assertIn('healthy active', action.help)
+
+    def test_product_mapping_xml_update_clears_legacy_context_preserves_favorite(self):
+        """A real XML update repairs old action data without side effects.
+
+        Odoo's XML loader updates only fields declared by the record.  Seed the
+        historical context, reload the actual product-binding XML, and then
+        reload it again to cover the immediate repeat-upgrade path.  The
+        action-specific saved favorite must remain intact, and XML loading
+        must not enqueue connector work.
+        """
+        action = self.env.ref(
+            'shopify_connector_product.action_shopify_connector_product_template_binding'
+        ).sudo()
+        action.write({
+            'context': "{'search_default_filter_needs_attention': 1}",
+        })
+
+        filters = self.env['ir.filters'].sudo()
+        self.assertIn('action_id', filters._fields)
+        favorite_values = {
+            'name': 'U2 saved product mappings',
+            'model_id': action.res_model,
+            'action_id': action.id,
+            'domain': '[]',
+            'context': "{'group_by': 'store_id'}",
+        }
+        for field_name, value in (
+            ('user_id', self.env.user.id),
+            ('is_default', False),
+            ('sort', '[]'),
+        ):
+            if field_name in filters._fields:
+                favorite_values[field_name] = value
+        favorite = filters.create(favorite_values)
+        favorite_fields = [
+            field_name for field_name in (
+                'name', 'model_id', 'action_id', 'domain', 'context',
+                'user_id', 'is_default', 'sort',
+            ) if field_name in filters._fields
+        ]
+        favorite_before = favorite.read(favorite_fields)[0]
+
+        queue_models = [
+            'shopify.connector.job',
+            'shopify.connector.job.log',
+            'shopify.connector.mutation.attempt',
+        ]
+        if 'shopify.connector.product.export.preview' in self.env:
+            queue_models.append('shopify.connector.product.export.preview')
+        queue_models = tuple(queue_models)
+        counts_before = {
+            model_name: self.env[model_name].sudo().search_count([])
+            for model_name in queue_models
+        }
+
+        for _iteration in range(2):
+            convert_file(
+                self.env,
+                'shopify_connector_product',
+                'views/shopify_connector_product_binding_views.xml',
+                None,
+                mode='update',
+                noupdate=False,
+            )
+            self.env.invalidate_all()
+            action = self.env.ref(
+                'shopify_connector_product.action_shopify_connector_product_template_binding'
+            ).sudo()
+            self.assertEqual(
+                ast.literal_eval(action.context or '{}'), {},
+                'the canonical Product Mappings action must not force a filter',
+            )
+            favorite.invalidate_recordset()
+            self.assertTrue(favorite.exists())
+            self.assertEqual(favorite.read(favorite_fields)[0], favorite_before)
+            self.assertEqual(
+                {
+                    model_name: self.env[model_name].sudo().search_count([])
+                    for model_name in queue_models
+                },
+                counts_before,
+                'an action-data update must not enqueue Shopify work',
             )
 
     # ------------------------------------------------------------------

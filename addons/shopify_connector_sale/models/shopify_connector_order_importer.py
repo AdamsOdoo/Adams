@@ -1,3 +1,4 @@
+import hashlib
 import itertools
 import json
 import re
@@ -41,8 +42,13 @@ SOLVER_MAX_DEPENDENT_LINES = 2
 SOLVER_MAX_CANDIDATE_VECTORS = 25
 PENDING_RECHECK_MINUTES = 15
 ORDER_LINE_DESCRIPTION_MAX_LEN = 512
+ORDER_CANCELLED_PAYLOAD_PREFIX = 'webhook_cancelled|'
 _EMAIL_RE = re.compile(r'(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b')
 _PHONE_RE = re.compile(r'(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)')
+_RFC3339_RE = re.compile(
+    r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}'
+    r'(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$'
+)
 REDACTION_EXTENSION = frozenset((
     'address', 'address1', 'address2', 'billingAddress', 'city', 'company',
     'display_name', 'displayName', 'email', 'first_name', 'firstName',
@@ -107,7 +113,7 @@ query ConnectorOrderHeader($id: ID!) {
         originalTotalSet { shopMoney { amount } }
         discountedUnitPriceSet { shopMoney { amount } }
         discountedTotalSet { shopMoney { amount } }
-        priceAfterAllDiscountsBeforeTaxesSet {
+        discountedUnitPriceAfterAllDiscountsSet {
           shopMoney { amount currencyCode }
           presentmentMoney { amount currencyCode }
         }
@@ -160,7 +166,7 @@ query ConnectorOrderLineItemsPage($id: ID!, $after: String!) {
         originalTotalSet { shopMoney { amount } }
         discountedUnitPriceSet { shopMoney { amount } }
         discountedTotalSet { shopMoney { amount } }
-        priceAfterAllDiscountsBeforeTaxesSet {
+        discountedUnitPriceAfterAllDiscountsSet {
           shopMoney { amount currencyCode }
           presentmentMoney { amount currencyCode }
         }
@@ -723,9 +729,9 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             )
         for line in payload.get('line_items') or []:
             self._validate_money_bag_currency(
-                line.get('priceAfterAllDiscountsBeforeTaxesSet'),
+                line.get('discountedUnitPriceAfterAllDiscountsSet'),
                 currency,
-                'lineItems.priceAfterAllDiscountsBeforeTaxesSet',
+                'lineItems.discountedUnitPriceAfterAllDiscountsSet',
             )
             if line.get('quantity') != line.get('currentQuantity'):
                 raise OrderPolicySkip(
@@ -1036,7 +1042,36 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             source_tax_lines, payload.get('taxesIncluded'),
             require_presentment=False,
         )
-        if source_by_fingerprint != order_by_fingerprint:
+        fingerprints_reconcile = (
+            source_by_fingerprint == order_by_fingerprint
+        )
+        # Shopify can expose ``channelLiable=null`` on an order-level
+        # aggregate while the contributing line TaxLine carries a known
+        # Boolean.  ``null`` means unknown, not a third contradictory
+        # liability value.  In that narrowly-defined case compare the same
+        # rate/title/source/inclusion identities and amounts without the
+        # unknown aggregate dimension.  A known order-level True/False still
+        # has to match the source lines exactly and therefore continues to
+        # fail closed on disagreement.
+        if (
+            not fingerprints_reconcile
+            and order_tax_lines
+            and all(
+                evidence.get('channelLiable') is None
+                for evidence in order_tax_lines
+                if isinstance(evidence, dict)
+            )
+        ):
+            order_comparison = self._tax_fingerprint_amounts(
+                order_tax_lines, payload.get('taxesIncluded'),
+                require_presentment=True, ignore_channel_liability=True,
+            )
+            source_comparison = self._tax_fingerprint_amounts(
+                source_tax_lines, payload.get('taxesIncluded'),
+                require_presentment=False, ignore_channel_liability=True,
+            )
+            fingerprints_reconcile = source_comparison == order_comparison
+        if not fingerprints_reconcile:
             raise JobHandlerError(
                 'financial_total_mismatch',
                 'Order-level and source-line tax fingerprints do not '
@@ -1046,6 +1081,7 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
     @api.model
     def _tax_fingerprint_amounts(
         self, tax_lines, price_included, require_presentment,
+        ignore_channel_liability=False,
     ):
         totals = {}
         for evidence in tax_lines:
@@ -1058,7 +1094,11 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 fingerprint = build_tax_fingerprint(
                     evidence.get('rate'), evidence.get('ratePercentage'),
                     evidence.get('title'), evidence.get('source'),
-                    evidence.get('channelLiable'), price_included,
+                    (
+                        None if ignore_channel_liability
+                        else evidence.get('channelLiable')
+                    ),
+                    price_included,
                 )
                 price = evidence.get('priceSet')
                 shop = self._money_side_decimal(price, 'shopMoney')
@@ -1305,13 +1345,25 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                     'A Shopify line item had an invalid quantity.',
                 )
             product = self._resolve_product(store, item, settings)
+            # Shopify 2026-07 exposes the after-all-discounts value as a
+            # unit price.  The projection below compares a whole-line amount,
+            # so derive it explicitly instead of silently treating the unit
+            # value as a line total.
             source_target = self._money_decimal(
-                item.get('priceAfterAllDiscountsBeforeTaxesSet'),
-            )
+                item.get('discountedUnitPriceAfterAllDiscountsSet'),
+            ) * quantity
             taxes, rate_total, signature = self._resolve_taxes(
                 order, store, item.get('taxLines') or [],
                 payload.get('taxesIncluded'), settings,
             )
+            # Shopify reports this after-discount amount in the order's
+            # tax-inclusion posture.  The comparison and residual projection
+            # below are tax-excluded, so remove Shopify's authoritative tax
+            # amount for included orders just as the shipping-line path does.
+            if payload.get('taxesIncluded'):
+                source_target -= self._tax_source_total(
+                    item.get('taxLines') or [],
+                )
             original_unit = self._money_decimal(item.get('originalUnitPriceSet'))
             original_base = self._raw_excluded_for_values(
                 order, product, taxes, original_unit, quantity,
@@ -1777,9 +1829,8 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             tax = mapping.account_tax_id
             self._validate_resolved_tax(tax, settings, price_included, rate_key)
             mapped = (
-                order.fiscal_position_id.map_tax(
-                    tax, product=False, partner=order.partner_id,
-                ) if order.fiscal_position_id else tax
+                order.fiscal_position_id.map_tax(tax)
+                if order.fiscal_position_id else tax
             )
             if len(mapped) != 1:
                 raise JobHandlerError(
@@ -2250,7 +2301,9 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             'shopify_order_name': payload.get('name') or False,
             'shopify_legacy_resource_id': payload.get('legacyResourceId') or False,
             'shopify_processed_at': self._to_odoo_datetime(payload.get('processedAt')),
-            'shopify_updated_at_snapshot': self._to_odoo_datetime(payload.get('updatedAt')),
+            'shopify_updated_at_snapshot': self._strict_updated_at(
+                payload.get('updatedAt'),
+            ),
             'shopify_created_at': self._to_odoo_datetime(payload.get('createdAt')),
             'shopify_currency_code': payload.get('currencyCode'),
             'shopify_presentment_currency_code': payload.get(
@@ -2282,6 +2335,9 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             'shopify_total_tip_amount': self._money_amount(
                 payload.get('totalTipReceivedSet'), 'shopMoney',
             ),
+            'shopify_line_composition_fingerprint': (
+                self._line_composition_fingerprint(payload)
+            ),
             'customer_resolution': resolution,
             'shopify_last_imported_at': fields.Datetime.now(),
             'shopify_last_evidence_refresh_at': fields.Datetime.now(),
@@ -2304,12 +2360,115 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
     @api.model
     def _refresh_existing(self, binding, payload, settings, job):
         self._validate_refresh_evidence(payload)
+        # Scheduled scans and webhook-triggered reads can complete out of
+        # order.  Serialize the final snapshot comparison with a database row
+        # lock so an older Shopify read can never overwrite a newer one.  The
+        # non-blocking ORM lock is intentional: a genuine race is classified
+        # for the durable job retry path instead of waiting while a sibling
+        # importer holds the binding transaction.
+        binding = binding.sudo().try_lock_for_update()
+        if not binding:
+            raise JobHandlerError(
+                'concurrency_race_conflict',
+                'The Shopify order binding is being refreshed by another '
+                'importer; retry the durable order job.',
+            )
+        binding.invalidate_recordset()
+        if not binding.exists():
+            raise JobHandlerError(
+                'concurrency_race_conflict',
+                'The Shopify order binding was deleted while its refresh was '
+                'being serialized; no snapshot update was claimed.',
+            )
+        refreshed_at = self._strict_updated_at(payload.get('updatedAt'))
+        if (
+            binding.shopify_updated_at_snapshot
+            and refreshed_at
+            and refreshed_at < binding.shopify_updated_at_snapshot
+        ):
+            if job:
+                self.env['shopify.connector.job.log']._system_append(
+                    job,
+                    'note',
+                    'Ignored stale Shopify order snapshot; no commercial or '
+                    'binding evidence was overwritten.',
+                    technical_detail=json.dumps({
+                        'order_binding_id': binding.id,
+                        'shopify_order_gid': binding.shopify_gid,
+                        'incoming_updated_at': fields.Datetime.to_string(
+                            refreshed_at,
+                        ),
+                        'stored_updated_at': fields.Datetime.to_string(
+                            binding.shopify_updated_at_snapshot,
+                        ),
+                    }, sort_keys=True),
+                )
+            return binding
+        if (
+            job
+            and job.job_source == 'webhook'
+            and binding.shopify_updated_at_snapshot
+            and refreshed_at == binding.shopify_updated_at_snapshot
+        ):
+            same_snapshot = bool(
+                binding.shopify_financial_status_snapshot
+                == payload.get('displayFinancialStatus')
+                and binding.shopify_fulfillment_status_snapshot
+                == payload.get('displayFulfillmentStatus')
+                and binding.shopify_cancelled_at
+                == self._to_odoo_datetime(payload.get('cancelledAt'))
+                and (binding.shopify_cancel_reason or False)
+                == (payload.get('cancelReason') or False)
+                and self._binding_financial_evidence_matches(binding, payload)
+                and (
+                    not binding.shopify_line_composition_fingerprint
+                    or binding.shopify_line_composition_fingerprint
+                    == self._line_composition_fingerprint(payload)
+                )
+            )
+            if not same_snapshot:
+                # Two changed webhook bodies can carry the same source second.
+                # Refuse to overwrite committed evidence without an ordering
+                # proof.  The delivery and blocked child remain durable, while
+                # the overlapping scheduled scan/manual refresh can perform a
+                # fresh read outside the webhook equal-timestamp ambiguity.
+                raise JobHandlerError(
+                    'ambiguous_match',
+                    'Shopify returned changed order evidence at the same '
+                    'updatedAt already stored on the binding. The webhook '
+                    'refresh was held for manual review; run scheduled order '
+                    'reconciliation to obtain a fresh ordering signal.',
+                    json.dumps({
+                        'order_binding_id': binding.id,
+                        'shopify_order_gid': binding.shopify_gid,
+                        'incoming_job_payload_hash': job.payload_hash,
+                        'updated_at': fields.Datetime.to_string(refreshed_at),
+                    }, sort_keys=True),
+                )
+            self.env['shopify.connector.job.log']._system_append(
+                job,
+                'note',
+                'Equal-timestamp Shopify order evidence matched the stored '
+                'snapshot exactly; treated as an idempotent no-op.',
+                technical_detail=json.dumps({
+                    'order_binding_id': binding.id,
+                    'shopify_order_gid': binding.shopify_gid,
+                    'updated_at': fields.Datetime.to_string(refreshed_at),
+                }, sort_keys=True),
+            )
+            return binding
         previous = binding.shopify_financial_status_snapshot
         previous_fulfillment = binding.shopify_fulfillment_status_snapshot
         previous_cancelled = bool(binding.shopify_cancelled_at)
         gateway = self._classify_manual_gateway(payload)
         financial_evidence_matches = self._binding_financial_evidence_matches(
             binding, payload,
+        )
+        incoming_composition = self._line_composition_fingerprint(payload)
+        composition_matches = bool(
+            not binding.shopify_line_composition_fingerprint
+            or binding.shopify_line_composition_fingerprint
+            == incoming_composition
         )
         values = self._binding_snapshot_vals(
             payload,
@@ -2342,10 +2501,46 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             values.update({
                 'status': 'review',
                 'cod_commercial_state': 'review',
+                'review_reason_code': 'financial_evidence_changed',
+                'review_reason': (
+                    'Shopify financial totals or currency evidence no longer '
+                    'matches the imported Odoo order.'
+                ),
+                'review_required_action': (
+                    'Stop shipment and compare the Shopify order with the '
+                    'Odoo quotation or sale order before proceeding.'
+                ),
+            })
+        if not composition_matches:
+            values.update({
+                'status': 'review',
+                'cod_commercial_state': 'review',
+                'review_reason_code': 'line_composition_changed',
+                'review_reason': (
+                    'Shopify line identity or quantity changed even though '
+                    'the order totals may still match.'
+                ),
+                'review_required_action': (
+                    'Stop shipment and compare every Shopify line with the '
+                    'unchanged Odoo order lines.'
+                ),
+            })
+        unsafe_lifecycle = self._unsafe_lifecycle_review(
+            binding, payload, previous, current,
+        )
+        if unsafe_lifecycle:
+            values.update({
+                'status': 'review',
+                'cod_commercial_state': 'review',
+                **unsafe_lifecycle,
             })
         approved_at_evidence = binding.manual_gateway_approved_shopify_updated_at
-        refreshed_at = self._to_odoo_datetime(payload.get('updatedAt'))
         if binding.manual_gateway_approval_state == 'pending':
+            cancellation_signal = bool(
+                job
+                and isinstance(job.payload_hash, str)
+                and job.payload_hash.startswith(ORDER_CANCELLED_PAYLOAD_PREFIX)
+            )
             eligible = (
                 binding.sale_order_id.state == 'draft'
                 and settings.manual_gateway_policy == 'require_approval'
@@ -2362,13 +2557,20 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 approval_was_recorded
                 and eligible
                 and refreshed_at == approved_at_evidence
+                and not cancellation_signal
             ):
                 binding.sale_order_id.action_confirm()
                 values.update({
                     'manual_gateway_approval_state': 'approved',
                     'cod_commercial_state': 'confirmed',
                 })
-            elif not approval_was_recorded and current == 'PAID':
+            elif (
+                not approval_was_recorded
+                and current == 'PAID'
+                and not unsafe_lifecycle
+                and financial_evidence_matches
+                and composition_matches
+            ):
                 # Fresh paid evidence makes a still-unapproved manual-gateway
                 # intent unnecessary. The permanent binding is retained and
                 # the ordinary store confirmation policy decides below.
@@ -2396,10 +2598,19 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             ) != 'pending'
             and values.get('status', binding.status) != 'review'
             and financial_evidence_matches
+            and not payload.get('cancelledAt')
+            and not (
+                job
+                and isinstance(job.payload_hash, str)
+                and job.payload_hash.startswith(ORDER_CANCELLED_PAYLOAD_PREFIX)
+            )
         )
         if transition_to_paid:
             binding.sale_order_id.action_confirm()
             values['cod_commercial_state'] = 'confirmed'
+        transitioned_to_review = bool(
+            binding.status != 'review' and values.get('status') == 'review'
+        )
         binding.sudo().write(values)
         if job:
             diverged = bool(
@@ -2408,6 +2619,7 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 != payload.get('displayFulfillmentStatus')
                 or previous_cancelled != bool(payload.get('cancelledAt'))
                 or not financial_evidence_matches
+                or not composition_matches
                 or gateway['state'] == 'mixed'
             )
             self.env['shopify.connector.job.log']._system_append(
@@ -2415,7 +2627,7 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                 'note',
                 'Order evidence refreshed%s; existing commercial lines were '
                 'left unchanged.' % (
-                    ' and routed for review' if diverged else '',
+                    ' and routed for review' if transitioned_to_review else '',
                 ),
                 technical_detail=json.dumps({
                     'order_binding_id': binding.id,
@@ -2423,10 +2635,87 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
                     'previous_financial_status': previous,
                     'current_financial_status': current,
                     'financial_evidence_matches': financial_evidence_matches,
+                    'line_composition_matches': composition_matches,
+                    'review_reason_code': values.get('review_reason_code'),
                     'mixed_gateway_evidence': gateway['state'] == 'mixed',
                 }, sort_keys=True),
             )
         return binding
+
+    @api.model
+    def _line_composition_fingerprint(self, payload):
+        """PII-free identity/quantity fingerprint for post-import edits."""
+        lines = []
+        for line in payload.get('line_items') or []:
+            lines.append({
+                'line_gid': line.get('id') or False,
+                'product_gid': (line.get('product') or {}).get('id') or False,
+                'variant_gid': (line.get('variant') or {}).get('id') or False,
+                'sku': line.get('sku') or False,
+                'quantity': line.get('quantity'),
+                'current_quantity': line.get('currentQuantity'),
+            })
+        normalized = json.dumps(
+            sorted(lines, key=lambda row: (
+                row['line_gid'] or '', row['variant_gid'] or '',
+                row['product_gid'] or '', row['sku'] or '',
+            )),
+            sort_keys=True,
+            separators=(',', ':'),
+        )
+        return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
+
+    @api.model
+    def _unsafe_lifecycle_review(self, binding, payload, previous, current):
+        current_upper = (current or '').upper()
+        if payload.get('cancelledAt'):
+            return {
+                'review_reason_code': 'cancelled_on_shopify',
+                'review_reason': (
+                    'Shopify cancelled this order after it was imported; '
+                    'Odoo was deliberately not cancelled automatically.'
+                ),
+                'review_required_action': (
+                    'Stop shipment. Review the Shopify cancellation and decide '
+                    'the supported Odoo commercial action manually.'
+                ),
+            }
+        labels = {
+            'VOIDED': 'voided',
+            'EXPIRED': 'expired',
+            'REFUNDED': 'refunded',
+            'PARTIALLY_REFUNDED': 'partially refunded',
+        }
+        if current_upper in labels:
+            label = labels[current_upper]
+            return {
+                'review_reason_code': 'unsafe_financial_%s' % current_upper.lower(),
+                'review_reason': (
+                    'Shopify now reports this order as %s; Odoo financial and '
+                    'shipment records were deliberately left unchanged.' % label
+                ),
+                'review_required_action': (
+                    'Stop shipment and review the payment/refund evidence. '
+                    'Automatic refund and credit-note accounting is unsupported.'
+                ),
+            }
+        if (
+            (previous or '').upper() in ('PAID', 'AUTHORIZED', 'PARTIALLY_PAID')
+            and current_upper in ('PENDING', 'PARTIALLY_PAID')
+            and (previous or '').upper() != current_upper
+        ):
+            return {
+                'review_reason_code': 'payment_safety_regression',
+                'review_reason': (
+                    'Shopify payment evidence moved from %s to %s after import.'
+                    % (previous, current)
+                ),
+                'review_required_action': (
+                    'Stop shipment and verify payment in Shopify before any '
+                    'manual Odoo action.'
+                ),
+            }
+        return False
 
     @api.model
     def _binding_financial_evidence_matches(self, binding, payload):
@@ -2697,6 +2986,32 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
         return parsed
 
+    @api.model
+    def _strict_updated_at(self, value):
+        """Parse Shopify Order.updatedAt only when it is strict RFC3339.
+
+        A timezone-less value is not orderable across workers or stores and
+        therefore cannot participate in the binding's monotonic watermark.
+        Other evidence timestamps retain the connector's existing tolerant
+        parser because they do not fence snapshot replacement.
+        """
+        if not isinstance(value, str) or not _RFC3339_RE.fullmatch(value):
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify Order.updatedAt must be a timezone-qualified RFC3339 '
+                'timestamp; the order snapshot was not applied.',
+            )
+        try:
+            parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except ValueError as exc:
+            raise JobHandlerError(
+                'data_shape_schema_mismatch',
+                'Shopify Order.updatedAt is not a valid RFC3339 timestamp; '
+                'the order snapshot was not applied.',
+                type(exc).__name__,
+            ) from exc
+        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
+
 
 class ShopifyConnectorJobOrderExtension(models.Model):
     _inherit = 'shopify.connector.job'
@@ -2733,9 +3048,20 @@ class ShopifyConnectorJobDispatchOrderExtension(models.AbstractModel):
     @api.model
     def _handle_order_import_sync(self, job):
         try:
-            self.env['shopify.connector.order.importer'].import_order_sync(
+            binding = self.env[
+                'shopify.connector.order.importer'
+            ].import_order_sync(
                 job.store_id, job.shopify_target_gid, job=job,
             )
+            if binding and binding.status == 'review':
+                job._transition_blocked_manual_review(
+                    'destructive_write_guard_blocked',
+                    'destructive_write_guard_blocked',
+                    binding.review_reason or (
+                        'The imported Shopify order requires a business '
+                        'decision before automatic processing can continue.'
+                    ),
+                )
         except OrderPolicySkip as exc:
             detail = json.dumps({
                 'skip_reason': exc.skip_reason,

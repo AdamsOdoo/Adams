@@ -50,6 +50,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.models import (
     shopify_connector_job_dispatch as dispatch_module,
 )
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see test_job_dispatch.py.
@@ -104,6 +105,7 @@ class TestDispatchThroughput(TransactionCase):
         )
         self.assertEqual(self.Dispatch._resolve_drain_batch_size(), 75)
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch')
     def test_batch_size_rejects_malformed_and_out_of_range_values(self):
         """A typo must neither stop the drain nor monopolise the worker."""
         for bad in ('abc', '', '   ', '0', '-5', '501', '10000', '3.5'):
@@ -129,6 +131,47 @@ class TestDispatchThroughput(TransactionCase):
             dispatch_module.DRAIN_BATCH_SIZE_PARAM, '50',
         )
         self.assertEqual(self.Dispatch.run_drain(), 2)
+
+    def test_claim_round_robins_across_stores(self):
+        first = self._queue(4, self.store)
+        second = self._queue(1, self.other_store)
+        claimed = self.Job._claim_for_dispatch(2)
+        self.assertEqual(set(claimed.store_id.ids), {
+            self.store.id, self.other_store.id,
+        })
+        self.assertIn(first[0], claimed)
+        self.assertIn(second, claimed)
+
+    def test_drain_gives_each_store_a_slot_before_second_round(self):
+        self._queue(4, self.store)
+        self._queue(1, self.other_store)
+        observed = []
+
+        def record_dispatch(_service, job):
+            observed.append(job.store_id.id)
+            job.sudo().write({'state': 'cancelled'})
+
+        with patch.object(
+            type(self.Dispatch), '_dispatch_one', record_dispatch,
+        ):
+            self.Dispatch.run_drain(limit=3)
+        self.assertEqual(observed, [
+            self.store.id, self.other_store.id, self.store.id,
+        ])
+
+    def test_successful_enqueue_wakes_the_normal_drain_cron(self):
+        cron = self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain'
+        )
+        Cron = type(cron)
+        with patch.object(Cron, '_trigger', autospec=True) as trigger:
+            self.env['shopify.connector.job.enqueue'].enqueue(
+                self.store,
+                'setup_readiness_check',
+                'core_dispatch_selftest',
+                payload_hash=str(uuid.uuid4()),
+            )
+        trigger.assert_called_once()
 
     # ------------------------------------------------------------------
     # Cron progress + time budget (D-PERF1-1)

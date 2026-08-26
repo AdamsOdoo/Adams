@@ -689,7 +689,7 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
     # ------------------------------------------------------------------
 
     def action_shopify_export_reconnect_reconciliation(self):
-        """Run (or re-run) the pass. Retryable by an authorised operator.
+        """Run (or re-run) the pass. Administrator-only recovery action.
 
         Requirement 2: authority and company access are both checked
         BEFORE anything elevates, because everything after this point runs
@@ -701,16 +701,11 @@ class ShopifyConnectorStoreExportReconnect(models.Model):
         than only expiring previews.
         """
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may run '
+                'Only a Shopify Connector Administrator may run '
                 'the export reconnect reconciliation.'
             )
         if self.company_id and self.company_id not in self.env.user.company_ids:

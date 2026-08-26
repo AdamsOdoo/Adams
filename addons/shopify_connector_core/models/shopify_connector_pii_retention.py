@@ -2,6 +2,7 @@ import json
 from datetime import timedelta
 
 from odoo import api, fields, models
+from odoo.exceptions import AccessError
 
 
 MASKED_PII_VALUE = '***'
@@ -9,6 +10,9 @@ ATTEMPT_EVIDENCE_RETENTION_DAYS = 180
 ATTEMPT_EVIDENCE_RETENTION_PARAM = (
     'shopify_connector.layer2_attempt_evidence_retention_days'
 )
+TERMINAL_JOB_RETENTION_DAYS = 90
+TERMINAL_JOB_RETENTION_PARAM = 'shopify_connector.terminal_job_retention_days'
+RETENTION_BATCH_SIZE = 2000
 
 PII_KEY_PARTS = (
     'email',
@@ -69,6 +73,54 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
         return value if value > 0 else ATTEMPT_EVIDENCE_RETENTION_DAYS
 
     @api.model
+    def _terminal_job_retention_days(self):
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            TERMINAL_JOB_RETENTION_PARAM, TERMINAL_JOB_RETENTION_DAYS,
+        )
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return TERMINAL_JOB_RETENTION_DAYS
+        return value if value > 0 else TERMINAL_JOB_RETENTION_DAYS
+
+    @api.model
+    def _run_terminal_job_retention(self):
+        """Delete only low-risk terminal history in one bounded batch.
+
+        Failed/review jobs and every job with Layer-2 attempt evidence are
+        deliberately retained. Referentially-owned jobs are skipped under a
+        savepoint, so retention can never damage a business record merely to
+        satisfy an age target.
+        """
+        cutoff = fields.Datetime.now() - timedelta(
+            days=self._terminal_job_retention_days(),
+        )
+        Job = self.env['shopify.connector.job'].sudo()
+        Attempt = self.env['shopify.connector.mutation.attempt'].sudo()
+        candidates = Job.search([
+            ('state', 'in', ('succeeded', 'skipped', 'cancelled')),
+            ('finished_at', '!=', False),
+            ('finished_at', '<', cutoff),
+        ], order='id asc', limit=RETENTION_BATCH_SIZE)
+        attempt_job_ids = set(Attempt.search([
+            ('job_id', 'in', candidates.ids),
+        ]).mapped('job_id').ids)
+        removed = 0
+        for job in candidates.filtered(lambda row: row.id not in attempt_job_ids):
+            try:
+                with self.env.cr.savepoint():
+                    self.env['shopify.connector.job.log'].sudo().search([
+                        ('job_id', '=', job.id),
+                    ]).unlink()
+                    job.unlink()
+                removed += 1
+            except Exception:
+                # A domain addon may own a restrict reference. That job is
+                # evidence and remains intact; later candidates still drain.
+                continue
+        return removed
+
+    @api.model
     def _run_attempt_evidence_masking(self):
         cutoff = fields.Datetime.now() - timedelta(
             days=self._attempt_evidence_retention_days(),
@@ -117,6 +169,13 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
         redaction of *evidence*, which stays mandatory; neither touches a
         binding's stored business fields.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may run PII '
+                'retention maintenance.'
+            )
         settings_records = self.env[
             'shopify.connector.store.settings'
         ].sudo().search([('log_redaction_retention_days', '>', 0)])
@@ -164,4 +223,5 @@ class ShopifyConnectorPiiRetention(models.AbstractModel):
                     )
                 )
         self._run_attempt_evidence_masking()
+        self._run_terminal_job_retention()
         return True

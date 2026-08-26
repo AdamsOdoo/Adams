@@ -1,3 +1,105 @@
+### UI restructure — product-owner sign-off + ChatGPT implementation mission — compact handoff (2026-08-02, continuation)
+
+- **Branch / PR:** `claude/connector-ui-config-design-ks0avb` (same session,
+  second commit); docs-only; no PR opened.
+- **Files changed:**
+  `docs/06-prompts/chatgpt-ui-restructure-implementation-prompt-2026-08-02.md` (new),
+  `docs/02-product/ui-restructure-design-contract-2026-08-02.md` (status
+  banner addendum), this handoff.
+- **What changed / residue fixed:** recorded the dated product-owner
+  instruction of 2026-08-02: C1–C8 signed; implementation authorized to
+  start now; roles for this mission — ChatGPT 5.6 implementation worker with
+  continuous self-validation, Claude independent review and control gate,
+  product owner final authority; no-self-acceptance unchanged. Authored the
+  full ChatGPT mission prompt (base `49cfffbd…`, branch
+  `codex/ui-restructure-implementation`, stacked draft PR into
+  `fable/wave-5-completion`, batches 0/A–F with per-batch self-validation,
+  evidence doc `docs/05-qa/ui-restructure-implementation-evidence-2026-08-02.md`,
+  hard stops, handback contract). Ratifiable defaults set for the two open
+  §5 decisions (export no-JS route: keep, diff-embedded, Administrator-only,
+  audited; order lifecycle: declared-scope, review-excluded metrics).
+- **Items deferred:** independent Claude review + control after ChatGPT's
+  handback; Odoo.sh exact-head campaign; controlled Shopify UAT; R5
+  traceability; product-owner ratification of the two defaults.
+- **Learning feedback loop:** *New issue:* none. *Repeated pattern:* role
+  reassignments must land as dated in-repo records at the moment they
+  happen, or the governance trail breaks — handled here in the prompt file's
+  preamble. *Rules updated:* none (mission-scoped role assignment recorded,
+  CLAUDE.md untouched). *Rejected approaches:* none. *Technical debt:* none
+  new. *Architecture concerns:* none new.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked
+  YES · learning captured YES · rejected approach logged N/A · technical
+  debt logged N/A · repeated-issue escalation N/A.
+- **Next recommended session:** *Independent Claude review + control gate* —
+  after ChatGPT posts `IMPLEMENTATION COMPLETE` on its draft PR: fresh
+  session reviews the exact handback head from scratch (contract C1–C8
+  compliance, protected-contract integrity, test/evidence audit,
+  adversarial re-verification) per
+  `docs/06-prompts/claude-mvp-wave-review-template.md`.
+- **Stop condition:** stopped at prompt/authorization capture; no
+  `addons/**` change, no acceptance, no merge, no runtime/Shopify
+  operation by this session.
+
+### UI restructure design contract — control-room ruling capture + independent verification — compact handoff (2026-08-02)
+
+- **Branch / PR:** `claude/connector-ui-config-design-ks0avb` (based on the exact
+  PR #204 head `49cfffbd…`); docs-only; no PR opened.
+- **Files changed:**
+  `docs/02-product/ui-restructure-design-contract-2026-08-02.md` (new),
+  `docs/00-source-materials/2026-08-02-product-restructure-review-capture.md` (new),
+  `docs/00-source-materials/2026-08-02-functional-correctness-audit-capture.md` (new),
+  this handoff.
+- **What changed / residue fixed:** captured the two 2026-08-02 control-room
+  audit documents (product/restructure review recommending Option D; functional
+  correctness audit with findings F-01…F-09) and the control-room ruling
+  (locked menu hierarchy, access model, multi-store, onboarding, export
+  acknowledgement ladder, mode-switch, dashboard-split contracts; experimental
+  branch `067ba238…` rejected as target design; implementation not authorized).
+  Independently verified the load-bearing claims at the exact head with
+  file:line evidence: F-01 (setup client never follows the refresh job)
+  CONFIRMED; F-02 (mode-switch flag set before enqueue; silent non-connected
+  refusal; "Return to Mode 1" invisible in the stuck state; per-nonce dedup
+  admits duplicate scans) CONFIRMED; F-03 (review-flagged orders included in
+  Store 360 commercial sums) CONFIRMED; menu fragmentation, SEC-2 two-visible-
+  roles structure, store-model contract, legacy `execute()` reads, webhook
+  absence CONFIRMED; export "confirm without the review screen" CONFIRMED WITH
+  NUANCE (requires a live preview; it is the deliberate no-JS fallback route).
+  All contracts consolidated as C1–C8 with a recommended sequencing (§4) and
+  product-owner open items (§5).
+- **Items deferred:** wireframe + premium-UX-master-spec update incorporating
+  C1–C8 (next session, after product-owner sign-off); DEC record for the
+  ruling (control room/product owner to accept formally); re-fetch of the
+  competitor/Shopify links cited in the ruling; R5 document traceability.
+- **Learning feedback loop:** *New issue:* a fail-closed backend state
+  (`switch_in_progress=True` on an incomplete scan) combined with a
+  UI visibility condition (`invisible="mode != 'mode2'"`) produces a
+  permanently-stuck *experience* even though a recovery action exists
+  server-side — UI reachability of recovery actions must be part of every
+  state-machine contract, not an afterthought. *Repeated pattern:* async job
+  admission without client follow-through (refresh journey) mirrors the
+  earlier dashboard-truth findings — "admitted" is not "done" anywhere in the
+  UI. *Rules updated:* none (contract doc records the design rules; CLAUDE.md
+  untouched). *Rejected approaches:* none new logged (the experimental-branch
+  rejection is a control-room design ruling with revisit condition =
+  incorporate corrections, recorded in the contract doc, not a §10
+  architecture-approach rejection). *Technical debt:* legacy `client.execute`
+  read seam (V-9) and per-nonce mode-switch dedup (V-4) recorded in the
+  contract doc §2. *Architecture concerns:* none beyond the captured audits.
+- **Quality gate confirmation:** handoff updated YES · feedback loop checked
+  YES · learning captured YES · rejected approach logged N/A (none met §10
+  criteria) · technical debt logged YES (contract doc §2/V-9, V-4) ·
+  repeated-issue escalation N/A.
+- **Next recommended session:** *Design-spec + wireframe update session* —
+  after the product owner signs C1–C8, update
+  `docs/02-product/premium-ux-master-specification.md` (IA §2, dashboards,
+  onboarding phases, mode-switch panel) and the `docs/09-ui-prototype`
+  wireframes to the locked contracts, docs-only, then request control-room
+  validation to open the correctness-repair batch (F-01/F-02/F-03).
+- **Stop condition:** stopped at documentation capture + verification;
+  no `addons/**` change, no wireframe rewrite, no DEC self-acceptance, no
+  PR, no merge, no runtime/Shopify operation. Implementation remains
+  unauthorized pending product-owner sign-off and control-room gate opening.
+
 ### Shopify Store 360 — CONSOLIDATED BLOCKER CORRECTION (2026-08-01)
 
 - **Branch / PR:** `fable/wave-5-completion` (PR #204, draft). Started at the

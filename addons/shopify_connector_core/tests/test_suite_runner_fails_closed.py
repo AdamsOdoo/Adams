@@ -54,25 +54,56 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'assertions; it may have been short-circuited',
         )
         for expected in (
+            'webhook addon is installed and selected by the suite',
             'an unsanctioned skip is an evidence failure',
             'the sanctioned test skipping for a DIFFERENT reason still fails',
+            'the migration capability-absence skip passes in a migration phase',
+            'the migration capability-absence skip fails outside migration phases',
+            'the migration capability skip with a DIFFERENT reason fails',
             'a required tour that never ran fails even when marker counts add up',
             'required tours with no success markers fail',
             'a HOOT suite with no verified evidence line fails',
             'preflight aborts on an unresolvable browser',
             'preflight aborts when websocket-client is absent',
+            'browser probe cleanup is bounded and path-scoped',
+            'browser probe cleanup rejects broad paths',
         ):
             self.assertIn(
                 'self-test PASS: %s' % expected, result.stdout,
                 'the runner self-test no longer covers %r' % expected,
             )
 
-    def test_runner_declares_exactly_one_sanctioned_skip(self):
-        """The skip allowance is bound to an identity, not to a count.
+    def test_browser_probe_cleanup_is_bounded_and_path_scoped(self):
+        """CDP probe cleanup cannot race into an unsafe broad deletion."""
+        text = RUNNER.read_text()
+        self.assertIn('cleanup_browser_probe_dir', text)
+        self.assertIn('PROBE_CLEANUP_ATTEMPTS=8', text)
+        self.assertIn('rm -rf -- "$probe_dir"', text)
+        self.assertIn('mktemp -d /tmp/shopify-connector-cdp.XXXXXX', text)
+        self.assertIn('"$relative" != shopify-connector-cdp.*', text)
+        self.assertIn('cleanup_browser_probe_dir "/tmp"', text)
 
-        A "one skip is allowed" rule would let any test skip, which is the
-        hole TD-010 is about. The allowance must name the exact test and the
-        exact reason.
+    def test_runner_selects_webhook_addon_for_fresh_warm_and_standard_passes(self):
+        """The W1 addon cannot disappear from a green suite by list drift."""
+        text = RUNNER.read_text()
+        self.assertRegex(
+            text, r'(?m)^MODULES="[^"]*shopify_connector_webhook',
+        )
+        self.assertRegex(
+            text, r'(?m)^STANDARD_TAGS="[^"]*/shopify_connector_webhook',
+        )
+        self.assertIn(
+            'verify_connector_module_inventory', text,
+            'fresh/warm suite must fail closed when the addon is omitted',
+        )
+
+    def test_runner_declares_exact_sanctioned_skips(self):
+        """Each skip allowance is bound to identity, reason and phase.
+
+        A count-based rule would let any test skip, which is the hole TD-010
+        is about. The migration exception is additionally phase-scoped because
+        its optional capability is absent only in the intentionally older
+        migration bases.
         """
         text = RUNNER.read_text()
         self.assertIn(
@@ -84,6 +115,21 @@ class TestSuiteRunnerFailsClosed(TransactionCase):
             'ALLOWED_SKIP_REASON="real process-death harness is opt-in '
             'outside Odoo.sh"', text,
             'the sanctioned skip must be bound to that exact reason',
+        )
+        self.assertIn(
+            'ALLOWED_MIGRATION_SKIP_TEST="TestSetupWizardActivation.'
+            'test_w1_offline_token_without_app_secret_stops_before_activation"',
+            text,
+            'the migration skip must be bound to that exact test identity',
+        )
+        self.assertIn(
+            'ALLOWED_MIGRATION_SKIP_REASON="shopify_connector_webhook is not installed"',
+            text,
+            'the migration skip must be bound to that exact reason',
+        )
+        self.assertIn(
+            'migration-[0-9a-f]{8}(-again)?', text,
+            'the migration skip must be bound to generated migration phases',
         )
 
     def test_runner_installs_websocket_client_on_every_run(self):

@@ -106,6 +106,7 @@ SEC3_MODELS = (
     ('shopify.connector.product.variant.binding', '_row_variant_binding'),
     ('shopify.connector.location.mapping', '_row_location_mapping'),
     ('shopify.connector.inventory.level.binding', '_row_inventory_binding'),
+    ('shopify.connector.inventory.observation', '_row_inventory_observation'),
     ('shopify.connector.tax.mapping', '_row_tax_mapping'),
     ('shopify.connector.fulfillment.binding', '_row_fulfillment_binding'),
     ('shopify.connector.fulfillment.inbound.evidence', '_row_evidence'),
@@ -118,9 +119,16 @@ SEC3_MODELS = (
     # points at a job and (once applied) at a binding, so it is in the matrix
     # rather than trusted to be safe by resemblance.
     ('shopify.connector.product.match.decision', '_row_match_decision'),
+    # W1 webhook evidence is control-plane data, not an unscoped transport
+    # detail.  Keep all three durable store-rooted rows in the same matrix so
+    # ACL/rule changes cannot make the public ingress leak another company's
+    # callback, delivery or subscription evidence.
+    ('shopify.connector.webhook.secret', '_row_webhook_secret'),
+    ('shopify.connector.webhook.delivery', '_row_webhook_delivery'),
+    ('shopify.connector.webhook.subscription', '_row_webhook_subscription'),
 )
 
-# Models that deliberately carry NO `ir.model.access.csv` row, so no connector
+# Models that deliberately grant NO `ir.model.access.csv` permission, so no
 # group -- not even Administrator -- may read them through RPC. They are still
 # in SEC3_MODELS (they are durable and store-scoped and must have the company
 # rule and the relation declarations), but the four read-shape tests assert the
@@ -152,6 +160,8 @@ SEC3_STORE_RELATIONS = (
     ('shopify.connector.product.match.decision', 'job_id'),
     ('shopify.connector.product.match.decision', 'resulting_template_binding_id'),
     ('shopify.connector.product.match.decision', 'resulting_variant_binding_id'),
+    ('shopify.connector.webhook.delivery', 'job_id'),
+    ('shopify.connector.webhook.subscription', 'last_job_id'),
 )
 
 # Relations whose scope disagreement is structurally impossible, because the
@@ -377,6 +387,55 @@ class Sec3Base(TransactionCase):
             'store_id': store.id, 'credential_epoch': 1,
         })
 
+    def _row_webhook_secret(self, store):
+        """Mint callback evidence through the W1 service surface."""
+        return self.env[
+            'shopify.connector.webhook.secret'
+        ].sudo()._ensure_for_store(store)
+
+    def _row_webhook_delivery(self, store):
+        """Use the verified-ingestion service, including its durable job."""
+        Delivery = self.env['shopify.connector.webhook.delivery']
+        raw_marker = 'sec3-webhook-%s-%s' % (self.tag, store.id)
+        return Delivery._ingest(
+            store,
+            delivery_id='sec3-delivery-%s-%s' % (self.tag, store.id),
+            event_id='sec3-event-%s-%s' % (self.tag, store.id),
+            topic='app/uninstalled',
+            shop_domain=store.shop_domain,
+            api_version=store.api_version,
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=fields.Datetime.now(),
+            payload_digest=hashlib.sha256(raw_marker.encode()).hexdigest(),
+            payload_size=0,
+            payload_identity={'id': str(store.id)},
+        )[0]
+
+    def _row_webhook_subscription(self, store):
+        """Create one active-registry row through the service sentinel."""
+        Subscription = self.env[
+            'shopify.connector.webhook.subscription'
+        ].sudo()
+        existing = Subscription.search([
+            ('store_id', '=', store.id),
+            ('topic', '=', 'app/uninstalled'),
+        ], limit=1)
+        if existing:
+            return existing
+        spec = self.env[
+            'shopify.connector.webhook.registry'
+        ].topic_spec('app/uninstalled')
+        return Subscription.with_context(
+            **Subscription._service_context()
+        ).create({
+            'store_id': store.id,
+            'topic': 'app/uninstalled',
+            'topic_enum': spec['enum'],
+            'expected': True,
+            'expected_api_version': store.api_version,
+            'state': 'expected',
+        })
+
     def _row_access_token(self, store):
         Cache = self.env['shopify.connector.store.access.token'].sudo()
         existing = Cache.search([('store_id', '=', store.id)], limit=1)
@@ -571,6 +630,32 @@ class Sec3Base(TransactionCase):
                 self._gid('InventoryItem', store),
         })
 
+    def _row_inventory_observation(self, store):
+        Observation = self.env[
+            'shopify.connector.inventory.observation'
+        ].sudo().with_context(
+            **self.env[
+                'shopify.connector.inventory.observation'
+            ]._service_context()
+        )
+        job = self._job(store)
+        return Observation.create({
+            'store_id': store.id,
+            'job_id': job.id,
+            'inventory_level_gid': (
+                'gid://shopify/InventoryLevel/%s?inventory_item_id=%s' %
+                (store.id + 1000, store.id + 2000)
+            ),
+            'inventory_item_gid': 'gid://shopify/InventoryItem/%s' % (
+                store.id + 2000,
+            ),
+            'location_gid': 'gid://shopify/Location/%s' % (store.id + 1000),
+            'available': 1,
+            'source_updated_at': fields.Datetime.now(),
+            'source': 'scheduled_sync',
+            'state': 'accepted',
+        })
+
     def _row_tax_mapping(self, store):
         # The mapping refuses to exist until the store's settings name an
         # order company, so the settings row is a prerequisite, not decoration.
@@ -687,8 +772,8 @@ class TestSec3ModelMatrix(Sec3Base):
 
         `shopify.connector.store.access.token` is the one model where hiding it
         from everybody is the POINT rather than a regression. It holds the
-        cached 24-hour Shopify access token, and it carries no
-        `ir.model.access.csv` row on purpose, so no connector group -- including
+        cached 24-hour Shopify access token, and its `ir.model.access.csv`
+        marker grants no permission, so no connector group -- including
         Administrator -- can reach it through RPC. The token is reachable only
         through the sanctioned, store-scoped `sudo()` accessor on
         `shopify.connector.store.credential`.
@@ -1282,6 +1367,7 @@ class TestSec3HistoricRows(Sec3Base):
             store.company_id,
             'a refused remediation must not have assigned anything')
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_a_historic_cross_store_row_is_quarantined_not_re_homed(self):
         """The shape a constraint can never catch, because it predates it.
 
@@ -1328,6 +1414,7 @@ class TestSec3HistoricRows(Sec3Base):
             variant_a.product_template_binding_id.store_id, self.store_a2,
             'the sweep must not have re-homed either half')
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_releasing_a_quarantine_requires_the_disagreement_to_be_resolved(self):
         binding_a2 = self._row_template_binding(self.store_a2)
         variant_a = self._row_variant_binding(self.store_a)
@@ -1348,6 +1435,7 @@ class TestSec3HistoricRows(Sec3Base):
             record.with_user(self.user_a).action_sec3_release_scope_quarantine()
         self.assertTrue(record.sec3_scope_quarantined)
 
+    @mute_logger('odoo.addons.shopify_connector_core.models.shopify_connector_scope_mixin')
     def test_quarantining_evidence_also_hides_its_ledger_lines(self):
         """A stored related flag does not follow a SQL write to its source.
 

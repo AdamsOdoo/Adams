@@ -33,8 +33,8 @@ _READ_TIMEOUT_SECONDS = 20
 # slice, so no logic in this slice depends on the exact value.
 _CALL_LEASE_LIFETIME_SECONDS = 300
 
-# The fixed 16-class error_class registry (DEC-009) -- only the four
-# classes below are ever raised by this client; identity-mismatch
+# The fixed error_class registry (DEC-009) -- only existing job classes are
+# raised by this client; identity-mismatch
 # (`odoo_validation_configuration`) is interpreted by
 # `action_test_connection()` from a successful `execute()` response, not
 # raised here.
@@ -42,6 +42,11 @@ ERROR_TEMPORARY = 'shopify_temporary_server_network'
 ERROR_AUTH = 'shopify_permission_scope_auth'
 ERROR_THROTTLE = 'shopify_throttling_rate_limit'
 ERROR_UNKNOWN = 'unknown_system_error'
+# Shopify can return HTTP 200 for a GraphQL selection/schema mismatch.  This
+# is an existing job error class, not a new taxonomy value: callers must be
+# told that the response shape is incompatible rather than encouraged to
+# retry an otherwise unknown system failure.
+ERROR_DATA_SHAPE = 'data_shape_schema_mismatch'
 # The API-version block. Classified as a configuration/API-compatibility
 # problem, which is exactly what it is: an operator fixes it (by correcting
 # the store's recorded version, or by the connector being upgraded to a
@@ -73,6 +78,10 @@ REASON_UNKNOWN = (
     'Shopify returned a response we could not interpret — try again, '
     'and contact support if it persists.'
 )
+REASON_DATA_SHAPE = (
+    'Shopify returned a data shape the connector does not support — '
+    'check the configured API version and connector compatibility.'
+)
 # Deliberately names no header value, no token and no domain: an
 # operator-facing reason has to be safe to paste into a support ticket.
 REASON_API_VERSION = (
@@ -94,11 +103,28 @@ LIFECYCLE_PURPOSE_STATES = {
     'reconnect_probe': ('reconnect_needed', 'disconnected'),
 }
 
+# Batch B2: a business read names the domain whose claimed job owns it. The
+# mapping is deliberately fixed and prefix-based over the immutable job_type;
+# callers cannot invent a generic purpose to borrow another domain's job.
+BUSINESS_READ_PURPOSE_JOB_PREFIXES = {
+    'inventory': ('inventory_',),
+    'fulfillment': ('fulfillment_',),
+    'product_export': ('product_export_',),
+}
+
+# The only pre-activation business read. This is deliberately an exact triple,
+# not another prefix or a store-state bypass: the inventory location refresh
+# admitted by guided setup exists to produce the cache used by onboarding
+# readiness. Every other business read remains connected-only.
+SETUP_BUSINESS_READ_JOBS = frozenset({
+    ('inventory', 'setup_readiness_check', 'inventory_location_sync'),
+})
+
 
 class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
 
-    Attributes: `error_class` (one of the fixed 16), `reason` (the
+    Attributes: `error_class` (one of the fixed job classes), `reason` (the
     plain-language safe message), `technical_detail` (redacted; carries
     `extensions.requestId` when present, otherwise a redacted status/body
     excerpt), and `credential_invalid` (bool, default False -- set only
@@ -395,6 +421,177 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 technical_detail=redact(str(exc)),
             )
         return self._normalize_response(store, response)
+
+    @contextmanager
+    def execute_business_read(
+        self, job, store, query, variables=None, purpose=None,
+    ):
+        """Issue one job-owned read under the business admission lease.
+
+        This is the named read counterpart to Layer 2 mutation admission. A
+        fixed domain purpose must match the claimed job's immutable type; the
+        job and store must share identity/company; the job must be running; and
+        the existing generation-fenced admission owns a committed lease for
+        the entire caller ``with`` body. Mutations are always refused here.
+        """
+        variables = variables or {}
+        self._validate_graphql_operation(query, variables, mutation_context=None)
+        if self._graphql_contains_mutation(query):
+            raise UserError(
+                'Business-read admission accepts GraphQL queries only.'
+            )
+        if not store.shop_domain or not store.api_version:
+            raise UserError(
+                'A shop domain and API version are required before '
+                'contacting Shopify.'
+            )
+        lease_key, token = self._admit_business_read(job, store, purpose)
+        try:
+            body = {'query': query, 'variables': variables}
+            try:
+                response = self._send(store, body, token)
+            except ShopifyClientError:
+                raise
+            except requests.exceptions.RequestException as exc:
+                raise ShopifyClientError(
+                    error_class=ERROR_TEMPORARY,
+                    reason=REASON_TEMPORARY,
+                    technical_detail=redact(str(exc)),
+                )
+            result = self._normalize_response(store, response)
+            yield result
+        except BaseException as primary_error:
+            try:
+                self._release_lease(lease_key)
+            except BaseException as release_error:
+                raise primary_error from release_error
+            raise
+        else:
+            self._release_lease(lease_key)
+
+    def _admit_business_read(self, job, store, purpose):
+        """Atomically validate read ownership and commit its call lease."""
+        prefixes = BUSINESS_READ_PURPOSE_JOB_PREFIXES.get(purpose)
+        if not prefixes:
+            raise ShopifyQuiescedError(
+                'An unknown business-read purpose was requested.'
+            )
+        if not job or not getattr(job, 'id', False) or not job.exists():
+            raise ShopifyQuiescedError(
+                'A business Shopify read requires a valid job.'
+            )
+        if store.company_id.id not in self.env.companies.ids:
+            raise ShopifyQuiescedError(
+                'The target store company is outside the active company scope.'
+            )
+        # The dispatcher claims queued -> running in its owning transaction
+        # and deliberately does not commit before invoking the handler.  An
+        # independent lease transaction can therefore only see the last
+        # committed state (normally ``queued``); requiring ``running`` in that
+        # transaction would refuse every genuine first read.  Validate the
+        # protected worker record here, while the side transaction below owns
+        # the live store/generation gate and commits the lease.
+        if job.state != 'running':
+            raise ShopifyQuiescedError(
+                'A business Shopify read requires the claimed running job.'
+            )
+        setup_business_read = (
+            purpose, job.job_source, job.job_type,
+        ) in SETUP_BUSINESS_READ_JOBS
+        # Refresh client-credentials tokens before opening the side transaction,
+        # never under a store-row lock. The credential service performs its own
+        # fresh committed state check. Its setup-business purpose is narrower
+        # than the general setup probe family, so reconnect-needed/disconnected
+        # stores cannot contact Shopify in the interval before the final gate.
+        self.env['shopify.connector.store.credential']._ensure_access_token(
+            store,
+            purpose=(
+                'setup_business_read' if setup_business_read
+                else 'business'
+            ),
+        )
+        lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
+        side_cr = self.env.registry.cursor()
+        try:
+            side_cr.execute(
+                "SELECT j.store_id, j.job_source, j.job_type, "
+                "j.expected_connection_generation, s.company_id, s.state, "
+                "s.connection_generation "
+                "FROM shopify_connector_job j "
+                "JOIN shopify_connector_store s ON s.id = j.store_id "
+                "WHERE j.id = %s AND s.id = %s FOR SHARE OF s",
+                (job.id, store.id),
+            )
+            row = side_cr.fetchone()
+            if not row:
+                raise ShopifyQuiescedError(
+                    'This job does not belong to the target store.'
+                )
+            (
+                job_store_id, job_source, job_type, expected_generation,
+                store_company_id, store_state, store_generation,
+            ) = row
+            # The job's immutable store foreign key is the ownership boundary.
+            # ``job.company_id`` is a stored related field derived from that
+            # same store and may still be awaiting recomputation immediately
+            # after enqueue; comparing it here adds no security fact and can
+            # falsely refuse an otherwise valid claimed job.  The target
+            # store's live company is checked against the active environment
+            # immediately below.
+            if job_store_id != store.id:
+                raise ShopifyQuiescedError(
+                    'This job and store do not share scope ownership.'
+                )
+            if store_company_id not in self.env.companies.ids:
+                raise ShopifyQuiescedError(
+                    'The target store company is outside the active company '
+                    'scope.'
+                )
+            if not any(job_type.startswith(prefix) for prefix in prefixes):
+                raise ShopifyQuiescedError(
+                    'This job does not own the requested business-read purpose.'
+                )
+            setup_state_allowed = (
+                store_state in ('setup_incomplete', 'reconnect_needed')
+                and (purpose, job_source, job_type)
+                in SETUP_BUSINESS_READ_JOBS
+            )
+            if store_state != 'connected' and not setup_state_allowed:
+                raise ShopifyQuiescedError(
+                    'This store is not connected; the Shopify call is refused.'
+                )
+            if expected_generation != store_generation:
+                raise ShopifyQuiescedError(
+                    'This store was reconnected; the Shopify call is refused.'
+                )
+            side_env = api.Environment(side_cr, self.env.uid, self.env.context)
+            side_store = side_env['shopify.connector.store'].browse(store.id)
+            token = side_env[
+                'shopify.connector.store.credential'
+            ]._get_access_token(side_store)
+            if not token:
+                raise ShopifyClientError(
+                    error_class=ERROR_AUTH,
+                    reason=REASON_TOKEN_INVALID,
+                    credential_invalid=True,
+                )
+            lease_key = uuid.uuid4().hex
+            admitted_at = fields.Datetime.now()
+            side_env['shopify.connector.call.lease'].create({
+                'store_id': store.id,
+                'lease_key': lease_key,
+                'job_id': job.id,
+                'worker_ref': self._lease_worker_ref(),
+                'admitted_at': admitted_at,
+                'expires_at': admitted_at + lifetime,
+            })
+            side_cr.commit()
+        except Exception:
+            side_cr.rollback()
+            raise
+        finally:
+            side_cr.close()
+        return lease_key, token
 
     @contextmanager
     def execute_business(
@@ -1157,14 +1354,84 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             'restoreRate': throttle_status.get('restoreRate'),
         }
 
+    @api.model
+    def _record_throttle_status_isolated(self, store, throttle_status):
+        """Persist response telemetry after the business transaction ends.
+
+        A handler may issue more than one Shopify read.  Recording the first
+        response on ``store`` in the handler transaction takes a row-update
+        lock; the next call's CORE-R2 admission then opens its independent
+        cursor and waits for ``FOR SHARE`` on the same row.  The handler is
+        waiting for that admission while the admission is waiting for the
+        handler to commit: a self-deadlock which leaves the visible run queued
+        and the shared dispatcher occupied.
+
+        Telemetry is observational and already best-effort, so production
+        writes it in its own short, non-blocking transaction *after* the
+        business transaction commits or rolls back.  The timing is
+        load-bearing: committing a side-transaction update of the store while
+        the caller still owns an older REPEATABLE READ snapshot makes a later
+        child-row insert (whose foreign key takes ``FOR KEY SHARE`` on that
+        store) fail with SQLSTATE 40001.  Location discovery exposed exactly
+        that deterministic sequence.
+
+        Post-transaction callbacks preserve the original observational
+        independence on both success and failure, while ensuring the store
+        update cannot invalidate the caller's snapshot.  They run
+        synchronously from ``commit()``/``rollback()``, so same-pass
+        backpressure still sees the durable observation before the dispatcher
+        considers the next claim.  Odoo's TransactionCase cursor forbids
+        commits; there we retain the direct in-transaction write so the
+        deterministic unit tests keep exercising the projection.
+        """
+        commit = getattr(self.env.cr, 'commit', None)
+        if getattr(commit, '__name__', '') == 'forbidden':
+            return store._record_throttle_status(throttle_status)
+
+        registry = self.env.registry
+        uid = self.env.uid
+        context = dict(self.env.context)
+        store_id = store.id
+        payload = dict(throttle_status)
+
+        def persist_after_transaction():
+            side_cr = registry.cursor()
+            try:
+                side_env = api.Environment(side_cr, uid, context)
+                side_store = side_env['shopify.connector.store'].browse(
+                    store_id
+                ).try_lock_for_update()
+                if not side_store:
+                    side_cr.rollback()
+                    return False
+                result = side_store._record_throttle_status(payload)
+                side_cr.commit()
+                return result
+            except Exception:  # noqa: BLE001 - telemetry is best effort
+                side_cr.rollback()
+                _logger.exception(
+                    'Could not persist deferred Shopify rate head-room for '
+                    'store %s; the response itself is unaffected.', store_id,
+                )
+                return False
+            finally:
+                side_cr.close()
+
+        # Exactly one callback runs. Odoo clears the opposite callback set
+        # before executing the completed transaction's callbacks.
+        self.env.cr.postcommit.add(persist_after_transaction)
+        self.env.cr.postrollback.add(persist_after_transaction)
+        return True
+
     def _error_from_graphql_errors(self, errors, response):
         first_error = errors[0] if errors else {}
         extensions = first_error.get('extensions') or {}
         code = extensions.get('code')
+        message = first_error.get('message') or ''
         request_id = extensions.get('requestId')
         extra = (
             'requestId=%s' % request_id
-            if request_id else first_error.get('message')
+            if request_id else message
         )
         technical_detail = self._technical_detail(response, extra=extra)
         if code == 'ACCESS_DENIED':
@@ -1187,9 +1454,31 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 ERROR_TEMPORARY, REASON_TEMPORARY, technical_detail,
                 credential_invalid=False,
             )
+        # Shopify's GraphQL layer reports an HTTP-200 response for an invalid
+        # field selection in some Admin API revisions.  ``selectionMismatch``
+        # is the documented extension code seen for an object selected as a
+        # scalar (for example ``WebhookSubscription.apiVersion`` in 2026-07).
+        # Keep the response redacted through the same technical-detail path,
+        # but use the already-supported data-shape job class so operators do
+        # not retry a schema defect as an unknown transport outage.  The
+        # message fallback covers schema-selection errors from revisions that
+        # omit the extension code entirely.
+        normalized_code = str(code or '').replace('_', '').lower()
+        normalized_message = str(message).lower()
+        if (
+            normalized_code in {
+                'selectionmismatch', 'schemaselection', 'undefinedfield',
+            }
+            or 'must have a selection of subfields' in normalized_message
+            or 'selection mismatch' in normalized_message
+        ):
+            return ShopifyClientError(
+                ERROR_DATA_SHAPE, REASON_DATA_SHAPE, technical_detail,
+                credential_invalid=False,
+            )
         # MAX_COST_EXCEEDED on this tiny query, and anything unclassifiable
         # (incl. an unknown extensions.code), fall to the single
-        # safety-net path per DEC-009 -- no 17th class is introduced.
+        # safety-net path per DEC-009.
         return ShopifyClientError(
             ERROR_UNKNOWN, REASON_UNKNOWN, technical_detail,
             credential_invalid=False,
@@ -1268,7 +1557,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         # a failure, so the result is returned regardless.
         if throttle_status and store:
             try:
-                store._record_throttle_status(throttle_status)
+                self._record_throttle_status_isolated(store, throttle_status)
             except Exception:  # noqa: BLE001 - see above
                 _logger.exception(
                     'Could not record Shopify rate head-room for store %s; '

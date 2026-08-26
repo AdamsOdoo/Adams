@@ -102,6 +102,11 @@ class TestStore360Aggregates(OrderImportCase):
     def test_commercial_arithmetic_and_exclusions(self):
         kept_a = self._imported_order(days_ago=2, amount=100.0, qty=2)
         kept_b = self._imported_order(days_ago=3, amount=50.0, qty=1)
+        # Disclosed separately, but excluded from every reconciled value,
+        # order, unit, trend, and product aggregate.
+        review = self._imported_order(
+            days_ago=2, amount=777.0, qty=7, status='review',
+        )
         # Excluded: Odoo-cancelled.
         cancelled = self._imported_order(days_ago=2, amount=999.0)
         cancelled.write({'state': 'cancel'})
@@ -134,15 +139,129 @@ class TestStore360Aggregates(OrderImportCase):
         block = commercial['blocks'][0]
         expected_sales = kept_a.amount_total + kept_b.amount_total
         self.assertAlmostEqual(block['sales'], expected_sales, places=2)
+        self.assertAlmostEqual(block['gross'], expected_sales, places=2)
+        self.assertAlmostEqual(block['net'], expected_sales, places=2)
+        self.assertEqual(block['refunds'], 0.0)
         self.assertEqual(block['orders'], 2)
         self.assertAlmostEqual(
             block['aov'], expected_sales / 2.0, places=2)
         self.assertEqual(commercial['units'], 3)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
+        review_block = commercial['awaiting_review']['blocks'][0]
+        self.assertEqual(review_block['count'], 1)
+        self.assertAlmostEqual(
+            review_block['value'], review.amount_total, places=2,
+        )
 
         # The orders drill-down IS the aggregate population.
         model = self.env['sale.order'].with_user(self.viewer)
         domain = [tuple(t) for t in commercial['orders_target']['domain']]
         self.assertEqual(model.search_count(domain), 2)
+        self.assertNotIn(review, model.search(domain))
+        currency_domain = [tuple(t) for t in block['orders_target']['domain']]
+        currency_orders = model.search(currency_domain)
+        self.assertEqual(currency_orders, kept_a | kept_b)
+        self.assertAlmostEqual(
+            sum(currency_orders.mapped('amount_total')),
+            block['gross'], places=2,
+        )
+        review_domain = [
+            tuple(t) for t in commercial['awaiting_review']['target']['domain']
+        ]
+        self.assertEqual(model.search(review_domain), review)
+        review_currency_domain = [
+            tuple(t) for t in review_block['target']['domain']
+        ]
+        review_currency_orders = model.search(review_currency_domain)
+        self.assertEqual(review_currency_orders, review)
+        self.assertAlmostEqual(
+            sum(review_currency_orders.mapped('amount_total')),
+            review_block['value'], places=2,
+        )
+
+    def test_sales_dashboard_is_sales_only_and_keeps_review_separate(self):
+        kept = self._imported_order(days_ago=1, amount=125.0, qty=2)
+        review = self._imported_order(
+            days_ago=1, amount=500.0, qty=5, status='review',
+        )
+        payload = self.Dashboard.get_sales_dashboard_data(
+            self.store.id, '30d'
+        )
+        self.assertIn('commercial', payload)
+        self.assertNotIn('health', payload)
+        self.assertNotIn('flows', payload)
+        commercial = payload['commercial']
+        self.assertEqual(commercial['orders_total'], 1)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
+        self.assertEqual(len(commercial['awaiting_review']['blocks']), 1)
+        self.assertAlmostEqual(
+            commercial['awaiting_review']['blocks'][0]['value'],
+            review.amount_total, places=2,
+        )
+        block = commercial['blocks'][0]
+        self.assertAlmostEqual(block['gross'], kept.amount_total, places=2)
+        self.assertAlmostEqual(block['net'], kept.amount_total, places=2)
+        self.assertEqual(block['refunds'], 0.0)
+        self.assertIn('excluded', commercial['refund_scope_note'].lower())
+
+    def test_kpis_equal_drilldowns_with_review_quarantine_and_cancel(self):
+        """A3: every commercial KPI reconciles to its exact population."""
+        kept = self._imported_order(days_ago=1, amount=125.0, qty=2)
+        review = self._imported_order(
+            days_ago=1, amount=500.0, qty=5, status='review',
+        )
+        quarantined = self._imported_order(
+            days_ago=1, amount=1000.0, qty=10,
+            sec3_scope_quarantined=True,
+        )
+        cancelled = self._imported_order(days_ago=1, amount=2000.0, qty=20)
+        cancelled.write({'state': 'cancel'})
+
+        commercial = self._payload_360()['commercial']
+        self.assertEqual(commercial['orders_total'], 1)
+        self.assertEqual(commercial['units'], 2)
+        self.assertEqual(commercial['awaiting_review']['count'], 1)
+        review_block = commercial['awaiting_review']['blocks'][0]
+        self.assertAlmostEqual(
+            review_block['value'], review.amount_total, places=2,
+        )
+        self.assertEqual(len(commercial['blocks']), 1)
+        block = commercial['blocks'][0]
+        self.assertAlmostEqual(block['sales'], kept.amount_total, places=2)
+
+        Order = self.env['sale.order'].with_user(self.viewer)
+        Line = self.env['sale.order.line'].with_user(self.viewer)
+        order_domain = [
+            tuple(term) for term in commercial['orders_target']['domain']
+        ]
+        line_domain = [
+            tuple(term) for term in commercial['units_target']['domain']
+        ]
+        review_domain = [
+            tuple(term)
+            for term in commercial['awaiting_review']['target']['domain']
+        ]
+        reconciled = Order.search(order_domain)
+        self.assertEqual(reconciled, kept)
+        self.assertAlmostEqual(
+            sum(reconciled.mapped('amount_total')), block['sales'], places=2,
+        )
+        self.assertAlmostEqual(
+            sum(Line.search(line_domain).mapped('product_uom_qty')),
+            commercial['units'], places=2,
+        )
+        self.assertEqual(Order.search(review_domain), review)
+        review_currency_domain = [
+            tuple(term) for term in review_block['target']['domain']
+        ]
+        review_population = Order.search(review_currency_domain)
+        self.assertEqual(review_population, review)
+        self.assertAlmostEqual(
+            sum(review_population.mapped('amount_total')),
+            review_block['value'], places=2,
+        )
+        self.assertNotIn(quarantined, reconciled)
+        self.assertNotIn(cancelled, reconciled)
 
     def test_zero_orders_never_divides(self):
         payload = self._payload_360()
@@ -289,8 +408,9 @@ class TestStore360Aggregates(OrderImportCase):
         self.assertEqual(buckets['pending_non_cod'], 1)
         self.assertEqual(buckets['cod'], 1)
         self.assertEqual(buckets['review'], 1)
-        # An unknown financial value is disclosed, never silently healthy.
-        self.assertEqual(lifecycle['payment']['other'], 1)
+        # The unknown value belongs to the separately-disclosed review order;
+        # it cannot leak back into the reconciled remainder.
+        self.assertEqual(lifecycle['payment']['other'], 0)
 
         cod = lifecycle['cod']
         self.assertEqual(cod['total'], 1)
@@ -300,7 +420,7 @@ class TestStore360Aggregates(OrderImportCase):
         progress = {b['id']: b['count']
                     for b in lifecycle['fulfillment_progress']['buckets']}
         self.assertEqual(progress['fulfilled'], 1)
-        self.assertEqual(progress['unfulfilled'], 5)
+        self.assertEqual(progress['unfulfilled'], 4)
         self.assertEqual(progress['not_observed'], 0)
 
         self.assertTrue(lifecycle['oldest_paid_unfulfilled'])
@@ -371,6 +491,25 @@ class TestStore360Aggregates(OrderImportCase):
         payload = self._payload_360()
         self.assertEqual(payload['bridge']['state'], 'incomplete')
         self.assertTrue(payload['critical']['active'])
+
+    def test_disabled_order_import_routes_attention_to_settings(self):
+        self.settings.sudo().write({
+            'sale_domain_enabled': False,
+            'sale_order_last_import_checkpoint_at': fields.Datetime.now(),
+        })
+        payload = self._payload_360()
+        bridge = payload['bridge']
+        self.assertEqual(bridge['state'], 'incomplete')
+        self.assertEqual(bridge['g3'], 0)
+        self.assertIn('disabled', bridge['critical_text'])
+        self.assertEqual(
+            bridge['critical_target']['res_model'],
+            'shopify.connector.store.settings',
+        )
+        self.assertEqual(
+            bridge['critical_target']['domain'],
+            [['store_id', '=', self.store.id]],
+        )
 
     def test_unvalidated_filters_are_refused(self):
         from odoo.exceptions import UserError

@@ -1,13 +1,34 @@
 # Part of the Odoo 19 <-> Shopify Connector (Wave 4 Gate B).
 # Fulfillment / tracking backend: both Mode 1 (Odoo-controlled) and Mode 2
 # (bidirectional exact reconciliation). Every Shopify mutation runs under the
-# accepted DEC-036/DEC-031 Layer 2 substrate. No UI (Wave 5). No live Shopify
-# mutation in Gate B.
+# accepted DEC-036/DEC-031 Layer 2 substrate.
 {
     'name': 'Shopify Connector - Fulfillment',
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.10.0',
     'category': 'Connector',
-    'summary': 'Odoo 19 <-> Shopify fulfillment and tracking synchronisation',
+    'summary': (
+        'Guarded Odoo <-> Shopify fulfillment and tracking synchronization: '
+        'Mode 1 outbound operations, Mode 2 reconciliation, durable mode '
+        'transitions, review queues, operator controls, and recovery evidence.'
+    ),
+    'description': """
+Shopify Connector Fulfillment
+=============================
+
+Fulfillment and tracking domain module with two explicit operating modes.
+Mode 1 keeps Odoo in control of outbound Shopify fulfillment/tracking
+mutations. Mode 2 adds conservative inbound reconciliation and applies only
+eligible, fully evidenced changes. Mode changes use durable requested and
+effective state, a transition run, blocker/reason evidence, last-verified
+timestamps, and a normal-UI rollback path.
+
+Every Shopify mutation uses the connector's durable Layer 2 attempt and
+reconciliation protocol. The addon includes fulfillment binding and review
+workspaces, job recovery views, a mode-switch wizard and Store Settings
+controls. Unsupported or ambiguous cases fail closed to review. Freshness is
+scan/reconciliation based; there is no webhook delivery pipeline or OAuth
+flow, and no claim of live-Shopify certification in the module metadata.
+""",
     'author': 'Adams',
     'license': 'LGPL-3',
     'depends': [

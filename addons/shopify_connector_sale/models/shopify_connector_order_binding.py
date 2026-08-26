@@ -40,6 +40,12 @@ class ShopifyConnectorOrderBinding(models.Model):
     shopify_total_discounts_amount = fields.Char(readonly=True)
     shopify_total_shipping_amount = fields.Char(readonly=True)
     shopify_total_tip_amount = fields.Char(readonly=True)
+    shopify_line_composition_fingerprint = fields.Char(
+        size=64, readonly=True, index=True,
+    )
+    review_reason_code = fields.Char(readonly=True, index=True)
+    review_reason = fields.Text(readonly=True)
+    review_required_action = fields.Text(readonly=True)
     customer_resolution = fields.Selection(
         selection=[
             ('existing_binding', 'Existing Binding'),
@@ -146,6 +152,10 @@ class ShopifyConnectorOrderBinding(models.Model):
             'shopify_total_discounts_amount',
             'shopify_total_shipping_amount',
             'shopify_total_tip_amount',
+            'shopify_line_composition_fingerprint',
+            'review_reason_code',
+            'review_reason',
+            'review_required_action',
             'customer_resolution',
             'shopify_last_imported_at',
             'shopify_last_evidence_refresh_at',
@@ -175,16 +185,11 @@ class ShopifyConnectorOrderBinding(models.Model):
     def action_approve_manual_gateway_order(self, reason=False):
         """Record approval intent and enqueue a read-only evidence refresh."""
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'approve a manual-gateway order.'
             )
         if not isinstance(reason, str) or not reason.strip():

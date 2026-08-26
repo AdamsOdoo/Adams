@@ -89,12 +89,10 @@ class TestSec3InventoryCompanyIsolation(TransactionCase):
 
     @classmethod
     def _mapping(cls, store, location, tag):
-        # `with_company` is required, not incidental: the connector's write-side
-        # guard `_check_location_company_consistency` fails closed when the
-        # mapped location is outside `self.env.company`. Building the company-B
-        # fixture in company A's context is refused -- which is the guard
-        # working, and is exactly the write-side invariant SEC-3 §4.1 records.
-        # These record rules cover the READ side that guard does not reach.
+        # Keep the fixture environment aligned with its company for Odoo-owned
+        # defaults. The connector invariant itself compares location ownership
+        # with ``store.company_id`` and is deliberately independent of the
+        # operator's active company; these record rules cover the read side.
         return cls.env['shopify.connector.location.mapping'].sudo().with_company(
             location.company_id
         ).create({

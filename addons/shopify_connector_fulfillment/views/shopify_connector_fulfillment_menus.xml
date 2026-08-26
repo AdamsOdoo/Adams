@@ -1,59 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--
-        U1 operator UI: the fulfillment branch of the connector navigation.
-
-        Placement: under the existing U0 root (`menu_shopify_connector_root`),
-        between Sync Center (30) and Error & Review Center (40). U1 adds no new
-        root app menu — the operator keeps one connector app.
-
-        VISIBILITY vs AUTHORIZATION. Every menu here is gated on the SEC-2
-        customer-facing role `group_shopify_connector_user` (Connector
-        Administrator implies it). That is a VISIBILITY control only. The
-        server enforces the four internal capability groups on every action and
-        every ACL row, and a denied caller gets an AccessError with zero side
-        effects whether or not a menu was ever rendered. A hidden menu is never
-        the security control.
-
-        Every destination is a real, usable U1 screen; there are no
-        placeholders for later work.
-    -->
+    <!-- C1: fulfillment operations remain visible to Connector Users while
+         settings and mode move to Administrator-only Configuration. -->
 
     <menuitem id="menu_shopify_connector_fulfillment"
-              name="Fulfillment"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="35"
+              name="Fulfillments"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              action="action_shopify_connector_fulfillment_binding"
+              sequence="40"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_review"
-              name="Review Workspace"
-              parent="menu_shopify_connector_fulfillment"
+              name="Fulfillment Review"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
               action="action_shopify_connector_fulfillment_review"
-              sequence="10"/>
+              sequence="45"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_binding"
               name="Fulfillments"
               parent="menu_shopify_connector_fulfillment"
               action="action_shopify_connector_fulfillment_binding"
-              sequence="20"/>
+              sequence="20"
+              active="False"/>
 
     <menuitem id="menu_shopify_connector_fulfillment_jobs"
-              name="Fulfillment Jobs"
+              name="Fulfillment Runs"
               parent="menu_shopify_connector_fulfillment"
               action="action_shopify_connector_fulfillment_job"
-              sequence="30"/>
+              sequence="30"
+              active="False"/>
 
-    <!--
-        The operating-mode surface. The mode fields themselves carry
-        `groups="...group_shopify_connector_admin"` at the Python field-security
-        layer, so a Connector User who opens this screen simply does not receive
-        them. The menu stays visible to the User role because the notification
-        and reconciliation-watermark fields on the same record are not
-        Administrator-restricted and are useful to an operator.
-    -->
+    <!-- The operating-mode surface is Configuration and therefore
+         Administrator-only at both menu and action layers. Python field
+         security and the existing server guards remain the final boundary. -->
     <menuitem id="menu_shopify_connector_fulfillment_settings"
-              name="Fulfillment Settings"
-              parent="menu_shopify_connector_fulfillment"
+              name="Fulfillment Settings and Mode"
+              parent="shopify_connector_core.menu_shopify_connector_configuration"
               action="action_shopify_connector_fulfillment_settings"
-              sequence="40"/>
+              groups="shopify_connector_core.group_shopify_connector_admin"
+              sequence="50"/>
 </odoo>

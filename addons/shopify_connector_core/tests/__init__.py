@@ -24,6 +24,7 @@ from . import test_redaction
 from . import test_security_hardening
 from . import test_test_connection
 from . import test_mutation_attempt
+from . import test_mutation_acknowledgement
 from . import test_mutation_dispatch
 from . import test_mutation_reconciliation
 from . import test_mutation_recovery
@@ -65,3 +66,4 @@ from . import canonical_settings_classification
 from . import test_canonical_store_settings
 from . import test_batch2_journeys_core
 from . import test_ui_b2_settings_tours
+from . import test_graphql_schema_conformance

@@ -108,6 +108,55 @@ class TestUiU2Inventory(TransactionCase):
                 'shopify_connector_inventory.%s is missing' % name,
             )
 
+    def test_inventory_and_configuration_destinations_are_separated(self):
+        operations = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_operations'
+        )
+        mappings = self.env.ref(
+            'shopify_connector_product.menu_shopify_connector_catalog'
+        )
+        configuration = self.env.ref(
+            'shopify_connector_core.menu_shopify_connector_configuration'
+        )
+        inventory = self.env.ref(
+            'shopify_connector_inventory.menu_shopify_connector_inventory'
+        )
+        self.assertEqual(inventory.parent_id, operations)
+        self.assertEqual(
+            inventory.action,
+            self.env.ref(
+                'shopify_connector_inventory.'
+                'action_shopify_connector_inventory_workspace'
+            ),
+        )
+        self.assertFalse(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_inventory_workspace'
+        ).active)
+        self.assertEqual(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_inventory_first_push'
+        ).parent_id, configuration)
+        self.assertEqual(self.env.ref(
+            'shopify_connector_inventory.'
+            'menu_shopify_connector_location_mapping'
+        ).parent_id, mappings)
+
+    def test_inventory_configuration_actions_are_administrator_only(self):
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        for name in (
+            'action_shopify_connector_inventory_first_push',
+            'action_shopify_connector_location_mapping',
+            'action_shopify_connector_location_refresh_wizard',
+            'action_shopify_connector_location_map_wizard',
+        ):
+            action = self.env.ref(
+                'shopify_connector_inventory.%s' % name
+            )
+            self.assertEqual(action.group_ids, admin)
+
     def test_first_push_guard_is_its_own_filtered_surface(self):
         """RA-008: the ceremony must not be buried in the routine queue."""
         guard = self.env.ref(
@@ -223,17 +272,8 @@ class TestUiU2Inventory(TransactionCase):
                     [], limit=1,
                 )
 
-    def test_push_toggle_gating_matches_the_server_guard_exactly(self):
-        """The view must gate on what the SERVER permits, not on a doc.
-
-        `action_set_push_enabled` admits Operator or Administrator. The
-        premium UX master specification lists this screen as User-read /
-        Administrator-act, which disagrees. This test pins the view to the
-        server: an auditor-only caller is refused, and a Connector User --
-        who implies Operator -- is permitted. If the server guard is ever
-        tightened to Administrator, this test fails and the button's
-        `groups=` has to move with it.
-        """
+    def test_push_toggle_is_administrator_only(self):
+        """Changing a location mapping is connector configuration."""
         mapping = self._mapping('gid://shopify/Location/U2Denied')
         auditor = self._user('u2_inv_auditor', [
             'shopify_connector_core.group_shopify_connector_auditor',
@@ -247,13 +287,20 @@ class TestUiU2Inventory(TransactionCase):
             'a refused toggle must leave the mapping untouched',
         )
 
-        connector_user = self._user('u2_inv_user_allowed', [
+        connector_user = self._user('u2_inv_user_denied', [
             'shopify_connector_core.group_shopify_connector_user',
         ])
         self.assertTrue(connector_user.has_group(
             'shopify_connector_core.group_shopify_connector_operator'
-        ), 'Connector User must imply Operator for this gating to hold')
-        mapping.with_user(connector_user).action_set_push_enabled(not before)
+        ), 'Connector User must retain routine Operator capability')
+        with self.assertRaises(AccessError):
+            mapping.with_user(connector_user).action_set_push_enabled(not before)
+        mapping.invalidate_recordset()
+        self.assertEqual(mapping.push_enabled, before)
+        admin = self._user('u2_inv_user_admin', [
+            'shopify_connector_core.group_shopify_connector_admin',
+        ])
+        mapping.with_user(admin).action_set_push_enabled(not before)
         mapping.invalidate_recordset()
         self.assertEqual(mapping.push_enabled, not before)
 

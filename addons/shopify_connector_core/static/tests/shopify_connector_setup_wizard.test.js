@@ -21,31 +21,49 @@ import { mountWithCleanup, mockService } from "@web/../tests/web_test_helpers";
 import { ShopifyConnectorSetupWizard } from "@shopify_connector_core/js/shopify_connector_setup_wizard";
 
 const STEPS = [
-    ["welcome", "Welcome"],
-    ["identity", "Store identity"],
-    ["credential", "Credentials"],
-    ["scopes", "Permissions"],
-    ["test_connection", "Test connection"],
-    ["directions", "What to sync"],
-    ["location_mapping", "Location mapping"],
-    ["source_of_truth", "Source of truth"],
-    ["notification", "Customer notifications"],
-    ["first_push", "First stock push"],
-    ["final_readiness", "Final readiness"],
-    ["review", "Review and activate"],
+    ["welcome", "Welcome", "connect", "Connect", 1],
+    ["identity", "Store identity", "connect", "Connect", 1],
+    ["credential", "Credentials", "connect", "Connect", 1],
+    ["scopes", "Permissions", "connect", "Connect", 1],
+    ["test_connection", "Test connection", "connect", "Connect", 1],
+    ["directions", "What to sync", "choose", "Choose", 2],
+    ["location_mapping", "Location mapping", "map", "Map", 3],
+    ["source_of_truth", "Source of truth", "protect", "Protect", 4],
+    ["notification", "Customer notifications", "protect", "Protect", 4],
+    ["first_push", "First stock push", "protect", "Protect", 4],
+    ["final_readiness", "Final readiness", "verify", "Verify", 5],
+    ["review", "Review and activate", "verify", "Verify", 5],
+];
+
+const PHASES = [
+    ["connect", "Connect"],
+    ["choose", "Choose"],
+    ["map", "Map"],
+    ["protect", "Protect"],
+    ["verify", "Verify"],
 ];
 
 function payload(overrides = {}) {
     return Object.assign(
         {
-            steps: STEPS.map(([key, label], index) => ({
+            steps: STEPS.map(([key, label, phaseKey, phaseLabel, phaseIndex], index) => ({
                 index: index + 1,
                 key,
                 label,
+                phase_key: phaseKey,
+                phase_label: phaseLabel,
+                phase_index: phaseIndex,
                 applicable: true,
                 skipped_reason: "",
             })),
             step_count: STEPS.length,
+            phases: PHASES.map(([key, label], index) => ({
+                index: index + 1,
+                key,
+                label,
+                step_keys: STEPS.filter((step) => step[2] === key).map((step) => step[0]),
+            })),
+            phase_count: PHASES.length,
             resume_step_key: "welcome",
             resume_step: 1,
             store: {
@@ -87,6 +105,9 @@ function payload(overrides = {}) {
                 mapped_count: 0,
                 unmapped_count: 0,
                 has_valid_mapping: false,
+                mapping_complete: false,
+                shopify_total: 0,
+                odoo_total: 0,
             },
             matching_choices: [
                 {
@@ -163,11 +184,89 @@ describe("shopify connector setup wizard", () => {
         expect(labels).toEqual(STEPS.map(([, label]) => label));
     });
 
+    test("groups the unchanged twelve steps into the five merchant phases", async () => {
+        mockOrm(() => payload());
+        await mount();
+        const phases = queryAll(".sc_setup_phase__label").map((el) =>
+            el.textContent.trim()
+        );
+        expect(phases).toEqual(PHASES.map(([, label]) => label));
+        expect(queryAll(".sc_setup_phase")).toHaveLength(5);
+        expect(queryAll(".sc_setup_step")).toHaveLength(12);
+        expect(queryText(".sc_setup__heading")).toInclude("Phase 1 of 5");
+    });
+
     test("the heading states the step number and the total", async () => {
         mockOrm(() => payload());
         await mount();
         expect(queryText(".sc_setup__heading")).toInclude("Step 1 of 12");
         expect(queryText(".sc_setup__heading")).toInclude("Welcome");
+    });
+
+    test("starting another store clears location transients and refocuses the heading", async () => {
+        const existing = payload({
+            store: Object.assign(payload().store, {
+                id: 9,
+                name: "Existing store",
+                shop_domain: "existing.myshopify.com",
+            }),
+            stores: [{ id: 9, name: "Existing store" }],
+        });
+        const blank = payload({
+            stores: [{ id: 9, name: "Existing store" }],
+        });
+        mockOrm((method, kwargs) =>
+            method === "get_setup_state" && kwargs.new_store
+                ? blank
+                : existing
+        );
+        const component = await mount();
+
+        for (const side of ["shopify", "odoo"]) {
+            Object.assign(component.state.locationSearch[side], {
+                query: "old-store-search",
+                items: [{ id: "old" }],
+                total: 8,
+                offset: 4,
+                nextOffset: 6,
+                continuation: "old-store-continuation",
+                emptyReason: "old-store-reason",
+            });
+        }
+        component.state.locationMappingChoices["old-store-gid"] = "12";
+        component.state.locationRefreshStillRunning = true;
+        component.locationRefreshJobId = 44;
+        component.locationRefreshFollowGeneration = 7;
+        const poll = component._waitForLocationRefresh(
+            10000,
+            component.locationRefreshFollowGeneration
+        );
+
+        await component.startNewStore();
+        await poll;
+        await animationFrame();
+
+        expect(queryFirst(".o_sc_setup").getAttribute("data-store-id")).toBe(
+            "new"
+        );
+        for (const side of ["shopify", "odoo"]) {
+            const search = component.state.locationSearch[side];
+            expect(search.query).toBe("");
+            expect(search.items).toBe(null);
+            expect(search.total).toBe(0);
+            expect(search.offset).toBe(0);
+            expect(search.nextOffset).toBe(false);
+            expect(search.continuation).toBe(null);
+            expect(search.emptyReason).toBe("");
+        }
+        expect(
+            Object.keys(component.state.locationMappingChoices)
+        ).toHaveLength(0);
+        expect(component.locationRefreshJobId).toBe(null);
+        expect(component.state.locationRefreshStillRunning).toBe(false);
+        expect(component.locationRefreshTimer).toBe(null);
+        expect(component.locationRefreshTimerResolve).toBe(null);
+        expect(document.activeElement).toBe(queryFirst(".sc_setup__heading"));
     });
 
     test("it opens at the resume step key, not always at the first step", async () => {
@@ -303,6 +402,178 @@ describe("shopify connector setup wizard", () => {
             "Existing Admin API access token"
         );
         expect(Boolean(queryFirst(".sc_setup_token"))).toBe(true);
+    });
+
+    test("a stored client credential is retained through a non-secret check", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 9,
+                    credential_present: true,
+                    auth_mode: "dev_dashboard_client_credentials",
+                    client_credentials_present: true,
+                }),
+            })
+        );
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(calls[0].kwargs.auth_mode).toBe(
+            "dev_dashboard_client_credentials"
+        );
+        expect(queryText(".sc_setup__heading")).toInclude("Permissions");
+    });
+
+    test("a stored offline token is retained through a non-secret check", async () => {
+        mockOrm(() =>
+            payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 10,
+                    credential_present: true,
+                    auth_mode: "offline_access_token",
+                }),
+            })
+        );
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(calls[0].kwargs.auth_mode).toBe("offline_access_token");
+        expect(queryText(".sc_setup__heading")).toInclude("Permissions");
+    });
+
+    test("a stale stored-credential snapshot is refused by the action-time check", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, {
+                        id: 12,
+                        credential_present: true,
+                        auth_mode: "dev_dashboard_client_credentials",
+                        client_credentials_present: true,
+                    }),
+                });
+            }
+            const error = new Error("stale credential");
+            error.data = {
+                message: "The stored credential is no longer present.",
+            };
+            throw error;
+        });
+        await mount();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        expect(calls).toHaveLength(1);
+        expect(calls[0].method).toBe("retain_existing_credential");
+        expect(queryText(".sc_setup__error")).toInclude("no longer present");
+        expect(queryText(".sc_setup__heading")).toInclude("Credentials");
+    });
+
+    test("a client secret is cleared when Client ID validation fails locally", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, { id: 13 }),
+                });
+            }
+            return payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 13,
+                    credential_present: true,
+                    auth_mode: "dev_dashboard_client_credentials",
+                    client_credentials_present: true,
+                }),
+            });
+        });
+        const component = await mount();
+        const canary = "HOOT_EARLY_VALIDATION_SECRET_LEAKCANARY";
+        const secretInput = queryFirst(".sc_setup_client_secret");
+        secretInput.value = canary;
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+
+        expect(queryText(".sc_setup__error")).toInclude("Client ID");
+        expect(secretInput.value).toBe("");
+        expect(calls).toHaveLength(0);
+        expect(JSON.stringify(component.state)).not.toInclude(canary);
+        expect(JSON.stringify(component.props)).not.toInclude(canary);
+        expect(document.body.innerHTML).not.toInclude(canary);
+
+        // Prove a later request cannot inherit the rejected value.
+        queryFirst(".sc_setup_client_id").value = "replacement-client-id";
+        queryFirst(".sc_setup_client_secret").value =
+            "replacement-secret-without-canary";
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        expect(JSON.stringify(calls)).not.toInclude(canary);
+        expect(JSON.stringify(component.state)).not.toInclude(canary);
+        expect(JSON.stringify(component.props)).not.toInclude(canary);
+        expect(document.body.innerHTML).not.toInclude(canary);
+        for (const element of document.querySelectorAll("*")) {
+            for (const attribute of element.attributes) {
+                expect(attribute.value).not.toInclude(canary);
+            }
+            if ("value" in element) {
+                expect(String(element.value)).not.toInclude(canary);
+            }
+        }
+    });
+
+    test("changing credential mode still requires replacement values", async () => {
+        mockOrm((method) => {
+            if (method === "get_setup_state") {
+                return payload({
+                    resume_step_key: "credential",
+                    store: Object.assign(payload().store, {
+                        id: 11,
+                        credential_present: true,
+                        auth_mode: "dev_dashboard_client_credentials",
+                        client_credentials_present: true,
+                    }),
+                });
+            }
+            return payload({
+                resume_step_key: "credential",
+                store: Object.assign(payload().store, {
+                    id: 11,
+                    credential_present: true,
+                    auth_mode: "offline_access_token",
+                }),
+            });
+        });
+        const component = await mount();
+        queryFirst(".sc_setup__mode input[value='offline_access_token']").click();
+        await animationFrame();
+        calls = [];
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        expect(calls).toHaveLength(0);
+        expect(queryText(".sc_setup__error")).toInclude("Paste the Admin API access token");
+
+        queryFirst(".sc_setup_token").value = "shpat_HOOT_MODE_SWITCH_LEAKCANARY";
+        queryFirst(".sc_setup_continue").click();
+        await animationFrame();
+        await animationFrame();
+        const sent = calls.find((call) => call.method === "save_credential");
+        expect(Boolean(sent)).toBe(true);
+        expect(sent.kwargs.token).toBe("shpat_HOOT_MODE_SWITCH_LEAKCANARY");
+        expect(JSON.stringify(component.state)).not.toInclude(
+            "shpat_HOOT_MODE_SWITCH_LEAKCANARY"
+        );
     });
 
     test("the client secret is never held in component state", async () => {
@@ -577,6 +848,35 @@ describe("shopify connector setup wizard", () => {
         expect(row).not.toInclude("Passed");
     });
 
+    test("activation is disabled while an essential readiness check blocks", async () => {
+        const blocking = [{
+            code: "catalog_export_permissions",
+            label: "Catalog export permissions",
+            reason: "A forbidden scope is granted.",
+        }];
+        mockOrm(() =>
+            payload({
+                resume_step_key: "review",
+                store: Object.assign(payload().store, { id: 5 }),
+                readiness: {
+                    ran: true,
+                    overall: "fail",
+                    stale: false,
+                    checks: [],
+                    blocking,
+                    waiting: [],
+                },
+                summary: Object.assign(payload().summary, {
+                    can_activate: false,
+                    blocking,
+                }),
+            })
+        );
+        await mount();
+        expect(queryFirst(".sc_setup_continue").disabled).toBe(true);
+        expect(queryText(".sc_setup__summary")).toInclude("Blocked: 1 essential");
+    });
+
     test("a pending location refresh is not reported as an empty Shopify store", async () => {
         mockOrm(() =>
             payload({
@@ -591,6 +891,9 @@ describe("shopify connector setup wizard", () => {
                     mapped_count: 0,
                     unmapped_count: 0,
                     has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 0,
+                    odoo_total: 0,
                 },
             })
         );
@@ -599,6 +902,72 @@ describe("shopify connector setup wizard", () => {
         expect(panel).toInclude("Reading your Shopify locations");
         expect(panel).toInclude("not a report that Shopify has no locations");
         expect(queryText(".sc_setup_refresh_state")).toInclude("Waiting");
+    });
+
+    test("entering the required location step starts discovery automatically", async () => {
+        const initial = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "none", job_id: false, reason: "" },
+            }),
+        });
+        const loaded = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+            }),
+        });
+        mockOrm((method) =>
+            method === "refresh_shopify_locations" ? loaded : initial
+        );
+
+        await mount();
+
+        expect(
+            calls.some((call) => call.method === "refresh_shopify_locations")
+        ).toBe(true);
+    });
+
+    test("re-entering location mapping refreshes an already populated cache", async () => {
+        const cached = payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                locations: [{
+                    shopify_gid: "gid://shopify/Location/1",
+                    name: "Shop location",
+                    mapped: false,
+                }],
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+                shopify_total: 1,
+                unmapped_count: 1,
+            }),
+        });
+        mockOrm(() => cached);
+
+        await mount();
+
+        expect(queryText(".sc_setup__panel")).toInclude("Shop location");
+        expect(
+            calls.some((call) => call.method === "refresh_shopify_locations")
+        ).toBe(true);
+    });
+
+    test("Continue stays disabled until every active location is mapped", async () => {
+        mockOrm(() => payload({
+            resume_step_key: "location_mapping",
+            store: Object.assign(payload().store, { id: 5 }),
+            location_mapping: Object.assign({}, payload().location_mapping, {
+                refresh: { state: "succeeded", job_id: false, reason: "" },
+                shopify_total: 2,
+                unmapped_count: 1,
+                mapping_complete: false,
+            }),
+        }));
+        await mount();
+        expect(queryFirst(".sc_setup_continue").disabled).toBe(true);
     });
 
     test("a mapped and an unmapped location are visibly different", async () => {
@@ -633,7 +1002,10 @@ describe("shopify connector setup wizard", () => {
                     refresh: { state: "succeeded", job_id: 7, reason: "" },
                     mapped_count: 1,
                     unmapped_count: 1,
-                    has_valid_mapping: true,
+                    has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 2,
+                    odoo_total: 1,
                 },
             })
         );
@@ -642,7 +1014,7 @@ describe("shopify connector setup wizard", () => {
         expect(rows[0]).toInclude("Mapped");
         expect(rows[0]).toInclude("WH/Stock");
         expect(rows[1]).toInclude("Not mapped");
-        expect(rows[1]).toInclude("will not be synchronised");
+        expect(rows[1]).toInclude("Choose the Odoo location");
     });
 
     // ======================================================================
@@ -803,6 +1175,9 @@ describe("shopify connector setup wizard", () => {
                     mapped_count: 0,
                     unmapped_count: 0,
                     has_valid_mapping: false,
+                    mapping_complete: false,
+                    shopify_total: 0,
+                    odoo_total: 0,
                 },
                 locationMapping
             ),
@@ -821,7 +1196,13 @@ describe("shopify connector setup wizard", () => {
                     return server.page(kwargs);
                 }
                 if (method === "save_location_mapping") {
-                    return onSaveMapping ? onSaveMapping(kwargs) : state;
+                    // The production RPC returns the complete setup payload;
+                    // keep the callback as an observation hook, but do not
+                    // let a truthy sentinel replace that payload in `_adopt`.
+                    if (onSaveMapping) {
+                        onSaveMapping(kwargs);
+                    }
+                    return state;
                 }
                 return state;
             },
@@ -859,8 +1240,16 @@ describe("shopify connector setup wizard", () => {
             locationMapping: {
                 locations: [shopifyRow(1)],
                 odoo_locations: [odooRow(9)],
+                shopify_total: 11,
             },
         });
+        component.setLocationMappingChoice(
+            "gid://shopify/Location/1",
+            "9"
+        );
+        await animationFrame();
+        expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(false);
+
         server.hold = true;
         const inFlight = component.searchLocations("shopify");
         await animationFrame();
@@ -871,6 +1260,7 @@ describe("shopify connector setup wizard", () => {
 
         await releaseSearch(server);
         await inFlight;
+        await animationFrame();
         expect(component.state.busy).toBe(false);
         expect(queryFirst(".sc_setup_search_shopify_go").disabled).toBe(false);
         expect(queryFirst(".sc_setup_create_mapping").disabled).toBe(false);
@@ -1082,10 +1472,9 @@ describe("shopify connector setup wizard", () => {
         await component.searchLocations("odoo");
         await animationFrame();
 
-        component.state.form.mapShopifyGid = "gid://shopify/Location/3";
-        component.state.form.mapOdooLocationId = "10";
+        component.setLocationMappingChoice("gid://shopify/Location/3", "10");
         const searchesBefore = server.searchCalls.length;
-        await component.createMapping();
+        await component.createMapping("gid://shopify/Location/3");
         await animationFrame();
 
         // The write happened, with both identities explicit.
@@ -1111,8 +1500,9 @@ describe("shopify connector setup wizard", () => {
         );
         expect(mapped[0].textContent).toInclude("WH10/Stock");
         // The selection is consumed, not left armed for a second click.
-        expect(component.state.form.mapShopifyGid).toBe("");
-        expect(component.state.form.mapOdooLocationId).toBe("");
+        expect(
+            component.state.locationMappingChoices["gid://shopify/Location/3"]
+        ).toBe(undefined);
     });
 
     test("a selection is revalidated after every search, clear and load more", async () => {
@@ -1137,16 +1527,12 @@ describe("shopify connector setup wizard", () => {
         await animationFrame();
         component.state.form.mapShopifyGid = "gid://shopify/Location/1";
         await animationFrame();
-        expect(queryFirst("#sc_setup_map_shopify").value).toBe(
-            "gid://shopify/Location/1"
-        );
 
         // ...and gone after the next one.
         shopify.query = "south";
         await component.searchLocations("shopify");
         await animationFrame();
         expect(component.state.form.mapShopifyGid).toBe("");
-        expect(queryFirst("#sc_setup_map_shopify").value).toBe("");
 
         // Load more keeps a selection that is still on screen...
         component.state.form.mapShopifyGid = "gid://shopify/Location/2";
@@ -1239,7 +1625,15 @@ describe("shopify connector setup wizard", () => {
             odoo: [],
             emptyReasonFor: () => reason,
         });
-        const component = await mountLocationStep(server);
+        const component = await mountLocationStep(server, {
+            locationMapping: {
+                refresh: {
+                    state: "failed",
+                    job_id: 7,
+                    reason: "Automatic loading did not finish.",
+                },
+            },
+        });
 
         component.state.locationSearch.shopify.query = "nothing matches this";
         await component.searchLocations("shopify");
@@ -1248,10 +1642,9 @@ describe("shopify connector setup wizard", () => {
         expect(noResults).toInclude("No location matches this search");
         // The controls that are the way OUT of a fruitless search must survive
         // it: a zero-result search used to hide the search row, the Clear
-        // button and the Map control together, leaving no visible route back.
+        // button together, leaving no visible route back.
         expect(queryAll(".sc_setup_search_shopify")).toHaveLength(1);
         expect(queryAll(".sc_setup_search_shopify_clear")).toHaveLength(1);
-        expect(queryAll(".sc_setup_create_mapping")).toHaveLength(1);
 
         reason = "no_cached_locations";
         component.state.locationSearch.shopify.query = "";
@@ -1259,7 +1652,8 @@ describe("shopify connector setup wizard", () => {
         await animationFrame();
         const noCache = queryText(".sc_setup__empty--shopify");
         expect(noCache).toInclude("No Shopify locations have been read");
-        expect(noCache).toInclude("Refresh Shopify locations");
+        expect(noCache).toInclude("Try again");
+        expect(queryText(".sc_setup_refresh_locations")).toInclude("Try again");
         expect(noCache).not.toBe(noResults);
     });
 

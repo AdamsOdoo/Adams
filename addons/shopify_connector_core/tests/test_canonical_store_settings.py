@@ -20,6 +20,7 @@ from odoo.addons.shopify_connector_core.tests.canonical_settings_classification 
     CANONICAL_LIST_XMLID,
     CANONICAL_READONLY,
     CLASSIFIED_MODULES,
+    OPTIONAL_CLASSIFIED_MODULES,
     INTERNAL_PROTECTED,
     OWNED_BY_SURFACE,
     SETTINGS_MODEL,
@@ -29,6 +30,7 @@ from odoo.addons.shopify_connector_core.tests.canonical_settings_classification 
     contributing_modules,
     fields_contributed_by,
 )
+from odoo.tools import mute_logger
 
 MODULE = 'shopify_connector_core'
 
@@ -176,10 +178,22 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
         them.
         """
         live = contributing_modules(self.env)
+        required_classified = CLASSIFIED_MODULES - OPTIONAL_CLASSIFIED_MODULES
         self.assertEqual(
-            live & CLASSIFIED_MODULES, CLASSIFIED_MODULES,
-            'a module with a classification test no longer contributes '
-            'settings fields; the guard has drifted from the registry',
+            live & required_classified, required_classified,
+            'a required module with a classification test no longer '
+            'contributes settings fields; the guard has drifted from the '
+            'registry',
+        )
+        installed_optional = set(self.env['ir.module.module'].search([
+            ('name', 'in', list(OPTIONAL_CLASSIFIED_MODULES)),
+            ('state', '=', 'installed'),
+        ]).mapped('name'))
+        self.assertEqual(
+            live & OPTIONAL_CLASSIFIED_MODULES,
+            installed_optional,
+            'classified optional addons must contribute fields exactly when '
+            'they are installed; absent migration-era addons are explicit',
         )
         self.assertEqual(
             live & UNCLASSIFIED_CONTRIBUTING_MODULES,
@@ -278,6 +292,11 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
             self.env.ref(
                 'shopify_connector_core.menu_shopify_connector_configuration'
             ).group_ids,
+        )
+        self.assertTrue(menu.active)
+        self.assertFalse(
+            menu.child_id.filtered('active'),
+            'Sync Rules must remain a clickable route, not a menu heading.',
         )
 
     # ------------------------------------------------------------------
@@ -381,6 +400,7 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
         ).action_open_canonical_store_settings()
         self.assertFalse(self._settings_for(orphan))
 
+    @mute_logger('odoo.sql_db')
     def test_row_ensure_contains_a_concurrent_unique_row_winner(self):
         """The `UNIQUE(store_id)` violation is contained, not raised.
 
@@ -472,6 +492,7 @@ class TestCanonicalStoreSettingsCore(TransactionCase):
         settings.write({'setup_readiness_stale_since': False})
         self.assertFalse(settings.setup_readiness_stale_since)
 
+    @mute_logger('odoo.sql_db')
     def test_existing_constraints_stay_load_bearing_on_the_form_path(self):
         """§6.8: the form saves through the ordinary write path.
 

@@ -8,6 +8,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (
     FulfillmentReadError,
 )
+from odoo.tools import mute_logger
 
 
 class _FakeRecordset(list):
@@ -1272,6 +1273,10 @@ class TestFulfillmentMode2Engine(TransactionCase):
 
     # -- Correction P0-2: atomic Mode-2 application ------------------------
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_fulfillment.models.'
+        'shopify_connector_fulfillment_mode2'
+    )
     def test_apply_mode2_expected_validation_failure_rolls_back_atomically(self):
         # An EXPECTED business/applicability failure (UserError) during
         # local validation must roll back the ENTIRE bind/validate/ledger
@@ -1327,6 +1332,10 @@ class TestFulfillmentMode2Engine(TransactionCase):
             ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
         ]))
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_fulfillment.models.'
+        'shopify_connector_fulfillment_mode2'
+    )
     def test_apply_mode2_failure_after_validation_before_ledger_rolls_back(self):
         # Local validation SUCCEEDS, but a later failure inside the same
         # atomic unit (ledger creation) still rolls back the EARLIER binding
@@ -1353,6 +1362,10 @@ class TestFulfillmentMode2Engine(TransactionCase):
             ('store_id', '=', self.store.id), ('picking_id', '=', picking.id),
         ]))
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_fulfillment.models.'
+        'shopify_connector_fulfillment_mode2'
+    )
     def test_retry_after_rolled_back_failure_can_succeed(self):
         # After a failed+rolled-back attempt, retrying the same evidence
         # must be able to succeed cleanly -- nothing left over from the

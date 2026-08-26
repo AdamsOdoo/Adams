@@ -21,6 +21,7 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     InventoryActivationSupersededError,
     InventoryPreC2FailClosedError,
 )
+from odoo.tools import mute_logger
 
 
 FIXED_ERROR_CLASS_VOCABULARY = frozenset((
@@ -119,7 +120,7 @@ class TestInventoryPushMechanics(TransactionCase):
             'login': 'push_mechanics_reviewer',
             'group_ids': [(6, 0, [
                 cls.env.ref(
-                    'shopify_connector_core.group_shopify_connector_reviewer'
+                    'shopify_connector_core.group_shopify_connector_admin'
                 ).id,
             ])],
         })
@@ -1951,6 +1952,7 @@ class TestInventoryPushMechanics(TransactionCase):
         job.invalidate_recordset()
         self.assertFalse(job.operation_scope_key)
 
+    @mute_logger('odoo.sql_db')
     def test_duplicate_pair_rejected_via_operation_scope_key(self):
         self._make_mutation_job('inventory_push_sync')
         with self.assertRaises(Exception):
@@ -2490,6 +2492,10 @@ class TestInventoryPushMechanics(TransactionCase):
             ('job_id', 'in', successors.ids),
         ]))
 
+    @mute_logger(
+        'odoo.addons.shopify_connector_inventory.models.'
+        'shopify_connector_inventory_service'
+    )
     def test_activate_success_conflicting_gid_flags_review_not_overwrite(self):
         self.binding.sudo().write({
             'shopify_gid': 'gid://shopify/InventoryLevel/RECORDED',
@@ -3389,6 +3395,34 @@ class TestInventoryPushMechanics(TransactionCase):
         self.assertNotIn('payload.get("userErrors") or []', source)
         self.assertNotIn('result.get("user_errors") or []', source)
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        _source, tree = self._service_source_tree()
+        calls = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+        ]
+        self.assertFalse(
+            [
+                node.lineno for node in calls
+                if node.func.attr == 'execute'
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == 'client'
+            ],
+        )
+        read_calls = [
+            node for node in calls
+            if node.func.attr == 'execute_business_read'
+        ]
+        self.assertEqual(len(read_calls), 2)
+        for call in read_calls:
+            purpose = next(
+                (kw.value for kw in call.keywords if kw.arg == 'purpose'),
+                None,
+            )
+            self.assertIsInstance(purpose, ast.Constant)
+            self.assertEqual(purpose.value, 'inventory')
+
     # ------------------------------------------------------------------
     # `_read_shopify_inventory_pair` response-shape hardening (PR #182
     # comment 5029906989 item 4/8) -- exercised through a mocked
@@ -3416,58 +3450,347 @@ class TestInventoryPushMechanics(TransactionCase):
         }}
 
     def test_read_pair_rejects_duplicate_available_entries(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response([
-                {'name': 'available', 'quantity': 5, 'updatedAt': None},
-                {'name': 'available', 'quantity': 7, 'updatedAt': None},
-            ]),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response([
+                    {'name': 'available', 'quantity': 5, 'updatedAt': None},
+                    {'name': 'available', 'quantity': 7, 'updatedAt': None},
+                ]),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_rejects_item_identity_mismatch(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
-                [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
-                item_id='gid://shopify/InventoryItem/DIFFERENT',
-            ),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response(
+                    [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
+                    item_id='gid://shopify/InventoryItem/DIFFERENT',
+                ),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_rejects_level_location_identity_mismatch(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
-                [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
-                location_id='gid://shopify/Location/WRONG',
-            ),
-        ):
-            with self.assertRaises(JobHandlerError):
-                self.Service._read_shopify_inventory_pair(
-                    self.store, self.binding,
-                )
+        with self.assertRaises(JobHandlerError):
+            self.Service._inventory_pair_read_result(
+                self._pair_read_response(
+                    [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
+                    location_id='gid://shopify/Location/WRONG',
+                ),
+                self.binding.shopify_inventory_item_gid,
+                self.mapping.shopify_gid,
+            )
 
     def test_read_pair_accepts_well_formed_response(self):
-        with patch.object(
-            type(self.env['shopify.connector.api.client']), 'execute',
-            return_value=self._pair_read_response(
+        read = self.Service._inventory_pair_read_result(
+            self._pair_read_response(
                 [{'name': 'available', 'quantity': 5, 'updatedAt': None}],
             ),
-        ):
-            read = self.Service._read_shopify_inventory_pair(
-                self.store, self.binding,
-            )
+            self.binding.shopify_inventory_item_gid,
+            self.mapping.shopify_gid,
+        )
         self.assertEqual(read['available'], 5)
         self.assertEqual(
             read['inventory_level_gid'], 'gid://shopify/InventoryLevel/1',
         )
+
+
+    def test_activation_handoff_race_preserves_terminal_evidence_without_child(self):
+        """A parent status race after the lock check must not roll back the
+        orchestration terminal state or create a child job."""
+        Service = self.Service
+        job = self._make_push_sync_dispatch_job()
+        original_eligible = type(Service)._binding_operationally_eligible
+        calls = []
+
+        def _eligible_with_race(service, binding):
+            calls.append(True)
+            if len(calls) == 3:
+                self.variant_binding.sudo().write({'status': 'stale'})
+            return original_eligible(service, binding)
+
+        with patch.object(
+            type(Service), '_binding_operationally_eligible',
+            _eligible_with_race,
+        ), patch.object(
+            type(Service), '_read_shopify_inventory_pair',
+            return_value={
+                'tracked': True, 'item_exists': True, 'level_exists': False,
+                'inventory_level_gid': None, 'available': None,
+                'updated_at': False, 'store_identity': self.store.shop_domain,
+            },
+        ):
+            Service._handle_inventory_push_sync(job)
+
+        job.invalidate_recordset()
+        self.assertGreaterEqual(len(calls), 3)
+        self.assertEqual(job.state, 'succeeded')
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_activate'),
+            ('res_id', '=', self.binding.id),
+        ]))
+        self.assertTrue(self.env['shopify.connector.job.log'].search([
+            ('job_id', '=', job.id),
+            ('message', 'ilike', 'suppressed'),
+        ]))
+
+    def test_successful_activation_handoff_race_preserves_evidence(
+        self,
+    ):
+        job, token = self._make_mutation_job('inventory_activate')
+        attempt = self._make_attempt(job, token)
+        job.sudo().write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now(),
+        })
+        Service = self.Service
+        original_eligible = type(Service)._binding_operationally_eligible
+
+        def _eligible_with_race(service, binding):
+            self.variant_binding.sudo().write({'status': 'stale'})
+            return original_eligible(service, binding)
+
+        with patch.object(
+            type(Service), '_binding_operationally_eligible',
+            _eligible_with_race,
+        ):
+            Service._apply_consequence_activate(
+                job, attempt, 'direct',
+                {
+                    'observed_outcome': 'succeeded',
+                    'error_class': False,
+                    'manual_review_subreason': False,
+                    'action': 'succeed',
+                    'message': 'Activated.',
+                    'evidence': {
+                        'inventory_level_gid':
+                        'gid://shopify/InventoryLevel/RACE',
+                    },
+                },
+            )
+
+        job.invalidate_recordset()
+        self.binding.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        self.assertTrue(self.binding.last_pushed_at)
+        self.assertEqual(
+            self.binding.shopify_gid,
+            'gid://shopify/InventoryLevel/RACE',
+        )
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_push_sync'),
+            ('res_id', '=', self.binding.id),
+        ]))
+        self.assertTrue(self.env['shopify.connector.job.log'].search([
+            ('job_id', '=', job.id),
+            ('message', 'ilike', 'suppressed'),
+        ]))
+
+    def test_activation_success_rejects_corrupt_cross_store_binding(
+        self,
+    ):
+        foreign_store = self.env['shopify.connector.store'].create({
+            'name': 'Push Mechanics Foreign Store',
+            'shop_domain': 'push-mechanics-foreign.myshopify.com',
+            'api_version': '2026-07',
+        })
+        self.env.cr.execute(
+            'UPDATE shopify_connector_inventory_level_binding '
+            'SET store_id = %s WHERE id = %s',
+            (foreign_store.id, self.binding.id),
+        )
+        self.env['shopify.connector.inventory.level.binding'].invalidate_model()
+        job, token = self._make_mutation_job('inventory_activate')
+        attempt = self._make_attempt(job, token)
+        job.sudo().write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now(),
+        })
+        Service = self.Service
+        with patch.object(
+            type(Service), '_handoff_succeed_to_fresh_orchestration',
+        ) as handoff:
+            with self.assertRaises(ValidationError):
+                with self.env.cr.savepoint():
+                    Service._apply_consequence_activate(
+                        job, attempt, 'direct',
+                        {
+                            'observed_outcome': 'succeeded',
+                            'error_class': False,
+                            'manual_review_subreason': False,
+                            'action': 'succeed',
+                            'message': 'Activated.',
+                            'evidence': {
+                                'inventory_level_gid':
+                                'gid://shopify/InventoryLevel/WRONG-SCOPE',
+                            },
+                        },
+                    )
+        self.binding.invalidate_recordset()
+        self.assertFalse(self.binding.shopify_gid)
+        self.assertFalse(self.binding.last_pushed_at)
+        handoff.assert_not_called()
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_push_sync'),
+            ('res_id', '=', self.binding.id),
+        ]))
+
+    def test_set_quantities_success_rejects_corrupt_cross_store_binding(
+        self,
+    ):
+        foreign_store = self.env['shopify.connector.store'].create({
+            'name': 'Push Mechanics Quantity Foreign Store',
+            'shop_domain': 'push-mechanics-quantity-foreign.myshopify.com',
+            'api_version': '2026-07',
+        })
+        self.env.cr.execute(
+            'UPDATE shopify_connector_inventory_level_binding '
+            'SET store_id = %s WHERE id = %s',
+            (foreign_store.id, self.binding.id),
+        )
+        self.env['shopify.connector.inventory.level.binding'].invalidate_model()
+        job, token = self._make_mutation_job('inventory_set_quantities')
+        attempt = self._make_attempt(job, token)
+        before = (
+            self.binding.last_pushed_available,
+            self.binding.last_pushed_at,
+            self.binding.shopify_gid,
+        )
+        job.sudo().write({
+            'state': 'succeeded',
+            'finished_at': fields.Datetime.now(),
+        })
+        Service = self.Service
+        with self.assertRaises(ValidationError):
+            with self.env.cr.savepoint():
+                Service._apply_consequence_set_quantities(
+                    job, attempt, 'direct',
+                    {
+                        'observed_outcome': 'succeeded',
+                        'error_class': False,
+                        'manual_review_subreason': False,
+                        'action': 'succeed',
+                        'message': 'Set quantities applied.',
+                        'evidence': {
+                            'inventory_level_gid':
+                            'gid://shopify/InventoryLevel/WRONG-SCOPE',
+                        },
+                    },
+                )
+        self.binding.invalidate_recordset()
+        self.assertEqual(
+            (
+                self.binding.last_pushed_available,
+                self.binding.last_pushed_at,
+                self.binding.shopify_gid,
+            ),
+            before,
+        )
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('res_model', '=', 'shopify.connector.inventory.level.binding'),
+            ('res_id', '=', self.binding.id),
+            ('id', '!=', job.id),
+        ]))
+
+    def test_cas_replacement_race_preserves_attempt_without_successor(self):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=1,
+        )
+        attempt = self._make_attempt(job, token)
+        attempt._record_direct_outcome(
+            'failed_clean',
+            evidence={'user_errors': [
+                {'code': 'CHANGE_FROM_QUANTITY_STALE', 'field': []},
+            ]},
+        )
+        Service = self.Service
+        original_eligible = type(Service)._binding_operationally_eligible
+        calls = []
+
+        def _eligible_with_race(service, binding):
+            calls.append(True)
+            if len(calls) == 2:
+                self.variant_binding.sudo().write({'status': 'stale'})
+            return original_eligible(service, binding)
+
+        with patch.object(
+            type(Service), '_binding_operationally_eligible',
+            _eligible_with_race,
+        ):
+            Service._apply_consequence_set_quantities(
+                job, attempt, 'direct',
+                {
+                    'observed_outcome': 'failed_clean',
+                    'error_class': 'concurrency_race_conflict',
+                    'manual_review_subreason': False,
+                    'action': 'domain_callback',
+                    'message': 'CAS stale.',
+                    'evidence': {},
+                    'domain_payload': {'reason': 'cas_stale'},
+                },
+            )
+
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'cancelled')
+        self.assertFalse(job.superseded_by_job_id)
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertTrue(self.env['shopify.connector.mutation.attempt'].search([
+            ('id', '=', attempt.id),
+            ('job_id', '=', job.id),
+        ]))
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_set_quantities'),
+            ('res_id', '=', self.binding.id),
+            ('id', '!=', job.id),
+        ]))
+
+    def test_reconciliation_replacement_race_preserves_terminal_job(
+        self,
+    ):
+        job, token = self._make_mutation_job(
+            'inventory_set_quantities', cas_retry_ordinal=2,
+        )
+        attempt = self._make_attempt(job, token)
+        Service = self.Service
+        original_eligible = type(Service)._binding_operationally_eligible
+        calls = []
+
+        def _eligible_with_race(service, binding):
+            calls.append(True)
+            if len(calls) == 2:
+                self.variant_binding.sudo().write({'status': 'stale'})
+            return original_eligible(service, binding)
+
+        with patch.object(
+            type(Service), '_binding_operationally_eligible',
+            _eligible_with_race,
+        ):
+            Service._apply_consequence_set_quantities(
+                job, attempt, 'reconciliation',
+                {
+                    'observed_outcome': 'uncertain',
+                    'error_class': False,
+                    'manual_review_subreason': False,
+                    'action': 'domain_callback',
+                    'message': 'Not applied.',
+                    'evidence': {},
+                },
+            )
+
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'cancelled')
+        self.assertFalse(job.superseded_by_job_id)
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertTrue(self.env['shopify.connector.mutation.attempt'].search([
+            ('id', '=', attempt.id),
+            ('job_id', '=', job.id),
+        ]))
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('job_type', '=', 'inventory_set_quantities'),
+            ('res_id', '=', self.binding.id),
+            ('id', '!=', job.id),
+        ]))
 
 
 @tagged('post_install', '-at_install')
@@ -3735,3 +4058,69 @@ class TestInventoryPreC2RecoverySeam(TransactionCase):
                 binding.shopify_gid,
                 'gid://shopify/InventoryLevel/already-present',
             )
+
+    def test_activation_superseded_race_commits_skip_and_identity_without_child(self):
+        """The committed existing-level recovery seam keeps its skipped
+        evidence and observed InventoryLevel identity when the successor
+        becomes ineligible at its final enqueue check."""
+        _store_id, binding_id, job_id, token = self._durable_activation_fixture()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(Service), '_binding_operationally_eligible',
+            return_value=False,
+        ):
+            with db_connect(self.env.cr.dbname).cursor() as cr:
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                env['shopify.connector.job.dispatch']._recover_pre_c2_failure(
+                    job_id, token,
+                    InventoryActivationSupersededError(
+                        'gid://shopify/InventoryLevel/race-present',
+                    ),
+                )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(job.state, 'skipped')
+            self.assertTrue(env['shopify.connector.job.log'].search([
+                ('job_id', '=', job_id),
+                ('message', 'ilike', 'suppressed'),
+            ]))
+            self.assertFalse(env['shopify.connector.job'].search([
+                ('job_type', '=', 'inventory_push_sync'),
+                ('res_id', '=', binding_id),
+            ]))
+            binding = env[
+                'shopify.connector.inventory.level.binding'
+            ].browse(binding_id)
+            self.assertEqual(
+                binding.shopify_gid,
+                'gid://shopify/InventoryLevel/race-present',
+            )
+
+    def test_activation_superseded_corrupt_scope_blocks_without_identity_evidence(self):
+        _store_id, binding_id, job_id, token = self._durable_activation_fixture()
+        Service = self.env['shopify.connector.inventory.service']
+        with patch.object(
+            type(Service), '_binding_scope_compatible',
+            return_value=False,
+        ):
+            with db_connect(self.env.cr.dbname).cursor() as cr:
+                env = api.Environment(cr, SUPERUSER_ID, {})
+                env['shopify.connector.job.dispatch']._recover_pre_c2_failure(
+                    job_id, token,
+                    InventoryActivationSupersededError(
+                        'gid://shopify/InventoryLevel/corrupt-scope',
+                    ),
+                )
+        with db_connect(self.env.cr.dbname).cursor() as cr:
+            env = api.Environment(cr, SUPERUSER_ID, {})
+            job = env['shopify.connector.job'].browse(job_id)
+            self.assertEqual(job.state, 'blocked_manual_review')
+            self.assertFalse(env['shopify.connector.job'].search([
+                ('job_type', '=', 'inventory_push_sync'),
+                ('res_id', '=', binding_id),
+            ]))
+            binding = env[
+                'shopify.connector.inventory.level.binding'
+            ].browse(binding_id)
+            self.assertFalse(binding.shopify_gid)

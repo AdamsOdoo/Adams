@@ -10,10 +10,13 @@ No Shopify contact anywhere: the transport is replaced with a stand-in that
 fails the test if it is reached.
 """
 
+import json
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
+from odoo.tools.safe_eval import safe_eval
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract; see
@@ -103,6 +106,22 @@ class TestSetupLocationStep(TransactionCase):
             'shopify_location_active': active,
         })
 
+    def _mark_refresh_succeeded(self):
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'setup-location-current-success',
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
+        job.sudo().write({'state': 'running'})
+        job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        return job
+
 
     def _assert_refused(self, call):
         """Assert a call is refused, without caring which refusal it is.
@@ -129,6 +148,15 @@ class TestSetupLocationStep(TransactionCase):
         return patch.object(Client, '_send', refuse)
 
     # --- the payload ----------------------------------------------------
+
+    def test_permissions_catalog_names_inventory_write_scope(self):
+        scopes = {
+            entry['scope']
+            for entry in self.env[
+                'shopify.connector.readiness.check'
+            ]._governed_scope_catalog()
+        }
+        self.assertIn('write_inventory', scopes)
 
     def test_zero_one_and_many_cached_locations(self):
         payload = self._as().get_setup_state(self.store.id)['location_mapping']
@@ -196,6 +224,46 @@ class TestSetupLocationStep(TransactionCase):
             self.assertIn(
                 location.company_id.id,
                 (False, self.store.company_id.id),
+            )
+
+    def test_map_wizard_domain_follows_store_company_and_keeps_server_fence(self):
+        """The modal must not offer an allowed-but-foreign internal location.
+
+        The service remains the authority: this test evaluates the actual
+        field domain used by the modal and then proves the same foreign target
+        is still rejected by the governed save path.
+        """
+        foreign = self.env['stock.location'].sudo().create({
+            'name': 'Wizard Foreign Company Location',
+            'usage': 'internal',
+            'company_id': self.company_b.id,
+        })
+        Wizard = self.env['shopify.connector.location.map.wizard']
+        wizard = Wizard.with_user(self.admin).with_context(
+            default_store_id=self.store.id,
+        ).new({'store_id': self.store.id})
+        self.assertEqual(wizard.store_company_id, self.store.company_id)
+        domain = safe_eval(
+            Wizard._fields['odoo_location_id'].domain,
+            {'store_company_id': self.store.company_id.id},
+        )
+        # Evaluate as sudo so record rules cannot make a missing company
+        # predicate look correct by hiding the foreign row first.
+        candidates = self.env['stock.location'].sudo().search(domain)
+        self.assertIn(self.location_a, candidates)
+        self.assertNotIn(foreign, candidates)
+        Remap = self.env['shopify.connector.location.remap.wizard']
+        self.assertIn(
+            'store_company_id',
+            Remap._fields['new_location_id'].domain,
+        )
+
+        self._cache('gid://shopify/Location/WIZARD-COMPANY', 'Wizard company')
+        with self.assertRaises(UserError):
+            self._as().save_location_mapping(
+                self.store.id,
+                'gid://shopify/Location/WIZARD-COMPANY',
+                foreign.id,
             )
 
     def test_a_foreign_company_odoo_location_is_not_offered(self):
@@ -386,16 +454,16 @@ class TestSetupLocationStep(TransactionCase):
             )
         )
 
-    def test_the_setup_refresh_reaches_the_public_guarded_action(self):
+    def test_the_setup_refresh_reaches_the_private_setup_guard(self):
         calls = []
-        original = type(self.Service).action_refresh_shopify_locations
+        original = type(self.Service)._setup_refresh_shopify_locations
 
         def spy(self_, store_id):
             calls.append(store_id)
             return original(self_, store_id)
 
         with patch.object(
-            type(self.Service), 'action_refresh_shopify_locations', spy,
+            type(self.Service), '_setup_refresh_shopify_locations', spy,
         ):
             with self._fail_on_contact():
                 self._as().refresh_shopify_locations(self.store.id)
@@ -407,14 +475,140 @@ class TestSetupLocationStep(TransactionCase):
         self.assertEqual(len(job), 1)
         self.assertEqual(job.state, 'queued')
 
-    def test_a_mapping_created_in_setup_stales_the_readiness_evidence(self):
-        self._cache('gid://shopify/Location/ST1', 'Stale probe')
-        self.settings.sudo().write({'setup_readiness_stale_since': False})
+    def test_continue_requires_a_current_refresh_and_every_mapping(self):
+        self._cache('gid://shopify/Location/C1', 'Continue One')
+        self._cache('gid://shopify/Location/C2', 'Continue Two')
+        with self.assertRaises(UserError):
+            self._as().acknowledge_location_mapping(self.store.id)
+
+        self._mark_refresh_succeeded()
         self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/C1', self.location_a.id,
+        )
+        with self.assertRaises(UserError) as refusal:
+            self._as().acknowledge_location_mapping(self.store.id)
+        self.assertIn('1 location', str(refusal.exception))
+
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/C2', self.location_b.id,
+        )
+        state = self._as().acknowledge_location_mapping(self.store.id)
+        self.assertTrue(state['location_mapping']['mapping_complete'])
+
+    def test_a_mapping_created_in_setup_recomputes_readiness_immediately(self):
+        self._cache('gid://shopify/Location/ST1', 'Stale probe')
+        self._as().run_readiness(self.store.id)
+        before = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+
+        state = self._as().save_location_mapping(
             self.store.id, 'gid://shopify/Location/ST1', self.location_a.id,
         )
+
         self.settings.invalidate_recordset()
-        self.assertTrue(self.settings.setup_readiness_stale_since)
+        after = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+        self.assertEqual(after, before + 1)
+        self.assertFalse(self.settings.setup_readiness_stale_since)
+        self.assertTrue(state['readiness']['ran'])
+        self.assertFalse(state['readiness']['stale'])
+
+    def test_success_followup_reloads_and_recomputes_readiness(self):
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'setup-followup-success',
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
+        job.sudo().write({'state': 'running'})
+        self._cache('gid://shopify/Location/FOLLOW', 'Follow-up Warehouse')
+        job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        self.settings.sudo()._mark_setup_readiness_stale()
+        before = self.env['shopify.connector.job'].sudo().search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+
+        state = self._as().follow_location_refresh(
+            self.store.id, job.id,
+        )
+
+        self.assertEqual(
+            state['location_mapping']['refresh']['state'], 'succeeded',
+        )
+        self.assertEqual(
+            state['location_mapping']['locations'][0]['name'],
+            'Follow-up Warehouse',
+        )
+        self.assertFalse(state['readiness']['stale'])
+        self.assertEqual(
+            self.env['shopify.connector.job'].sudo().search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', 'core_readiness_check'),
+            ]),
+            before + 1,
+        )
+
+    def test_foreign_administrator_cannot_follow_this_stores_refresh(self):
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'foreign-follow-refusal',
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
+
+        self._assert_refused(
+            lambda: self._as(self.admin_b).follow_location_refresh(
+                self.store.id, job.id,
+            )
+        )
+
+    def test_old_generation_location_refresh_blocks_readiness(self):
+        self.store.sudo().write({
+            'granted_scopes': json.dumps(['write_inventory']),
+        })
+        self._cache('gid://shopify/Location/OLDGEN', 'Old generation')
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/OLDGEN', self.location_a.id,
+        )
+        job = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'old-generation-success',
+            'expected_connection_generation':
+                self.store.connection_generation,
+        })
+        job.sudo().write({'state': 'running'})
+        job.sudo().write({
+            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+        })
+        self.store.sudo().write({'connection_generation': 1})
+
+        state = self._as().run_readiness(self.store.id)
+        check = next(
+            row for row in state['readiness']['checks']
+            if row['code'] == 'mapped_location'
+        )
+
+        self.assertEqual(
+            state['location_mapping']['refresh']['state'], 'stale',
+        )
+        self.assertEqual(check['state'], 'blocking')
+        self.assertIn('connection', check['reason'].lower())
 
     def test_readiness_requires_a_mapping_while_inventory_is_enabled(self):
         state = self._as().run_readiness(self.store.id)
@@ -424,8 +618,22 @@ class TestSetupLocationStep(TransactionCase):
             checks['mapped_location']['action_step_key'], 'location_mapping',
         )
         self._cache('gid://shopify/Location/RD1', 'Readiness probe')
+        self._cache('gid://shopify/Location/RD2', 'Readiness probe two')
+        self._mark_refresh_succeeded()
         self._as().save_location_mapping(
             self.store.id, 'gid://shopify/Location/RD1', self.location_a.id,
+        )
+        state = self._as().run_readiness(self.store.id)
+        checks = {c['code']: c for c in state['readiness']['checks']}
+        self.assertEqual(checks['mapped_location']['state'], 'blocking')
+        self.assertEqual(
+            checks['mapped_location']['reason'],
+            '1 active Shopify location(s) still need an explicit Odoo '
+            'location mapping.',
+        )
+
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/RD2', self.location_b.id,
         )
         state = self._as().run_readiness(self.store.id)
         checks = {c['code']: c for c in state['readiness']['checks']}

@@ -28,13 +28,13 @@
         <field name="model">shopify.connector.location.mapping</field>
         <field name="arch" type="xml">
             <search string="Location Mapping">
-                <field name="shopify_location_name_snapshot"/>
+                <field name="shopify_location_name_snapshot" string="Shopify location"/>
                 <field name="odoo_location_id"/>
                 <field name="store_id"/>
                 <filter name="filter_push_disabled" string="Push Disabled"
                         domain="[('push_enabled', '=', False)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_store" string="Store"
@@ -52,7 +52,7 @@
         <field name="model">shopify.connector.location.mapping</field>
         <field name="arch" type="xml">
             <list string="Location Mapping" create="false" delete="false">
-                <field name="shopify_location_name_snapshot"/>
+                <field name="shopify_location_name_snapshot" string="Shopify location"/>
                 <field name="odoo_location_id"/>
                 <field name="store_id" optional="show"/>
                 <field name="push_enabled" widget="boolean_toggle"
@@ -60,7 +60,7 @@
                 <field name="status"
                        decoration-warning="status == 'review'"
                        decoration-muted="status == 'inactive'"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
             </list>
         </field>
@@ -74,19 +74,11 @@
             <form string="Location Mapping" create="false" delete="false">
                 <header>
                     <!--
-                        GROUP GATING IS DERIVED FROM THE SERVER, NOT FROM THE
-                        role matrix. `action_set_push_enabled` admits
-                        Operator OR Administrator (see the method's own
-                        guard), and the ACL gives Reviewer write on this
-                        model, so the button and the editable field carry
-                        exactly those groups. The premium UX master
-                        specification §2.4 lists this screen as
-                        "User: read, Administrator: act", which disagrees with
-                        the merged server guard; the view follows the SERVER,
-                        because a view that hides a permitted capability is a
-                        UI defect and a view that shows a denied one is worse.
-                        The discrepancy is recorded for the control room
-                        rather than resolved by silently changing either side.
+                        GROUP GATING IS DERIVED FROM THE SERVER. Changing a
+                        location mapping is connector configuration, so both
+                        the push-toggle route and the editable Odoo target
+                        are Administrator-only. The server remains the final
+                        authority for direct RPC calls.
 
                         `action_set_push_enabled(enabled)` takes a REQUIRED
                         argument, and an Odoo object button passes none, so
@@ -98,7 +90,7 @@
                     <button name="%(action_shopify_connector_location_push_toggle_wizard)d"
                             type="action" string="Change Push"
                             class="btn-primary"
-                            groups="shopify_connector_core.group_shopify_connector_operator"/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
                         WAVE 5 — REMAP.
 
@@ -153,7 +145,7 @@
                 <sheet>
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This mapping's company no longer agrees with its
                         store's. Inventory for this location is paused until
                         an administrator releases it.
@@ -166,7 +158,7 @@
                     <group>
                         <group string="Mapping">
                             <field name="odoo_location_id"
-                                   groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                                   groups="shopify_connector_core.group_shopify_connector_admin"/>
                             <field name="push_enabled" readonly="1"/>
                             <field name="company_id" readonly="1"/>
                         </group>
@@ -174,7 +166,7 @@
                             <field name="store_id" readonly="1"/>
                             <field name="shopify_gid" readonly="1"/>
                             <field name="status" readonly="1"/>
-                            <field name="match_key" readonly="1"/>
+                            <field name="match_key" string="Matched by" readonly="1"/>
                         </group>
                     </group>
                 </sheet>
@@ -184,9 +176,11 @@
 
     <record id="action_shopify_connector_location_mapping"
             model="ir.actions.act_window">
-        <field name="name">Location Mapping</field>
+        <field name="name">Location Mappings</field>
         <field name="res_model">shopify.connector.location.mapping</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="search_view_id"
                ref="view_shopify_connector_location_mapping_search"/>
         <field name="help" type="html">
@@ -196,8 +190,8 @@
             <p>
                 Start with <b>Refresh Shopify Locations</b> to read this
                 store's location list, then <b>Map a Shopify Location</b> to
-                pair one with an Odoo location. Both are in the Inventory
-                menu beside this one.
+                pair one with an Odoo location. Both are in Configuration,
+                under Mappings.
             </p>
             <p>
                 Until a pair exists, inventory for that Shopify location stays
@@ -216,7 +210,7 @@
         <field name="model">shopify.connector.inventory.level.binding</field>
         <field name="arch" type="xml">
             <search string="Inventory Levels">
-                <field name="product_variant_binding_id"/>
+                <field name="product_variant_binding_id" string="Product variant"/>
                 <field name="location_mapping_id"/>
                 <field name="store_id"/>
                 <field name="shopify_inventory_item_gid"/>
@@ -239,7 +233,7 @@
                 <filter name="filter_never_pushed" string="Never Pushed"
                         domain="[('last_pushed_at', '=', False)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_location" string="Location"
@@ -259,18 +253,18 @@
         <field name="model">shopify.connector.inventory.level.binding</field>
         <field name="arch" type="xml">
             <list string="Inventory Levels" create="false" delete="false">
-                <field name="product_variant_binding_id"/>
-                <field name="location_mapping_id" optional="show"/>
-                <field name="pending_target_available" string="Odoo Target"/>
+                <field name="product_variant_binding_id" string="Product variant"/>
+                <field name="location_mapping_id" string="Location pair" optional="show"/>
+                <field name="pending_target_available" string="Odoo quantity"/>
                 <field name="last_known_shopify_available"
-                       string="Shopify (last known)"/>
+                       string="Shopify quantity (last known)"/>
                 <field name="last_pushed_available" optional="hide"/>
-                <field name="last_pushed_at" optional="show"/>
-                <field name="first_push_state"
+                <field name="last_pushed_at" string="Last pushed" optional="show"/>
+                <field name="first_push_state" string="First stock push"
                        decoration-warning="first_push_state == 'pending'"
                        decoration-success="first_push_state == 'confirmed'"/>
                 <field name="status" optional="hide"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="show"/>
                 <field name="store_id" optional="hide"/>
             </list>
@@ -312,7 +306,7 @@
                     <button name="action_confirm_first_push" type="object"
                             string="Confirm First Push" class="btn-primary"
                             invisible="first_push_state != 'previewed'"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             confirm="This is the FIRST stock push for this
                                      product and location. Shopify's quantity
                                      will be replaced by Odoo's. This cannot
@@ -323,16 +317,13 @@
                         The reason is mandatory because it lands on the
                         verification job's audit trail.
 
-                        REVIEWER, not operator. The service guard is
-                        "Only a Shopify Connector Reviewer or Administrator
-                        may release a blocked inventory pair"; gating the
-                        button on Operator showed a control to a role the
-                        server refuses, which the packet's §3 rule names as a
-                        test failure — UI and ACL must agree.
+                        Administrator-only. Re-checking a blocked inventory
+                        pair is privileged recovery; the button and wizard
+                        must agree with the server guard.
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer"/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
                         The TD-020 closure. A previewed/confirmed pair used to
                         be a dead end: the remap guard (correctly) refuses to
@@ -356,7 +347,7 @@
                 <sheet>
                     <div class="alert alert-danger" role="alert"
                          invisible="not sec3_scope_quarantined">
-                        <strong>Excluded from synchronisation.</strong>
+                        <strong>Excluded from synchronization.</strong>
                         This level's company no longer agrees with its store's.
                         No push or verification job will process it until an
                         administrator releases it.
@@ -421,7 +412,7 @@
                     <group>
                         <group string="Pair">
                             <field name="product_variant_binding_id"
-                                   readonly="1"/>
+                                   string="Product variant" readonly="1"/>
                             <field name="location_mapping_id" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="company_id" readonly="1"/>
@@ -460,7 +451,7 @@
                         <field name="shopify_inventory_item_gid" readonly="1"/>
                         <field name="shopify_gid" readonly="1"/>
                         <field name="status" readonly="1"/>
-                        <field name="match_key" readonly="1"/>
+                        <field name="match_key" string="Matched by" readonly="1"/>
                     </group>
                 </sheet>
             </form>
@@ -469,7 +460,7 @@
 
     <record id="action_shopify_connector_inventory_workspace"
             model="ir.actions.act_window">
-        <field name="name">Inventory Workspace</field>
+        <field name="name">Inventory</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id"
@@ -487,9 +478,11 @@
 
     <record id="action_shopify_connector_inventory_first_push"
             model="ir.actions.act_window">
-        <field name="name">First-Push Guard</field>
+        <field name="name">Inventory Safeguards</field>
         <field name="res_model">shopify.connector.inventory.level.binding</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <!--
             BOTH waiting states. Scoping this queue to `pending` alone meant
             the guard listed only rows whose confirm control is not yet

@@ -30,6 +30,8 @@ class TestUiActions(TransactionCase):
         cls.operator = new_test_user(
             cls.env, login='u0_act_op',
             groups='base.group_user,shopify_connector_core.group_shopify_connector_operator')
+        cls.no_access = new_test_user(
+            cls.env, login='u0_act_none', groups='base.group_user')
         cls.store = cls._make_store()
 
     @classmethod
@@ -40,7 +42,7 @@ class TestUiActions(TransactionCase):
         vals.update(extra)
         return cls.Store.create(vals)
 
-    def _make_job(self, state):
+    def _make_job(self, state, **extra):
         self.__class__._seq += 1
         vals = {'store_id': self.store.id, 'job_source': 'setup_readiness_check',
                 'job_type': 'core_manual_maintenance', 'state': state,
@@ -49,6 +51,7 @@ class TestUiActions(TransactionCase):
             vals['manual_review_subreason'] = 'ambiguous_match'
         if state in ('succeeded', 'failed_final', 'skipped', 'cancelled'):
             vals['finished_at'] = fields.Datetime.now()
+        vals.update(extra)
         return self.Job.create(vals)
 
     def _make_attempt(self, job, observed_outcome='uncertain'):
@@ -97,6 +100,95 @@ class TestUiActions(TransactionCase):
         job.invalidate_recordset()
         with self.assertRaises(UserError):
             job.with_user(self.admin).action_manual_retry()
+
+    def test_attention_projection_prioritizes_human_owned_cases(self):
+        blocked = self._make_job('blocked_manual_review')
+        final = self._make_job(
+            'failed_final', error_class='shopify_permission_scope_auth'
+        )
+        retryable = self._make_job(
+            'failed_retryable', error_class='mapping_missing'
+        )
+        self.assertGreater(blocked.attention_priority, final.attention_priority)
+        self.assertGreater(final.attention_priority, retryable.attention_priority)
+        self.assertEqual(blocked.attention_owner, 'Administrator decision')
+        self.assertNotIn('Reviewer', blocked.attention_owner)
+        self.assertIn('Administrator', blocked.attention_next_action)
+        self.assertEqual(blocked.recovery_owner, blocked.attention_owner)
+        self.assertEqual(blocked.recovery_next_action, blocked.attention_next_action)
+        self.assertIn('Ambiguous Match', blocked.attention_reason)
+        self.assertIn('Retry', retryable.attention_next_action)
+
+    def test_attention_case_routes_mutation_evidence_to_the_exact_attempt(self):
+        job = self._make_job('blocked_manual_review')
+        attempt = self._make_attempt(job)
+        action = job.with_user(self.admin).action_open_attention_case()
+        self.assertEqual(action['res_model'], attempt._name)
+        self.assertEqual(action['res_id'], attempt.id)
+        self.assertEqual(action['view_mode'], 'form')
+
+    def test_attention_case_routes_a_business_target_without_sudo(self):
+        job = self._make_job(
+            'failed_retryable',
+            error_class='odoo_validation_configuration',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        action = job.with_user(self.admin).action_open_attention_case()
+        self.assertEqual(action['res_model'], self.store._name)
+        self.assertEqual(action['res_id'], self.store.id)
+        self.assertEqual(action['view_mode'], 'form')
+
+    def test_runs_and_attention_actions_have_distinct_populations(self):
+        runs = self.env.ref(
+            'shopify_connector_core.action_shopify_connector_sync_center'
+        )
+        attention = self.env.ref(
+            'shopify_connector_core.action_shopify_connector_error_center'
+        )
+        self.assertEqual(
+            eval(runs.domain or '[]'), [],  # noqa: S307 -- static XML literal
+            'Runs & Recovery must show every run.',
+        )
+        self.assertEqual(
+            eval(attention.domain),  # noqa: S307 -- static XML literal
+            [
+                ('state', 'in', (
+                    'blocked_manual_review', 'failed_final',
+                    'failed_retryable',
+                )),
+                ('superseded_by_job_id', '=', False),
+            ],
+        )
+        self.assertNotIn('retry_waiting', attention.domain)
+
+    def test_mutation_attempt_explains_business_effect_and_recovery(self):
+        job = self._make_job(
+            'blocked_manual_review',
+            error_class='mapping_missing',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        attempt = self._make_attempt(job, observed_outcome='uncertain')
+        self.assertEqual(attempt.business_object, self.store.display_name)
+        self.assertIn('Unknown', attempt.shopify_effect)
+        self.assertIn('No completed', attempt.odoo_effect)
+        self.assertFalse(attempt.remote_result_certain)
+        self.assertIn('Re-read', attempt.required_user_action)
+        self.assertIn('re-reads Shopify', attempt.shopify_reread_plan)
+        action = attempt.with_user(self.admin).action_open_business_record()
+        self.assertEqual(action['res_model'], self.store._name)
+        self.assertEqual(action['res_id'], self.store.id)
+
+    def test_mutation_business_link_denied_without_connector_access(self):
+        job = self._make_job(
+            'blocked_manual_review',
+            res_model=self.store._name,
+            res_id=self.store.id,
+        )
+        attempt = self._make_attempt(job, observed_outcome='uncertain')
+        with self.assertRaises(AccessError):
+            attempt.with_user(self.no_access).action_open_business_record()
 
     # ------------------------------------------------------------------ #
     #  cancel wizard

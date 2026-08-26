@@ -42,6 +42,9 @@ Everything else is labels, counts and ordering.
 
 from odoo import _, api, models
 from odoo.exceptions import AccessError
+from odoo.tools.translate import LazyTranslate
+
+_lt = LazyTranslate(__name__)
 
 # Plain-language labels for the refusal kinds the export service records.
 # Keeping them here rather than in the template means an unknown kind renders
@@ -49,26 +52,26 @@ from odoo.exceptions import AccessError
 # visible, because a refusal nobody can see is the failure this whole surface
 # exists to prevent.
 REFUSAL_LABELS = {
-    'too_many_options': _('More Shopify options than Shopify allows'),
-    'too_many_variants': _('More variants than one export job carries'),
-    'remote_option_divergence': _('Shopify option structure differs'),
-    'variant_create_withheld': _('New variants withheld'),
-    'bound_product_missing_remotely': _('Bound Shopify product is gone'),
-    'bound_variant_missing_remotely': _('A bound Shopify variant is gone'),
-    'unowned_remote_variant': _('Shopify variant this connector does not own'),
-    'custom_id_already_bound_remotely': _('Already exported to this store'),
-    'duplicate_sku_on_shopify': _('SKU already exists on Shopify'),
+    'too_many_options': _lt('More Shopify options than Shopify allows'),
+    'too_many_variants': _lt('More variants than one export job carries'),
+    'remote_option_divergence': _lt('Shopify option structure differs'),
+    'variant_create_withheld': _lt('New variants withheld'),
+    'bound_product_missing_remotely': _lt('Bound Shopify product is gone'),
+    'bound_variant_missing_remotely': _lt('A bound Shopify variant is gone'),
+    'unowned_remote_variant': _lt('Shopify variant this connector does not own'),
+    'custom_id_already_bound_remotely': _lt('Already exported to this store'),
+    'duplicate_sku_on_shopify': _lt('SKU already exists on Shopify'),
 }
 
 # Step -> operator-facing label. The raw job types are internal vocabulary and
 # must never be the thing a reviewer reads.
 STEP_LABELS = {
-    'product_export_binding_namespace': _('Establish the connector binding id'),
-    'product_export_create': _('Create the product on Shopify'),
-    'product_export_update': _('Update product details'),
-    'product_export_variants_update': _('Update variants'),
-    'product_export_variants_create': _('Add new variants'),
-    'product_export_media_stage': _('Append an image'),
+    'product_export_binding_namespace': _lt('Establish the connector binding id'),
+    'product_export_create': _lt('Create the product on Shopify'),
+    'product_export_update': _lt('Update product details'),
+    'product_export_variants_update': _lt('Update variants'),
+    'product_export_variants_create': _lt('Add new variants'),
+    'product_export_media_stage': _lt('Append an image'),
 }
 
 STEP_STATE_TONE = {
@@ -165,7 +168,7 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
         """Whether THIS user could confirm THIS preview right now.
 
         Mirrors `action_confirm_export_preview` rather than guessing: same
-        two groups, same state, same expiry, same empty-plan rule. The server
+        Administrator capability, same state, same expiry, same empty-plan rule. The server
         remains the authority — this only decides whether to render a button
         that would otherwise fail. A UI that offers a control the backend
         refuses is a UI that teaches operators to distrust it.
@@ -174,13 +177,8 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
             return False
         if not (preview.apply_plan or {}).get('steps'):
             return False
-        return bool(
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        return self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         )
 
     @api.model
@@ -302,16 +300,16 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
 
     @api.model
     def _refusals(self, items):
-        return [
-            {
-                'kind': item.get('kind') or '',
-                'label': REFUSAL_LABELS.get(
-                    item.get('kind'), item.get('kind') or _('Refused'),
-                ),
+        rendered = []
+        for item in items:
+            kind = item.get('kind') or ''
+            label = REFUSAL_LABELS.get(kind)
+            rendered.append({
+                'kind': kind,
+                'label': self.env._(label) if label else kind or _('Refused'),
                 'detail': item.get('detail') or '',
-            }
-            for item in items
-        ]
+            })
+        return rendered
 
     @api.model
     def _plan(self, plan):
@@ -322,7 +320,8 @@ class ShopifyConnectorProductExportUi(models.AbstractModel):
             rendered.append({
                 'index': index,
                 'step': step_type,
-                'label': STEP_LABELS.get(step_type, step_type),
+                'label': self.env._(STEP_LABELS[step_type])
+                if step_type in STEP_LABELS else step_type,
                 'state': step.get('state') or 'pending',
                 'tone': STEP_STATE_TONE.get(step.get('state'), 'neutral'),
             })

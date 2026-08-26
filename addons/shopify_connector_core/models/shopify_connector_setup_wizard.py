@@ -43,8 +43,9 @@ right for any connector group.
 
 No Shopify request is made anywhere in this file except through
 `action_test_connection`, which is step 5's whole purpose and is the existing
-read-only probe. Nothing here enqueues a domain job, and activation
-deliberately starts no synchronisation.
+read-only probe. Activation triggers only existing read/scan cron producers;
+their own eligibility and queue boundaries remain authoritative, and no
+Shopify mutation is admitted here.
 """
 
 import json
@@ -52,6 +53,11 @@ import re
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, MissingError, UserError
+
+from .shopify_connector_store_credential import (
+    AUTH_MODE_CLIENT_CREDENTIALS,
+    AUTH_MODE_OFFLINE,
+)
 
 #: A Shopify permanent shop domain, matched WHOLE. Shopify's shop handle is
 #: lowercase alphanumerics and hyphens; anything else -- a scheme, a path, a
@@ -101,6 +107,38 @@ SETUP_STEPS = (
 )
 
 SETUP_STEP_COUNT = len(SETUP_STEPS)
+
+#: C4 presentation-only grouping. The twelve durable step keys above remain
+#: the persistence/navigation contract; these five phases only help a merchant
+#: understand where they are. Every step appears exactly once and in the same
+#: order. Scope/test-connection stay in Connect because the current durable
+#: sequence verifies access and identity together before any sync direction is
+#: chosen; no server-side completion rule moves into this grouping.
+SETUP_PHASES = (
+    (
+        'connect', 'Connect',
+        ('welcome', 'identity', 'credential', 'scopes', 'test_connection'),
+    ),
+    ('choose', 'Choose', ('directions',)),
+    ('map', 'Map', ('location_mapping',)),
+    (
+        'protect', 'Protect',
+        ('source_of_truth', 'notification', 'first_push'),
+    ),
+    ('verify', 'Verify', ('final_readiness', 'review')),
+)
+SETUP_PHASE_COUNT = len(SETUP_PHASES)
+SETUP_STEP_PHASE = {
+    step_key: {
+        'key': phase_key,
+        'label': phase_label,
+        'index': phase_index,
+    }
+    for phase_index, (phase_key, phase_label, step_keys) in enumerate(
+        SETUP_PHASES, start=1,
+    )
+    for step_key in step_keys
+}
 
 #: The step keys, in order, and their display ordinals. `SETUP_STEP_ORDER` is
 #: the ONLY place a step key becomes a number, and the number it becomes is
@@ -198,9 +236,10 @@ SETUP_DOMAINS = (
         'key': 'inventory',
         'field': 'inventory_domain_enabled',
         'label': 'Inventory',
-        'direction': 'Shopify to Odoo, then Odoo to Shopify',
-        'happens': 'Stock levels are read in as a baseline, and later Odoo '
-                   'stock changes are pushed back.',
+        'direction': 'Odoo to Shopify; Shopify read-only comparison',
+        'happens': 'Odoo stock changes can be pushed to Shopify. Shopify '
+                   'available quantity is read only to detect drift and is '
+                   'never imported into Odoo.',
         'withheld': 'The first push always waits for a preview you confirm.',
     },
     {
@@ -538,16 +577,23 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def get_setup_state(self, store_id=None):
+    def get_setup_state(self, store_id=None, new_store=False):
         """The whole render payload for the wizard, as the current user.
 
         One bounded round trip per navigation rather than a call per field.
         Every value is either a plain-language label this service owns or a
         field the caller could read anyway -- and the credential is not among
         them: `credential_present` is a boolean, and no token, fragment or
-        length ever crosses this boundary.
+        length ever crosses this boundary. `new_store=True` is an explicit
+        Administrator intent that suppresses the one-candidate resume
+        convenience; creation still happens only when the identity step calls
+        `save_store_identity` without a `store_id`.
         """
         self._assert_setup_admin()
+        if new_store and store_id:
+            raise UserError(_(
+                'Choose an existing store or start a new one, not both.'
+            ))
         store = False
         if store_id:
             store = self._resolve_store(store_id)
@@ -557,8 +603,11 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         candidates = self.env['shopify.connector.store'].search(
             [], order='id asc', limit=20,
         )
-        if not store and len(candidates) == 1:
-            store = candidates
+        if not store and not new_store and candidates:
+            # Keep ordinary entry deterministic when more than one store is
+            # visible too. Only the explicit `new_store` intent suppresses
+            # resume and leaves the identity step blank.
+            store = candidates[0]
 
         settings = self._settings_for(store) if store else False
         resume_key = self._resume_key(settings)
@@ -566,6 +615,18 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         payload = {
             'steps': self._step_payload(settings, locations),
             'step_count': SETUP_STEP_COUNT,
+            'phases': [
+                {
+                    'index': index,
+                    'key': key,
+                    'label': label,
+                    'step_keys': list(step_keys),
+                }
+                for index, (key, label, step_keys) in enumerate(
+                    SETUP_PHASES, start=1,
+                )
+            ],
+            'phase_count': SETUP_PHASE_COUNT,
             # The resume point the client navigates by. The ordinal beside it
             # is what the heading renders ("Step 7 of 12") and is never what
             # the client compares against.
@@ -602,6 +663,9 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 'index': index,
                 'key': key,
                 'label': label,
+                'phase_key': SETUP_STEP_PHASE[key]['key'],
+                'phase_label': SETUP_STEP_PHASE[key]['label'],
+                'phase_index': SETUP_STEP_PHASE[key]['index'],
                 'applicable': applicable.get(key, {}).get('applicable', True),
                 'skipped_reason': applicable.get(key, {}).get('reason', ''),
             }
@@ -764,6 +828,14 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     @api.model
     def _setup_refresh_locations(self, store):
         """Admit a governed Shopify-location refresh job. Domain seam."""
+        raise UserError(_(
+            'Location mapping needs the Shopify Connector Inventory module, '
+            'which is not installed in this database.'
+        ))
+
+    @api.model
+    def _setup_follow_location_refresh(self, store, job_id):
+        """Read one exact domain-owned refresh run. Domain extension seam."""
         raise UserError(_(
             'Location mapping needs the Shopify Connector Inventory module, '
             'which is not installed in this database.'
@@ -975,6 +1047,8 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         tier = check.get('tier')
         if code == 'mapped_location':
             refresh_state = (locations or {}).get('refresh', {}).get('state')
+            if refresh_state == 'stale':
+                return READINESS_BLOCKING
             if result != 'pass' and refresh_state in ('waiting', 'running'):
                 # A refresh is genuinely in flight, so "no mapping yet" is
                 # not yet a fact about this store. It is also NEVER reported
@@ -1007,6 +1081,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     @api.model
     def _readiness_reason(self, check, state, locations):
         """The sentence under a check, corrected for what is actually known."""
+        if state == READINESS_BLOCKING and check.get('code') == 'mapped_location':
+            refresh = (locations or {}).get('refresh', {})
+            if refresh.get('state') == 'stale':
+                return refresh.get('reason') or _(
+                    'The location list belongs to an earlier store connection.'
+                )
         if state == READINESS_WAITING and check.get('code') == 'mapped_location':
             refresh = (locations or {}).get('refresh', {})
             if refresh.get('state') in ('waiting', 'running'):
@@ -1095,6 +1175,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'mapped_location': _('Inventory location mapping'),
             'cron_queue_health': _('Background jobs are running'),
             'domain_flag_enablement': _('Sync features selected'),
+            'supported_scale': _('Supported deployment size'),
             'product_export_scopes': _('Catalog export permissions'),
             'fulfillment_write_scope': _('Fulfillment write permission'),
             'fulfillment_api_version': _('Fulfillment API version'),
@@ -1115,6 +1196,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             'mapped_location': _('Administrator'),
             'cron_queue_health': _('Odoo administrator'),
             'domain_flag_enablement': _('Administrator'),
+            'supported_scale': _('Odoo administrator'),
             'product_export_scopes': _('Shopify admin'),
             'fulfillment_write_scope': _('Shopify admin'),
             'fulfillment_api_version': _('Administrator'),
@@ -1209,7 +1291,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             return _('Shopify will email your customers when a delivery is '
                      'fulfilled.')
         return _('Customers will not be emailed. You can change this later in '
-                 'Store Settings.')
+                 'Sync Rules.')
 
     @api.model
     def _first_push_summary(self, settings):
@@ -1219,10 +1301,11 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         if 'inventory_scheduled_sync_enabled' not in settings._fields:
             return _('Inventory scheduling is not available in this install.')
         if settings.inventory_scheduled_sync_enabled:
-            return _('Stock scanning is scheduled. The first push still waits '
-                     'for a preview you confirm.')
-        return _('Stock scanning is off for now. You can turn it on later in '
-                 'Store Settings.')
+            return _('Stock scanning is enabled. The first push still waits '
+                     'for a preview you explicitly confirm.')
+        return _('Stock scanning will be enabled when setup is completed. '
+                 'The first push still waits for a preview you explicitly '
+                 'confirm.')
 
     # ------------------------------------------------------------------
     # Step 2 -- store identity
@@ -1352,6 +1435,69 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         self._record_progress(settings, 'credential')
         return self.get_setup_state(store_id=store.id)
 
+    @api.model
+    def retain_existing_credential(self, store_id, auth_mode):
+        """Confirm a blank credential step against current non-secret state.
+
+        A browser's setup payload is only a snapshot. Another session may
+        clear or replace the write-only credential while this step remains
+        open, so the client must not advance merely because its old payload
+        said ``credential_present``. This action-time check reads only the
+        governed presence/mode mirrors, never a token, client ID or secret,
+        and refuses a mode change so replacement still requires fresh values.
+        """
+        store = self._resolve_store(store_id)
+        if auth_mode not in (
+            AUTH_MODE_OFFLINE,
+            AUTH_MODE_CLIENT_CREDENTIALS,
+        ):
+            raise UserError(_('Choose a supported credential method.'))
+        # Linearize against clear/replacement using the credential lifecycle's
+        # established global lock order. The locks remain held through the
+        # progress write and the response projection, so a concurrent lifecycle
+        # mutation either commits first (and this fresh read refuses it) or
+        # waits until this validated retention has committed. No Shopify call
+        # occurs and no secret leaves the write-only credential service.
+        store._lock_store_for_lifecycle()
+        Credential = self.env['shopify.connector.store.credential']
+        locked_version = Credential._lifecycle_credential_version(
+            store, lock=True,
+        )
+        credential = Credential._credential_for(store)
+        if credential:
+            credential.invalidate_recordset([
+                'auth_mode',
+                'client_credentials_present',
+                'credential_state',
+            ])
+        present = bool(
+            store.credential_present
+            and locked_version
+            and credential
+            and credential.credential_state != 'absent'
+        )
+        if not present:
+            raise UserError(_(
+                'The stored credential is no longer present. Enter it again '
+                'to continue.'
+            ))
+        if credential.auth_mode != auth_mode:
+            raise UserError(_(
+                'The stored credential method changed. Enter new values for '
+                'the selected method to continue.'
+            ))
+        if (
+            auth_mode == AUTH_MODE_CLIENT_CREDENTIALS
+            and not credential.client_credentials_present
+        ):
+            raise UserError(_(
+                'The stored credential is no longer present. Enter it again '
+                'to continue.'
+            ))
+        settings = self._settings_for(store)
+        self._record_progress(settings, 'credential')
+        return self.get_setup_state(store_id=store.id)
+
     # ------------------------------------------------------------------
     # Steps 4 and 5 -- scopes and test connection
     # ------------------------------------------------------------------
@@ -1447,6 +1593,18 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             values[domain['field']] = enabled
             if bool(settings[domain['field']]) != enabled:
                 changed = True
+        # A merchant selecting a read workflow is selecting the workflow, not
+        # merely making a later scheduler checkbox available.  Keep the
+        # scheduler mirrors aligned here so catalog/order discovery starts
+        # after activation without a second, easily missed configuration step.
+        # Shopify writes remain protected by their own preview/confirmation
+        # gates; these two flags only admit read-side discovery scans.
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            values['product_scheduled_sync_enabled'] = (
+                'product_import' in keys
+            )
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            values['order_scheduled_sync_enabled'] = 'sale' in keys
         settings.sudo().write(values)
         if changed:
             # `domain_flag_enablement` and `mapped_location` both read these
@@ -1465,16 +1623,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     def acknowledge_location_mapping(self, store_id):
         """Step 7's Continue.
 
-        Records progress and nothing else. It deliberately does NOT require a
-        mapping to exist: whether a mapping is required is a readiness
-        decision, made by `mapped_location` on the final-readiness step with
-        the full picture, and duplicating that rule here would give an
-        operator two different answers to the same question. It also
-        deliberately enqueues nothing -- a step that silently contacted
-        Shopify because somebody pressed Continue would be a surprise.
+        The inventory setup cannot advance on an unknown or partial location
+        configuration.  The domain seam owns the facts and exposes the same
+        ``mapping_complete`` value consumed by readiness; this method merely
+        enforces that one answer at the navigation boundary.  Continue itself
+        still enqueues nothing and contacts nothing.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
+        if settings.inventory_domain_enabled:
+            locations = self._setup_location_payload(store, settings)
+            refresh_state = (locations.get('refresh') or {}).get('state')
+            if refresh_state != 'succeeded':
+                raise UserError(_(
+                    'Shopify locations must finish loading before you can '
+                    'continue.'
+                ))
+            if not locations.get('shopify_total'):
+                raise UserError(_(
+                    'Shopify returned no active inventory locations. Add or '
+                    'activate a Shopify location, then load the list again.'
+                ))
+            if not locations.get('mapping_complete'):
+                raise UserError(_(
+                    'Map every active Shopify location before continuing. '
+                    '%(count)s location(s) still need an Odoo location.',
+                    count=locations.get('unmapped_count', 0),
+                ))
         self._record_progress(settings, 'location_mapping')
         return self.get_setup_state(store_id=store.id)
 
@@ -1494,8 +1669,33 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         Administrator gate is in addition to those, not instead of them.
         """
         store = self._resolve_store(store_id)
-        self._setup_refresh_locations(store)
-        return self.get_setup_state(store_id=store.id)
+        job = self._setup_refresh_locations(store)
+        state = self.get_setup_state(store_id=store.id)
+        # Bind the first response to the exact admitted/coalesced run too. The
+        # next request echoes this id through `follow_location_refresh`.
+        state['location_mapping']['refresh'] = (
+            self._setup_follow_location_refresh(store, job.id)
+        )
+        return state
+
+    @api.model
+    def follow_location_refresh(self, store_id, job_id):
+        """Follow one exact refresh and refresh readiness after its success."""
+        store = self._resolve_store(store_id)
+        refresh = self._setup_follow_location_refresh(store, job_id)
+        settings = self._settings_for(store)
+        if refresh['state'] == 'succeeded' and (
+            not store.last_readiness_at
+            or self._readiness_is_stale(store, settings)
+        ):
+            self.env['shopify.connector.readiness.check'].run_for_store(store)
+            store.invalidate_recordset()
+            self._clear_readiness_stale(settings)
+        state = self.get_setup_state(store_id=store.id)
+        # `get_setup_state` normally presents the newest refresh. Preserve the
+        # exact identity this request followed even if another run now exists.
+        state['location_mapping']['refresh'] = refresh
+        return state
 
     @api.model
     def save_location_mapping(
@@ -1520,6 +1720,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         # A new mapping is exactly what `mapped_location` reads, so any
         # earlier readiness result is now stale.
         self._mark_readiness_stale(settings)
+        # The mapping is the evidence `mapped_location` reads. Recompute now so
+        # the step never displays a stale readiness verdict after a successful
+        # save; this is a local evidence read and makes no Shopify request.
+        self.env['shopify.connector.readiness.check'].run_for_store(store)
+        store.invalidate_recordset()
+        self._clear_readiness_stale(settings)
         self._record_progress(settings, 'location_mapping')
         return self.get_setup_state(store_id=store.id)
 
@@ -1579,13 +1785,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
 
     @api.model
     def save_first_push_schedule(self, store_id, schedule_now):
-        """Step 10. Scheduling ONLY -- the first-push guard is untouched.
+        """Step 10. Enable scanning -- the first-push guard is untouched.
 
-        This flips the scheduled stock-scan flag and nothing else. The scan
-        enqueues a preview; the preview waits for an explicit confirmation
-        before a single quantity reaches Shopify. Nothing here previews,
-        confirms, admits a push job or writes to Shopify, and "scheduled" is
-        never presented as "pushed".
+        ``schedule_now`` remains in the RPC signature for compatibility with
+        an already-open wizard, but inventory-enabled onboarding no longer
+        offers a misleading opt-out. The scan creates protected preview work;
+        it never confirms, admits a push job or writes a quantity to Shopify.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
@@ -1594,7 +1799,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             and 'inventory_scheduled_sync_enabled' in settings._fields
         ):
             settings.sudo().write({
-                'inventory_scheduled_sync_enabled': bool(schedule_now),
+                'inventory_scheduled_sync_enabled': True,
             })
         self._record_progress(settings, 'first_push')
         return self.get_setup_state(store_id=store.id)
@@ -1602,6 +1807,52 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
     # ------------------------------------------------------------------
     # Step 12 -- review and activate
     # ------------------------------------------------------------------
+
+    @api.model
+    def _activation_completion_policy(self, store, settings):
+        """Return the finalisation decision for an activation attempt.
+
+        Core owns the transaction and the store lifecycle transition, while
+        an installed domain addon may have a durable readiness proof that has
+        to be established asynchronously after that transition.  The default
+        keeps core-only installations unchanged.  Addons must not perform a
+        remote request here: a false result is a hand-off to their durable
+        job/worker path, and the setup-completion write below is skipped.
+
+        The return value is intentionally a small policy seam rather than a
+        boolean override of ``activate``.  That preserves the core admission,
+        generation fencing, audit and read-side scheduling transaction for
+        every addon and makes it impossible for an extension to bypass the
+        final completion guard accidentally.
+        """
+        del store, settings
+        return {'complete': True}
+
+    @api.model
+    def _activation_preflight(self, store, settings):
+        """Return whether an installed domain permits lifecycle activation.
+
+        This is an additive domain seam before ``action_activate``.  Core has
+        no knowledge of domain-specific post-connection prerequisites, while a
+        domain addon may need to refuse activation before it can enqueue any
+        dependent reconciliation work.  The hook is local-only: it must not
+        perform a Shopify request.  Core-only installations keep the
+        historical behaviour through the affirmative default.
+        """
+        del store, settings
+        return {'allowed': True}
+
+    @api.model
+    def _activation_completion_guard(self, store, settings):
+        """Return whether completion may be written at this exact point.
+
+        An extension may use this final local-only seam to revalidate its
+        asynchronous proof immediately before core writes ``setup_completed``.
+        It must acquire any sanctioned lifecycle locks itself and must not make
+        a network request.  Core-only installations remain unchanged.
+        """
+        del store, settings
+        return True
 
     @api.model
     def activate(self, store_id):
@@ -1615,9 +1866,12 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         looking at those checks on this screen and a generic refusal here
         would be a worse message than the one they can already see.
 
-        No synchronisation starts. No Shopify mutation occurs. No domain job
-        is enqueued. Activation records that setup is complete and the
-        dashboard takes over.
+        Selected read-side discovery schedules start through their existing
+        queue producers. No Shopify mutation occurs: every write-side workflow
+        keeps its preview, review, and confirmation guards. Activation records
+        setup as complete only when any installed domain completion policy has
+        returned its proof; otherwise it returns the durable hand-off state and
+        leaves the operator in setup.
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
@@ -1657,9 +1911,29 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                     check['label'] for check in readiness['waiting']
                 ),
             ))
+        activation_preflight = self._activation_preflight(store, settings)
+        if activation_preflight and not activation_preflight.get('allowed', True):
+            return self.get_setup_state(store_id=store.id)
         if store.state != 'connected':
             store.action_activate()
             store.invalidate_recordset()
+        # A modular domain may need a post-connection, asynchronous proof
+        # (for example a webhook subscription read-back) before setup is
+        # truthfully complete.  The hook runs only after the lifecycle
+        # transition, and a deferred policy deliberately leaves the completion
+        # timestamp, completion actor, completion audit and read-side cron
+        # nudges untouched.  No remote operation is permitted in this
+        # transaction; the addon must return a durable job hand-off instead.
+        activation_policy = self._activation_completion_policy(store, settings)
+        if activation_policy and not activation_policy.get('complete', True):
+            return self.get_setup_state(store_id=store.id)
+        # A domain proof can become stale between the asynchronous policy
+        # decision and this completion write (disconnect/reconnect or a
+        # credential replacement).  Give the installed domain one final,
+        # local-only fence while the core transaction is still open; a false
+        # result leaves setup incomplete and re-renders the truthful state.
+        if not self._activation_completion_guard(store, settings):
+            return self.get_setup_state(store_id=store.id)
         settings.sudo().write({
             'setup_wizard_step_key': 'review',
             'setup_wizard_step': SETUP_STEP_COUNT,
@@ -1680,6 +1954,37 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 'on' if settings.notification_default_enabled else 'off',
             )
         )
+        # Do not make a newly activated merchant wait for the next 15/60-minute
+        # cron boundary. Trigger only the existing enqueue crons for workflows
+        # they selected; the normal eligibility, queue, and write guards remain
+        # authoritative inside those producers and handlers.
+        cron_refs = []
+        if (
+            'product_scheduled_sync_enabled' in settings._fields
+            and settings.product_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_product.ir_cron_shopify_connector_product_scan'
+            )
+        if (
+            'order_scheduled_sync_enabled' in settings._fields
+            and settings.order_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_sale.ir_cron_shopify_connector_order_scan'
+            )
+        if (
+            'inventory_scheduled_sync_enabled' in settings._fields
+            and settings.inventory_scheduled_sync_enabled
+        ):
+            cron_refs.append(
+                'shopify_connector_inventory.'
+                'ir_cron_shopify_connector_inventory_push_scan'
+            )
+        for xmlid in cron_refs:
+            cron = self.env.ref(xmlid, raise_if_not_found=False)
+            if cron:
+                cron.sudo()._trigger()
         return self.get_setup_state(store_id=store.id)
 
     # ------------------------------------------------------------------

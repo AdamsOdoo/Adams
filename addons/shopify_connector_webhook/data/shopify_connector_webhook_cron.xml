@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Reconciliation is a mandatory backstop, not an optional webhook
+             feature. The bounded service enqueues at most 20 stores per pass,
+             rotates by each store's scheduling cursor, and the normal job
+             drain performs the remote work. -->
+        <record id="ir_cron_shopify_connector_webhook_reconciliation" model="ir.cron">
+            <field name="name">Shopify Connector: Webhook Subscription Reconciliation</field>
+            <field name="model_id" ref="model_shopify_connector_webhook_subscription"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="state">code</field>
+            <field name="code">model.run_scheduled_reconciliation(limit=20)</field>
+            <field name="interval_number">15</field>
+            <field name="interval_type">minutes</field>
+            <field name="priority">5</field>
+            <field name="active" eval="True"/>
+        </record>
+        <record id="ir_cron_shopify_connector_webhook_delivery_retention" model="ir.cron">
+            <field name="name">Shopify Connector: Webhook Evidence Retention</field>
+            <field name="model_id" ref="model_shopify_connector_webhook_delivery"/>
+            <field name="user_id" ref="base.user_root"/>
+            <field name="state">code</field>
+            <field name="code">model.run_retention_sweep()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="priority">10</field>
+            <field name="active" eval="True"/>
+        </record>
+    </data>
+</odoo>

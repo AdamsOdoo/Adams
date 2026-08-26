@@ -523,16 +523,18 @@ def run_concurrent_inconclusive_increment(settings, timeout):
             strategy = dict(dispatch._get_reconciliation_strategies()[
                 attempt.mutation_domain
             ])
-            strategy['reconcile'] = lambda current_attempt: {
-                'verdict': 'inconclusive',
-                'observed_store_identity':
-                    current_attempt.expected_store_identity,
-                'action': 'reconcile',
-                'error_class': 'shopify_temporary_server_network',
-                'manual_review_subreason': False,
-                'message': 'Concurrent read remains inconclusive.',
-                'evidence': {'read': 'runtime-concurrent-cap'},
-            }
+            strategy['reconcile'] = (
+                lambda current_attempt, _reconciliation_job: {
+                    'verdict': 'inconclusive',
+                    'observed_store_identity':
+                        current_attempt.expected_store_identity,
+                    'action': 'reconcile',
+                    'error_class': 'shopify_temporary_server_network',
+                    'manual_review_subreason': False,
+                    'message': 'Concurrent read remains inconclusive.',
+                    'evidence': {'read': 'runtime-concurrent-cap'},
+                }
+            )
             with patch.object(
                 type(dispatch),
                 '_get_reconciliation_strategies',

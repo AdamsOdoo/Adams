@@ -140,25 +140,22 @@
                     <button name="action_import_tracking" type="object"
                             string="Import tracking to delivery"
                             class="btn-primary"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             invisible="reconciled_state in ('acknowledged', 'applied', 'superseded')"
                             help="Copy the carrier tracking reference onto the matching Odoo delivery and mark this observation acknowledged. This never moves stock."/>
                     <button name="action_acknowledge_external" type="object"
                             string="Acknowledge (handled outside Odoo)"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             invisible="reconciled_state in ('acknowledged', 'applied', 'superseded')"
                             confirm="This records that the fulfilment was handled outside Odoo. No stock is moved and nothing is sent to Shopify."
                             help="Close this observation without changing Odoo stock."/>
                     <!--
-                        Mode-2 explicit validation is Reviewer/Administrator on
-                        the server. Only the Administrator role is a
-                        customer-facing role that certainly resolves to Reviewer,
-                        so visibility uses the Connector User role and the server
-                        refuses a caller who lacks Reviewer or Admin.
+                        Mode-2 explicit validation is Administrator-only on the
+                        server because it applies a proposed fulfillment.
                     -->
                     <button name="action_validate_proposed" type="object"
                             string="Validate proposed fulfilment"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             invisible="reconciled_state != 'review'"
                             confirm="Odoo will re-run the full 16-condition Mode 2 checklist. If any condition fails the case stays open and nothing is applied."
                             help="Apply the observed Shopify fulfilment to Odoo, but only if every Mode 2 condition passes."/>

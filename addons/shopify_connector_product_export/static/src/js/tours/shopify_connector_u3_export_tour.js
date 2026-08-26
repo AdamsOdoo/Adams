@@ -4,10 +4,9 @@
 // Browser tours for the U3 export surfaces, driven by HttpCase.start_tour (see
 // tests/test_u3_export_tours.py).
 //
-// The navigation tour is the automated acceptance: it walks the whole Export
-// branch and asserts every U3 surface renders for a connector user. It needs
-// no seeded Shopify state, so it runs in the ordinary suite rather than only
-// in a driven runtime campaign.
+// The navigation tour checks the C1 split: export monitoring in Operations,
+// settings in Administrator-only Configuration, and diagnostics/recovery out
+// of navigation. It needs no seeded Shopify state.
 //
 // The review tour opens the Owl diff surface on a seeded preview and asserts
 // the three things that make it safe: the refusals are on screen, the tag
@@ -27,8 +26,36 @@ const REVIEW_BUTTON = ".o_form_view button:contains('Review Export')";
 const coreMenu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
 const menu = (xmlid) =>
     `[data-menu-xmlid="shopify_connector_product_export.${xmlid}"]`;
+const topMenu = {
+    Operations: coreMenu("menu_shopify_connector_operations"),
+    Configuration: coreMenu("menu_shopify_connector_configuration"),
+};
 
-// --- 1. Navigation: every U3 export surface renders. ---
+const openPath = (labels, content = "") => ({
+    trigger: topMenu[labels[0]] || ".o_menu_sections",
+    content,
+    async run() {
+        for (const label of labels) {
+            const topEntry = [...document.querySelectorAll(
+                topMenu[label] || "__missing__"
+            )].find((candidate) => candidate.getClientRects().length);
+            const textNode = [...document.querySelectorAll(
+                ".o_menu_sections *, .o-dropdown--menu *"
+            )].find((candidate) => candidate.textContent.trim() === label);
+            const entry = topEntry || (textNode && (
+                textNode.closest("a, button, [role='menuitem'], [data-menu-xmlid]")
+                || textNode
+            ));
+            if (!entry) {
+                throw new Error(`${label} is absent from the operator menu tree`);
+            }
+            entry.click();
+            await new Promise((resolve) => setTimeout(resolve, 400));
+        }
+    },
+});
+
+// --- 1. Navigation: operations plus Administrator configuration. ---
 registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", {
     url: "/odoo",
     steps: () => [
@@ -43,74 +70,23 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_nav_tour", 
             content: "Open the Shopify Connector app.",
             run: "click",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            content: "Open the Export branch.",
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_preview"),
-            content: "Export Previews.",
-            run: "click",
-        },
+        openPath(
+            ["Operations", "Product Export Reviews"],
+            "Open Product Export Reviews."
+        ),
         {
             trigger: ".o_list_view",
             content: "The export previews list renders.",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            content: "Re-open the Export branch — the dropdown collapses on navigation.",
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_media"),
-            content: "Exported Media.",
-            run: "click",
-        },
+        openPath(["Operations", "Media Exports"], "Open Media Exports."),
         {
             trigger: ".o_list_view",
-            content: "The exported-media registry renders.",
+            content: "The media export registry renders.",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_backfill"),
-            content: "Reconnect and Backfill.",
-            run: "click",
-        },
-        {
-            trigger: ".o_list_view",
-            content: "The reconnect/backfill catch-up surface renders.",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_settings"),
-            content: "Export Settings.",
-            run: "click",
-        },
+        openPath(["Configuration", "Export Settings"], "Open Export Settings."),
         {
             trigger: ".o_list_view",
             content: "The per-store export settings render.",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_diagnostics"),
-            content: "Export Diagnostics.",
-            run: "click",
-        },
-        {
-            trigger: ".o_list_view, .o_nocontent_help",
-            content:
-                "Diagnostics renders — either rows that need a decision, or the " +
-                "empty state that says nothing does.",
         },
     ],
 });
@@ -129,14 +105,7 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_review_tour
             trigger: `.o_app${coreMenu("menu_shopify_connector_root")}`,
             run: "click",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_preview"),
-            run: "click",
-        },
+        openPath(["Operations", "Product Export Reviews"]),
         {
             trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
             content: "Open the seeded preview.",
@@ -188,14 +157,7 @@ registry.category("web_tour.tours").add("shopify_connector_u3_export_keyboard_to
             trigger: `.o_app${coreMenu("menu_shopify_connector_root")}`,
             run: "click",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_preview"),
-            run: "click",
-        },
+        openPath(["Operations", "Product Export Reviews"]),
         {
             trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
             run: "click",
@@ -254,16 +216,10 @@ registry.category("web_tour.tours").add("shopify_connector_u3_media_resume_tour"
             content: "Open the Shopify Connector app.",
             run: "click",
         },
-        {
-            trigger: menu("menu_shopify_connector_product_export"),
-            content: "Open the Export branch.",
-            run: "click",
-        },
-        {
-            trigger: menu("menu_shopify_connector_product_export_media"),
-            content: "Exported Media — the registry that owns this surface.",
-            run: "click",
-        },
+        openPath(
+            ["Operations", "Media Exports"],
+            "Exported Media — the registry that owns this surface."
+        ),
         {
             trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
             content: "Open the stopped media row.",
@@ -315,11 +271,9 @@ registry.category("web_tour.tours").add("shopify_connector_u3_checksum_ack_tour"
             content: "Open the Shopify Connector app.",
             run: "click",
         },
-        {
-            trigger: coreMenu("menu_shopify_connector_stores"),
-            content: "Stores — the store owns the reconciliation surface.",
-            run: "click",
-        },
+        openPath(["Configuration", "Stores"],
+            "Stores — the store owns the reconciliation surface."
+        ),
         {
             trigger: ".o_list_view .o_data_row:first-child .o_data_cell",
             content: "Open the reconnected store.",

@@ -7,6 +7,7 @@ from odoo.tests.common import TransactionCase, tagged
 from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
     JobHandlerError,
 )
+from odoo.tools import mute_logger
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -205,6 +206,7 @@ class TestCustomerDuplicatePrevention(TransactionCase):
     # 6. Uniqueness constraints hold as the backstop.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_direct_create_collisions_prove_uniqueness_backstop(self):
         partner_1 = self._make_partner('Uniq A')
         partner_2 = self._make_partner('Uniq B')

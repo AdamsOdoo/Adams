@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from odoo import api, fields, models
@@ -383,22 +384,24 @@ class ShopifyConnectorCustomerImporter(models.AbstractModel):
 
     @api.model
     def _build_candidate_payload(self, shopify_gid, normalized_incoming, candidates):
-        """The exact §8.2 JSON shape (D2) -- capped at the first 20
-        candidates by partner_id ascending; candidate_count always
-        carries the true total. Minimum disambiguation set only (id,
-        display name, email, active) -- no phone, no address, no order
-        data."""
+        """Build deterministic, PII-free technical ambiguity evidence.
+
+        Technical detail is retained in job logs, so it may carry stable
+        record IDs and a one-way email fingerprint, never customer names or
+        addresses. Authorized reviewers follow the partner IDs to the normal
+        business records, whose ACLs remain the PII boundary.
+        """
         ordered = candidates.sorted(key=lambda partner: partner.id)
         return json.dumps({
             'kind': 'customer_ambiguous_match_candidates',
             'shopify_customer_gid': shopify_gid,
-            'incoming_email_normalized': normalized_incoming,
+            'incoming_email_sha256': hashlib.sha256(
+                normalized_incoming.encode('utf-8'),
+            ).hexdigest(),
             'candidate_count': len(candidates),
             'candidates': [
                 {
                     'partner_id': partner.id,
-                    'display_name': partner.display_name,
-                    'email': partner.email,
                     'active': partner.active,
                 }
                 for partner in ordered[:20]

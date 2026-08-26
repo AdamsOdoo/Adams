@@ -277,8 +277,38 @@ class ShopifyConnectorProductExportPreview(models.Model):
     # The one public confirmation action (D-015-5)
     # ------------------------------------------------------------------
 
+    def _confirm_export_preview_fallback(self):
+        """Administrator-only confirmation from the no-JS diff wizard.
+
+        The primary Owl review route continues to admit Reviewer or
+        Administrator through ``action_confirm_export_preview``. This narrow
+        wrapper exists so the retained fallback is independently guarded and
+        its use is visible in the append-only lifecycle audit before it
+        delegates to the same confirmation authority.
+        """
+        self.ensure_one()
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may use the '
+                'no-JavaScript export confirmation fallback. Use the '
+                'Review Export screen instead.'
+            )
+        self.store_id._create_lifecycle_audit_job(
+            'No-JS export confirmation authorized preview_id=%d '
+            'template_id=%d actor_uid=%d steps=%d blocked=%d' % (
+                self.id,
+                self.product_template_id.id,
+                self.env.uid,
+                len((self.apply_plan or {}).get('steps') or []),
+                len((self.blocked_differences or {}).get('items') or []),
+            )
+        )
+        return self.action_confirm_export_preview()
+
     def action_confirm_export_preview(self):
-        """Reviewer/Administrator confirmation. The only door to an apply.
+        """Administrator confirmation. The only door to an apply.
 
         Re-verified rather than trusted: the preview is re-checked for
         expiry under a row lock at confirmation time, so a preview that
@@ -287,16 +317,11 @@ class ShopifyConnectorProductExportPreview(models.Model):
         looking at a minute ago.
         """
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                'Only a Shopify Connector Reviewer or Administrator may '
+                'Only a Shopify Connector Administrator may '
                 'confirm a product export.'
             )
         locked = self.try_lock_for_update()

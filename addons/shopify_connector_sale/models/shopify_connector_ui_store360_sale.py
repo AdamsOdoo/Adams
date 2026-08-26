@@ -66,10 +66,13 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
     # ------------------------------------------------------------------ #
     #  Shared domains (the ONE C1 population definition)
     # ------------------------------------------------------------------ #
-    def _store_360_order_domain(self, ctx, which='current'):
+    def _store_360_order_domain(self, ctx, which='current', review=False):
         """The C1 population: imported, non-cancelled, non-quarantined
         Shopify orders of the selected scope, `date_order` in the window.
-        Used verbatim for every order-grain aggregate AND its drill-down."""
+        The reconciled population excludes review rows; passing ``review``
+        builds the separately disclosed review population with every other
+        scope/exclusion term identical. Used verbatim for every order-grain
+        aggregate AND its drill-down."""
         store = ctx['store']
         window = ctx['window']
         if which == 'current':
@@ -87,6 +90,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
         domain = [
             ('shopify_connector_quarantined', '=', False),
             ('shopify_connector_cancelled_at', '=', False),
+            ('shopify_connector_review', '=', bool(review)),
             ('state', '!=', 'cancel'),
             ('date_order', '>=', start),
             end_term,
@@ -131,6 +135,9 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             tz=ctx['window']['tz'])
         current_domain = self._store_360_order_domain(ctx, 'current')
         prev_domain = self._store_360_order_domain(ctx, 'previous')
+        review_domain = self._store_360_order_domain(
+            ctx, 'current', review=True,
+        )
 
         current_rows = Order._read_group(
             current_domain, groupby=['currency_id'],
@@ -143,6 +150,27 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 aggregates=['amount_total:sum', '__count'],
             )
         }
+        review_blocks = []
+        for currency, total, count in Order._read_group(
+            review_domain, groupby=['currency_id'],
+            aggregates=['amount_total:sum', '__count'],
+        ):
+            review_blocks.append({
+                'currency': self._currency_info(currency),
+                'value': total or 0.0,
+                'count': count,
+                'target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        review_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _(
+                        "Orders awaiting data review — %(currency)s",
+                        currency=currency.name,
+                    ),
+                },
+            })
+        review_blocks.sort(key=lambda block: block['currency']['name'])
         blocks = []
         for currency, total, count in current_rows:
             prev_total, prev_count = prev_rows.get(
@@ -150,11 +178,31 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             )
             blocks.append({
                 'currency': self._currency_info(currency),
+                'orders_target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        current_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _("Imported Odoo orders — %(currency)s",
+                              currency=currency.name),
+                },
                 'sales': total or 0.0,
+                # Declared-scope lifecycle policy: every refund/divergence
+                # lands in the separately disclosed review population and is
+                # excluded from this reconciled population. Gross and net are
+                # therefore equal here and reconciled refunds are zero; the
+                # dashboard states that limitation instead of implying a
+                # refund ledger the supported kernel does not maintain.
+                'gross': total or 0.0,
+                'refunds': 0.0,
+                'net': total or 0.0,
                 'orders': count,
                 'aov': (total / count) if count else False,
                 'previous': {
                     'sales': prev_total or 0.0,
+                    'gross': prev_total or 0.0,
+                    'refunds': 0.0,
+                    'net': prev_total or 0.0,
                     'orders': prev_count,
                     'aov': (prev_total / prev_count) if prev_count else False,
                 },
@@ -168,11 +216,25 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             currency = self.env['res.currency'].browse(currency_id)
             blocks.append({
                 'currency': self._currency_info(currency),
+                'orders_target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(
+                        current_domain + [('currency_id', '=', currency.id)]
+                    ),
+                    'name': _("Imported Odoo orders — %(currency)s",
+                              currency=currency.name),
+                },
                 'sales': 0.0,
+                'gross': 0.0,
+                'refunds': 0.0,
+                'net': 0.0,
                 'orders': 0,
                 'aov': False,
                 'previous': {
                     'sales': prev_total or 0.0,
+                    'gross': prev_total or 0.0,
+                    'refunds': 0.0,
+                    'net': prev_total or 0.0,
                     'orders': prev_count,
                     'aov': (prev_total / prev_count) if prev_count else False,
                 },
@@ -200,13 +262,27 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             'orders_target': {
                 'res_model': 'sale.order',
                 'domain': self._serialize_domain(current_domain),
-                'name': _("Imported Shopify orders"),
+                'name': _("Imported Odoo orders"),
             },
             'units_target': {
                 'res_model': 'sale.order.line',
                 'domain': self._serialize_domain(current_line_domain),
-                'name': _("Imported Shopify order lines"),
+                'name': _("Imported Odoo order lines"),
             },
+            'awaiting_review': {
+                'count': sum(block['count'] for block in review_blocks),
+                'blocks': review_blocks,
+                'target': {
+                    'res_model': 'sale.order',
+                    'domain': self._serialize_domain(review_domain),
+                    'name': _("Imported orders awaiting data review"),
+                },
+            },
+            'refund_scope_note': _(
+                "Refunded or otherwise divergent imported orders are shown "
+                "under Awaiting data review and excluded from gross, net, "
+                "refund, and average-order-value figures."
+            ),
         }
         primary = blocks[0] if blocks else False
         result['trend'] = self._store_360_trend(
@@ -302,7 +378,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 'res_model': 'sale.order',
                 'domain': self._serialize_domain(
                     current_domain + currency_term),
-                'name': _("Imported Shopify orders"),
+                'name': _("Imported Odoo orders"),
             },
         }
 
@@ -375,6 +451,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
             ('store_id', '=', store.id),
             ('job_type', 'in', list(_ORDER_JOB_TYPES)),
             ('state', 'in', list(_G3_STATES)),
+            ('superseded_by_job_id', '=', False),
         ]
         g2 = Job.search_count(g2_domain)
         g3 = Job.search_count(g3_domain)
@@ -487,13 +564,56 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 'domain': self._serialize_domain(g3_domain or []),
                 'name': _("Order imports needing attention"),
             },
+            'discovery_target': {
+                'res_model': 'shopify.connector.job',
+                'domain': self._serialize_domain(
+                    self._store_term(store) + [
+                        ('job_type', 'in', (
+                            'order_import_scan', 'order_import_sync',
+                            'customer_import_sync',
+                        )),
+                    ]
+                ),
+                'name': _("Order discovery runs"),
+            },
+            'settings_target': {
+                'res_model': 'shopify.connector.store.settings',
+                'domain': self._serialize_domain([
+                    ('store_id', '=', store.id),
+                ]),
+                'name': _("Order import settings"),
+            },
+            'store_target': {
+                'res_model': 'shopify.connector.store',
+                'domain': self._serialize_domain([('id', '=', store.id)]),
+                'name': _("Store connection"),
+            },
         }
-        if state in ('stale', 'incomplete'):
+        if state == 'incomplete':
+            if g3 > 0:
+                result['critical_text'] = _(
+                    "A connector problem may make these figures incomplete — "
+                    "review order imports."
+                )
+                result['critical_target'] = result['g3_target']
+            elif sale_disabled_with_history and not disconnected:
+                result['critical_text'] = _(
+                    "Order import is disabled, so these figures are historic "
+                    "and may be incomplete — review order import settings."
+                )
+                result['critical_target'] = result['settings_target']
+            else:
+                result['critical_text'] = _(
+                    "The Shopify connection is unavailable, so these figures "
+                    "are last known and may be incomplete."
+                )
+                result['critical_target'] = result['store_target']
+        elif state == 'stale':
             result['critical_text'] = _(
-                "A connector problem may make these figures incomplete — "
-                "review order imports."
+                "Order discovery is not current yet — run or enable order "
+                "import before relying on these figures."
             )
-            result['critical_target'] = result['g3_target']
+            result['critical_target'] = result['discovery_target']
         return result
 
     # ------------------------------------------------------------------ #
@@ -502,6 +622,9 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
     def _store_360_lifecycle(self, ctx):
         Order = self.env['sale.order']
         domain = self._store_360_order_domain(ctx, 'current')
+        review_domain = self._store_360_order_domain(
+            ctx, 'current', review=True,
+        )
 
         def target(extra, name):
             return {
@@ -534,9 +657,7 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 pending_non_cod += count
             else:
                 other += count
-        review = Order.search_count(
-            domain + [('shopify_connector_review', '=', True)],
-        )
+        review = Order.search_count(review_domain)
         payment = {
             'buckets': [
                 {
@@ -574,9 +695,11 @@ class ShopifyConnectorUiStore360Sale(models.AbstractModel):
                 {
                     'id': 'review', 'label': _("Needs review"),
                     'count': review,
-                    'target': target(
-                        [('shopify_connector_review', '=', True)],
-                        _("Imported orders needing review")),
+                    'target': {
+                        'res_model': 'sale.order',
+                        'domain': self._serialize_domain(review_domain),
+                        'name': _("Imported orders needing review"),
+                    },
                 },
             ],
             'other': other,

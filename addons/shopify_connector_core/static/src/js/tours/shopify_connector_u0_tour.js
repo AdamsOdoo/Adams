@@ -1,9 +1,9 @@
 /** @odoo-module **/
 // Part of the Shopify Connector (U0 operator UI foundation).
 //
-// Browser tours for the U0 operator surfaces, driven by HttpCase.start_tour
-// (see tests/test_ui_tours.py). The primary navigation tour is role-agnostic
-// (every connector role can read every surface) and is the automated check.
+// Browser tours for the connector operator surfaces, driven by
+// HttpCase.start_tour (see tests/test_ui_tours.py). The primary navigation
+// tour uses the visible Connector User role.
 // The role-action tours exercise the retry / cancel / review controls and are
 // intended for the driven Odoo.sh runtime campaign with seeded fixtures.
 
@@ -11,10 +11,31 @@ import { registry } from "@web/core/registry";
 import { stepUtils } from "@web_tour/tour_utils";
 
 const menu = (xmlid) => `[data-menu-xmlid="shopify_connector_core.${xmlid}"]`;
+const topMenu = {
+    Dashboard: menu("menu_shopify_connector_dashboard"),
+    Operations: menu("menu_shopify_connector_operations"),
+    Reporting: menu("menu_shopify_connector_reporting"),
+};
+const pathMenu = {
+    ...topMenu,
+    "Connector Health": menu("menu_shopify_connector_connector_health"),
+    "Runs & Recovery": menu("menu_shopify_connector_sync_center"),
+    "Needs Attention": menu("menu_shopify_connector_error_center"),
+    "Sync Performance": menu("menu_shopify_connector_sync_analysis"),
+    "Audit Trail": menu("menu_shopify_connector_logs"),
+};
 
-// --- 1. Primary navigation (Auditor and up): Dashboard -> Stores ->
-//        Sync Center -> Error & Review Center -> Logs. Read-only; asserts each
-//        surface renders and no write control is required to move through. ---
+// Each menu level is its own tour step. The tour engine waits until that
+// exact entry is visible before clicking it, so first-load asset generation
+// cannot be mistaken for a missing destination after a fixed sleep.
+const openPath = (labels, content) => labels.map((label, index) => ({
+    trigger: pathMenu[label],
+    content: index === 0 ? content : `Open ${label}.`,
+    run: "click",
+}));
+
+// --- 1. Primary navigation: Dashboard -> Operations -> Reporting. Read-only;
+//        Configuration is covered separately with an Administrator. ---
 registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
     url: "/odoo",
     steps: () => [
@@ -32,11 +53,8 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
         },
         {
             trigger: ".o_sc_dashboard",
-            content: "The Store 360 dashboard renders.",
+            content: "The Sales Dashboard renders.",
         },
-        // Store 360: with the seeded connected store (test fixture), the
-        // shell shows the header with the period filter group, the two
-        // distinct timestamps, and the connector-health region.
         {
             trigger: ".o_sc_dashboard .sc360-period",
             content: "The reporting-period filter group renders.",
@@ -46,64 +64,44 @@ registry.category("web_tour.tours").add("shopify_connector_u0_nav_tour", {
             content: "The page-updated timestamp renders.",
         },
         {
-            trigger: ".o_sc_dashboard .sc360-health",
-            content: "The connector-health region renders.",
+            trigger: ".o_sc_dashboard .sc360-commercial",
+            content: "The review-excluded sales region renders.",
+        },
+        ...openPath(["Dashboard", "Connector Health"], "Open Connector Health."),
+        {
+            trigger: ".o_sc_connector_health .sc360-stores-table",
+            content: "Per-store health renders without sales figures.",
         },
         {
-            trigger: ".o_sc_dashboard .sc360-flows",
-            content: "The flow-health table renders.",
+            trigger: ".o_sc_connector_health .sc360-flows",
+            content: "Domain freshness renders unknown states explicitly.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_stores")}`,
-            content: "Go to Stores.",
-            run: "click",
-        },
-        {
-            trigger: ".o_list_view",
-            content: "The stores list renders.",
-        },
-        {
-            trigger: `${menu("menu_shopify_connector_sync_center")}`,
-            content: "Go to the Sync Center.",
-            run: "click",
-        },
+        ...openPath(["Operations", "Runs & Recovery"], "Go to Runs & Recovery."),
         {
             trigger: ".o_list_view",
-            content: "The Sync Center list renders.",
+            content: "The runs list renders.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_error_center")}`,
-            content: "Go to the Error & Review Center.",
-            run: "click",
-        },
+        ...openPath(["Operations", "Needs Attention"], "Go to Needs Attention."),
         {
             trigger: ".o_list_view",
-            content: "The Error & Review Center renders.",
+            content: "Needs Attention renders.",
         },
         // Store 360 slice: the zero-schema Sync Operations Analysis surface
         // (graph over the job model, native rules).
-        {
-            trigger: `${menu("menu_shopify_connector_sync_analysis")}`,
-            content: "Go to Sync Operations Analysis.",
-            run: "click",
-        },
+        ...openPath(["Reporting", "Sync Performance"], "Go to Sync Performance."),
         {
             trigger: ".o_graph_renderer, .o_graph_view, .o_view_nocontent",
             content: "The analysis graph view renders.",
         },
-        {
-            trigger: `${menu("menu_shopify_connector_logs")}`,
-            content: "Go to Logs.",
-            run: "click",
-        },
+        ...openPath(["Reporting", "Audit Trail"], "Go to Audit Trail."),
         {
             trigger: ".o_list_view",
-            content: "The Logs list renders.",
+            content: "The audit trail renders.",
         },
     ],
 });
 
-// --- 2. Operator: open the Error Center, open a cancellable job, open the
+// --- 2. Operator: open Runs & Recovery, open a cancellable run, open the
 //        cancellation wizard, confirm a reason is required. Needs a seeded
 //        queued/running job (runtime fixture). ---
 registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
@@ -126,17 +124,17 @@ registry.category("web_tour.tours").add("shopify_connector_u0_operator_tour", {
         },
         {
             trigger: ".o_list_view .o_data_row:first-child",
-            content: "Open the first job.",
+            content: "Open the first run.",
             run: "click",
         },
         {
             trigger: ".o_form_view",
-            content: "The job form is available; cancellation is offered where the state and role allow it.",
+            content: "The run form is available; cancellation is offered where the state and role allow it.",
         },
     ],
 });
 
-// --- 3. Reviewer: reach a blocked_manual_review job and confirm the review
+// --- 3. Reviewer: reach a blocked manual-review run and confirm the review
 //        controls (release / resolve) are present, while admin-only mutation
 //        resolution is not. Needs a seeded blocked job (runtime fixture). ---
 registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
@@ -159,14 +157,13 @@ registry.category("web_tour.tours").add("shopify_connector_u0_reviewer_tour", {
         },
         {
             trigger: ".o_list_view",
-            content: "The Error & Review Center renders for the reviewer.",
+            content: "Needs Attention renders for the reviewer.",
         },
     ],
 });
 
-// --- 4. Administrator: open a store, confirm the safe lifecycle/test controls
-//        are visible and no credential value is shown; reach mutation evidence
-//        and confirm the resolution wizard is offered. Needs seeded fixtures. ---
+// --- 4. Administrator: open a store, then reach mutation evidence only as a
+//        contextual drill-down from Needs Attention. Needs seeded fixtures. ---
 registry.category("web_tour.tours").add("shopify_connector_u0_admin_tour", {
     url: "/odoo",
     steps: () => [
@@ -190,12 +187,22 @@ registry.category("web_tour.tours").add("shopify_connector_u0_admin_tour", {
             content: "The stores list renders for the administrator.",
         },
         {
-            trigger: `${menu("menu_shopify_connector_mutation_evidence")}`,
+            trigger: `${menu("menu_shopify_connector_error_center")}`,
             run: "click",
         },
         {
-            trigger: ".o_list_view",
-            content: "The mutation-evidence list renders.",
+            trigger: ".o_list_view .o_data_row:has(.o_field_widget[name='mutation_attempt_id'] a) .o_data_cell:first-child",
+            content: "Open a run carrying mutation evidence.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view .o_field_widget[name='mutation_attempt_id'] a",
+            content: "Open the contextual Shopify evidence.",
+            run: "click",
+        },
+        {
+            trigger: ".o_form_view",
+            content: "The Shopify evidence renders contextually.",
         },
     ],
 });

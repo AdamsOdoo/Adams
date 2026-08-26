@@ -8,7 +8,7 @@ guided setup anywhere in the connector: `shopify.connector.store` carries
 `create="false"` on both its list and its form, so there was no route to create
 a store at all outside a data import or a `sudo()` call, and every setup
 decision -- credential, scopes, directions, source of truth, notifications,
-first-push scheduling -- had to be found on separate screens in an order
+first-push scanning -- had to be found on separate screens in an order
 nobody stated.
 
 What these tests hold
@@ -21,9 +21,9 @@ every entry point including a foreign id supplied directly; progress is durable
 and resumes where it left off; Back loses nothing; the credential is
 write-only and never comes back; no source-of-truth choice is ever pre-selected
 into consent; notifications are off by default and take an explicit
-consequence-stating confirmation; the first-push guard is scheduled but never
-bypassed; and activation starts no synchronisation and writes nothing to
-Shopify.
+consequence-stating confirmation; the first-push guard is enabled but never
+bypassed; and activation promptly triggers only the selected read-side
+producers while writing nothing to Shopify.
 
 No Shopify request is made anywhere in this file. Step 5's probe is driven
 through the module's existing `_send` transport seam with a stand-in, exactly
@@ -34,6 +34,7 @@ the real response taxonomy all run with only the socket absent.
 import json
 from unittest.mock import patch
 
+from odoo import fields
 from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
 
@@ -50,6 +51,8 @@ from ..models.shopify_connector_setup_wizard import (
     SETUP_STEP_KEYS,
     SETUP_STEP_ORDER,
     SETUP_STEPS,
+    SETUP_PHASES,
+    SETUP_PHASE_COUNT,
 )
 
 DUMMY_TOKEN = 'shpat_SETUPWIZARDDUMMY000000000000000'
@@ -202,10 +205,90 @@ class SetupWizardCase(TransactionCase):
         user = user or self.admin_a
         store = self._make_store(user=user)
         self._as(user).save_credential(store.id, DUMMY_TOKEN)
+        # The optional W1 addon needs an app client secret for Shopify webhook
+        # HMAC verification.  Keep the core fixture's offline-token journey
+        # valid by seeding that non-returned test evidence before activation;
+        # the production wizard never writes this field from a read payload.
+        if self._webhook_installed():
+            Credential = self.env['shopify.connector.store.credential']
+            credential = Credential.sudo().search([
+                ('store_id', '=', store.id),
+            ], limit=1)
+            Credential.sudo()._credential_surface('_mutate_token').browse(
+                credential.id,
+            ).write({'client_secret': 's1-setup-client-secret'})
         with self._transport(ok=True):
             self._as(user).run_test_connection(store.id)
         store.invalidate_recordset()
         return store
+
+    def _webhook_installed(self):
+        return 'shopify.connector.webhook.registry' in self.env.registry.models
+
+    def _complete_webhook_setup_proof(self, store):
+        """Seed W1's durable read-back evidence for core setup tests.
+
+        This is test-only evidence: no Shopify request is made.  The W1
+        product-export journey owns the same two-stage assertion; core's
+        existing activation tests use this helper only so their original
+        completion assertions remain valid when the optional addon is part of
+        the all-modules qualification database.
+        """
+        if not self._webhook_installed():
+            return
+        from odoo.addons.shopify_connector_core.tools.api_version import (
+            SHOPIFY_API_VERSION,
+        )
+        Credential = self.env['shopify.connector.store.credential']
+        credential = Credential.sudo().search([
+            ('store_id', '=', store.id),
+        ], limit=1)
+        Credential.sudo()._credential_surface('_mutate_token').browse(
+            credential.id,
+        ).write({'client_secret': 's1-webhook-proof-client-secret'})
+        Secret = self.env['shopify.connector.webhook.secret']
+        Subscription = self.env['shopify.connector.webhook.subscription']
+        Secret._ensure_for_store(store)
+        expected = Subscription._ensure_expected_for_store(store)
+        callback_digest = Secret._callback_url_digest_for_store(store)
+        epoch = Subscription._credential_epoch(store)
+        for subscription in expected:
+            subscription._service_write({
+                'state': 'active',
+                'shopify_subscription_gid': (
+                    'gid://shopify/WebhookSubscription/s1-%d'
+                    % subscription.id
+                ),
+                'actual_topic': subscription.topic_enum,
+                'actual_uri_digest': callback_digest,
+                'actual_api_version': SHOPIFY_API_VERSION,
+                'actual_format': 'JSON',
+                'last_reconciled_at': fields.Datetime.now(),
+                'hmac_credential_epoch': epoch,
+                'last_error': False,
+            })
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'webhook_subscription_reconcile'),
+            ('job_source', '=', 'setup_readiness_check'),
+            ('state', '=', 'queued'),
+        ])
+        if jobs:
+            jobs.write({
+                'state': 'running',
+                'started_at': fields.Datetime.now(),
+            })
+            jobs.write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+
+    def _complete_pending_webhook_activation(self, store):
+        if not self._webhook_installed():
+            return
+        self._complete_webhook_setup_proof(store)
+        self._as(self.admin_a).run_readiness(store.id)
+        self._as(self.admin_a).activate(store.id)
 
 
 @tagged('post_install', '-at_install')
@@ -261,6 +344,33 @@ class TestSetupWizardShape(SetupWizardCase):
         self.assertEqual(state['steps'][0]['key'], 'welcome')
         self.assertEqual(state['steps'][-1]['key'], 'review')
         self.assertEqual(state['resume_step_key'], 'welcome')
+
+    def test_five_merchant_phases_group_every_step_without_changing_keys(self):
+        state = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(SETUP_PHASE_COUNT, 5)
+        self.assertEqual(
+            [phase[0] for phase in SETUP_PHASES],
+            ['connect', 'choose', 'map', 'protect', 'verify'],
+        )
+        self.assertEqual(state['phase_count'], 5)
+        self.assertEqual(
+            [phase['label'] for phase in state['phases']],
+            ['Connect', 'Choose', 'Map', 'Protect', 'Verify'],
+        )
+        grouped = [
+            step_key
+            for phase in state['phases']
+            for step_key in phase['step_keys']
+        ]
+        self.assertEqual(grouped, list(SETUP_STEP_KEYS))
+        self.assertEqual(
+            [step['phase_key'] for step in state['steps']],
+            [
+                'connect', 'connect', 'connect', 'connect', 'connect',
+                'choose', 'map', 'protect', 'protect', 'protect',
+                'verify', 'verify',
+            ],
+        )
 
     def test_scopes_are_derived_from_the_governed_declaration(self):
         """Not a hand-written list that can go stale on a setup screen.
@@ -323,8 +433,12 @@ class TestSetupWizardAuthorization(SetupWizardCase):
         for call in (
             lambda: setup.get_setup_state(store.id),
             lambda: setup.get_setup_state(),
+            lambda: setup.get_setup_state(new_store=True),
             lambda: setup.save_store_identity('x', 'y.myshopify.com'),
             lambda: setup.save_credential(store.id, DUMMY_TOKEN),
+            lambda: setup.retain_existing_credential(
+                store.id, 'offline_access_token',
+            ),
             lambda: setup.acknowledge_scopes(store.id),
             lambda: setup.run_test_connection(store.id),
             lambda: setup.run_readiness(store.id),
@@ -354,6 +468,9 @@ class TestSetupWizardAuthorization(SetupWizardCase):
         for call in (
             lambda: setup.get_setup_state(store.id),
             lambda: setup.save_credential(store.id, DUMMY_TOKEN),
+            lambda: setup.retain_existing_credential(
+                store.id, 'offline_access_token',
+            ),
             lambda: setup.run_readiness(store.id),
             lambda: setup.save_directions(store.id, ['sale']),
             lambda: setup.activate(store.id),
@@ -416,6 +533,64 @@ class TestSetupWizardSteps(SetupWizardCase):
         self._make_store()
         with self.assertRaises(UserError):
             self._as(self.admin_a).save_store_identity('Again', SHOP_DOMAIN)
+
+    def test_an_explicit_new_store_flow_does_not_select_or_change_existing(self):
+        existing = self._make_store(
+            name='Existing store', domain='existing-store.myshopify.com',
+        )
+
+        # Normal entry still resumes the only visible store. The explicit
+        # flag is the deliberate escape hatch for the second-store path.
+        resumed = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(resumed['store']['id'], existing.id)
+        blank = self._as(self.admin_a).get_setup_state(new_store=True)
+        self.assertFalse(blank['store']['id'])
+        self.assertEqual(blank['store']['name'], '')
+        self.assertEqual(blank['store']['shop_domain'], '')
+        self.assertEqual([row['id'] for row in blank['stores']], [existing.id])
+
+        with self.assertRaises(UserError):
+            self._as(self.admin_a).get_setup_state(
+                store_id=existing.id, new_store=True,
+            )
+
+        created = self._as(self.admin_a).save_store_identity(
+            'Second store', 'second-store.myshopify.com',
+        )
+        second = self.Store.browse(created['store']['id'])
+        self.assertNotEqual(second, existing)
+        self.assertEqual(
+            self.Store.search_count([
+                ('company_id', '=', self.company_a.id),
+            ]),
+            2,
+        )
+        existing.invalidate_recordset()
+        self.assertEqual(existing.name, 'Existing store')
+        self.assertEqual(existing.shop_domain, 'existing-store.myshopify.com')
+
+    def test_multiple_stores_resume_the_oldest_unless_new_store_is_explicit(self):
+        first = self._make_store(
+            name='First store', domain='first-store.myshopify.com',
+        )
+        second_state = self._as(self.admin_a).save_store_identity(
+            'Second existing store', 'second-existing.myshopify.com',
+        )
+        second = self.Store.browse(second_state['store']['id'])
+
+        resumed = self._as(self.admin_a).get_setup_state()
+        self.assertEqual(resumed['store']['id'], first.id)
+        self.assertEqual(
+            [row['id'] for row in resumed['stores']],
+            [first.id, second.id],
+        )
+
+        blank = self._as(self.admin_a).get_setup_state(new_store=True)
+        self.assertFalse(blank['store']['id'])
+        self.assertEqual(
+            [row['id'] for row in blank['stores']],
+            [first.id, second.id],
+        )
 
     def test_identity_does_not_assert_what_readiness_confirms(self):
         """Shape only. The store-identity check confirms it against Shopify."""
@@ -499,6 +674,25 @@ class TestSetupWizardSteps(SetupWizardCase):
             self._settings(store).setup_wizard_step_key, 'test_connection',
         )
 
+    def test_a_later_pass_supersedes_obsolete_connection_failures(self):
+        store = self._ready_store()
+        old_failure = self.env['shopify.connector.job'].sudo().create({
+            'store_id': store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'core_test_connection',
+            'state': 'failed_final',
+            'payload_hash': 'obsolete-connection-failure',
+            'finished_at': fields.Datetime.now(),
+        })
+
+        with self._transport(ok=True):
+            self._as(self.admin_a).run_test_connection(store.id)
+
+        old_failure.invalidate_recordset()
+        self.assertTrue(old_failure.superseded_by_job_id)
+        self.assertEqual(old_failure.superseded_by_job_id.state, 'succeeded')
+        self.assertEqual(old_failure.superseded_by_job_id.store_id, store)
+
     def test_a_failing_test_connection_does_not_advance_or_lose_the_token(self):
         """A refusal must not read as a pass, and must not discard the
         credential the operator has just entered."""
@@ -574,6 +768,25 @@ class TestSetupWizardSteps(SetupWizardCase):
         self.assertTrue(settings.inventory_domain_enabled)
         self.assertFalse(settings.product_domain_enabled)
 
+    def test_selected_read_workflows_enable_their_schedulers(self):
+        """Choosing a workflow is the complete onboarding decision."""
+        store = self._ready_store()
+        self._as(self.admin_a).save_directions(
+            store.id, ['product_import', 'sale'],
+        )
+        settings = self._settings(store)
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.product_scheduled_sync_enabled)
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.order_scheduled_sync_enabled)
+
+        self._as(self.admin_a).save_directions(store.id, [])
+        settings.invalidate_recordset()
+        if 'product_scheduled_sync_enabled' in settings._fields:
+            self.assertFalse(settings.product_scheduled_sync_enabled)
+        if 'order_scheduled_sync_enabled' in settings._fields:
+            self.assertFalse(settings.order_scheduled_sync_enabled)
+
     # --- source of truth ------------------------------------------------
 
     def test_both_source_of_truth_choices_are_required(self):
@@ -640,9 +853,8 @@ class TestSetupWizardSteps(SetupWizardCase):
 
     # --- first stock push -----------------------------------------------
 
-    def test_first_push_scheduling_never_bypasses_the_guard(self):
-        """Scheduling flips a scan flag. It does not preview, confirm, admit a
-        push job or write a quantity to Shopify."""
+    def test_first_push_scanning_never_bypasses_the_guard(self):
+        """Scanning does not preview, confirm, admit or write a quantity."""
         store = self._ready_store()
         self._as(self.admin_a).save_directions(store.id, ['inventory'])
         before = self.env['shopify.connector.job'].sudo().search_count([
@@ -659,6 +871,14 @@ class TestSetupWizardSteps(SetupWizardCase):
             before,
             'scheduling must admit no job',
         )
+
+    def test_inventory_enabled_cannot_silently_disable_first_push_scanning(self):
+        store = self._ready_store()
+        self._as(self.admin_a).save_directions(store.id, ['inventory'])
+        self._as(self.admin_a).save_first_push_schedule(store.id, False)
+        settings = self._settings(store)
+        if 'inventory_scheduled_sync_enabled' in settings._fields:
+            self.assertTrue(settings.inventory_scheduled_sync_enabled)
 
     def test_first_push_passes_through_safely_when_inventory_is_off(self):
         store = self._ready_store()
@@ -843,6 +1063,70 @@ class TestSetupWizardActivation(SetupWizardCase):
         store.invalidate_recordset()
         return store
 
+    def test_w1_offline_token_without_app_secret_stops_before_activation(self):
+        """Webhook setup must not enqueue impossible subscription work."""
+        if not self._webhook_installed():
+            self.skipTest('shopify_connector_webhook is not installed')
+        self._make_readiness_passable()
+        store = self._make_store(user=self.admin_a)
+        setup = self._as(self.admin_a)
+        setup.save_credential(store.id, DUMMY_TOKEN)
+        with self._transport(ok=True):
+            setup.run_test_connection(store.id)
+        setup.save_directions(store.id, ['sale'])
+        setup.acknowledge_location_mapping(store.id)
+        setup.save_source_of_truth(
+            store.id, 'odoo_source', 'odoo_authoritative',
+        )
+        setup.save_notification(store.id, False)
+        setup.save_first_push_schedule(store.id, False)
+        setup.run_readiness(store.id)
+        Job = self.env['shopify.connector.job'].sudo()
+        webhook_job_types = (
+            'webhook_subscription_bootstrap',
+            'webhook_subscription_reconcile',
+            'webhook_subscription_create',
+            'webhook_subscription_delete',
+            'webhook_subscription_mutation_reconcile',
+        )
+        before_webhook_jobs = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', 'in', webhook_job_types),
+        ])
+        before_readiness_jobs = Job.search_count([
+            ('store_id', '=', store.id),
+            ('job_type', '=', 'core_readiness_check'),
+        ])
+        with patch.object(
+            type(self.env['shopify.connector.api.client']), '_send',
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError('offline-token gate contacted Shopify')
+            ),
+        ):
+            state = setup.activate(store.id)
+        store.invalidate_recordset()
+        self.assertEqual(store.state, 'setup_incomplete')
+        self.assertEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('job_type', 'in', webhook_job_types),
+            ]),
+            before_webhook_jobs,
+            'the client-secret gate must admit no webhook job',
+        )
+        self.assertGreaterEqual(
+            Job.search_count([
+                ('store_id', '=', store.id),
+                ('job_type', '=', 'core_readiness_check'),
+            ]),
+            before_readiness_jobs + 1,
+            'activation may record its expected core readiness audit job',
+        )
+        payload = state['store']
+        self.assertEqual(payload['setup_completion_state'], 'action_required')
+        self.assertEqual(payload['setup_completion_code'], 'client_secret_required')
+        self.assertIn('Client ID + Client secret', payload['setup_completion_message'])
+
     def test_activation_re_runs_readiness_when_the_step_was_not_run(self):
         """PR #204 Odoo.sh qualification correction, 2026-07-31.
 
@@ -916,14 +1200,27 @@ class TestSetupWizardActivation(SetupWizardCase):
         # reaching this line.
         self.assertIn(store.last_readiness_result, ('pass', 'warning'))
         self.assertEqual(store.state, 'connected')
-        self.assertEqual(
-            Job.search_count([
-                ('store_id', '=', store.id),
-                ('state', 'in', ('queued', 'running')),
-            ]),
-            jobs_before,
-            'activation must enqueue no domain job',
-        )
+        if self._webhook_installed():
+            self.assertEqual(
+                Job.search_count([
+                    ('store_id', '=', store.id),
+                    ('job_type', '=', 'webhook_subscription_reconcile'),
+                    ('job_source', '=', 'setup_readiness_check'),
+                    ('state', 'in', ('queued', 'running')),
+                ]),
+                1,
+                'W1 activation must hand off exactly one reconciliation job',
+            )
+            self.assertFalse(self._settings(store).setup_completed_at)
+        else:
+            self.assertEqual(
+                Job.search_count([
+                    ('store_id', '=', store.id),
+                    ('state', 'in', ('queued', 'running')),
+                ]),
+                jobs_before,
+                'activation must enqueue no domain job',
+            )
 
     def test_activation_is_refused_while_an_essential_check_fails(self):
         """A genuine essential failure, produced rather than simulated.
@@ -947,12 +1244,13 @@ class TestSetupWizardActivation(SetupWizardCase):
         store.invalidate_recordset()
         self.assertNotEqual(store.state, 'connected')
 
-    def test_activation_starts_no_sync_and_writes_nothing_to_shopify(self):
-        """The whole safety claim of the review step, observed not asserted.
+    def test_activation_admits_no_direct_job_and_writes_nothing_to_shopify(self):
+        """The review step only nudges existing read-side cron producers.
 
         The transport seam is replaced with a responder that FAILS the test if
-        it is reached, so a request of any kind would be caught -- not only a
-        mutation.
+        it is reached, and no domain job is admitted in the activation
+        transaction. The scheduled producers run later through their normal
+        eligibility and queue boundaries.
         """
         store = self._complete_through_readiness()
         jobs_before = self.env['shopify.connector.job'].sudo().search_count([
@@ -969,6 +1267,8 @@ class TestSetupWizardActivation(SetupWizardCase):
 
         with patch.object(Client, '_send', refuse):
             self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         store.invalidate_recordset()
         self.assertEqual(store.state, 'connected')
         self.assertEqual(
@@ -1014,6 +1314,8 @@ class TestSetupWizardActivation(SetupWizardCase):
 
         with patch.object(Client, '_send', refuse):
             self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         store.invalidate_recordset()
         self.assertEqual(
             store.state, 'connected',
@@ -1047,6 +1349,8 @@ class TestSetupWizardActivation(SetupWizardCase):
     def test_completion_is_audited_with_the_actor(self):
         store = self._complete_through_readiness()
         self._as(self.admin_a).activate(store.id)
+        if self._webhook_installed():
+            self._complete_pending_webhook_activation(store)
         audits = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),
             ('job_type', '=', 'core_manual_maintenance'),
@@ -1117,6 +1421,14 @@ class TestSetupWizardRerun(SetupWizardCase):
         )
         self.assertFalse(
             Dashboard.with_user(self.user_a).get_dashboard_data()
+            ['setup_available'],
+        )
+        self.assertTrue(
+            Dashboard.with_user(self.admin_a).get_sales_dashboard_data()
+            ['setup_available'],
+        )
+        self.assertFalse(
+            Dashboard.with_user(self.user_a).get_sales_dashboard_data()
             ['setup_available'],
         )
 
@@ -1255,7 +1567,8 @@ class TestSetupWizardConditionalLocationStep(SetupWizardCase):
     def test_continuing_past_the_step_fabricates_no_mapping(self):
         store = self._ready_store()
         self._as(self.admin_a).save_directions(store.id, ['inventory'])
-        self._as(self.admin_a).acknowledge_location_mapping(store.id)
+        with self.assertRaises(UserError):
+            self._as(self.admin_a).acknowledge_location_mapping(store.id)
         if 'shopify.connector.location.mapping' in self.env:
             self.assertFalse(
                 self.env['shopify.connector.location.mapping'].sudo().search(
@@ -1317,7 +1630,7 @@ class TestSetupWizardReadinessPresentation(SetupWizardCase):
         self.assertEqual(
             entry['reason'],
             'No sync features are enabled. This store will connect without '
-            'syncing. You can enable features later from Store Settings.',
+            'syncing. You can enable features later from Sync Rules.',
         )
         self.assertNotIn(entry, state['readiness']['blocking'])
 

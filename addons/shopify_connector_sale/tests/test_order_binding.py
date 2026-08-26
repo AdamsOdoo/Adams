@@ -30,6 +30,10 @@ class TestOrderBinding(OrderImportCase):
         'shopify_total_discounts_amount',
         'shopify_total_shipping_amount',
         'shopify_total_tip_amount',
+        'shopify_line_composition_fingerprint',
+        'review_reason_code',
+        'review_reason',
+        'review_required_action',
         'customer_resolution',
         'shopify_last_imported_at',
         'shopify_last_evidence_refresh_at',
@@ -96,8 +100,8 @@ class TestOrderBinding(OrderImportCase):
             self.Binding._protected_binding_fields(),
             self.EXPECTED_PROTECTED_FIELDS,
         )
-        # 50 + SEC-3 `company_id` and `sec3_scope_quarantined` (#197).
-        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 52)
+        # 54 + SEC-3 `company_id` and `sec3_scope_quarantined` (#197).
+        self.assertEqual(len(self.EXPECTED_PROTECTED_FIELDS), 56)
 
     def test_every_stored_connector_field_is_classified(self):
         stored = {
@@ -107,6 +111,7 @@ class TestOrderBinding(OrderImportCase):
         self.assertEqual(stored, self.EXPECTED_PROTECTED_FIELDS)
         self.Binding._assert_binding_field_classification()
 
+    @mute_logger('odoo.sql_db')
     def test_required_fields_and_uniqueness(self):
         with self.assertRaises(IntegrityError):
             with self.env.cr.savepoint():

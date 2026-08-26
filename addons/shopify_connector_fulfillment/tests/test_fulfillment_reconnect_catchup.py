@@ -23,6 +23,7 @@ from ..models.shopify_connector_job import (
     JOB_TYPE_RECONCILIATION_CHECK,
     JOB_TYPE_RECONNECT_CATCHUP,
 )
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -98,6 +99,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
     # ------------------------------------------------------------------
     # admission from the real entry point (was a dead-end at a1c5931)
     # ------------------------------------------------------------------
+    @mute_logger('odoo.sql_db')
     def test_reconnect_admits_the_registered_catchup_route(self):
         self.assertFalse(self._catchup_jobs(),
                          'nothing may admit the route before reconnect')
@@ -153,8 +155,11 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
     # fail-closed pending stamp
     # ------------------------------------------------------------------
     def _order_binding(self, suffix):
+        partner = self.env['res.partner'].sudo().create({
+            'name': 'Reconnect Catchup %s' % suffix,
+        })
         order = self.env['sale.order'].sudo().create({
-            'partner_id': self.env.ref('base.res_partner_1').id,
+            'partner_id': partner.id,
             'company_id': self.env.company.id,
         })
         return self.env['shopify.connector.order.binding'].sudo().create({
@@ -171,7 +176,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
 
         with patch.object(
             Service, '_read_order_fulfillments',
-            lambda service, store, gid: [],
+            lambda service, read_job, store, gid: [],
         ):
             self.Service._handle_fulfillment_reconnect_catchup(job)
         self.settings.invalidate_recordset()
@@ -194,7 +199,7 @@ class TestFulfillmentReconnectCatchup(TransactionCase):
         # stamp does not move to the failing job.
         failing = self._catchup_job()
 
-        def flaky(service, store, gid):
+        def flaky(service, read_job, store, gid):
             if gid.endswith('FCA'):
                 raise FulfillmentReadError(
                     'shopify_graphql_throttled', 'boom')

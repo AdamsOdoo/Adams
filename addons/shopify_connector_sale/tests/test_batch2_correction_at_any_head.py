@@ -24,6 +24,7 @@ from odoo.addons.shopify_connector_sale.models.shopify_connector_tax_mapping imp
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 ORDER_SCAN_CRON_XMLID = (
     'shopify_connector_sale.ir_cron_shopify_connector_order_scan'
@@ -312,6 +313,7 @@ class TestBatch2SaleCorrectionAtAnyHead(OrderImportCase):
 
     # -- F6 ------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_a_different_choice_never_replaces_the_mapping_that_won(self):
         """Two orders blocked on one fingerprint; two administrators choose
         differently. At the starting head the loser's `IntegrityError` was

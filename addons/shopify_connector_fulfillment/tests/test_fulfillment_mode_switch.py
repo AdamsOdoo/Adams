@@ -3,7 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from odoo import fields
-from odoo.exceptions import AccessError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
@@ -42,15 +42,17 @@ class TestFulfillmentModeSwitch(TransactionCase):
     """The Mode 1 <-> Mode 2 switch state machine on store settings (Modes §6).
 
     Covers the admin-only actions and the switch-scan handler:
-    - action_start_mode2_switch: sets switch_in_progress + a nonce and enqueues
-      a mode-switch scan; idempotent no-op when already Mode 2;
+    - action_start_mode2_switch: admits one scan before exposing a requested
+      Mode 2 transition, coalesces duplicate confirmation onto that scan, and
+      returns to stable Mode 1 when admission is refused;
     - action_rollback_to_mode1: returns to Mode 1, cancels in-flight Mode 2
       evaluations back to cancelled, but LEAVES in-flight Layer 2
       create/tracking/reconcile mutation jobs untouched;
     - both actions are Administrator-only (AccessError otherwise);
     - _handle_fulfillment_mode_switch_scan: a clean scan completes to Mode 2, a
       blocker (a read that fails, or an external fulfillment forcing a review)
-      aborts back to Mode 1.
+      aborts back to Mode 1, and an incomplete/dead scan is recoverable rather
+      than leaving an immortal switching flag.
 
     fulfillment_operating_mode / _switch_in_progress / _mode_switch_nonce are
     Administrator-grouped fields -> written and read here via sudo().
@@ -93,6 +95,17 @@ class TestFulfillmentModeSwitch(TransactionCase):
             'name': 'FUL Non-Admin',
             'login': 'ful-nonadmin-%s' % uuid.uuid4().hex,
             'group_ids': [(6, 0, [cls.env.ref('base.group_user').id])],
+        })
+        cls.connector_operator = cls.env['res.users'].create({
+            'name': 'FUL Connector Operator',
+            'login': 'ful-operator-%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.'
+                    'group_shopify_connector_operator'
+                ).id,
+            ])],
         })
 
     # ------------------------------------------------------------------
@@ -186,7 +199,8 @@ class TestFulfillmentModeSwitch(TransactionCase):
             ),
         })
 
-    def _scan_job(self):
+    def _scan_job(self, nonce=None):
+        nonce = nonce or uuid.uuid4().hex
         return self.Job.sudo().create({
             'store_id': self.store.id,
             'job_source': 'manual_sync',
@@ -194,8 +208,24 @@ class TestFulfillmentModeSwitch(TransactionCase):
             'state': 'queued',
             'res_model': 'shopify.connector.store',
             'res_id': self.store.id,
-            'payload_hash': uuid.uuid4().hex,
+            'payload_hash': 'mode_switch:%d:%s' % (self.store.id, nonce),
+            'expected_connection_generation':
+                self.store.connection_generation,
         })
+
+    def _arm_switch(self, job=None):
+        """Attach the exact scan identity to one requested Mode 2 switch."""
+        job = job or self._scan_job()
+        nonce = job.payload_hash.rsplit(':', 1)[-1]
+        self.settings.sudo().write({
+            'fulfillment_operating_mode': 'mode1',
+            'fulfillment_requested_mode': 'mode2',
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_mode_switch_state': 'queued',
+            'fulfillment_mode_switch_job_id': job.id,
+            'fulfillment_mode_switch_nonce': nonce,
+        })
+        return job
 
     # ------------------------------------------------------------------
     # action_start_mode2_switch
@@ -207,11 +237,91 @@ class TestFulfillmentModeSwitch(TransactionCase):
         self.settings.invalidate_recordset()
         self.assertTrue(self.settings.sudo().fulfillment_switch_in_progress)
         self.assertTrue(self.settings.sudo().fulfillment_mode_switch_nonce)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_requested_mode, 'mode2',
+        )
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_state, 'queued',
+        )
         scan = self.Job.search([
             ('store_id', '=', self.store.id),
             ('job_type', '=', JOB_TYPE_MODE_SWITCH_SCAN),
         ])
         self.assertTrue(scan)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_job_id, scan,
+        )
+
+    def test_start_switch_admission_refusal_returns_to_stable_mode1(self):
+        """The silent non-connected refusal must never outlive admission."""
+        self.store.sudo().write({'state': 'reconnect_needed'})
+        before = self.Job.search_count([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', JOB_TYPE_MODE_SWITCH_SCAN),
+        ])
+
+        self.settings.action_start_mode2_switch()
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertFalse(state.fulfillment_mode_switch_job_id)
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'admission_refused',
+        )
+        self.assertTrue(state.fulfillment_mode_switch_failure_reason)
+        self.assertEqual(
+            self.Job.search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', JOB_TYPE_MODE_SWITCH_SCAN),
+            ]),
+            before,
+        )
+
+    def test_start_switch_admission_exception_records_recoverable_mode1(self):
+        """A visible enqueue failure is recorded without an RPC rollback."""
+        Service = self.env['shopify.connector.fulfillment.service']
+        with patch.object(
+            type(Service), '_enqueue_once',
+            side_effect=UserError('Admission failed before a run existed.'),
+        ):
+            self.settings.action_start_mode2_switch()
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertFalse(state.fulfillment_mode_switch_job_id)
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'admission_refused',
+        )
+        self.assertTrue(state.fulfillment_mode_switch_failure_reason)
+
+    def test_duplicate_confirmation_coalesces_on_exact_scan_and_nonce(self):
+        self.settings.action_start_mode2_switch()
+        self.settings.invalidate_recordset()
+        first = self.settings.sudo().fulfillment_mode_switch_job_id
+        first_nonce = self.settings.sudo().fulfillment_mode_switch_nonce
+
+        self.settings.action_start_mode2_switch()
+
+        self.settings.invalidate_recordset()
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_job_id, first,
+        )
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_nonce, first_nonce,
+        )
+        self.assertEqual(
+            self.Job.search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', JOB_TYPE_MODE_SWITCH_SCAN),
+            ]),
+            1,
+        )
 
     def test_start_switch_idempotent_when_already_mode2(self):
         self.settings.sudo().write({'fulfillment_operating_mode': 'mode2'})
@@ -233,6 +343,127 @@ class TestFulfillmentModeSwitch(TransactionCase):
     def test_start_switch_requires_admin(self):
         with self.assertRaises(AccessError):
             self.settings.with_user(self.non_admin).action_start_mode2_switch()
+
+    def test_retry_waiting_scan_keeps_request_and_shows_next_retry(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        retry_at = fields.Datetime.now() + timedelta(minutes=5)
+
+        job.sudo()._transition_retry_waiting(
+            next_retry_at=retry_at,
+            retry_count=1,
+            error_class='shopify_temporary_server_network',
+            message='Temporary read failure.',
+        )
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertTrue(state.fulfillment_switch_in_progress)
+        self.assertEqual(state.fulfillment_requested_mode, 'mode2')
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'retry_waiting',
+        )
+        self.assertEqual(state.fulfillment_mode_switch_next_retry_at, retry_at)
+
+    def test_retryable_failed_scan_returns_to_recoverable_mode1(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+
+        job.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='Configuration must be corrected.',
+        )
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'failed_retryable',
+        )
+        self.assertEqual(state.fulfillment_mode_switch_job_id, job)
+        self.assertTrue(state.fulfillment_mode_switch_failure_reason)
+
+    def test_terminal_failed_scan_returns_to_recoverable_mode1(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+
+        job.sudo()._transition_failed_final(
+            error_class='shopify_temporary_server_network',
+            message='Retry budget exhausted.',
+        )
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'failed_final',
+        )
+        self.assertEqual(state.fulfillment_mode_switch_job_id, job)
+        self.assertTrue(state.fulfillment_mode_switch_failure_reason)
+
+    def test_operator_cannot_retry_or_cancel_a_mode_configuration_scan(self):
+        """Generic run recovery must not bypass the Administrator boundary."""
+        job = self._arm_switch()
+        with self.assertRaises(AccessError):
+            job.with_user(self.connector_operator).action_cancel(
+                'Operator attempted to cancel configuration work.'
+            )
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        job.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='Configuration must be corrected.',
+        )
+
+        with self.assertRaises(AccessError):
+            job.with_user(self.connector_operator).action_manual_retry()
+
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'failed_retryable')
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+
+    def test_retry_action_rearms_the_same_failed_scan(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        job.sudo()._transition_failed_retryable(
+            error_class='odoo_validation_configuration',
+            message='Configuration must be corrected.',
+        )
+
+        self.settings.action_retry_mode2_switch()
+
+        job.invalidate_recordset()
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(job.state, 'queued')
+        self.assertEqual(state.fulfillment_mode_switch_job_id, job)
+        self.assertEqual(state.fulfillment_requested_mode, 'mode2')
+        self.assertTrue(state.fulfillment_switch_in_progress)
+        self.assertEqual(state.fulfillment_mode_switch_state, 'queued')
+        self.assertFalse(state.fulfillment_mode_switch_failure_reason)
 
     # ------------------------------------------------------------------
     # action_rollback_to_mode1
@@ -258,6 +489,10 @@ class TestFulfillmentModeSwitch(TransactionCase):
             self.settings.sudo().fulfillment_operating_mode, 'mode1',
         )
         self.assertFalse(self.settings.sudo().fulfillment_switch_in_progress)
+        self.assertFalse(self.settings.sudo().fulfillment_requested_mode)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_state, 'recovered',
+        )
         # In-flight Mode 2 evaluations are cancelled back (local only).
         for job in (eval_queued, eval_retry):
             job.invalidate_recordset()
@@ -275,13 +510,60 @@ class TestFulfillmentModeSwitch(TransactionCase):
         with self.assertRaises(AccessError):
             self.settings.with_user(self.non_admin).action_rollback_to_mode1()
 
+    def test_stale_running_scan_is_detectable_and_recoverable(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now() - timedelta(minutes=31),
+        })
+
+        self.settings.invalidate_recordset()
+        self.assertTrue(
+            self.settings.sudo().fulfillment_mode_switch_is_stale,
+        )
+
+        self.settings.action_rollback_to_mode1()
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(state.fulfillment_mode_switch_state, 'recovered')
+        # A running read is not force-cancelled underneath its worker; the
+        # handler's end fence prevents it from activating Mode 2 later.
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'running')
+
+    def test_missing_scan_pointer_is_detectable_and_recoverable(self):
+        self.settings.sudo().write({
+            'fulfillment_operating_mode': 'mode1',
+            'fulfillment_requested_mode': 'mode2',
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_mode_switch_state': 'running',
+            'fulfillment_mode_switch_job_id': False,
+        })
+
+        self.settings.invalidate_recordset()
+        self.assertTrue(
+            self.settings.sudo().fulfillment_mode_switch_is_stale,
+        )
+
+        self.settings.action_rollback_to_mode1()
+
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(state.fulfillment_mode_switch_state, 'recovered')
+
     # ------------------------------------------------------------------
     # _handle_fulfillment_mode_switch_scan
     # ------------------------------------------------------------------
 
     def test_scan_clean_completes_to_mode2(self):
-        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
-        job = self._scan_job()
+        job = self._arm_switch()
         with patch.object(type(self.Service), '_read_order_fulfillments',
                           return_value=[]):
             self.Service._handle_fulfillment_mode_switch_scan(job)
@@ -290,13 +572,16 @@ class TestFulfillmentModeSwitch(TransactionCase):
             self.settings.sudo().fulfillment_operating_mode, 'mode2',
         )
         self.assertFalse(self.settings.sudo().fulfillment_switch_in_progress)
+        self.assertFalse(self.settings.sudo().fulfillment_requested_mode)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_state, 'succeeded',
+        )
+        self.assertTrue(
+            self.settings.sudo().fulfillment_mode_switch_verified_at,
+        )
 
     def test_scan_read_error_aborts_to_mode1(self):
-        self.settings.sudo().write({
-            'fulfillment_operating_mode': 'mode1',
-            'fulfillment_switch_in_progress': True,
-        })
-        job = self._scan_job()
+        job = self._arm_switch()
         with patch.object(type(self.Service), '_read_order_fulfillments',
                           side_effect=FulfillmentReadError(
                               'data_shape_schema_mismatch', 'boom')):
@@ -306,10 +591,13 @@ class TestFulfillmentModeSwitch(TransactionCase):
             self.settings.sudo().fulfillment_operating_mode, 'mode1',
         )
         self.assertFalse(self.settings.sudo().fulfillment_switch_in_progress)
+        self.assertFalse(self.settings.sudo().fulfillment_requested_mode)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_state, 'blocked',
+        )
 
     def test_scan_external_fulfillment_aborts_to_mode1(self):
-        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
-        job = self._scan_job()
+        job = self._arm_switch()
         node = {
             'id': 'gid://shopify/Fulfillment/EXT',
             'status': 'SUCCESS',
@@ -324,6 +612,9 @@ class TestFulfillmentModeSwitch(TransactionCase):
             self.settings.sudo().fulfillment_operating_mode, 'mode1',
         )
         self.assertFalse(self.settings.sudo().fulfillment_switch_in_progress)
+        self.assertEqual(
+            self.settings.sudo().fulfillment_mode_switch_state, 'blocked',
+        )
         # The pre-existing external fulfillment is recorded as a review case
         # (the scan blocker that aborted the switch).
         evidence = self.env[
@@ -334,12 +625,40 @@ class TestFulfillmentModeSwitch(TransactionCase):
         ], limit=1)
         self.assertEqual(evidence.reconciled_state, 'review')
 
+    def test_rollback_during_running_scan_prevents_late_mode2_activation(self):
+        job = self._arm_switch()
+        job.sudo().write({
+            'state': 'running',
+            'started_at': fields.Datetime.now(),
+        })
+        rolled_back = {'done': False}
+
+        def _read_then_rollback(read_job, store, order_gid):
+            if not rolled_back['done']:
+                self.settings.action_rollback_to_mode1()
+                rolled_back['done'] = True
+            return []
+
+        with patch.object(
+            type(self.Service), '_read_order_fulfillments',
+            side_effect=_read_then_rollback,
+        ):
+            self.Service._handle_fulfillment_mode_switch_scan(job)
+
+        self.assertTrue(rolled_back['done'])
+        self.settings.invalidate_recordset()
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(state.fulfillment_mode_switch_state, 'recovered')
+
     # ------------------------------------------------------------------
     # Theme E — watermark-boundary pagination beyond the old 200-row window
     # ------------------------------------------------------------------
 
     def test_mode_switch_scan_processes_more_than_200_order_bindings(self):
-        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
+        job = self._arm_switch()
         OrderBinding = self.env['shopify.connector.order.binding']
         for i in range(201):
             sale = self.env['sale.order'].create({
@@ -350,10 +669,9 @@ class TestFulfillmentModeSwitch(TransactionCase):
                 'shopify_gid': 'gid://shopify/Order/MSBULK-%d' % i,
                 'sale_order_id': sale.id, 'status': 'active',
             })
-        job = self._scan_job()
         call_count = {'n': 0}
 
-        def _counting_read(store, order_gid):
+        def _counting_read(read_job, store, order_gid):
             call_count['n'] += 1
             return []
 
@@ -366,8 +684,8 @@ class TestFulfillmentModeSwitch(TransactionCase):
             self.settings.sudo().fulfillment_operating_mode, 'mode2',
         )
 
-    def test_mode_switch_scan_incomplete_pass_fails_closed(self):
-        self.settings.sudo().write({'fulfillment_switch_in_progress': True})
+    def test_mode_switch_scan_incomplete_pass_recovers_to_mode1(self):
+        job = self._arm_switch()
         OrderBinding = self.env['shopify.connector.order.binding']
         for i in range(3):
             sale = self.env['sale.order'].create({
@@ -378,7 +696,6 @@ class TestFulfillmentModeSwitch(TransactionCase):
                 'shopify_gid': 'gid://shopify/Order/MSCAP-%d' % i,
                 'sale_order_id': sale.id, 'status': 'active',
             })
-        job = self._scan_job()
         with patch(
             'odoo.addons.shopify_connector_fulfillment.models.'
             'shopify_connector_fulfillment_scans.MAX_SCAN_PAGES', 1,
@@ -390,9 +707,28 @@ class TestFulfillmentModeSwitch(TransactionCase):
         ):
             with self.assertRaises(JobHandlerError):
                 self.Service._handle_fulfillment_mode_switch_scan(job)
+        # ``assertRaises`` is a database savepoint in Odoo, so the handler's
+        # fail-closed projection is deliberately rolled back with the raised
+        # exception here.  The real dispatcher catches JobHandlerError and
+        # routes the exact run outside that savepoint; exercise that durable
+        # transition explicitly before asserting the operator-visible state.
+        job.sudo()._transition_failed_retryable(
+            error_class='data_shape_schema_mismatch',
+            message='The verification population was incomplete.',
+        )
         self.settings.invalidate_recordset()
-        # A failed/incomplete pass never completes the switch either way.
-        self.assertTrue(self.settings.sudo().fulfillment_switch_in_progress)
+        # A failed/incomplete pass never completes the switch and never leaves
+        # the store permanently switching. Evidence remains attached for a
+        # reviewed retry, while Mode 1 is the stable effective state.
+        state = self.settings.sudo()
+        self.assertEqual(state.fulfillment_operating_mode, 'mode1')
+        self.assertFalse(state.fulfillment_switch_in_progress)
+        self.assertFalse(state.fulfillment_requested_mode)
+        self.assertEqual(
+            state.fulfillment_mode_switch_state, 'failed_retryable',
+        )
+        self.assertEqual(state.fulfillment_mode_switch_job_id, job)
+        self.assertTrue(state.fulfillment_mode_switch_failure_reason)
 
     def test_mode_switch_scan_boundary_excludes_bindings_before_watermark(self):
         # PD-B4: the switch scan boundary derives from the watermark (minus
@@ -495,11 +831,10 @@ class TestFulfillmentModeSwitch(TransactionCase):
         self.assertAlmostEqual(boundary, newer_at, delta=timedelta(seconds=10))
 
     def test_clean_scan_advances_watermark_exactly_once(self):
+        job = self._arm_switch()
         self.settings.sudo().write({
-            'fulfillment_switch_in_progress': True,
             'fulfillment_last_reconciliation_at': False,
         })
-        job = self._scan_job()
         with patch.object(type(self.Service), '_read_order_fulfillments',
                           return_value=[]):
             self.Service._handle_fulfillment_mode_switch_scan(job)

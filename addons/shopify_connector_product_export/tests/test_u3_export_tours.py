@@ -38,14 +38,14 @@ class TestU3ExportTours(HttpCase):
         )
 
     def test_export_navigation_tour(self):
-        """Every U3 export surface renders for a connector user."""
+        """Operations and Configuration render for an Administrator."""
         self._connector_user(
-            'u3_tour_user',
-            'shopify_connector_core.group_shopify_connector_user',
+            'u3_tour_admin',
+            'shopify_connector_core.group_shopify_connector_admin',
         )
         self.start_tour(
             '/odoo', 'shopify_connector_u3_export_nav_tour',
-            login='u3_tour_user',
+            login='u3_tour_admin',
         )
 
     # ------------------------------------------------------------------
@@ -127,7 +127,7 @@ class TestU3ExportTours(HttpCase):
         """The refusals and the tag removals are on screen with the confirm."""
         user = self._connector_user(
             'u3_tour_reviewer',
-            'shopify_connector_core.group_shopify_connector_user',
+            'shopify_connector_core.group_shopify_connector_admin',
         )
         preview = self._seed_preview()
         # Prove the fixture is READABLE by the tour user before driving a
@@ -152,7 +152,7 @@ class TestU3ExportTours(HttpCase):
         """Tab-reachable, and the focused control matches :focus-visible."""
         self._connector_user(
             'u3_tour_keyboard',
-            'shopify_connector_core.group_shopify_connector_user',
+            'shopify_connector_core.group_shopify_connector_admin',
         )
         self._seed_preview()
         self.env.flush_all()

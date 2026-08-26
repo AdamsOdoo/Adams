@@ -10,6 +10,7 @@ from . import test_sec3_company_isolation
 from . import test_ui_u2_inventory
 from . import test_ui_u2_action_tours
 from . import test_inventory_first_push_reachability
+from . import test_inventory_pair_bootstrap
 from . import test_location_refresh_action
 from . import test_setup_location_step
 

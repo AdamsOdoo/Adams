@@ -31,6 +31,7 @@ from odoo.addons.shopify_connector_sale.wizards.shopify_connector_tax_decision_w
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 VIEWS_ROOT = Path(__file__).resolve().parent.parent / 'views'
 
@@ -273,6 +274,16 @@ class TestTaxDecisionRoute(OrderImportCase):
             evidence['suggestion_basis'],
             'rate_and_inclusion_only_non_binding',
         )
+
+    def test_needs_attention_opens_the_tax_mapping_decision(self):
+        job, _detail = self._block_order_on_unknown_tax()
+        action = job.with_user(
+            self.roles['admin']
+        ).action_open_attention_case()
+        self.assertEqual(
+            action['res_model'], 'shopify.connector.tax.decision.wizard',
+        )
+        self.assertEqual(action['target'], 'new')
 
     def test_a_healthy_job_offers_no_decision_route(self):
         job = self._job()
@@ -989,6 +1000,7 @@ class TestTaxDecisionRoute(OrderImportCase):
     # a different administrator's tax choice for this one.
     # ==================================================================
 
+    @mute_logger('odoo.sql_db')
     def test_an_identical_earlier_mapping_is_proved_before_it_is_reused(self):
         """The one branch that may return a row it did not create.
 
@@ -1027,6 +1039,7 @@ class TestTaxDecisionRoute(OrderImportCase):
         self.assertEqual(len(mappings), 1)
         self.assertEqual(mappings.account_tax_id, tax)
 
+    @mute_logger('odoo.sql_db')
     def test_a_different_choice_against_an_existing_mapping_refuses(self):
         """§10 tax 8/9 for the visible-row case.
 

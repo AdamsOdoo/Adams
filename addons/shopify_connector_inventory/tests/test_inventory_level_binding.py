@@ -1,4 +1,4 @@
-from odoo.exceptions import UserError
+from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
 
@@ -40,6 +40,7 @@ class TestInventoryLevelBinding(TransactionCase):
         'pending_target_available',
         'first_push_state',
         'first_push_preview_qty',
+        'first_push_previewed_at',
         'first_push_confirmed_at',
         'first_push_confirmed_by_uid',
     ))
@@ -91,7 +92,7 @@ class TestInventoryLevelBinding(TransactionCase):
             'login': 'inventory_binding_reviewer',
             'group_ids': [(6, 0, [
                 cls.env.ref(
-                    'shopify_connector_core.group_shopify_connector_reviewer'
+                    'shopify_connector_core.group_shopify_connector_admin'
                 ).id,
             ])],
         })
@@ -113,6 +114,7 @@ class TestInventoryLevelBinding(TransactionCase):
             'shopify_inventory_item_gid': item_gid,
         })
 
+    @mute_logger('odoo.sql_db')
     def test_required_fields(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
@@ -204,19 +206,39 @@ class TestInventoryLevelBinding(TransactionCase):
         self.assertNotIn('last_push_params_hash', stored_fields)
 
     def test_exact_stored_field_classification(self):
-        self.assertEqual(
-            self.Binding._protected_binding_fields(),
-            self.EXPECTED_PROTECTED_FIELDS,
-        )
+        protected_fields = self.Binding._protected_binding_fields()
         automatic = frozenset((
             'id', 'display_name', 'create_uid', 'create_date',
             'write_uid', 'write_date',
         ))
+        base_closure = frozenset((
+            'shopify_connector_core',
+            'shopify_connector_inventory',
+        ))
+        base_stored_fields = {
+            name for name, field in self.Binding._fields.items()
+            if field.store
+            and name not in automatic
+            and base_closure.intersection(field._modules or ())
+        }
+        # Field._modules is Odoo 19's live provenance for declarations and
+        # extensions. This keeps the base assertion exact without naming an
+        # optional addon that may extend the concrete model.
+        self.assertEqual(
+            base_stored_fields, self.EXPECTED_PROTECTED_FIELDS,
+        )
         stored_fields = {
             name for name, field in self.Binding._fields.items()
             if field.store and name not in automatic
         }
-        self.assertEqual(stored_fields, self.EXPECTED_PROTECTED_FIELDS)
+        self.assertEqual(stored_fields, protected_fields)
+        extension_stored_fields = (
+            stored_fields - self.EXPECTED_PROTECTED_FIELDS
+        )
+        self.assertTrue(
+            extension_stored_fields <=
+            self.Binding._additional_protected_binding_fields()
+        )
 
     def test_protected_fields_cannot_be_written_generically(self):
         binding = self._make_binding('gid://shopify/InventoryItem/107')
@@ -251,7 +273,7 @@ class TestInventoryLevelBinding(TransactionCase):
         # The location-mapping's _check_location_company_consistency guard is
         # the enforcement point for a cross-company Odoo location: a binding
         # can only ever reference a company-consistent mapping, so mapping a
-        # location owned by a different company than the current company must
+        # location owned by a different company than the owning store must
         # be rejected outright.
         with self.assertRaises(UserError):
             with self.env.cr.savepoint():
@@ -291,10 +313,10 @@ class TestInventoryLevelBinding(TransactionCase):
     # 22.B)
     # ------------------------------------------------------------------
 
-    def test_sanctioned_service_creates_binding_for_operator(self):
+    def test_sanctioned_service_creates_binding_for_administrator(self):
         Service = self.env['shopify.connector.inventory.service']
         binding = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/111',
@@ -307,18 +329,33 @@ class TestInventoryLevelBinding(TransactionCase):
     def test_sanctioned_service_ensure_is_idempotent(self):
         Service = self.env['shopify.connector.inventory.service']
         first = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/112',
         )
         second = Service.with_user(
-            self.user_operator
+            self.user_reviewer
         ).ensure_inventory_level_binding(
             self.variant_binding, self.mapping,
             'gid://shopify/InventoryItem/112',
         )
         self.assertEqual(first.id, second.id)
+
+    def test_sanctioned_service_denied_for_operator(self):
+        Service = self.env['shopify.connector.inventory.service']
+        before = self.Binding.search_count([
+            ('store_id', '=', self.store.id),
+        ])
+        with self.assertRaises(AccessError):
+            Service.with_user(self.user_operator).ensure_inventory_level_binding(
+                self.variant_binding, self.mapping,
+                'gid://shopify/InventoryItem/113',
+            )
+        self.assertEqual(
+            self.Binding.search_count([('store_id', '=', self.store.id)]),
+            before,
+        )
 
     def test_sanctioned_service_denied_for_auditor(self):
         auditor = self.env['res.users'].create({
@@ -331,8 +368,15 @@ class TestInventoryLevelBinding(TransactionCase):
             ])],
         })
         Service = self.env['shopify.connector.inventory.service']
-        with self.assertRaises(Exception):
+        before = self.Binding.search_count([
+            ('store_id', '=', self.store.id),
+        ])
+        with self.assertRaises(AccessError):
             Service.with_user(auditor).ensure_inventory_level_binding(
                 self.variant_binding, self.mapping,
-                'gid://shopify/InventoryItem/113',
+                'gid://shopify/InventoryItem/114',
             )
+        self.assertEqual(
+            self.Binding.search_count([('store_id', '=', self.store.id)]),
+            before,
+        )

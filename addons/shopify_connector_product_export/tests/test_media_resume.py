@@ -534,6 +534,13 @@ class TestMediaResumeProductionRoute(ExportCase):
         self.Job = self.env['shopify.connector.job']
         self.operator = self._user_in('group_shopify_connector_operator')
         self.auditor = self._user_in('group_shopify_connector_auditor')
+        self.reviewer = self._user_in('group_shopify_connector_reviewer')
+        self.admin = self._user_in('group_shopify_connector_admin')
+        self.plain = self.env['res.users'].sudo().create({
+            'name': 'TD-011 plain internal',
+            'login': 'td011_plain_%d' % self.store.id,
+            'group_ids': [(6, 0, [self.env.ref('base.group_user').id])],
+        })
 
     # ------------------------------------------------------------------
     # Fixtures
@@ -582,6 +589,20 @@ class TestMediaResumeProductionRoute(ExportCase):
             ('res_model', '=', row._name),
             ('res_id', '=', row.id),
         ])
+
+    def test_media_poll_rpc_requires_connector_administrator(self):
+        Service = self.env[
+            'shopify.connector.media.export.service'
+        ]
+        for user in (
+            self.plain, self.auditor, self.operator, self.reviewer,
+        ):
+            with self.assertRaises(AccessError, msg=user.login):
+                Service.with_user(user).run_media_status_poll()
+        self.assertEqual(
+            Service.with_user(self.admin).run_media_status_poll(), 0,
+        )
+        self.assertEqual(Service.sudo().run_media_status_poll(), 0)
 
     # ------------------------------------------------------------------
     # 1. The route exists and admits the right job

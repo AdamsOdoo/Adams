@@ -310,12 +310,9 @@ class TestMediaExportPipeline(ExportCase):
             'files': {'nodes': [{'id': FILE_GID, 'fileStatus': 'READY'}]},
             'shop': {'myshopifyDomain': self.store.shop_domain},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            verdict = self.Media._reconcile_media_file_create(_Attempt())
+        verdict = self.Media._reconcile_media_file_create_result(
+            _Attempt(), body,
+        )
         self.assertEqual(verdict['verdict'], 'applied')
         self.assertEqual(verdict['evidence']['file']['id'], FILE_GID)
 
@@ -332,12 +329,9 @@ class TestMediaExportPipeline(ExportCase):
             ]},
             'shop': {'myshopifyDomain': self.store.shop_domain},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            verdict = self.Media._reconcile_media_file_create(_Attempt())
+        verdict = self.Media._reconcile_media_file_create_result(
+            _Attempt(), body,
+        )
         self.assertEqual(verdict['action'], 'block_manual_review')
         self.assertEqual(verdict['error_class'], 'shopify_user_errors_validation')
 
@@ -349,12 +343,7 @@ class TestMediaExportPipeline(ExportCase):
         body = {'data': {
             'shop': {'myshopifyDomain': self.store.shop_domain},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            verdict = self.Media._reconcile_media_stage(_Attempt())
+        verdict = self.Media._reconcile_media_stage_result(_Attempt(), body)
         self.assertEqual(verdict['verdict'], 'not_applied')
         self.assertEqual(verdict['action'], 'block_manual_review')
         # The identity is OBSERVED, not echoed back from the attempt.
@@ -370,12 +359,7 @@ class TestMediaExportPipeline(ExportCase):
         body = {'data': {
             'shop': {'myshopifyDomain': 'someone-else.myshopify.com'},
         }}
-        response = FakeSendResponse(body)
-        with self.send_patch(
-            lambda self, store, body, token=None, mutation_context=None,
-            r=response: r
-        ):
-            verdict = self.Media._reconcile_media_stage(_Attempt())
+        verdict = self.Media._reconcile_media_stage_result(_Attempt(), body)
         self.assertEqual(verdict['error_class'], 'store_identity_mismatch')
 
     def test_a_failed_media_link_blocks_the_plan_entry_it_belongs_to(self):

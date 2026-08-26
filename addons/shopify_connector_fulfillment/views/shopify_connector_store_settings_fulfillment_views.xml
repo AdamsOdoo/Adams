@@ -55,7 +55,20 @@
                             context="{'default_settings_id': id}"
                             invisible="fulfillment_operating_mode != 'mode2'"
                             help="Stop applying Shopify fulfilments to Odoo automatically. Always available."/>
+                    <button name="action_rollback_to_mode1"
+                            type="object"
+                            string="Return to Mode 1"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            confirm="Return this store to stable Mode 1? A running verification read may finish, but its late result cannot activate Mode 2."
+                            invisible="not fulfillment_switch_in_progress and fulfillment_mode_switch_state not in ['failed_retryable', 'failed_final', 'blocked']"/>
+                    <button name="action_retry_mode2_switch"
+                            type="object"
+                            string="Retry verification"
+                            class="btn-primary"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="fulfillment_mode_switch_state not in ['failed_retryable', 'failed_final']"/>
                     <field name="fulfillment_operating_mode" widget="statusbar"
+                           string="Effective mode"
                            statusbar_visible="mode1,mode2"
                            groups="shopify_connector_core.group_shopify_connector_admin"/>
                 </header>
@@ -69,15 +82,58 @@
                         reconciliation scan completes.
                     </div>
 
+                    <div class="o_sc_note o_sc_note--warning" role="note"
+                         invisible="fulfillment_operating_mode != 'mode1' or fulfillment_switch_in_progress"
+                         groups="shopify_connector_core.group_shopify_connector_admin">
+                        <strong>Queues a Shopify reconciliation read.</strong>
+                        Confirmation does not change the effective mode immediately;
+                        Mode 1 remains effective until the exact transition run passes.
+                    </div>
+
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not fulfillment_mode_switch_is_stale"
+                         groups="shopify_connector_core.group_shopify_connector_admin">
+                        <strong>Stale or missing transition run.</strong>
+                        Return to Mode 1 is available now and preserves the failure evidence.
+                    </div>
+
                     <div class="oe_title">
                         <h1><field name="store_id" readonly="1"/></h1>
                     </div>
 
                     <group>
-                        <group string="Operating mode"
+                        <group string="Fulfillment transition"
                                groups="shopify_connector_core.group_shopify_connector_admin">
-                            <field name="fulfillment_operating_mode" readonly="1"/>
-                            <field name="fulfillment_switch_in_progress" readonly="1"/>
+                            <field name="fulfillment_operating_mode" readonly="1"
+                                   string="Effective mode"/>
+                            <field name="fulfillment_switch_in_progress" readonly="1"
+                                   string="Transition running"/>
+                            <field name="fulfillment_requested_mode" readonly="1"
+                                   string="Requested mode"/>
+                            <field name="fulfillment_mode_switch_state" readonly="1"
+                                   string="Scan state"/>
+                            <div class="text-muted" colspan="2"
+                                 invisible="fulfillment_mode_switch_state">
+                                Scan state: Not started
+                            </div>
+                            <field name="fulfillment_mode_switch_job_id" readonly="1"
+                                   string="Transition run"
+                                   invisible="not fulfillment_mode_switch_job_id"/>
+                            <field name="fulfillment_mode_switch_failure_reason" readonly="1"
+                                   string="Blocker or reason"
+                                   invisible="not fulfillment_mode_switch_failure_reason"/>
+                            <field name="fulfillment_mode_switch_next_retry_at" readonly="1"
+                                   string="Next retry"
+                                   invisible="not fulfillment_mode_switch_next_retry_at"/>
+                            <field name="fulfillment_mode_switch_next_action" readonly="1"
+                                   string="Next action"
+                                   invisible="not fulfillment_mode_switch_next_action"/>
+                            <field name="fulfillment_mode_switch_is_stale" readonly="1"
+                                   string="Stale or missing"
+                                   invisible="not fulfillment_mode_switch_is_stale"/>
+                            <field name="fulfillment_mode_switch_verified_at" readonly="1"
+                                   string="Last verified"
+                                   invisible="not fulfillment_mode_switch_verified_at"/>
                             <field name="fulfillment_last_mode_switch_at" readonly="1"
                                    invisible="not fulfillment_last_mode_switch_at"/>
                             <field name="fulfillment_last_mode_switch_uid" readonly="1"
@@ -112,9 +168,11 @@
 
     <record id="action_shopify_connector_fulfillment_settings"
             model="ir.actions.act_window">
-        <field name="name">Fulfillment Settings</field>
+        <field name="name">Fulfillment Settings and Mode</field>
         <field name="res_model">shopify.connector.store.settings</field>
         <field name="view_mode">list,form</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
         <field name="view_ids"
                eval="[(5, 0, 0),
                       (0, 0, {'view_mode': 'list', 'sequence': 10,

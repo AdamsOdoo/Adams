@@ -1,6 +1,10 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 
+from .shopify_connector_mutation_attempt import (
+    MERCHANT_WRITE_STATUS_SELECTION,
+)
+
 # Shared with shopify_connector_job_log.py (from_state/to_state) so the two
 # models can never drift apart on the job state vocabulary (DEC-009).
 JOB_STATE_SELECTION = [
@@ -234,7 +238,7 @@ class ShopifyConnectorJob(models.Model):
     )
     cancel_reason = fields.Char(readonly=True)
     started_at = fields.Datetime(readonly=True)
-    finished_at = fields.Datetime(readonly=True)
+    finished_at = fields.Datetime(readonly=True, index=True)
     # CORE-R2 (AR-047) connection epoch captured at business-job enqueue
     # (`shopify.connector.job.enqueue`). `execute_business` admission compares it
     # against the store's live `connection_generation` under a `FOR SHARE` lock
@@ -257,6 +261,17 @@ class ShopifyConnectorJob(models.Model):
         readonly=True,
         ondelete='restrict',
     )
+    merchant_write_status = fields.Selection(
+        MERCHANT_WRITE_STATUS_SELECTION,
+        string='Shopify acknowledgement',
+        compute='_compute_merchant_write_status',
+        readonly=True,
+        help=(
+            'Merchant-facing remote-write acknowledgement. This is derived '
+            'from the job and immutable mutation-attempt evidence; it is not '
+            'a second writable workflow state.'
+        ),
+    )
 
     _store_idempotency_key_uniq = models.Constraint(
         'UNIQUE(store_id, idempotency_key)',
@@ -270,6 +285,44 @@ class ShopifyConnectorJob(models.Model):
         '(mutation_attempt_id) WHERE mutation_attempt_id IS NOT NULL',
         'Only one reconciliation job may own a mutation attempt.',
     )
+
+    @api.depends('state', 'job_type', 'mutation_attempt_id')
+    def _compute_merchant_write_status(self):
+        """Expose the C5 ladder on job-backed merchant surfaces.
+
+        Original mutation jobs point to their attempt in the attempt's
+        ``job_id`` direction, while reconciliation jobs use
+        ``mutation_attempt_id``. Resolve both without changing either protected
+        ownership contract. Before C2 there is no attempt, so a recognised
+        mutation job remains Queued; pre-send failures need attention but are
+        never mislabelled as a Shopify rejection.
+        """
+        attempts_by_job = {}
+        if self.ids:
+            attempts = self.env[
+                'shopify.connector.mutation.attempt'
+            ].sudo().search([('job_id', 'in', self.ids)])
+            attempts_by_job = {attempt.job_id.id: attempt for attempt in attempts}
+        mutation_domains = set(
+            self.env[
+                'shopify.connector.job.dispatch'
+            ]._get_reconciliation_strategies()
+        )
+        for job in self:
+            attempt = attempts_by_job.get(job.id) or job.mutation_attempt_id
+            if attempt:
+                job.merchant_write_status = attempt.merchant_write_status
+            elif job.job_type not in mutation_domains:
+                job.merchant_write_status = False
+            elif job.state in ('draft', 'queued', 'running'):
+                job.merchant_write_status = 'queued'
+            elif job.state in (
+                'retry_waiting', 'failed_retryable', 'failed_final',
+                'blocked_manual_review',
+            ):
+                job.merchant_write_status = 'needs_attention'
+            else:
+                job.merchant_write_status = False
 
     @api.model
     def _is_business_job_source(self, job_source):
@@ -380,16 +433,11 @@ class ShopifyConnectorJob(models.Model):
                 'Mutation-evidence-linked jobs may only be resolved through '
                 'action_resolve_mutation_attempt.'
             )
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Reviewer or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "resolve a manual-review job."
             )
         if self.state != 'blocked_manual_review':
@@ -602,11 +650,42 @@ class ShopifyConnectorJob(models.Model):
         (`test_dispatch_throughput.py::test_claim_lock_and_recheck_unchanged`).
         """
         now = fields.Datetime.now()
-        candidates = self.search(
-            self._claimable_domain(now, exclude_store_ids),
-            limit=limit,
-            order='id asc',
+        domain = self._claimable_domain(now, exclude_store_ids)
+        # One bounded round-robin over stores prevents an old backlog in one
+        # shop from monopolising every claim slot.  The grouped read discovers
+        # each visible store's oldest candidate; subsequent rounds select the
+        # next id for that store.  Scope locks and the post-lock state recheck
+        # below remain unchanged.
+        store_heads = self._read_group(
+            domain,
+            groupby=['store_id'],
+            aggregates=['id:min'],
         )
+        ordered_stores = [
+            store for store, _oldest in sorted(
+                store_heads, key=lambda row: (row[1], row[0].id),
+            )
+        ]
+        candidates = self.browse()
+        after_by_store = {store.id: 0 for store in ordered_stores}
+        while ordered_stores and len(candidates) < limit:
+            next_round = []
+            for store in ordered_stores:
+                if len(candidates) >= limit:
+                    break
+                candidate = self.search(
+                    domain + [
+                        ('store_id', '=', store.id),
+                        ('id', '>', after_by_store[store.id]),
+                    ],
+                    limit=1,
+                    order='id asc',
+                )
+                if candidate:
+                    candidates |= candidate
+                    after_by_store[store.id] = candidate.id
+                    next_round.append(store)
+            ordered_stores = next_round
         if not candidates:
             return candidates
         locked = candidates.try_lock_for_update()

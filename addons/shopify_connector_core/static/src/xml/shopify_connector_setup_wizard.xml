@@ -18,7 +18,8 @@
 <templates xml:space="preserve">
 
     <t t-name="shopify_connector_core.SetupWizard">
-        <div class="o_sc_setup" t-att-dir="direction">
+        <div class="o_sc_setup" t-att-dir="direction"
+             t-att-data-store-id="store.id || 'new'">
             <div class="o_sc_setup__inner">
 
                 <!-- ============ LOADING ============ -->
@@ -41,36 +42,53 @@
                 <!-- ============ READY ============ -->
                 <t t-else="">
 
-                    <!-- Step indicator: plain step names, never numbers alone. -->
+                    <!-- Five merchant phases over the unchanged twelve durable
+                         step keys. Both levels keep text labels, so neither
+                         progress nor completion is conveyed by colour alone. -->
                     <nav class="sc_setup__steps" aria-label="Setup steps">
                         <ol>
-                            <t t-foreach="steps" t-as="step" t-key="step.key">
-                                <li t-att-class="stepClass(step)"
-                                    t-att-data-step-key="step.key"
-                                    t-att-aria-current="step.key === state.stepKey ? 'step' : false">
-                                    <span class="sc_setup_step__index" t-esc="step.index"/>
-                                    <span class="sc_setup_step__label" t-esc="step.label"/>
-                                    <span t-if="step.applicable === false"
-                                          class="sc-badge sc-badge--neutral">Not required</span>
+                            <t t-foreach="phases" t-as="phase" t-key="phase.key">
+                                <li t-att-class="phaseClass(phase)"
+                                    t-att-aria-current="phase.key === currentPhase.key ? 'step' : false">
+                                    <div class="sc_setup_phase__heading">
+                                        <span class="sc_setup_phase__index" t-esc="phase.index"/>
+                                        <span class="sc_setup_phase__label" t-esc="phase.label"/>
+                                    </div>
+                                    <ol class="sc_setup_phase__steps">
+                                        <t t-foreach="phaseSteps(phase)" t-as="step" t-key="step.key">
+                                            <li t-att-class="stepClass(step)"
+                                                t-att-data-step-key="step.key"
+                                                t-att-aria-current="step.key === state.stepKey ? 'step' : false">
+                                                <span class="sc_setup_step__index" t-esc="step.index"/>
+                                                <span class="sc_setup_step__label" t-esc="step.label"/>
+                                                <span t-if="step.applicable === false"
+                                                      class="sc-badge sc-badge--neutral">Not required</span>
+                                            </li>
+                                        </t>
+                                    </ol>
                                 </li>
                             </t>
                         </ol>
                     </nav>
 
-                    <!--
-                        THE SCROLLING REGION.
-
-                        The panel scrolls; the action row below it does not.
-                        Splitting them is what lets Back / Continue / Save &amp;
-                        Exit stay on screen through a long Permissions list or a
-                        long readiness result, which is where an operator most
-                        needs them and exactly where they used to disappear
-                        below the fold.
-                    -->
-                    <section class="sc_setup__panel" aria-live="polite">
+                    <div class="sc_setup__workspace">
+                    <!-- The panel is the owned scrolling region. The action
+                         row is a separate grid row, so it remains reachable
+                         without ever covering a field. -->
+                    <section class="sc_setup__panel" aria-live="polite" t-ref="panel">
+                        <div t-if="state.data and state.data.stores.length and store.id"
+                             class="sc_setup__store_actions"
+                             role="group" aria-label="Store setup options">
+                            <button class="sc-btn sc-btn--secondary sc_setup_new_store"
+                                    t-att-disabled="state.busy"
+                                    t-on-click="() => this.startNewStore()">
+                                Set up another store
+                            </button>
+                        </div>
                         <h1 class="sc_setup__heading" tabindex="-1" t-ref="heading">
                             <span class="sc_setup__heading-count">
-                                Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
+                                Phase <t t-esc="currentPhase.index"/> of <t t-esc="state.data.phase_count"/>
+                                · Step <t t-esc="currentStep.index"/> of <t t-esc="state.data.step_count"/>
                             </span>
                             <span t-esc="currentStep.label"/>
                         </h1>
@@ -86,11 +104,34 @@
                             </div>
                         </div>
 
+                        <!-- Optional domain hand-off state.  Core-only setup
+                             keeps this empty; an installed domain addon may
+                             defer completion to a durable post-activation
+                             proof without making the connector look ready. -->
+                        <div t-if="store.setup_completion_state === 'pending'"
+                             class="sc-band sc-band--info sc_setup__completion_pending"
+                             role="status">
+                            <i class="fa fa-clock-o sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text">Setup is waiting for verification</div>
+                                <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                            </div>
+                        </div>
+                        <div t-if="store.setup_completion_state === 'action_required'"
+                             class="sc-band sc-band--warning sc_setup__completion_action"
+                             role="alert">
+                            <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text">Setup needs an operator action</div>
+                                <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                            </div>
+                        </div>
+
                         <!-- ===== welcome ===== -->
                         <t t-if="state.stepKey === 'welcome'">
                             <p class="sc_setup__lead">
                                 This connects one Shopify store to this Odoo database. It
-                                takes about ten minutes, and <strong>nothing synchronises
+                                takes about ten minutes, and <strong>nothing synchronizes
                                 and nothing is written to Shopify until you finish and
                                 say so</strong>.
                             </p>
@@ -151,7 +192,8 @@
                         <t t-if="state.stepKey === 'credential'">
                             <p class="sc_setup__lead">
                                 Choose how this store authenticates with Shopify, then
-                                enter that path's credentials once.
+                                enter that path's credentials. If a credential is already
+                                on record, leave the fields blank to keep it.
                             </p>
                             <!--
                                 TWO REAL PATHS, STATED AS WHAT THE MERCHANT HAS.
@@ -318,8 +360,9 @@
                                 A credential is already on record for this store
                                 <t t-if="store.auth_mode === 'dev_dashboard_client_credentials'">(Dev Dashboard app)</t>
                                 <t t-else="">(access token)</t>.
-                                Saving new values replaces it, and the connection has to be
-                                tested again.
+                                Leave this path's fields blank to keep it. Enter new values
+                                to replace it; changing the path also requires new values,
+                                and the connection has to be tested again.
                             </p>
                             <div class="sc-band sc-band--info" role="note">
                                 <i class="fa fa-lock sc-band__icon" aria-hidden="true"/>
@@ -448,20 +491,21 @@
                             </t>
                             <t t-else="">
                                 <p class="sc_setup__lead">
-                                    Each Shopify location has to be paired with an Odoo
-                                    internal location before its stock can be synchronised.
-                                    <strong>An unmapped Shopify location is not
-                                    synchronised.</strong> Pairing is always explicit —
-                                    nothing is matched by name.
+                                    Match each Shopify location to the Odoo internal location
+                                    that manages its stock. Locations are loaded automatically,
+                                    and every active Shopify location must be mapped before you
+                                    continue. Nothing is matched by name.
                                 </p>
 
                                 <!-- Refresh, and the state of the refresh. Text, never
                                      colour alone, and never silence. -->
                                 <div class="sc_setup__refresh">
-                                    <button class="sc-btn sc_setup_refresh_locations"
+                                    <button t-if="refreshState() === 'succeeded' or refreshState() === 'failed'"
+                                            class="sc-btn sc_setup_refresh_locations"
                                             t-att-disabled="state.busy"
                                             t-on-click="() => this.refreshLocations()">
-                                        <span>Refresh Shopify locations</span>
+                                        <span t-if="refreshState() === 'succeeded'">Reload from Shopify</span>
+                                        <span t-else="">Try again</span>
                                     </button>
                                     <span class="sc-badge sc_setup_refresh_state"
                                           t-att-class="'sc-badge--' + (refreshState() === 'succeeded' ? 'success' : (refreshState() === 'failed' ? 'danger' : (refreshState() === 'none' ? 'neutral' : 'info')))"
@@ -479,12 +523,31 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div t-if="state.locationRefreshStillRunning and (refreshState() === 'waiting' or refreshState() === 'running')"
+                                     class="sc-band sc-band--info sc_setup_refresh_still_running"
+                                     role="status">
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">The refresh is still running</div>
+                                        <div class="sc-band__hint">
+                                            Background work can take longer than this screen waits.
+                                            Nothing was cancelled and this is not a failure.
+                                        </div>
+                                    </div>
+                                    <button class="sc-btn sc_setup_check_refresh"
+                                            t-att-disabled="state.busy"
+                                            t-on-click="() => this.checkLocationRefresh()">
+                                        Check status
+                                    </button>
+                                </div>
                                 <div t-if="refreshState() === 'failed'"
                                      class="sc-band sc-band--danger" role="alert">
                                     <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
                                         <div class="sc-band__text">The last location refresh did not finish</div>
                                         <div class="sc-band__hint">
+                                            <span class="sc_setup_refresh_failure_reason"
+                                                  t-if="locations.refresh.reason"
+                                                  t-esc="locations.refresh.reason"/><br t-if="locations.refresh.reason"/>
                                             The list below is whatever was read last time, and may
                                             be incomplete. Try refreshing again; if it keeps
                                             failing, check the connection and the read_locations
@@ -496,10 +559,9 @@
                                      class="sc-band sc-band--warning" role="status">
                                     <i class="fa fa-info-circle sc-band__icon" aria-hidden="true"/>
                                     <div class="sc-band__body">
-                                        <div class="sc-band__text">No locations have been read yet</div>
+                                        <div class="sc-band__text">Preparing Shopify locations</div>
                                         <div class="sc-band__hint">
-                                            Press Refresh Shopify locations to read this store's
-                                            list.
+                                            Loading starts automatically when this step opens.
                                         </div>
                                     </div>
                                 </div>
@@ -528,7 +590,8 @@
                                     </div>
                                 </div>
 
-                                <div class="sc_setup__field sc_setup__location-search">
+                                <div t-if="showLocationSearch('shopify')"
+                                     class="sc_setup__field sc_setup__location-search">
                                     <label for="sc_setup_search_shopify">Find a Shopify location</label>
                                     <div class="sc_setup__search-row">
                                         <input id="sc_setup_search_shopify" type="search"
@@ -562,10 +625,41 @@
                                 -->
                                 <p class="sc_setup__showing sc_setup__showing--shopify"
                                    data-showing="shopify" role="status" aria-live="polite">
-                                    Showing <t t-esc="locationShowing('shopify').shown"/>
-                                    of <t t-esc="locationShowing('shopify').total"/>
-                                    Shopify locations<t t-if="state.locationSearch.shopify.items !== null"> matching the search</t>.
+                                    <strong><t t-esc="locations.mapped_count"/> of
+                                    <t t-esc="locations.shopify_total"/> configured.</strong>
+                                    <t t-if="state.locationSearch.shopify.items !== null">
+                                        Showing <t t-esc="locationShowing('shopify').shown"/>
+                                        search result(s).
+                                    </t>
                                 </p>
+
+                                <div t-if="locations.mapping_complete"
+                                     class="sc-band sc-band--success sc_setup_mapping_complete"
+                                     role="status">
+                                    <i class="fa fa-check-circle sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">All active Shopify locations are mapped</div>
+                                    </div>
+                                </div>
+
+                                <div t-if="showLocationSearch('odoo')"
+                                     class="sc_setup__field sc_setup__location-search">
+                                    <label for="sc_setup_search_odoo">Find an Odoo location</label>
+                                    <div class="sc_setup__search-row">
+                                        <input id="sc_setup_search_odoo" type="search"
+                                               class="o_input sc_setup_search_odoo"
+                                               placeholder="Type part of the location's name…"
+                                               t-model="state.locationSearch.odoo.query"
+                                               t-on-keydown="(ev) => this.onLocationSearchKeydown(ev, 'odoo')"/>
+                                        <button class="sc-btn sc_setup_search_odoo_go"
+                                                t-att-disabled="state.busy"
+                                                t-on-click="() => this.searchLocations('odoo')">Search</button>
+                                        <button t-if="state.locationSearch.odoo.items !== null"
+                                                class="sc-btn sc-btn--secondary sc_setup_search_odoo_clear"
+                                                t-att-disabled="state.busy"
+                                                t-on-click="() => this.clearLocationSearch('odoo')">Clear</button>
+                                    </div>
+                                </div>
 
                                 <ul class="sc_setup__locations">
                                     <t t-foreach="visibleShopifyLocations" t-as="location"
@@ -597,9 +691,29 @@
                                                 Odoo location: <t t-esc="location.odoo_location_name"/>
                                             </span>
                                             <span t-else="" class="sc_setup__location-target">
-                                                Stock for this Shopify location will not be
-                                                synchronised until it is mapped.
+                                                Choose the Odoo location that manages this stock.
                                             </span>
+                                            <div t-if="!location.mapped" class="sc_setup__row-map">
+                                                <label t-att-for="'sc_setup_map_' + location.shopify_gid">
+                                                    Odoo inventory location
+                                                </label>
+                                                <select t-att-id="'sc_setup_map_' + location.shopify_gid"
+                                                        class="o_input sc_setup_map_odoo"
+                                                        t-att-value="state.locationMappingChoices[location.shopify_gid] || ''"
+                                                        t-on-change="(ev) => this.setLocationMappingChoice(location.shopify_gid, ev.target.value)">
+                                                    <option value="">Select an Odoo location…</option>
+                                                    <t t-foreach="visibleOdooLocations" t-as="odooLocation"
+                                                       t-key="odooLocation.id">
+                                                        <option t-att-value="odooLocation.id"
+                                                                t-esc="odooLocation.name"/>
+                                                    </t>
+                                                </select>
+                                                <button class="sc-btn sc_setup_create_mapping"
+                                                        t-att-disabled="state.busy or !state.locationMappingChoices[location.shopify_gid]"
+                                                        t-on-click="() => this.createMapping(location.shopify_gid)">
+                                                    Map location
+                                                </button>
+                                            </div>
                                             <code class="sc_setup__location-gid"
                                                   t-esc="location.shopify_gid"/>
                                         </li>
@@ -613,17 +727,6 @@
                                     </button>
                                 </div>
 
-                                <!--
-                                    A zero-result Shopify SEARCH used to hide
-                                    this whole block: the Odoo search box, the
-                                    Map button and the only visible route back,
-                                    because "no rows on screen" and "this store
-                                    has no locations" were the same condition.
-                                    They are not: with a search active the list
-                                    is empty because of the query, and the fix is
-                                    to clear it, which requires the controls to
-                                    still be there.
-                                -->
                                 <div t-if="!visibleShopifyLocations.length and locationEmptyReason('shopify')"
                                      class="sc_setup__empty sc_setup__empty--shopify sc-band sc-band--info"
                                      role="status">
@@ -632,99 +735,9 @@
                                         <div class="sc-band__text" t-esc="locationEmptyReason('shopify')"/>
                                     </div>
                                 </div>
-                                <div t-if="visibleShopifyLocations.length or state.locationSearch.shopify.items !== null" class="sc_setup__map">
-                                    <div class="sc_setup__field">
-                                        <label for="sc_setup_map_shopify">Shopify location</label>
-                                        <select id="sc_setup_map_shopify" class="o_input"
-                                                t-model="state.form.mapShopifyGid">
-                                            <option value="">Choose a Shopify location…</option>
-                                            <t t-foreach="visibleShopifyLocations" t-as="location"
-                                               t-key="'opt-' + location.shopify_gid">
-                                                <option t-att-value="location.shopify_gid"
-                                                        t-esc="location.name"/>
-                                            </t>
-                                        </select>
-                                        <small>
-                                            The choices follow the list above — search to bring a
-                                            location into it.
-                                        </small>
-                                    </div>
-                                    <div class="sc_setup__field">
-                                        <label for="sc_setup_search_odoo">Find an Odoo location</label>
-                                        <div class="sc_setup__search-row">
-                                            <input id="sc_setup_search_odoo" type="search"
-                                                   class="o_input sc_setup_search_odoo"
-                                                   placeholder="Type part of the location's name…"
-                                                   t-model="state.locationSearch.odoo.query"
-                                                   t-on-keydown="(ev) => this.onLocationSearchKeydown(ev, 'odoo')"/>
-                                            <button class="sc-btn sc_setup_search_odoo_go"
-                                                    t-att-disabled="state.busy"
-                                                    t-on-click="() => this.searchLocations('odoo')">
-                                                <span>Search</span>
-                                            </button>
-                                            <button t-if="state.locationSearch.odoo.items !== null"
-                                                    class="sc-btn sc-btn--secondary sc_setup_search_odoo_clear"
-                                                    t-att-disabled="state.busy"
-                                                    t-on-click="() => this.clearLocationSearch('odoo')">
-                                                <span>Clear</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="sc_setup__field">
-                                        <label for="sc_setup_map_odoo">Odoo location</label>
-                                        <select id="sc_setup_map_odoo" class="o_input"
-                                                t-model="state.form.mapOdooLocationId">
-                                            <option value="">Choose an Odoo location…</option>
-                                            <t t-foreach="visibleOdooLocations" t-as="odooLocation"
-                                               t-key="odooLocation.id">
-                                                <option t-att-value="odooLocation.id"
-                                                        t-esc="odooLocation.name"/>
-                                            </t>
-                                        </select>
-                                        <p class="sc_setup__showing sc_setup__showing--odoo"
-                                           data-showing="odoo" role="status" aria-live="polite">
-                                            Showing <t t-esc="locationShowing('odoo').shown"/>
-                                            of <t t-esc="locationShowing('odoo').total"/>
-                                            Odoo locations<t t-if="state.locationSearch.odoo.items !== null"> matching the search</t>.
-                                        </p>
-                                        <div t-if="locationHasMore('odoo') and state.locationSearch.odoo.items !== null">
-                                            <button class="sc-btn sc-btn--secondary sc_setup_more_odoo"
-                                                    t-att-disabled="state.busy"
-                                                    t-on-click="() => this.loadMoreLocations('odoo')">
-                                                <span>Load more Odoo locations</span>
-                                            </button>
-                                        </div>
-                                        <!--
-                                            FOUR empty states, not one. This
-                                            single line was shown for all of
-                                            them, so an operator whose SEARCH
-                                            matched nothing was told they had no
-                                            Inventory access, and one who really
-                                            had no Inventory access was told to
-                                            create a warehouse they would not be
-                                            able to see. `locationEmptyReason`
-                                            returns the server's own reason.
-                                        -->
-                                        <small t-if="!visibleOdooLocations.length and locationEmptyReason('odoo')"
-                                               class="sc_setup__empty sc_setup__empty--odoo"
-                                               role="status"
-                                               t-esc="locationEmptyReason('odoo')"/>
-                                        <small t-elif="!visibleOdooLocations.length"
-                                               class="sc_setup__empty sc_setup__empty--odoo"
-                                               role="status">
-                                            No internal Odoo locations are visible to you in this
-                                            company. Ask an Odoo administrator for Inventory
-                                            access, or create a warehouse first.
-                                        </small>
-                                    </div>
-                                    <div>
-                                        <button class="sc-btn sc_setup_create_mapping"
-                                                t-att-disabled="state.busy"
-                                                t-on-click="() => this.createMapping()">
-                                            <span>Map this location</span>
-                                        </button>
-                                    </div>
-                                </div>
+                                <small t-if="!visibleOdooLocations.length and locationEmptyReason('odoo')"
+                                       class="sc_setup__empty sc_setup__empty--odoo"
+                                       role="status" t-esc="locationEmptyReason('odoo')"/>
                             </t>
                         </t>
 
@@ -771,8 +784,8 @@
                         <t t-if="state.stepKey === 'notification'">
                             <p class="sc_setup__lead">
                                 Right now, <strong>customers will not be emailed</strong> when
-                                a delivery is fulfilled. You can change this any time in Store
-                                Settings.
+                                a delivery is fulfilled. Re-run guided Setup to change this
+                                explicitly confirmed choice.
                             </p>
                             <label class="sc_setup__choice">
                                 <input type="checkbox" id="sc_setup_notify"
@@ -805,29 +818,24 @@
                             <t t-if="isDomainEnabled('inventory')">
                                 <p class="sc_setup__lead">
                                     <strong>Nothing is written to Shopify until you review and
-                                    confirm the stock preview.</strong> This step only picks
-                                    when the connector starts looking.
+                                    confirm the stock preview.</strong> Stock scanning is enabled
+                                    automatically so the preview is ready when product mappings
+                                    exist.
                                 </p>
-                                <label class="sc_setup__choice">
-                                    <input type="radio" name="sc_setup_push"
-                                           t-att-checked="state.form.schedulePush"
-                                           t-on-change="() => this.state.form.schedulePush = true"/>
-                                    <span class="sc_setup__choice-label">Schedule stock scanning now</span>
-                                    <span class="sc_setup__choice-consequence">
-                                        The connector starts preparing a first-push preview for
-                                        you to review.
-                                    </span>
-                                </label>
-                                <label class="sc_setup__choice">
-                                    <input type="radio" name="sc_setup_push"
-                                           t-att-checked="!state.form.schedulePush"
-                                           t-on-change="() => this.state.form.schedulePush = false"/>
-                                    <span class="sc_setup__choice-label">Do it later</span>
-                                    <span class="sc_setup__choice-consequence">
-                                        A first-class choice. The dashboard keeps it visible
-                                        without nagging.
-                                    </span>
-                                </label>
+                                <div class="sc-band sc-band--info" role="status">
+                                    <i class="fa fa-shield sc-band__icon" aria-hidden="true"/>
+                                    <div class="sc-band__body">
+                                        <div class="sc-band__text">First stock push is protected</div>
+                                        <div class="sc-band__hint">
+                                            Odoo is the inventory authority. The connector reads
+                                            Shopify available quantity only for comparison and
+                                            prepares the exact Odoo quantity that would be written
+                                            for each mapped product and location. Shopify stock is
+                                            never imported into Odoo. An Administrator must confirm
+                                            every first push before any quantity can be sent.
+                                        </div>
+                                    </div>
+                                </div>
                             </t>
                             <t t-else="">
                                 <div class="sc-band sc-band--info" role="status">
@@ -837,7 +845,7 @@
                                         <div class="sc-band__hint">
                                             Inventory syncing is not enabled for this store, so
                                             there is no first stock push to schedule. You can
-                                            enable it later in Store Settings, and this step will
+                                            enable it later in Sync Rules, and this step will
                                             be waiting.
                                         </div>
                                     </div>
@@ -910,7 +918,7 @@
                         <t t-if="state.stepKey === 'review'">
                             <p class="sc_setup__lead">
                                 Here is what this connector will do. You can change any of it
-                                later in Store Settings.
+                                later in Sync Rules.
                             </p>
                             <dl class="sc_setup__summary">
                                 <dt>Store</dt>
@@ -965,13 +973,17 @@
                                     <div class="sc-band__text">
                                         No sync features are enabled. This store will connect
                                         without syncing. You can enable features later from
-                                        Store Settings.
+                                        Sync Rules.
                                     </div>
                                 </div>
                             </div>
                             <p class="sc_setup__note">
-                                Activating does not start a sync. Nothing is written to Shopify.
-                                The dashboard shows you the next explicit action.
+                                Activation starts the selected read and import scans and reconciles
+                                Shopify webhook subscriptions. It does not itself export catalog,
+                                inventory, or fulfillment business data. Later writes follow each
+                                domain's safeguards, including preview and confirmation where
+                                applicable. The dashboard shows initial synchronization progress,
+                                exceptions, and the next required action.
                             </p>
                         </t>
 
@@ -981,22 +993,7 @@
                         </p>
                     </section>
 
-                    <!-- ===== Actions =====
-                         STICKY to the bottom of the viewport while long content
-                         scrolls past it. On a long step the primary control used
-                         to sit below the fold, so a mobile operator had to scroll
-                         through the whole Permissions list to find Continue and
-                         scroll back up to read the error it produced.
-
-                         It is a normal-flow sibling AFTER the panel, so at the
-                         very bottom of the page it sits in its own space and
-                         covers nothing — sticky only lifts it while there is
-                         still content below. Keyboard focus is kept clear of it
-                         by `scroll-margin-block-end` on every focusable element
-                         in this surface, which is in the stylesheet and is
-                         asserted in the rendered-browser evidence rather than
-                         read out of the CSS.
-                    -->
+                    <!-- ===== Actions: a dedicated non-overlapping grid row ===== -->
                     <div class="sc_setup__actions" role="group" aria-label="Setup navigation">
                         <button class="sc-btn sc_setup_back"
                                 t-att-disabled="isFirstStep or state.busy"
@@ -1004,7 +1001,7 @@
                             <span>Back</span>
                         </button>
                         <button class="sc-btn sc-btn--primary sc_setup_continue"
-                                t-att-disabled="state.busy"
+                                t-att-disabled="state.busy or !canContinue"
                                 t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
                                 t-on-click="() => this.continueStep()">
                             <span t-if="isLastStep">Activate</span>
@@ -1021,6 +1018,7 @@
                                 t-on-click="() => this.rerun()">
                             <span>Start again</span>
                         </button>
+                    </div>
                     </div>
                 </t>
             </div>

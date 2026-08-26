@@ -26,6 +26,16 @@ TEN_JOB_TYPES = frozenset((
     'fulfillment_mode_switch_scan', 'fulfillment_mode2_evaluation',
 ))
 
+# The core fulfillment addon freezes the ten values above. Optional domain
+# addons may extend the shared dispatcher; the installed fulfillment-webhook
+# addon contributes this one read-only resolver job and no other fulfillment
+# job type. Keep it separate from the core taxonomy so the guard catches an
+# accidental production registration without rejecting a deliberate module
+# extension.
+OPTIONAL_FULFILLMENT_JOB_TYPES = frozenset((
+    'fulfillment_webhook_resolve',
+))
+
 # The exact enumerated production + test file allowlist (§2/§5).
 ALLOWED_MODEL_FILES = frozenset((
     '__init__.py', 'shopify_connector_fulfillment_binding.py',
@@ -205,6 +215,33 @@ class TestFulfillmentSourceGuards(TransactionCase):
                     violations.append((path.name, node.lineno, 'requests.%s' % attr))
         self.assertFalse(violations, violations)
 
+    def test_business_reads_use_only_the_job_bound_read_seam(self):
+        legacy = []
+        read_calls = []
+        for path, source in self._model_sources().items():
+            for node in ast.walk(ast.parse(source)):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                ):
+                    continue
+                if (
+                    node.func.attr == 'execute'
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == 'client'
+                ):
+                    legacy.append((path.name, node.lineno))
+                if node.func.attr == 'execute_business_read':
+                    read_calls.append((path.name, node))
+        self.assertFalse(legacy, legacy)
+        self.assertEqual(len(read_calls), 1)
+        _path, call = read_calls[0]
+        purpose = next(
+            (kw.value for kw in call.keywords if kw.arg == 'purpose'), None,
+        )
+        self.assertIsInstance(purpose, ast.Constant)
+        self.assertEqual(purpose.value, 'fulfillment')
+
     # -- Mutation documents are only reachable through the guarded transport.
 
     def test_fulfillment_mutation_documents_are_guarded(self):
@@ -238,7 +275,19 @@ class TestFulfillmentSourceGuards(TransactionCase):
         handlers = set(Dispatch._get_handlers())
         replay = set(Dispatch._get_replay_policies())
         fulfillment_handlers = {h for h in handlers if h.startswith('fulfillment_')}
-        self.assertEqual(fulfillment_handlers, TEN_JOB_TYPES)
+        # The frozen core contract remains exactly ten. An optional webhook
+        # addon is allowed to add only its explicitly named resolver; an
+        # unknown `fulfillment_*` registration is still a hard failure.
+        self.assertEqual(fulfillment_handlers & TEN_JOB_TYPES, TEN_JOB_TYPES)
+        self.assertTrue(
+            fulfillment_handlers <= (
+                TEN_JOB_TYPES | OPTIONAL_FULFILLMENT_JOB_TYPES
+            ),
+            fulfillment_handlers - (
+                TEN_JOB_TYPES | OPTIONAL_FULFILLMENT_JOB_TYPES
+            ),
+        )
+        self.assertTrue(fulfillment_handlers <= replay)
         self.assertTrue(TEN_JOB_TYPES <= replay)
         # No per-domain reconcile, no review-release job type.
         self.assertNotIn('fulfillment_create_reconcile', handlers)

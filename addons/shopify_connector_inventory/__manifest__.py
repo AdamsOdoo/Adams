@@ -1,11 +1,10 @@
 {
     'name': 'Shopify Connector Inventory',
-    'version': '19.0.1.6.0',
+    'version': '19.0.1.12.0',
     'summary': (
-        'Shopify inventory synchronization (Task 013): explicit location '
-        'mapping, per-pair inventory-level bindings, first-push guard, and '
-        'the Odoo -> Shopify available-quantity push via inventorySetQuantities '
-        '/ inventoryActivate through the existing Stage 0 Layer 2 wrapper.'
+        'Guarded Odoo-to-Shopify available-inventory synchronization with '
+        'explicit location mappings, pair bindings, preview-first activation, '
+        'absolute-quantity CAS, reconciliation, scans, and operator recovery.'
     ),
     'description': """
 Shopify Connector Inventory
@@ -40,10 +39,13 @@ same-job redispatch); the public action_recheck_inventory_pair(reason)
 action (Reviewer/Administrator only) is the sole release path for a
 blocked pair.
 
-No fulfillment, product export, webhook, OAuth, or UI logic. No
-Shopify -> Odoo stock write of any kind (the one-time reviewed baseline
-import is deferred to a separately-gated Task 013B). No
-inventoryAdjustQuantities call anywhere in this module.
+The addon includes location-mapping and inventory-pair workspaces, preview
+and confirmation wizards, Store Settings controls, scheduled scans and
+review/recovery actions. It contains no fulfillment or product-export
+logic, webhook delivery pipeline, or OAuth flow. There is no Shopify ->
+Odoo stock write of any kind (the one-time reviewed baseline import remains
+deferred), and no ``inventoryAdjustQuantities`` call anywhere in this
+module.
 """,
     'author': 'Adams',
     'license': 'LGPL-3',

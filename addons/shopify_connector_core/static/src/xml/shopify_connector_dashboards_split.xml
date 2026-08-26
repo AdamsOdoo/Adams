@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<templates xml:space="preserve">
+
+    <t t-name="shopify_connector_core.SalesDashboard">
+        <div class="o_sc_dashboard" t-att-dir="direction">
+            <div class="o_sc_dashboard__inner">
+                <t t-if="state.status === 'loading'">
+                    <div class="sc-skeleton sc-skeleton--band" aria-hidden="true"/>
+                    <p role="status">Loading the sales dashboard…</p>
+                </t>
+                <t t-elif="state.status === 'error'">
+                    <div class="sc-band sc-band--danger" role="alert">
+                        <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                        <div class="sc-band__body">
+                            <div class="sc-band__text">We couldn't load the sales dashboard</div>
+                            <div class="sc-band__hint" t-esc="state.errorMessage"/>
+                        </div>
+                    </div>
+                    <button class="sc-btn" t-on-click="() => this.refresh()">Try again</button>
+                </t>
+                <t t-else="">
+                    <t t-set="data" t-value="state.data"/>
+                    <header class="sc360-header">
+                        <div class="sc360-header__row">
+                            <div>
+                                <h1 class="sc360-title">Sales Dashboard</h1>
+                                <p class="sc360-scope-note">Imported Odoo order value · review orders excluded</p>
+                            </div>
+                            <div class="sc360-filters">
+                                <label class="sc360-filter" t-if="data.meta.stores.length &gt; 1">
+                                    <span class="sc360-filter__label">Store</span>
+                                    <select class="sc360-store-select" t-on-change="onStoreChange">
+                                        <option value="" t-att-selected="!state.storeId ? 'selected' : undefined">All stores</option>
+                                        <t t-foreach="data.meta.stores" t-as="candidate" t-key="candidate.id">
+                                            <option t-att-value="candidate.id"
+                                                    t-att-selected="state.storeId === candidate.id ? 'selected' : undefined"
+                                                    t-esc="candidate.name"/>
+                                        </t>
+                                    </select>
+                                </label>
+                                <div class="sc360-period" role="group" aria-label="Reporting period">
+                                    <t t-foreach="data.meta.periods" t-as="periodKey" t-key="periodKey">
+                                        <button t-att-class="'sc-btn sc360-period__btn' + (state.period === periodKey ? ' sc360-period__btn--active' : '')"
+                                                t-att-aria-pressed="state.period === periodKey ? 'true' : 'false'"
+                                                t-on-click="() => this.setPeriod(periodKey)">
+                                            <t t-esc="periodLabel(periodKey)"/>
+                                        </button>
+                                    </t>
+                                </div>
+                                <button class="sc-btn sc360-refresh" t-on-click="() => this.refresh()">
+                                    <i class="fa fa-rotate-right" aria-hidden="true"/>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="sc360-timestamps">
+                            <span class="sc360-ts sc360-ts-page">Page updated <bdi t-esc="formatInstant(data.generated_at)"/></span>
+                            <span class="sc360-ts sc360-ts-source" t-if="data.bridge and data.bridge.available">
+                                Order data synchronized through <bdi t-esc="formatInstant(data.bridge.synced_through)"/>
+                            </span>
+                        </div>
+                    </header>
+
+                    <div t-if="!data.meta.stores.length" class="sc-empty">
+                        <p>No visible store evidence exists yet.</p>
+                        <button t-if="data.setup_available"
+                                class="sc-btn sc_dashboard_setup"
+                                t-on-click="() => this.openSetup()">
+                            Set up your store
+                        </button>
+                    </div>
+
+                    <t t-if="data.critical and data.critical.active">
+                        <div class="sc-band sc-band--danger sc360-critical" role="alert">
+                            <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <t t-foreach="data.critical.causes" t-as="cause" t-key="cause.id">
+                                    <div class="sc360-critical__cause">
+                                        <span class="sc-band__text" t-esc="cause.text"/>
+                                        <button class="sc-btn sc-btn--inverse" t-on-click="() => this.openTarget(cause.target)">Review</button>
+                                    </div>
+                                </t>
+                            </div>
+                        </div>
+                    </t>
+
+                    <section class="sc360-section sc360-commercial" aria-label="Imported Odoo order value">
+                        <h2 class="sc-section__title">Reconciled imported orders</h2>
+                        <t t-if="!data.commercial.available">
+                            <div class="sc360-no-permission" role="note">
+                                Sales figures are unavailable for this role or installation. They are not shown as zero.
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <div class="sc360-kpis">
+                                <button class="sc360-kpi sc360-kpi--action"
+                                        t-on-click="() => this.openTarget(data.commercial.orders_target)">
+                                    <div class="sc360-kpi__label">Imported orders</div>
+                                    <div class="sc360-kpi__value" t-esc="formatNumber(data.commercial.orders_total)"/>
+                                </button>
+                                <button class="sc360-kpi sc360-kpi--action"
+                                        t-on-click="() => this.openTarget(data.commercial.awaiting_review.target)">
+                                    <div class="sc360-kpi__label">Awaiting data review</div>
+                                    <div class="sc360-kpi__value" t-esc="formatNumber(data.commercial.awaiting_review.count)"/>
+                                    <div class="sc360-kpi__delta">Excluded from every reconciled KPI</div>
+                                </button>
+                                <button class="sc360-kpi sc360-kpi--action"
+                                        t-on-click="() => this.openTarget(data.commercial.units_target)">
+                                    <div class="sc360-kpi__label">Imported units</div>
+                                    <div class="sc360-kpi__value" t-esc="formatNumber(data.commercial.units)"/>
+                                </button>
+                            </div>
+
+                            <table class="sc360-table sc360-review-currencies">
+                                <caption class="sc-visually-hidden">Awaiting-review values separated by currency</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Awaiting-review currency</th>
+                                        <th scope="col" class="sc360-table__num">Excluded order value</th>
+                                        <th scope="col" class="sc360-table__num">Orders</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="data.commercial.awaiting_review.blocks.length">
+                                        <t t-foreach="data.commercial.awaiting_review.blocks" t-as="block" t-key="block.currency.id">
+                                            <tr>
+                                                <th scope="row" t-esc="block.currency.name"/>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.target)"><bdi t-esc="formatMoney(block.currency, block.value)"/></button></td>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.target)" t-esc="formatNumber(block.count)"/></td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr><td colspan="3">No imported orders are awaiting data review.</td></tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                            <table class="sc360-table sc360-sales-currencies">
+                                <caption class="sc-visually-hidden">Sales values separated by currency</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Currency</th>
+                                        <th scope="col" class="sc360-table__num">Gross order value</th>
+                                        <th scope="col" class="sc360-table__num">Refunds in reconciled population</th>
+                                        <th scope="col" class="sc360-table__num">Net order value</th>
+                                        <th scope="col" class="sc360-table__num">Orders</th>
+                                        <th scope="col" class="sc360-table__num">Average order value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-if="data.commercial.blocks.length">
+                                        <t t-foreach="data.commercial.blocks" t-as="block" t-key="block.currency.id">
+                                            <tr>
+                                                <th scope="row" t-esc="block.currency.name"/>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.orders_target)"><bdi t-esc="formatMoney(block.currency, block.gross)"/></button></td>
+                                                <td class="sc360-table__num"><bdi t-esc="formatMoney(block.currency, block.refunds)"/></td>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.orders_target)"><bdi t-esc="formatMoney(block.currency, block.net)"/></button></td>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.orders_target)" t-esc="formatNumber(block.orders)"/></td>
+                                                <td class="sc360-table__num"><button class="sc-link" t-on-click="() => this.openTarget(block.orders_target)"><bdi t-esc="formatMoney(block.currency, block.aov)"/></button></td>
+                                            </tr>
+                                        </t>
+                                    </t>
+                                    <t t-else="">
+                                        <tr><td colspan="6">No reconciled imported orders in this period.</td></tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                            <p class="sc360-scope-note" t-esc="data.commercial.refund_scope_note"/>
+                        </t>
+                    </section>
+
+                    <t t-if="data.bridge and data.bridge.available">
+                        <section t-att-class="bridgeClass(data.bridge.state)" aria-label="Data completeness">
+                            <div class="sc-bridge__dot" aria-hidden="true"/>
+                            <div class="sc-bridge__body">
+                                <span class="sc-bridge__state" t-esc="bridgeLabel(data.bridge.state)"/>
+                                <span class="sc-bridge__text" t-esc="data.bridge.text"/>
+                            </div>
+                        </section>
+                    </t>
+
+                    <t t-if="data.commercial.available and data.commercial.trend and data.commercial.trend.available">
+                        <section class="sc360-section sc360-trend" aria-label="Imported order trend">
+                            <h2 class="sc-section__title">Imported order trend</h2>
+                            <table class="sc360-table">
+                                <thead><tr><th scope="col">Period</th><th scope="col" class="sc360-table__num">Current</th><th scope="col" class="sc360-table__num">Previous</th></tr></thead>
+                                <tbody>
+                                    <t t-foreach="data.commercial.trend.buckets" t-as="bucket" t-key="bucket_index">
+                                        <tr>
+                                            <th scope="row" t-esc="bucket.label"/>
+                                            <td class="sc360-table__num"><bdi t-esc="formatMoney(data.commercial.trend.currency, bucket.value)"/></td>
+                                            <td class="sc360-table__num"><bdi t-esc="formatMoney(data.commercial.trend.currency, bucket.previous)"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </section>
+                    </t>
+                </t>
+            </div>
+        </div>
+    </t>
+
+    <t t-name="shopify_connector_core.ConnectorHealth">
+        <div class="o_sc_dashboard o_sc_connector_health" t-att-dir="direction">
+            <div class="o_sc_dashboard__inner">
+                <t t-if="state.status === 'loading'">
+                    <div class="sc-skeleton sc-skeleton--band" aria-hidden="true"/>
+                    <p role="status">Loading connector health…</p>
+                </t>
+                <t t-elif="state.status === 'error'">
+                    <div class="sc-band sc-band--danger" role="alert">
+                        <i class="fa fa-exclamation-triangle sc-band__icon" aria-hidden="true"/>
+                        <div class="sc-band__body"><div class="sc-band__text">We couldn't load connector health</div><div class="sc-band__hint" t-esc="state.errorMessage"/></div>
+                    </div>
+                    <button class="sc-btn" t-on-click="() => this.refresh()">Try again</button>
+                </t>
+                <t t-else="">
+                    <t t-set="data" t-value="state.data"/>
+                    <header class="sc360-header">
+                        <div class="sc360-header__row">
+                            <div><h1 class="sc360-title">Connector Health</h1><p class="sc360-scope-note">Scan-based operational evidence · no sales figures</p></div>
+                            <div class="sc360-filters">
+                                <label class="sc360-filter" t-if="data.meta.stores.length &gt; 1">
+                                    <span class="sc360-filter__label">Store</span>
+                                    <select class="sc360-store-select" t-on-change="onStoreChange">
+                                        <option value="" t-att-selected="!state.storeId ? 'selected' : undefined">All stores</option>
+                                        <t t-foreach="data.meta.stores" t-as="candidate" t-key="candidate.id">
+                                            <option t-att-value="candidate.id" t-att-selected="state.storeId === candidate.id ? 'selected' : undefined" t-esc="candidate.name"/>
+                                        </t>
+                                    </select>
+                                </label>
+                                <button class="sc-btn sc360-refresh" t-on-click="() => this.refresh()"><i class="fa fa-rotate-right" aria-hidden="true"/><span>Refresh</span></button>
+                            </div>
+                        </div>
+                        <div class="sc360-timestamps"><span class="sc360-ts sc360-ts-page">Observed from stored evidence · page updated <bdi t-esc="formatInstant(data.generated_at)"/></span></div>
+                    </header>
+
+                    <t t-if="data.health.state === 'empty'">
+                        <div t-att-class="bandClass(data.health.lead.severity)" aria-live="polite">
+                            <i class="fa sc-band__icon" t-att-class="data.health.lead.icon" aria-hidden="true"/>
+                            <div class="sc-band__body">
+                                <div class="sc-band__text" t-esc="data.health.lead.text"/>
+                                <div class="sc-band__hint" t-esc="data.health.lead.hint"/>
+                                <button t-if="data.setup_available" class="sc-btn sc-band__action sc_dashboard_setup" t-on-click="() => this.openSetup()">Set up your store</button>
+                            </div>
+                        </div>
+                    </t>
+                    <t t-else="">
+                        <div t-att-class="bandClass(data.health.lead.severity)" aria-live="polite">
+                            <i class="fa sc-band__icon" t-att-class="data.health.lead.icon" aria-hidden="true"/>
+                            <div class="sc-band__body"><div class="sc-band__text" t-esc="data.health.lead.text"/><div class="sc-band__hint" t-esc="data.health.lead.hint"/></div>
+                        </div>
+
+                        <section class="sc360-section sc360-stores" aria-label="Store health">
+                            <h2 class="sc-section__title">Store health</h2>
+                            <div class="sc360-kpis">
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Ready stores</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.healthy)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Work in progress</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.working)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Stores needing attention</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.attention)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Unknown state</div><div class="sc360-kpi__value" t-esc="formatNumber(data.stores_region.summary.unknown)"/></div>
+                            </div>
+                            <table class="sc360-table sc360-stores-table">
+                                <thead><tr><th scope="col">Store</th><th scope="col">Operational state</th><th scope="col">Initial progress</th><th scope="col" class="sc360-table__num">Pending work</th><th scope="col" class="sc360-table__num">Attention</th><th scope="col">Next action</th><th scope="col">Last connector activity</th></tr></thead>
+                                <tbody>
+                                    <t t-foreach="data.stores_region.rows" t-as="row" t-key="row.id">
+                                        <tr t-att-data-store="row.id">
+                                            <th scope="row" t-esc="row.name"/>
+                                            <td><strong t-esc="row.operational_label"/><div class="text-muted" t-esc="row.operational_reason"/></td>
+                                            <td><bdi t-esc="formatNumber(row.domains_completed)"/> / <bdi t-esc="formatNumber(row.domains_selected)"/> domains</td>
+                                            <td class="sc360-table__num" t-esc="formatNumber(row.backlog)"/>
+                                            <td t-att-class="'sc360-table__num' + (row.attention ? ' sc360-table__num--danger' : '')" t-esc="formatNumber(row.attention)"/>
+                                            <td t-esc="row.next_action"/>
+                                            <td><t t-if="row.last_activity"><bdi t-esc="formatInstant(row.last_activity)"/><t t-if="row.last_activity_relative"> · <bdi t-esc="row.last_activity_relative"/></t></t><t t-else="">Unknown</t></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section class="sc360-section sc360-health" aria-label="Runs and recovery">
+                            <h2 class="sc-section__title">Runs &amp; recovery</h2>
+                            <div class="sc360-kpis">
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Queue depth</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.backlog)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Waiting on review</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.needs_review)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Retry waiting</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.jobs.retry_waiting)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Retries exhausted</div><div class="sc360-kpi__value" t-esc="formatNumber(data.health.jobs.failed_final)"/></div>
+                            </div>
+                            <button class="sc360-scope-note sc360-scope-note--action"
+                                    t-if="data.health.oldest_blocked"
+                                    t-on-click="() => this.openTarget(data.health.oldest_blocked.target)">
+                                Oldest blocked case: <bdi t-esc="data.health.oldest_blocked.age"/>
+                            </button>
+                            <t t-foreach="data.health.exceptions" t-as="exc" t-key="exc.id">
+                                <div t-att-class="exceptionClass(exc.severity)">
+                                    <div class="sc-exception__main"><span class="sc-owner-chip" t-esc="exc.owner"/><span class="sc-exception__title" t-esc="exc.title"/><span class="sc-exception__count" t-esc="formatNumber(exc.count)"/><div class="sc-exception__why" t-esc="exc.why"/></div>
+                                    <button class="sc-btn" t-on-click="() => this.openException(exc)">Review</button>
+                                </div>
+                            </t>
+                        </section>
+
+                        <section class="sc360-section" aria-label="Domain freshness">
+                            <h2 class="sc-section__title">Domain freshness</h2>
+                            <table class="sc360-table sc360-flows">
+                                <thead><tr><th scope="col">Domain</th><th scope="col" class="sc360-table__num">Queue</th><th scope="col" class="sc360-table__num">Failures</th><th scope="col">Last successful run</th></tr></thead>
+                                <tbody>
+                                    <t t-foreach="data.flows" t-as="flow" t-key="flow.id">
+                                        <tr t-att-data-flow="flow.id"><th scope="row" t-esc="flow.label"/><td class="sc360-table__num" t-esc="formatNumber(flow.backlog)"/><td t-att-class="'sc360-table__num' + (flow.failures ? ' sc360-table__num--danger' : '')" t-esc="formatNumber(flow.failures)"/><td><t t-if="flow.last_success"><bdi t-esc="formatInstant(flow.last_success)"/><t t-if="flow.last_success_relative"> · <bdi t-esc="flow.last_success_relative"/></t></t><t t-else="">Unknown</t></td></tr>
+                                    </t>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section class="sc360-section" aria-label="Shopify API throttle headroom">
+                            <h2 class="sc-section__title">Shopify API headroom</h2>
+                            <table class="sc360-table"><thead><tr><th scope="col">Store</th><th scope="col">Headroom</th><th scope="col">Observed</th></tr></thead><tbody>
+                                <t t-foreach="data.throttle.rows" t-as="row" t-key="row.store_id">
+                                    <tr><th scope="row" t-esc="row.store"/><td><t t-if="row.headroom_ratio !== false and row.headroom_ratio !== null"><bdi t-esc="formatShare(row.headroom_ratio)"/></t><t t-else="">Unknown</t></td><td><t t-if="row.observed_at"><bdi t-esc="formatInstant(row.observed_at)"/></t><t t-else="">No observation yet</t></td></tr>
+                                </t>
+                            </tbody></table>
+                        </section>
+
+                        <section class="sc360-section" aria-label="Mapping evidence">
+                            <h2 class="sc-section__title">Mapping evidence</h2>
+                            <table class="sc360-table"><thead><tr><th scope="col">Mapping</th><th scope="col">Evidence</th><th scope="col" class="sc360-table__num">Rows</th></tr></thead><tbody>
+                                <t t-foreach="data.mappings.rows" t-as="row" t-key="row.id"><tr><th scope="row" t-esc="row.label"/><td t-esc="evidenceStateLabel(row.state)"/><td class="sc360-table__num"><t t-if="row.count !== false" t-esc="formatNumber(row.count)"/><t t-else="">—</t></td></tr></t>
+                            </tbody></table>
+                        </section>
+
+                        <section class="sc360-section" aria-label="Reconciliation evidence">
+                            <h2 class="sc-section__title">Reconciliation evidence</h2>
+                            <p class="sc360-scope-note">Last successful reconciliation: <t t-if="data.reconciliation.last_success"><bdi t-esc="formatInstant(data.reconciliation.last_success)"/></t><t t-else="">not yet</t></p>
+                            <div class="sc360-kpis">
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Pending reconciliation runs</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.pending_runs)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Failed reconciliation runs</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.failed_runs)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Ambiguous changes</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.ambiguous_mutations)"/></div>
+                                <div class="sc360-kpi"><div class="sc360-kpi__label">Verified in Shopify</div><div class="sc360-kpi__value" t-esc="formatNumber(data.reconciliation.verified_mutations)"/></div>
+                            </div>
+                        </section>
+
+                        <section class="sc360-section" aria-label="Fulfillment mode switch">
+                            <h2 class="sc-section__title">Fulfillment mode switch</h2>
+                            <table class="sc360-table"><thead><tr><th scope="col">Store</th><th scope="col">Effective mode</th><th scope="col">Requested mode</th><th scope="col">State</th></tr></thead><tbody>
+                                <t t-foreach="data.mode_switch.rows" t-as="row" t-key="row.store_id"><tr><th scope="row" t-esc="row.store"/><td t-esc="modeLabel(row.effective_mode)"/><td t-esc="modeLabel(row.requested_mode)"/><td><t t-esc="row.state"/><t t-if="row.stale"> · stale</t></td></tr></t>
+                            </tbody></table>
+                            <p class="sc360-scope-note">Unknown means the current role cannot read mode configuration or no mode evidence has been recorded; it never means healthy.</p>
+                        </section>
+                    </t>
+                </t>
+            </div>
+        </div>
+    </t>
+
+</templates>

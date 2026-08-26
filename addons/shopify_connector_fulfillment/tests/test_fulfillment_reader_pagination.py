@@ -5,6 +5,7 @@ from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (  # noqa: E501
     MAX_PAGES,
+    ORDER_FULFILLMENTS_QUERY,
     PAGE_SIZE,
     FulfillmentReadError,
 )
@@ -68,6 +69,7 @@ class TestFulfillmentReaderPagination(TransactionCase):
 
     def _paginate(self):
         return self.Service._paginate(
+            False,
             self.store,
             'query',
             {'orderId': 'gid://shopify/Order/1'},
@@ -81,6 +83,70 @@ class TestFulfillmentReaderPagination(TransactionCase):
     def test_pagination_constants(self):
         self.assertEqual(PAGE_SIZE, 50)
         self.assertEqual(MAX_PAGES, 100)
+
+    def test_order_fulfillments_query_uses_the_2026_07_list_shape(self):
+        self.assertIn('fulfillments(first: 250)', ORDER_FULFILLMENTS_QUERY)
+        self.assertIn(
+            'fulfillmentLineItems(first: %d)' % PAGE_SIZE,
+            ORDER_FULFILLMENTS_QUERY,
+        )
+        self.assertNotIn('%(page)', ORDER_FULFILLMENTS_QUERY)
+        # Order.fulfillments itself is a list in 2026-07.  Its nested
+        # fulfillmentLineItems field remains a connection and therefore
+        # legitimately has pageInfo/nodes.
+        fulfillments_selection = ORDER_FULFILLMENTS_QUERY.split(
+            'fulfillmentLineItems', 1,
+        )[0]
+        self.assertNotIn('after:', fulfillments_selection)
+        self.assertNotIn('pageInfo', fulfillments_selection)
+        self.assertNotIn('nodes', fulfillments_selection)
+
+    def test_order_fulfillments_reader_accepts_the_actual_list_shape(self):
+        response = {
+            'order': {
+                'fulfillments': [{
+                    'id': 'gid://shopify/Fulfillment/1',
+                    'status': 'SUCCESS',
+                    'displayStatus': 'FULFILLED',
+                    'trackingInfo': [],
+                    'fulfillmentLineItems': {
+                        'pageInfo': {
+                            'hasNextPage': False,
+                            'endCursor': None,
+                        },
+                        'nodes': [],
+                    },
+                }],
+            },
+        }
+        with patch.object(
+            type(self.Service), '_read_data', return_value=response,
+        ) as read:
+            result = self.Service._read_order_fulfillments(
+                False, self.store, 'gid://shopify/Order/1',
+            )
+        self.assertEqual(result, response['order']['fulfillments'])
+        self.assertEqual(read.call_count, 1)
+
+    def test_order_fulfillments_reader_rejects_connection_shape(self):
+        response = {
+            'order': {
+                'fulfillments': {
+                    'pageInfo': {'hasNextPage': False},
+                    'nodes': [],
+                },
+            },
+        }
+        with patch.object(
+            type(self.Service), '_read_data', return_value=response,
+        ):
+            with self.assertRaises(FulfillmentReadError) as caught:
+                self.Service._read_order_fulfillments(
+                    False, self.store, 'gid://shopify/Order/1',
+                )
+        self.assertEqual(
+            caught.exception.error_class, 'data_shape_schema_mismatch',
+        )
 
     # ------------------------------------------------------------------
     # Happy paths

@@ -201,6 +201,13 @@ class ShopifyConnectorJobTaxDecision(models.Model):
             'context': {'default_job_id': self.id},
         }
 
+    def _attention_resolution_action(self):
+        """Make Needs Attention's primary action open the real tax dialog."""
+        self.ensure_one()
+        if self._tax_decision_evidence():
+            return self.action_open_tax_mapping_decision()
+        return super()._attention_resolution_action()
+
 
 class ShopifyConnectorTaxDecisionWizard(models.TransientModel):
     _name = 'shopify.connector.tax.decision.wizard'

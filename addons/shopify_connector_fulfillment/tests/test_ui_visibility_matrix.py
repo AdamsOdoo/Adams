@@ -55,15 +55,15 @@ class TestUiVisibilityMatrix(TransactionCase):
 
     # ------------------------------------------------ implied-group closure
 
-    def test_connector_user_resolves_to_operator_reviewer_auditor(self):
-        """SEC-2 Option M-A: the customer-facing role resolves to the internal
-        capability primitives through additive implied_ids."""
+    def test_connector_user_resolves_to_operator_and_auditor_only(self):
+        """User is routine operational, never Reviewer-capable."""
         user = self.connector_user
-        for internal in (G_OPERATOR, G_REVIEWER, G_AUDITOR):
+        for internal in (G_OPERATOR, G_AUDITOR):
             self.assertTrue(
                 user.has_group(internal),
                 'Connector User must resolve to %s' % internal,
             )
+        self.assertFalse(user.has_group(G_REVIEWER))
         self.assertFalse(
             user.has_group(ADMIN_ROLE),
             'Connector User must NOT resolve to Administrator.',
@@ -114,6 +114,14 @@ class TestUiVisibilityMatrix(TransactionCase):
         for restricted in (
             'fulfillment_operating_mode', 'fulfillment_switch_in_progress',
             'fulfillment_mode_switch_nonce',
+            'fulfillment_requested_mode',
+            'fulfillment_mode_switch_state',
+            'fulfillment_mode_switch_job_id',
+            'fulfillment_mode_switch_failure_reason',
+            'fulfillment_mode_switch_next_action',
+            'fulfillment_mode_switch_next_retry_at',
+            'fulfillment_mode_switch_is_stale',
+            'fulfillment_mode_switch_verified_at',
         ):
             self.assertNotIn(
                 restricted, user_fields,
@@ -155,6 +163,8 @@ class TestUiVisibilityMatrix(TransactionCase):
         self.assertEqual(self.settings.fulfillment_operating_mode, before_mode)
         self.assertFalse(self.settings.fulfillment_switch_in_progress)
         self.assertFalse(self.settings.fulfillment_mode_switch_nonce)
+        self.assertFalse(self.settings.fulfillment_requested_mode)
+        self.assertFalse(self.settings.fulfillment_mode_switch_job_id)
         self.assertEqual(
             self.env['shopify.connector.job'].search_count([
                 ('store_id', '=', self.store.id),

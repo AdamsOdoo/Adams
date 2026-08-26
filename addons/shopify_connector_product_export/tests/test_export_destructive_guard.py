@@ -178,6 +178,23 @@ class TestExportDestructiveGuard(ExportCase):
         self.assertTrue(untouched['existing_media'])
         self.assertIn('never included', untouched['note'])
 
+    def test_imported_active_title_only_preview_has_no_status_row(self):
+        self.template.with_context(shopify_seed_remote_status=True).write({
+            'shopify_export_status': 'active',
+            'shopify_export_status_managed': False,
+        })
+        self.template.write({'name': 'Renamed safely'})
+        read = self._read(variants=[self._bound_remote_variant()])
+        read['product']['status'] = 'ACTIVE'
+        diff, _steps, _blocked = self.Service._preview_update_path(
+            self.store, self.template, self.binding,
+            self.Service._desired_scalars(self.template),
+            self.Service._desired_options(self.template),
+            self.template.product_variant_ids, True, read,
+        )
+        self.assertIn('title', [row['field'] for row in diff['scalars']])
+        self.assertNotIn('status', [row['field'] for row in diff['scalars']])
+
     # ------------------------------------------------------------------
     # No delete mutation exists anywhere in this module
     # ------------------------------------------------------------------

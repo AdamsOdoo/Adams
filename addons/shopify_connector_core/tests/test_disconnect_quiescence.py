@@ -43,6 +43,7 @@ import queue
 import re
 import textwrap
 import threading
+import time
 import traceback
 import uuid
 from datetime import timedelta
@@ -374,8 +375,8 @@ class TestCallLeaseModelSchema(TransactionCase):
             'only the owned side cursor may commit; found: %s' % committed,
         )
 
-    # 20b. execute_business is the sole guarded public mutation boundary.
-    def test_public_surface_adds_only_execute_business(self):
+    # 20b. The two guarded business boundaries are explicit and purpose-bound.
+    def test_public_surface_adds_only_guarded_business_seams(self):
         ClientClass = client_module.ShopifyConnectorApiClient
         public = {
             name for name, value in vars(
@@ -383,7 +384,9 @@ class TestCallLeaseModelSchema(TransactionCase):
             ).items()
             if callable(value) and not name.startswith('_')
         }
-        self.assertEqual(public, {'execute', 'execute_business'})
+        self.assertEqual(
+            public, {'execute', 'execute_business', 'execute_business_read'},
+        )
         self.assertIn(
             '_validate_graphql_operation',
             guard_called_names(guard_fn_ast(ClientClass.execute)),
@@ -403,6 +406,20 @@ class TestCallLeaseModelSchema(TransactionCase):
         self.assertNotIn('_admit_mutation', guard_called_names(
             guard_fn_ast(ClientClass._send_lifecycle)
         ))
+        read_calls = guard_called_names(
+            guard_fn_ast(ClientClass.execute_business_read)
+        )
+        self.assertIn('_validate_graphql_operation', read_calls)
+        self.assertIn('_admit_business_read', read_calls)
+        self.assertNotIn('_admit_mutation', read_calls)
+
+    def test_business_read_ownership_uses_the_immutable_store_fk(self):
+        source = inspect.getsource(
+            client_module.ShopifyConnectorApiClient._admit_business_read
+        )
+        self.assertIn('j.store_id', source)
+        self.assertNotIn('j.company_id', source)
+        self.assertIn('store_company_id not in self.env.companies.ids', source)
 
     # API-parity source guards (review 4680664964, blocker 1): execute_business
     # normalizes like execute(), keeps the two-arg legacy seam, uses the explicit
@@ -521,6 +538,42 @@ class TestBusinessAdmission(TransactionCase):
         self.env.flush_all()
         with self.assertRaises(ShopifyQuiescedError):
             with self.Client.execute_business(job, self.store, 'q'):
+                pass
+        self.assertEqual(self._lease_count(), 0)
+
+    def test_business_read_admission_owns_lease_until_body_exit(self):
+        job = self._make_job()
+        # The queued row is committed before a worker claims it.  Keep the
+        # running transition in the owning transaction: the side admission
+        # transaction cannot and must not require that uncommitted state.
+        self.env.flush_all()
+        job.sudo().write({'state': 'running'})
+
+        def fake_send(self, store, body, token=None):
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.dict(
+            client_module.BUSINESS_READ_PURPOSE_JOB_PREFIXES,
+            {'core_test': ('core_',)},
+            clear=False,
+        ), patch.object(type(self.Client), '_send', fake_send):
+            with self.Client.execute_business_read(
+                job, self.store, 'query { shop { id } }',
+                purpose='core_test',
+            ) as result:
+                self.assertIn('data', result)
+                self.assertEqual(self._lease_count(), 1)
+            self.assertEqual(self._lease_count(), 0)
+
+    def test_business_read_wrong_purpose_fails_before_lease(self):
+        job = self._make_job()
+        job.sudo().write({'state': 'running'})
+        self.env.flush_all()
+        with self.assertRaises(ShopifyQuiescedError):
+            with self.Client.execute_business_read(
+                job, self.store, 'query { shop { id } }',
+                purpose='inventory',
+            ):
                 pass
         self.assertEqual(self._lease_count(), 0)
 
@@ -1113,6 +1166,86 @@ class TestGenuineRealAdmission(TransactionCase):
             self.assertEqual(len(observed['in_body']), 1)       # visible in ctx
             self.assertEqual(observed['result']['data'], {'ok': True})  # normalized
             self.assertEqual(len(observed['after']), 0)         # released on exit
+        finally:
+            if worker_cr is not None:
+                worker_cr.rollback()
+                worker_cr.close()
+            self._cleanup(dbname, store_id, job_ids)
+
+    def test_response_telemetry_cannot_invalidate_caller_fk_snapshot(self):
+        """A successful response may be followed by store-owned child writes.
+
+        Production telemetry is committed independently.  It must not update
+        the parent store until the caller's REPEATABLE READ transaction ends,
+        otherwise PostgreSQL's implicit FK ``FOR KEY SHARE`` sees a newer
+        parent tuple and raises a genuine SQLSTATE 40001.  This is the exact
+        sequence exercised by onboarding location discovery.
+        """
+        dbname = self.env.cr.dbname
+        store_id = None
+        job_ids = []
+        worker_cr = None
+        synthetic_lease_key = uuid.uuid4().hex
+        throttle = {
+            'maximumAvailable': 2000.0,
+            'currentlyAvailable': 900.0,
+            'restoreRate': 100.0,
+        }
+        try:
+            store_id, job_ids = self._commit_fixtures(dbname, n_jobs=1)
+            worker_cr = self._open_bounded(dbname)
+            worker_env = api.Environment(worker_cr, SUPERUSER_ID, {})
+            store = worker_env['shopify.connector.store'].browse(store_id)
+            job = worker_env['shopify.connector.job'].browse(job_ids[0])
+            Client = worker_env['shopify.connector.api.client']
+
+            response = FakeResponse(200, json_body={
+                'data': {'ok': True},
+                'extensions': {'cost': {'throttleStatus': throttle}},
+            })
+
+            with patch.object(
+                    self.registry, 'cursor',
+                    self._real_registry_cursor(dbname)), patch.object(
+                    type(Client), '_send', return_value=response):
+                with Client.execute_business(
+                        job, store, 'query { shop { id } }'):
+                    # A real store FK insert after response normalization.  The
+                    # former immediate side-transaction telemetry update made
+                    # this statement raise a genuine 40001.
+                    worker_env['shopify.connector.call.lease'].create({
+                        'store_id': store_id,
+                        'lease_key': synthetic_lease_key,
+                        'job_id': job.id,
+                        'worker_ref': 'telemetry-fk-regression',
+                        'admitted_at': fields.Datetime.now(),
+                        'expires_at': fields.Datetime.add(
+                            fields.Datetime.now(), minutes=1,
+                        ),
+                    })
+                worker_cr.commit()
+
+            observer = self._open_bounded(dbname)
+            try:
+                observer.execute(
+                    'SELECT count(*) FROM shopify_connector_call_lease '
+                    'WHERE store_id = %s AND lease_key = %s',
+                    (store_id, synthetic_lease_key),
+                )
+                self.assertEqual(
+                    observer.fetchone()[0], 1,
+                    'the caller child row must commit without SQLSTATE 40001',
+                )
+                observer.execute(
+                    'SELECT api_throttle_available, api_throttle_maximum, '
+                    'api_throttle_restore_rate '
+                    'FROM shopify_connector_store WHERE id = %s',
+                    (store_id,),
+                )
+                self.assertEqual(observer.fetchone(), (900.0, 2000.0, 100.0))
+                observer.rollback()
+            finally:
+                observer.close()
         finally:
             if worker_cr is not None:
                 worker_cr.rollback()
@@ -2937,6 +3070,8 @@ class _GenuineRaceHelpers:
     with distinct backend PIDs. Raw SQL is used ONLY to commit fixtures, OBSERVE
     committed state, and clean up -- never to create the row under test."""
 
+    PROBE_TIMEOUT_SECONDS = 6.0
+
     STATEMENT_TIMEOUT_MS = 10000
     LOCK_TIMEOUT_MS = 8000
     BOUND_SECONDS = 20
@@ -3005,6 +3140,34 @@ class _GenuineRaceHelpers:
         alive = sum(1 for t in threads if t is not None and t.is_alive())
         self.assertEqual(
             alive, 0, 'worker thread still alive at the cleanup boundary')
+
+    def _wait_for_backend_lock(self, dbname, backend_pid):
+        """Return once a real backend is waiting on a PostgreSQL lock.
+
+        The activation race below deliberately holds the first caller's row
+        lock open before releasing it to the second caller.  A thread/event
+        ordering alone would only prove that the second request eventually
+        ran; observing ``pg_stat_activity`` proves it actually waited on the
+        production ``FOR NO KEY UPDATE`` lock.  Keep the poll bounded so a
+        failed lock choreography cannot strand a test worker.
+        """
+        deadline = time.monotonic() + self.BOUND_SECONDS
+        while time.monotonic() < deadline:
+            observer = self._open_bounded(dbname, read_committed=True)
+            try:
+                observer.execute(
+                    "SELECT wait_event_type, wait_event "
+                    "FROM pg_stat_activity WHERE pid = %s",
+                    (backend_pid,),
+                )
+                row = observer.fetchone()
+                observer.rollback()
+            finally:
+                observer.close()
+            if row and row[0] == 'Lock':
+                return True
+            time.sleep(0.01)
+        return False
 
     def _commit_connected_fixture(self, dbname, with_job=False):
         """Create+commit a connected store, its credential, and (optionally) one
@@ -3117,6 +3280,12 @@ class _GenuineRaceHelpers:
             cr.execute(
                 "DELETE FROM shopify_connector_job WHERE store_id = %s", (store_id,))
             cr.execute(
+                "DELETE FROM shopify_connector_store_access_token "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
+                "DELETE FROM shopify_connector_store_settings "
+                "WHERE store_id = %s", (store_id,))
+            cr.execute(
                 "DELETE FROM shopify_connector_store_credential WHERE store_id = %s",
                 (store_id,))
             cr.execute(
@@ -3133,6 +3302,7 @@ class _GenuineRaceHelpers:
                 ('shopify_connector_call_lease', 'store_id', 'lease'),
                 ('shopify_connector_store', 'id', 'store'),
                 ('shopify_connector_store_credential', 'store_id', 'credential'),
+                ('shopify_connector_store_settings', 'store_id', 'settings'),
                 ('shopify_connector_job', 'store_id', 'job'),
             ):
                 v.execute(
@@ -3143,6 +3313,459 @@ class _GenuineRaceHelpers:
             v.rollback()
         finally:
             v.close()
+
+
+@tagged('post_install', '-at_install')
+class TestSetupCredentialRetainRaceGenuine(
+    _GenuineRaceHelpers, TransactionCase,
+):
+    """Retain-existing linearizes with clear and mode replacement.
+
+    The mutation worker parks only after the real lifecycle store lock has
+    been acquired. A second independent backend then calls the real public
+    setup RPC. PostgreSQL lock observation proves that retain waits on the
+    production lock; after the mutation commits, retain must refuse and must
+    not advance durable setup progress from its older browser intent.
+    """
+
+    CLIENT_ID = 'retain-race-client-id'
+    CLIENT_SECRET = 'retain-race-synthetic-secret'
+    OFFLINE_TOKEN = 'retain-race-synthetic-offline-token'
+
+    def _commit_retain_fixture(self, dbname):
+        setup = self._open_bounded(dbname)
+        admin = None
+        try:
+            env = api.Environment(setup, SUPERUSER_ID, {})
+            store = env['shopify.connector.store'].create({
+                'name': 'Credential Retain Race Store',
+                'shop_domain': 'retain-race-%s.myshopify.com' % uuid.uuid4().hex,
+                'api_version': '2026-07',
+                'state': 'setup_incomplete',
+            })
+            env['shopify.connector.store.settings'].create({
+                'store_id': store.id,
+                'setup_wizard_step_key': 'welcome',
+            })
+            admin = env['res.users'].create({
+                'name': 'Retain Race Connector Administrator',
+                'login': 'retain-race-admin-%s' % uuid.uuid4().hex,
+                'company_id': store.company_id.id,
+                'company_ids': [(6, 0, [store.company_id.id])],
+                'group_ids': [(6, 0, [env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin',
+                ).id])],
+            })
+            self.assertTrue(admin.has_group(
+                'shopify_connector_core.group_shopify_connector_admin',
+            ))
+            env[
+                'shopify.connector.store.credential'
+            ].action_set_client_credentials(
+                store, self.CLIENT_ID, self.CLIENT_SECRET,
+            )
+            store_id = store.id
+            setup.commit()
+            return store_id, admin.id, store.company_id.id
+        except BaseException:
+            setup.rollback()
+            if admin:
+                env = api.Environment(setup, SUPERUSER_ID, {})
+                env['res.users'].browse(admin.id).unlink()
+                setup.commit()
+            raise
+        finally:
+            setup.close()
+
+    def _cleanup_retain_admin(self, dbname, user_id):
+        if not user_id:
+            return
+        cleanup = self._open_bounded(dbname)
+        try:
+            env = api.Environment(cleanup, SUPERUSER_ID, {})
+            env['res.users'].browse(user_id).unlink()
+            cleanup.commit()
+        finally:
+            cleanup.close()
+        verify = self._open_bounded(dbname, read_committed=True)
+        try:
+            env = api.Environment(verify, SUPERUSER_ID, {})
+            self.assertFalse(env['res.users'].browse(user_id).exists())
+            verify.rollback()
+        finally:
+            verify.close()
+
+    def _observe_retain_fixture(self, dbname, store_id):
+        observer = self._open_bounded(dbname, read_committed=True)
+        try:
+            observer.execute(
+                "SELECT s.credential_present, c.credential_state, "
+                "c.auth_mode, x.setup_wizard_step_key "
+                "FROM shopify_connector_store s "
+                "LEFT JOIN shopify_connector_store_credential c "
+                "ON c.store_id = s.id "
+                "LEFT JOIN shopify_connector_store_settings x "
+                "ON x.store_id = s.id WHERE s.id = %s",
+                (store_id,),
+            )
+            row = observer.fetchone()
+            observer.rollback()
+            return row
+        finally:
+            observer.close()
+
+    def _wait_for_lock_or_finish(
+        self, observer, backend_pid, expected_blocker_pid, finished,
+    ):
+        """Prove retain is blocked by the exact mutation backend.
+
+        ``wait_event_type`` alone is insufficient: a worker can be waiting on
+        an unrelated lock, and ``transactionid`` is a ``wait_event`` value,
+        not a wait type.  PostgreSQL exposes the precise blocker through
+        ``pg_blocking_pids``; require the mutation PID before releasing it.
+        """
+        deadline = time.monotonic() + self.PROBE_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            if finished.is_set():
+                return False
+            observer.execute(
+                "SELECT wait_event_type, wait_event, state, "
+                "pg_blocking_pids(pid) FROM pg_stat_activity "
+                "WHERE pid = %s", (backend_pid,),
+            )
+            row = observer.fetchone()
+            observer.rollback()
+            if (
+                row and row[0] == 'Lock'
+                and row[1] in ('transactionid', 'tuple')
+                and row[2] == 'active'
+                and expected_blocker_pid in (row[3] or [])
+            ):
+                return True
+            time.sleep(0.01)
+        return False
+
+    def _assert_mutation_wins_before_retain(self, mutation):
+        dbname = self.env.cr.dbname
+        store_id = None
+        retain_uid = None
+        mutation_holds = threading.Event()
+        release_mutation = threading.Event()
+        retain_started = threading.Event()
+        retain_finished = threading.Event()
+        findings = queue.Queue()
+        pids = {}
+        mutation_thread = retain_thread = None
+        probe_observer = None
+        try:
+            store_id, retain_uid, company_id = self._commit_retain_fixture(dbname)
+            Store = type(self.env['shopify.connector.store'])
+            original_lock = Store._lock_store_for_lifecycle
+
+            def gated_lifecycle_lock(store_record):
+                result = original_lock(store_record)
+                if getattr(
+                    threading.current_thread(), 'retain_race_mutation', False,
+                ):
+                    mutation_holds.set()
+                    if not release_mutation.wait(timeout=self.BOUND_SECONDS):
+                        raise AssertionError(
+                            'retain race mutation gate was not released'
+                        )
+                return result
+
+            def mutate_worker():
+                cursor = None
+                try:
+                    threading.current_thread().retain_race_mutation = True
+                    cursor = self._open_bounded(dbname)
+                    pids['mutation'] = self._backend_pid(cursor)
+                    env = api.Environment(cursor, SUPERUSER_ID, {})
+                    store = env['shopify.connector.store'].browse(store_id)
+                    Credential = env[
+                        'shopify.connector.store.credential'
+                    ]
+                    if mutation == 'clear':
+                        Credential.action_clear_token(store)
+                    else:
+                        Credential.action_set_token(store, self.OFFLINE_TOKEN)
+                    cursor.commit()
+                    findings.put(('mutation', 'committed'))
+                except BaseException as exc:
+                    if cursor is not None:
+                        cursor.rollback()
+                    findings.put(('mutation', type(exc).__name__))
+                finally:
+                    if cursor is not None:
+                        cursor.close()
+
+            def retain_worker():
+                cursor = None
+                try:
+                    cursor = self._open_bounded(dbname, read_committed=True)
+                    pids['retain'] = self._backend_pid(cursor)
+                    env = api.Environment(cursor, retain_uid, {
+                        'allowed_company_ids': [company_id],
+                    })
+                    retain_started.set()
+                    env[
+                        'shopify.connector.setup.wizard'
+                    ].retain_existing_credential(
+                        store_id, 'dev_dashboard_client_credentials',
+                    )
+                    cursor.commit()
+                    findings.put(('retain', 'advanced'))
+                except UserError as exc:
+                    if cursor is not None:
+                        cursor.rollback()
+                    # UserError messages here are fixed, secret-free refusal
+                    # reasons; retain the classification to diagnose a
+                    # pre-lock refusal without ever exposing credentials.
+                    findings.put(('retain', 'refused:%s' % str(exc)))
+                except BaseException as exc:
+                    if cursor is not None:
+                        cursor.rollback()
+                    findings.put(('retain', type(exc).__name__))
+                finally:
+                    retain_finished.set()
+                    if cursor is not None:
+                        cursor.close()
+
+            with patch.object(type(self.registry), '_lock', threading.RLock()), \
+                 patch.object(Store, '_lock_store_for_lifecycle',
+                              gated_lifecycle_lock):
+                mutation_thread = threading.Thread(
+                    target=mutate_worker, daemon=True,
+                )
+                mutation_thread.start()
+                try:
+                    self.assertTrue(
+                        mutation_holds.wait(timeout=self.BOUND_SECONDS),
+                        'credential mutation did not acquire the lifecycle lock',
+                    )
+                    probe_observer = self._open_bounded(
+                        dbname, read_committed=True,
+                    )
+                    retain_thread = threading.Thread(
+                        target=retain_worker, daemon=True,
+                    )
+                    retain_thread.start()
+                    self.assertTrue(
+                        retain_started.wait(timeout=self.BOUND_SECONDS),
+                        'retain worker did not start',
+                    )
+                    self.assertTrue(
+                        self._wait_for_lock_or_finish(
+                            probe_observer, pids['retain'], pids['mutation'],
+                            retain_finished,
+                        ),
+                        'retain did not wait on the credential lifecycle lock '
+                        '(finished=%s outcome=%s)' % (
+                            retain_finished.is_set(), self._drain(findings),
+                        ),
+                    )
+                finally:
+                    release_mutation.set()
+                    mutation_thread.join(timeout=self.BOUND_SECONDS)
+                    if retain_thread is not None:
+                        retain_thread.join(timeout=self.BOUND_SECONDS)
+                    if probe_observer is not None:
+                        probe_observer.close()
+                        probe_observer = None
+                self._assert_workers_dead((mutation_thread, retain_thread))
+
+            self.assertNotEqual(pids['mutation'], pids['retain'])
+            outcomes = sorted(self._drain(findings))
+            self.assertEqual(len(outcomes), 2)
+            self.assertEqual(outcomes[0], ('mutation', 'committed'))
+            self.assertEqual(outcomes[1][0], 'retain')
+            self.assertTrue(outcomes[1][1].startswith('refused:'))
+            present, state, mode, progress = self._observe_retain_fixture(
+                dbname, store_id,
+            )
+            self.assertEqual(progress, 'welcome')
+            if mutation == 'clear':
+                self.assertFalse(present)
+                self.assertEqual(state, 'absent')
+            else:
+                self.assertTrue(present)
+                self.assertEqual(mode, 'offline_access_token')
+        finally:
+            release_mutation.set()
+            for worker in (mutation_thread, retain_thread):
+                if worker is not None:
+                    worker.join(timeout=self.BOUND_SECONDS)
+            if probe_observer is not None:
+                probe_observer.close()
+            try:
+                self._cleanup(dbname, store_id)
+            finally:
+                self._cleanup_retain_admin(dbname, retain_uid)
+
+    def test_clear_cannot_race_retain_into_false_advancement(self):
+        self._assert_mutation_wins_before_retain('clear')
+
+    def test_mode_replace_cannot_race_retain_into_false_advancement(self):
+        self._assert_mutation_wins_before_retain('replace')
+
+
+@tagged('post_install', '-at_install')
+class TestConcurrentActivationIdempotency(_GenuineRaceHelpers, TransactionCase):
+    """Two real PostgreSQL callers must not bump a store twice."""
+
+    def test_waiting_concurrent_activation_does_not_bump_generation(self):
+        """A second real caller waits on the first activation's row lock.
+
+        The previous wall-clock barrier let both Odoo worker threads remain
+        alive on Odoo.sh when one request held the lifecycle lock.  This test
+        uses a deterministic PostgreSQL choreography instead: the first
+        production ``action_activate`` runs on a genuine pooled connection
+        and intentionally remains uncommitted; the second production call is
+        started on another backend and its lock wait is observed in
+        ``pg_stat_activity`` before the first transaction commits.  Once the
+        second caller wakes it must read the freshly committed ``connected``
+        state and leave the generation unchanged.
+        """
+        dbname = self.env.cr.dbname
+        store_id = None
+        second = None
+        first = None
+        result = queue.Queue()
+        backend = {}
+        second_ready = threading.Event()
+        second_attempting = threading.Event()
+        # Odoo's post-install runner holds the framework registry lock on the
+        # main test thread.  A genuine worker must still build its own
+        # Environment, so use the same bounded fresh-RLock decoupling as the
+        # other independent-connection tests in this file.  This changes only
+        # the framework lock used to construct the already-loaded registry;
+        # the production lifecycle method and PostgreSQL row lock remain real.
+        registry_lock_patch = patch.object(
+            type(self.registry), '_lock', threading.RLock(),
+        )
+        registry_lock_patch.start()
+        try:
+            store_id, _domain, _job = self._commit_connected_fixture(dbname)
+            # Turn the committed fixture into a genuinely activation-eligible
+            # store through the ORM.  The fixture helper intentionally creates
+            # an already-connected store for the many disconnect-race tests;
+            # this test needs one real transition so the first caller bumps
+            # the generation exactly once.
+            prepared = self._open_bounded(dbname)
+            try:
+                prepared_env = api.Environment(prepared, SUPERUSER_ID, {})
+                prepared_store = prepared_env[
+                    'shopify.connector.store'
+                ].browse(store_id)
+                now = fields.Datetime.now()
+                prepared_store.write({
+                    'state': 'reconnect_needed',
+                    'last_test_connection_result': 'pass',
+                    'last_readiness_result': 'pass',
+                    'credential_last_verified_at': now,
+                    'last_readiness_at': now,
+                })
+                prepared.commit()
+            finally:
+                prepared.close()
+
+            before = self._observe_store(dbname, store_id)
+            generation_before = before[1]
+
+            # The first caller is a real production method on a real pooled
+            # backend.  Its uncommitted row write is the lock holder that makes
+            # the second call's wait deterministic.
+            first = self._open_bounded(dbname, read_committed=True)
+            first_env = api.Environment(first, SUPERUSER_ID, {})
+            first_store = first_env['shopify.connector.store'].browse(store_id)
+            first_store.action_activate()
+            self.assertEqual(
+                first_store.connection_generation, generation_before + 1,
+            )
+
+            def activate_waiting():
+                cr = None
+                try:
+                    threading.current_thread().dbname = dbname
+                    cr = self._open_bounded(dbname, read_committed=True)
+                    backend['pid'] = self._backend_pid(cr)
+                    env = api.Environment(cr, SUPERUSER_ID, {})
+                    store = env['shopify.connector.store'].browse(store_id)
+                    second_ready.set()
+                    second_attempting.set()
+                    # This is the real public production method on an
+                    # independent backend; no state, lock, or timing seam is
+                    # patched.  It waits on the first transaction's row lock.
+                    store.action_activate()
+                    cr.commit()
+                    result.put({'ok': True})
+                except BaseException as exc:
+                    result.put(self._sanitize(exc, 'activation'))
+                finally:
+                    if cr is not None:
+                        try:
+                            cr.rollback()
+                        finally:
+                            cr.close()
+
+            second = threading.Thread(target=activate_waiting, daemon=True)
+            second.start()
+            self.assertTrue(
+                second_ready.wait(timeout=self.BOUND_SECONDS),
+                'second activation backend did not become ready',
+            )
+            self.assertTrue(
+                second_attempting.wait(timeout=self.BOUND_SECONDS),
+                'second activation did not reach the production method',
+            )
+            self.assertTrue(backend.get('pid'), 'second backend PID missing')
+            self.assertTrue(
+                self._wait_for_backend_lock(dbname, backend['pid']),
+                'second activation did not wait on the first row lock',
+            )
+
+            # Release the first activation only after the second backend is
+            # demonstrably waiting.  This makes the race reproducible while
+            # retaining the real PostgreSQL lock and production method.
+            first.commit()
+            first.close()
+            first = None
+            second.join(timeout=self.BOUND_SECONDS)
+            self._assert_workers_dead([second])
+            self.assertEqual(result.get(timeout=self.BOUND_SECONDS), {'ok': True})
+            after = self._observe_store(dbname, store_id)
+            self.assertEqual(after[0], 'connected')
+            self.assertEqual(
+                after[1], generation_before + 1,
+                'the waiting activation must not bump the connection epoch',
+            )
+        finally:
+            try:
+                # Always release the holder before joining the worker.  This
+                # teardown remains inside the fresh-RLock window, so even a
+                # failed assertion cannot restore Registry._lock while the
+                # worker is still constructing its Environment.  It is a
+                # test-teardown guarantee, not a production timeout
+                # workaround.
+                if first is not None:
+                    try:
+                        first.rollback()
+                    finally:
+                        first.close()
+                if second is not None and second.is_alive():
+                    second.join(timeout=self.BOUND_SECONDS)
+                if second is not None:
+                    self._assert_workers_dead([second])
+            finally:
+                try:
+                    # Durable cleanup also stays within the bounded patch
+                    # scope; the worker's own rollback/close has completed
+                    # before this fresh-connection teardown begins.
+                    self._cleanup(dbname, store_id)
+                finally:
+                    # Restore the framework lock only after every worker and
+                    # pooled cursor has been released.
+                    registry_lock_patch.stop()
 
 
 @tagged('post_install', '-at_install')
@@ -3288,6 +3911,7 @@ class TestLifecycleAdmissionRaceGenuine(_GenuineRaceHelpers, TransactionCase):
     # Store-row lock attribution: the admission FOR SHARE conflicts with a held
     # lifecycle FOR NO KEY UPDATE (distinct backend) -> it blocks and hits its
     # bounded lock_timeout; once the holder releases, the admission succeeds.
+    @mute_logger('odoo.sql_db')
     def test_admission_for_share_conflicts_with_lifecycle_update_lock(self):
         dbname = self.env.cr.dbname
         store_id = None
@@ -3670,6 +4294,7 @@ class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
                 stack.enter_context(p)
             yield
 
+    @mute_logger('odoo.sql_db')
     def test_repeatable_read_serialization_retry_issues_one_transport(self):
         dbname = self.env.cr.dbname
         store_id = None
@@ -3804,6 +4429,7 @@ class TestLifecycleServiceRetryGenuine(_GenuineRaceHelpers, TransactionCase):
             service_logger.setLevel(prior_level)
             self._cleanup(dbname, store_id)
 
+    @mute_logger('odoo.sql_db')
     def test_scheduled_run_drain_serialization_retry_refuses_after_disconnect(self):
         """Phase-5 companion proof, corrected for the ownership/replay model
         (control-room review `4699752673`): the SAME genuine 40001-driven conflict
@@ -4155,6 +4781,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # Test B -- still-connected post-transport serialization failure
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_b_still_connected_post_transport_serialization_routes_once(self):
         """Test B -- a genuine post-transport 40001 while the store stays
         CONNECTED (no disconnect). Proves exactly one transport, the complete
@@ -4246,6 +4873,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # DEC-031 Layer 1 (AR-048) -- fail-closed replay-policy recovery routing.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_conservative_replay_policy_routes_to_blocked_manual_review_not_retry(
             self):
         """The SAME genuine post-transport 40001 as Test B, but with a
@@ -4362,6 +4990,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # Test A -- post-rollback reclaim race (SKIP-LOCKED mutual exclusion)
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_a_rollback_reclaim_race_one_owner_one_transport(self):
         """Test A -- the post-rollback reclaim race. Worker A transports once,
         hits a genuine 40001, rolls back (losing its claim), and reacquires the
@@ -4529,6 +5158,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # Test C -- retry/exhaustion + ownership refusal
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_c_conflict_exhaustion_routes_to_failed_final_after_reacquire(self):
         """Test C (exhaustion) -- when the bounded retry budget is already spent,
         the conflict path, reached ONLY after reacquiring the exact job lock,
@@ -4590,6 +5220,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
         finally:
             self._cleanup(dbname, store_id)
 
+    @mute_logger('odoo.sql_db')
     def test_c_recovery_refuses_to_overwrite_a_job_worker_b_completed(self):
         """Test C (ownership) -- if, during A's reset window (after A rolled back,
         before A reacquires), Worker B genuinely claims and COMPLETES the job, A's
@@ -4748,6 +5379,7 @@ class TestDrainOwnershipReplayGenuine(_GenuineRaceHelpers, TransactionCase):
     # Test D -- batch integrity across a per-job-committed drain
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_d_batch_integrity_neighbor_conflict_preserves_committed_jobs(self):
         """Test D -- per-job commit integrity across a batch. Job 1 succeeds and
         commits once; Job 2 hits a genuine 40001 and is routed once to the bounded

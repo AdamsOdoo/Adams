@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        U0 operator UI: connector navigation.
+        C1/C2 information architecture. The root has exactly four visible
+        pillars. Existing destination IDs are re-parented below so bookmarks
+        and references survive the restructure; the domain addons add their
+        own children to these pillars.
 
-        One root app menu "Shopify Connector", gated to the connector Auditor
-        group so the whole tree is hidden from users outside the connector
-        groups. Every first-level destination is a real, usable U0 screen; no
-        empty placeholders for later U1/U2/U3 work are shown. Mutation Evidence
-        is nested under the Error & Review Center as review content.
-
-        Read-only surfaces are visible to all four roles (all imply Auditor);
-        write/action controls inside each screen follow the existing server
-        group + state matrix.
+        Menus are visibility only. Existing ACLs, record rules and hidden
+        capability groups remain the authorization boundary.
     -->
     <menuitem id="menu_shopify_connector_root"
               name="Shopify Connector"
@@ -21,42 +17,82 @@
     <menuitem id="menu_shopify_connector_dashboard"
               name="Dashboard"
               parent="menu_shopify_connector_root"
-              action="action_shopify_connector_dashboard"
-              sequence="10"/>
+              sequence="10"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
 
-    <menuitem id="menu_shopify_connector_stores"
-              name="Stores"
-              parent="menu_shopify_connector_root"
-              action="action_shopify_connector_store"
+    <menuitem id="menu_shopify_connector_connector_health"
+              name="Connector Health"
+              parent="menu_shopify_connector_dashboard"
+              action="action_shopify_connector_health"
               sequence="20"/>
 
-    <menuitem id="menu_shopify_connector_sync_center"
-              name="Sync Center"
+    <menuitem id="menu_shopify_connector_operations"
+              name="Operations"
               parent="menu_shopify_connector_root"
+              sequence="20"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
+
+    <menuitem id="menu_shopify_connector_sync_center"
+              name="Runs &amp; Recovery"
+              parent="menu_shopify_connector_operations"
               action="action_shopify_connector_sync_center"
-              sequence="30"/>
+              sequence="50"/>
 
     <menuitem id="menu_shopify_connector_error_center"
-              name="Error &amp; Review Center"
-              parent="menu_shopify_connector_root"
+              name="Needs Attention"
+              parent="menu_shopify_connector_operations"
               action="action_shopify_connector_error_center"
-              sequence="40"/>
+              sequence="60"/>
 
+    <!-- Evidence is a contextual drill-down, never a navigation concept. -->
     <menuitem id="menu_shopify_connector_mutation_evidence"
-              name="Mutation Evidence"
+              name="Shopify Write Evidence"
               parent="menu_shopify_connector_error_center"
               action="action_shopify_connector_mutation_attempt"
-              sequence="10"/>
+              sequence="10"
+              active="False"/>
+
+    <menuitem id="menu_shopify_connector_reporting"
+              name="Reporting"
+              parent="menu_shopify_connector_root"
+              sequence="30"
+              groups="shopify_connector_core.group_shopify_connector_user"/>
 
     <menuitem id="menu_shopify_connector_sync_analysis"
-              name="Sync Operations Analysis"
-              parent="menu_shopify_connector_root"
+              name="Sync Performance"
+              parent="menu_shopify_connector_reporting"
               action="action_shopify_connector_sync_analysis"
-              sequence="45"/>
+              sequence="20"/>
 
     <menuitem id="menu_shopify_connector_logs"
-              name="Logs"
-              parent="menu_shopify_connector_root"
+              name="Audit Trail"
+              parent="menu_shopify_connector_reporting"
               action="action_shopify_connector_job_log"
-              sequence="50"/>
+              sequence="30"/>
+
+    <menuitem id="menu_shopify_connector_configuration"
+              name="Configuration"
+              parent="menu_shopify_connector_root"
+              sequence="40"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
+
+    <!-- Stable store ID, moved under the Administrator-only Configuration
+         pillar. -->
+    <menuitem id="menu_shopify_connector_stores"
+              name="Stores &amp; Onboarding"
+              parent="menu_shopify_connector_configuration"
+              action="action_shopify_connector_store"
+              sequence="10"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
+
+    <!-- Odoo renders a menu that has children as a non-clickable section
+         heading, even when that parent carries an action. Keep the stable
+         parent ID above, and expose its store-list action as a real child so
+         Stores & Onboarding is an operable route rather than a label. -->
+    <menuitem id="menu_shopify_connector_store_records"
+              name="Stores"
+              parent="menu_shopify_connector_stores"
+              action="action_shopify_connector_store"
+              sequence="5"
+              groups="shopify_connector_core.group_shopify_connector_admin"/>
 </odoo>

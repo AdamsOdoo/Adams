@@ -153,6 +153,43 @@ class TestJobDispatch(TransactionCase):
         logs = self._logs_for(job)
         self.assertTrue(any(log.to_state == 'succeeded' for log in logs))
 
+    def test_retry_success_clears_current_failure_metadata(self):
+        """A successful retry clears current error/scheduling fields.
+
+        The prior failure remains in the transition log, but the succeeded
+        job itself must not report stale failure metadata or a pending retry.
+        """
+        self.store.write({'state': 'connected'})
+        job = self._create_selftest_job(state='queued')
+
+        def _raise_unknown(_job):
+            raise RuntimeError('first attempt failed')
+
+        DispatchModel = self.env.registry['shopify.connector.job.dispatch']
+        with patch.object(
+            DispatchModel, '_get_handlers',
+            lambda self: {'core_dispatch_selftest': _raise_unknown},
+        ):
+            self.Dispatch._dispatch_one(job)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'retry_waiting')
+        self.assertEqual(job.error_class, 'unknown_system_error')
+        self.assertEqual(job.retry_count, 1)
+        job.write({
+            'next_retry_at': fields.Datetime.now() - timedelta(seconds=1),
+        })
+        self.Dispatch._dispatch_one(job)
+        job.invalidate_recordset()
+        self.assertEqual(job.state, 'succeeded')
+        self.assertFalse(job.error_class)
+        self.assertFalse(job.manual_review_subreason)
+        self.assertFalse(job.next_retry_at)
+        self.assertEqual(job.retry_count, 1)
+        self.assertTrue(job.finished_at)
+        logs = self._logs_for(job)
+        self.assertTrue(any(log.to_state == 'retry_waiting' for log in logs))
+        self.assertTrue(any(log.to_state == 'succeeded' for log in logs))
+
     def test_extension_seam_overrides_handler_without_modifying_core(self):
         """Mirrors the existing
         test_extension_seam_registers_check_without_modifying_core
@@ -659,6 +696,7 @@ class TestJobDispatch(TransactionCase):
         expected = sorted([
             ('shopify_connector_job_enqueue.py', 'enqueue',
              "self.env['shopify.connector.job']"),
+            ('shopify_connector_job_enqueue.py', 'enqueue', 'cron'),
             ('shopify_connector_job_dispatch.py', '_block_original_job', 'job'),
             ('shopify_connector_job_dispatch.py',
              '_apply_validated_consequence', 'job'),

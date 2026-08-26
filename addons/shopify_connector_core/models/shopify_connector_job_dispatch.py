@@ -5,7 +5,7 @@ import random
 import uuid
 
 from odoo import api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
 from ..tools.redaction import redact
@@ -323,6 +323,13 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
         Returns the number of jobs dispatched in this pass.
         """
+        if not self.env.su and not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
+        ):
+            raise AccessError(
+                'Only a Shopify Connector Administrator may drain connector '
+                'jobs outside the root cron environment.'
+            )
         cap = (
             self._resolve_drain_batch_size() if limit is None
             else limit
@@ -337,6 +344,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         report_progress = self._concurrency_retry_supported()
         Job = self.env['shopify.connector.job']
         processed = 0
+        served_stores = set()
         for _slot in range(cap):
             # TD-014 correction. The deferred set used to be computed ONCE,
             # here, before the loop -- so throttle pressure a job in THIS
@@ -368,15 +376,26 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                         "rest of it.", len(newly),
                     )
                     deferred |= newly
-            exclude = tuple(sorted(deferred))
-            if not self._drain_one(exclude_store_ids=exclude):
+            fair_exclude = tuple(sorted(deferred | served_stores))
+            claimed_store_id = self._drain_one(
+                exclude_store_ids=fair_exclude,
+            )
+            if not claimed_store_id and served_stores:
+                # Every currently eligible store received one slot. Begin a
+                # new round without lifting rate-limit deferrals.
+                served_stores.clear()
+                claimed_store_id = self._drain_one(
+                    exclude_store_ids=tuple(sorted(deferred)),
+                )
+            if not claimed_store_id:
                 break
+            served_stores.add(claimed_store_id)
             processed += 1
             if not report_progress:
                 continue
             remaining = self.env['ir.cron']._commit_progress(
                 1,
-                remaining=Job._claimable_count(exclude),
+                remaining=Job._claimable_count(tuple(sorted(deferred))),
             )
             if remaining <= 0:
                 _logger.info(
@@ -420,7 +439,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         for ``local_only``/``remote_read_replay_safe`` jobs, manual review
         for ``remote_effect_not_replay_safe``/undeclared ones).
 
-        Returns ``True`` when a job was claimed and handled (whether it
+        Returns the claimed store id when a job was handled (whether it
         succeeded, was refused, routed, recovered, or left to another worker),
         ``False`` when no claimable job remains so ``run_drain`` can stop early.
         """
@@ -430,6 +449,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         if not claimed:
             return False
         job_id = claimed.id
+        claimed_store_id = claimed.store_id.id
 
         if self._is_mutation_job_type(claimed.job_type):
             if not self._concurrency_retry_supported():
@@ -438,7 +458,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                     'real commit boundaries.'
                 )
             self._drain_mutation_one(claimed)
-            return True
+            return claimed_store_id
 
         if not self._concurrency_retry_supported():
             # The shared in-test transaction cursor forbids commit/rollback, so
@@ -449,7 +469,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # independent-connection lifecycle tests drive the real boundary
             # below on real pooled cursors.
             self._dispatch_one(claimed)
-            return True
+            return claimed_store_id
 
         try:
             # Dispatch the claimed job ONCE, under the currently-held claim.
@@ -481,7 +501,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             # Commit this job's own outcome so a later job's rollback can never
             # undo it and it is never re-exposed to a duplicate call.
             self.env.cr.commit()
-        return True
+        return claimed_store_id
 
     @api.model
     def _recover_after_concurrency_conflict(self, job_id):
@@ -783,7 +803,9 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         }
 
     @api.model
-    def _reconcile_mutation_dispatch_selftest(self, attempt):
+    def _reconcile_mutation_dispatch_selftest(
+        self, attempt, reconciliation_job=None,
+    ):
         return {
             'verdict': 'applied',
             'observed_store_identity': attempt.expected_store_identity,
@@ -1076,7 +1098,7 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
             normalized = self._validate_reconciliation_result(result)
         except Exception:
             self._block_original_job(
@@ -1831,7 +1853,14 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         JobLog = self.env['shopify.connector.job.log']
         from_state = job.state
         job.sudo().write({
-            'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+            'state': 'succeeded',
+            # A retrying job's prior failure remains durably visible in its
+            # transition log, but the current terminal state must not retain
+            # stale error/retry metadata after the handler succeeds.
+            'error_class': False,
+            'manual_review_subreason': False,
+            'next_retry_at': False,
+            'finished_at': fields.Datetime.now(),
         })
         JobLog._system_append(
             job, 'attempt', 'Dispatch succeeded.',

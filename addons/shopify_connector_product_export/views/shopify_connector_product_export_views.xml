@@ -28,7 +28,7 @@
         <field name="name">shopify.connector.product.export.preview.search</field>
         <field name="model">shopify.connector.product.export.preview</field>
         <field name="arch" type="xml">
-            <search string="Export Previews">
+            <search string="Product Export Reviews">
                 <field name="product_template_id"/>
                 <field name="store_id"/>
                 <field name="remote_product_gid"/>
@@ -42,7 +42,7 @@
                         string="Has Refused Differences"
                         domain="[('has_blocked_differences', '=', True)]"/>
                 <separator/>
-                <filter name="filter_quarantined" string="Scope Quarantined"
+                <filter name="filter_quarantined" string="Company Scope Conflict"
                         domain="[('sec3_scope_quarantined', '=', True)]"/>
                 <group>
                     <filter name="group_store" string="Store"
@@ -61,7 +61,7 @@
         <field name="name">shopify.connector.product.export.preview.list</field>
         <field name="model">shopify.connector.product.export.preview</field>
         <field name="arch" type="xml">
-            <list string="Export Previews" create="false" delete="false">
+            <list string="Product Export Reviews" create="false" delete="false">
                 <field name="previewed_at"/>
                 <field name="product_template_id"/>
                 <field name="export_path"/>
@@ -77,11 +77,11 @@
                        decoration-danger="state == 'blocked'"
                        decoration-success="state == 'applied'"
                        decoration-muted="state == 'expired'"/>
-                <field name="has_blocked_differences" string="Refusals"
+                <field name="has_blocked_differences" string="Blocked changes"
                        widget="boolean_toggle" readonly="1"/>
                 <field name="expires_at" optional="show"/>
-                <field name="confirmed_uid" optional="show"/>
-                <field name="sec3_scope_quarantined" string="Quarantined"
+                <field name="confirmed_uid" string="Confirmed by" optional="show"/>
+                <field name="sec3_scope_quarantined" string="Company scope conflict"
                        widget="boolean_toggle" readonly="1" optional="hide"/>
             </list>
         </field>
@@ -117,15 +117,17 @@
                     <!--
                         The wizard stays as the second route rather than being
                         replaced. It is the surface that works with JavaScript
-                        assets unavailable, and removing a working confirmation
-                        path to make a nicer one the only one would be a
-                        downgrade for anyone who lands there.
+                        assets unavailable. Because that fallback cannot offer
+                        the primary Owl review interaction, the signed product
+                        default restricts it to Administrators. The wizard still
+                        embeds the complete executable/refused/untouched diff,
+                        and its server action audits the fallback route.
                     -->
                     <button name="%(action_shopify_connector_product_export_confirm_wizard)d"
                             type="action" string="Confirm without the review screen"
                             class="btn-secondary"
                             invisible="state != 'previewed'"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             context="{'default_preview_id': id}"/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="previewed,confirmed,applying,applied"/>
@@ -150,7 +152,7 @@
                             <field name="product_template_id" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="export_path" readonly="1"/>
-                            <field name="product_template_binding_id"
+                            <field name="product_template_binding_id" string="Product mapping"
                                    readonly="1"
                                    invisible="not product_template_binding_id"/>
                             <field name="remote_product_gid" readonly="1"
@@ -162,7 +164,7 @@
                             <field name="remote_updated_at" readonly="1"
                                    invisible="not remote_updated_at"/>
                             <field name="source_write_date" readonly="1"/>
-                            <field name="confirmed_uid" readonly="1"
+                            <field name="confirmed_uid" string="Confirmed by" readonly="1"
                                    invisible="not confirmed_uid"/>
                             <field name="confirmed_at" readonly="1"
                                    invisible="not confirmed_at"/>
@@ -199,18 +201,19 @@
 
     <record id="action_shopify_connector_product_export_preview"
             model="ir.actions.act_window">
-        <field name="name">Export Previews</field>
+        <field name="name">Product Export Reviews</field>
         <field name="res_model">shopify.connector.product.export.preview</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'search_default_filter_awaiting_review': 1}</field>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
-                No export preview yet
+                No completed export preview is awaiting review
             </p>
             <p>
                 Enable "Export to Shopify" on a product, then use
                 <em>Preview Shopify Export</em> on its form. Nothing is ever
                 written to Shopify without a reviewed, confirmed preview.
+                A preview still being prepared appears in Runs &amp; Recovery.
             </p>
         </field>
     </record>
@@ -224,10 +227,10 @@
         <field name="name">shopify.connector.product.media.binding.search</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <search string="Exported Media">
+            <search string="Media Exports">
                 <field name="connector_filename"/>
                 <field name="shopify_gid"/>
-                <field name="product_template_binding_id"/>
+                <field name="product_template_binding_id" string="Product mapping"/>
                 <field name="store_id"/>
                 <filter name="filter_in_flight" string="In Flight"
                         domain="[('remote_status', 'in', ['staged', 'uploaded', 'processing', 'ready'])]"/>
@@ -251,11 +254,11 @@
         <field name="name">shopify.connector.product.media.binding.list</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <list string="Exported Media" create="false" delete="false">
+            <list string="Media Exports" create="false" delete="false">
                 <field name="connector_filename"/>
                 <field name="media_role"/>
-                <field name="product_template_binding_id" optional="show"/>
-                <field name="product_variant_binding_id" optional="hide"/>
+                <field name="product_template_binding_id" string="Product mapping" optional="show"/>
+                <field name="product_variant_binding_id" string="Product variant mapping" optional="hide"/>
                 <field name="remote_status"
                        decoration-warning="remote_status in ['staged', 'uploaded', 'processing']"
                        decoration-danger="remote_status == 'failed'"
@@ -273,7 +276,7 @@
         <field name="name">shopify.connector.product.media.binding.form</field>
         <field name="model">shopify.connector.product.media.binding</field>
         <field name="arch" type="xml">
-            <form string="Exported Media" create="false" delete="false">
+            <form string="Media Export" create="false" delete="false">
                 <header>
                     <!--
                         TD-011. The one production route to the resume
@@ -344,7 +347,7 @@
 
     <record id="action_shopify_connector_product_media_binding"
             model="ir.actions.act_window">
-        <field name="name">Exported Media</field>
+        <field name="name">Media Exports</field>
         <field name="res_model">shopify.connector.product.media.binding</field>
         <field name="view_mode">list,form</field>
         <!--
@@ -399,20 +402,30 @@
                         <field name="shopify_export_enabled"/>
                         <field name="shopify_export_status"
                                invisible="not shopify_export_enabled"/>
+                        <field name="shopify_export_status_managed"
+                               invisible="not shopify_export_enabled"/>
                     </group>
                     <group invisible="not shopify_export_enabled">
                         <field name="shopify_export_vendor"/>
+                        <field name="shopify_export_vendor_managed"/>
                         <field name="shopify_export_product_type"/>
+                        <field name="shopify_export_product_type_managed"/>
                         <field name="shopify_export_tags"
                                placeholder="tag-one, tag-two"/>
+                        <field name="shopify_export_tags_managed"/>
+                        <field name="shopify_export_description_managed"/>
                     </group>
                     <div class="text-muted" colspan="2"
                          invisible="not shopify_export_enabled">
                         Only these fields, the product's options and its
                         variants are ever exported. Collections, merchant
-                        metafields, existing media and publication state are
-                        never touched. Every change needs a reviewed,
-                        confirmed preview.
+                        metafields and existing media are never touched.
+                        Shopify status is omitted for imported products until
+                        Manage Shopify Status is explicitly enabled. Every change needs a reviewed,
+                        confirmed preview. Leave a Manage checkbox off to
+                        omit an empty local value; enable it and clear the
+                        value only when the empty value is an explicit
+                        Shopify clear.
                     </div>
                 </group>
             </xpath>
@@ -460,7 +473,7 @@
                     <button name="action_shopify_export_reconnect_reconciliation"
                             type="object" class="btn-secondary"
                             string="Re-run Export Reconciliation"
-                            groups="shopify_connector_core.group_shopify_connector_user"
+                            groups="shopify_connector_core.group_shopify_connector_admin"
                             confirm="Every open export preview for this store will be expired and must be reviewed again, and every previously exported product will be re-read from Shopify. Continue?"/>
                 </group>
                 <!--
@@ -533,15 +546,15 @@
                     <group>
                         <group string="Domain">
                             <field name="store_id" readonly="1"/>
-                            <field name="product_export_domain_enabled"
+                            <field name="product_export_domain_enabled" string="Product exports enabled"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
                             <field name="product_export_binding_namespace_ready"
-                                   readonly="1"/>
+                                   string="Product export mappings ready" readonly="1"/>
                         </group>
                         <group string="Ownership">
-                            <field name="price_source_of_truth"
+                            <field name="price_source_of_truth" string="Price owner"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
-                            <field name="media_source_of_truth"
+                            <field name="media_source_of_truth" string="Media owner"
                                    groups="shopify_connector_core.group_shopify_connector_admin"/>
                         </group>
                     </group>
@@ -568,12 +581,12 @@
         <field name="arch" type="xml">
             <list string="Export Settings" create="false" delete="false">
                 <field name="store_id"/>
-                <field name="product_export_domain_enabled"
+                <field name="product_export_domain_enabled" string="Product exports enabled"
                        widget="boolean_toggle" readonly="1"/>
                 <field name="product_export_binding_namespace_ready"
-                       widget="boolean_toggle" readonly="1"/>
-                <field name="price_source_of_truth"/>
-                <field name="media_source_of_truth"/>
+                       string="Product export mappings ready" widget="boolean_toggle" readonly="1"/>
+                <field name="price_source_of_truth" string="Price owner"/>
+                <field name="media_source_of_truth" string="Media owner"/>
             </list>
         </field>
     </record>
@@ -605,7 +618,7 @@
                       (0, 0, {'view_mode': 'form', 'sequence': 20,
                               'view_id': ref('view_shopify_connector_store_settings_form_export')})]"/>
         <field name="group_ids"
-               eval="[(4, ref('shopify_connector_core.group_shopify_connector_user'))]"/>
+               eval="[(6, 0, [ref('shopify_connector_core.group_shopify_connector_admin')])]"/>
         <field name="help" type="html">
             <p class="o_view_nocontent_smiling_face">
                 No store is configured yet.

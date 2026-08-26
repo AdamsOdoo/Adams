@@ -11,6 +11,10 @@ from unittest.mock import patch
 from odoo.exceptions import ValidationError
 from odoo.tests.common import tagged
 
+from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch import (
+    JobHandlerError,
+)
+
 from ..models.shopify_connector_product_export_service import (
     ExportPreC2FailClosedError,
     FORBIDDEN_UPDATE_KEYS,
@@ -182,10 +186,7 @@ class TestExportMutationStrategy(ExportCase):
 
     def test_variant_create_preserves_the_standalone_variant(self):
         binding = self.bind_template()
-        extra = self.env['product.product'].create({
-            'product_tmpl_id': self.template.id,
-            'default_code': 'WIDGET-2',
-        })
+        extra = self.add_template_variant('WIDGET-2')
         preview = self.make_preview(
             export_path='update', binding=binding, state='applying',
             steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
@@ -201,9 +202,16 @@ class TestExportMutationStrategy(ExportCase):
                 PRODUCT_GID,
             )
         )
-        request = self.Service._prepare_preconditions_variants_create(
-            snapshot, {},
-        )
+        with patch.object(
+            type(self.Service), '_read_remote_product',
+            return_value={'exists': True, 'store_identity': self.store.shop_domain,
+                          'variants': [{
+                'id': VARIANT_GID, 'sku': 'WIDGET-1',
+            }]},
+        ):
+            request = self.Service._prepare_preconditions_variants_create(
+                snapshot, {},
+            )
         # `DEFAULT` would delete the standalone "Default Title" variant when
         # it is the only one on the product. A remote deletion is not
         # available to this module, so the strategy that performs one is not
@@ -212,6 +220,113 @@ class TestExportMutationStrategy(ExportCase):
             request['variables']['strategy'], 'PRESERVE_STANDALONE_VARIANT',
         )
         self.assertNotIn('DEFAULT', str(request['variables']['strategy']))
+
+    def test_variant_create_refuses_skuless_new_variant_before_remote_read(self):
+        binding = self.bind_template()
+        extra = self.add_template_variant(False)
+        preview = self.make_preview(
+            export_path='update', binding=binding, state='applying',
+            steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
+                    'variant_ids': [extra.id]}],
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        snapshot = self.Service._prepare_local_common(self.make_job(
+            JOB_TYPE_VARIANTS_CREATE, preview._name, preview.id, PRODUCT_GID,
+        ))
+        with patch.object(
+            type(self.Service), '_read_remote_product',
+        ) as remote_read, self.assertRaises(ExportPreC2FailClosedError):
+            self.Service._prepare_preconditions_variants_create(snapshot, {})
+        remote_read.assert_not_called()
+
+    def test_variant_create_fresh_remote_sku_collision_fails_before_c2(self):
+        binding = self.bind_template()
+        extra = self.add_template_variant('WIDGET-2')
+        preview = self.make_preview(
+            export_path='update', binding=binding, state='applying',
+            steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
+                    'variant_ids': [extra.id]}],
+        )
+        preview._preview_surface('_record_confirmation').write({
+            'confirmed_uid': self.env.uid,
+            'confirmed_at': preview.previewed_at,
+        })
+        snapshot = self.Service._prepare_local_common(self.make_job(
+            JOB_TYPE_VARIANTS_CREATE, preview._name, preview.id, PRODUCT_GID,
+        ))
+        with patch.object(
+            type(self.Service), '_read_remote_product',
+            return_value={'exists': True, 'store_identity': self.store.shop_domain,
+                          'variants': [{
+                'id': 'gid://shopify/ProductVariant/remote-collision',
+                'sku': 'WIDGET-2',
+            }]},
+        ), self.assertRaises(ExportPreC2FailClosedError) as caught:
+            self.Service._prepare_preconditions_variants_create(snapshot, {})
+        self.assertEqual(caught.exception.error_class, 'duplicate_risk')
+
+    def test_variant_finalization_binds_only_confirmed_new_variant(self):
+        binding = self.bind_template()
+        # A SKU-less existing sibling was the original defect trigger: the
+        # old finalizer iterated it even though the mutation did not create it.
+        self.variant.write({'default_code': False})
+        extra = self.add_template_variant('WIDGET-2')
+        preview = self.make_preview(
+            export_path='update', binding=binding, state='applying',
+            steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
+                    'variant_ids': [extra.id]}],
+        )
+        remote = [{
+            'id': 'gid://shopify/ProductVariant/created-2',
+            'sku': 'WIDGET-2', 'barcode': False, 'price': '12.5',
+            'inventoryItem': {
+                'id': 'gid://shopify/InventoryItem/created-2',
+                'sku': 'WIDGET-2', 'tracked': True,
+            },
+        }]
+        self.Service._bind_created_variants(self.store, preview, remote)
+        created = self.VariantBinding.search([
+            ('store_id', '=', self.store.id),
+            ('product_variant_id', '=', extra.id),
+        ])
+        self.assertEqual(len(created), 1)
+        self.assertEqual(created.shopify_gid, remote[0]['id'])
+        self.assertEqual(
+            self.VariantBinding.search_count([
+                ('store_id', '=', self.store.id),
+                ('product_variant_id', '=', self.variant.id),
+            ]), 1,
+        )
+        # Local finalization is idempotent after a remote acknowledgement or
+        # reconciliation: repeating it adopts the same row, never creates one.
+        self.Service._bind_created_variants(self.store, preview, remote)
+        self.assertEqual(self.VariantBinding.search_count([
+            ('store_id', '=', self.store.id),
+            ('product_variant_id', '=', extra.id),
+        ]), 1)
+
+    def test_variant_finalization_refuses_conflicting_existing_binding(self):
+        binding = self.bind_template()
+        extra = self.add_template_variant('WIDGET-2')
+        self.VariantBinding.create({
+            'store_id': self.store.id,
+            'product_variant_id': extra.id,
+            'product_template_binding_id': binding.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/other',
+        })
+        preview = self.make_preview(
+            export_path='update', binding=binding, state='applying',
+            steps=[{'step': JOB_TYPE_VARIANTS_CREATE, 'state': 'pending',
+                    'variant_ids': [extra.id]}],
+        )
+        with self.assertRaises(JobHandlerError):
+            self.Service._bind_created_variants(self.store, preview, [{
+                'id': 'gid://shopify/ProductVariant/created-2',
+                'sku': 'WIDGET-2',
+            }])
 
     # ------------------------------------------------------------------
     # The create path builds a productSet with no merchant-owned lists

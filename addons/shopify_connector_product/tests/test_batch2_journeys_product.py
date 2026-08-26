@@ -165,7 +165,16 @@ class TestBatch2ProductJourneys(TransactionCase):
             'id': gid, 'sku': sku, 'barcode': barcode,
             'price': '9.99', 'compareAtPrice': None,
             'selectedOptions': [], 'image': None,
-            'inventoryItem': {'id': 'gid://shopify/InventoryItem/1'},
+            # Shopify inventory identity is per variant.  Reusing one fixed
+            # InventoryItem GID made the second product collide with the
+            # binding's store-scoped uniqueness constraint, turning this
+            # journey into a retry rather than proving two independent
+            # imports.
+            'inventoryItem': {
+                'id': 'gid://shopify/InventoryItem/%s' % (
+                    gid.rsplit('/', 1)[-1],
+                ),
+            },
         }
 
     def _patch_transport(self, scan_pages=(), products=None):
@@ -314,13 +323,13 @@ class TestBatch2ProductJourneys(TransactionCase):
 
         # --- 7. Resolve it through the real dialog ----------------------
         action = dup_job.with_user(
-            self.roles['reviewer']
+            self.roles['admin']
         ).action_open_product_match_decision()
         self.assertEqual(
             action['res_model'],
             'shopify.connector.product.match.decision.wizard',
         )
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             action['context']
         ).create({})
         self.assertEqual(
@@ -354,10 +363,10 @@ class TestBatch2ProductJourneys(TransactionCase):
         self.assertEqual(len(dup_binding), 1)
         self.assertEqual(dup_binding.product_template_id, dup_b)
         self.assertEqual(dup_binding.match_key, 'manual')
-        self.assertEqual(dup_binding.matched_by_uid, self.roles['reviewer'])
+        self.assertEqual(dup_binding.matched_by_uid, self.roles['admin'])
         self.assertEqual(decision.state, 'consumed')
         self.assertEqual(decision.resulting_template_binding_id, dup_binding)
-        self.assertEqual(decision.resolved_uid, self.roles['reviewer'])
+        self.assertEqual(decision.resolved_uid, self.roles['admin'])
         self.assertEqual(decision.resumed_job_state, 'queued')
         # And the store form now reports a completed sync with no scan in
         # flight.
@@ -528,14 +537,14 @@ class TestBatch2ProductJourneys(TransactionCase):
         # (a) The generic resolution refuses, and says what does work.
         with self.assertRaises(UserError) as ctx:
             job.with_user(
-                self.roles['reviewer']
+                self.roles['admin']
             ).action_resolve_manual_review()
         self.assertIn('match decision', str(ctx.exception))
 
         # (b) A blunt manual retry is technically permitted, and it cannot
         #     loop: it reproduces the same block against the same decision,
         #     without multiplying decisions.
-        job.with_user(self.roles['reviewer']).action_manual_retry()
+        job.with_user(self.roles['admin']).action_manual_retry()
         job.invalidate_recordset()
         self.assertEqual(job.state, 'queued')
         self._drain(products={gid: body})
@@ -547,7 +556,7 @@ class TestBatch2ProductJourneys(TransactionCase):
 
         # (c) The safe route resolves it, once, and the result is visible.
         decision = self.Decision.search([('job_id', '=', job.id)])
-        wizard = self.Wizard.with_user(self.roles['reviewer']).with_context(
+        wizard = self.Wizard.with_user(self.roles['admin']).with_context(
             default_decision_id=decision.id,
         ).create({'selected_template_id': first.id})
         wizard.action_confirm()
@@ -583,9 +592,9 @@ class TestBatch2ProductJourneys(TransactionCase):
         )})
         decision = self.Decision.search([('store_id', '=', store.id)])
         self.assertEqual(len(decision), 1)
-        # Two reviewers open the same decision.
+        # Two administrators open the same decision.
         reviewer_wizard = self.Wizard.with_user(
-            self.roles['reviewer']
+            self.roles['admin']
         ).with_context(default_decision_id=decision.id).create({
             'selected_template_id': first.id,
         })
@@ -599,7 +608,7 @@ class TestBatch2ProductJourneys(TransactionCase):
             admin_wizard.action_confirm()
         decision.invalidate_recordset()
         self.assertEqual(decision.selected_template_id, first)
-        self.assertEqual(decision.resolved_uid, self.roles['reviewer'])
+        self.assertEqual(decision.resolved_uid, self.roles['admin'])
 
     def test_journey_k_a_failed_scan_leaves_the_checkpoint_alone(self):
         store, settings = self.store, self._settings_of(self.store)

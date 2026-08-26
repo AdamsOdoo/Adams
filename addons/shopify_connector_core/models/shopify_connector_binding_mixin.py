@@ -246,13 +246,15 @@ class ShopifyConnectorBindingMixin(models.AbstractModel):
         target_company = (
             target.company_id if 'company_id' in target._fields else False
         )
+        store_company = self.store_id.company_id
         for label, company in (
             ('current bound record', current_company),
             ('proposed target record', target_company),
         ):
-            if company and company != self.env.company:
+            if company and company != store_company:
                 raise UserError(
-                    "The %s belongs to a different company." % label
+                    "The %s belongs to a different company than the Shopify "
+                    "store." % label
                 )
         if (
             current_company

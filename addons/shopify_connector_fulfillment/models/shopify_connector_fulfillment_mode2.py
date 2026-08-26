@@ -47,7 +47,7 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
         if self._store_operating_mode(evidence.store_id) != 'mode2':
             self._open_review(evidence, 'mode_not_enabled')
             return
-        result = self._evaluate_mode2(evidence)
+        result = self._evaluate_mode2(evidence, job)
         if not result['passed']:
             self._open_review(evidence, result['reason'], result.get('detail'))
             return
@@ -58,8 +58,13 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _evaluate_mode2(self, evidence):
-        ctx = {'evidence': evidence, 'store': evidence.store_id, 'plan': {}}
+    def _evaluate_mode2(self, evidence, job=None):
+        ctx = {
+            'evidence': evidence,
+            'store': evidence.store_id,
+            'job': job,
+            'plan': {},
+        }
         checks = (
             ('order_binding_missing', self._c1_order_binding),
             ('fulfillment_state_not_success', self._c2_fulfillment_success),
@@ -106,7 +111,9 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
     def _c3_fo_resolved(self, ctx):
         store = ctx['store']
         order_gid = ctx['order_binding'].shopify_gid
-        fulfillments = self._read_order_fulfillments(store, order_gid)
+        fulfillments = self._read_order_fulfillments(
+            ctx['job'], store, order_gid,
+        )
         node = next(
             (f for f in fulfillments
              if isinstance(f, dict)
@@ -219,7 +226,7 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
         compatible) fails closed to `location_unmapped`, exactly as it
         always has."""
         node_fos = self._read_fulfillment_orders(
-            ctx['store'], ctx['order_binding'].shopify_gid,
+            ctx['job'], ctx['store'], ctx['order_binding'].shopify_gid,
         )
         try:
             location_gid = self._resolve_single_location(
@@ -320,7 +327,9 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
         # local validation.
         store = ctx['store']
         order_gid = ctx['order_binding'].shopify_gid
-        fulfillments = self._read_order_fulfillments(store, order_gid)
+        fulfillments = self._read_order_fulfillments(
+            ctx['job'], store, order_gid,
+        )
         node = next(
             (f for f in fulfillments
              if isinstance(f, dict)
@@ -351,7 +360,9 @@ class ShopifyConnectorFulfillmentMode2(models.AbstractModel):
             return False, 'fulfillment quantities changed on second read'
         # Location evidence must remain resolvable and unchanged (a fresh read
         # of the same sanctioned FO/location path condition 8 already used).
-        node_fos = self._read_fulfillment_orders(store, order_gid)
+        node_fos = self._read_fulfillment_orders(
+            ctx['job'], store, order_gid,
+        )
         try:
             second_location_gid = self._resolve_single_location(
                 store,

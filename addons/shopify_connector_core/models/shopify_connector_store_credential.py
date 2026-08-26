@@ -91,6 +91,14 @@ TOKEN_REFRESH_WAIT_SECONDS = 0.25
 TOKEN_EXCHANGE_PURPOSE_STATES = {
     'business': ('connected',),
     'setup': ('setup_incomplete', 'connected', 'reconnect_needed'),
+    # Exact pre-activation cache read used by the onboarding location refresh.
+    # Kept separate from `setup`: that broader diagnostic family intentionally
+    # includes reconnect_needed, while business work must remain quiesced there.
+    # Guided setup may repair a previously connected store after credential
+    # replacement has deliberately demoted it to ``reconnect_needed``.  This
+    # purpose is still used only by the exact setup location-read triple in
+    # the API client; it does not open ordinary business reads or writes.
+    'setup_business_read': ('setup_incomplete', 'reconnect_needed'),
     'reconnect': ('reconnect_needed', 'disconnected'),
 }
 
@@ -336,7 +344,7 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'Shopify credentials can only be created through the '
                 'connector credential service, which invalidates the cached '
                 'token, the recorded verification and the connection state '
-                'at the same time. Use the setup surface or Store Settings.'
+                'at the same time. Use Stores & Onboarding or Sync Rules.'
             ))
         return super().create(vals_list)
 
@@ -354,7 +362,7 @@ class ShopifyConnectorStoreCredential(models.Model):
                 'Shopify credentials can only be changed through the '
                 'connector credential service, which invalidates the cached '
                 'token, the recorded verification and the connection state '
-                'at the same time. Use the setup surface or Store Settings.'
+                'at the same time. Use Stores & Onboarding or Sync Rules.'
             ))
         return super().write(vals)
 

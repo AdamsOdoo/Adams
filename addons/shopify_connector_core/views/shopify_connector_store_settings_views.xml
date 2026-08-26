@@ -3,7 +3,7 @@
     <!--
         Batch 2 checkpoint 1: the canonical per-store configuration surface.
 
-        Shopify Connector -> Configuration -> Store Settings.
+        Shopify Connector -> Configuration -> Sync Rules.
 
         WHAT THIS IS, AND WHAT IT IS NOT. It is the one place a merchant can
         reach the store-scoped configuration that until now existed only as
@@ -47,7 +47,7 @@
                 merchant would be toggling a domain switch with none of the
                 context the form gives them.
             -->
-            <list string="Store Settings" create="false" delete="false">
+            <list string="Sync Rules" create="false" delete="false">
                 <field name="store_id"/>
                 <field name="company_id" optional="show"/>
                 <field name="product_domain_enabled" widget="boolean_toggle"/>
@@ -63,7 +63,7 @@
         <field name="name">shopify.connector.store.settings.store.form</field>
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
-            <form string="Store Settings" create="false" delete="false">
+            <form string="Sync Rules" create="false" delete="false">
                 <!--
                     `o_sc_store_settings` (2026-07-31) IS INERT and exists to
                     be MEASURED. No connector stylesheet selects it and none
@@ -114,7 +114,7 @@
                                     <strong>First sync direction</strong> was
                                     decided during onboarding and is shown
                                     read-only. Changing the direction of a
-                                    store that has already synchronised is not
+                                    store that has already synchronized is not
                                     a settings edit, and is not offered here.
                                 </p>
                             </div>
@@ -141,7 +141,7 @@
         <field name="name">shopify.connector.store.settings.store.search</field>
         <field name="model">shopify.connector.store.settings</field>
         <field name="arch" type="xml">
-            <search string="Store Settings">
+            <search string="Sync Rules">
                 <field name="store_id"/>
                 <field name="company_id"/>
                 <group>
@@ -164,7 +164,7 @@
     -->
     <record id="action_shopify_connector_store_settings_canonical"
             model="ir.actions.act_window">
-        <field name="name">Store Settings</field>
+        <field name="name">Sync Rules</field>
         <field name="res_model">shopify.connector.store.settings</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id"
@@ -189,7 +189,7 @@
                 No store is configured yet.
             </p>
             <p>
-                Store Settings appear here once a Shopify store exists. Each
+                Sync rules appear here once a Shopify store exists. Each
                 store carries its own configuration, and only a Shopify
                 Connector Administrator may change it.
             </p>
@@ -204,7 +204,7 @@
     -->
     <record id="action_shopify_connector_store_settings_open"
             model="ir.actions.server">
-        <field name="name">Store Settings</field>
+        <field name="name">Sync Rules</field>
         <field name="model_id"
                ref="shopify_connector_core.model_shopify_connector_store_settings"/>
         <field name="state">code</field>
@@ -214,7 +214,7 @@
     </record>
 
     <menuitem id="menu_shopify_connector_store_settings"
-              name="Store Settings"
+              name="Sync Rules"
               parent="shopify_connector_core.menu_shopify_connector_configuration"
               action="action_shopify_connector_store_settings_open"
               groups="shopify_connector_core.group_shopify_connector_admin"

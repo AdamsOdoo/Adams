@@ -7,6 +7,7 @@
 # rule, bounded reads, and the no-sensitive-data guarantee.
 
 import re
+from datetime import timedelta
 
 from odoo import fields
 from odoo.exceptions import AccessError, UserError
@@ -261,3 +262,177 @@ class TestUiDashboard(TransactionCase):
         self.assertTrue(payload['critical']['active'])
         causes = {cause['id'] for cause in payload['critical']['causes']}
         self.assertIn('store_state', causes)
+
+    # ------------------------------------------------------------------ #
+    #  C7 split dashboards
+    # ------------------------------------------------------------------ #
+    def test_split_payloads_never_mix_sales_and_health(self):
+        store = self._make_store()
+        sales = self.Dashboard.get_sales_dashboard_data(store.id, '30d')
+        health = self.Dashboard.get_connector_health_data(store.id)
+
+        self.assertIn('commercial', sales)
+        for forbidden in (
+            'health', 'flows', 'stores_region', 'throttle', 'mappings',
+            'reconciliation', 'mode_switch',
+        ):
+            self.assertNotIn(forbidden, sales)
+
+        for key in (
+            'health', 'flows', 'stores_region', 'throttle', 'mappings',
+            'reconciliation', 'mode_switch',
+        ):
+            self.assertIn(key, health)
+        for forbidden in ('commercial', 'bridge', 'lifecycle', 'dispatch'):
+            self.assertNotIn(forbidden, health)
+
+    def test_health_all_stores_never_hides_a_failing_store(self):
+        healthy = self._make_store()
+        failing = self._make_store()
+        self._make_job(healthy, 'succeeded')
+        self._make_job(failing, 'failed_final')
+        payload = self.Dashboard.get_connector_health_data(False)
+        rows = {row['id']: row for row in payload['stores_region']['rows']}
+        self.assertEqual(set(rows), {healthy.id, failing.id})
+        self.assertEqual(rows[failing.id]['tone'], 'attention')
+        self.assertEqual(payload['stores_region']['summary']['attention'], 1)
+
+    def test_health_missing_evidence_is_unknown_not_healthy(self):
+        store = self._make_store()
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        self.assertEqual(
+            payload['stores_region']['rows'][0]['tone'], 'unknown',
+        )
+        self.assertTrue(all(
+            row['tone'] == 'unknown' for row in payload['flows']
+        ))
+        self.assertTrue(all(
+            row['state'] in ('observed', 'unknown')
+            for row in payload['mappings']['rows']
+        ))
+        self.assertTrue(any(
+            row['state'] == 'unknown'
+            for row in payload['mappings']['rows']
+        ))
+
+    def test_connected_cannot_be_ready_before_required_domain_evidence(self):
+        store = self._make_store(api_health_state='normal')
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        # A successful setup/audit job is activity, not catalog completion.
+        self._make_job(store, 'succeeded')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(
+            row['operational_state'], 'connected_initial_sync_pending',
+        )
+        self.assertEqual(row['domains_selected'], 1)
+        self.assertEqual(row['domains_completed'], 0)
+        self.assertEqual(
+            payload['health']['state'], 'connected_initial_sync_pending',
+        )
+
+    def test_ready_requires_fresh_completion_and_no_blocking_work(self):
+        store = self._make_store(api_health_state='normal')
+        settings = self.env[
+            'shopify.connector.store.settings'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        settings.sudo().write({
+            'product_last_import_success_at': fields.Datetime.now(),
+        })
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'ready')
+        self.assertEqual(row['domains_completed'], 1)
+        self.assertEqual(row['tone'], 'healthy')
+
+    def test_completion_anchor_with_pending_child_is_still_running(self):
+        store = self._make_store(api_health_state='normal')
+        settings = self.env[
+            'shopify.connector.store.settings'
+        ].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        settings.sudo().write({
+            'product_last_import_success_at': fields.Datetime.now(),
+        })
+        self._make_job(store, 'queued', job_type='product_import_sync')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'initial_sync_running')
+        self.assertEqual(row['initial_child_pending'], 1)
+        self.assertNotEqual(row['operational_state'], 'ready')
+
+    def test_initial_sync_running_exposes_bounded_progress(self):
+        store = self._make_store(api_health_state='normal')
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': store.id,
+            'product_domain_enabled': True,
+        })
+        self._make_job(store, 'queued', job_type='product_import_scan')
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['stores_region']['rows'][0]
+        self.assertEqual(row['operational_state'], 'initial_sync_running')
+        self.assertEqual(row['initial_child_pending'], 1)
+        self.assertIn('Monitor progress', row['next_action'])
+
+    def test_health_oldest_blocked_ignores_queue_and_drills_to_same_scope(self):
+        store = self._make_store()
+        other_store = self._make_store()
+        self._make_job(store, 'queued')
+        now = fields.Datetime.now()
+        recently_blocked_old_job = self._make_job(
+            store, 'blocked_manual_review',
+            finished_at=now - timedelta(hours=1),
+        )
+        recently_blocked_old_job.sudo().write({
+            'create_date': now - timedelta(days=30),
+        })
+        blocked = self._make_job(
+            store, 'blocked_manual_review',
+            finished_at=now - timedelta(days=2),
+        )
+        self._make_job(other_store, 'blocked_manual_review')
+
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        oldest = payload['health']['oldest_blocked']
+        self.assertEqual(
+            oldest['age'],
+            self.Dashboard._relative_time(blocked.finished_at, now),
+        )
+        self.assertEqual(oldest['target']['res_model'], blocked._name)
+        domain = [tuple(term) for term in oldest['target']['domain']]
+        self.assertEqual(
+            self.env[blocked._name].with_user(self.viewer).search(domain),
+            recently_blocked_old_job | blocked,
+        )
+
+    def test_health_projects_throttle_headroom_with_observation_time(self):
+        store = self._make_store()
+        store._record_throttle_status({
+            'currentlyAvailable': 100,
+            'maximumAvailable': 1000,
+            'restoreRate': 0,
+        })
+        payload = self.Dashboard.get_connector_health_data(store.id)
+        row = payload['throttle']['rows'][0]
+        self.assertEqual(row['store_id'], store.id)
+        self.assertAlmostEqual(row['headroom_ratio'], 0.1)
+        self.assertEqual(row['tone'], 'danger')
+        self.assertTrue(row['observed_at'])
+
+    def test_split_dashboards_refuse_non_connector_user(self):
+        user = new_test_user(
+            self.env, login='u0_split_outsider', groups='base.group_user'
+        )
+        dashboard = self.Dashboard.with_user(user)
+        with self.assertRaises(AccessError):
+            dashboard.get_sales_dashboard_data()
+        with self.assertRaises(AccessError):
+            dashboard.get_connector_health_data()

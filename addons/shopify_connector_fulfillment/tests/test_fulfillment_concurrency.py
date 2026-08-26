@@ -11,6 +11,7 @@ from odoo.tests.common import TransactionCase
 from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_job import (
     fulfillment_operation_scope_key,
 )
+from odoo.tools import mute_logger
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +331,7 @@ class TestFulfillmentConcurrency(TransactionCase):
         # A terminal job clears its scope so a replacement never collides.
         self.assertFalse(job.operation_scope_key)
 
+    @mute_logger('odoo.sql_db')
     def test_overlapping_same_scope_insert_is_refused(self):
         """Genuine independent-connection overlap: an uncommitted mutation job
         holding an operation scope blocks a second insert of the same scope
@@ -704,7 +706,7 @@ class TestFulfillmentConcurrency(TransactionCase):
         lock_result = {}
         call_state = {'n': 0}
 
-        def _read_fn(store_arg, order_gid):
+        def _read_fn(read_job, store_arg, order_gid):
             call_state['n'] += 1
             if call_state['n'] == 2:
                 # This is condition 14's SECOND, separately fresh read:

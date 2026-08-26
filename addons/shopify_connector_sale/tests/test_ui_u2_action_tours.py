@@ -49,7 +49,7 @@ class TestUiU2SaleActionTours(OrderImportCase, HttpCase):
         super().setUpClass()
         cls.reviewer = cls._u2_user(
             'u2ord_reviewer',
-            'shopify_connector_core.group_shopify_connector_user',
+            'shopify_connector_core.group_shopify_connector_admin',
         )
         # Auditor reads everything and acts on nothing: the role
         # `action_approve_manual_gateway_order` refuses.

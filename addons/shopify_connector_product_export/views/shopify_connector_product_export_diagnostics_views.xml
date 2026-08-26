@@ -64,7 +64,7 @@
                 <group>
                     <filter name="group_store" string="Store"
                             context="{'group_by': 'store_id'}"/>
-                    <filter name="group_type" string="Job type"
+                    <filter name="group_type" string="Run type"
                             context="{'group_by': 'job_type'}"/>
                     <filter name="group_error" string="Error class"
                             context="{'group_by': 'error_class'}"/>
@@ -192,6 +192,30 @@
         </field>
     </record>
 
+    <!-- A definitely-not-applied ProductSet create is never replayed.  The
+         administrator first corrects the source/configuration record, then
+         this action starts a new read-only preview with fresh business
+         intent.  The original remote-write evidence remains immutable. -->
+    <record id="view_shopify_connector_job_form_product_export_recovery"
+            model="ir.ui.view">
+        <field name="name">shopify.connector.job.form.product.export.recovery</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="inherit_id"
+               ref="shopify_connector_core.view_shopify_connector_job_form"/>
+        <field name="priority">99</field>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_recover_not_applied_create"
+                        type="object"
+                        string="Correct and Start Fresh Preview"
+                        class="btn-secondary"
+                        groups="shopify_connector_core.group_shopify_connector_admin"
+                        invisible="job_type != 'product_export_create' or state != 'blocked_manual_review'"
+                        help="Correct the source or configuration issue first. This starts a fresh read-only preview; the original remote operation and evidence remain unchanged and the old write is never resent."/>
+            </xpath>
+        </field>
+    </record>
+
     <!-- ============================================================== -->
     <!-- The reconnect banner on the store form (S25)                    -->
     <!-- ============================================================== -->
@@ -217,9 +241,12 @@
                      groups="shopify_connector_core.group_shopify_connector_user">
                     <strong>This store's API health is degraded.</strong>
                     Exports stay reviewable, but a confirmation taken now may
-                    be refused at apply time. Open
-                    <em>Export &gt; Reconnect and Backfill</em> to see what is
-                    waiting.
+                    be refused at apply time.
+                    <button type="action"
+                            name="%(action_shopify_connector_export_backfill)d"
+                            string="Review reconnect and backfill"
+                            class="btn-link"
+                            groups="shopify_connector_core.group_shopify_connector_user"/>
                 </div>
                 <div class="alert alert-info" role="alert"
                      invisible="state == 'connected'"

@@ -24,9 +24,13 @@ Upstream ground truth (DEC-041 D1), odoo/odoo@19.0 `30bde9ff`, read 2026-07-25:
 No Shopify transport of any kind occurs in this module.
 """
 
+import importlib.util
+from pathlib import Path
+
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
+from odoo.tools.convert import convert_file
 
 CORE = 'shopify_connector_core'
 
@@ -136,17 +140,21 @@ class TestSec2Roles(TransactionCase):
     # ------------------------------------------------------------------
 
     def test_connector_user_resolves_to_the_expected_capability_closure(self):
-        """SEC-2 packet §H test 14: user resolves to user+operator+reviewer+auditor."""
+        """User resolves only to User, Operator and Auditor."""
         closure = self._group('group_shopify_connector_user').all_implied_ids
         expected = {
             self._group(x).id for x in (
                 'group_shopify_connector_user',
                 'group_shopify_connector_operator',
-                'group_shopify_connector_reviewer',
                 'group_shopify_connector_auditor',
             )
         }
         self.assertEqual(set(closure.ids) & self._connector_group_ids(), expected)
+        self.assertNotIn(
+            self._group('group_shopify_connector_reviewer').id,
+            closure.ids,
+            'Connector User must not inherit Reviewer capabilities',
+        )
 
     def test_connector_administrator_resolves_to_all_connector_groups(self):
         """SEC-2 packet §H test 14: admin resolves to all connector groups."""
@@ -164,6 +172,101 @@ class TestSec2Roles(TransactionCase):
             'Connector User must not imply Connector Administrator',
         )
 
+    def test_role_edges_are_exact_and_upgrade_safe(self):
+        """The XML uses replacement semantics, so stale Reviewer edges vanish."""
+        user = self._group('group_shopify_connector_user')
+        admin = self._group('group_shopify_connector_admin')
+        self.assertEqual(
+            set(user.implied_ids.ids),
+            {self._group('group_shopify_connector_operator').id},
+        )
+        self.assertEqual(
+            set(admin.implied_ids.ids),
+            {
+                user.id,
+                self._group('group_shopify_connector_reviewer').id,
+            },
+        )
+
+    def test_security_xml_upgrade_removes_historical_user_reviewer_edge(self):
+        """Reload the real security XML against a stale pre-upgrade graph.
+
+        The historical edge is deliberately seeded on the actual group record,
+        then the module's update data is applied through Odoo's XML loader. This
+        proves the ``(6, 0, ...)`` replacement reaches both the group closure
+        and an already-existing Connector User, while Administrator retains the
+        Reviewer capability. Applying the same update twice proves idempotence.
+        """
+        user_group = self._group('group_shopify_connector_user')
+        admin_group = self._group('group_shopify_connector_admin')
+        reviewer = self._group('group_shopify_connector_reviewer')
+        operator = self._group('group_shopify_connector_operator')
+
+        # Simulate a database upgraded from the additive User -> Reviewer
+        # contract. The existing role user must lose the stale effective edge.
+        user_group.write({'implied_ids': [(4, reviewer.id)]})
+        self.assertIn(reviewer.id, user_group.implied_ids.ids)
+        self.assertTrue(self.role_user.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+
+        convert_file(
+            self.env, CORE, 'security/shopify_connector_security.xml', None,
+            mode='update', noupdate=False,
+        )
+        self.env.invalidate_all()
+        user_group = self._group('group_shopify_connector_user')
+        admin_group = self._group('group_shopify_connector_admin')
+        self.assertEqual(set(user_group.implied_ids.ids), {operator.id})
+        self.assertNotIn(reviewer.id, user_group.all_implied_ids.ids)
+        self.assertFalse(self.role_user.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+        self.assertIn(reviewer.id, admin_group.implied_ids.ids)
+        self.assertTrue(self.role_admin.has_group(
+            '%s.group_shopify_connector_reviewer' % CORE))
+
+        # Reapplying the same module update must not add edges or otherwise
+        # change the exact graph.
+        convert_file(
+            self.env, CORE, 'security/shopify_connector_security.xml', None,
+            mode='update', noupdate=False,
+        )
+        self.env.invalidate_all()
+        self.assertEqual(
+            set(self._group('group_shopify_connector_user').implied_ids.ids),
+            {operator.id},
+        )
+        self.assertEqual(
+            set(self._group('group_shopify_connector_admin').implied_ids.ids),
+            {user_group.id, reviewer.id},
+        )
+
+    def test_role_post_migration_is_exact_and_idempotent(self):
+        """The versioned upgrade mirrors the XML replacement contract."""
+        user = self._group('group_shopify_connector_user')
+        admin = self._group('group_shopify_connector_admin')
+        operator = self._group('group_shopify_connector_operator')
+        reviewer = self._group('group_shopify_connector_reviewer')
+        user.write({'implied_ids': [(4, reviewer.id)]})
+
+        path = (
+            Path(__file__).resolve().parents[1]
+            / 'migrations' / '19.0.1.23.0' / 'post-migrate.py'
+        )
+        spec = importlib.util.spec_from_file_location(
+            'shopify_connector_core_role_post_migrate', path,
+        )
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+
+        for _iteration in range(2):
+            migration.migrate(self.env.cr, '19.0.1.22.0')
+            self.env.invalidate_all()
+            self.assertEqual(set(user.implied_ids.ids), {operator.id})
+            self.assertEqual(
+                set(admin.implied_ids.ids), {user.id, reviewer.id},
+            )
+            self.assertNotIn(reviewer.id, user.all_implied_ids.ids)
+
     def test_effective_user_groups_match_the_group_closure(self):
         """Prove the closure on the *user*, not only on the group records."""
         for user, xmlid in (
@@ -177,10 +280,9 @@ class TestSec2Roles(TransactionCase):
             )
 
     def test_has_group_resolves_capability_groups_through_the_roles(self):
-        """The 44 existing server-side has_group checks keep working."""
+        """User is routine-only; Administrator retains every capability."""
         for xmlid in ('group_shopify_connector_auditor',
-                      'group_shopify_connector_operator',
-                      'group_shopify_connector_reviewer'):
+                      'group_shopify_connector_operator'):
             self.assertTrue(
                 self.role_user.has_group('%s.%s' % (CORE, xmlid)),
                 'Connector User must satisfy has_group(%s)' % xmlid,
@@ -189,6 +291,15 @@ class TestSec2Roles(TransactionCase):
                 self.role_admin.has_group('%s.%s' % (CORE, xmlid)),
                 'Connector Administrator must satisfy has_group(%s)' % xmlid,
             )
+        self.assertFalse(
+            self.role_user.has_group(
+                '%s.group_shopify_connector_reviewer' % CORE),
+            'Connector User must NOT satisfy the reviewer check',
+        )
+        self.assertTrue(
+            self.role_admin.has_group(
+                '%s.group_shopify_connector_reviewer' % CORE),
+        )
         self.assertFalse(
             self.role_user.has_group(
                 '%s.group_shopify_connector_admin' % CORE),

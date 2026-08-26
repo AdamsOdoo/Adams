@@ -568,31 +568,56 @@ class TestProductRefreshAndStale(TransactionCase):
         )
 
     # ------------------------------------------------------------------
-    # Source-level declared-write guard.
+    # Runtime price ownership contract.
     # ------------------------------------------------------------------
 
-    def test_source_level_list_price_only_written_in_price_path(self):
-        import os
-        path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-            'models', 'shopify_connector_product_importer.py',
+    def test_runtime_price_ownership_separates_birth_from_refresh(self):
+        """Birth setup initializes price; refresh ownership gates later writes.
+
+        This behavioral proof intentionally avoids inspecting Python source:
+        birth initialization is a separate contract from `_apply_prices`, so
+        a valid birth write must not be rejected merely because it lives in a
+        different helper.
+        """
+        settings = self._settings(
+            price_source_of_truth='odoo_authoritative',
+            product_import_refresh_mode='shopify_fields',
         )
-        with open(path, 'r', encoding='utf-8') as source_file:
-            lines = source_file.readlines()
-        price_writes = [
-            (i, line) for i, line in enumerate(lines)
-            if 'list_price' in line and '=' in line and 'def ' not in line
-        ]
-        # Every list_price assignment lives inside _apply_prices.
-        apply_prices_start = next(
-            i for i, line in enumerate(lines) if 'def _apply_prices(' in line
+        gid = 'gid://shopify/Product/6300-runtime-price'
+        first = self.Importer._apply_import(
+            self.store,
+            self._payload(
+                gid, [self._variant('%s/v' % gid, 20.0, sku='RP1')],
+            ),
         )
-        should_write_start = next(
-            i for i, line in enumerate(lines)
-            if 'def _should_write_shopify_owned_fields(' in line
+        template = first['template_binding'].product_template_id
+        self.assertEqual(
+            float_compare(template.list_price, 20.0, precision_digits=2), 0,
         )
-        for index, _line in price_writes:
-            self.assertTrue(
-                apply_prices_start < index < should_write_start,
-                'list_price written outside _apply_prices',
-            )
+
+        # Odoo owns later refreshes, so a changed Shopify price is retained
+        # only in binding evidence and cannot overwrite the birth price.
+        self.Importer._apply_import(
+            self.store,
+            self._payload(
+                gid, [self._variant('%s/v' % gid, 30.0, sku='RP1')],
+            ),
+        )
+        template.invalidate_recordset(['list_price'])
+        self.assertEqual(
+            float_compare(template.list_price, 20.0, precision_digits=2), 0,
+        )
+
+        # Changing the configured owner to Shopify enables the same normal
+        # refresh path, proving the write is governed by runtime policy.
+        settings.write({'price_source_of_truth': 'shopify_authoritative'})
+        self.Importer._apply_import(
+            self.store,
+            self._payload(
+                gid, [self._variant('%s/v' % gid, 35.0, sku='RP1')],
+            ),
+        )
+        template.invalidate_recordset(['list_price'])
+        self.assertEqual(
+            float_compare(template.list_price, 35.0, precision_digits=2), 0,
+        )

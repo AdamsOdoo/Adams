@@ -32,6 +32,7 @@
 // against real attribute selectors instead.
 
 import { registry } from "@web/core/registry";
+import { stepUtils } from "@web_tour/tour_utils";
 
 const tours = registry.category("web_tour.tours");
 
@@ -149,7 +150,7 @@ tours.add("shopify_connector_b2_store_settings_tour", {
     steps: () => [
         {
             trigger: ".o_list_view .o_data_row .o_data_cell",
-            content: "Store Settings lists the configured store.",
+            content: "Sync Rules lists the configured store.",
             run: "click",
         },
         {
@@ -244,11 +245,7 @@ tours.add("shopify_connector_b2_product_controls_denied_tour", {
 tours.add("shopify_connector_b2_store360_drilldown_tour", {
     url: "/odoo",
     steps: () => [
-        {
-            trigger: ".o_navbar_apps_menu button",
-            content: "Open the apps menu.",
-            run: "click",
-        },
+        stepUtils.showAppsMenuItem(),
         {
             trigger: ".o_app[data-menu-xmlid='shopify_connector_core.menu_shopify_connector_root']",
             content: "Open the Shopify Connector app.",
@@ -263,7 +260,7 @@ tours.add("shopify_connector_b2_store360_drilldown_tour", {
             content: "The Shopify-source timestamp renders distinctly from the page timestamp.",
         },
         {
-            trigger: ".o_sc_dashboard .sc360-kpi[data-kpi='orders']",
+            trigger: ".o_sc_dashboard button.sc360-kpi--action:contains('Imported orders')",
             content: "Open the imported-orders drill-down.",
             run: "click",
         },
@@ -315,7 +312,7 @@ tours.add("shopify_connector_b2_tax_decision_tour", {
             // stopped order and that nothing in this dialog can change. The
             // selector states the corrected semantics, so a revert to `status`
             // fails the tour rather than passing on the class alone.
-            trigger: `${DIALOG} .alert-info[role='note']`,
+            trigger: `${DIALOG} .o_sc_tax_decision[role='note']`,
             content:
                 "The dialog says why the order stopped, and that nothing is " +
                 "sent to Shopify.",
@@ -375,7 +372,7 @@ tours.add("shopify_connector_b2_product_match_decision_tour", {
             // the tax dialog above (2026-07-31): static instructional copy is
             // document structure, and the tour asserts the role so the ruling
             // cannot be reverted quietly.
-            trigger: `${DIALOG} .alert-info[role='note']`,
+            trigger: `${DIALOG} .o_sc_match_decision_wizard[role='note']`,
             content:
                 "The dialog says why the import stopped before asking anything.",
         },

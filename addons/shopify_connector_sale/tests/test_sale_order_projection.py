@@ -28,6 +28,7 @@ from odoo.addons.shopify_connector_sale.models.shopify_connector_sale_order_proj
 _REMOVED_SANCTION_KEY = 'shopify_connector_projection_sanctioned_write'
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -426,6 +427,7 @@ class TestSaleOrderProjectionRpc(HttpCase):
         ).get_store_360_data(self.store.id, '30d')
         return (data.get('commercial') or {}).get('orders_total')
 
+    @mute_logger('odoo.http')
     def test_no_client_input_reaches_the_projection_over_rpc(self):
         self.authenticate('projection_rpc_user', 'projection_rpc_user')
         Order = self.env['sale.order'].sudo()

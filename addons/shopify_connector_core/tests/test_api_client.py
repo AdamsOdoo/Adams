@@ -12,6 +12,7 @@ from ..models import shopify_connector_api_client as client_module
 from ..models.shopify_connector_api_client import (
     ERROR_API_VERSION,
     ERROR_AUTH,
+    ERROR_DATA_SHAPE,
     ERROR_TEMPORARY,
     ERROR_THROTTLE,
     ERROR_UNKNOWN,
@@ -38,12 +39,17 @@ def _public_api_guard_violations(source):
         if isinstance(node, ast.FunctionDef) and not node.name.startswith('_')
     }
     violations = []
-    if set(methods) != {'execute', 'execute_business'}:
+    if set(methods) != {
+        'execute', 'execute_business', 'execute_business_read',
+    }:
         violations.append(('public_surface', tuple(sorted(methods))))
     for name, required_calls in {
         'execute': {'_validate_graphql_operation'},
         'execute_business': {
             '_validate_graphql_operation', '_admit_mutation',
+        },
+        'execute_business_read': {
+            '_validate_graphql_operation', '_admit_business_read',
         },
     }.items():
         method = methods.get(name)
@@ -206,6 +212,24 @@ class TestApiClient(TransactionCase):
             }],
         }))
         self.assertEqual(exc.error_class, ERROR_UNKNOWN)
+
+    def test_graphql_selection_mismatch_maps_to_existing_data_shape_class(self):
+        exc = self._raises_with(FakeResponse(200, json_body={
+            'errors': [{
+                'message': (
+                    "Field 'apiVersion' must have a selection of subfields."
+                ),
+                'extensions': {
+                    'code': 'selectionMismatch',
+                    'typeName': 'WebhookSubscription',
+                    'fieldName': 'apiVersion',
+                },
+            }],
+        }))
+        self.assertEqual(exc.error_class, ERROR_DATA_SHAPE)
+        self.assertFalse(exc.credential_invalid)
+        self.assertNotIn('shpat_', exc.reason)
+        self.assertIn('HTTP 200', exc.technical_detail)
 
     # 5. INTERNAL_SERVER_ERROR + requestId -> requestId in technical_detail.
     def test_internal_server_error_includes_request_id(self):
@@ -419,9 +443,11 @@ class TestApiClient(TransactionCase):
             ).items()
             if callable(value) and not name.startswith('_')
         }
-        # CORE-R2 (AR-047) adds exactly one public entry point:
-        # `execute_business`, the committed-admission-lease context manager.
-        self.assertEqual(public_methods, {'execute', 'execute_business'})
+        # Business mutations and reads have separate guarded context managers.
+        self.assertEqual(
+            public_methods,
+            {'execute', 'execute_business', 'execute_business_read'},
+        )
         self.assertFalse(_public_api_guard_violations(source))
 
     def test_read_only_entry_points_refuse_mutation_before_transport(self):
@@ -466,6 +492,40 @@ class TestApiClient(TransactionCase):
                     pass
         admit.assert_not_called()
         transport.assert_not_called()
+
+    def test_business_read_refuses_mutation_before_admission(self):
+        mutation = 'mutation Unsafe($id: ID!) { shop { id } }'
+        ClientClass = type(self.Client)
+        with patch.object(
+            ClientClass, '_admit_business_read',
+            side_effect=AssertionError('read admission forbidden'),
+        ) as admit:
+            with self.assertRaises(UserError):
+                with self.Client.execute_business_read(
+                    False, self.store, mutation, {'id': 'x'}, purpose='inventory',
+                ):
+                    pass
+        admit.assert_not_called()
+
+    def test_business_read_releases_only_after_caller_body(self):
+        ClientClass = type(self.Client)
+        released = []
+
+        def fake_send(self, store, body, token=None):
+            return FakeResponse(200, json_body=_success_body())
+
+        with patch.object(
+            ClientClass, '_admit_business_read', return_value=('lease', 'token'),
+        ), patch.object(ClientClass, '_send', fake_send), patch.object(
+            ClientClass, '_release_lease', side_effect=released.append,
+        ):
+            with self.Client.execute_business_read(
+                object(), self.store, 'query { shop { id } }',
+                purpose='inventory',
+            ) as result:
+                self.assertEqual(released, [])
+                self.assertIn('data', result)
+            self.assertEqual(released, ['lease'])
 
     def test_public_api_guard_detector_rejects_extra_mutation_method(self):
         source = inspect.getsource(client_module)

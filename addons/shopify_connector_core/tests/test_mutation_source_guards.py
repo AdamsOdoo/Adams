@@ -63,6 +63,12 @@ ACCEPTED_PREPARE_TRANSPORT_SPLIT = {
         'ShopifyConnectorInventoryService',
         '_prepare_preconditions_activate',
     ): '_transport_activate',
+    (
+        'shopify_connector_webhook/models/'
+        'shopify_connector_webhook_subscription.py',
+        'ShopifyConnectorWebhookSubscription',
+        '_prepare_subscription_preconditions',
+    ): '_transport_subscription_mutation',
     # Task 015 / 015B (2026-07-26 ruling). The export module splits its
     # mutations across four product and three media domains; every one
     # reaches transport ONLY through the single shared guarded helper
@@ -619,13 +625,12 @@ class TestMutationSourceGuards(TransactionCase):
         # explicitly, so widening it (e.g. to every `_prepare_preconditions_*`,
         # or to a whole file) fails this test rather than passing quietly.
         #
-        # Ten entries as of the 2026-07-26 export batch: the two original
-        # inventory pairs, plus the five product-export and three media-export
-        # pairs Task 015/015B added. Each export pair reaches transport only
-        # through the ONE shared guarded helper named in
-        # SHARED_GUARDED_TRANSPORT, whose existence and guardedness are
-        # asserted separately -- so the widening buys a shared audit point, not
-        # a weaker contract.
+        # Eleven entries: the two original inventory pairs, the bounded
+        # webhook-subscription pair, plus the five product-export and three
+        # media-export pairs Task 015/015B added. Each split reaches transport
+        # only through its exact paired method; export pairs additionally use
+        # the ONE shared guarded helper named in SHARED_GUARDED_TRANSPORT,
+        # whose existence and guardedness are asserted separately.
         export_service = (
             'shopify_connector_product_export/models/'
             'shopify_connector_product_export_service.py'
@@ -647,6 +652,12 @@ class TestMutationSourceGuards(TransactionCase):
                     _INV_SPLIT_FILE, _INV_SPLIT_CLASS,
                     '_prepare_preconditions_activate',
                 ): '_transport_activate',
+                (
+                    'shopify_connector_webhook/models/'
+                    'shopify_connector_webhook_subscription.py',
+                    'ShopifyConnectorWebhookSubscription',
+                    '_prepare_subscription_preconditions',
+                ): '_transport_subscription_mutation',
                 (
                     export_service, export_class,
                     '_prepare_preconditions_binding_namespace',
@@ -731,6 +742,27 @@ class TestMutationSourceGuards(TransactionCase):
                 'prepare method unexpectedly holds the guarded call; the '
                 'split test would be vacuous',
             )
+        self.assertEqual(_mutation_literal_violations(source, relative), [])
+
+    def test_accepted_split_real_webhook_subscription_service_passes(self):
+        """The W1 Layer-2 subscription pair stays on guarded transport."""
+        root = self._addon_root()
+        path = (
+            root / 'shopify_connector_webhook' / 'models'
+            / 'shopify_connector_webhook_subscription.py'
+        )
+        source = path.read_text(encoding='utf-8')
+        relative = str(path.relative_to(root))
+        self.assertIn('mutation ConnectorWebhookSubscriptionCreate', source)
+        self.assertIn('mutation ConnectorWebhookSubscriptionDelete', source)
+        tree = ast.parse(source)
+        prepare_methods = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef)
+            and node.name == '_prepare_subscription_preconditions'
+        ]
+        self.assertEqual(len(prepare_methods), 1)
+        self.assertFalse(_method_has_guarded_execute_business(prepare_methods[0]))
         self.assertEqual(_mutation_literal_violations(source, relative), [])
 
     def test_accepted_split_both_synthetic_pairs_pass(self):

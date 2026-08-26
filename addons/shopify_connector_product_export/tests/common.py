@@ -123,6 +123,39 @@ class ExportCase(TransactionCase):
             })
         return binding
 
+    def add_template_variant(self, default_code, barcode=False):
+        """Create a genuine attribute-backed sibling variant.
+
+        Odoo 19 enforces one empty ``combination_indices`` row per template,
+        so directly creating a second ``product.product`` row is not a valid
+        fixture. Adding an always-generated attribute line exercises the same
+        business shape as the UI and preserves the original standalone row as
+        one of the two combinations.
+        """
+        attribute = self.env['product.attribute'].create({
+            'name': 'Export test option',
+            'create_variant': 'always',
+        })
+        values = self.env['product.attribute.value'].create([
+            {'name': 'Original', 'attribute_id': attribute.id},
+            {'name': 'Added', 'attribute_id': attribute.id},
+        ])
+        self.env['product.template.attribute.line'].create({
+            'product_tmpl_id': self.template.id,
+            'attribute_id': attribute.id,
+            'value_ids': [(6, 0, values.ids)],
+        })
+        self.template.invalidate_recordset(['product_variant_ids'])
+        extra = self.template.product_variant_ids.filtered(
+            lambda variant: variant.id != self.variant.id
+        )[:1]
+        extra.ensure_one()
+        extra.write({
+            'default_code': default_code or False,
+            'barcode': barcode or False,
+        })
+        return extra
+
     def make_job(self, job_type, res_model, res_id, gid=False):
         return self.env['shopify.connector.job.enqueue'].enqueue(
             self.store,

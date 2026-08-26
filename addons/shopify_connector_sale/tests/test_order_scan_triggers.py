@@ -8,6 +8,7 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 class TestOrderScanTriggers(OrderImportCase):
@@ -46,16 +47,72 @@ class TestOrderScanTriggers(OrderImportCase):
         node.update(extra)
         return node
 
-    def _patch_scan(self, bodies):
+    def _patch_scan(self, bodies, sent=None):
         bodies = iter(bodies)
+        sent = sent if sent is not None else []
 
         def fake_execute(_client, _job, _store, _query, variables=None):
+            sent.append(dict(variables or {}))
             return self._result(next(bodies))
 
         client = self.env['shopify.connector.api.client']
         return patch.object(
             type(client), 'execute_business', new=fake_execute,
         )
+
+    def test_scan_uses_graphql_null_then_the_server_cursor(self):
+        job = self._job(
+            job_type='order_import_scan', target='scan:order', state='running',
+        )
+        sent = []
+        bodies = [
+            self._scan_body(
+                [self._node('CursorFirst')],
+                has_next=True,
+                end_cursor='CUR-1',
+            ),
+            self._scan_body([]),
+        ]
+        with self._patch_scan(bodies, sent=sent):
+            self.env['shopify.connector.order.scan'].run_scan(job)
+        self.assertIsNone(
+            sent[0]['after'],
+            'the first GraphQL page must send JSON null for an optional '
+            'String cursor, never JSON false',
+        )
+        self.assertEqual(
+            sent[1]['after'], 'CUR-1',
+            'the second page must use the cursor Shopify returned',
+        )
+
+    def test_scan_persists_cursor_and_resumes_in_successor_job(self):
+        job = self._job(
+            job_type='order_import_scan', target='scan:order', state='running',
+        )
+        first_sent = []
+        first_slice = [
+            self._scan_body([], has_next=True, end_cursor='CUR-%d' % index)
+            for index in range(10)
+        ]
+        with self._patch_scan(first_slice, sent=first_sent):
+            self.env['shopify.connector.order.scan'].run_scan(job)
+        self.settings.invalidate_recordset()
+        self.assertEqual(self.settings.sale_order_scan_cursor, 'CUR-9')
+        self.assertFalse(self.settings.sale_order_last_import_checkpoint_at)
+        successor = self.env['shopify.connector.job'].search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'order_import_scan'),
+            ('id', '>', job.id),
+        ], limit=1)
+        self.assertTrue(successor)
+        successor.sudo().write({'state': 'running'})
+        second_sent = []
+        with self._patch_scan([self._scan_body([])], sent=second_sent):
+            self.env['shopify.connector.order.scan'].run_scan(successor)
+        self.assertEqual(second_sent[0]['after'], 'CUR-9')
+        self.settings.invalidate_recordset()
+        self.assertTrue(self.settings.sale_order_last_import_checkpoint_at)
+        self.assertFalse(self.settings.sale_order_scan_cursor)
 
     def test_manual_store_trigger_is_role_gated_enqueue_only_and_idempotent(self):
         for role in ('auditor', 'reviewer'):
@@ -95,6 +152,7 @@ class TestOrderScanTriggers(OrderImportCase):
             ('id', '=', binding.id),
         ]), 1)
 
+    @mute_logger('odoo.addons.shopify_connector_sale.models.shopify_connector_order_scan')
     def test_cron_requires_both_flags_and_connected_store(self):
         self.settings.write({'order_scheduled_sync_enabled': False})
         self.env['shopify.connector.store']._cron_enqueue_order_scans()

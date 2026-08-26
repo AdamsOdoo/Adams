@@ -1,10 +1,11 @@
 {
     'name': 'Shopify Connector Product Export',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.7.0',
     'summary': (
-        'Controlled Odoo -> Shopify product export (Task 015) and '
-        'append-only product media export (Task 015B): per-template opt-in, '
-        'preview-first, allowlisted, split-mutation, non-destructive.'
+        'Controlled Odoo-to-Shopify product and append-only media export: '
+        'per-template opt-in, diff preview, Reviewer/Administrator confirmation, '
+        'allowlisted non-destructive mutations, acknowledgements, and '
+        'reconciliation evidence.'
     ),
     'description': """
 Shopify Connector Product Export

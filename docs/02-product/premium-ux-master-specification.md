@@ -1,5 +1,14 @@
 # Premium UX Master Specification
 
+> **Signed implementation delta (2026-08-02).** The product owner approved
+> [the C1–C8 UI-restructure contract](ui-restructure-design-contract-2026-08-02.md).
+> [The dated implementation delta](premium-ux-ui-restructure-delta-2026-08-02.md)
+> is therefore authoritative wherever this earlier proposal conflicts with the
+> four-pillar navigation, two-dashboard split, five onboarding phases,
+> acknowledgement ladder, or recoverable fulfillment-mode transition. The
+> historical screen inventory below remains useful only for component and flow
+> provenance; it is not the implementation navigation target.
+
 > **Status: Proposed — Fable gap-closure mission, 2026-07-16.** The premium UX
 > master specification: single coherent information architecture for the whole
 > connector under the two-role model. Builds on the accepted design system
@@ -95,6 +104,13 @@ affordance-gated model retained from the accepted corpus; only the role
 count changes to two).
 
 ## 2. Information architecture
+
+The current implementation information architecture is the locked four-pillar
+tree in
+[premium-ux-ui-restructure-delta-2026-08-02.md](premium-ux-ui-restructure-delta-2026-08-02.md)
+§2. Sections 2.1–2.4 below preserve the superseded 2026-07-16 proposal for
+traceability and must not be used to retain Dashboard / Sync Center / Error
+Center / Catalog & Matching as peer navigation entries.
 
 ### 2.1 One navigation model (extends the accepted 7-menu structure)
 

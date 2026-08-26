@@ -22,6 +22,7 @@ _logger = logging.getLogger(__name__)
 
 ORDER_SCAN_PAGE_SIZE = 100
 ORDER_SCAN_PAGE_LIMIT = 100
+ORDER_SCAN_SLICE_PAGES = 10
 ORDER_SCAN_OVERLAP_MINUTES = 30
 ORDER_SCAN_TARGET = 'scan:order'
 # The exact cron this module installs. Named as a constant so the truthful
@@ -57,10 +58,32 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
     def run_scan(self, job):
         store = job.store_id
         settings = self._settings(store)
-        start = self._incremental_start(settings)
-        scan_upper_bound = fields.Datetime.now()
+        generation = job.expected_connection_generation
+        if (
+            settings.sale_order_scan_window_end_at
+            and settings.sale_order_scan_generation == generation
+        ):
+            start = settings.sale_order_scan_window_start_at or False
+            scan_upper_bound = settings.sale_order_scan_window_end_at
+            cursor = settings.sale_order_scan_cursor or None
+            prior_latest = settings.sale_order_scan_latest_at or False
+            prior_pages = settings.sale_order_scan_page_count or 0
+        else:
+            start = self._incremental_start(settings)
+            scan_upper_bound = fields.Datetime.now()
+            cursor = None
+            prior_latest = False
+            prior_pages = 0
+            settings.sudo().write({
+                'sale_order_scan_window_start_at': start,
+                'sale_order_scan_window_end_at': scan_upper_bound,
+                'sale_order_scan_cursor': False,
+                'sale_order_scan_latest_at': False,
+                'sale_order_scan_page_count': 0,
+                'sale_order_scan_generation': generation,
+            })
         self._assert_access_window(settings, start)
-        counts, latest, _digest = self._enumerate(
+        counts, latest, _digest, next_cursor, complete = self._enumerate(
             job, store, settings,
             query_filter=self._range_filter(
                 'updated_at', start, scan_upper_bound, settings,
@@ -68,7 +91,37 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
             enqueue=True,
             log_pages=True,
             entity_job_source=job.job_source,
+            start_cursor=cursor,
+            page_limit=ORDER_SCAN_SLICE_PAGES,
+            resumable=True,
         )
+        latest = max(filter(None, (prior_latest, latest)), default=False)
+        total_pages = prior_pages + counts['pages']
+        if not complete:
+            settings.sudo().write({
+                'sale_order_scan_cursor': next_cursor,
+                'sale_order_scan_latest_at': latest,
+                'sale_order_scan_page_count': total_pages,
+            })
+            job.sudo().write({
+                'state': 'succeeded',
+                'finished_at': fields.Datetime.now(),
+            })
+            self.env['shopify.connector.job.log']._system_append(
+                job, 'state_change',
+                'Order scan slice completed; durable cursor saved and the '
+                'next bounded slice was queued.',
+                from_state='running', to_state='succeeded',
+                technical_detail=json.dumps(counts, sort_keys=True),
+            )
+            successor = store._enqueue_order_scan(job.job_source)
+            if not successor:
+                raise JobHandlerError(
+                    'concurrency_race_conflict',
+                    'Order scan cursor was saved but no continuation job '
+                    'could be admitted.',
+                )
+            return counts
         checkpoint = settings.sale_order_last_import_checkpoint_at
         next_checkpoint = latest
         if not next_checkpoint or (
@@ -90,6 +143,12 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
                 job.expected_connection_generation,
             'sale_order_catchup_pending_upper_bound_at': scan_upper_bound,
             'sale_order_catchup_pending_scan_job_id': job.id,
+            'sale_order_scan_window_start_at': False,
+            'sale_order_scan_window_end_at': False,
+            'sale_order_scan_cursor': False,
+            'sale_order_scan_latest_at': False,
+            'sale_order_scan_page_count': 0,
+            'sale_order_scan_generation': 0,
         })
         self.env['shopify.connector.job.log']._system_append(
             job,
@@ -219,10 +278,15 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
     @api.model
     def _enumerate(
         self, job, store, settings, query_filter, enqueue, log_pages,
-        entity_job_source, collected_candidates=None,
+        entity_job_source, collected_candidates=None, start_cursor=None,
+        page_limit=ORDER_SCAN_PAGE_LIMIT, resumable=False,
     ):
         client = self.env['shopify.connector.api.client']
-        cursor = False
+        # GraphQL nullable String variables must use JSON null on the first
+        # page.  Python ``False`` serializes as JSON false, which Shopify
+        # correctly refuses to coerce to ``String`` before executing the
+        # query.
+        cursor = start_cursor
         page_count = 0
         seen_cursors = set()
         seen_gids = set()
@@ -239,7 +303,18 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
             'pages': 0,
         }
         while True:
-            if page_count >= ORDER_SCAN_PAGE_LIMIT:
+            if page_count >= page_limit:
+                if resumable:
+                    digest_payload = json.dumps(
+                        token_evidence, sort_keys=True, separators=(',', ':'),
+                    )
+                    return (
+                        counts, latest,
+                        hashlib.sha256(
+                            digest_payload.encode('utf-8')
+                        ).hexdigest(),
+                        cursor, False,
+                    )
                 raise JobHandlerError(
                     'data_shape_schema_mismatch',
                     'The order scan page ceiling was exceeded.',
@@ -320,11 +395,14 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
                 digest_payload = json.dumps(
                     token_evidence, sort_keys=True, separators=(',', ':'),
                 )
-                return (
+                result = (
                     counts,
                     latest,
                     hashlib.sha256(digest_payload.encode('utf-8')).hexdigest(),
                 )
+                if resumable:
+                    return result + (False, True)
+                return result
             if not page['end_cursor'] or page['end_cursor'] == cursor:
                 raise JobHandlerError(
                     'data_shape_schema_mismatch',

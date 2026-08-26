@@ -129,7 +129,7 @@ class TestMutationReconciliation(TransactionCase):
             attempt.mutation_domain
         ])
         direct = attempt.remote_evidence_refs['direct']
-        strategy['reconcile'] = lambda _attempt: {
+        strategy['reconcile'] = lambda _attempt, _reconciliation_job: {
             'verdict': 'inconclusive',
             'observed_store_identity': attempt.expected_store_identity,
             'action': 'reconcile',
@@ -176,7 +176,7 @@ class TestMutationReconciliation(TransactionCase):
         strategy = dict(Dispatch._get_reconciliation_strategies()[
             attempt.mutation_domain
         ])
-        strategy['reconcile'] = lambda _attempt: {
+        strategy['reconcile'] = lambda _attempt, _reconciliation_job: {
             'verdict': 'applied',
             'observed_store_identity': 'different-shop.myshopify.com',
             'action': 'succeed',
@@ -316,7 +316,8 @@ class TestMutationReconciliation(TransactionCase):
             strategy['transport'] = transport
 
             def recovered_result(
-                _attempt, verdict=verdict, action=action,
+                _attempt, _reconciliation_job,
+                verdict=verdict, action=action,
             ):
                 return {
                     'verdict': verdict,

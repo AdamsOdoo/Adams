@@ -13,10 +13,11 @@
 // make a feature look implemented and be unusable.
 //
 // The traversal tour walks all TWELVE steps in order and finishes by
-// activating. It contacts no Shopify store: the test patches the transport
-// seam before starting the browser, so the test-connection step's probe is
-// answered locally, and no tour here ever admits a location-refresh job that
-// would reach a socket.
+// activating. No tour contacts a Shopify store: each test patches only the
+// existing transport seam. The C4 tours deliberately admit a real refresh
+// run and execute it through the genuine dispatcher; only its final socket is
+// replaced, so browser/RPC/admission/job/handler/database follow-through stays
+// production-real.
 
 import { registry } from "@web/core/registry";
 import { stepUtils } from "@web_tour/tour_utils";
@@ -144,27 +145,17 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             content: "The Client secret is a password input on the default path.",
         },
         {
-            // Switch to the offline-token path the rest of this tour uses.
-            trigger: ".sc_setup__mode input[value='offline_access_token']",
-            run: "click",
+            // Keep this activation journey on the supported Dev Dashboard
+            // path.  The HttpCase fixture supplies a synthetic token-exchange
+            // response, so the tour proves the real client-credentials
+            // lifecycle without selecting a mode whose token would be
+            // rejected by W1's offline-token HMAC gate.
+            trigger: "#sc_setup_client_id",
+            run: "edit s1-tour-client-id",
         },
         {
-            // The three-value disclosure. An operator who pastes the Client
-            // ID gets an authentication failure one step later with no way to
-            // tell which of the three values was wrong, so the screen has to
-            // say which one it wants and what the other two are not.
-            trigger: ".sc_setup__panel:contains('not the Client ID')",
-            content: "The token guidance names the Client ID as NOT the token.",
-        },
-        {
-            trigger: ".sc_setup__panel:contains('Client Secret')",
-            content: "...and the Client Secret as NOT the token either.",
-        },
-        {
-            // The token field must be a password input: a plain text input is
-            // readable over a shoulder and captured by every screenshot tool.
-            trigger: "#sc_setup_token[type='password']",
-            run: "edit shpat_S1TOURDUMMY000000000000000000000",
+            trigger: "#sc_setup_client_secret[type='password']",
+            run: "edit s1-tour-client-secret",
         },
         { trigger: CONTINUE, run: "click" },
 
@@ -179,14 +170,15 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             trigger: ".sc_setup__panel:contains('does not grant anything')",
         },
         {
-            // The credential field is gone from the DOM, so nothing that
-            // walks the page afterwards can find the token in it.
-            trigger: "body:not(:has(#sc_setup_token))",
-            content: "The token input no longer exists once it is submitted.",
+            // Credential fields are gone from the DOM, so nothing that walks
+            // the page afterwards can find either client secret or token.
+            trigger:
+                "body:not(:has(#sc_setup_token)):not(:has(#sc_setup_client_id)):" +
+                "not(:has(#sc_setup_client_secret))",
+            content: "Credential inputs no longer exist once they are submitted.",
         },
         {
-            // The action row is reachable without scrolling to the bottom of
-            // this long step -- which is the whole point of it being sticky.
+            // The action row is a separate visible row below the panel.
             trigger: CONTINUE,
             content: "Continue is on screen on the longest step.",
             run() {
@@ -195,8 +187,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
                 if (rect.bottom > window.innerHeight + 1 || rect.top < 0) {
                     throw new Error(
                         "the action row is outside the viewport on the " +
-                        "Permissions step; a sticky bar that is not on " +
-                        "screen is not sticky"
+                        "Permissions step"
                     );
                 }
             },
@@ -300,13 +291,21 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             content: "The summary is in plain words, and it is this store's.",
         },
         {
-            trigger: ".sc_setup__panel:contains('does not start a sync')",
-            content: "Activation states plainly that it starts nothing.",
+            trigger: ".sc_setup__panel:contains('starts the selected read and import scans')",
+            content: "Activation truthfully states which synchronization starts.",
         },
         { trigger: `${CONTINUE}:contains('Activate')`, run: "click" },
         {
-            trigger: ".o_sc_dashboard",
-            content: "Activation hands off to the dashboard.",
+            // The optional W1 foundation deliberately keeps setup on this
+            // screen until its durable Shopify subscription read-back proof
+            // exists.  Core-only installations hand off directly to the
+            // dashboard.  With W1 installed, this successful client-
+            // credentials journey must show the pending hand-off; an
+            // action-required state is a failure handled by a separate
+            // refusal journey.
+            trigger:
+                ".o_sc_dashboard, .sc_setup__completion_pending",
+            content: "Activation completes or truthfully waits for webhook proof.",
         },
     ],
 });
@@ -336,7 +335,57 @@ registry.category("web_tour.tours").add("shopify_connector_s1_dashboard_entry_to
     ],
 });
 
-// --- 3. Save & Exit, then resume where it stopped. ---
+// --- 3. Explicitly start a second store while one store is visible. ---
+registry.category("web_tour.tours").add("shopify_connector_s1_new_store_tour", {
+    url: "/odoo",
+    steps: () => [
+        ...openSetupWizard(),
+        {
+            trigger: heading(1, "Welcome"),
+            content: "The existing store opens through the normal resume path.",
+        },
+        {
+            trigger: ".sc_setup_new_store",
+            content: "An Administrator can intentionally start another store.",
+            run: "click",
+        },
+        {
+            trigger: ".o_sc_setup[data-store-id='new']",
+            content: "The new-store flow has no selected existing store.",
+            run() {
+                const heading = document.querySelector(".sc_setup__heading");
+                if (document.activeElement !== heading) {
+                    throw new Error(
+                        "focus did not return to the new store's step heading"
+                    );
+                }
+            },
+        },
+        { trigger: CONTINUE, run: "click" },
+        {
+            trigger: ".o_sc_setup[data-store-id='new'] #sc_setup_name",
+            content: "The new identity form starts blank.",
+            run() {
+                const name = document.querySelector("#sc_setup_name");
+                const domain = document.querySelector("#sc_setup_domain");
+                if (!name || name.value || !domain || domain.value) {
+                    throw new Error("new-store identity was not blank");
+                }
+            },
+        },
+        { trigger: "#sc_setup_name", run: "edit S1 Second Store" },
+        { trigger: "#sc_setup_domain", run: "edit s1-second.myshopify.com" },
+        { trigger: CONTINUE, run: "click" },
+        {
+            trigger: heading(3, "Credentials"),
+            content: "The second store was created and the flow advanced.",
+        },
+        { trigger: ".sc_setup_exit", run: "click" },
+        { trigger: ".o_sc_dashboard" },
+    ],
+});
+
+// --- 4. Save & Exit, then resume where it stopped. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     url: "/odoo",
     steps: () => [
@@ -363,7 +412,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_resume_tour", {
     ],
 });
 
-// --- 4. Keyboard traversal, focus management and the sticky action row. ---
+// --- 5. Keyboard traversal, focus management and the action row. ---
 registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
     url: "/odoo",
     steps: () => [
@@ -416,7 +465,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
             trigger: ".sc_setup__actions",
             content:
                 "Every action-row control reserves clearance so focus cannot " +
-                "land underneath the sticky bar.",
+                "land against the panel edge.",
             run() {
                 const controls = document.querySelectorAll(
                     ".sc_setup__actions button:not([disabled])"
@@ -430,8 +479,7 @@ registry.category("web_tour.tours").add("shopify_connector_s1_keyboard_tour", {
                     if (!margin || parseFloat(margin) <= 0) {
                         throw new Error(
                             "an action-row control reserves no scroll " +
-                            "clearance, so keyboard focus can land under the " +
-                            "sticky bar: " + control.outerHTML.slice(0, 80)
+                            "clearance: " + control.outerHTML.slice(0, 80)
                         );
                     }
                 }
@@ -508,45 +556,12 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             content: "The Shopify identity is shown, read-only.",
         },
         {
-            trigger: ".sc_setup_refresh_locations",
-            content: "A refresh control exists on the step itself.",
+            trigger: ".sc_setup_refresh_state",
+            content:
+                "Automatic discovery always exposes its state on the step; " +
+                "the manual retry control appears only after a terminal result.",
         },
 
-        // --- Wave 5: the bounded server-side search, driven for real. The
-        //     reachability BOUND (a row past the first page) is a server
-        //     test; what the browser proves is that the search control
-        //     genuinely filters through the RPC and genuinely clears.
-        {
-            trigger: ".sc_setup_search_shopify",
-            run: "edit Warehouse C",
-        },
-        { trigger: ".sc_setup_search_shopify_go", run: "click" },
-        {
-            // The Shopify counter specifically. Two elements shared the
-            // `.sc_setup__showing` class, so this could previously have been
-            // satisfied by the Odoo counter instead.
-            trigger: ".sc_setup__showing--shopify:contains('Showing 1 of 1')",
-            content: "The search narrowed the list, with an honest count.",
-        },
-        {
-            trigger: ".sc_setup__locations:not(:contains('Tour Warehouse A'))",
-            content: "Rows that do not match are genuinely gone, not hidden.",
-        },
-        {
-            trigger: ".sc_setup__location:contains('Tour Warehouse C')",
-            content: "The matching row is the one shown.",
-        },
-        { trigger: ".sc_setup_search_shopify_clear", run: "click" },
-        {
-            trigger: ".sc_setup__location:contains('Tour Warehouse A')",
-            content: "Clearing the search restores the full first page.",
-        },
-
-        {
-            // Create a second mapping through the governed route.
-            trigger: "#sc_setup_map_shopify",
-            run: "select gid://shopify/Location/TOURB",
-        },
         {
             // The eligible-Odoo-location assertion lives INSIDE this step's
             // `run()` rather than as its own `:not([value=''])` trigger. An
@@ -554,11 +569,16 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
             // hoot-dom correctly reports it as not visible and a trigger on
             // one can only ever time out -- it would be asserting that a
             // dropdown is open, which is not the claim.
-            trigger: "#sc_setup_map_odoo",
+            trigger:
+                ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                ".sc_setup_map_odoo",
             content: "At least one eligible Odoo location is offered, and a "
                      + "location not already mapped elsewhere is chosen.",
             run() {
-                const select = document.querySelector("#sc_setup_map_odoo");
+                const select = document.querySelector(
+                    ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                    ".sc_setup_map_odoo"
+                );
                 // Pick a location that is NOT already the target of another
                 // Shopify mapping. `UNIQUE(store_id, odoo_location_id)` refuses a
                 // second mapping onto the same Odoo location, so taking the
@@ -589,7 +609,12 @@ registry.category("web_tour.tours").add("shopify_connector_s1_location_tour", {
                 select.dispatchEvent(new Event("change", { bubbles: true }));
             },
         },
-        { trigger: ".sc_setup_create_mapping", run: "click" },
+        {
+            trigger:
+                ".sc_setup__location[data-shopify-gid='gid://shopify/Location/TOURB'] " +
+                ".sc_setup_create_mapping",
+            run: "click",
+        },
         {
             // Exact state, not a substring that "Not mapped" also satisfies.
             // The DATABASE consequence is asserted by the Python test that
@@ -633,3 +658,96 @@ registry.category("web_tour.tours").add("shopify_connector_s1_readiness_tour", {
         },
     ],
 });
+
+// --- 7. C4: automatic admission, dispatch and durable reopening. ---
+registry.category("web_tour.tours").add(
+    "shopify_connector_s1_location_refresh_dispatch_tour",
+    {
+        url: "/odoo",
+        steps: () => [
+            ...openSetupWizard(),
+            {
+                trigger: heading(7, "Location mapping"),
+                content: "The exact store resumes on its location step.",
+            },
+            {
+                trigger: ".sc_setup_refresh_state:contains('Succeeded')",
+                content:
+                    "Automatic discovery admitted one run and the genuine " +
+                    "dispatcher completed it.",
+            },
+            {
+                trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
+                content: "Terminal success reloaded the real cached location.",
+            },
+            {
+                trigger: ".sc_setup_exit",
+                run: "click",
+            },
+            { trigger: ".o_sc_dashboard" },
+            // App-launch reachability was already proved at the start of this
+            // journey. Reopen Setup from the connector dashboard so this
+            // second half isolates the durable close/reopen claim instead of
+            // depending on a second apps-launcher render in the constrained
+            // native Odoo.sh browser.
+            openConnectorSection("menu_shopify_connector_configuration"),
+            {
+                trigger: menu("menu_shopify_connector_setup_wizard"),
+                content: "Reopen the guided setup from the connector app.",
+                run: "click",
+            },
+            {
+                trigger: heading(7, "Location mapping"),
+                content: "Closing and reopening resumes the same store and step.",
+            },
+            {
+                trigger: ".sc_setup__location:contains('Dispatcher Tour Warehouse')",
+                content: "The reopened setup shows the refreshed store, not another store.",
+            },
+            {
+                trigger:
+                    ".sc_setup_refresh_state:contains('Waiting'), " +
+                    ".sc_setup_refresh_state:contains('Running')",
+                content:
+                    "The genuine re-entry visibly starts its own discovery pass.",
+            },
+            {
+                trigger: ".sc_setup_refresh_state:contains('Succeeded')",
+                content:
+                    "Re-entering the location step starts and completes a new " +
+                    "discovery pass rather than showing cached rows as current.",
+            },
+        ],
+    }
+);
+
+// --- 8. C4: dispatched classified failure and same-run successful Retry. ---
+registry.category("web_tour.tours").add(
+    "shopify_connector_s1_location_refresh_failure_tour",
+    {
+        url: "/odoo",
+        steps: () => [
+            ...openSetupWizard(),
+            { trigger: heading(7, "Location mapping") },
+            {
+                trigger: ".sc_setup_refresh_failure_reason:contains('did not serve the Admin API version')",
+                content:
+                    "Automatic discovery exposes the dispatcher's classified " +
+                    "merchant-safe reason.",
+            },
+            {
+                trigger: ".sc_setup_refresh_locations:contains('Try again')",
+                content: "Try again is reachable from the normal setup surface.",
+                run: "click",
+            },
+            {
+                trigger: ".sc_setup_refresh_state:contains('Succeeded')",
+                content: "Retry continued the preserved run and completed successfully.",
+            },
+            {
+                trigger: ".sc_setup__location:contains('Dispatcher Retry Warehouse')",
+                content: "The retried dispatcher populated the real location cache.",
+            },
+        ],
+    }
+);

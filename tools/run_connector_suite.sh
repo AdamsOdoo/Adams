@@ -13,10 +13,11 @@
 #      verifies it on every run so a cached checkout can never silently execute
 #      a different Odoo
 #   2. installs the connector modules into a disposable PostgreSQL database
-#   3. runs THREE passes, each into its own database with its own log:
+#   3. runs FOUR passes, each into its own database with its own log:
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
 #        * the complete NON-STANDARD tag suite
+#        * W2-only install over an older installed W1 (no W1 upgrade)
 #   4. verifies the checked-out connector commit against the commit the caller
 #      says this run is testing ($SOURCE_HEAD_SHA), and ABORTS on a mismatch
 #   5. writes durable per-pass logs and a machine-readable summary under
@@ -42,6 +43,7 @@
 #
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
+#                                [--skip-w2-only-install]
 #                                [--tags <extra-test-tags>]
 #   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
 #
@@ -58,7 +60,13 @@
 
 set -euo pipefail
 
-MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export"
+MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
+W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
+W1_WEBHOOK_SCHEMA_VERSION="19.0.1.3.0"
+W2_PRODUCT_WEBHOOK_VERSION="19.0.0.3.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.4.0"
+W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
+W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
 # dependencies, and that is exactly the point: they contribute the required
 # columns behind issue #193, so a suite that omits them cannot reproduce the
@@ -152,9 +160,12 @@ TestU3ExportTours.test_td015_checksum_acknowledgement_tour \
 TestUiSetupTours.test_setup_wizard_traverses_all_twelve_steps \
 TestUiSetupTours.test_the_dashboard_empty_state_opens_setup \
 TestUiSetupTours.test_setup_resumes_at_the_step_it_was_left_on \
+TestUiSetupTours.test_setup_can_start_a_second_store_without_touching_the_first \
 TestUiSetupTours.test_setup_is_operable_by_keyboard_alone \
 TestUiSetupTours.test_the_location_step_shows_every_cached_location_and_maps_one \
 TestUiSetupTours.test_a_blocking_readiness_row_deep_links_by_step_key \
+TestUiC4LocationRefreshTours.test_location_refresh_success_is_followed_and_reloaded \
+TestUiC4LocationRefreshTours.test_location_refresh_failure_shows_reason_and_retries_same_run \
 TestUiB2SettingsTours.test_store_settings_tour_changes_a_setting_through_the_menu_route \
 TestUiB2ProductTours.test_product_controls_tour_starts_a_real_scan \
 TestUiB2ProductTours.test_product_controls_are_absent_for_a_role_the_server_refuses \
@@ -176,6 +187,13 @@ REQUIRED_HOOT_SUITES="shopify connector dashboard|shopify connector export diff|
 ALLOWED_SKIP_TEST="TestMutationRecovery.test_real_process_death_harness"
 ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 
+# Migration bases intentionally predate the optional W1 webhook addon.  Core's
+# activation guard therefore skips truthfully when that capability is absent;
+# unlike the opt-in process-death harness above, this allowance is valid only
+# for the runner's generated migration labels and this exact identity/reason.
+ALLOWED_MIGRATION_SKIP_TEST="TestSetupWizardActivation.test_w1_offline_token_without_app_secret_stops_before_activation"
+ALLOWED_MIGRATION_SKIP_REASON="shopify_connector_webhook is not installed"
+
 # Restrict the STANDARD passes to the connector modules.
 #
 # `--test-enable` with no selector runs every installed module's tests --
@@ -185,7 +203,7 @@ ALLOWED_SKIP_REASON="real process-death harness is opt-in outside Odoo.sh"
 # passes to the code this PR is responsible for. `account` and `stock` are still
 # INSTALLED (see EXTRA_MODULES) -- they must be, or the #193 warm-update failure
 # family cannot reproduce -- they are simply not re-tested here.
-STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export"
+STANDARD_TAGS="/shopify_connector_core,/shopify_connector_product,/shopify_connector_sale,/shopify_connector_inventory,/shopify_connector_fulfillment,/shopify_connector_product_export,/shopify_connector_webhook,/shopify_connector_product_webhook,/shopify_connector_inventory_webhook,/shopify_connector_sale_webhook,/shopify_connector_fulfillment_webhook"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ODOO_SRC="${ODOO_SRC:-${REPO_ROOT}/.odoo-src}"
@@ -198,6 +216,7 @@ export PGHOST PGPORT
 RUN_FRESH=1
 RUN_WARM=1
 RUN_NONSTANDARD=1
+RUN_W2_ONLY_INSTALL=1
 RUN_SELF_TEST=0
 TEST_TAGS=""
 # --- The migration passes (2026-07-30) ---------------------------------------
@@ -237,15 +256,16 @@ MIGRATION_FROM_REFS=(
 RUN_MIGRATION=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
-        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; shift ;;
+        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
         # Same rule, same reason: opt-OUT only. A run that skips the genuine
         # version-to-version upgrade must say so in the summary, which it does.
         --skip-migration)   RUN_MIGRATION=0; shift ;;
-        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; shift ;;
+        --skip-w2-only-install) RUN_W2_ONLY_INSTALL=0; shift ;;
+        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_ONLY_INSTALL=0; shift ;;
         # Override the upgrade origins (space-separated refs), for a one-off
         # check against some other ancestor.
         --migration-from)   read -r -a MIGRATION_FROM_REFS <<< "$2"; shift 2 ;;
@@ -286,6 +306,45 @@ resolve_browser() {
     return 1
 }
 
+# Chromium may still flush profile files for a short interval after its
+# process has been reaped.  Cleanup is intentionally scoped to the exact
+# mktemp template below and retried for a bounded interval; an unvalidated
+# `rm -rf` would make a browser probe failure an unsafe filesystem operation.
+PROBE_CLEANUP_ATTEMPTS=8
+PROBE_CLEANUP_DELAY_SECONDS="0.1"
+
+cleanup_browser_probe_dir() {
+    local probe_dir="${1:-}" relative suffix attempt
+    if [[ -z "$probe_dir" ]]; then
+        log "FATAL: refusing to clean an empty browser probe path"
+        return 1
+    fi
+    relative="${probe_dir#/tmp/}"
+    suffix="${relative#shopify-connector-cdp.}"
+    if [[ "$probe_dir" != /tmp/* \
+          || "$relative" == "$probe_dir" \
+          || "$relative" != shopify-connector-cdp.* \
+          || -z "$suffix" \
+          || "$relative" == */* ]]; then
+        log "FATAL: refusing to clean an untrusted browser probe path: ${probe_dir}"
+        return 1
+    fi
+    for ((attempt = 1; attempt <= PROBE_CLEANUP_ATTEMPTS; attempt++)); do
+        if [[ ! -e "$probe_dir" && ! -L "$probe_dir" ]]; then
+            return 0
+        fi
+        # A late Chromium profile writer can race the recursive walk.  Force
+        # removal and verify the exact path after every bounded attempt.
+        rm -rf -- "$probe_dir" 2>/dev/null || true
+        if [[ ! -e "$probe_dir" && ! -L "$probe_dir" ]]; then
+            return 0
+        fi
+        sleep "$PROBE_CLEANUP_DELAY_SECONDS"
+    done
+    log "FATAL: browser probe directory remained after bounded cleanup: ${probe_dir}"
+    return 1
+}
+
 # Prove the browser prerequisites BEFORE running anything that needs them.
 # A skip discovered afterwards is a green run that proved nothing; a failure
 # here is a red run that says exactly what is missing.
@@ -319,20 +378,71 @@ preflight_browser() {
         exit 2
     fi
 
-    # The binary existing is not the same as the binary STARTING. A sandbox
-    # that forbids user namespaces, or a missing shared library, produces a
-    # binary that resolves and then dies -- which Odoo also turns into a skip.
-    local probe_dir
-    probe_dir="$(mktemp -d)"
-    if ! "$ODOO_BROWSER_BIN" --headless=new --no-sandbox --disable-gpu \
-            --disable-dev-shm-usage --user-data-dir="$probe_dir" \
-            --dump-dom about:blank >/dev/null 2>&1; then
-        rm -rf "$probe_dir"
-        log "FATAL: ${ODOO_BROWSER_BIN} resolves but cannot render a page"
-        log "headlessly. Odoo would turn the failed connection into a SkipTest."
+    # Odoo drives Chromium through CDP. A headless process is expected to stay
+    # alive, and `--dump-dom` can hang even when CDP is healthy, so capability
+    # is proved through the same HTTP + WebSocket boundary HttpCase consumes.
+    local probe_dir probe_log browser_pid port
+    probe_dir="$(mktemp -d /tmp/shopify-connector-cdp.XXXXXX)"
+    probe_log="$probe_dir/chromium.log"
+    "$ODOO_BROWSER_BIN" --headless --no-sandbox --disable-gpu \
+        --disable-dev-shm-usage --remote-debugging-address=127.0.0.1 \
+        --remote-debugging-port=0 --user-data-dir="$probe_dir/profile" \
+        about:blank >"$probe_log" 2>&1 &
+    browser_pid=$!
+    port=""
+    for _ in $(seq 1 300); do
+        if [[ -s "$probe_dir/profile/DevToolsActivePort" ]]; then
+            IFS= read -r port <"$probe_dir/profile/DevToolsActivePort"
+            break
+        fi
+        if ! kill -0 "$browser_pid" 2>/dev/null; then
+            break
+        fi
+        sleep 0.1
+    done
+    if [[ -z "$port" ]] || ! kill -0 "$browser_pid" 2>/dev/null || \
+       ! "$VENV/bin/python" - "$port" <<'PY'
+import json
+import sys
+import urllib.request
+
+import websocket
+
+port = int(sys.argv[1])
+base = f'http://127.0.0.1:{port}'
+with urllib.request.urlopen(base + '/json/version', timeout=5) as response:
+    version = json.load(response)
+ws_url = version.get('webSocketDebuggerUrl')
+if not ws_url:
+    raise SystemExit('CDP version response has no browser WebSocket URL')
+ws = websocket.create_connection(ws_url, timeout=5, suppress_origin=True)
+try:
+    ws.send(json.dumps({'id': 1, 'method': 'Browser.getVersion'}))
+    reply = json.loads(ws.recv())
+finally:
+    ws.close()
+if not reply.get('result', {}).get('product'):
+    raise SystemExit('Browser.getVersion returned no product')
+with urllib.request.urlopen(base + '/json/list', timeout=5) as response:
+    targets = json.load(response)
+if not any(target.get('type') == 'page' for target in targets):
+    raise SystemExit('CDP exposed no inspectable page target')
+PY
+    then
+        kill "$browser_pid" 2>/dev/null || true
+        wait "$browser_pid" 2>/dev/null || true
+        log "FATAL: ${ODOO_BROWSER_BIN} did not expose a usable CDP endpoint."
+        sed -n '1,40p' "$probe_log" >&2
+        if ! cleanup_browser_probe_dir "$probe_dir"; then
+            exit 2
+        fi
         exit 2
     fi
-    rm -rf "$probe_dir"
+    kill "$browser_pid" 2>/dev/null || true
+    wait "$browser_pid" 2>/dev/null || true
+    if ! cleanup_browser_probe_dir "$probe_dir"; then
+        exit 2
+    fi
 
     log "browser: ${ODOO_BROWSER_BIN} (${BROWSER_VERSION})"
     log "websocket-client: ${WEBSOCKET_VERSION}"
@@ -349,6 +459,150 @@ preflight_browser() {
 EVIDENCE_ERRORS=()
 
 evidence_fail() { EVIDENCE_ERRORS+=("$1"); log "EVIDENCE FAILURE: $1"; }
+
+# Check addon-local constant imports before booting Odoo.  Registry loading
+# happens before any test can run, so a typo in a relative import otherwise
+# turns into an Odoo.sh-only failure with no actionable suite evidence.
+verify_inventory_webhook_import_contract() {
+    local addon_dir="${REPO_ROOT}/addons/shopify_connector_inventory_webhook"
+    local contract_error
+    if ! contract_error="$(python3 - "$addon_dir" <<'PY'
+import ast
+import pathlib
+import sys
+
+addon = pathlib.Path(sys.argv[1])
+constants = ast.parse(
+    (addon / 'models' / 'constants.py').read_text(encoding='utf-8'),
+    filename=str(addon / 'models' / 'constants.py'),
+)
+exported = {
+    node.id
+    for node in constants.body
+    if isinstance(node, (ast.Assign, ast.AnnAssign, ast.FunctionDef,
+                         ast.AsyncFunctionDef, ast.ClassDef))
+    for node in (
+        node.targets if isinstance(node, ast.Assign) else
+        [node.target] if isinstance(node, ast.AnnAssign) else [node]
+    )
+    if isinstance(node, ast.Name)
+}
+registry_path = addon / 'models' / 'shopify_connector_inventory_webhook.py'
+registry = ast.parse(registry_path.read_text(encoding='utf-8'),
+                     filename=str(registry_path))
+missing = []
+for node in ast.walk(registry):
+    if not isinstance(node, ast.ImportFrom) or node.module != 'constants':
+        continue
+    if not node.level:
+        continue
+    missing.extend(alias.name for alias in node.names if alias.name not in exported)
+if missing:
+    print('missing constants imported by inventory webhook registry: %s' %
+          ', '.join(sorted(set(missing))))
+    raise SystemExit(1)
+PY
+    )"; then
+        evidence_fail "inventory webhook import contract: ${contract_error}"
+    fi
+}
+
+# The addon must be present in both the install set and the standard selector.
+# Keeping this as a fail-closed runtime guard prevents a fresh/warm run from
+# silently omitting the modular webhook addon after a list-edit or rename.
+verify_connector_module_inventory() {
+    verify_inventory_webhook_import_contract
+    case ",${MODULES}," in
+        *,shopify_connector_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W1_WEBHOOK_SCHEMA_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_webhook manifest is not bumped for the includeFields schema"
+    fi
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/migrations/${W1_WEBHOOK_SCHEMA_VERSION}/post-migrate.py" ]]; then
+        evidence_fail "shopify_connector_webhook schema-verification migration is missing"
+    fi
+    case ",${MODULES}," in
+        *,shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_product_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_product_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_product_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W2_PRODUCT_WEBHOOK_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_product_webhook manifest version is not current"
+    elif ! grep -Fq "'pre_init_hook': 'pre_init_hook'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "product webhook W2-only install schema bridge is not registered"
+    fi
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_product_webhook/pre_init.py" ]]; then
+        evidence_fail "product webhook W2-only install schema bridge is missing"
+    fi
+    # W2 depends on W1's upgraded model.  Keep the dependency before the
+    # optional addon in every fresh/warm install set; a list edit that installs
+    # W2 first must fail the evidence gate instead of masking a missing schema.
+    case ",${MODULES}," in
+        *,shopify_connector_webhook,shopify_connector_product_webhook,*) ;;
+        *) evidence_fail "shopify_connector_webhook must precede shopify_connector_product_webhook in MODULES" ;;
+    esac
+    if ! grep -Fq "'shopify_connector_webhook', 'shopify_connector_product'" \
+        "${REPO_ROOT}/addons/shopify_connector_product_webhook/__manifest__.py"; then
+        evidence_fail "product webhook addon dependency closure is not W1 + product"
+    fi
+    if ! grep -Fq "${W2_ONLY_INSTALL_ORIGIN}" \
+        "${REPO_ROOT}/tools/run_connector_suite.sh"; then
+        evidence_fail "W2-only install phase does not use the durable old-W1 origin"
+    fi
+    case ",${MODULES}," in
+        *,shopify_connector_inventory_webhook,*) ;;
+        *) evidence_fail "shopify_connector_inventory_webhook is absent from MODULES" ;;
+    esac
+    case ",${STANDARD_TAGS}," in
+        *,/shopify_connector_inventory_webhook,*) ;;
+        *) evidence_fail "shopify_connector_inventory_webhook is absent from STANDARD_TAGS" ;;
+    esac
+    if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py" ]]; then
+        evidence_fail "shopify_connector_inventory_webhook manifest is missing from the checkout"
+    elif ! grep -Fq "'version': '${W3_INVENTORY_WEBHOOK_VERSION}'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py"; then
+        evidence_fail "shopify_connector_inventory_webhook manifest version is not current"
+    elif ! grep -Fq "'shopify_connector_webhook'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py" \
+        || ! grep -Fq "'shopify_connector_inventory'" \
+        "${REPO_ROOT}/addons/shopify_connector_inventory_webhook/__manifest__.py"; then
+        evidence_fail "inventory webhook addon dependency closure is not W1 + inventory"
+    fi
+    # W3 order/fulfillment acceleration addons are optional at product level,
+    # but this candidate's CI contract is not optional: fresh/warm passes must
+    # install them and select their production-path tests explicitly.
+    local domain_webhook
+    for domain_webhook in \
+        shopify_connector_sale_webhook \
+        shopify_connector_fulfillment_webhook; do
+        case ",${MODULES}," in
+            *,${domain_webhook},*) ;;
+            *) evidence_fail "${domain_webhook} is absent from MODULES" ;;
+        esac
+        case ",${STANDARD_TAGS}," in
+            *,/${domain_webhook},*) ;;
+            *) evidence_fail "${domain_webhook} is absent from STANDARD_TAGS" ;;
+        esac
+        if [[ ! -f "${REPO_ROOT}/addons/${domain_webhook}/__manifest__.py" ]]; then
+            evidence_fail "${domain_webhook} manifest is missing from the checkout"
+        fi
+    done
+}
 
 # Any skip that is not the single sanctioned one fails the run.
 verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
@@ -375,10 +629,21 @@ verify_no_unexpected_skips() {  # verify_no_unexpected_skips <log> <label>
     # old pattern did not match at all, so every subtest skip was invisible.
     while IFS= read -r occurrence; do
         [[ -z "$occurrence" ]] && continue
+        # Odoo's emitted occurrence can carry a trailing space before the
+        # newline.  Normalize only that boundary whitespace; an extra reason
+        # detail remains part of the occurrence and must still fail the exact
+        # migration allowance below.
+        occurrence="$(sed -E 's/[[:space:]]+$//' <<<"$occurrence")"
         identity="$(sed -E 's/^skipped (Subtest )?([A-Za-z0-9_]+\.[A-Za-z0-9_]+).*$/\2/' <<<"$occurrence")"
         if [[ "$identity" == "$ALLOWED_SKIP_TEST" \
               && "$occurrence" == *"$ALLOWED_SKIP_REASON"* ]]; then
             log "${label}: sanctioned skip ${identity}"
+            continue
+        fi
+        if [[ "$label" =~ ^migration-[0-9a-f]{8}(-again)?$ \
+              && "$identity" == "$ALLOWED_MIGRATION_SKIP_TEST" \
+              && "$occurrence" == *": ${ALLOWED_MIGRATION_SKIP_REASON}" ]]; then
+            log "${label}: sanctioned migration capability skip ${identity}"
             continue
         fi
         evidence_fail "${label}: unexpected skipped test -> ${occurrence#skipped }"
@@ -493,6 +758,9 @@ self_test() {
         EVIDENCE_ERRORS=()
     }
 
+    verify_connector_module_inventory
+    _expect 0 "webhook addon is installed and selected by the suite"
+
     # A log with every required tour, both HOOT suites and only the sanctioned
     # skip is the one shape that must pass.
     local good="${tmp}/good.log" t
@@ -541,6 +809,30 @@ self_test() {
     EVIDENCE_ERRORS=()
     verify_no_unexpected_skips "$wrong_reason" self-test
     _expect 1 "the sanctioned test skipping for a DIFFERENT reason still fails"
+
+    # 2a. A migration base can truthfully lack the optional W1 addon.  Only
+    #     this exact capability absence, on a generated migration label, is
+    #     sanctioned; the same line must still fail in every other phase.
+    local migration_capability_skip="${tmp}/migration_capability_skip.log"
+    printf 'INFO db mod: skipped %s : %s \n' \
+        "$ALLOWED_MIGRATION_SKIP_TEST" "$ALLOWED_MIGRATION_SKIP_REASON" \
+        > "$migration_capability_skip"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_capability_skip" migration-50b770a3
+    _expect 0 "the migration capability-absence skip passes in a migration phase"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_capability_skip" self-test
+    _expect 1 "the migration capability-absence skip fails outside migration phases"
+
+    # 2b. The migration allowance is bound to the exact reason as well as the
+    #     exact test identity; a borrowed name cannot ride through.
+    local migration_wrong_reason="${tmp}/migration_wrong_reason.log"
+    printf 'INFO db mod: skipped %s : %s but with extra detail\n' \
+        "$ALLOWED_MIGRATION_SKIP_TEST" "$ALLOWED_MIGRATION_SKIP_REASON" \
+        > "$migration_wrong_reason"
+    EVIDENCE_ERRORS=()
+    verify_no_unexpected_skips "$migration_wrong_reason" migration-50b770a3
+    _expect 1 "the migration capability skip with a DIFFERENT reason fails"
 
     # 2b. Two skips on ONE line: a real skip followed by the sanctioned one.
     #     This is the shape that defeated the previous line-based check -- a
@@ -664,6 +956,27 @@ self_test() {
         log "self-test PASS: preflight aborts when websocket-client is absent"
     fi
 
+    # 9. Probe cleanup must remove a nested profile with the bounded, exact
+    #     mktemp prefix and must reject broad paths such as /tmp.
+    local probe_cleanup_fixture
+    probe_cleanup_fixture="$(mktemp -d /tmp/shopify-connector-cdp.selftest.XXXXXX)"
+    mkdir -p "$probe_cleanup_fixture/profile/Default"
+    touch "$probe_cleanup_fixture/profile/Default/Preferences"
+    if cleanup_browser_probe_dir "$probe_cleanup_fixture" \
+       && [[ ! -e "$probe_cleanup_fixture" \
+             && ! -L "$probe_cleanup_fixture" ]]; then
+        log "self-test PASS: browser probe cleanup is bounded and path-scoped"
+    else
+        log "self-test FAIL: browser probe cleanup did not remove its fixture"
+        failures=$((failures + 1))
+    fi
+    if cleanup_browser_probe_dir "/tmp" >/dev/null 2>&1; then
+        log "self-test FAIL: browser probe cleanup accepted a broad path"
+        failures=$((failures + 1))
+    else
+        log "self-test PASS: browser probe cleanup rejects broad paths"
+    fi
+
     if [[ "$failures" -ne 0 ]]; then
         log "SELF-TEST FAILED (${failures} problems). The runner does NOT fail closed."
         return 1
@@ -774,8 +1087,21 @@ fi
 # created, because a cached venv from before this change would otherwise keep
 # silently skipping every browser test. This is idempotent and near-instant
 # once satisfied.
-"$VENV/bin/pip" install --quiet websocket-client
+"$VENV/bin/pip" install --quiet websocket-client "graphql-core==3.2.6"
 WEBSOCKET_VERSION="$("$VENV/bin/python" -c 'import websocket; print(websocket.__version__)' 2>/dev/null || echo missing)"
+
+# WP-1: validate every production GraphQL document against the vendored,
+# immutable Shopify Admin API 2026-07 introspection snapshot before Odoo can
+# execute any test. The final release gate separately repeats this against the
+# live schema; this offline gate prevents a store outage from disabling CI.
+"$VENV/bin/python" "${REPO_ROOT}/tools/validate_shopify_graphql.py"
+
+verify_connector_module_inventory
+if [[ "${#EVIDENCE_ERRORS[@]}" -ne 0 ]]; then
+    log "FATAL: connector module inventory guard failed; refusing to run an incomplete suite."
+    exit 2
+fi
+EVIDENCE_ERRORS=()
 
 preflight_browser
 
@@ -834,6 +1160,12 @@ run_odoo() {  # run_odoo <db> <logfile> <args...>
         --stop-after-init --log-level=test "$@" ) > "$logfile" 2>&1
 }
 
+run_odoo_with_conf() {  # run_odoo_with_conf <conf> <db> <logfile> <args...>
+    local conf="$1" db="$2" logfile="$3"; shift 3
+    ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$conf" -d "$db" \
+        --stop-after-init --log-level=test "$@" ) > "$logfile" 2>&1
+}
+
 # Odoo exits non-zero on test failure, so the result line is the source of
 # truth for *counts* and the exit code for pass/fail. Parse both.
 result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" | tail -1 || true; }
@@ -841,6 +1173,11 @@ result_line() { grep -E "[0-9]+ failed, [0-9]+ error\(s\) of [0-9]+ tests" "$1" 
 FRESH_STATUS="skipped"; FRESH_RESULT=""
 WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
+W2_ONLY_INSTALL_STATUS="skipped"; W2_ONLY_INSTALL_RESULT=""
+W2_ONLY_INSTALL_DB=""
+W2_ONLY_INSTALL_COLUMNS=""
+W2_ONLY_INSTALL_W1_VERSION=""
+W2_ONLY_INSTALL_W2_VERSION=""
 OVERALL=0
 
 # --- Pass 1: fresh install ---------------------------------------------------
@@ -892,6 +1229,107 @@ if [[ $RUN_WARM -eq 1 ]]; then
     # This pass is a SAME-VERSION update and must never be quoted as migration
     # evidence. Asserted, not assumed.
     verify_no_migration_ran "${ARTIFACT_DIR}/warm.log" "warm"
+fi
+
+# --- W2-only install over an older installed W1 -----------------------------
+# Odoo does not upgrade an already-installed dependency during `-i W2`.  This
+# is therefore a distinct install contract, not a combined `-u` migration:
+# install the durable old-W1 origin into a disposable database, switch the
+# addons path back to this candidate, and install ONLY W2.  The candidate's
+# pre-init bridge must make the W1-owned JSONB evidence columns available
+# before the current W1 registry is loaded, while the installed W1 version must
+# remain unchanged.  A missing origin, failed old install, failed W2 tests, or
+# wrong schema/version is evidence failure rather than a skipped scenario.
+if [[ $RUN_W2_ONLY_INSTALL -eq 1 ]]; then
+    bridge_short="${W2_ONLY_INSTALL_ORIGIN:0:8}"
+    bridge_tree="${ARTIFACT_DIR}/base-w2-only-${bridge_short}"
+    bridge_old_conf="${ARTIFACT_DIR}/odoo-w2-only-old-${bridge_short}.conf"
+    bridge_old_log="${ARTIFACT_DIR}/w2-only-old-w1-install.log"
+    bridge_log="${ARTIFACT_DIR}/w2-only-install.log"
+    W2_ONLY_INSTALL_DB="connector_w2_only_$$"
+    log "W2-only install bridge from ${bridge_short} -> ${W2_ONLY_INSTALL_DB}"
+    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
+        log "${bridge_short} is not in this clone; fetching durable W2-only origin"
+        git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin \
+            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 \
+            || git -C "$REPO_ROOT" fetch --no-tags origin \
+            "$W2_ONLY_INSTALL_ORIGIN" >/dev/null 2>&1 || true
+    fi
+    if ! git -C "$REPO_ROOT" cat-file -e "${W2_ONLY_INSTALL_ORIGIN}^{commit}" 2>/dev/null; then
+        W2_ONLY_INSTALL_STATUS="fail"
+        W2_ONLY_INSTALL_RESULT="durable W2-only origin is unavailable"
+        evidence_fail "w2-only: origin ${W2_ONLY_INSTALL_ORIGIN} is unavailable"
+    else
+        rm -rf "$bridge_tree"
+        mkdir -p "$bridge_tree"
+        git -C "$REPO_ROOT" archive "$W2_ONLY_INSTALL_ORIGIN" addons \
+            | tar -x -C "$bridge_tree"
+        sed "s|^addons_path = .*|addons_path = ${ODOO_SRC}/addons,${bridge_tree}/addons|" \
+            "$CONF" > "$bridge_old_conf"
+        dropdb --if-exists "$W2_ONLY_INSTALL_DB" 2>/dev/null || true
+        createdb "$W2_ONLY_INSTALL_DB"
+        if ! run_odoo_with_conf "$bridge_old_conf" "$W2_ONLY_INSTALL_DB" \
+                "$bridge_old_log" -i "${W1_ONLY_MODULES},${EXTRA_MODULES}"; then
+            W2_ONLY_INSTALL_STATUS="fail"
+            W2_ONLY_INSTALL_RESULT="old W1 install failed"
+            evidence_fail "w2-only: old W1 origin install failed"
+        else
+            W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
+                "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            bridge_before_w2="$(psql -tAc \
+                "SELECT count(*) FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            bridge_before_columns="$(psql -tAc \
+                "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields')" \
+                "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+            log "w2-only old base: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2 rows=${bridge_before_w2}, includeFields columns=${bridge_before_columns}"
+            if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
+                  || "$bridge_before_w2" != "0" \
+                  || "$bridge_before_columns" != "0" ]]; then
+                W2_ONLY_INSTALL_STATUS="fail"
+                W2_ONLY_INSTALL_RESULT="old base was not W1-only with the pre-bridge schema"
+                evidence_fail "w2-only: old base identity/schema precondition failed"
+            elif run_odoo "$W2_ONLY_INSTALL_DB" "$bridge_log" \
+                    -i shopify_connector_product_webhook --test-enable \
+                    --test-tags "$W2_ONLY_INSTALL_TEST_TAGS"; then
+                W2_ONLY_INSTALL_STATUS="pass"
+                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
+            else
+                W2_ONLY_INSTALL_STATUS="fail"
+                W2_ONLY_INSTALL_RESULT="$(result_line "$bridge_log")"
+                evidence_fail "w2-only: installing W2 over old W1 failed"
+            fi
+            if [[ "$W2_ONLY_INSTALL_STATUS" == "pass" ]]; then
+                verify_no_unexpected_skips "$bridge_log" "w2-only"
+                verify_no_migration_ran "$bridge_log" "w2-only"
+                if ! grep -Eq '[0-9]+ failed, [0-9]+ error\(s\) of [1-9][0-9]* tests' \
+                    "$bridge_log"; then
+                    W2_ONLY_INSTALL_STATUS="fail"
+                    evidence_fail "w2-only: no installed W2 test result was recorded"
+                fi
+                W2_ONLY_INSTALL_W1_VERSION="$(psql -tAc \
+                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_webhook'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                W2_ONLY_INSTALL_W2_VERSION="$(psql -tAc \
+                    "SELECT latest_version FROM ir_module_module WHERE name = 'shopify_connector_product_webhook'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                W2_ONLY_INSTALL_COLUMNS="$(psql -tAc \
+                    "SELECT count(*) FROM information_schema.columns WHERE table_name = 'shopify_connector_webhook_subscription' AND column_name IN ('expected_include_fields', 'actual_include_fields') AND udt_name = 'jsonb'" \
+                    "$W2_ONLY_INSTALL_DB" | tr -d '[:space:]')"
+                log "w2-only result: W1=${W2_ONLY_INSTALL_W1_VERSION}, W2=${W2_ONLY_INSTALL_W2_VERSION}, JSONB columns=${W2_ONLY_INSTALL_COLUMNS}"
+                if [[ "$W2_ONLY_INSTALL_W1_VERSION" != "19.0.1.0.0" \
+                      || "$W2_ONLY_INSTALL_W2_VERSION" != "$W2_PRODUCT_WEBHOOK_VERSION" \
+                      || "$W2_ONLY_INSTALL_COLUMNS" != "2" ]]; then
+                    W2_ONLY_INSTALL_STATUS="fail"
+                    evidence_fail "w2-only: W1 was upgraded or W2/schema verification failed"
+                fi
+            fi
+        fi
+    fi
+    if [[ "$W2_ONLY_INSTALL_STATUS" == "fail" ]]; then
+        OVERALL=1
+    fi
 fi
 
 # --- Pass 2b: genuine version-to-version migrations --------------------------
@@ -1108,6 +1546,7 @@ cat > "$SUMMARY" <<EOF
                                "kind": "SAME-VERSION module update",
                                "runs_migration_scripts": false,
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
+    "w2_only_install_over_old_w1": {"status": "${W2_ONLY_INSTALL_STATUS}", "result": "${W2_ONLY_INSTALL_RESULT}", "db": "${W2_ONLY_INSTALL_DB}", "origin": "${W2_ONLY_INSTALL_ORIGIN}", "w1_version_after": "${W2_ONLY_INSTALL_W1_VERSION}", "w2_version_after": "${W2_ONLY_INSTALL_W2_VERSION}", "jsonb_columns": "${W2_ONLY_INSTALL_COLUMNS}", "log": "w2-only-install.log", "kind": "W2 -i over installed old W1; W1 is not upgraded"},
     "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
   },
   "migration_passes": {

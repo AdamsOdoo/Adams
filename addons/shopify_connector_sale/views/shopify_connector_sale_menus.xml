@@ -1,46 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <!--
-        U2 operator UI: the Orders branch, plus the customer-matching entry
-        that belongs under the Catalog &amp; Matching branch the product
-        module owns.
+    <!-- C1: sales destinations join the signed four-pillar tree. -->
 
-        Placement: Orders at sequence 15, directly under Dashboard (10) and
-        above Stores (20) — the master specification puts Orders second
-        because order-first merchants open it before anything else.
+    <menuitem id="menu_shopify_connector_sales_dashboard"
+              name="Sales Dashboard"
+              parent="shopify_connector_core.menu_shopify_connector_dashboard"
+              action="shopify_connector_core.action_shopify_connector_dashboard"
+              sequence="10"/>
 
-        Customer Matching parents into `shopify_connector_product`'s Catalog
-        branch rather than creating a second matching home. That cross-module
-        parent is safe: `shopify_connector_sale` depends on
-        `shopify_connector_product`, so the parent menu is always loaded
-        first.
-
-        VISIBILITY vs AUTHORIZATION: as everywhere else in this UI, `groups=`
-        here hides a menu and nothing more. The server enforces every ACL and
-        every action guard independently.
-    -->
+    <!-- This is a genuine reporting destination today: Store 360 already
+         exposes the review-excluded, per-currency sales aggregates. Batch D
+         gives the dashboard its own presentation while this stable reporting
+         entry remains available. -->
+    <menuitem id="menu_shopify_connector_sales_analysis"
+              name="Sales Analysis"
+              parent="shopify_connector_core.menu_shopify_connector_reporting"
+              action="shopify_connector_core.action_shopify_connector_dashboard"
+              sequence="10"/>
 
     <menuitem id="menu_shopify_connector_orders"
               name="Orders"
-              parent="shopify_connector_core.menu_shopify_connector_root"
-              sequence="15"
+              parent="shopify_connector_core.menu_shopify_connector_operations"
+              action="action_shopify_connector_order_workspace"
+              sequence="10"
               groups="shopify_connector_core.group_shopify_connector_user"/>
 
+    <!-- Stable former leaf, retained as an inactive alias because Orders now
+         opens the workspace directly. -->
     <menuitem id="menu_shopify_connector_order_workspace"
               name="Orders Workspace"
               parent="menu_shopify_connector_orders"
               action="action_shopify_connector_order_workspace"
-              sequence="10"/>
+              sequence="10"
+              active="False"/>
 
     <menuitem id="menu_shopify_connector_cod_reconciliation"
               name="COD Reconciliation"
               parent="menu_shopify_connector_orders"
               action="action_shopify_connector_cod_reconciliation"
-              sequence="20"/>
+              sequence="20"
+              active="False"/>
 
     <menuitem id="menu_shopify_connector_customer_binding"
-              name="Customer Matching"
+              name="Customer Mappings"
               parent="shopify_connector_product.menu_shopify_connector_catalog"
               action="action_shopify_connector_customer_binding"
+              groups="shopify_connector_core.group_shopify_connector_admin"
               sequence="30"/>
 </odoo>

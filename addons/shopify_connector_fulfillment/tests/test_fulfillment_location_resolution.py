@@ -175,7 +175,9 @@ class TestFulfillmentLocationResolution(TransactionCase):
                 'isActive': True,
             }],
         ):
-            self.assertTrue(self.Service._refresh_location_cache(self.store))
+            self.assertTrue(
+                self.Service._refresh_location_cache(False, self.store)
+            )
         row = self.Location.search([
             ('store_id', '=', self.store.id),
             ('shopify_location_gid', '=', 'gid://shopify/Location/50'),
@@ -194,7 +196,9 @@ class TestFulfillmentLocationResolution(TransactionCase):
                 'isActive': False,
             }],
         ):
-            self.assertTrue(self.Service._refresh_location_cache(self.store))
+            self.assertTrue(
+                self.Service._refresh_location_cache(False, self.store)
+            )
         rows = self.Location.search([
             ('store_id', '=', self.store.id),
             ('shopify_location_gid', '=', 'gid://shopify/Location/50'),

@@ -224,7 +224,7 @@ class OrderImportCase(TransactionCase):
                 'discountedTotalSet': {
                     'shopMoney': {'amount': '100.00'},
                 },
-                'priceAfterAllDiscountsBeforeTaxesSet': total,
+                'discountedUnitPriceAfterAllDiscountsSet': total,
                 'discountAllocations': [],
                 'taxLines': [],
             }],
@@ -248,6 +248,16 @@ class OrderImportCase(TransactionCase):
 
 @tagged('post_install', '-at_install')
 class TestOrderImportMappingStatic(TransactionCase):
+
+    def test_order_documents_use_2026_07_discounted_unit_price_field(self):
+        documents = (ORDER_HEADER_QUERY, ORDER_LINE_ITEMS_PAGE_QUERY)
+        for document in documents:
+            self.assertIn(
+                'discountedUnitPriceAfterAllDiscountsSet', document,
+            )
+            self.assertNotIn(
+                'priceAfterAllDiscountsBeforeTaxesSet', document,
+            )
 
     def _source(self, filename):
         return (MODELS_ROOT / filename).read_text(encoding='utf-8')
@@ -319,16 +329,17 @@ class TestOrderImportMappingStatic(TransactionCase):
     def test_exact_sudo_inventory_and_dispatch_create_guard(self):
         expected = {
             'shopify_connector_order_binding.py': 2,
-            'shopify_connector_order_importer.py': 2,
-            # Store 360 slice 1 raised the order-scan inventory from 1 to 3:
-            # the checkpoint/lineage settings write (pre-existing), plus the
-            # two minimal technical-sudo READS in the cancelled-import
-            # resume path (`_resume_cancelled_order_import`: the prior-job
-            # lookup and the binding-evidence lookup) — the same P1-3
-            # posture as `_enqueue_once`'s technical-sudo job handle. Job
-            # creation itself still flows only through the sanctioned
-            # `job.enqueue` service.
-            'shopify_connector_order_scan.py': 3,
+            # The importer has three deliberately narrow technical-sudo
+            # boundaries: binding creation under the permanent uniqueness
+            # race, the non-blocking binding row lock used to serialize
+            # refreshes, and the locked binding evidence write.  Keep the
+            # explicit count so a future privilege expansion is visible.
+            'shopify_connector_order_importer.py': 3,
+            # The resumable scan owns three protected checkpoint writes and
+            # one terminal job transition. The cancelled-import resume path
+            # adds two narrow protected evidence reads. Job creation still
+            # flows only through the sanctioned `job.enqueue` service.
+            'shopify_connector_order_scan.py': 6,
             'shopify_connector_tax_mapping.py': 0,
         }
         for filename, count in expected.items():
@@ -389,7 +400,14 @@ class TestOrderImportMappingStatic(TransactionCase):
         # and the 19.0.2.9.0 backfill migration -- a genuine schema change
         # with a genuine migration script, so the version moves a minor
         # step. Recorded here rather than the guard being relaxed.
-        self.assertEqual(manifest['version'], '19.0.2.9.0')
+        # The UI-restructure release adds the supported-kernel order
+        # capability statement, review-aware Sales Dashboard aggregation,
+        # and the split navigation/reporting surfaces. Loaded metadata and
+        # production behavior changed together, so the manifest advances.
+        # The coherent-repair upgrade qualification adds an explicit migration
+        # checkpoint so existing databases consume the tightened role graph
+        # and newly persisted product/inventory identity safely.
+        self.assertEqual(manifest['version'], '19.0.2.15.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],

@@ -63,4 +63,13 @@ class ShopifyConnectorJobEnqueue(models.AbstractModel):
         if trigger_origin_event_at:
             vals['trigger_origin_event_at'] = trigger_origin_event_at
         job = self.env['shopify.connector.job'].sudo().create(vals)
+        cron = self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain',
+            raise_if_not_found=False,
+        )
+        if cron:
+            # Odoo coalesces trigger rows for the scheduled action.  This is a
+            # wakeup hint after a durable enqueue, never a replacement for the
+            # normal interval and never an inline dispatch.
+            cron.sudo()._trigger()
         return self.env['shopify.connector.job'].browse(job.id)

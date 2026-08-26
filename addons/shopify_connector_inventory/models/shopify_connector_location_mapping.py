@@ -56,6 +56,36 @@ class ShopifyConnectorLocationMapping(models.Model):
             'push_enabled',
         ))
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        mappings = super().create(vals_list)
+        if mappings:
+            # The mapping may be created before or after the product import.
+            # The internal service reconciles both orders without exposing a
+            # public unguarded binding-creation method.
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._bootstrap_inventory_level_bindings(
+                location_mappings=mappings,
+            )
+        return mappings
+
+    def write(self, vals):
+        result = super().write(vals)
+        if set(vals) & {
+            'store_id', 'shopify_gid', 'odoo_location_id', 'push_enabled',
+            'status',
+        }:
+            # `action_set_push_enabled` deliberately delegates to write on a
+            # sudo record; this post-write hook therefore covers the public
+            # enable/disable action and sanctioned mapping service alike.
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._bootstrap_inventory_level_bindings(
+                location_mappings=self,
+            )
+        return result
+
     @api.constrains('store_id', 'odoo_location_id')
     def _check_no_ancestor_descendant_overlap(self):
         for mapping in self:
@@ -99,24 +129,20 @@ class ShopifyConnectorLocationMapping(models.Model):
     def _check_location_company_consistency(self):
         for mapping in self:
             location_company = mapping.odoo_location_id.company_id
-            if location_company and location_company != self.env.company:
+            store_company = mapping.store_id.company_id
+            if location_company and location_company != store_company:
                 raise UserError(
                     "The mapped Odoo location belongs to a different "
-                    "company than the current company."
+                    "company than the Shopify store."
                 )
 
     def action_set_push_enabled(self, enabled):
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_operator'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Operator or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "change a location mapping's push-enable flag."
             )
         self.sudo().write({'push_enabled': bool(enabled)})
@@ -161,6 +187,9 @@ class ShopifyConnectorLocationOdooResolution(models.Model):
             return False
         if location.usage != 'internal':
             return False
-        if location.company_id and location.company_id != self.env.company:
+        if (
+            location.company_id
+            and location.company_id != mapping.store_id.company_id
+        ):
             return False
         return location

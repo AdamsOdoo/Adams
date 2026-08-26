@@ -1,5 +1,6 @@
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError
+from odoo.tools.float_utils import float_compare
 
 
 FIRST_PUSH_STATE_SELECTION = [
@@ -74,6 +75,11 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
         readonly=True,
     )
     first_push_preview_qty = fields.Float(readonly=True)
+    # Presence distinguishes a preview produced by the guarded service from
+    # legacy/manual preview rows created before the stale-preview contract.
+    # New confirmations compare the live quantity only when this durable
+    # evidence exists, preserving warm-upgrade compatibility.
+    first_push_previewed_at = fields.Datetime(readonly=True)
     first_push_confirmed_at = fields.Datetime(readonly=True)
     first_push_confirmed_by_uid = fields.Many2one(
         comodel_name='res.users', readonly=True,
@@ -108,6 +114,7 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
             'pending_target_available',
             'first_push_state',
             'first_push_preview_qty',
+            'first_push_previewed_at',
             'first_push_confirmed_at',
             'first_push_confirmed_by_uid',
         ))
@@ -141,27 +148,28 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
     def _check_company_consistency(self):
         """SEC-1 composite-binding company rule (PR #182 comment
         5025803697 item 21): any non-empty company on the product
-        variant or the mapped location must equal `env.company`, and
+        variant or the mapped location must equal the owning store company, and
         when both are non-empty they must equal each other.
         Company-neutral product/location records remain valid. Runs on
         every create/write of this binding regardless of caller (the
         sanctioned service included) -- never bypassed by `sudo()`,
-        since `@api.constrains` always evaluates on the base record
-        visible to the current environment's company context.
+        since `@api.constrains` compares persistent record ownership rather
+        than the operator's currently active company.
         """
         for binding in self:
             product = binding.product_variant_binding_id.product_variant_id
             location = binding.location_mapping_id.odoo_location_id
             product_company = product.company_id if product else False
             location_company = location.company_id if location else False
+            store_company = binding.store_id.company_id
             for label, company in (
                 ('product variant', product_company),
                 ('mapped location', location_company),
             ):
-                if company and company != self.env.company:
+                if company and company != store_company:
                     raise UserError(
                         "The %s belongs to a different company than the "
-                        "current company." % label
+                        "Shopify store." % label
                     )
             if (
                 product_company and location_company
@@ -173,7 +181,7 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
                 )
 
     def action_confirm_first_push(self):
-        """Reviewer/Administrator-only explicit first-push confirmation.
+        """Administrator-only explicit first-push confirmation.
 
         Records the confirming actor and timestamp and moves
         `first_push_state` from `previewed` to `confirmed`. A row with no
@@ -184,22 +192,30 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
         mutation job type for this pair (D-013-4).
         """
         self.ensure_one()
-        if not (
-            self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_reviewer'
-            )
-            or self.env.user.has_group(
-                'shopify_connector_core.group_shopify_connector_admin'
-            )
+        if not self.env.user.has_group(
+            'shopify_connector_core.group_shopify_connector_admin'
         ):
             raise AccessError(
-                "Only a Shopify Connector Reviewer or Administrator may "
+                "Only a Shopify Connector Administrator may "
                 "confirm a first push."
             )
         if self.first_push_state != 'previewed':
             raise UserError(
                 "A first push can only be confirmed after its preview has "
                 "run."
+            )
+        current_target = self.env[
+            'shopify.connector.inventory.service'
+        ]._current_odoo_available(self)
+        if self.first_push_previewed_at and float_compare(
+            current_target, self.first_push_preview_qty, precision_digits=4,
+        ):
+            raise UserError(
+                'Odoo available quantity changed from %.4f to %.4f after '
+                'this preview. Run or refresh the first-push preview and '
+                'review the new quantity before confirming.' % (
+                    self.first_push_preview_qty, current_target,
+                )
             )
         self.sudo().write({
             'first_push_state': 'confirmed',

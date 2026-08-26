@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <!--
-        U0 operator UI: Sync Center + Error & Manual Review Center over the
-        existing shopify.connector.job model.
+        Batch E operator UI: distinct Runs & Recovery and human-owned Needs
+        Attention projections over the existing shopify.connector.job model.
 
         All roles read (job ACL is read for all four). Action buttons target
         ONLY existing sanctioned methods and are gated to match the server's
@@ -23,12 +23,12 @@
         <field name="name">shopify.connector.job.search</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <search string="Sync jobs">
+            <search string="Sync runs">
                 <field name="store_id"/>
-                <field name="job_type"/>
+                <field name="job_type" string="Run type"/>
                 <field name="error_class"/>
                 <filter name="filter_needs_attention" string="Needs attention"
-                        domain="[('state', 'in', ('failed_retryable', 'retry_waiting', 'blocked_manual_review'))]"/>
+                        domain="[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable')), ('superseded_by_job_id', '=', False)]"/>
                 <separator/>
                 <filter name="filter_queued_running" string="Queued / running"
                         domain="[('state', 'in', ('queued', 'running'))]"/>
@@ -47,12 +47,12 @@
                 <filter name="filter_cancelled" string="Cancelled"
                         domain="[('state', '=', 'cancelled')]"/>
                 <separator/>
-                <filter name="filter_has_evidence" string="Has mutation evidence"
+                <filter name="filter_has_evidence" string="Has Shopify write evidence"
                         domain="[('mutation_attempt_id', '!=', False)]"/>
                 <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
                     <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
-                    <filter name="group_job_type" string="Job type" context="{'group_by': 'job_type'}"/>
+                    <filter name="group_job_type" string="Run type" context="{'group_by': 'job_type'}"/>
                     <filter name="group_source" string="Source" context="{'group_by': 'job_source'}"/>
                     <filter name="group_error_class" string="Error class" context="{'group_by': 'error_class'}"/>
                 </group>
@@ -65,7 +65,7 @@
         <field name="name">shopify.connector.job.list</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <list string="Sync jobs"
+            <list string="Runs &amp; Recovery" default_order="create_date desc, id desc"
                   decoration-danger="state in ('failed_final', 'failed_retryable', 'blocked_manual_review')"
                   decoration-warning="state == 'retry_waiting'"
                   decoration-info="state in ('queued', 'running')"
@@ -73,16 +73,56 @@
                   decoration-muted="state in ('skipped', 'cancelled')"
                   create="false" delete="false" edit="false">
                 <field name="store_id"/>
-                <field name="job_type"/>
-                <field name="job_source" optional="show"/>
+                <field name="job_type" string="Run type"/>
+                <field name="job_source" string="Source" optional="show"/>
                 <field name="state" string="State" decoration-bf="1"/>
-                <field name="error_class" optional="show"/>
-                <field name="manual_review_subreason" optional="hide"/>
+                <field name="merchant_write_status" string="Shopify acknowledgement"
+                       optional="show"/>
+                <field name="recovery_owner" string="Owner" optional="show"/>
+                <field name="recovery_next_action" string="Next action" optional="show"/>
+                <field name="error_class" string="Recorded reason" optional="hide"/>
                 <field name="retry_count" string="Retries" optional="show"/>
-                <field name="mutation_attempt_id" string="Mutation evidence" optional="show" widget="many2one"/>
+                <field name="next_retry_at" string="Next retry" optional="show"/>
+                <field name="mutation_attempt_id" string="Shopify write evidence" optional="show" widget="many2one"/>
+                <field name="operator_has_mutation_evidence" column_invisible="True"/>
                 <field name="res_model" optional="hide"/>
                 <field name="started_at" string="Started" optional="hide"/>
                 <field name="finished_at" string="Finished" optional="show"/>
+                <button name="action_open_recovery_evidence" type="object"
+                        string="Review evidence" icon="fa-shield"
+                        invisible="not operator_has_mutation_evidence"
+                        help="Open preserved Shopify write evidence. This only reads evidence; it does not retry or change Shopify."/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Human-owned cases only. Priority is a stored projection of the
+         existing state: decision blockers, then final failures, then
+         retryable failures. Automatic retry waiting remains in Runs &
+         Recovery and never inflates this inbox. -->
+    <record id="view_shopify_connector_attention_list" model="ir.ui.view">
+        <field name="name">shopify.connector.job.attention.list</field>
+        <field name="model">shopify.connector.job</field>
+        <field name="arch" type="xml">
+            <list string="Needs Attention"
+                  default_order="attention_priority desc, create_date asc, id asc"
+                  decoration-danger="state in ('blocked_manual_review', 'failed_final')"
+                  decoration-warning="state == 'failed_retryable'"
+                  create="false" delete="false" edit="false">
+                <field name="attention_priority" string="Priority" optional="hide"/>
+                <field name="store_id"/>
+                <field name="job_type" string="Run type"/>
+                <field name="attention_reason" string="Reason"/>
+                <field name="attention_business_object" string="Affected object"/>
+                <field name="attention_owner" string="Owner"/>
+                <field name="attention_next_action" string="Next action"/>
+                <field name="state" string="Case state"/>
+                <field name="merchant_write_status" string="Shopify acknowledgement"
+                       optional="show"/>
+                <field name="create_date" string="Opened"/>
+                <button name="action_open_attention_case" type="object"
+                        string="Open case" icon="fa-external-link"
+                        help="Open the preserved evidence or affected record for this exact case. Opening it changes nothing."/>
             </list>
         </field>
     </record>
@@ -92,50 +132,63 @@
         <field name="name">shopify.connector.job.form</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <form string="Sync job" create="false" delete="false" edit="false">
+            <form string="Sync run" create="false" delete="false" edit="false">
                 <header>
                     <!-- Ordinary retry: Operator/Admin, non-mutation. -->
                     <button name="action_manual_retry" type="object"
                             string="Retry" class="btn-primary"
                             groups="shopify_connector_core.group_shopify_connector_operator,shopify_connector_core.group_shopify_connector_admin"
-                            invisible="state not in ('failed_retryable', 'failed_final', 'skipped') or mutation_attempt_id"
-                            help="Re-queue this job to run again."/>
-                    <!-- Blocked-review retry / release: Reviewer/Admin, non-mutation. -->
+                            invisible="state not in ('failed_retryable', 'failed_final', 'skipped') or operator_has_mutation_evidence"
+                            confirm="Retry queues a new background run in Odoo. It does not run immediately and is not proof that Shopify accepted a write. Continue?"
+                            help="Queues local background work; it does not run immediately."/>
+                    <!-- Blocked-review retry / release: Administrator-only privileged recovery. -->
                     <button name="action_manual_retry" type="object"
                             string="Release for retry"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer,shopify_connector_core.group_shopify_connector_admin"
-                            invisible="state != 'blocked_manual_review' or mutation_attempt_id"
-                            help="Re-queue a job that was waiting on a review decision."/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state != 'blocked_manual_review' or operator_has_mutation_evidence"
+                            confirm="Release queues this reviewed run again. It does not run immediately. Continue?"
+                            help="Queues a reviewed run after the decision is complete."/>
                     <button name="action_resolve_manual_review" type="object"
                             string="Resolve review" class="btn-primary"
-                            groups="shopify_connector_core.group_shopify_connector_reviewer,shopify_connector_core.group_shopify_connector_admin"
-                            invisible="state != 'blocked_manual_review' or mutation_attempt_id"
-                            help="Mark the review resolved and re-queue the job."/>
+                            groups="shopify_connector_core.group_shopify_connector_admin"
+                            invisible="state != 'blocked_manual_review' or operator_has_mutation_evidence"
+                            help="Mark the review resolved and re-queue the run."/>
+                    <button name="action_open_attention_case" type="object"
+                            string="Open case"
+                            invisible="state not in ('blocked_manual_review', 'failed_final', 'failed_retryable')"
+                            help="Open the preserved evidence or affected record. Opening it changes nothing."/>
+                    <button name="action_open_recovery_evidence" type="object"
+                            string="Review Shopify evidence"
+                            invisible="not operator_has_mutation_evidence"
+                            help="Reads preserved mutation evidence only; it does not retry, reconcile, or change Shopify."/>
                     <!-- Cancel with a reason: Operator/Admin, non-mutation, cancellable states. -->
                     <button name="%(action_shopify_connector_job_cancel_wizard)d" type="action"
-                            string="Cancel job"
+                            string="Cancel run"
                             groups="shopify_connector_core.group_shopify_connector_operator,shopify_connector_core.group_shopify_connector_admin"
-                            invisible="state not in ('draft', 'queued', 'running', 'retry_waiting') or mutation_attempt_id"
-                            help="Cancel this job. A reason is required and recorded."/>
+                            invisible="state not in ('draft', 'queued', 'running', 'retry_waiting') or operator_has_mutation_evidence"
+                            help="Cancel this run. A reason is required and recorded."/>
                     <field name="state" widget="statusbar"
                            statusbar_visible="draft,queued,running,succeeded"/>
                 </header>
                 <sheet>
+                    <field name="operator_has_mutation_evidence" invisible="1"/>
                     <div class="oe_button_box" name="button_box">
                         <button type="action" name="%(action_shopify_connector_job_log)d"
                                 class="oe_stat_button" icon="fa-file-text-o"
                                 string="Log entries"
                                 context="{'search_default_job_id': id}"/>
                     </div>
-                    <widget name="web_ribbon" title="Mutation evidence"
+                    <widget name="web_ribbon" title="Shopify write evidence"
                             bg_color="text-bg-warning"
-                            invisible="not mutation_attempt_id"/>
+                            invisible="not operator_has_mutation_evidence"/>
                     <group>
                         <group string="What">
-                            <field name="job_type" readonly="1"/>
-                            <field name="job_source" readonly="1"/>
+                            <field name="job_type" string="Run type" readonly="1"/>
+                            <field name="job_source" string="Source" readonly="1"/>
                             <field name="store_id" readonly="1"/>
                             <field name="state" readonly="1"/>
+                            <field name="merchant_write_status" readonly="1"
+                                   invisible="not merchant_write_status"/>
                         </group>
                         <group string="Why">
                             <field name="error_class" readonly="1" invisible="not error_class"/>
@@ -161,9 +214,23 @@
                     <group string="Cancellation" invisible="not cancel_reason">
                         <field name="cancel_reason" readonly="1"/>
                     </group>
+                    <group string="Business context"
+                           invisible="state not in ('blocked_manual_review', 'failed_final', 'failed_retryable')">
+                        <group>
+                            <field name="attention_business_object" readonly="1"/>
+                            <field name="attention_event" readonly="1"/>
+                            <field name="attention_shopify_state" readonly="1"/>
+                            <field name="attention_odoo_state" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="attention_effect" readonly="1"/>
+                            <field name="attention_next_action" readonly="1"/>
+                            <field name="attention_consequence" readonly="1"/>
+                        </group>
+                    </group>
                     <div class="text-muted"
-                         invisible="not mutation_attempt_id">
-                        This job carries mutation evidence. It is resolved only through the
+                         invisible="not operator_has_mutation_evidence">
+                        This run carries Shopify write evidence. It is resolved only through the
                         administrator mutation-attempt review — the generic retry and cancel
                         actions do not apply.
                     </div>
@@ -172,30 +239,42 @@
         </field>
     </record>
 
-    <!-- Sync Center: all jobs, defaulting to the "needs attention" facet -->
+    <!-- Runs & Recovery: every run, including system-owned retry waiting. -->
     <record id="action_shopify_connector_sync_center" model="ir.actions.act_window">
-        <field name="name">Sync Center</field>
+        <field name="name">Runs &amp; Recovery</field>
         <field name="res_model">shopify.connector.job</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_shopify_connector_job_search"/>
-        <field name="context">{'search_default_filter_needs_attention': 1}</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_job_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_job_form')})]"/>
+        <field name="context">{}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">Nothing needs attention</p>
-            <p>Sync jobs appear here. When something needs a decision or a fix, it shows up first.</p>
+            <p class="o_view_nocontent_smiling_face">No runs yet</p>
+            <p>Every queued, running, retrying and completed connector run appears here. Retry queues local background work; cancel records a reason; Shopify write evidence opens read-only before any administrator decision.</p>
         </field>
     </record>
 
-    <!-- Error & Manual Review Center: attention-required states only -->
+    <!-- Needs Attention: prioritized human-owned cases only. -->
     <record id="action_shopify_connector_error_center" model="ir.actions.act_window">
-        <field name="name">Error &amp; Review Center</field>
+        <field name="name">Needs Attention</field>
         <field name="res_model">shopify.connector.job</field>
         <field name="view_mode">list,form</field>
         <field name="search_view_id" ref="view_shopify_connector_job_search"/>
-        <field name="domain">[('state', 'in', ('failed_retryable', 'failed_final', 'blocked_manual_review', 'retry_waiting'))]</field>
+        <field name="view_ids"
+               eval="[(5, 0, 0),
+                      (0, 0, {'view_mode': 'list', 'sequence': 10,
+                              'view_id': ref('view_shopify_connector_attention_list')}),
+                      (0, 0, {'view_mode': 'form', 'sequence': 20,
+                              'view_id': ref('view_shopify_connector_job_form')})]"/>
+        <field name="domain">[('state', 'in', ('blocked_manual_review', 'failed_final', 'failed_retryable')), ('superseded_by_job_id', '=', False)]</field>
         <field name="context">{}</field>
         <field name="help" type="html">
-            <p class="o_view_nocontent_smiling_face">No open errors</p>
-            <p>Everything that ran recently succeeded. Failures and items awaiting a decision appear here.</p>
+            <p class="o_view_nocontent_smiling_face">No one needs to act</p>
+            <p>Human decisions and failures needing a fix appear here. Automatic retries stay in Runs &amp; Recovery until a person actually owns the next step.</p>
         </field>
     </record>
 </odoo>

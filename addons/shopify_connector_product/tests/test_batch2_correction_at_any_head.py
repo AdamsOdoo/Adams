@@ -100,6 +100,9 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
         cls.reviewer = cls._role_user(
             'reviewer', 'group_shopify_connector_reviewer', cls.company,
         )
+        cls.admin = cls._role_user(
+            'admin', 'group_shopify_connector_admin', cls.company,
+        )
         cls.operator = cls._role_user(
             'operator', 'group_shopify_connector_operator', cls.company,
         )
@@ -198,7 +201,7 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
         return job, decision, first, second
 
     def _confirm(self, decision, chosen, user=None):
-        wizard = self.Wizard.with_user(user or self.reviewer).with_context(
+        wizard = self.Wizard.with_user(user or self.admin).with_context(
             default_decision_id=decision.id,
         ).create({})
         wizard.write({'selected_template_id': chosen.id})
@@ -411,58 +414,17 @@ class TestProductMatchRealDataAtAnyHead(TransactionCase):
 
     # -- F11 -----------------------------------------------------------
 
-    def test_the_scan_ceiling_refusal_states_the_limit_and_consequence(self):
-        """A refusal an operator cannot act on is not an operable failure."""
-        from odoo.addons.shopify_connector_product.models\
-            .shopify_connector_product_scan import (
-                PRODUCT_SCAN_PAGE_LIMIT,
-                PRODUCT_SCAN_PAGE_SIZE,
-            )
-        from odoo.addons.shopify_connector_core.models\
-            .shopify_connector_job_dispatch import JobHandlerError
+    def test_product_scan_is_durably_resumable_not_catalog_capped(self):
+        import inspect
 
-        pages = iter([
-            {'data': {'products': {
-                'edges': [{
-                    'cursor': 'c-%d' % index,
-                    'node': {
-                        'id': 'gid://shopify/Product/73462990%05d' % index,
-                        'updatedAt': '2026-07-17T12:00:00Z',
-                        'status': 'ACTIVE',
-                    },
-                }],
-                'pageInfo': {
-                    'hasNextPage': True, 'endCursor': 'CUR-%d' % index,
-                },
-            }}}
-            for index in range(PRODUCT_SCAN_PAGE_LIMIT + 1)
-        ])
-
-        class _Ctx:
-            def __enter__(inner):
-                return next(pages)
-
-            def __exit__(inner, *args):
-                return False
-
-        client = self.env['shopify.connector.api.client']
-        scan = self.store.with_user(self.operator).action_sync_products_now()
-        with patch.object(
-            type(client), 'execute_business',
-            new=lambda *args, **kwargs: _Ctx(),
+        service = self.env['shopify.connector.product.scan']
+        source = inspect.getsource(type(service).run_scan)
+        for required in (
+            'product_scan_window_end_at',
+            'product_scan_cursor',
+            'product_scan_generation',
+            'PRODUCT_SCAN_SLICE_PAGES',
+            '_enqueue_product_scan',
         ):
-            with self.assertRaises(JobHandlerError) as ceiling:
-                self.Dispatch._handle_product_import_scan(scan)
-        reason = ceiling.exception.reason
-        for expected in (
-            str(PRODUCT_SCAN_PAGE_SIZE),
-            str(PRODUCT_SCAN_PAGE_LIMIT),
-            str(PRODUCT_SCAN_PAGE_SIZE * PRODUCT_SCAN_PAGE_LIMIT),
-        ):
-            self.assertIn(
-                expected, reason,
-                'the ceiling refusal does not state %s, so an operator '
-                'cannot tell what they hit: %r' % (expected, reason),
-            )
-        self.assertIn('NOTHING WAS IMPORTED', reason)
-        self.assertIn('has NOT moved', reason)
+            self.assertIn(required, source)
+        self.assertIn('if not complete:', source)

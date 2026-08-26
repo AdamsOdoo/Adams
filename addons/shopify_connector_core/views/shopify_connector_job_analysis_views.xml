@@ -14,9 +14,9 @@
         <field name="name">shopify.connector.job.analysis.search</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <search string="Sync Operations Analysis">
+            <search string="Sync Performance">
                 <field name="store_id"/>
-                <field name="job_type"/>
+                <field name="job_type" string="Run type"/>
                 <field name="state"/>
                 <field name="job_source"/>
                 <field name="error_class"/>
@@ -57,7 +57,7 @@
         <field name="name">shopify.connector.job.analysis.graph</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <graph string="Sync Operations Analysis" sample="0">
+            <graph string="Sync Performance" sample="0">
                 <field name="create_date" interval="day"/>
                 <field name="state"/>
             </graph>
@@ -68,16 +68,16 @@
         <field name="name">shopify.connector.job.analysis.pivot</field>
         <field name="model">shopify.connector.job</field>
         <field name="arch" type="xml">
-            <pivot string="Sync Operations Analysis" sample="0">
+            <pivot string="Sync Performance" sample="0">
                 <field name="store_id" type="row"/>
-                <field name="job_type" type="row"/>
+                <field name="job_type" string="Run type" type="row"/>
                 <field name="state" type="col"/>
             </pivot>
         </field>
     </record>
 
     <record id="action_shopify_connector_sync_analysis" model="ir.actions.act_window">
-        <field name="name">Sync Operations Analysis</field>
+        <field name="name">Sync Performance</field>
         <field name="res_model">shopify.connector.job</field>
         <field name="view_mode">graph,pivot,list,form</field>
         <field name="search_view_id" ref="view_shopify_connector_job_analysis_search"/>

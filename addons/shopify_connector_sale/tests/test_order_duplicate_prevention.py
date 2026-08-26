@@ -16,9 +16,34 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 )
 
 from .test_order_import_mapping import OrderImportCase
+from odoo.tools import mute_logger
 
 
 class TestOrderDuplicatePrevention(OrderImportCase):
+
+    def test_same_second_changed_webhook_fails_closed(self):
+        payload = self._payload('gid://shopify/Order/SameSecond')
+        binding = self.Importer._apply_import(self.store, payload)
+        fingerprint = binding.shopify_line_composition_fingerprint
+        job = self.Job.sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'webhook',
+            'job_type': 'order_import_sync',
+            'state': 'queued',
+            'payload_hash': 'same-second-changed-body',
+            'res_model': 'shopify.connector.store',
+            'res_id': self.store.id,
+            'shopify_target_gid': payload['id'],
+            'expected_connection_generation': self.store.connection_generation,
+        })
+        payload['line_items'][0]['sku'] = 'CHANGED-SAME-SECOND'
+        with self.assertRaises(JobHandlerError) as caught:
+            self.Importer._apply_import(self.store, payload, job=job)
+        self.assertEqual(caught.exception.error_class, 'ambiguous_match')
+        binding.invalidate_recordset()
+        self.assertEqual(
+            binding.shopify_line_composition_fingerprint, fingerprint,
+        )
 
     def test_repeat_import_refreshes_one_permanent_binding_and_order(self):
         payload = self._payload('gid://shopify/Order/Repeat')
@@ -41,6 +66,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
             'product_id', 'product_uom_qty', 'price_unit', 'discount', 'tax_ids',
         ]), line_before)
 
+    @mute_logger('odoo.sql_db')
     def test_every_discovery_source_collides_on_same_entity_identity(self):
         Scan = self.env['shopify.connector.order.scan']
         node = {
@@ -63,6 +89,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
         self.assertEqual(len(jobs), 1)
         self.assertEqual(jobs.job_source, 'scheduled_sync')
 
+    @mute_logger('odoo.sql_db')
     def test_overlapping_windows_and_repeated_pages_do_not_duplicate(self):
         Scan = self.env['shopify.connector.order.scan']
         node = {
@@ -81,6 +108,7 @@ class TestOrderDuplicatePrevention(OrderImportCase):
             ('shopify_target_gid', '=', node['id']),
         ]), 1)
 
+    @mute_logger('odoo.sql_db')
     def test_database_binding_constraints_are_the_last_race_anchor(self):
         binding = self.Importer._apply_import(
             self.store, self._payload('gid://shopify/Order/BindingAnchor'),
@@ -239,7 +267,7 @@ class TestOrderDiscoveryConcurrencyGenuine(TransactionCase):
                 'discountedTotalSet': {
                     'shopMoney': {'amount': '100.00'},
                 },
-                'priceAfterAllDiscountsBeforeTaxesSet': total,
+                'discountedUnitPriceAfterAllDiscountsSet': total,
                 'discountAllocations': [],
                 'taxLines': [],
             }],

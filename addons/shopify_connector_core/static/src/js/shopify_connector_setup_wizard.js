@@ -37,6 +37,7 @@
 import {
     Component,
     onWillStart,
+    onWillUnmount,
     useEffect,
     useRef,
     useState,
@@ -65,6 +66,10 @@ const MODEL = "shopify.connector.setup.wizard";
 // not arrived yet; every other key in this file comes from that payload.
 const FIRST_STEP_KEY = "welcome";
 
+// Finite one-shot backoff: no interval survives the setup session and no
+// browser loop claims a background run must finish within an arbitrary time.
+const LOCATION_REFRESH_BACKOFF_MS = [250, 500, 1000, 2000];
+
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";
     static props = { "*": true };
@@ -75,6 +80,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.notification = useService("notification");
         this.direction = localeDirection();
         this.headingRef = useRef("heading");
+        this.panelRef = useRef("panel");
 
         this.state = useState({
             status: "loading", // "loading" | "ready" | "error"
@@ -93,7 +99,6 @@ export class ShopifyConnectorSetupWizard extends Component {
                 price: "",
                 notification: false,
                 notificationConfirmed: false,
-                schedulePush: false,
                 scopesRead: false,
                 mapShopifyGid: "",
                 mapOdooLocationId: "",
@@ -121,10 +126,28 @@ export class ShopifyConnectorSetupWizard extends Component {
                     nextOffset: false, continuation: null, emptyReason: "",
                 },
             },
+            // Per-Shopify-row Odoo choices.  Keeping the choice beside the
+            // row removes the old two-list/two-search/global-select puzzle;
+            // the server still validates both identities on every save.
+            locationMappingChoices: {},
+            locationRefreshStillRunning: false,
         });
 
+        this.locationRefreshJobId = null;
+        this.locationRefreshFollowGeneration = 0;
+        this.locationRefreshTimer = null;
+        this.locationRefreshTimerResolve = null;
+
         onWillStart(async () => {
-            await this._load(this._contextStoreId());
+            await this._load(
+                this._contextStoreId(),
+                this._contextStartsNewStore(),
+            );
+        });
+
+        onWillUnmount(() => {
+            this.locationRefreshFollowGeneration += 1;
+            this._cancelLocationRefreshTimer();
         });
 
         // A11y: focus moves to the step heading on advance, so a keyboard or
@@ -132,11 +155,17 @@ export class ShopifyConnectorSetupWizard extends Component {
         // left at the bottom of the previous one.
         useEffect(
             () => {
+                if (this.panelRef.el) {
+                    this.panelRef.el.scrollTop = 0;
+                }
                 if (this.headingRef.el) {
                     this.headingRef.el.focus();
                 }
             },
-            () => [this.state.stepKey]
+            // A store swap can leave the semantic step key unchanged (both
+            // flows start on Welcome), so the store identity belongs in the
+            // dependency list too.
+            () => [this.state.stepKey, this.store.id]
         );
     }
 
@@ -145,8 +174,17 @@ export class ShopifyConnectorSetupWizard extends Component {
         return context.default_setup_store_id || null;
     }
 
+    _contextStartsNewStore() {
+        const context = (this.props.action && this.props.action.context) || {};
+        return Boolean(context.default_setup_new_store);
+    }
+
     get steps() {
         return (this.state.data && this.state.data.steps) || [];
+    }
+
+    get phases() {
+        return (this.state.data && this.state.data.phases) || [];
     }
 
     get store() {
@@ -167,6 +205,9 @@ export class ShopifyConnectorSetupWizard extends Component {
                 refresh: { state: "none" },
                 mapped_count: 0,
                 unmapped_count: 0,
+                mapping_complete: false,
+                shopify_total: 0,
+                odoo_total: 0,
             }
         );
     }
@@ -187,6 +228,27 @@ export class ShopifyConnectorSetupWizard extends Component {
         return this.steps.find((s) => s.key === this.state.stepKey) || {};
     }
 
+    get currentPhase() {
+        const key = this.currentStep.phase_key;
+        return this.phases.find((phase) => phase.key === key) || {};
+    }
+
+    phaseSteps(phase) {
+        const keys = new Set(phase.step_keys || []);
+        return this.steps.filter((step) => keys.has(step.key));
+    }
+
+    phaseClass(phase) {
+        let cls = "sc_setup_phase";
+        const currentIndex = this.currentPhase.index || 0;
+        if (phase.key === this.currentPhase.key) {
+            cls += " sc_setup_phase--current";
+        } else if (phase.index < currentIndex) {
+            cls += " sc_setup_phase--done";
+        }
+        return cls;
+    }
+
     /** Position of the current step in the server's own ordered list. */
     get currentIndex() {
         return this.steps.findIndex((s) => s.key === this.state.stepKey);
@@ -205,6 +267,27 @@ export class ShopifyConnectorSetupWizard extends Component {
     get currentStepApplies() {
         const step = this.currentStep;
         return step.applicable === undefined ? true : step.applicable;
+    }
+
+    /** One navigation rule, mirrored by the server-side Continue guard. */
+    get canContinue() {
+        if (this.state.stepKey === "review") {
+            // The server re-runs readiness and remains the authoritative
+            // activation fence.  Mirror that decision in the client so a
+            // screen which says "Blocked" never presents an enabled primary
+            // action that is guaranteed to be refused.
+            return Boolean(this.summary.can_activate);
+        }
+        if (
+            this.state.stepKey === "location_mapping" &&
+            this.currentStepApplies
+        ) {
+            return Boolean(
+                this.refreshState() === "succeeded" &&
+                this.locations.mapping_complete
+            );
+        }
+        return true;
     }
 
     stepClass(step) {
@@ -234,16 +317,18 @@ export class ShopifyConnectorSetupWizard extends Component {
             running: _t("Running"),
             succeeded: _t("Succeeded"),
             failed: _t("Failed"),
+            stale: _t("Out of date"),
             none: _t("Not run yet"),
         }[this.refreshState()];
     }
 
     // --- server round trips -------------------------------------------------
 
-    async _load(storeId) {
+    async _load(storeId, newStore = false) {
         try {
             const data = await this.orm.call(MODEL, "get_setup_state", [], {
                 store_id: storeId || null,
+                new_store: newStore,
             });
             this._adopt(data, true);
             this.state.status = "ready";
@@ -272,13 +357,13 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.price = "";
         this.state.form.notification = false;
         this.state.form.notificationConfirmed = false;
-        this.state.form.schedulePush = false;
         this.state.form.mapShopifyGid = "";
         this.state.form.mapOdooLocationId = "";
         // Seed the credential-path choice from what the store already uses, so
         // a rerun opens on the merchant's actual path. A store with no
         // credential yet defaults to the Dev Dashboard path, because that is
         // the app-creation flow Shopify currently gives a new merchant.
+        this.state.form.credentialMode = "dev_dashboard_client_credentials";
         if (store.credential_present && store.auth_mode) {
             this.state.form.credentialMode = store.auth_mode;
         }
@@ -291,6 +376,29 @@ export class ShopifyConnectorSetupWizard extends Component {
     setCredentialMode(mode) {
         this.state.form.credentialMode = mode;
         this.state.errorMessage = "";
+    }
+
+    /**
+     * A setup rerun must not turn a stored write-only credential into a
+     * mandatory re-entry.  The server deliberately returns only a boolean
+     * presence mirror and the non-secret auth mode, so blank fields are the
+     * operator's explicit choice to keep the existing credential. The boolean
+     * only decides whether to request an action-time, non-secret server check;
+     * it never authorizes reuse by itself. Supplying replacement values (or
+     * choosing another mode) still takes the normal write-only path below.
+     */
+    _canReuseStoredCredential() {
+        return Boolean(
+            this.store.credential_present &&
+            this.store.auth_mode === this.state.form.credentialMode
+        );
+    }
+
+    async _retainExistingCredential() {
+        return this._call("retain_existing_credential", {
+            store_id: this.store.id,
+            auth_mode: this.state.form.credentialMode,
+        });
     }
 
     _message(error) {
@@ -355,14 +463,34 @@ export class ShopifyConnectorSetupWizard extends Component {
      * Work that happens on ARRIVING at a step, whichever direction it was
      * reached from.
      *
-     * Final readiness is the one step with any: entering it must evaluate the
-     * configuration as it is NOW, not replay a result recorded before the
-     * choices above it were made. It re-runs only when there is nothing to
-     * show or when what is shown is stale, so paging back and forth does not
-     * queue a run per keystroke. `run_readiness` reads stored evidence and
-     * contacts nothing.
+     * Location discovery starts on entry because it is part of the step, not
+     * an optional utility action. Final readiness evaluates the configuration
+     * as it is NOW, not a result recorded before the choices above it changed.
      */
     async _onEnterStep() {
+        if (
+            this.state.stepKey === "location_mapping" &&
+            this.currentStepApplies &&
+            this.store.id
+        ) {
+            const refresh = this.locations.refresh || {};
+            if (
+                ["waiting", "running"].includes(this.refreshState()) &&
+                refresh.job_id
+            ) {
+                // Keep the screen interactive while the bounded follower
+                // updates it in place; mounting must not wait through the
+                // polling backoff.
+                void this._followLocationRefresh(refresh.job_id);
+                return;
+            }
+            // Cached rows render immediately, but every entry also requests a
+            // fresh discovery pass. The server coalesces an equivalent active
+            // refresh, so opening/re-entering this screen is the trigger and
+            // the merchant never has to know that a manual refresh exists.
+            void this.refreshLocations();
+            return;
+        }
         if (this.state.stepKey !== "final_readiness") {
             return;
         }
@@ -389,6 +517,27 @@ export class ShopifyConnectorSetupWizard extends Component {
             { type: "success" }
         );
         this.action.doAction("shopify_connector_core.action_shopify_connector_dashboard");
+    }
+
+    async startNewStore() {
+        if (this.state.busy) {
+            return;
+        }
+        this._resetLocationTransientState();
+        this.state.busy = true;
+        try {
+            const data = await this.orm.call(MODEL, "get_setup_state", [], {
+                store_id: null,
+                new_store: true,
+            });
+            this._adopt(data, true);
+            this.state.stepKey = FIRST_STEP_KEY;
+            this.state.errorMessage = "";
+        } catch (error) {
+            this.state.errorMessage = this._message(error);
+        } finally {
+            this.state.busy = false;
+        }
     }
 
     /** One handler per step, selected by KEY. Each calls one guarded method. */
@@ -458,7 +607,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "first_push":
                 ok = await this._call("save_first_push_schedule", {
                     store_id: storeId,
-                    schedule_now: this.state.form.schedulePush,
+                    schedule_now: true,
                 });
                 break;
             case "final_readiness":
@@ -473,8 +622,18 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "review":
                 ok = await this._call("activate", { store_id: storeId });
                 if (ok) {
+                    if (["pending", "action_required"].includes(
+                        this.store.setup_completion_state
+                    )) {
+                        this.notification.add(
+                            this.store.setup_completion_message ||
+                            _t("Setup is waiting for verification before it can be completed."),
+                            { type: "warning" }
+                        );
+                        return;
+                    }
                     this.notification.add(
-                        _t("Your store is set up. Nothing is syncing yet — the dashboard shows what to do next."),
+                        _t("Activation started the selected read and import scans. Shopify writes still require their protected confirmation path; the dashboard shows progress and exceptions."),
                         { type: "success" }
                     );
                     this.action.doAction(
@@ -507,20 +666,125 @@ export class ShopifyConnectorSetupWizard extends Component {
         await this._call("run_readiness", { store_id: this.store.id });
     }
 
-    /** The location step's refresh. Admits a job; contacts nothing from here. */
-    async refreshLocations() {
-        await this._call("refresh_shopify_locations", {
-            store_id: this.store.id,
+    _resetLocationTransientState() {
+        // A store swap must not carry a search result, server continuation,
+        // mapping choice or poll handle into the new store's identity flow.
+        // Advance the follower generation before cancelling its timer so an
+        // already-resolving old-store request cannot resume polling.
+        this.locationRefreshFollowGeneration += 1;
+        this._cancelLocationRefreshTimer();
+        this.locationRefreshJobId = null;
+        this.state.locationRefreshStillRunning = false;
+        this.state.locationMappingChoices = {};
+        this.state.locationSearch = {
+            shopify: {
+                query: "", items: null, total: 0, offset: 0,
+                nextOffset: false, continuation: null, emptyReason: "",
+            },
+            odoo: {
+                query: "", items: null, total: 0, offset: 0,
+                nextOffset: false, continuation: null, emptyReason: "",
+            },
+        };
+    }
+
+    _waitForLocationRefresh(delay, generation) {
+        return new Promise((resolve) => {
+            if (generation !== this.locationRefreshFollowGeneration) {
+                resolve();
+                return;
+            }
+            this.locationRefreshTimerResolve = resolve;
+            this.locationRefreshTimer = setTimeout(() => {
+                this.locationRefreshTimer = null;
+                this.locationRefreshTimerResolve = null;
+                resolve();
+            }, delay);
         });
     }
 
+    _cancelLocationRefreshTimer() {
+        if (this.locationRefreshTimer !== null) {
+            clearTimeout(this.locationRefreshTimer);
+            this.locationRefreshTimer = null;
+        }
+        if (this.locationRefreshTimerResolve) {
+            this.locationRefreshTimerResolve();
+            this.locationRefreshTimerResolve = null;
+        }
+    }
+
+    async _followLocationRefreshOnce(jobId) {
+        return this._call("follow_location_refresh", {
+            store_id: this.store.id,
+            job_id: jobId,
+        });
+    }
+
+    async _followLocationRefresh(jobId) {
+        this._cancelLocationRefreshTimer();
+        const generation = ++this.locationRefreshFollowGeneration;
+        this.locationRefreshJobId = jobId;
+        this.state.locationRefreshStillRunning = false;
+        for (const delay of LOCATION_REFRESH_BACKOFF_MS) {
+            await this._waitForLocationRefresh(delay, generation);
+            if (generation !== this.locationRefreshFollowGeneration) {
+                return;
+            }
+            const ok = await this._followLocationRefreshOnce(jobId);
+            if (!ok || generation !== this.locationRefreshFollowGeneration) {
+                return;
+            }
+            if (!["waiting", "running"].includes(this.refreshState())) {
+                return;
+            }
+        }
+        if (generation === this.locationRefreshFollowGeneration) {
+            this.state.locationRefreshStillRunning = true;
+        }
+    }
+
+    /** The location step's refresh. Admits a job; contacts nothing from here. */
+    async refreshLocations() {
+        const ok = await this._call("refresh_shopify_locations", {
+            store_id: this.store.id,
+        });
+        const refresh = this.locations.refresh || {};
+        if (ok && refresh.job_id) {
+            await this._followLocationRefresh(refresh.job_id);
+        }
+    }
+
+    async checkLocationRefresh() {
+        if (!this.locationRefreshJobId) {
+            return;
+        }
+        const ok = await this._followLocationRefreshOnce(
+            this.locationRefreshJobId
+        );
+        if (ok && ["waiting", "running"].includes(this.refreshState())) {
+            this.state.locationRefreshStillRunning = true;
+        } else if (ok) {
+            this.state.locationRefreshStillRunning = false;
+        }
+    }
+
+    setLocationMappingChoice(shopifyGid, odooLocationId) {
+        this.state.locationMappingChoices[shopifyGid] = odooLocationId;
+        this.state.errorMessage = "";
+    }
+
     /** The location step's create. Both identities explicit, both server-checked. */
-    async createMapping() {
-        if (!this.state.form.mapShopifyGid) {
+    async createMapping(shopifyGid = null) {
+        const selectedShopifyGid = shopifyGid || this.state.form.mapShopifyGid;
+        const selectedOdooLocationId = shopifyGid
+            ? this.state.locationMappingChoices[shopifyGid]
+            : this.state.form.mapOdooLocationId;
+        if (!selectedShopifyGid) {
             this.state.errorMessage = _t("Choose a Shopify location to map.");
             return;
         }
-        if (!this.state.form.mapOdooLocationId) {
+        if (!selectedOdooLocationId) {
             this.state.errorMessage = _t("Choose an Odoo location to map it to.");
             return;
         }
@@ -528,17 +792,26 @@ export class ShopifyConnectorSetupWizard extends Component {
         // `<select>` retains an assigned value after its `<option>` is gone, so
         // searching away from a chosen location used to leave the identity in
         // `state.form`, off screen, and send it on the next click.
-        this._revalidateLocationSelection("shopify");
-        this._revalidateLocationSelection("odoo");
-        if (!this.state.form.mapShopifyGid || !this.state.form.mapOdooLocationId) {
+        if (!shopifyGid) {
+            this._revalidateLocationSelection("shopify");
+            this._revalidateLocationSelection("odoo");
+        }
+        if (
+            !this.visibleShopifyLocations.some(
+                (row) => row.shopify_gid === selectedShopifyGid
+            ) ||
+            !this.visibleOdooLocations.some(
+                (row) => String(row.id) === String(selectedOdooLocationId)
+            )
+        ) {
             this.state.errorMessage = _t(
                 "The location you had chosen is no longer in the list on " +
                 "screen, so nothing was mapped. Choose from the current list."
             );
             return;
         }
-        const mappedGid = this.state.form.mapShopifyGid;
-        const mappedOdooId = parseInt(this.state.form.mapOdooLocationId, 10);
+        const mappedGid = selectedShopifyGid;
+        const mappedOdooId = parseInt(selectedOdooLocationId, 10);
         const mappedOdooName = (
             this.visibleOdooLocations.find(
                 (row) => row.id === mappedOdooId
@@ -552,6 +825,7 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (ok) {
             this.state.form.mapShopifyGid = "";
             this.state.form.mapOdooLocationId = "";
+            delete this.state.locationMappingChoices[mappedGid];
             // Update the affected row IN PLACE rather than re-running the
             // search. Re-running it fetched a single page at the LAST requested
             // offset and replaced the accumulated results with it, so an
@@ -618,6 +892,15 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         const showing = this.locationShowing(side);
         return showing.shown < showing.total;
+    }
+
+    /** Search is progressive disclosure, not empty-page furniture. */
+    showLocationSearch(side) {
+        const search = this.state.locationSearch[side];
+        const total = side === "shopify"
+            ? this.locations.shopify_total
+            : this.locations.odoo_total;
+        return search.items !== null || (total || 0) > 10;
     }
 
     async searchLocations(side) {
@@ -701,18 +984,32 @@ export class ShopifyConnectorSetupWizard extends Component {
      */
     _revalidateLocationSelection(side) {
         if (side === "shopify") {
+            const visibleGids = new Set(
+                this.visibleShopifyLocations.map((row) => row.shopify_gid)
+            );
+            for (const gid of Object.keys(this.state.locationMappingChoices)) {
+                if (!visibleGids.has(gid)) {
+                    delete this.state.locationMappingChoices[gid];
+                }
+            }
             const gid = this.state.form.mapShopifyGid;
-            if (gid && !this.visibleShopifyLocations.some(
-                (row) => row.shopify_gid === gid
-            )) {
+            if (gid && !visibleGids.has(gid)) {
                 this.state.form.mapShopifyGid = "";
             }
             return;
         }
-        const id = this.state.form.mapOdooLocationId;
-        if (id && !this.visibleOdooLocations.some(
-            (row) => String(row.id) === String(id)
+        const visibleIds = new Set(
+            this.visibleOdooLocations.map((row) => String(row.id))
+        );
+        for (const [gid, selectedId] of Object.entries(
+            this.state.locationMappingChoices
         )) {
+            if (selectedId && !visibleIds.has(String(selectedId))) {
+                delete this.state.locationMappingChoices[gid];
+            }
+        }
+        const id = this.state.form.mapOdooLocationId;
+        if (id && !visibleIds.has(String(id))) {
             this.state.form.mapOdooLocationId = "";
         }
     }
@@ -791,7 +1088,7 @@ export class ShopifyConnectorSetupWizard extends Component {
             case "no_cached_locations":
                 return _t(
                     "No Shopify locations have been read for this store yet. " +
-                    "Press Refresh Shopify locations."
+                    "Use Try again if automatic loading did not finish."
                 );
             case "no_eligible_odoo_locations":
                 return _t(
@@ -809,6 +1106,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         const input = document.querySelector(".sc_setup_token");
         const value = input ? input.value : "";
+        if (!value && this._canReuseStoredCredential()) {
+            return this._retainExistingCredential();
+        }
         if (!value) {
             this.state.errorMessage = _t(
                 "Paste the Admin API access token to continue."
@@ -835,30 +1135,39 @@ export class ShopifyConnectorSetupWizard extends Component {
         const secretInput = document.querySelector(".sc_setup_client_secret");
         const clientId = idInput ? idInput.value : "";
         const clientSecret = secretInput ? secretInput.value : "";
-        if (!clientId) {
-            this.state.errorMessage = _t(
-                "Enter the app's Client ID to continue."
-            );
-            return false;
+        if (!clientId && !clientSecret && this._canReuseStoredCredential()) {
+            return this._retainExistingCredential();
         }
-        if (!clientSecret) {
-            this.state.errorMessage = _t(
-                "Enter the app's Client secret to continue."
-            );
-            return false;
+        try {
+            if (!clientId) {
+                this.state.errorMessage = _t(
+                    "Enter the app's Client ID to continue."
+                );
+                return false;
+            }
+            if (!clientSecret) {
+                this.state.errorMessage = _t(
+                    "Enter the app's Client secret to continue."
+                );
+                return false;
+            }
+            const ok = await this._call("save_client_credentials", {
+                store_id: this.store.id,
+                client_id: clientId,
+                client_secret: clientSecret,
+            });
+            if (ok && idInput) {
+                idInput.value = "";
+            }
+            return ok;
+        } finally {
+            // Clear on every non-reuse path, including local validation. A
+            // secret must not remain in a password input just because another
+            // field was missing and no RPC was issued.
+            if (secretInput) {
+                secretInput.value = "";
+            }
         }
-        const ok = await this._call("save_client_credentials", {
-            store_id: this.store.id,
-            client_id: clientId,
-            client_secret: clientSecret,
-        });
-        if (secretInput) {
-            secretInput.value = "";
-        }
-        if (ok && idInput) {
-            idInput.value = "";
-        }
-        return ok;
     }
 
     toggleDomain(key) {

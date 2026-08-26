@@ -999,7 +999,16 @@ OVERFLOW_JS = r"""
   // a new `o_sc_*` root appears without being added to it.
   const SURFACE_SELECTOR = [
     ".o_sc_dashboard", ".o_sc_dashboard__inner",
+    // The split Connector Health dashboard shares the dashboard layout root
+    // and inner box, but keeps its own surface identity. Name it explicitly
+    // so the inventory guard cannot mistake shared styling for missing
+    // measurement coverage.
+    ".o_sc_connector_health",
     ".o_sc_export_diff", ".o_sc_export_diff__inner",
+    // Static connector note bands are layout-bearing content surfaces too:
+    // long consequence copy must be measured where it wraps inside dialogs
+    // and forms, independently of the Odoo chrome that contains it.
+    ".o_sc_note",
     // S1 (2026-07-27): the guided setup surface. Its non-root elements use
     // the `sc_` prefix precisely so this list stays the inventory of
     // MEASURED ROOTS rather than a list of every class in the connector.
@@ -1843,6 +1852,19 @@ class TestUiVisualEvidence(HttpCase):
                     ),
                     'shopify_location_active': True,
                 })
+            refresh_job = self.env['shopify.connector.job'].sudo().create({
+                'store_id': store.id,
+                'job_source': 'manual_sync',
+                'job_type': 'inventory_location_sync',
+                'state': 'queued',
+                'payload_hash': 'visual-location-refresh-%s' % store.id,
+                'expected_connection_generation':
+                    store.connection_generation,
+            })
+            refresh_job.sudo().write({'state': 'running'})
+            refresh_job.sudo().write({
+                'state': 'succeeded', 'finished_at': fields.Datetime.now(),
+            })
         # A recorded readiness result, so the Final readiness step renders a
         # full result list rather than "Not run yet".
         self.env['shopify.connector.readiness.check'].run_for_store(store)
@@ -2508,7 +2530,7 @@ class TestUiVisualEvidence(HttpCase):
             % json.dumps(clipping, indent=2))
 
     # ------------------------------------------------------------------
-    # B2. The sticky setup action row (Wave 5)
+    # B2. The non-overlapping setup action row
     # ------------------------------------------------------------------
 
     #: The four widths the correction packet names for the action row. 1440 is
@@ -2545,36 +2567,21 @@ class TestUiVisualEvidence(HttpCase):
         parseFloat(getComputedStyle(el).scrollMarginBlockEnd) || 0,
     };
   });
-  // WHERE THE BAR IS SUPPOSED TO BE PINNED.
-  //
-  // Not the viewport bottom. `position: sticky` pins to the bottom of the
-  // nearest SCROLLPORT's padding box, and this surface carries its own
-  // padding -- so the correct target is the scroll container's bottom edge
-  // minus its bottom padding. Comparing against `innerHeight` reports the
-  // surface's own padding as a defect, which is how a correct sticky bar
-  // gets "fixed" into a wrong one.
-  const scroller = (() => {
-    for (let node = bar.parentElement; node; node = node.parentElement) {
-      const cs = getComputedStyle(node);
-      if (/auto|scroll/.test(cs.overflowY)) return node;
-      if (node === document.body) break;
-    }
-    return document.scrollingElement;
-  })();
+  const panel = document.querySelector(".sc_setup__panel");
+  const scroller = panel;
   const sRect = scroller.getBoundingClientRect();
-  const sPadBottom = parseFloat(getComputedStyle(scroller).paddingBottom) || 0;
   return JSON.stringify({
     error: null,
     position: getComputedStyle(bar).position,
     surface_direction: surface ? getComputedStyle(surface).direction : null,
     bar: {top: rect.top, bottom: rect.bottom, left: rect.left,
           right: rect.right, height: rect.height},
+    panel: {top: sRect.top, bottom: sRect.bottom, left: sRect.left,
+            right: sRect.right, height: sRect.height},
+    overlap: Math.max(0, sRect.bottom - rect.top),
     scrollport: {
-      cls: (scroller.className && String(scroller.className).split(/\s+/)[0])
-           || scroller.tagName,
+      cls: "sc_setup__panel",
       bottom: sRect.bottom,
-      padding_bottom: sPadBottom,
-      pin_target: sRect.bottom - sPadBottom,
       extent: scroller.scrollHeight - scroller.clientHeight,
     },
     viewport: {width: window.innerWidth, height: window.innerHeight},
@@ -2603,7 +2610,7 @@ class TestUiVisualEvidence(HttpCase):
   // evidence this whole file exists to stop producing.
   const chain = [];
   let scroller = null;
-  for (let node = document.querySelector(".o_sc_setup"); node;
+  for (let node = document.querySelector(".sc_setup__panel"); node;
        node = node.parentElement) {
     const cs = getComputedStyle(node);
     const extent = node.scrollHeight - node.clientHeight;
@@ -2650,26 +2657,11 @@ class TestUiVisualEvidence(HttpCase):
                 'action_shopify_connector_setup_wizard')
 
     def test_the_setup_action_row_stays_reachable_while_content_scrolls(self):
-        """Back / Continue / Save & Exit stay on screen through long content.
+        """Back / Continue / Save & Exit stay visible without covering content.
 
-        MEASURED, not read out of the stylesheet. `position: sticky` resolves
-        against the nearest scrolling ancestor, and a surface that
-        accidentally becomes its own scroll container silently stops being
-        sticky while the CSS still says it is -- which is exactly the failure
-        a stylesheet review cannot see. So this scrolls the real container to
-        the middle of real content and reads the rendered rectangle back.
-
-        WHAT "STICKY" IS ASSERTED AS, AND WHY IT IS NOT "SCROLLED TO THE
-        MIDDLE". The scroll is attempted and what actually scrolled is
-        recorded, but the assertion does not depend on it: when a surface's
-        content extends below the viewport, a sticky bar's bottom edge sits
-        exactly at the viewport's bottom edge, and a non-sticky bar's does
-        not — it sits at the end of the content, below the fold. That
-        equality is therefore the direct evidence, it holds at the top of a
-        long page as well as mid-scroll, and it fails for the defect this
-        exists to catch (a surface that accidentally becomes its own scroll
-        container, which makes `position` still report `sticky` while the bar
-        stops being lifted).
+        The panel and action row are separate grid rows. This scrolls the real
+        panel and measures both rectangles, so a regression that makes the
+        action row overlay a field or makes the wrong ancestor scroll fails.
 
         Three of the four viewport widths the packet names carry no
         `prefers-reduced-motion` or RTL variation here; both are covered by
@@ -2700,35 +2692,16 @@ class TestUiVisualEvidence(HttpCase):
                                 % (step.replace('_', '-'), width),
                                 'Wave 5 sticky action row; §10 responsive, '
                                 'SC 2.4.11 focus not obscured')
-                    if payload['position'] != 'sticky':
+                    if payload['position'] not in ('static', 'relative'):
                         failures.append({
-                            'case': key, 'why': 'the action row is not sticky',
+                            'case': key, 'why': 'the action row is positioned over content',
                             'position': payload['position'],
                         })
-                    # THE DIRECT EVIDENCE that the bar is being LIFTED
-                    # rather than merely declared sticky: while there is
-                    # content still below it, its bottom edge sits at the
-                    # scrollport's pin target. A bar that had stopped being
-                    # lifted would be at the end of the content instead,
-                    # hundreds of pixels lower. 2px of tolerance for
-                    # sub-pixel layout rounding.
-                    port = payload['scrollport']
-                    still_below = (
-                        port['extent'] - (scroll.get('to') or 0)
-                    ) > 4
-                    off_target = abs(
-                        payload['bar']['bottom'] - port['pin_target']
-                    ) > 2
-                    if still_below and off_target:
+                    if payload['overlap'] > 2:
                         failures.append({
                             'case': key,
-                            'why': 'content remains below the fold but the '
-                                   'action row is not pinned to the '
-                                   'scrollport, so it is declared sticky and '
-                                   'is not behaving so',
-                            'bar_bottom': payload['bar']['bottom'],
-                            'pin_target': port['pin_target'],
-                            'scrollport': port['cls'],
+                            'why': 'the action row overlaps the scrolling panel',
+                            'overlap': payload['overlap'],
                         })
                     for control in payload['controls']:
                         if control['disabled']:

@@ -40,6 +40,20 @@ FULFILLMENT_NODE_QUERY = (
     '}'
 )
 
+FULFILLMENT_NODES_QUERY = (
+    'query ConnectorFulfillmentNodes($ids: [ID!]!) {\n'
+    '  nodes(ids: $ids) {\n'
+    '    ... on Fulfillment {\n'
+    '      id\n'
+    '      status\n'
+    '      displayStatus\n'
+    '      trackingInfo { number url company }\n'
+    '    }\n'
+    '  }\n'
+    '}'
+)
+FULFILLMENT_NODES_BATCH = 50
+
 
 class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     """The 7-callback Layer 2 strategy for `fulfillment_tracking_update` plus the
@@ -51,10 +65,41 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     _inherit = 'shopify.connector.fulfillment.service'
 
     @api.model
-    def _read_fulfillment(self, store, fulfillment_gid):
-        data = self._read_data(store, FULFILLMENT_NODE_QUERY, {'id': fulfillment_gid})
+    def _read_fulfillment(self, job, store, fulfillment_gid):
+        data = self._read_data(
+            job, store, FULFILLMENT_NODE_QUERY, {'id': fulfillment_gid},
+        )
         node = data.get('fulfillment')
         return node if isinstance(node, dict) else None
+
+    @api.model
+    def _read_fulfillments_batch(self, job, store, fulfillment_gids):
+        """Read bounded Node batches and prove exact identity coverage."""
+        requested = list(dict.fromkeys(fulfillment_gids))
+        result = {}
+        for offset in range(0, len(requested), FULFILLMENT_NODES_BATCH):
+            ids = requested[offset:offset + FULFILLMENT_NODES_BATCH]
+            data = self._read_data(
+                job, store, FULFILLMENT_NODES_QUERY, {'ids': ids},
+            )
+            nodes = data.get('nodes')
+            if not isinstance(nodes, list) or len(nodes) != len(ids):
+                raise FulfillmentReadError(
+                    'data_shape_schema_mismatch',
+                    'Shopify returned an invalid fulfillment nodes batch.',
+                )
+            for expected_gid, node in zip(ids, nodes):
+                if node is None:
+                    result[expected_gid] = None
+                    continue
+                if not isinstance(node, dict) or node.get('id') != expected_gid:
+                    raise FulfillmentReadError(
+                        'data_shape_schema_mismatch',
+                        'A fulfillment nodes batch did not preserve exact '
+                        'requested identity.',
+                    )
+                result[expected_gid] = node
+        return result
 
     # ------------------------------------------------------------------
     # Callback 2: prepare_local
@@ -90,6 +135,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     def _prepare_preconditions_fulfillment_tracking_update(
         self, local_snapshot, owner_context,
     ):
+        read_job = self.env['shopify.connector.job'].browse(
+            local_snapshot['job_id']
+        )
         store = self.env['shopify.connector.store'].browse(
             local_snapshot['store_id']
         )
@@ -100,7 +148,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
                 'The fulfillment binding has no Shopify Fulfillment GID.',
             )
         try:
-            node = self._read_fulfillment(store, fulfillment_gid)
+            node = self._read_fulfillment(
+                read_job, store, fulfillment_gid,
+            )
         except FulfillmentReadError as exc:
             self._fail_closed_pre_c2(exc.error_class, exc.message)
         if not node:
@@ -254,7 +304,9 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
     # ------------------------------------------------------------------
 
     @api.model
-    def _reconcile_fulfillment_tracking_update(self, attempt):
+    def _reconcile_fulfillment_tracking_update(
+        self, attempt, reconciliation_job=None,
+    ):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         observed_identity = store.shop_domain
@@ -269,7 +321,11 @@ class ShopifyConnectorFulfillmentTrackingStrategy(models.AbstractModel):
                 observed_identity, 'No fulfillment identity to reconcile.',
             )
         try:
-            node = self._read_fulfillment(store, fulfillment_gid)
+            node = self._read_fulfillment(
+                reconciliation_job or attempt.job_id,
+                store,
+                fulfillment_gid,
+            )
         except FulfillmentReadError:
             return self._inconclusive_reconcile(
                 observed_identity,

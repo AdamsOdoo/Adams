@@ -3,11 +3,13 @@ import os
 import uuid
 
 from odoo import fields
+from odoo.exceptions import UserError
 from odoo.tests.common import TransactionCase, tagged
 
 from odoo.addons.shopify_connector_core.models.shopify_connector_job import (
     TERMINAL_JOB_STATES,
 )
+from odoo.addons.shopify_connector_core.hooks import uninstall_hook
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -50,6 +52,12 @@ class TestLifecycleUninstall(TransactionCase):
         self.assertEqual(job.original_job_type, 'core_dispatch_selftest')
         self.assertTrue(self.Job._fields['original_job_type'].index)
         self.assertTrue(self.Job._fields['original_job_type'].readonly)
+
+    def test_full_uninstall_blocks_until_store_is_safely_disconnected(self):
+        with self.assertRaises(UserError):
+            uninstall_hook(self.env)
+        self.store.sudo().write({'state': 'disconnected'})
+        uninstall_hook(self.env)
 
     def test_original_job_type_cannot_be_forged_at_create(self):
         job = self._job(original_job_type='forged')

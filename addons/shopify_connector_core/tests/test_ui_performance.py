@@ -159,6 +159,45 @@ class TestUiPerformance(TransactionCase):
             "a per-store read is hiding somewhere." % (two, many),
         )
 
+    def test_split_dashboard_query_counts_are_bounded_and_constant(self):
+        self._seed_jobs(20)
+        self.Dashboard.get_sales_dashboard_data(False, '30d')
+        self.Dashboard.get_connector_health_data(False)
+        sales_small = self._count_queries(
+            lambda: self.Dashboard.get_sales_dashboard_data(False, '30d')
+        )
+        health_small = self._count_queries(
+            lambda: self.Dashboard.get_connector_health_data(False)
+        )
+        self._seed_jobs(200)
+        sales_large = self._count_queries(
+            lambda: self.Dashboard.get_sales_dashboard_data(False, '30d')
+        )
+        health_large = self._count_queries(
+            lambda: self.Dashboard.get_connector_health_data(False)
+        )
+        self.assertEqual(sales_small, sales_large)
+        self.assertEqual(health_small, health_large)
+        self.assertLessEqual(sales_large, 100)
+        self.assertLessEqual(health_large, 140)
+
+    def test_health_store_rows_do_not_introduce_per_store_queries(self):
+        self.Dashboard.get_connector_health_data(False)
+        two = self._count_queries(
+            lambda: self.Dashboard.get_connector_health_data(False)
+        )
+        for _index in range(6):
+            self._make_store()
+        self.env.flush_all()
+        many = self._count_queries(
+            lambda: self.Dashboard.get_connector_health_data(False)
+        )
+        self.assertLessEqual(
+            many, two + 4,
+            'Connector Health grew from %d to %d queries across six stores.'
+            % (two, many),
+        )
+
     def test_dashboard_source_uses_bounded_reads(self):
         addon_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         src = open(os.path.join(addon_root, 'models', 'shopify_connector_ui_dashboard.py'),

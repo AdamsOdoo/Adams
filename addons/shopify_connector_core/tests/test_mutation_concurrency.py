@@ -20,6 +20,7 @@ from ..models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
 )
+from odoo.tools import mute_logger
 
 
 @tagged('post_install', '-at_install')
@@ -475,6 +476,7 @@ class TestMutationConcurrency(TransactionCase):
                     )
                     self.assertEqual(cr.fetchone()[0], 1)
 
+    @mute_logger('odoo.sql_db')
     def test_concurrent_second_attempt_with_different_tokens_is_rejected(self):
         _store_id, job_id = self._durable_fixture()
         start = threading.Barrier(2)
@@ -880,6 +882,7 @@ class TestMutationConcurrency(TransactionCase):
             worker.close()
             observer.close()
 
+    @mute_logger('odoo.sql_db')
     def test_serialization_failure_recovers_to_reconciliation(self):
         _store_id, job_id, attempt_id, token = (
             self._durable_owned_attempt()

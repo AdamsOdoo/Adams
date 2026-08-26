@@ -76,7 +76,7 @@ class TestJobActions(TransactionCase):
         cases = (
             ('failed_retryable', self.operator),
             ('failed_final', self.operator),
-            ('blocked_manual_review', self.reviewer),
+            ('blocked_manual_review', self.admin),
             ('skipped', self.operator),
         )
         for state, user in cases:
@@ -221,6 +221,11 @@ class TestJobActions(TransactionCase):
         ]
         self.assertEqual(
             sorted(public_methods),
-            ['action_cancel', 'action_manual_retry'],
+            [
+                'action_cancel',
+                'action_manual_retry',
+                'action_open_attention_case',
+                'action_open_recovery_evidence',
+            ],
         )
         self.assertEqual(len(sudo_calls), 2)

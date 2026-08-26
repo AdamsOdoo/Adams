@@ -41,7 +41,13 @@ class TestProductVariantBinding(TransactionCase):
         'shopify_option_values',
         'shopify_price_snapshot',
         'shopify_compare_at_price_snapshot',
+        'shopify_sku_snapshot',
+        'shopify_barcode_snapshot',
+        'shopify_inventory_item_gid',
+        'shopify_inventory_tracked',
+        'shopify_inventory_tracked_known',
         'shopify_last_imported_at',
+        'shopify_birth_initialized',
         'shopify_primary_image_url',
         'shopify_image_checksum',
     ))
@@ -94,6 +100,7 @@ class TestProductVariantBinding(TransactionCase):
     # 1. Required fields.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_requires_store_id(self):
         template_binding = self._make_template_binding(
             'gid://shopify/Product/100', 'Template 100',
@@ -106,6 +113,7 @@ class TestProductVariantBinding(TransactionCase):
                     'product_template_binding_id': template_binding.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_shopify_gid(self):
         template_binding = self._make_template_binding(
             'gid://shopify/Product/101', 'Template 101',
@@ -118,6 +126,7 @@ class TestProductVariantBinding(TransactionCase):
                     'product_template_binding_id': template_binding.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_product_template_binding_id(self):
         """product_template_binding_id is required and never stands in
         for a missing variant binding -- importing a variant always
@@ -179,6 +188,37 @@ class TestProductVariantBinding(TransactionCase):
                     'shopify_gid': 'gid://shopify/ProductVariant/105',
                     'product_variant_id': variant.id,
                     'product_template_binding_id': template_binding.id,
+                })
+
+    @mute_logger('odoo.sql_db')
+    def test_unique_store_inventory_item_gid_enforced(self):
+        first_template_binding = self._make_template_binding(
+            'gid://shopify/Product/105', 'Inventory Item First',
+        )
+        second_template_binding = self._make_template_binding(
+            'gid://shopify/Product/106', 'Inventory Item Second',
+        )
+        item_gid = 'gid://shopify/InventoryItem/105'
+        self.VariantBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/105',
+            'product_variant_id': (
+                first_template_binding.product_template_id.product_variant_id.id
+            ),
+            'product_template_binding_id': first_template_binding.id,
+            'shopify_inventory_item_gid': item_gid,
+        })
+        with self.assertRaises(Exception):
+            with self.env.cr.savepoint():
+                self.VariantBinding.sudo().create({
+                    'store_id': self.store.id,
+                    'shopify_gid': 'gid://shopify/ProductVariant/106',
+                    'product_variant_id': (
+                        second_template_binding.product_template_id
+                        .product_variant_id.id
+                    ),
+                    'product_template_binding_id': second_template_binding.id,
+                    'shopify_inventory_item_gid': item_gid,
                 })
 
     # ------------------------------------------------------------------
@@ -293,7 +333,15 @@ class TestProductVariantBinding(TransactionCase):
             'shopify_option_values': 'Size=M',
             'shopify_price_snapshot': 10.0,
             'shopify_compare_at_price_snapshot': 12.0,
+            'shopify_sku_snapshot': 'PROTECTED-SKU',
+            'shopify_barcode_snapshot': 'PROTECTED-BARCODE',
+            'shopify_inventory_item_gid': (
+                'gid://shopify/InventoryItem/ProtectedSurface'
+            ),
+            'shopify_inventory_tracked': True,
+            'shopify_inventory_tracked_known': True,
             'shopify_last_imported_at': '2000-01-03 00:00:00',
+            'shopify_birth_initialized': True,
             'shopify_primary_image_url': 'https://example.invalid/original',
             'shopify_image_checksum': 'original-checksum',
         })
@@ -317,7 +365,15 @@ class TestProductVariantBinding(TransactionCase):
             'shopify_option_values': 'Size=Forged',
             'shopify_price_snapshot': 999.0,
             'shopify_compare_at_price_snapshot': 1000.0,
+            'shopify_sku_snapshot': 'FORGED-SKU',
+            'shopify_barcode_snapshot': 'FORGED-BARCODE',
+            'shopify_inventory_item_gid': (
+                'gid://shopify/InventoryItem/Forged'
+            ),
+            'shopify_inventory_tracked': False,
+            'shopify_inventory_tracked_known': False,
             'shopify_last_imported_at': fields.Datetime.now(),
+            'shopify_birth_initialized': False,
             'shopify_primary_image_url': 'https://example.invalid/forged',
             'shopify_image_checksum': 'forged-checksum',
         }

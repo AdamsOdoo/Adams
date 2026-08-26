@@ -2,16 +2,15 @@
 // Part of the Shopify Connector (U0 foundation → Store 360, spec
 // docs/02-product/ui-operations-360-dashboard-spec-2026-08-01.md).
 //
-// The Shopify Store 360 dashboard: sales performance + connector health in
-// the single bounded Owl client action registered under the ORIGINAL
-// `shopify_connector_dashboard` tag (navigation compatibility preserved).
+// C7's two separate dashboards share one restrained component base and two
+// bounded RPCs. The sales page never receives health aggregates; Connector
+// Health never receives a sales KPI.
 // It stays inside the Odoo web client (standard action + ORM services,
 // standard menus/breadcrumbs); it is not an SPA, has no custom router, no
 // parallel state store, and no client-side list re-implementation. It reads
-// ONLY the read-only aggregate service
-// `shopify.connector.ui.dashboard.get_store_360_data` and navigates to
-// native filtered lists through SERVER-BUILT targets — the client never
-// constructs a domain, model name or action id of its own (task §7).
+// ONLY the read-only aggregate service's sales/health methods and navigates
+// to native filtered lists through SERVER-BUILT targets — the client never
+// constructs a domain, model name or action id of its own.
 //
 // Auto-refresh is never faster than 30s and is paused while the browser tab
 // is hidden (PB-12 / WCAG 2.2.2). A page refresh updates "Page updated" and
@@ -38,7 +37,7 @@ function localeDirection() {
 }
 
 export class ShopifyConnectorDashboard extends Component {
-    static template = "shopify_connector_core.Dashboard";
+    static template = "shopify_connector_core.SalesDashboard";
     static props = { "*": true };
 
     setup() {
@@ -82,12 +81,20 @@ export class ShopifyConnectorDashboard extends Component {
         return Math.max(30, secs) * 1000;
     }
 
+    get rpcMethod() {
+        return "get_sales_dashboard_data";
+    }
+
+    get rpcArgs() {
+        return [this.state.storeId || false, this.state.period];
+    }
+
     async _load() {
         try {
             const data = await this.orm.call(
                 "shopify.connector.ui.dashboard",
-                "get_store_360_data",
-                [this.state.storeId || false, this.state.period]
+                this.rpcMethod,
+                this.rpcArgs
             );
             this.state.data = data;
             this.state.status = "ready";
@@ -312,6 +319,45 @@ export class ShopifyConnectorDashboard extends Component {
             disconnected: _t("Disconnected"),
         }[state] || state;
     }
+
+    healthToneLabel(tone) {
+        return {
+            healthy: _t("Healthy"),
+            working: _t("Work in progress"),
+            attention: _t("Needs attention"),
+            unknown: _t("Unknown"),
+        }[tone] || tone;
+    }
+
+    evidenceStateLabel(state) {
+        return {
+            observed: _t("Observed"),
+            unknown: _t("Unknown"),
+        }[state] || state;
+    }
+
+    modeLabel(mode) {
+        return {
+            mode1: _t("Mode 1 — review first"),
+            mode2: _t("Mode 2 — automatic apply"),
+        }[mode] || _t("Unknown");
+    }
 }
 
+export class ShopifyConnectorHealth extends ShopifyConnectorDashboard {
+    static template = "shopify_connector_core.ConnectorHealth";
+
+    get rpcMethod() {
+        return "get_connector_health_data";
+    }
+
+    get rpcArgs() {
+        return [this.state.storeId || false];
+    }
+}
+
+// The original tag remains a compatibility alias, but it now resolves to the
+// sales-only page rather than the retired combined Store 360 presentation.
 registry.category("actions").add("shopify_connector_dashboard", ShopifyConnectorDashboard);
+registry.category("actions").add("shopify_connector_sales_dashboard", ShopifyConnectorDashboard);
+registry.category("actions").add("shopify_connector_health", ShopifyConnectorHealth);

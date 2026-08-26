@@ -27,6 +27,16 @@ executable per the gap analysis); these are planning/readiness documents
 only. Authoritative statuses live in each file's own Status section; this
 note refreshes the stale index text only and decides nothing.
 
+**Exact-head assurance addendum (2026-08-18):** the current published PR #206
+test-only qualification correction `2b8108b9b69ca70b20a3b705a82e167ea13bb98a`
+/ tree `522bcd01035cb44d241ff56c3deff3de272701c2` is recorded in the
+[architecture-assurance exact-head addendum](./architecture-assurance-2026-08-18/exact-head-addendum-2026-08-18-f62.md).
+Its primary verdict is **NOT ASSURED — CORE ARCHITECTURE GAPS**; Odoo.sh
+access is additionally blocked by external infrastructure, and UI UAT is not
+authorized. Exact-head Actions run `32152200822` / job `95760574305` completed
+**success** and is accepted CI evidence for `2b8108b9…`; it is not live
+Shopify, Odoo.sh, or Gate A–H evidence.
+
 **Re-baseline note (2026-07-16, Fable gap-closure):** this package predates
 the 2026-07-15 checkpoint (`checkpoint/core-r2-readonly-uat-2026-07-15`) and
 Waves 0/1 of the MVP completion program; wave status is now tracked in

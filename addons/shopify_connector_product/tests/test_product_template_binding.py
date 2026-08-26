@@ -39,7 +39,12 @@ class TestProductTemplateBinding(TransactionCase):
         'shopify_title',
         'shopify_status',
         'shopify_primary_image_url',
+        'shopify_description_html',
+        'shopify_vendor',
+        'shopify_product_type',
+        'shopify_tags',
         'shopify_last_imported_at',
+        'shopify_birth_initialized',
         'shopify_updated_at',
         'shopify_image_checksum',
     ))
@@ -86,6 +91,7 @@ class TestProductTemplateBinding(TransactionCase):
     # 1. Required fields.
     # ------------------------------------------------------------------
 
+    @mute_logger('odoo.sql_db')
     def test_requires_store_id(self):
         template = self._make_template()
         with self.assertRaises(Exception):
@@ -95,6 +101,7 @@ class TestProductTemplateBinding(TransactionCase):
                     'product_template_id': template.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_shopify_gid(self):
         template = self._make_template()
         with self.assertRaises(Exception):
@@ -104,6 +111,7 @@ class TestProductTemplateBinding(TransactionCase):
                     'product_template_id': template.id,
                 })
 
+    @mute_logger('odoo.sql_db')
     def test_requires_product_template_id(self):
         with self.assertRaises(Exception):
             with self.env.cr.savepoint():
@@ -318,7 +326,12 @@ class TestProductTemplateBinding(TransactionCase):
             'shopify_title': 'Original title',
             'shopify_status': 'active',
             'shopify_primary_image_url': 'https://example.invalid/original',
+            'shopify_description_html': '<p>Original description</p>',
+            'shopify_vendor': 'Original vendor',
+            'shopify_product_type': 'Original type',
+            'shopify_tags': ['original'],
             'shopify_last_imported_at': '2000-01-03 00:00:00',
+            'shopify_birth_initialized': True,
             'shopify_updated_at': '2026-07-16T00:00:00Z',
             'shopify_image_checksum': 'original-checksum',
         })
@@ -341,7 +354,12 @@ class TestProductTemplateBinding(TransactionCase):
             'shopify_title': 'Forged title',
             'shopify_status': 'archived',
             'shopify_primary_image_url': 'https://example.invalid/forged',
+            'shopify_description_html': '<p>Forged description</p>',
+            'shopify_vendor': 'Forged vendor',
+            'shopify_product_type': 'Forged type',
+            'shopify_tags': ['forged'],
             'shopify_last_imported_at': fields.Datetime.now(),
+            'shopify_birth_initialized': False,
             'shopify_updated_at': '2026-07-17T00:00:00Z',
             'shopify_image_checksum': 'forged-checksum',
         }

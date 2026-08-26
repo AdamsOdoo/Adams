@@ -5,11 +5,11 @@
 # also cannot invoke it directly over ORM/RPC. A hidden button is never the
 # security control -- the server method / ACL is.
 #
-# Matrix under test (all four roles read every operator surface):
+# Matrix under test (visible User/Admin plus hidden capability primitives):
 #   Auditor     -> read only; no retry / cancel / review / resolve / lifecycle.
 #   Operator    -> ordinary retry + cancel; no blocked-review; no mutation resolve.
-#   Reviewer    -> blocked-review resolve/retry; no ordinary Operator cancel;
-#                  no mutation resolve.
+#   Reviewer    -> hidden primitive; no customer-facing review resolution.
+#   User        -> ordinary retry + cancel; no blocked-review resolution.
 #   Administrator -> everything sanctioned; still no protected-field write.
 
 from unittest.mock import patch
@@ -37,7 +37,7 @@ class TestUiVisibilityMatrix(TransactionCase):
                 cls.env, login='u0_%s' % role,
                 groups='base.group_user,shopify_connector_core.group_shopify_connector_%s' % role,
             )
-            for role in ('auditor', 'operator', 'reviewer', 'admin')
+            for role in ('auditor', 'operator', 'reviewer', 'user', 'admin')
         }
         cls.plain = new_test_user(cls.env, login='u0_plain', groups='base.group_user')
 
@@ -99,12 +99,12 @@ class TestUiVisibilityMatrix(TransactionCase):
                 job.with_user(self.users[role]).action_manual_retry()
 
     def test_retry_blocked_review_permissions(self):
-        # Reviewer and Admin may retry a blocked_manual_review job; Operator/Auditor may not.
-        for role in ('reviewer', 'admin'):
+        # Only Administrator may retry a blocked_manual_review job.
+        for role in ('admin',):
             job = self._make_job('blocked_manual_review')
             job.with_user(self.users[role]).action_manual_retry()
             self.assertEqual(job.state, 'queued')
-        for role in ('auditor', 'operator'):
+        for role in ('auditor', 'operator', 'reviewer', 'user'):
             job = self._make_job('blocked_manual_review')
             with self.assertRaises(AccessError):
                 job.with_user(self.users[role]).action_manual_retry()
@@ -129,11 +129,11 @@ class TestUiVisibilityMatrix(TransactionCase):
     #  manual-review resolution matrix
     # ------------------------------------------------------------------ #
     def test_resolve_manual_review_permissions(self):
-        for role in ('reviewer', 'admin'):
+        for role in ('admin',):
             job = self._make_job('blocked_manual_review')
             job.with_user(self.users[role]).action_resolve_manual_review()
             self.assertEqual(job.state, 'queued')
-        for role in ('auditor', 'operator'):
+        for role in ('auditor', 'operator', 'reviewer', 'user'):
             job = self._make_job('blocked_manual_review')
             with self.assertRaises(AccessError):
                 job.with_user(self.users[role]).action_resolve_manual_review()

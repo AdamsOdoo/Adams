@@ -95,6 +95,11 @@ from odoo.addons.shopify_connector_core.tools.search_syntax import (
 )
 
 from .shopify_connector_product_export_preview import PREVIEW_VALIDITY_HOURS
+from odoo.addons.shopify_connector_product.models.shopify_connector_product_normalization import (
+    normalize_option_specs,
+    normalize_selected_options,
+    singleton_transport_option_values,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -180,8 +185,8 @@ REMOTE_MEDIA_PAGE_SIZE = 250
 # `UniqueMetafieldValueInput` on purpose: the 2026-07 reference states
 # "If omitted, the app-reserved namespace will be used", which is exactly
 # the namespace a connector should own and a merchant should not.
-BINDING_METAFIELD_KEY = 'odoo_template_id'
-BINDING_METAFIELD_TYPE = 'single_line_text_field'
+BINDING_METAFIELD_KEY = 'odoo_template_custom_id_v2'
+BINDING_METAFIELD_TYPE = 'id'
 BINDING_METAFIELD_OWNER = 'PRODUCT'
 
 EXPORT_STATUS_TO_SHOPIFY = {
@@ -282,21 +287,34 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
 
     @api.model
     def _desired_scalars(self, template):
-        """The allowlisted product scalars, and nothing else."""
-        status = template.shopify_export_status or 'draft'
-        tags = [
-            tag.strip()
-            for tag in (template.shopify_export_tags or '').split(',')
-            if tag.strip()
-        ]
-        desired = {
-            'title': template.name or '',
-            'descriptionHtml': template.description_sale or '',
-            'vendor': template.shopify_export_vendor or '',
-            'productType': template.shopify_export_product_type or '',
-            'tags': tags,
-            'status': EXPORT_STATUS_TO_SHOPIFY[status],
-        }
+        """The allowlisted product scalars, omitting absent local values.
+
+        An unset Odoo field is not an instruction to erase a valid Shopify
+        value. Explicit clears require a managed field/intent and are not
+        inferred from the absence of a local value.
+        """
+        desired = {'title': template.name or ''}
+        if template.shopify_export_status_managed:
+            status = template.shopify_export_status or 'draft'
+            desired['status'] = EXPORT_STATUS_TO_SHOPIFY[status]
+        optional_fields = (
+            ('descriptionHtml', template.description_sale,
+             'shopify_export_description_managed'),
+            ('vendor', template.shopify_export_vendor,
+             'shopify_export_vendor_managed'),
+            ('productType', template.shopify_export_product_type,
+             'shopify_export_product_type_managed'),
+        )
+        for field_name, value, managed_field in optional_fields:
+            managed = bool(getattr(template, managed_field, False))
+            if value not in (False, None, '') or managed:
+                desired[field_name] = value or ''
+        if template.shopify_export_tags or template.shopify_export_tags_managed:
+            desired['tags'] = [
+                tag.strip()
+                for tag in (template.shopify_export_tags or '').split(',')
+                if tag.strip()
+            ]
         unexpected = set(desired) - PRODUCT_SCALAR_ALLOWLIST
         if unexpected:
             raise ValidationError(
@@ -322,7 +340,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 'name': line.attribute_id.name,
                 'values': values,
             })
-        return options
+        return normalize_option_specs(options)
 
     @api.model
     def _desired_variant(self, store, variant, include_price):
@@ -338,10 +356,11 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 'optionName': value.attribute_id.name,
                 'name': value.name,
             })
-        desired = {
-            'barcode': variant.barcode or '',
-            'inventoryItem': {'sku': variant.default_code or ''},
-        }
+        desired = {}
+        if variant.barcode:
+            desired['barcode'] = variant.barcode
+        if variant.default_code:
+            desired['inventoryItem'] = {'sku': variant.default_code}
         if option_values:
             desired['optionValues'] = option_values
         if include_price:
@@ -380,7 +399,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'product(id: $id) { id handle title descriptionHtml vendor '
             'productType tags status updatedAt '
             'options { id name position optionValues { id name } } '
-            'variants(first: %d) { nodes { id barcode price compareAtPrice '
+            'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
             'inventoryItem { id sku } '
             'selectedOptions { name value } } } '
             'collections(first: 1) { nodes { id } } '
@@ -553,20 +572,76 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         instead of a second one.
         """
         client = self.env['shopify.connector.api.client']
+        settings = self._settings(store)
+        if not (
+            settings and settings.product_export_binding_namespace_ready
+        ):
+            definition_query = (
+                'query ProductExportBindingDefinition($key: String!) { '
+                'metafieldDefinitions(first: 1, ownerType: PRODUCT, '
+                'key: $key) { '
+                'nodes { id key type { name } } } shop { myshopifyDomain } }'
+            )
+            with client.execute_business(
+                job, store, definition_query,
+                {'key': BINDING_METAFIELD_KEY},
+            ) as result:
+                definition_data = (result or {}).get('data') or {}
+            identity = (
+                definition_data.get('shop') or {}
+            ).get('myshopifyDomain')
+            definitions = (
+                (definition_data.get('metafieldDefinitions') or {})
+                .get('nodes') or []
+            )
+            if identity != store.shop_domain:
+                raise JobHandlerError(
+                    ERROR_CLASS_STORE_IDENTITY,
+                    'The binding-definition preflight observed a different '
+                    'Shopify store identity.',
+                )
+            if not definitions:
+                # The confirmed apply plan creates the definition before the
+                # product mutation. productByIdentifier cannot be queried
+                # before that definition exists: Shopify rejects the lookup
+                # instead of returning a null product.
+                return {'store_identity': identity, 'nodes': []}
+            definition = definitions[0]
+            if (
+                (definition.get('type') or {}).get('name')
+                != BINDING_METAFIELD_TYPE
+            ):
+                raise JobHandlerError(
+                    ERROR_CLASS_CONFIGURATION,
+                    'The connector binding metafield definition exists with '
+                    'an incompatible type; product creation is blocked.',
+                )
         query = (
-            'query ProductExportFindByCustomId($query: String!) { '
-            'products(first: 2, query: $query) { nodes { id title '
-            'updatedAt } } shop { myshopifyDomain } }'
+            'query ProductExportFindByCustomId('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title updatedAt } shop { myshopifyDomain } }'
         )
-        search = 'metafields.%s:%s' % (BINDING_METAFIELD_KEY, template_id)
+        identifier = {
+            'customId': {
+                'key': BINDING_METAFIELD_KEY,
+                'value': str(template_id),
+            },
+        }
         with client.execute_business(
-            job, store, query, {'query': search},
+            job, store, query, {'identifier': identifier},
         ) as result:
             data = (result or {}).get('data') or {}
-        nodes = ((data.get('products') or {}).get('nodes')) or []
+        product = data.get('product')
+        if product is not None and not isinstance(product, dict):
+            raise JobHandlerError(
+                ERROR_CLASS_VALIDATION,
+                'Shopify returned an invalid productByIdentifier payload; '
+                'the create-path duplicate gate is closed.',
+            )
         return {
             'store_identity': (data.get('shop') or {}).get('myshopifyDomain'),
-            'nodes': nodes,
+            'nodes': [product] if isinstance(product, dict) else [],
         }
 
     @api.model
@@ -896,19 +971,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
         blocked.extend(variant_plan['blocked'])
 
-        remote_options = [
-            {
-                'name': option.get('name'),
-                'values': [
-                    value.get('name')
-                    for value in (option.get('optionValues') or [])
-                ],
-            }
-            for option in sorted(
-                remote.get('options') or [],
-                key=lambda option: option.get('position') or 0,
-            )
-        ]
+        remote_options = normalize_option_specs(remote.get('options') or [])
         # Options are never mutated on an existing product in MVP. Every
         # 2026-07 option mutation either removes values or reshapes the
         # variant matrix, and no source verification proves a
@@ -1006,6 +1069,8 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
 
     @api.model
     def _options_diverge(self, remote_options, desired_options):
+        remote_options = normalize_option_specs(remote_options or [])
+        desired_options = normalize_option_specs(desired_options or [])
         if len(remote_options) != len(desired_options):
             return True
         for remote, desired in zip(remote_options, desired_options):
@@ -1096,19 +1161,31 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                               gid,
                           ),
                 'remote_variant_gid': gid,
-                'remote_sku': (entry.get('inventoryItem') or {}).get('sku'),
+                'remote_sku': (
+                    entry.get('sku')
+                    or (entry.get('inventoryItem') or {}).get('sku')
+                ),
             })
         return {'update': to_update, 'create': to_create, 'blocked': blocked}
 
     @api.model
     def _variant_changes(self, current, desired, include_price):
         changes = []
-        current_sku = (current.get('inventoryItem') or {}).get('sku') or ''
-        desired_sku = (desired.get('inventoryItem') or {}).get('sku') or ''
-        if current_sku != desired_sku:
+        if 'inventoryItem' in desired:
+            current_sku = (
+                current.get('sku')
+                or (current.get('inventoryItem') or {}).get('sku')
+                or ''
+            )
+            desired_sku = (desired.get('inventoryItem') or {}).get('sku') or ''
+        else:
+            current_sku = desired_sku = None
+        if desired_sku is not None and current_sku != desired_sku:
             changes.append({'field': 'sku', 'from': current_sku,
                             'to': desired_sku})
-        if (current.get('barcode') or '') != (desired.get('barcode') or ''):
+        if 'barcode' in desired and (
+            (current.get('barcode') or '') != desired['barcode']
+        ):
             changes.append({'field': 'barcode',
                             'from': current.get('barcode'),
                             'to': desired.get('barcode')})
@@ -1716,7 +1793,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'mutation ProductExportBindingNamespace('
             '$definition: MetafieldDefinitionInput!) { '
             'metafieldDefinitionCreate(definition: $definition) { '
-            'createdDefinition { id key namespace } '
+            'createdDefinition { id key namespace type { name } } '
             'userErrors { code field message } } }'
         )
         variables = {
@@ -1729,11 +1806,10 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                     'Connector-owned binding identity written by the Odoo '
                     'Shopify connector. Do not edit.'
                 ),
-                # `identifier.customId` takes a `UniqueMetafieldValueInput`,
-                # which only resolves against a definition whose values are
-                # unique. That is what makes this bootstrap a genuine
-                # prerequisite of the create path rather than a nicety.
-                'capabilities': {'uniqueValues': {'enabled': True}},
+                # Shopify's `id` metafield type is intrinsically unique. Do
+                # not also send the general-purpose `uniqueValues`
+                # capability: the live Admin API rejects that redundant
+                # capability for an ID definition before any product write.
             },
         }
         return self._mutation_request(
@@ -1756,6 +1832,11 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 return 'no created definition id'
             if created.get('key') != BINDING_METAFIELD_KEY:
                 return 'definition key mismatch'
+            if (
+                (created.get('type') or {}).get('name')
+                != BINDING_METAFIELD_TYPE
+            ):
+                return 'definition type mismatch'
             return True
 
         return self._classify_user_errors(
@@ -1768,22 +1849,36 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_binding_namespace(self, attempt):
+    def _reconcile_binding_namespace(self, attempt, reconciliation_job=None):
         """A definition that already exists is the desired end state."""
         store = attempt.store_id
         client = self.env['shopify.connector.api.client']
         query = (
             'query ProductExportBindingDefinition($key: String!) { '
             'metafieldDefinitions(first: 1, ownerType: PRODUCT, key: $key) { '
-            'nodes { id key } } shop { myshopifyDomain } }'
+            'nodes { id key type { name } } } shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'key': BINDING_METAFIELD_KEY})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'key': BINDING_METAFIELD_KEY},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_binding_namespace_result(attempt, result)
+
+    @api.model
+    def _reconcile_binding_namespace_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
             return self._reconcile_identity_mismatch(identity)
         nodes = ((data.get('metafieldDefinitions') or {}).get('nodes')) or []
-        if nodes:
+        if (
+            nodes
+            and (nodes[0].get('type') or {}).get('name')
+            == BINDING_METAFIELD_TYPE
+        ):
             return {
                 'verdict': 'applied',
                 'observed_store_identity': identity,
@@ -1799,8 +1894,9 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'action': 'block_manual_review',
             'error_class': ERROR_CLASS_CONFIGURATION,
             'manual_review_subreason': SUBREASON_BINDING_CONFLICT,
-            'message': 'The binding-metafield definition does not exist; the '
-                       'create path stays closed until it does.',
+            'message': 'The binding-metafield definition is missing or has '
+                       'an incompatible type; the create path stays closed '
+                       'until an ID definition exists.',
             'evidence': {},
         }
 
@@ -1886,6 +1982,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
                 'This product has more variants than one export job carries.',
             )
+        self._validate_local_create_variant_identities(variants)
 
         product_input = dict(scalars)
         if options:
@@ -1894,6 +1991,16 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                  'values': [{'name': value} for value in option['values']]}
                 for option in options
             ]
+        elif variants:
+            # ProductVariantSetInput requires optionValues for every variant,
+            # including Shopify's attribute-free singleton representation.
+            # The matching product option must travel with that value: sending
+            # ``Title / Default Title`` on the variant while omitting the
+            # ``Title`` product option is rejected by the live ProductSet API.
+            product_input['productOptions'] = [{
+                'name': 'Title',
+                'values': [{'name': 'Default Title'}],
+            }]
         product_input['variants'] = [
             self._create_variant_input(store, variant, include_price, options)
             for variant in variants
@@ -1910,9 +2017,11 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             '$identifier: ProductSetIdentifiers!) { '
             'productSet(input: $input, identifier: $identifier, '
             'synchronous: true) { '
-            'product { id handle title status updatedAt '
-            'variants(first: %d) { nodes { id barcode '
-            'inventoryItem { id sku } } } } '
+            'product { id handle title status updatedAt descriptionHtml vendor '
+            'productType tags '
+            'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
+            'selectedOptions { name value } '
+            'inventoryItem { id sku tracked } } } } '
             'userErrors { code field message } } }' % (MAX_EXPORT_VARIANTS,)
         )
         variables = {
@@ -1942,14 +2051,76 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
+    def _validate_local_create_variant_identities(self, variants):
+        """Fail closed before ProductSet when local identity is not unique.
+
+        ProductSet can create a remote product before a malformed response is
+        available for binding.  Every local variant therefore needs at least
+        one durable identity, and duplicate SKU/barcode values are rejected
+        even when one of the two fields would normally be preferred.  This
+        keeps an ambiguous local catalog from creating an orphan remote
+        product and guarantees that finalization can prove a one-to-one map.
+        """
+        missing = [
+            variant.display_name
+            for variant in variants
+            if not (str(variant.default_code or '').strip()
+                    or str(variant.barcode or '').strip())
+        ]
+        if missing:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'Product create requires every Odoo variant to have a SKU '
+                'or barcode before Shopify ProductSet is called: %s.' % (
+                    ', '.join(missing),
+                ),
+            )
+        for field_name, label in (
+            ('default_code', 'SKU'), ('barcode', 'barcode'),
+        ):
+            seen = {}
+            for variant in variants:
+                value = str(getattr(variant, field_name) or '').strip()
+                if not value:
+                    continue
+                seen.setdefault(value, []).append(variant.display_name)
+            duplicates = {
+                value: names for value, names in seen.items()
+                if len(names) > 1
+            }
+            if duplicates:
+                detail = '; '.join(
+                    '%s (%s)' % (value, ', '.join(names))
+                    for value, names in sorted(duplicates.items())
+                )
+                self._fail_closed_pre_c2(
+                    ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                    'Product create requires unique local %s identities; '
+                    'duplicate values: %s.' % (label, detail),
+                )
+
+    @api.model
     def _create_variant_input(self, store, variant, include_price, options):
         desired = self._desired_variant(store, variant, include_price)
-        entry = {
-            'barcode': desired['barcode'],
-            'inventoryItem': {'sku': desired['inventoryItem']['sku']},
-        }
+        entry = {}
+        if 'barcode' in desired:
+            entry['barcode'] = desired['barcode']
+        # ProductSet uses ProductVariantSetInput, whose SKU is top-level.
+        # Bulk create/update use a different ProductVariantsBulkInput shape
+        # and intentionally keep their InventoryItemInput nesting below.
+        if 'inventoryItem' in desired:
+            entry['sku'] = desired['inventoryItem']['sku']
         if options:
-            entry['optionValues'] = desired.get('optionValues') or []
+            if not desired.get('optionValues'):
+                raise ValidationError(
+                    'A structured product variant has no option values; '
+                    'the Shopify ProductSet input would be invalid.'
+                )
+            entry['optionValues'] = desired['optionValues']
+        else:
+            # ProductVariantSetInput requires an optionValues transport value
+            # even for Odoo's attribute-free singleton representation.
+            entry['optionValues'] = singleton_transport_option_values()
         if include_price:
             entry['price'] = desired['price']
             if 'compareAtPrice' in desired:
@@ -1974,13 +2145,12 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_create(self, attempt):
+    def _reconcile_create(self, attempt, reconciliation_job=None):
         """Reconcile by the connector's own custom id, never by title.
 
-        This is the read that makes an ambiguous create safe: found once →
-        adopt and bind; found more than once → review (this connector will
-        not choose between two products); not found → the attempt did not
-        apply.
+        This is the read that makes an ambiguous create safe: the dedicated
+        unique-identifier lookup returns the matching product to adopt and
+        bind, or no product when the attempt did not apply.
         """
         store = attempt.store_id
         template_id = (attempt.preconditions_snapshot or {}).get(
@@ -1988,19 +2158,39 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
         client = self.env['shopify.connector.api.client']
         query = (
-            'query ProductExportReconcileCreate($query: String!) { '
-            'products(first: 2, query: $query) { nodes { id title '
-            'updatedAt variants(first: %d) { nodes { id '
-            'inventoryItem { id sku } } } } } '
+            'query ProductExportReconcileCreate('
+            '$identifier: ProductIdentifierInput!) { '
+            'product: productByIdentifier(identifier: $identifier) { '
+            'id title status '
+            'descriptionHtml vendor productType tags updatedAt '
+            'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
+            'selectedOptions { name value } '
+            'inventoryItem { id sku tracked } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        search = 'metafields.%s:%s' % (BINDING_METAFIELD_KEY, template_id)
-        result = client.execute(store, query, {'query': search})
+        identifier = {
+            'customId': {
+                'key': BINDING_METAFIELD_KEY,
+                'value': str(template_id),
+            },
+        }
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'identifier': identifier},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_create_result(attempt, result)
+
+    @api.model
+    def _reconcile_create_result(self, attempt, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
             return self._reconcile_identity_mismatch(identity)
-        nodes = ((data.get('products') or {}).get('nodes')) or []
+        product = data.get('product')
+        nodes = [product] if isinstance(product, dict) else []
         if len(nodes) == 1:
             return {
                 'verdict': 'applied',
@@ -2065,6 +2255,116 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         self._advance_plan(preview, JOB_TYPE_CREATE)
 
     @api.model
+    def _match_created_product_variants(self, template, remote_variants):
+        """Prove the create response maps one-to-one before any write.
+
+        ProductSet returns the variants it created, but the response order is
+        not a business identity. Direct ``ProductVariant.sku`` is preferred;
+        ``inventoryItem.sku`` is only a compatibility fallback for responses
+        where the direct field is absent. Barcode is considered only when the
+        local variant has no SKU. Any missing, duplicate, or ambiguous match
+        blocks finalization rather than leaving a partially bound product.
+        """
+        local_variants = template.product_variant_ids
+        if not isinstance(remote_variants, list):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'Shopify product-create finalization returned no valid '
+                'variant list; no binding was written.',
+            )
+        if len(remote_variants) != len(local_variants):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'Shopify product-create finalization returned %d variant(s) '
+                'for %d Odoo variant(s); refusing incomplete binding.' % (
+                    len(remote_variants), len(local_variants),
+                ),
+            )
+
+        remote_ids = []
+        direct_skus = []
+        normalized = []
+        for entry in remote_variants:
+            if not isinstance(entry, dict) or not entry.get('id'):
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Shopify product-create finalization returned a variant '
+                    'without a durable GID; no binding was written.',
+                )
+            remote_id = entry['id']
+            remote_ids.append(remote_id)
+            direct_sku = entry.get('sku')
+            if direct_sku:
+                direct_skus.append(direct_sku)
+            compatibility_sku = (
+                direct_sku
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            normalized.append((entry, compatibility_sku))
+        if len(remote_ids) != len(set(remote_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'Shopify product-create finalization returned duplicate '
+                'variant GIDs; no binding was written.',
+            )
+        if len(direct_skus) != len(set(direct_skus)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'Shopify product-create finalization returned duplicate '
+                'direct SKUs; no binding was written.',
+            )
+
+        matched = {}
+        used_remote_ids = set()
+        for variant in local_variants:
+            local_sku = variant.default_code
+            if local_sku:
+                candidates = [
+                    entry for entry, remote_sku in normalized
+                    if remote_sku == local_sku
+                ]
+                identity_description = 'SKU %r' % local_sku
+            elif variant.barcode:
+                candidates = [
+                    entry for entry, _remote_sku in normalized
+                    if entry.get('barcode') == variant.barcode
+                ]
+                identity_description = 'barcode %r' % variant.barcode
+            else:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Odoo variant %s has neither SKU nor barcode; Shopify '
+                    'create finalization cannot prove its identity.' % (
+                        variant.display_name,
+                    ),
+                )
+            if len(candidates) != 1:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Shopify product-create finalization could not map Odoo '
+                    'variant %s by %s exactly once; no binding was written.' % (
+                        variant.display_name, identity_description,
+                    ),
+                )
+            remote = candidates[0]
+            if remote['id'] in used_remote_ids:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Multiple Odoo variants map to Shopify variant %s; no '
+                    'binding was written.' % remote['id'],
+                )
+            used_remote_ids.add(remote['id'])
+            matched[variant.id] = remote
+
+        if len(used_remote_ids) != len(remote_variants):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'Shopify product-create finalization left a remote variant '
+                'unmatched; no binding was written.',
+            )
+        return matched
+
+    @api.model
     def _bind_created_product(self, store, preview, product):
         """Write the bindings immediately, so the next run takes the update
         path and no second create is ever possible."""
@@ -2075,14 +2375,43 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'shopify.connector.product.variant.binding'
         ]
         template = preview.product_template_id
+        remote_variants = (
+            (product.get('variants') or {}).get('nodes')
+        )
+        remote_by_variant_id = self._match_created_product_variants(
+            template, remote_variants,
+        )
         binding = TemplateBinding.sudo().search([
             ('store_id', '=', store.id),
             ('product_template_id', '=', template.id),
         ], limit=1)
+        if binding and binding.shopify_gid != product.get('id'):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'The Odoo product is already bound to a different Shopify '
+                'product; create finalization will not rebind it.',
+            )
         values = {
             'shopify_gid': product.get('id'),
-            'shopify_title': product.get('title'),
-            'shopify_updated_at': product.get('updatedAt'),
+            'shopify_title': product.get('title') or False,
+            'shopify_status': (product.get('status') or '').lower() or False,
+            'shopify_description_html': (
+                product.get('descriptionHtml')
+                if product.get('descriptionHtml') is not None else False
+            ),
+            'shopify_vendor': (
+                product.get('vendor') if product.get('vendor') is not None
+                else False
+            ),
+            'shopify_product_type': (
+                product.get('productType')
+                if product.get('productType') is not None else False
+            ),
+            'shopify_tags': list(product.get('tags') or [])
+                if product.get('tags') is not None else False,
+            'shopify_updated_at': product.get('updatedAt') or False,
+            'shopify_last_imported_at': fields.Datetime.now(),
+            'shopify_birth_initialized': True,
             'status': 'active',
             'match_key': 'existing_binding',
         }
@@ -2094,22 +2423,19 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 store_id=store.id,
                 product_template_id=template.id,
             ))
-        remote_variants = (
-            (product.get('variants') or {}).get('nodes')
-        ) or []
-        # Variant identity is matched by SKU exactly once, here, at the
-        # moment the connector itself created them and therefore knows what
-        # it asked for. This is not name-matching: it is reading back the
-        # identity of rows this attempt authored.
-        by_sku = {}
-        for entry in remote_variants:
-            sku = ((entry or {}).get('inventoryItem') or {}).get('sku')
-            if sku:
-                by_sku[sku] = entry.get('id')
         for variant in template.product_variant_ids:
-            gid = by_sku.get(variant.default_code)
-            if not gid:
-                continue
+            remote = remote_by_variant_id[variant.id]
+            gid = remote.get('id')
+            remote_sku = (
+                remote.get('sku')
+                or (remote.get('inventoryItem') or {}).get('sku')
+            )
+            inventory_item = remote.get('inventoryItem') or {}
+            inventory_tracked = inventory_item.get('tracked')
+            inventory_tracked_known = isinstance(inventory_tracked, bool)
+            selected_options = normalize_selected_options(
+                remote.get('selectedOptions')
+            )
             existing = VariantBinding.sudo().search([
                 ('store_id', '=', store.id),
                 ('product_variant_id', '=', variant.id),
@@ -2117,6 +2443,27 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             variant_values = {
                 'shopify_gid': gid,
                 'product_template_binding_id': binding.id,
+                'shopify_option_values': (
+                    ' / '.join(
+                        '%s: %s' % (option.get('name'), option.get('value'))
+                        for option in selected_options
+                    ) or False
+                ),
+                'shopify_price_snapshot': self._safe_float(
+                    remote.get('price')
+                ),
+                'shopify_compare_at_price_snapshot': self._safe_float(
+                    remote.get('compareAtPrice')
+                ),
+                'shopify_sku_snapshot': remote_sku or False,
+                'shopify_barcode_snapshot': remote.get('barcode') or False,
+                'shopify_inventory_item_gid': inventory_item.get('id') or False,
+                'shopify_inventory_tracked': (
+                    inventory_tracked if inventory_tracked_known else False
+                ),
+                'shopify_inventory_tracked_known': inventory_tracked_known,
+                'shopify_last_imported_at': fields.Datetime.now(),
+                'shopify_birth_initialized': True,
                 'status': 'active',
                 'match_key': 'existing_binding',
             }
@@ -2129,6 +2476,13 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                     product_variant_id=variant.id,
                 ))
         return binding
+
+    @api.model
+    def _safe_float(self, value):
+        try:
+            return float(value) if value not in (None, False, '') else 0.0
+        except (TypeError, ValueError):
+            return 0.0
 
     # ------------------------------------------------------------------
     # Mutation domain: scalar update (productUpdate)
@@ -2226,7 +2580,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_update(self, attempt):
+    def _reconcile_update(self, attempt, reconciliation_job=None):
         """Compare the remote scalars against exactly what was requested."""
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
@@ -2238,7 +2592,17 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'product(id: $id) { id title descriptionHtml vendor productType '
             'tags status updatedAt } shop { myshopifyDomain } }'
         )
-        result = client.execute(store, query, {'id': product_gid})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': product_gid},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_update_result(attempt, expected, result)
+
+    @api.model
+    def _reconcile_update_result(self, attempt, expected, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2341,11 +2705,13 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             desired = self._desired_variant(
                 store, row.product_variant_id, include_price,
             )
-            entry = {
-                'id': row.shopify_gid,
-                'barcode': desired['barcode'],
-                'inventoryItem': {'sku': desired['inventoryItem']['sku']},
-            }
+            entry = {'id': row.shopify_gid}
+            if 'barcode' in desired:
+                entry['barcode'] = desired['barcode']
+            if 'inventoryItem' in desired:
+                entry['inventoryItem'] = {
+                    'sku': desired['inventoryItem']['sku'],
+                }
             if include_price:
                 entry['price'] = desired['price']
                 if 'compareAtPrice' in desired:
@@ -2413,7 +2779,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         return self._classify_user_errors(result, success, 'Variant update')
 
     @api.model
-    def _reconcile_variants_update(self, attempt):
+    def _reconcile_variants_update(self, attempt, reconciliation_job=None):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         expected = snapshot.get('expected_variants') or []
@@ -2424,7 +2790,19 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'price compareAtPrice inventoryItem { id sku } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        result = client.execute(store, query, {'id': snapshot.get('product_gid')})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_update_result(
+                attempt, expected, result,
+            )
+
+    @api.model
+    def _reconcile_variants_update_result(self, attempt, expected, result):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2452,11 +2830,20 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             if not observed:
                 applied = False
                 break
-            if (observed.get('barcode') or '') != (entry.get('barcode') or ''):
+            if 'barcode' in entry and (
+                (observed.get('barcode') or '') != entry['barcode']
+            ):
                 applied = False
                 break
-            observed_sku = (observed.get('inventoryItem') or {}).get('sku') or ''
-            if observed_sku != (entry.get('inventoryItem') or {}).get('sku', ''):
+            observed_sku = (
+                observed.get('sku')
+                or (observed.get('inventoryItem') or {}).get('sku')
+            )
+            expected_sku = (
+                (entry.get('inventoryItem') or {}).get('sku')
+                if 'inventoryItem' in entry else None
+            )
+            if expected_sku is not None and observed_sku != expected_sku:
                 applied = False
                 break
             if 'price' in entry and _money(
@@ -2511,20 +2898,36 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             local_snapshot['store_id']
         )
         include_price = self._price_export_allowed(store)
-        confirmed_ids = []
-        for step in (preview.apply_plan or {}).get('steps') or []:
-            if step['step'] == JOB_TYPE_VARIANTS_CREATE:
-                confirmed_ids = list(step.get('variant_ids') or [])
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
         if not confirmed_ids:
             self._fail_closed_pre_c2(
                 ERROR_CLASS_DESTRUCTIVE, SUBREASON_DESTRUCTIVE,
                 'No variant creation was confirmed for this product.',
+            )
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; no mutation was sent.',
             )
         variants = self.env['product.product'].browse(confirmed_ids).exists()
         if len(variants) != len(set(confirmed_ids)):
             self._fail_closed_pre_c2(
                 ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
                 'A confirmed new variant no longer exists in Odoo.',
+            )
+        skus = [variant.default_code for variant in variants]
+        if any(not sku for sku in skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
+                'Every confirmed new variant requires a non-empty SKU before '
+                'Shopify mutation so its response can be bound without guessing.',
+            )
+        if len(set(skus)) != len(skus):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'Confirmed new variants contain duplicate SKUs; no Shopify '
+                'mutation was sent.',
             )
         VariantBinding = self.env[
             'shopify.connector.product.variant.binding'
@@ -2539,15 +2942,60 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 'A confirmed new variant became bound after the preview; '
                 'creating it again would duplicate it.',
             )
+        # Re-read immediately before C2. A merchant or a prior uncertain
+        # attempt may have created the SKU after preview; local validation
+        # alone cannot prove remote absence.
+        remote = self._read_remote_product(
+            store,
+            self.env['shopify.connector.job'].browse(local_snapshot['job_id']),
+            local_snapshot['remote_product_gid'],
+        )
+        if remote.get('store_identity') != store.shop_domain:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'The fresh variant-create preflight observed a different '
+                'Shopify store identity; no mutation was sent.',
+            )
+        if not remote.get('exists'):
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_BINDING_CONFLICT, SUBREASON_BINDING_CONFLICT,
+                'The bound Shopify product no longer exists; a new variant '
+                'cannot be created safely.',
+            )
+        remote_skus = {}
+        for entry in remote.get('variants') or []:
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                remote_skus.setdefault(sku, []).append(entry.get('id'))
+        collisions = sorted(set(skus) & set(remote_skus))
+        if collisions:
+            self._fail_closed_pre_c2(
+                ERROR_CLASS_DUPLICATE, SUBREASON_DUPLICATE,
+                'A confirmed variant SKU now exists on Shopify (%s). The '
+                'fresh pre-mutation identity check stopped duplicate creation.'
+                % ', '.join(collisions),
+            )
         options = self._desired_options(preview.product_template_id)
         variants_input = []
         for variant in variants:
             desired = self._desired_variant(store, variant, include_price)
-            entry = {
-                'barcode': desired['barcode'],
-                'inventoryItem': {'sku': desired['inventoryItem']['sku']},
-            }
-            if options and desired.get('optionValues'):
+            entry = {}
+            if 'barcode' in desired:
+                entry['barcode'] = desired['barcode']
+            if 'inventoryItem' in desired:
+                entry['inventoryItem'] = {
+                    'sku': desired['inventoryItem']['sku'],
+                }
+            if options:
+                if not desired.get('optionValues'):
+                    self._fail_closed_pre_c2(
+                        ERROR_CLASS_DATA_SHAPE, SUBREASON_BINDING_CONFLICT,
+                        'A structured product variant has no option values; '
+                        'the Shopify variant-create input would be invalid.',
+                    )
                 entry['optionValues'] = desired['optionValues']
             if include_price:
                 entry['price'] = desired['price']
@@ -2572,7 +3020,9 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             '$strategy: ProductVariantsBulkCreateStrategy) { '
             'productVariantsBulkCreate(productId: $productId, '
             'variants: $variants, strategy: $strategy) { '
-            'productVariants { id barcode inventoryItem { id sku } } '
+            'productVariants { id sku barcode price compareAtPrice '
+            'selectedOptions { name value } '
+            'inventoryItem { id sku tracked } } '
             'userErrors { code field message } } }'
         )
         self._assert_no_product_set_on_existing(operation, local_snapshot)
@@ -2583,7 +3033,9 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             {'product_gid': local_snapshot['remote_product_gid'],
              'odoo_variant_ids': sorted(variants.ids),
              'expected_skus': sorted(
-                 entry['inventoryItem']['sku'] for entry in variants_input
+                 entry['inventoryItem']['sku']
+                 for entry in variants_input
+                 if 'inventoryItem' in entry
              ),
              'snapshot_taken_at': fields.Datetime.to_string(
                  fields.Datetime.now()
@@ -2610,7 +3062,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         )
 
     @api.model
-    def _reconcile_variants_create(self, attempt):
+    def _reconcile_variants_create(self, attempt, reconciliation_job=None):
         """Adopt-if-found by SKU on the variants this attempt authored."""
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
@@ -2619,10 +3071,25 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         query = (
             'query ProductExportReconcileVariantCreate($id: ID!) { '
             'product(id: $id) { id variants(first: %d) { nodes { id '
-            'inventoryItem { id sku } } } } '
+            'sku barcode price compareAtPrice '
+            'inventoryItem { id sku tracked } } } } '
             'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
         )
-        result = client.execute(store, query, {'id': snapshot.get('product_gid')})
+        with client.execute_business_read(
+            reconciliation_job or attempt.job_id,
+            store,
+            query,
+            {'id': snapshot.get('product_gid')},
+            purpose='product_export',
+        ) as result:
+            return self._reconcile_variants_create_result(
+                attempt, expected_skus, result,
+            )
+
+    @api.model
+    def _reconcile_variants_create_result(
+        self, attempt, expected_skus, result,
+    ):
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         if identity != attempt.expected_store_identity:
@@ -2640,11 +3107,35 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 'evidence': {},
             }
         nodes = ((product.get('variants') or {}).get('nodes')) or []
-        observed = {
-            ((entry or {}).get('inventoryItem') or {}).get('sku'): entry.get('id')
-            for entry in nodes
+        observed = {}
+        for entry in nodes:
+            if not isinstance(entry, dict):
+                continue
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                observed.setdefault(sku, []).append(entry)
+        duplicate_skus = {
+            sku for sku in expected_skus if len(observed.get(sku) or []) != 1
         }
-        found = {sku for sku in expected_skus if observed.get(sku)}
+        if duplicate_skus:
+            return {
+                'verdict': 'not_applied',
+                'observed_store_identity': identity,
+                'action': 'block_manual_review',
+                'error_class': ERROR_CLASS_DUPLICATE,
+                'manual_review_subreason': SUBREASON_DUPLICATE,
+                'message': 'Variant-create reconciliation found a missing or '
+                           'duplicate SKU identity; a reviewer must resolve '
+                           'the response before binding.',
+                'evidence': {'ambiguous_skus': sorted(duplicate_skus)},
+            }
+        found = {
+            sku for sku in expected_skus
+            if (observed.get(sku) or [{}])[0].get('id')
+        }
         if expected_skus and found == expected_skus:
             return {
                 'verdict': 'applied',
@@ -2700,29 +3191,114 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         binding = preview.product_template_binding_id
         if not binding:
             return
+        confirmed_ids = self._confirmed_variant_create_ids(preview)
+        if len(confirmed_ids) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'The confirmed variant-create plan contains duplicate Odoo '
+                'variant identities; binding finalization stopped.',
+            )
+        variants = self.env['product.product'].browse(confirmed_ids).exists()
+        if len(variants) != len(set(confirmed_ids)):
+            raise JobHandlerError(
+                ERROR_CLASS_BINDING_CONFLICT,
+                'A confirmed new variant disappeared before binding finalization.',
+            )
         by_sku = {}
         for entry in remote_variants:
-            sku = ((entry or {}).get('inventoryItem') or {}).get('sku')
-            if sku:
-                by_sku[sku] = entry.get('id')
-        for variant in preview.product_template_id.product_variant_ids:
-            gid = by_sku.get(variant.default_code)
-            if not gid:
+            if not isinstance(entry, dict):
                 continue
+            sku = (
+                entry.get('sku')
+                or (entry.get('inventoryItem') or {}).get('sku')
+            )
+            if sku:
+                by_sku.setdefault(sku, []).append(entry)
+        for variant in variants:
+            if not variant.default_code:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'A newly created Odoo variant has no SKU; its Shopify '
+                    'identity cannot be bound without guessing.',
+                )
+            candidates = by_sku.get(variant.default_code) or []
+            if len(candidates) != 1:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Variant-create finalization could not map Odoo variant '
+                    '%s by SKU exactly once.' % variant.display_name,
+                )
+            remote = candidates[0]
+            gid = remote.get('id')
+            if not gid:
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'Shopify returned a created variant without an identity; '
+                    'binding finalization stopped.',
+                )
             existing = VariantBinding.sudo().search([
                 ('store_id', '=', store.id),
                 ('product_variant_id', '=', variant.id),
             ], limit=1)
-            if existing:
-                continue
-            VariantBinding.sudo().create({
+            remote_inventory_item = remote.get('inventoryItem') or {}
+            inventory_tracked = remote_inventory_item.get('tracked')
+            inventory_tracked_known = isinstance(inventory_tracked, bool)
+            selected_options = normalize_selected_options(
+                remote.get('selectedOptions')
+            )
+            variant_values = {
                 'store_id': store.id,
                 'product_variant_id': variant.id,
                 'product_template_binding_id': binding.id,
                 'shopify_gid': gid,
+                'shopify_option_values': (
+                    ' / '.join(
+                        '%s: %s' % (option.get('name'), option.get('value'))
+                        for option in selected_options
+                    ) or False
+                ),
+                'shopify_price_snapshot': self._safe_float(
+                    remote.get('price')
+                ),
+                'shopify_compare_at_price_snapshot': self._safe_float(
+                    remote.get('compareAtPrice')
+                ),
+                'shopify_sku_snapshot': (
+                    remote.get('sku')
+                    or remote_inventory_item.get('sku')
+                    or False
+                ),
+                'shopify_barcode_snapshot': remote.get('barcode') or False,
+                'shopify_inventory_item_gid': remote_inventory_item.get('id') or False,
+                'shopify_inventory_tracked': (
+                    inventory_tracked if inventory_tracked_known else False
+                ),
+                'shopify_inventory_tracked_known': inventory_tracked_known,
+                'shopify_last_imported_at': fields.Datetime.now(),
+                'shopify_birth_initialized': True,
                 'status': 'active',
                 'match_key': 'existing_binding',
-            })
+            }
+            if existing:
+                if existing.shopify_gid == gid:
+                    existing.sudo().write(variant_values)
+                    continue
+                raise JobHandlerError(
+                    ERROR_CLASS_BINDING_CONFLICT,
+                    'The confirmed Odoo variant is already bound to a '
+                    'different Shopify variant; finalization stopped.',
+                )
+            VariantBinding.sudo().create(variant_values)
+
+    @api.model
+    def _confirmed_variant_create_ids(self, preview):
+        ids = []
+        for step in (preview.apply_plan or {}).get('steps') or []:
+            if step.get('step') == JOB_TYPE_VARIANTS_CREATE:
+                ids.extend(step.get('variant_ids') or [])
+        # Preserve the immutable confirmation order. Callers explicitly reject
+        # duplicate plan entries instead of silently normalizing evidence.
+        return ids
 
     # ------------------------------------------------------------------
     # Shared reconciliation helpers and the reconciliation handler
@@ -2793,7 +3369,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             )
             return
         try:
-            result = strategy['reconcile'](attempt)
+            result = strategy['reconcile'](attempt, job)
         except JobHandlerError:
             raise
         except PG_CONCURRENCY_EXCEPTIONS_TO_RETRY:

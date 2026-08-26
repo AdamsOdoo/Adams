@@ -164,6 +164,8 @@
         <field name="res_model">shopify.connector.location.refresh.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
     </record>
 
     <record id="view_shopify_connector_location_map_wizard_form"
@@ -181,16 +183,18 @@
                 </div>
                 <group>
                     <field name="store_id"/>
+                    <field name="store_company_id" invisible="1"/>
                     <field name="shopify_location_id"
                            options="{'no_create': True, 'no_open': True}"/>
                     <field name="odoo_location_id"
                            options="{'no_create': True}"/>
-                    <field name="push_enabled"/>
+                    <field name="push_enabled"
+                            string="Enable future inventory sync"/>
                 </group>
                 <div class="alert alert-warning" role="status">
-                    Mapping a location does not push any stock. The first
-                    push for each product and location still waits for its
-                    own explicit confirmation.
+                    This setting only enables future inventory synchronization. Creating
+                    the mapping does not push stock; each product-location
+                    pair still requires explicit confirmation before its first push.
                 </div>
                 <footer>
                     <button name="action_confirm" type="object"
@@ -209,6 +213,8 @@
         <field name="res_model">shopify.connector.location.map.wizard</field>
         <field name="view_mode">form</field>
         <field name="target">new</field>
+        <field name="group_ids"
+               eval="[(4, ref('shopify_connector_core.group_shopify_connector_admin'))]"/>
     </record>
 
     <record id="view_shopify_connector_location_remap_wizard_form"
@@ -227,6 +233,7 @@
                 </div>
                 <group>
                     <field name="mapping_id" invisible="1"/>
+                    <field name="store_company_id" invisible="1"/>
                     <field name="location_name" readonly="1"/>
                     <field name="current_location_id" readonly="1"/>
                     <field name="new_location_id"
@@ -269,7 +276,7 @@
                     reused. Administrator only, and the reason below is
                     recorded on the audit trail.
                 </div>
-                <div class="alert alert-info" role="note">
+                <div class="o_sc_note o_sc_note--info" role="note">
                     Use this when the mapped Odoo location must change — for
                     example after a physical warehouse move. Once every pair
                     of a Shopify location is back to Pending, the

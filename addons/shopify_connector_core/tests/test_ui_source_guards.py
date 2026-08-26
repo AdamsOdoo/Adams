@@ -3,7 +3,7 @@
 # Static source guards for the U0 batch. These assertions inspect the shipped
 # files directly, so they hold the U0 architecture and safety boundaries in
 # place regardless of runtime data:
-#   * exactly one Owl surface (the dashboard client action);
+#   * exactly the signed Sales Dashboard and Connector Health surfaces;
 #   * no HTTP controller, webhook, or OAuth surface;
 #   * no external dependency / CDN / font / npm / charting library;
 #   * the dashboard aggregate service never reads a credential field, never
@@ -112,35 +112,36 @@ class TestUiSourceGuards(TransactionCase):
                     yield os.path.join(root, name)
 
     # ------------------------------------------------------------------ #
-    def test_single_owl_surface(self):
-        """One client action per accepted Owl surface, and no more.
-
-        U0 accepted exactly one: the dashboard. S1 (2026-07-27) adds the
-        second and last core-owned one, the guided setup wizard -- an accepted
-        MVP screen in its own right (premium UX master specification §3 "S1 --
-        Setup wizard"; DEC-012 §1). The guard is kept as an exact inventory
-        rather than relaxed to a count, so a THIRD surface still has to be a
-        decision somebody makes on purpose.
-        """
-        expected_actions = {
-            'shopify_connector_dashboard.js': 'shopify_connector_dashboard',
-            'shopify_connector_setup_wizard.js':
-                'shopify_connector_setup_wizard',
-        }
-        for filename, tag in expected_actions.items():
-            js = self._read('static', 'src', 'js', filename)
-            self.assertEqual(
-                js.count('registry.category("actions").add('), 1,
-                "%s must register exactly one Owl client action." % filename,
-            )
-            self.assertIn(
-                '"%s"' % tag, js,
-                "%s must register the accepted client-action tag." % filename,
-            )
-        js_dir = os.path.join(self.addon_root, 'static', 'src', 'js')
-        top_level_js = [f for f in os.listdir(js_dir) if f.endswith('.js')]
+    def test_signed_owl_surface_inventory(self):
+        """The two C7 dashboards plus setup are the accepted surfaces."""
+        dashboard = self._read(
+            'static', 'src', 'js', 'shopify_connector_dashboard.js'
+        )
         self.assertEqual(
-            sorted(top_level_js), sorted(expected_actions),
+            dashboard.count('registry.category("actions").add('), 3,
+            'Sales, health, and the original compatibility tag are required.',
+        )
+        for tag in (
+            'shopify_connector_dashboard',
+            'shopify_connector_sales_dashboard',
+            'shopify_connector_health',
+        ):
+            self.assertIn('"%s"' % tag, dashboard)
+        setup = self._read(
+            'static', 'src', 'js', 'shopify_connector_setup_wizard.js'
+        )
+        self.assertEqual(
+            setup.count('registry.category("actions").add('), 1
+        )
+        self.assertIn('"shopify_connector_setup_wizard"', setup)
+        expected_actions = {
+            'shopify_connector_dashboard.js',
+            'shopify_connector_setup_wizard.js',
+        }
+        js_dir = os.path.join(self.addon_root, 'static', 'src', 'js')
+        top_level_js = {f for f in os.listdir(js_dir) if f.endswith('.js')}
+        self.assertEqual(
+            top_level_js, expected_actions,
             "Only the accepted Owl surfaces may live at static/src/js top "
             "level.",
         )
@@ -199,35 +200,89 @@ class TestUiSourceGuards(TransactionCase):
             "The guard must reject a synthetic controller/route fixture "
             "regardless of its filename.")
 
-    def test_sparkline_conveys_more_than_colour(self):
-        """Non-colour-alone charting, carried forward to Store 360 (the same
-        R2 principle the 7-day sparkline satisfied before the trend chart
-        replaced it): the trend must carry a full textual equivalent OUTSIDE
-        the decorative ``role="img"`` bars (a real data table), and the
-        previous-period series must be textured, never colour-alone.
-        """
-        xml = self._read('static', 'src', 'xml', 'shopify_connector_dashboard.xml')
-        self.assertIn(
-            'sc360-chart-table', xml,
-            "The trend chart must carry a data-table equivalent.")
+    def test_sales_trend_is_a_textual_table_not_colour_alone(self):
+        xml = self._read(
+            'static', 'src', 'xml',
+            'shopify_connector_dashboards_split.xml',
+        )
+        self.assertIn('Imported order trend', xml)
         self.assertIn(
             'bucket.value', xml,
-            "The table equivalent must include the current-period value.")
+            "The trend table must include the current-period value.")
         self.assertIn(
             'bucket.previous', xml,
-            "The table equivalent must include the previous-period value.")
-        scss = self._read('static', 'src', 'scss', 'shopify_connector_dashboard.scss')
-        self.assertIn(
-            'repeating-linear-gradient', scss,
-            "The previous-period series must carry a non-colour (textured) "
-            "fill, not just a different colour from the current bars.")
+            "The trend table must include the previous-period value.")
+
+    def test_sales_metric_names_odoo_value_and_discloses_review_population(self):
+        """C7/A3: the UI may not overclaim Shopify lifecycle truth."""
+        xml = self._read(
+            'static', 'src', 'xml',
+            'shopify_connector_dashboards_split.xml',
+        )
+        self.assertIn('Imported Odoo order value', xml)
+        self.assertIn('Awaiting data review', xml)
+        self.assertNotIn(
+            '<div class="sc360-kpi__label">Imported Shopify sales</div>',
+            xml,
+        )
+
+    def test_c7_templates_are_separate_pages(self):
+        from lxml import etree
+        path = os.path.join(
+            self.addon_root, 'static', 'src', 'xml',
+            'shopify_connector_dashboards_split.xml',
+        )
+        root = etree.parse(path)
+        sales = etree.tostring(root.xpath(
+            '//*[@t-name="shopify_connector_core.SalesDashboard"]'
+        )[0], encoding='unicode')
+        health = etree.tostring(root.xpath(
+            '//*[@t-name="shopify_connector_core.ConnectorHealth"]'
+        )[0], encoding='unicode')
+        self.assertIn('Imported Odoo order value', sales)
+        self.assertNotIn('Queue depth', sales)
+        self.assertNotIn('data.health', sales)
+        self.assertIn('Queue depth', health)
+        self.assertIn('Shopify API headroom', health)
+        self.assertNotIn('Imported Odoo order value', health)
+        self.assertNotIn('data.commercial', health)
+
+    def test_c7_pages_keep_rtl_responsive_and_timestamp_evidence(self):
+        xml = self._read(
+            'static', 'src', 'xml',
+            'shopify_connector_dashboards_split.xml',
+        )
+        scss = self._read(
+            'static', 'src', 'scss', 'shopify_connector_dashboard.scss',
+        )
+        self.assertEqual(xml.count('t-att-dir="direction"'), 2)
+        self.assertIn('formatInstant(row.last_activity)', xml)
+        self.assertIn('formatInstant(flow.last_success)', xml)
+        self.assertIn('@media (max-width: 640px)', scss)
+        self.assertIn('overflow-x: auto', scss)
+        self.assertIn('block.orders_target', xml)
+
+    def test_setup_location_refresh_polling_is_bounded_and_cancelled(self):
+        """C4/A2: no immortal timer may survive a setup refresh/session."""
+        js = self._read(
+            'static', 'src', 'js', 'shopify_connector_setup_wizard.js',
+        )
+        xml = self._read(
+            'static', 'src', 'xml', 'shopify_connector_setup_wizard.xml',
+        )
+        self.assertIn('LOCATION_REFRESH_BACKOFF_MS', js)
+        self.assertIn('onWillUnmount', js)
+        self.assertNotIn('setInterval(', js)
+        self.assertIn('sc_setup_refresh_still_running', xml)
+        self.assertIn('sc_setup_check_refresh', xml)
 
     def test_no_external_frontend_dependency(self):
         """No CDN, external font, npm import, or charting library in assets."""
         asset_files = [
             ('static', 'src', 'js', 'shopify_connector_dashboard.js'),
             ('static', 'src', 'js', 'tours', 'shopify_connector_u0_tour.js'),
-            ('static', 'src', 'xml', 'shopify_connector_dashboard.xml'),
+            ('static', 'src', 'xml',
+             'shopify_connector_dashboards_split.xml'),
             ('static', 'src', 'scss', 'shopify_connector_tokens.scss'),
             ('static', 'src', 'scss', 'shopify_connector_dashboard.scss'),
         ]
@@ -253,7 +308,10 @@ class TestUiSourceGuards(TransactionCase):
 
     def test_dashboard_service_reads_no_credential_or_payload(self):
         """The aggregate service never touches a credential or raw payload field."""
-        text = self._read('models', 'shopify_connector_ui_dashboard.py')
+        text = '\n'.join((
+            self._read('models', 'shopify_connector_ui_dashboard.py'),
+            self._read('models', 'shopify_connector_ui_health.py'),
+        ))
         for forbidden in ('access_token', 'remote_mutation_intent', 'preconditions_snapshot',
                           'remote_evidence_refs', 'payload_snapshot', 'technical_detail',
                           '.store.credential', '_get_access_token'):
@@ -264,12 +322,50 @@ class TestUiSourceGuards(TransactionCase):
 
     def test_dashboard_service_performs_no_write(self):
         """The read-only aggregate service performs no create/write/unlink."""
-        text = self._read('models', 'shopify_connector_ui_dashboard.py')
+        text = '\n'.join((
+            self._read('models', 'shopify_connector_ui_dashboard.py'),
+            self._read('models', 'shopify_connector_ui_health.py'),
+        ))
         for forbidden in ('.create(', '.write(', '.unlink(', '.action_'):
             self.assertNotIn(
                 forbidden, text,
                 "The dashboard service must be read-only; found %r." % forbidden,
             )
+
+    def test_setup_activation_and_inventory_copy_are_truthful(self):
+        setup_model = self._read(
+            'models', 'shopify_connector_setup_wizard.py',
+        )
+        setup_js = self._read(
+            'static', 'src', 'js', 'shopify_connector_setup_wizard.js',
+        )
+        setup_xml = self._read(
+            'static', 'src', 'xml', 'shopify_connector_setup_wizard.xml',
+        )
+        self.assertNotIn('Nothing is syncing yet', setup_js)
+        self.assertNotIn('Activating does not start a sync', setup_xml)
+        self.assertIn(
+            'Activation starts the selected read and import scans', setup_xml,
+        )
+        setup_copy = ' '.join(setup_xml.split())
+        self.assertIn(
+            'reconciles Shopify webhook subscriptions', setup_copy,
+        )
+        self.assertNotIn(
+            'Shopify to Odoo, then Odoo to Shopify', setup_model,
+        )
+        self.assertIn(
+            'Odoo to Shopify; Shopify read-only comparison', setup_model,
+        )
+        self.assertIn(
+            'available quantity is read only to detect drift', setup_model,
+        )
+        self.assertIn('never imported into Odoo', setup_model)
+        self.assertIn('Odoo is the inventory authority', setup_copy)
+        self.assertIn('Shopify stock is never imported into Odoo', setup_copy)
+        self.assertIn(
+            'reads Shopify available quantity only for comparison', setup_copy,
+        )
 
     def test_wizards_call_sanctioned_methods_only(self):
         """Wizards call the sanctioned methods and never write protected state."""

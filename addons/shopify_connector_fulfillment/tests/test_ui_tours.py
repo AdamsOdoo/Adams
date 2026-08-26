@@ -63,7 +63,10 @@ class TestUiTours(TransactionCase):
         # User is correctly refused, which the visibility matrix asserts
         # separately. Building it as a User here would assert the opposite of
         # the security contract.
-        admin_only = {'view_shopify_connector_fulfillment_mode_switch_wizard_form'}
+        admin_only = {
+            'view_shopify_connector_fulfillment_mode_switch_wizard_form',
+            'view_shopify_connector_fulfillment_review_release_wizard_form',
+        }
         for xmlid, model, view_type in U1_VIEWS:
             view = self.env.ref('shopify_connector_fulfillment.%s' % xmlid)
             self.assertEqual(view.model, model)
@@ -90,14 +93,50 @@ class TestUiTours(TransactionCase):
             self.assertTrue(menu.action, '%s has no action' % xmlid)
             self.assertIn(menu.action.res_model, self.env)
 
-    def test_the_fulfillment_branch_hangs_off_the_existing_u0_root(self):
+    def test_the_fulfillment_branch_is_an_operations_destination(self):
         branch = self.env.ref(
             'shopify_connector_fulfillment.menu_shopify_connector_fulfillment')
         self.assertEqual(
             branch.parent_id,
-            self.env.ref('shopify_connector_core.menu_shopify_connector_root'),
-            'U1 must not create a second connector app menu.',
+            self.env.ref('shopify_connector_core.menu_shopify_connector_operations'),
+            'Fulfillment must live under Operations.',
         )
+        review = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'menu_shopify_connector_fulfillment_review'
+        )
+        self.assertTrue(review.active)
+        self.assertEqual(
+            review.parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_operations'
+            ),
+        )
+        self.assertTrue(review.action)
+        self.assertEqual(
+            branch.action,
+            self.env.ref(
+                'shopify_connector_fulfillment.'
+                'action_shopify_connector_fulfillment_binding'
+            ),
+        )
+
+    def test_fulfillment_settings_are_administrator_configuration(self):
+        menu = self.env.ref(
+            'shopify_connector_fulfillment.'
+            'menu_shopify_connector_fulfillment_settings'
+        )
+        admin = self.env.ref(
+            'shopify_connector_core.group_shopify_connector_admin'
+        )
+        self.assertEqual(
+            menu.parent_id,
+            self.env.ref(
+                'shopify_connector_core.menu_shopify_connector_configuration'
+            ),
+        )
+        self.assertEqual(menu.group_ids, admin)
+        self.assertEqual(menu.action.group_ids, admin)
 
     def test_list_views_are_read_only_surfaces(self):
         """U1 never edits a record inline; every change goes through a

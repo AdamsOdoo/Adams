@@ -474,6 +474,343 @@ class TestProductImportMatching(TransactionCase):
             template_binding.product_template_id.product_variant_id,
         )
 
+    def test_raw_normalization_retains_product_and_inventory_evidence(self):
+        raw = {
+            'id': 'gid://shopify/Product/905-evidence',
+            'title': 'Evidence Product',
+            'status': 'DRAFT',
+            'descriptionHtml': '<p>Source description</p>',
+            'vendor': 'Source Vendor',
+            'productType': 'Source Type',
+            'tags': ['alpha', 'beta'],
+            'updatedAt': '2026-08-17T00:00:00Z',
+            'options': [{
+                'name': 'Title', 'position': 1,
+                'optionValues': [{'name': 'Default Title'}],
+            }],
+            'variants': {'nodes': [{
+                'id': 'gid://shopify/ProductVariant/905-evidence',
+                'sku': 'EVIDENCE-SKU', 'barcode': 'EVIDENCE-BARCODE',
+                'price': '29.95', 'compareAtPrice': '39.95',
+                'selectedOptions': [
+                    {'name': 'Title', 'value': 'Default Title'},
+                ],
+                'inventoryItem': {
+                    'id': 'gid://shopify/InventoryItem/905-evidence',
+                    'tracked': False,
+                },
+            }]},
+        }
+        normalized = self.Importer._normalize_payload(raw)
+        self.assertEqual(normalized['description_html'], '<p>Source description</p>')
+        self.assertEqual(normalized['vendor'], 'Source Vendor')
+        self.assertEqual(normalized['product_type'], 'Source Type')
+        self.assertEqual(normalized['tags'], ['alpha', 'beta'])
+        self.assertEqual(normalized['options'], [])
+        variant = normalized['variants'][0]
+        self.assertEqual(variant['sku'], 'EVIDENCE-SKU')
+        self.assertEqual(variant['barcode'], 'EVIDENCE-BARCODE')
+        self.assertEqual(variant['price'], 29.95)
+        self.assertEqual(
+            variant['inventory_item_gid'],
+            'gid://shopify/InventoryItem/905-evidence',
+        )
+        self.assertFalse(variant['inventory_tracked'])
+        self.assertTrue(variant['inventory_tracked_known'])
+        self.assertEqual(variant['selected_options'], [])
+
+    def test_birth_initialization_populates_usable_singleton_and_evidence(self):
+        payload = self._product_payload(
+            gid='gid://shopify/Product/905-birth',
+            title='Birth Product',
+            variants=[self._variant_payload(
+                'gid://shopify/ProductVariant/905-birth',
+                sku='BIRTH-SKU', barcode='BIRTH-BARCODE', price=29.95,
+            )],
+        )
+        payload.update({
+            'description_html': '<p>Birth description</p>',
+            'vendor': 'Birth Vendor',
+            'product_type': 'Birth Type',
+            'tags': ['birth'],
+        })
+        payload['variants'][0].update({
+            'inventory_item_gid': 'gid://shopify/InventoryItem/905-birth',
+            'inventory_tracked': True,
+            'inventory_tracked_known': True,
+        })
+        result = self.Importer._apply_import(self.store, payload)
+        template = result['template_binding'].product_template_id
+        variant = result['variant_bindings'].product_variant_id
+        self.assertEqual(template.description_sale, '<p>Birth description</p>')
+        self.assertEqual(template.list_price, 29.95)
+        self.assertEqual(variant.default_code, 'BIRTH-SKU')
+        self.assertEqual(variant.barcode, 'BIRTH-BARCODE')
+        self.assertEqual(
+            result['template_binding'].shopify_vendor, 'Birth Vendor',
+        )
+        self.assertEqual(
+            result['template_binding'].shopify_tags, ['birth'],
+        )
+        self.assertEqual(
+            result['variant_bindings'].shopify_inventory_item_gid,
+            'gid://shopify/InventoryItem/905-birth',
+        )
+        self.assertTrue(result['variant_bindings'].shopify_inventory_tracked)
+        self.assertTrue(
+            result['variant_bindings'].shopify_inventory_tracked_known
+        )
+
+    def test_later_imported_variant_initializes_identity_once(self):
+        """A variant added after product birth receives its own identity.
+
+        Template birth completion must not suppress the per-variant birth
+        contract, and an already-owned non-empty SKU/barcode remains local.
+        """
+        first = self.Importer._apply_import(
+            self.store,
+            self._product_payload(
+                gid='gid://shopify/Product/905-later-variant',
+                title='Later Variant Product',
+                variants=[self._variant_payload(
+                    'gid://shopify/ProductVariant/905-later-original',
+                    sku='ORIGINAL-SKU', barcode='ORIGINAL-BARCODE',
+                )],
+            ),
+        )
+        template_binding = first['template_binding']
+        original_binding = first['variant_bindings']
+        original = original_binding.product_variant_id
+        original.write({
+            'default_code': 'LOCALLY-OWNED-SKU',
+            'barcode': 'LOCALLY-OWNED-BARCODE',
+        })
+        extra = self.env['product.product'].create({
+            'product_tmpl_id': template_binding.product_template_id.id,
+        })
+        extra_binding = self.VariantBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/905-later-new',
+            'product_template_binding_id': template_binding.id,
+            'product_variant_id': extra.id,
+            'shopify_birth_initialized': False,
+        })
+        payload = {
+            'gid': template_binding.shopify_gid,
+            'variants': [
+                self._variant_payload(
+                    original_binding.shopify_gid,
+                    sku='REMOTE-CHANGED-SKU', barcode='REMOTE-CHANGED-BARCODE',
+                ),
+                self._variant_payload(
+                    extra_binding.shopify_gid,
+                    sku='LATER-SKU', barcode='LATER-BARCODE',
+                ),
+            ],
+        }
+        self.Importer._apply_birth_initialization(
+            payload, template_binding, 'existing_binding',
+            original_binding | extra_binding,
+        )
+        self.assertEqual(extra.default_code, 'LATER-SKU')
+        self.assertEqual(extra.barcode, 'LATER-BARCODE')
+        self.assertTrue(extra_binding.shopify_birth_initialized)
+        self.assertEqual(original.default_code, 'LOCALLY-OWNED-SKU')
+        self.assertEqual(original.barcode, 'LOCALLY-OWNED-BARCODE')
+
+    def test_legacy_candidate_binding_does_not_take_birth_ownership(self):
+        """An upgrade-era candidate match is an existing Odoo product.
+
+        Its false birth marker must not make a refresh overwrite merchant
+        SKU, description, or price as though the connector had created the
+        master record.  Historical connector-created rows have no match key;
+        candidate rows carry ``sku_reference``/``barcode`` evidence.
+        """
+        template, variant = self._make_product(
+            'Legacy Candidate', default_code='LOCAL-SKU',
+        )
+        template.write({
+            'list_price': 7.5,
+            'description_sale': '<p>Local description</p>',
+        })
+        template_binding = self.TemplateBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/905-candidate',
+            'product_template_id': template.id,
+            'match_key': 'sku_reference',
+        })
+        self.VariantBinding.create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/905-candidate',
+            'product_template_binding_id': template_binding.id,
+            'product_variant_id': variant.id,
+            'match_key': 'sku_reference',
+        })
+        result = self.Importer._apply_import(
+            self.store,
+            self._product_payload(
+                gid='gid://shopify/Product/905-candidate',
+                title='Remote Candidate',
+                variants=[self._variant_payload(
+                    'gid://shopify/ProductVariant/905-candidate',
+                    sku='REMOTE-SKU', price=99.99,
+                )],
+            ),
+        )
+        self.assertEqual(result['template_binding'], template_binding)
+        self.assertEqual(variant.default_code, 'LOCAL-SKU')
+        self.assertEqual(template.list_price, 7.5)
+        self.assertEqual(
+            template.description_sale, '<p>Local description</p>',
+        )
+        self.assertFalse(result['template_binding'].shopify_birth_initialized)
+
+    def test_legacy_connector_birth_repair_runs_once_even_same_updated_at(self):
+        """Repair the old connector-created default-price defect once.
+
+        The old importer could persist the remote updatedAt and price
+        snapshot while leaving the newly-created Odoo master at its default
+        1.00.  A same-timestamp replay must still perform the birth repair;
+        after the marker is set, an unchanged replay short-circuits and a
+        later remote price change never overwrites the repaired local value.
+        """
+        template, variant = self._make_product('Legacy Connector Birth')
+        template.write({'list_price': 1.0, 'description_sale': False})
+        template_binding = self.TemplateBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/905-legacy-birth',
+            'product_template_id': template.id,
+            'shopify_updated_at': '2026-08-17T00:00:00Z',
+            'shopify_birth_initialized': False,
+        })
+        variant_binding = self.VariantBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/905-legacy-birth',
+            'product_template_binding_id': template_binding.id,
+            'product_variant_id': variant.id,
+            'shopify_price_snapshot': 29.95,
+            'shopify_birth_initialized': False,
+        })
+        payload = self._product_payload(
+            gid='gid://shopify/Product/905-legacy-birth',
+            title='Legacy Connector Birth',
+            variants=[self._variant_payload(
+                'gid://shopify/ProductVariant/905-legacy-birth',
+                sku='LEGACY-BIRTH-SKU', barcode='LEGACY-BIRTH-BARCODE',
+                price=29.95,
+            )],
+        )
+        payload.update({
+            'description_html': '<p>Recovered birth description</p>',
+            'updated_at': '2026-08-17T00:00:00Z',
+        })
+
+        result = self.Importer._apply_import(self.store, payload)
+        self.assertEqual(result['template_binding'], template_binding)
+        self.assertEqual(template.list_price, 29.95)
+        self.assertEqual(
+            template.description_sale, '<p>Recovered birth description</p>',
+        )
+        self.assertEqual(variant.default_code, 'LEGACY-BIRTH-SKU')
+        self.assertEqual(variant.barcode, 'LEGACY-BIRTH-BARCODE')
+        self.assertTrue(template_binding.shopify_birth_initialized)
+        self.assertTrue(variant_binding.shopify_birth_initialized)
+
+        # The completed same-timestamp import is now a genuine no-op.
+        unchanged = self.Importer._apply_import(self.store, payload)
+        self.assertTrue(unchanged['unchanged'])
+
+        # A changed remote timestamp follows normal refresh processing, but
+        # the one-time birth repair cannot overwrite the repaired local price.
+        changed = dict(payload)
+        changed['updated_at'] = '2026-08-18T00:00:00Z'
+        changed['variants'] = [dict(payload['variants'][0], price=35.0)]
+        self.Importer._apply_import(self.store, changed)
+        self.assertEqual(template.list_price, 29.95)
+        self.assertEqual(
+            variant_binding.shopify_price_snapshot, 35.0,
+        )
+
+    def test_structured_birth_decomposes_price_extra_before_ownership(self):
+        """Birth pricing is exact for a newly-created structured product."""
+        payload = {
+            'gid': 'gid://shopify/Product/905-structured-birth',
+            'title': 'Structured Birth',
+            'status': 'active',
+            'description_html': False,
+            'options': [{
+                # Keep this fixture independent of the database's standard
+                # ``Size`` attribute, which is often configured with
+                # create_variant='always' and is intentionally incompatible
+                # with Shopify's sparse structured-variant import path.
+                'name': 'SC010B Structured Birth Size',
+                'position': 1, 'values': ['Small', 'Large'],
+            }],
+            'variants': [{
+                'gid': 'gid://shopify/ProductVariant/905-structured-small',
+                'sku': 'STRUCTURED-SMALL', 'barcode': False, 'price': 10.0,
+                'compare_at_price': False,
+                'selected_options': [{
+                    'name': 'SC010B Structured Birth Size',
+                    'value': 'Small',
+                }],
+                'option_values': 'SC010B Structured Birth Size: Small',
+                'image_url': False,
+            }, {
+                'gid': 'gid://shopify/ProductVariant/905-structured-large',
+                'sku': 'STRUCTURED-LARGE', 'barcode': False, 'price': 12.0,
+                'compare_at_price': False,
+                'selected_options': [{
+                    'name': 'SC010B Structured Birth Size',
+                    'value': 'Large',
+                }],
+                'option_values': 'SC010B Structured Birth Size: Large',
+                'image_url': False,
+            }],
+        }
+        result = self.Importer._apply_import(self.store, payload)
+        template = result['template_binding'].product_template_id
+        self.assertEqual(template.list_price, 10.0)
+        extras = {
+            ptav.product_attribute_value_id.name: ptav.price_extra
+            for ptav in template.attribute_line_ids.product_template_value_ids
+        }
+        self.assertEqual(extras['Small'], 0.0)
+        self.assertEqual(extras['Large'], 2.0)
+
+    def test_legacy_connector_birth_preserves_non_default_merchant_price(self):
+        """A non-default local price is not rewritten by legacy repair."""
+        template, variant = self._make_product(
+            'Legacy Merchant Price', default_code='LOCAL-MERCHANT-SKU',
+        )
+        template.write({'list_price': 7.5})
+        template_binding = self.TemplateBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/Product/905-legacy-merchant',
+            'product_template_id': template.id,
+            'shopify_birth_initialized': False,
+        })
+        self.VariantBinding.sudo().create({
+            'store_id': self.store.id,
+            'shopify_gid': 'gid://shopify/ProductVariant/905-legacy-merchant',
+            'product_template_binding_id': template_binding.id,
+            'product_variant_id': variant.id,
+            'shopify_price_snapshot': 29.95,
+            'shopify_birth_initialized': False,
+        })
+        self.Importer._apply_import(
+            self.store,
+            self._product_payload(
+                gid='gid://shopify/Product/905-legacy-merchant',
+                variants=[self._variant_payload(
+                    'gid://shopify/ProductVariant/905-legacy-merchant',
+                    sku='REMOTE-MERCHANT-SKU', price=29.95,
+                )],
+            ),
+        )
+        self.assertEqual(template.list_price, 7.5)
+        self.assertEqual(variant.default_code, 'LOCAL-MERCHANT-SKU')
+
     # ------------------------------------------------------------------
     # 6. Template GID and variant GID are never conflated.
     # ------------------------------------------------------------------
@@ -520,6 +857,10 @@ class TestProductImportMatching(TransactionCase):
                     'product': {
                         'id': 'gid://shopify/Product/907',
                         'title': 'Fetched Product', 'status': 'ACTIVE',
+                        'descriptionHtml': '<p>Fetched description</p>',
+                        'vendor': 'Fetched Vendor',
+                        'productType': 'Fetched Type',
+                        'tags': ['fetched'],
                         'featuredImage': None,
                         'variants': {
                             'nodes': [{
@@ -530,6 +871,10 @@ class TestProductImportMatching(TransactionCase):
                                     {'name': 'Size', 'value': 'M'},
                                 ],
                                 'image': None,
+                                'inventoryItem': {
+                                    'id': 'gid://shopify/InventoryItem/907',
+                                    'tracked': True,
+                                },
                             }],
                             'pageInfo': {'hasNextPage': False, 'endCursor': None},
                         },
@@ -551,6 +896,16 @@ class TestProductImportMatching(TransactionCase):
         self.assertEqual(
             result['variant_bindings'].shopify_option_values, 'Size: M',
         )
+        template = result['template_binding'].product_template_id
+        variant = result['variant_bindings'].product_variant_id
+        self.assertEqual(template.description_sale, '<p>Fetched description</p>')
+        self.assertEqual(template.list_price, 9.99)
+        self.assertEqual(variant.default_code, 'SKU-907')
+        self.assertEqual(
+            result['variant_bindings'].shopify_inventory_item_gid,
+            'gid://shopify/InventoryItem/907',
+        )
+        self.assertTrue(result['variant_bindings'].shopify_inventory_tracked)
 
     # ------------------------------------------------------------------
     # 8. Product-domain gating.
