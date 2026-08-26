@@ -1829,9 +1829,8 @@ class ShopifyConnectorOrderImporter(models.AbstractModel):
             tax = mapping.account_tax_id
             self._validate_resolved_tax(tax, settings, price_included, rate_key)
             mapped = (
-                order.fiscal_position_id.map_tax(
-                    tax, product=False, partner=order.partner_id,
-                ) if order.fiscal_position_id else tax
+                order.fiscal_position_id.map_tax(tax)
+                if order.fiscal_position_id else tax
             )
             if len(mapped) != 1:
                 raise JobHandlerError(
