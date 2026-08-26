@@ -64,7 +64,7 @@ ORDER_FULFILLMENTS_QUERY = (
     '    }\n'
     '  }\n'
     '}'
-)
+) % {'page': PAGE_SIZE}
 
 LOCATIONS_QUERY = (
     'query($cursor: String) {\n'

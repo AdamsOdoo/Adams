@@ -86,6 +86,11 @@ class TestFulfillmentReaderPagination(TransactionCase):
 
     def test_order_fulfillments_query_uses_the_2026_07_list_shape(self):
         self.assertIn('fulfillments(first: 250)', ORDER_FULFILLMENTS_QUERY)
+        self.assertIn(
+            'fulfillmentLineItems(first: %d)' % PAGE_SIZE,
+            ORDER_FULFILLMENTS_QUERY,
+        )
+        self.assertNotIn('%(page)', ORDER_FULFILLMENTS_QUERY)
         # Order.fulfillments itself is a list in 2026-07.  Its nested
         # fulfillmentLineItems field remains a connection and therefore
         # legitimately has pageInfo/nodes.
