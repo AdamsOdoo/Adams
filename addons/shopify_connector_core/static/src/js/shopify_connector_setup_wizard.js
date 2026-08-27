@@ -68,12 +68,19 @@ const FIRST_STEP_KEY = "welcome";
 
 // Finite one-shot backoff: no interval survives the setup session and no
 // browser loop claims a background run must finish within an arbitrary time.
-const LOCATION_REFRESH_BACKOFF_MS = [250, 500, 1000, 2000];
+const LOCATION_REFRESH_BACKOFF_MS = [
+    250, 500, 1000, 2000, 4000,
+    8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000,
+];
 // Activation can hand off to a durable webhook reconciliation chain. Follow
 // that chain long enough for the normal exact-build path to finish, then leave
 // an explicit Check status action instead of trapping the merchant on a
 // disabled Activate button. The server remains authoritative on every poll.
-const ACTIVATION_FOLLOW_BACKOFF_MS = [250, 500, 1000, 2000, 4000];
+const ACTIVATION_FOLLOW_BACKOFF_MS = [
+    250, 500, 1000, 2000, 4000,
+    10000, 10000, 10000, 10000, 10000, 10000, 10000,
+    10000, 10000, 10000, 10000, 10000, 10000,
+];
 
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";

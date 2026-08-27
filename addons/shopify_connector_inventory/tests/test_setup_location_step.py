@@ -610,6 +610,71 @@ class TestSetupLocationStep(TransactionCase):
         self.assertEqual(check['state'], 'blocking')
         self.assertIn('connection', check['reason'].lower())
 
+    def test_activation_admits_fresh_location_proof_after_generation_change(self):
+        """The setup must not strand itself on its pre-connect evidence."""
+        old = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'pre-activation-location-proof',
+            'expected_connection_generation': 0,
+        })
+        self.store.sudo().write({
+            'state': 'connected', 'connection_generation': 1,
+        })
+
+        with patch.object(
+            type(self.Service), '_trigger_dispatch_after_location_refresh',
+            lambda _service: True,
+        ):
+            self._as()._activation_post_transition(
+                self.store, self.settings,
+            )
+
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'inventory_location_sync'),
+        ], order='id asc')
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(jobs[0], old)
+        self.assertEqual(jobs[1].expected_connection_generation, 1)
+        self.assertEqual(jobs[1].job_source, 'manual_sync')
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'pending')
+        self.assertEqual(status['job_id'], jobs[1].id)
+
+    def test_activation_requirement_needs_current_refresh_and_complete_mapping(self):
+        self.store.sudo().write({
+            'state': 'connected', 'connection_generation': 1,
+        })
+        stale = self._mark_refresh_succeeded()
+        stale.sudo().write({'expected_connection_generation': 0})
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'action_required')
+
+        current = self._mark_refresh_succeeded()
+        self._cache('gid://shopify/Location/ACTIVATION', 'Activation proof')
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(current.expected_connection_generation, 1)
+        self.assertEqual(status['state'], 'action_required')
+
+        self._as().save_location_mapping(
+            self.store.id,
+            'gid://shopify/Location/ACTIVATION',
+            self.location_a.id,
+        )
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'ready')
+
     def test_readiness_requires_a_mapping_while_inventory_is_enabled(self):
         state = self._as().run_readiness(self.store.id)
         checks = {c['code']: c for c in state['readiness']['checks']}

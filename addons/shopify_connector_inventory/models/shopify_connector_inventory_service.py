@@ -2307,6 +2307,10 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         return Job.sudo().search([
             ('store_id', '=', store.id),
             ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+            (
+                'expected_connection_generation', '=',
+                store.connection_generation,
+            ),
             ('state', 'not in', TERMINAL_JOB_STATES),
         ], order='id desc', limit=1)
 

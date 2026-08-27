@@ -51,6 +51,88 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
     _inherit = 'shopify.connector.setup.wizard'
 
     @api.model
+    def _activation_post_transition(self, store, settings):
+        """Queue current-generation location proof during activation."""
+        result = super()._activation_post_transition(store, settings)
+        if not settings.inventory_domain_enabled:
+            return result
+        refresh = self.env[
+            'shopify.connector.inventory.service'
+        ].location_refresh_state(store)
+        if refresh.get('state') != 'succeeded':
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._setup_refresh_shopify_locations(store.id)
+        return result
+
+    @api.model
+    def _activation_requirement_status(self, store, settings):
+        """Require fresh locations and valid mappings in this generation."""
+        parent = super()._activation_requirement_status(store, settings)
+        if parent.get('state') != 'ready':
+            return parent
+        if not settings.inventory_domain_enabled:
+            return parent
+        payload = self._setup_location_payload(store, settings)
+        refresh = payload.get('refresh') or {}
+        state = refresh.get('state')
+        if state in ('waiting', 'running'):
+            return {
+                'state': 'pending',
+                'code': 'location_proof_pending',
+                'job_id': refresh.get('job_id'),
+                'message': (
+                    'Connected; verifying Shopify locations for this '
+                    'connection before setup completes. Location job #%s is '
+                    '%s.' % (refresh.get('job_id'), state)
+                ),
+            }
+        if state == 'succeeded' and payload.get('mapping_complete'):
+            return parent
+        if state == 'failed':
+            message = refresh.get('reason') or (
+                'The Shopify location verification did not finish safely.'
+            )
+        elif state == 'succeeded':
+            message = (
+                '%d active Shopify location(s) still need an explicit Odoo '
+                'location mapping.' % payload.get('unmapped_count', 0)
+            )
+        else:
+            message = (
+                'Shopify locations have not been verified for the current '
+                'connection.'
+            )
+        return {
+            'state': 'action_required',
+            'code': 'location_proof_required',
+            'job_id': refresh.get('job_id'),
+            'message': message,
+        }
+
+    @api.model
+    def _activation_completion_policy(self, store, settings):
+        parent = super()._activation_completion_policy(store, settings)
+        if parent and not parent.get('complete', True):
+            return parent
+        status = self._activation_requirement_status(store, settings)
+        if status.get('state') == 'ready':
+            return parent
+        return {
+            'complete': False,
+            'job_id': status.get('job_id'),
+            'message': status.get('message'),
+        }
+
+    @api.model
+    def _activation_completion_guard(self, store, settings):
+        if not super()._activation_completion_guard(store, settings):
+            return False
+        return self._activation_requirement_status(
+            store, settings,
+        ).get('state') == 'ready'
+
+    @api.model
     def _setup_location_payload(self, store, settings):
         """Cached Shopify locations, their mapping state, and the Odoo targets.
 

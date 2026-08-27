@@ -235,6 +235,10 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
                 'job_id': False,
             }
 
+        requirement = self._activation_requirement_status(store, settings)
+        if requirement.get('state') != 'ready':
+            return requirement
+
         # A bootstrap read may have populated rows while the store was still
         # setup-incomplete.  That evidence is useful, but it is not the
         # connected-state proof required to finish activation.  The
@@ -327,9 +331,10 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
     @api.model
     def _activation_completion_policy(self, store, settings):
         """Defer completion once, then allow it only on stored proof."""
+        parent = super()._activation_completion_policy(store, settings)
         status = self._webhook_setup_status(store, settings)
         if status['state'] == 'ready_to_complete':
-            return {'complete': True}
+            return parent
 
         # A missing HMAC secret, a blocked parent, or a failed child is an
         # explicit operator action.  Do not turn any of those states into a
@@ -391,6 +396,8 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
     @api.model
     def _activation_completion_guard(self, store, settings):
         """Revalidate lifecycle, credential and webhook proof under locks."""
+        if not super()._activation_completion_guard(store, settings):
+            return False
         locked_state, locked_generation = store._lock_store_for_lifecycle()
         Credential = self.env['shopify.connector.store.credential']
         credential_version = Credential._lifecycle_credential_version(

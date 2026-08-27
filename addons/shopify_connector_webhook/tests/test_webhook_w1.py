@@ -785,6 +785,8 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('setup_completion_state', wizard_js)
         self.assertIn('connected_job_proof', webhook_setup)
         self.assertIn('expected_connection_generation', webhook_setup)
+        self.assertIn('_activation_requirement_status', webhook_setup)
+        self.assertIn('super()._activation_completion_policy', webhook_setup)
         self.assertIn('Setup is waiting for verification',
                       (core_root / 'static' / 'src' / 'xml' /
                        'shopify_connector_setup_wizard.xml').read_text())

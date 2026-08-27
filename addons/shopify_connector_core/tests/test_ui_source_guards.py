@@ -275,6 +275,9 @@ class TestUiSourceGuards(TransactionCase):
         self.assertNotIn('setInterval(', js)
         self.assertIn('sc_setup_refresh_still_running', xml)
         self.assertIn('sc_setup_check_refresh', xml)
+        self.assertIn('8000, 8000, 8000, 8000', js)
+        self.assertIn('10000, 10000, 10000, 10000', js)
+        self.assertIn('ACTIVATION_FOLLOW_BACKOFF_MS', js)
 
     def test_no_external_frontend_dependency(self):
         """No CDN, external font, npm import, or charting library in assets."""
