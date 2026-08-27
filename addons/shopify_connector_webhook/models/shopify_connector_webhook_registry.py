@@ -109,6 +109,19 @@ class ShopifyConnectorWebhookRegistry(models.AbstractModel):
         return dict(spec) if spec else False
 
     @api.model
+    def inline_expand_safe(self, topic):
+        """Whether ingress may run this topic's local enqueue-only handler.
+
+        The flag is explicit and false by default. In particular,
+        ``app/uninstalled`` remains dispatcher-only because its handler
+        changes lifecycle state. Domain addons opt in only for handlers that
+        validate durable evidence and enqueue an authoritative-read child;
+        they must not contact Shopify or mutate business records.
+        """
+        spec = self.topic_spec(topic)
+        return bool(spec and spec.get('inline_expand_safe') is True)
+
+    @api.model
     def allowed_topics(self):
         return tuple(sorted(self._get_topic_registry()))
 

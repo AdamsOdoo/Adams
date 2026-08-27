@@ -167,6 +167,33 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             self.assertTrue(registry.topic_spec('products/update'))
         else:
             self.assertEqual(registry.topic_spec('products/update'), False)
+        self.assertFalse(registry.inline_expand_safe('app/uninstalled'))
+
+    def test_inline_context_never_runs_lifecycle_handler(self):
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 inline lifecycle fence',
+            'shop_domain': 'w1-inline-lifecycle.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+        })
+        delivery, duplicate = self.env[
+            'shopify.connector.webhook.delivery'
+        ].with_context(inline_webhook_expansion=True)._ingest(
+            store,
+            delivery_id='w1-inline-lifecycle-delivery',
+            event_id='w1-inline-lifecycle-event',
+            topic='app/uninstalled',
+            shop_domain=store.shop_domain,
+            api_version='2026-07',
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=False,
+            payload_digest=hashlib.sha256(b'inline-lifecycle').hexdigest(),
+            payload_size=32,
+            payload_identity={},
+        )
+        self.assertFalse(duplicate)
+        self.assertEqual(delivery.state, 'queued')
+        self.assertEqual(store.state, 'connected')
 
     def test_latest_reconciled_at_ignores_unreconciled_rows(self):
         older = datetime(2026, 8, 23, 18, 4, 19)

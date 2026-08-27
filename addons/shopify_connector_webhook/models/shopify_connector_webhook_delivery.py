@@ -1,5 +1,6 @@
 """Durable, payload-free Shopify webhook delivery evidence."""
 
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,8 @@ DELIVERY_STATES = [
 TERMINAL_DELIVERY_STATES = ('processed', 'ignored', 'failed', 'manual_review')
 WEBHOOK_RETENTION_DAYS = 30
 WEBHOOK_RETENTION_BATCH = 2000
+
+_logger = logging.getLogger(__name__)
 
 _DELIVERY_SERVICE_CONTEXT = 'shopify_connector_webhook_delivery_service'
 _DELIVERY_SERVICE_SENTINEL = object()
@@ -339,6 +342,29 @@ class ShopifyConnectorWebhookDelivery(models.Model):
             'job_id': job.id,
             'queued_at': fields.Datetime.now(),
         })
+        # Remove one full worker cycle from domain webhooks without moving a
+        # Shopify read or business write into the HTTP request. Explicitly
+        # opted-in registry handlers may only validate this durable envelope
+        # and enqueue their read-first child. The parent job remains queued as
+        # replay/recovery evidence; when the dispatcher reaches it,
+        # `_process_queued()` is an idempotent no-op for a terminal delivery.
+        Registry = self.env['shopify.connector.webhook.registry']
+        if (
+            self.env.context.get('inline_webhook_expansion')
+            and Registry.inline_expand_safe(topic)
+        ):
+            try:
+                with self.env.cr.savepoint():
+                    delivery._process_queued()
+            except Exception as exc:
+                # The ordinary parent job is still queued and is the durable
+                # recovery path. An optional latency optimization must not
+                # become lost evidence or a false acknowledgement.
+                delivery.invalidate_recordset()
+                _logger.warning(
+                    'Inline webhook expansion deferred to parent job %s (%s).',
+                    job.id, type(exc).__name__,
+                )
         return delivery, False
 
     def _service_write(self, values):

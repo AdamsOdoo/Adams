@@ -36,6 +36,7 @@ class ShopifyConnectorInventoryWebhookRegistry(models.AbstractModel):
             spec,
             domain='inventory',
             handler=INVENTORY_WEBHOOK_HANDLER,
+            inline_expand_safe=True,
             include_fields=list(INVENTORY_WEBHOOK_INCLUDE_FIELDS),
         )
         return registry

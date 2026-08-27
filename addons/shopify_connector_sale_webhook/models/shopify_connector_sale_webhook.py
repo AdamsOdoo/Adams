@@ -98,6 +98,7 @@ class ShopifyConnectorSaleWebhookRegistry(models.AbstractModel):
                 spec,
                 domain='sale',
                 handler=ORDER_IMPORT_JOB_TYPE,
+                inline_expand_safe=True,
                 # These are the only payload fields needed to correlate the
                 # envelope.  The child importer performs the full read.
                 include_fields=['admin_graphql_api_id', 'updated_at'],

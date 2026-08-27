@@ -79,6 +79,7 @@ class ShopifyConnectorFulfillmentWebhookRegistry(models.AbstractModel):
                 spec,
                 domain='fulfillment',
                 handler=FULFILLMENT_WEBHOOK_RESOLVE_JOB_TYPE,
+                inline_expand_safe=True,
                 # `order_id` is deliberately not requested or trusted.  The
                 # resolver obtains the exact Order GID from Shopify's node.
                 include_fields=['admin_graphql_api_id'],

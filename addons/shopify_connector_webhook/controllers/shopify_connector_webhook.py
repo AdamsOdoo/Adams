@@ -200,7 +200,9 @@ class ShopifyConnectorWebhookController(http.Controller):
         )
         identity = Delivery._minimal_resource_identity(payload)
         try:
-            _delivery, _duplicate = Delivery._ingest(
+            _delivery, _duplicate = Delivery.with_context(
+                inline_webhook_expansion=True,
+            )._ingest(
                 store,
                 delivery_id=delivery_id,
                 event_id=event_id,

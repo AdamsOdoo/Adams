@@ -61,6 +61,7 @@ class ShopifyConnectorProductWebhookRegistry(models.AbstractModel):
                 spec,
                 domain='product',
                 handler='product_import_sync',
+                inline_expand_safe=True,
                 # Every product topic requires Shopify's explicit Product GID.
                 # Create/update also provide the raw snake_case `updated_at`
                 # stamp; delete safely falls back to the verified body digest.
