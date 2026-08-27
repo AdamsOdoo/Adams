@@ -17,10 +17,17 @@ class ShopifyConnectorReadinessCheckSaleExtension(models.AbstractModel):
         settings = self.env['shopify.connector.store.settings'].search(
             [('store_id', '=', store.id)], limit=1,
         )
-        if not settings or not settings.sale_domain_enabled:
+        if (
+            not settings
+            or not settings.sale_domain_enabled
+            or not settings.order_scheduled_sync_enabled
+        ):
             return self._check_result(
                 'sale_order_defaults', self.ESSENTIAL, self.RESULT_PASS,
-                _('Not applicable — Orders is not enabled for this store.'),
+                _(
+                    'Not applicable — scheduled Orders synchronization is '
+                    'not enabled for this store.'
+                ),
                 not_applicable=True,
             )
         missing = []

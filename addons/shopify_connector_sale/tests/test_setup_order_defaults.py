@@ -1,5 +1,5 @@
 from odoo.exceptions import UserError
-from odoo.tests.common import TransactionCase, tagged
+from odoo.tests.common import TransactionCase, new_test_user, tagged
 
 
 @tagged('post_install', '-at_install')
@@ -21,7 +21,17 @@ class TestSetupOrderDefaults(TransactionCase):
             'name': 'Shopify setup test term',
         })
         cls.Readiness = cls.env['shopify.connector.readiness.check']
-        cls.Setup = cls.env['shopify.connector.setup.wizard']
+        cls.admin = new_test_user(
+            cls.env,
+            login='shopify_order_setup_admin',
+            groups=(
+                'base.group_user,'
+                'shopify_connector_core.group_shopify_connector_admin'
+            ),
+        )
+        cls.Setup = cls.env['shopify.connector.setup.wizard'].with_user(
+            cls.admin
+        ).with_context(allowed_company_ids=cls.admin.company_ids.ids)
 
     def test_disabled_orders_marks_defaults_not_applicable(self):
         result = self.Readiness._check_sale_order_defaults(self.store)
@@ -29,7 +39,10 @@ class TestSetupOrderDefaults(TransactionCase):
         self.assertTrue(result['not_applicable'])
 
     def test_enabled_orders_without_term_fails_readiness(self):
-        self.settings.write({'sale_domain_enabled': True})
+        self.settings.write({
+            'sale_domain_enabled': True,
+            'order_scheduled_sync_enabled': True,
+        })
         result = self.Readiness._check_sale_order_defaults(self.store)
         self.assertEqual(result['tier'], self.Readiness.ESSENTIAL)
         self.assertEqual(result['result'], self.Readiness.RESULT_FAIL)
