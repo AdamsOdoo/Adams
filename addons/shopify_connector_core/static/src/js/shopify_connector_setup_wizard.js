@@ -107,6 +107,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                 name: "",
                 shopDomain: "",
                 enabledDomains: [],
+                orderPaymentTermId: "",
                 matching: "",
                 price: "",
                 notification: false,
@@ -374,6 +375,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.enabledDomains = (data.domains || [])
             .filter((d) => d.enabled)
             .map((d) => d.key);
+        this.state.form.orderPaymentTermId = String(
+            (data.order_setup && data.order_setup.payment_term_id) || ""
+        );
         // Deliberately NOT seeded from the stored values. The source-of-truth
         // step requires an explicit choice, and pre-selecting whatever the
         // backend default happens to be is precisely how a default becomes
@@ -609,6 +613,12 @@ export class ShopifyConnectorSetupWizard extends Component {
                 ok = await this._call("save_directions", {
                     store_id: storeId,
                     enabled_keys: this.state.form.enabledDomains,
+                    ...(this.state.data.order_setup
+                        ? {
+                            order_payment_term_id:
+                                this.state.form.orderPaymentTermId || null,
+                        }
+                        : {}),
                 });
                 break;
             case "location_mapping":

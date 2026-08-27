@@ -407,7 +407,7 @@ class TestOrderImportMappingStatic(TransactionCase):
         # The coherent-repair upgrade qualification adds an explicit migration
         # checkpoint so existing databases consume the tightened role graph
         # and newly persisted product/inventory identity safely.
-        self.assertEqual(manifest['version'], '19.0.2.15.0')
+        self.assertEqual(manifest['version'], '19.0.2.16.0')
         self.assertEqual(
             manifest['depends'],
             ['shopify_connector_core', 'shopify_connector_product', 'sale'],
