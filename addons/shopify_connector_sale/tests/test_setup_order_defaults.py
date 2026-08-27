@@ -55,10 +55,13 @@ class TestSetupOrderDefaults(TransactionCase):
             )
         self.assertFalse(self.settings.sale_domain_enabled)
 
-    def test_legacy_caller_cannot_bypass_backend_readiness(self):
+    def test_legacy_caller_cannot_admit_scheduled_order_import(self):
         self.Setup.save_directions(self.store.id, ['sale'])
+        self.assertTrue(self.settings.sale_domain_enabled)
+        self.assertFalse(self.settings.order_scheduled_sync_enabled)
         result = self.Readiness._check_sale_order_defaults(self.store)
-        self.assertEqual(result['result'], self.Readiness.RESULT_FAIL)
+        self.assertEqual(result['result'], self.Readiness.RESULT_PASS)
+        self.assertTrue(result['not_applicable'])
 
     def test_directions_saves_term_and_readiness_passes(self):
         payload = self.Setup.save_directions(

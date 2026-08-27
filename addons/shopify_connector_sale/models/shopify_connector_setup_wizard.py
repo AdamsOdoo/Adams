@@ -42,7 +42,8 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
         # never configuration feedback about a store they may not inspect.
         store = self._resolve_store(store_id)
         keys = set(enabled_keys or [])
-        if 'sale' in keys and order_payment_term_id != '__not_provided__':
+        legacy_omitted = order_payment_term_id == '__not_provided__'
+        if 'sale' in keys and not legacy_omitted:
             if not order_payment_term_id:
                 raise UserError(_(
                     'Choose the payment term that imported Shopify orders '
@@ -59,7 +60,20 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
                 raise UserError(_('The selected payment term no longer exists.'))
             settings = self._settings_for(store)
             settings.write({'order_payment_term_id': term.id})
-        return super().save_directions(store_id, enabled_keys)
+        payload = super().save_directions(store_id, enabled_keys)
+        if 'sale' in keys and legacy_omitted:
+            # Older internal callers pre-date the explicit order-defaults
+            # argument.  They may enable the domain, but must never silently
+            # admit scheduled order imports without their required payment
+            # term.  The browser always supplies the argument (including an
+            # explicit null, which is refused above); keeping the scheduler
+            # off here is the safe compatibility boundary for tests, scripts,
+            # and upgraded integrations that still use the old RPC shape.
+            settings = self._settings_for(store)
+            if settings.order_scheduled_sync_enabled:
+                settings.write({'order_scheduled_sync_enabled': False})
+            payload = self.get_setup_state(store_id=store.id)
+        return payload
 
     @api.model
     def _readiness_action(self, check, state):
