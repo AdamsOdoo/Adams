@@ -782,6 +782,12 @@ class TestSetupWizardSteps(SetupWizardCase):
                 'name': 'Setup scheduler contract term',
             })
             direction_kwargs['order_payment_term_id'] = term.id
+        if 'customer_fallback_partner_id' in settings._fields:
+            fallback = self.env['res.partner'].create({
+                'name': 'Setup scheduler contract fallback',
+                'company_id': store.company_id.id,
+            })
+            direction_kwargs['customer_fallback_partner_id'] = fallback.id
         self._as(self.admin_a).save_directions(
             store.id, ['product_import', 'sale'], **direction_kwargs,
         )
