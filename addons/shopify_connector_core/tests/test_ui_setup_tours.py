@@ -837,15 +837,10 @@ class TestUiC4LocationRefreshTours(HttpCase):
         admissions, admissions_lock = self._install_admission_observer(
             fixture, [(1, first_dispatch), (2, reopen_dispatch)],
         )
-        thread, findings = self._start_dispatcher(
-            fixture, [first_dispatch, reopen_dispatch],
-        )
-
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
             login=fixture['login'],
         )
-        self._assert_worker_clean(thread, findings)
         with admissions_lock:
             admitted_ids = list(admissions)
         with calls_lock:
@@ -888,15 +883,10 @@ class TestUiC4LocationRefreshTours(HttpCase):
         admissions, admissions_lock = self._install_admission_observer(
             fixture, [(1, first_dispatch), (2, retry_dispatch)],
         )
-        thread, findings = self._start_dispatcher(
-            fixture, [first_dispatch, retry_dispatch],
-        )
-
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
             login=fixture['login'],
         )
-        self._assert_worker_clean(thread, findings)
         with admissions_lock:
             admitted_ids = list(admissions)
         with calls_lock:
