@@ -195,6 +195,24 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertEqual(delivery.state, 'queued')
         self.assertEqual(store.state, 'connected')
 
+        callbacks = []
+
+        class Response:
+            @staticmethod
+            def call_on_close(callback):
+                callbacks.append(callback)
+
+        returned = self.env[
+            'shopify.connector.webhook.delivery'
+        ]._dispatch_delivery_after_response(delivery, Response())
+        self.assertEqual(len(callbacks), 1)
+        self.assertIsInstance(returned, Response)
+        # Registration alone must not process the parent inside the ingress
+        # transaction.  Werkzeug invokes the callback only after closing the
+        # already-produced acknowledgement response.
+        self.assertEqual(delivery.state, 'queued')
+        self.assertEqual(delivery.job_id.state, 'queued')
+
     def test_latest_reconciled_at_ignores_unreconciled_rows(self):
         older = datetime(2026, 8, 23, 18, 4, 19)
         newer = datetime(2026, 8, 23, 19, 40, 3)
@@ -756,6 +774,9 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('inline_webhook_expansion=True', controller)
         self.assertIn(')._ingest(', controller)
         self.assertNotIn('process_delivery(', controller)
+        self.assertIn('call_on_close', delivery)
+        self.assertIn('_dispatch_delivery_after_response', controller)
+        self.assertNotIn('_dispatch_one(', controller)
         self.assertIn('UNIQUE(store_id, delivery_id)', delivery)
         self.assertIn('if api_version != SHOPIFY_API_VERSION:', delivery)
         self.assertIn("'api_version': SHOPIFY_API_VERSION", delivery)

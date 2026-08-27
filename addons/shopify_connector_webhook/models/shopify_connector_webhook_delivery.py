@@ -367,6 +367,78 @@ class ShopifyConnectorWebhookDelivery(models.Model):
                 )
         return delivery, False
 
+    def _dispatch_delivery_after_response(self, delivery, response):
+        """Run one webhook's durable chain only after its 200 is closed.
+
+        The delivery and parent job are committed by Odoo before Werkzeug
+        closes the response.  The close callback therefore opens a fresh
+        transaction for every exact claim.  It never owns acknowledgement
+        admission, and a crash or classified handler failure leaves the
+        durable job state available to the normal cron retry/recovery path.
+        """
+        delivery.ensure_one()
+        call_on_close = getattr(response, 'call_on_close', None)
+        if not callable(call_on_close) or not delivery.job_id:
+            return response
+
+        registry = self.env.registry
+        uid = self.env.uid
+        context = dict(self.env.context)
+        delivery_id = delivery.id
+        parent_job_id = delivery.job_id.id
+        store_id = delivery.store_id.id
+        delivery_ref = delivery.delivery_id
+
+        def dispatch_committed_delivery_chain():
+            next_parent_id = parent_job_id
+            # A normal domain event has one parent and one authoritative-read
+            # child.  The cap permits bounded local follow-on work while
+            # preventing one response close from becoming an unbounded drain.
+            for _step in range(8):
+                side_cr = registry.cursor()
+                try:
+                    side_env = api.Environment(side_cr, uid, context)
+                    Job = side_env['shopify.connector.job'].sudo()
+                    candidate = Job.browse(next_parent_id).exists()
+                    next_parent_id = False
+                    if not candidate or candidate.state not in (
+                        'queued', 'retry_waiting',
+                    ):
+                        candidate = Job.search([
+                            ('store_id', '=', store_id),
+                            ('job_source', '=', 'webhook'),
+                            ('trigger_origin_event_ref', '=', delivery_ref),
+                            ('state', 'in', ('queued', 'retry_waiting')),
+                        ], order='id asc', limit=1)
+                    if not candidate:
+                        side_cr.rollback()
+                        return True
+                    locked = candidate.try_lock_for_update().filtered_domain(
+                        candidate._claimable_domain(),
+                    )
+                    if not locked:
+                        side_cr.rollback()
+                        return True
+                    side_env[
+                        'shopify.connector.job.dispatch'
+                    ]._dispatch_one(locked)
+                    side_cr.flush()
+                    side_cr.commit()
+                except Exception:  # noqa: BLE001 - cron remains the fallback
+                    side_cr.rollback()
+                    _logger.exception(
+                        'Post-response webhook dispatch stopped for delivery '
+                        '%s; durable cron recovery remains scheduled.',
+                        delivery_id,
+                    )
+                    return False
+                finally:
+                    side_cr.close()
+            return True
+
+        call_on_close(dispatch_committed_delivery_chain)
+        return response
+
     def _service_write(self, values):
         self.ensure_one()
         allowed = {
