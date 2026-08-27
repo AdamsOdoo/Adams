@@ -29,7 +29,7 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
                 ('company_id', '=', store.company_id.id),
             ]
         fallback_partners = self.env['res.partner'].sudo().search(
-            partner_domain, order='display_name, id', limit=200,
+            partner_domain, order='name, id', limit=200,
         )
         payload['order_setup'] = {
             'payment_term_id': (
