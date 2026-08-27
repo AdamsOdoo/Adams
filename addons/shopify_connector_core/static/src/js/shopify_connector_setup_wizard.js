@@ -806,9 +806,10 @@ export class ShopifyConnectorSetupWizard extends Component {
                 return;
             }
             if (this.store.setup_completion_state === "action_required") {
-                this.state.errorMessage =
-                    this.store.setup_completion_message ||
-                    _t("Activation needs an operator action.");
+                // The completion band already renders the server's truthful
+                // operator projection and optional recovery action.  Do not
+                // duplicate the same condition as a generic refusal banner.
+                this.state.errorMessage = "";
                 return;
             }
             if (![
@@ -819,6 +820,13 @@ export class ShopifyConnectorSetupWizard extends Component {
         }
         if (generation === this.activationFollowGeneration) {
             this.state.activationFollowStillRunning = true;
+        }
+    }
+
+    openSetupCompletionAction() {
+        const actionXmlid = this.store.setup_completion_action_xmlid;
+        if (actionXmlid) {
+            this.action.doAction(actionXmlid);
         }
     }
 

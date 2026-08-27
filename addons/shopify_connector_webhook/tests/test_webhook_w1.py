@@ -832,6 +832,24 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('job.expected_connection_generation', setup)
         self.assertNotIn("setup_completed_at': fields.Datetime.now()", setup)
 
+    def test_setup_projects_preserved_stale_callbacks_truthfully(self):
+        addon_root = Path(__file__).resolve().parents[1]
+        setup = (addon_root / 'models' /
+                 'shopify_connector_webhook_setup.py').read_text()
+        core_root = addon_root.parent / 'shopify_connector_core'
+        wizard_js = (core_root / 'static' / 'src' / 'js' /
+                     'shopify_connector_setup_wizard.js').read_text()
+        wizard_xml = (core_root / 'static' / 'src' / 'xml' /
+                      'shopify_connector_setup_wizard.xml').read_text()
+        self.assertIn('def _stale_callback_review', setup)
+        self.assertIn("'stale_callback_review_required'", setup)
+        self.assertIn("'setup_completion_action_xmlid'", setup)
+        self.assertIn("'setup_completion_action_label'", setup)
+        self.assertIn('nothing was deleted', setup)
+        self.assertIn('openSetupCompletionAction', wizard_js)
+        self.assertIn('this.state.errorMessage = ""', wizard_js)
+        self.assertIn('sc_setup__completion_action_button', wizard_xml)
+
     def test_activation_fences_are_fresh_and_client_secret_gate_is_truthful(self):
         store = (Path(__file__).resolve().parents[2] / 'shopify_connector_core' /
                  'models' / 'shopify_connector_store.py').read_text()

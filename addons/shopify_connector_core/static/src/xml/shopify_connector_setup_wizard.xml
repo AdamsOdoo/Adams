@@ -129,6 +129,12 @@
                             <div class="sc-band__body">
                                 <div class="sc-band__text">Setup needs an operator action</div>
                                 <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                                <button t-if="store.setup_completion_action_xmlid"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary mt-2 sc_setup__completion_action_button"
+                                        t-on-click="openSetupCompletionAction">
+                                    <t t-esc="store.setup_completion_action_label"/>
+                                </button>
                             </div>
                         </div>
 
