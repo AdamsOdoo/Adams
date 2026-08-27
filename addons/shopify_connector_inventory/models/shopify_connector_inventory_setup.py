@@ -217,14 +217,43 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
     @api.model
     def _eligible_odoo_location_count(self, store):
         """How many internal Odoo locations this caller could map, in total."""
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         try:
             return self.env['stock.location'].search_count(domain)
         except AccessError:
             return 0
+
+    @api.model
+    def _setup_eligible_odoo_location_domain(self, store):
+        """Valid setup targets, excluding already-used/overlapping branches.
+
+        The authoritative mapping service still enforces the invariant.  This
+        projection prevents the wizard from offering choices it already knows
+        that service must refuse: a location already mapped for this store, or
+        one of its ancestors/descendants, would count the same physical stock
+        under two Shopify locations.
+        """
+        domain = [('usage', '=', 'internal')]
+        company = store.company_id
+        if company:
+            domain.append(('company_id', 'in', [False, company.id]))
+        Mapping = self.env['shopify.connector.location.mapping']
+        mapped = Mapping.search([
+            ('store_id', '=', store.id),
+        ]).mapped('odoo_location_id')
+        if not mapped:
+            return domain
+        Location = self.env['stock.location']
+        descendants = Location.search([('id', 'child_of', mapped.ids)])
+        conflicting_ids = set(descendants.ids)
+        for location in mapped:
+            conflicting_ids.update(
+                int(item) for item in (location.parent_path or '').split('/')
+                if item
+            )
+        if conflicting_ids:
+            domain.append(('id', 'not in', sorted(conflicting_ids)))
+        return domain
 
     @api.model
     def _setup_eligible_odoo_locations(self, store):
@@ -240,10 +269,7 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         list of unusable choices is worse than an honest empty one.
         """
         Location = self.env['stock.location']
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         try:
             locations = Location.search(
                 domain,
@@ -353,10 +379,7 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         # side == 'odoo' -- searched as the calling user, deliberately, for
         # the same reason `_setup_eligible_odoo_locations` is: Odoo's own
         # `stock.location` access decides what this operator may see.
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         if query:
             domain.append(('complete_name', 'ilike', query))
         Location = self.env['stock.location']
