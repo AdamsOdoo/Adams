@@ -1,5 +1,5 @@
 from odoo import _, api, models
-from odoo.exceptions import AccessError, UserError
+from odoo.exceptions import UserError
 
 
 class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
@@ -14,7 +14,14 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
         )
         store = self._resolve_store(store_id) if store_id else False
         settings = self._settings_for(store) if store else False
-        terms = self.env['account.payment.term'].search([], order='name, id')
+        # The setup service has already admitted a Connector Administrator.
+        # Payment terms are company configuration, not commerce/PII records,
+        # and that role does not necessarily carry Accounting's model ACL.
+        # Elevate only this bounded choice projection so setup remains usable;
+        # store/settings access and the write below remain caller-governed.
+        terms = self.env['account.payment.term'].sudo().search(
+            [], order='name, id', limit=200,
+        )
         payload['order_setup'] = {
             'payment_term_id': (
                 settings.order_payment_term_id.id if settings else False
@@ -41,15 +48,11 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
                 term_id = int(order_payment_term_id)
             except (TypeError, ValueError):
                 raise UserError(_('Choose a valid order payment term.'))
-            term = self.env['account.payment.term'].browse(term_id).exists()
+            term = self.env['account.payment.term'].sudo().browse(
+                term_id
+            ).exists()
             if not term:
                 raise UserError(_('The selected payment term no longer exists.'))
-            try:
-                term.check_access('read')
-            except AccessError:
-                raise UserError(_(
-                    'You no longer have access to the selected payment term.'
-                ))
             store = self._resolve_store(store_id)
             settings = self._settings_for(store)
             settings.write({'order_payment_term_id': term.id})
