@@ -169,11 +169,21 @@ class TestReadinessSlotClosure(TransactionCase):
         self.env['ir.config_parameter'].sudo().set_param(
             'web.base.url', 'https://core-r1.example.test'
         )
-        self.Settings.create({
+        settings_vals = {
             'store_id': store.id,
             'product_domain_enabled': True,
             'sale_domain_enabled': True,
-        })
+        }
+        # The full connector suite installs the sale extension, whose
+        # essential readiness check requires the same imported-order default
+        # that production activation requires. Keep this core+sale integration
+        # fixture genuinely eligible without making core depend on that field
+        # when the sale addon is absent.
+        if 'order_payment_term_id' in self.Settings._fields:
+            settings_vals['order_payment_term_id'] = self.env.ref(
+                'account.account_payment_term_immediate'
+            ).id
+        self.Settings.create(settings_vals)
         self._run_test_connection(
             store, FakeResponse(
                 200, json_body=self._scope_body(store.shop_domain, scopes)

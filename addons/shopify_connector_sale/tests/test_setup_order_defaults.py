@@ -37,8 +37,15 @@ class TestSetupOrderDefaults(TransactionCase):
 
     def test_directions_refuses_orders_without_explicit_term(self):
         with self.assertRaisesRegex(UserError, 'Choose the payment term'):
-            self.Setup.save_directions(self.store.id, ['sale'])
+            self.Setup.save_directions(
+                self.store.id, ['sale'], order_payment_term_id=None,
+            )
         self.assertFalse(self.settings.sale_domain_enabled)
+
+    def test_legacy_caller_cannot_bypass_backend_readiness(self):
+        self.Setup.save_directions(self.store.id, ['sale'])
+        result = self.Readiness._check_sale_order_defaults(self.store)
+        self.assertEqual(result['result'], self.Readiness.RESULT_FAIL)
 
     def test_directions_saves_term_and_readiness_passes(self):
         payload = self.Setup.save_directions(

@@ -35,10 +35,14 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
 
     @api.model
     def save_directions(
-        self, store_id, enabled_keys, order_payment_term_id=None,
+        self, store_id, enabled_keys,
+        order_payment_term_id='__not_provided__',
     ):
+        # Resolve first so an unauthorized caller always receives AccessError,
+        # never configuration feedback about a store they may not inspect.
+        store = self._resolve_store(store_id)
         keys = set(enabled_keys or [])
-        if 'sale' in keys:
+        if 'sale' in keys and order_payment_term_id != '__not_provided__':
             if not order_payment_term_id:
                 raise UserError(_(
                     'Choose the payment term that imported Shopify orders '
@@ -53,7 +57,6 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
             ).exists()
             if not term:
                 raise UserError(_('The selected payment term no longer exists.'))
-            store = self._resolve_store(store_id)
             settings = self._settings_for(store)
             settings.write({'order_payment_term_id': term.id})
         return super().save_directions(store_id, enabled_keys)
