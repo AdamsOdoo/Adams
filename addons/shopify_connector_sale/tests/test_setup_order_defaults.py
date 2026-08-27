@@ -20,6 +20,9 @@ class TestSetupOrderDefaults(TransactionCase):
         cls.term = cls.env['account.payment.term'].create({
             'name': 'Shopify setup test term',
         })
+        cls.fallback = cls.env['res.partner'].create({
+            'name': 'Shopify setup fallback customer',
+        })
         cls.Readiness = cls.env['shopify.connector.readiness.check']
         cls.admin = new_test_user(
             cls.env,
@@ -38,7 +41,7 @@ class TestSetupOrderDefaults(TransactionCase):
         self.assertEqual(result['result'], self.Readiness.RESULT_PASS)
         self.assertTrue(result['not_applicable'])
 
-    def test_enabled_orders_without_term_fails_readiness(self):
+    def test_enabled_orders_without_required_defaults_fails_readiness(self):
         self.settings.write({
             'sale_domain_enabled': True,
             'order_scheduled_sync_enabled': True,
@@ -47,11 +50,13 @@ class TestSetupOrderDefaults(TransactionCase):
         self.assertEqual(result['tier'], self.Readiness.ESSENTIAL)
         self.assertEqual(result['result'], self.Readiness.RESULT_FAIL)
         self.assertIn('order payment term', result['reason'])
+        self.assertIn('fallback customer', result['reason'])
 
     def test_directions_refuses_orders_without_explicit_term(self):
         with self.assertRaisesRegex(UserError, 'Choose the payment term'):
             self.Setup.save_directions(
                 self.store.id, ['sale'], order_payment_term_id=None,
+                customer_fallback_partner_id=self.fallback.id,
             )
         self.assertFalse(self.settings.sale_domain_enabled)
 
@@ -66,11 +71,18 @@ class TestSetupOrderDefaults(TransactionCase):
     def test_directions_saves_term_and_readiness_passes(self):
         payload = self.Setup.save_directions(
             self.store.id, ['sale'], order_payment_term_id=self.term.id,
+            customer_fallback_partner_id=self.fallback.id,
         )
         self.assertTrue(self.settings.sale_domain_enabled)
         self.assertEqual(self.settings.order_payment_term_id, self.term)
         self.assertEqual(
             payload['order_setup']['payment_term_id'], self.term.id,
+        )
+        self.assertEqual(
+            payload['order_setup']['fallback_partner_id'], self.fallback.id,
+        )
+        self.assertEqual(
+            self.settings.customer_fallback_partner_id, self.fallback,
         )
         result = self.Readiness._check_sale_order_defaults(self.store)
         self.assertEqual(result['result'], self.Readiness.RESULT_PASS)
@@ -78,4 +90,11 @@ class TestSetupOrderDefaults(TransactionCase):
     def test_payment_term_is_readiness_relevant(self):
         self.settings.sudo().write({'setup_readiness_stale_since': False})
         self.settings.write({'order_payment_term_id': self.term.id})
+        self.assertTrue(self.settings.setup_readiness_stale_since)
+
+    def test_fallback_customer_is_readiness_relevant(self):
+        self.settings.sudo().write({'setup_readiness_stale_since': False})
+        self.settings.write({
+            'customer_fallback_partner_id': self.fallback.id,
+        })
         self.assertTrue(self.settings.setup_readiness_stale_since)

@@ -22,6 +22,15 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
         terms = self.env['account.payment.term'].sudo().search(
             [], order='name, id', limit=200,
         )
+        partner_domain = [('active', '=', True)]
+        if store and store.company_id:
+            partner_domain += [
+                '|', ('company_id', '=', False),
+                ('company_id', '=', store.company_id.id),
+            ]
+        fallback_partners = self.env['res.partner'].sudo().search(
+            partner_domain, order='display_name, id', limit=200,
+        )
         payload['order_setup'] = {
             'payment_term_id': (
                 settings.order_payment_term_id.id if settings else False
@@ -30,6 +39,14 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
                 {'id': term.id, 'name': term.display_name}
                 for term in terms
             ],
+            'fallback_partner_id': (
+                settings.customer_fallback_partner_id.id
+                if settings else False
+            ),
+            'fallback_partners': [
+                {'id': partner.id, 'name': partner.display_name}
+                for partner in fallback_partners
+            ],
         }
         return payload
 
@@ -37,12 +54,16 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
     def save_directions(
         self, store_id, enabled_keys,
         order_payment_term_id='__not_provided__',
+        customer_fallback_partner_id='__not_provided__',
     ):
         # Resolve first so an unauthorized caller always receives AccessError,
         # never configuration feedback about a store they may not inspect.
         store = self._resolve_store(store_id)
         keys = set(enabled_keys or [])
-        legacy_omitted = order_payment_term_id == '__not_provided__'
+        legacy_omitted = (
+            order_payment_term_id == '__not_provided__'
+            or customer_fallback_partner_id == '__not_provided__'
+        )
         if 'sale' in keys and not legacy_omitted:
             if not order_payment_term_id:
                 raise UserError(_(
@@ -58,8 +79,27 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
             ).exists()
             if not term:
                 raise UserError(_('The selected payment term no longer exists.'))
+            if not customer_fallback_partner_id:
+                raise UserError(_(
+                    'Choose the fallback customer used when a Shopify order '
+                    'has no usable customer email before enabling Orders.'
+                ))
+            try:
+                fallback_id = int(customer_fallback_partner_id)
+            except (TypeError, ValueError):
+                raise UserError(_('Choose a valid fallback customer.'))
+            fallback = self.env['res.partner'].sudo().browse(
+                fallback_id
+            ).exists()
+            if not fallback:
+                raise UserError(_(
+                    'The selected fallback customer no longer exists.'
+                ))
             settings = self._settings_for(store)
-            settings.write({'order_payment_term_id': term.id})
+            settings.write({
+                'order_payment_term_id': term.id,
+                'customer_fallback_partner_id': fallback.id,
+            })
         payload = super().save_directions(store_id, enabled_keys)
         if 'sale' in keys and legacy_omitted:
             # Older internal callers pre-date the explicit order-defaults
@@ -81,7 +121,7 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
             if state in ('passed', 'not_required'):
                 return {}
             return {
-                'label': _('Choose order payment term'),
+                'label': _('Choose imported-order defaults'),
                 'step_key': 'directions',
             }
         return super()._readiness_action(check, state)

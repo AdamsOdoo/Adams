@@ -108,6 +108,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                 shopDomain: "",
                 enabledDomains: [],
                 orderPaymentTermId: "",
+                customerFallbackPartnerId: "",
                 matching: "",
                 price: "",
                 notification: false,
@@ -378,6 +379,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.orderPaymentTermId = String(
             (data.order_setup && data.order_setup.payment_term_id) || ""
         );
+        this.state.form.customerFallbackPartnerId = String(
+            (data.order_setup && data.order_setup.fallback_partner_id) || ""
+        );
         // Deliberately NOT seeded from the stored values. The source-of-truth
         // step requires an explicit choice, and pre-selecting whatever the
         // backend default happens to be is precisely how a default becomes
@@ -617,6 +621,8 @@ export class ShopifyConnectorSetupWizard extends Component {
                         ? {
                             order_payment_term_id:
                                 this.state.form.orderPaymentTermId || null,
+                            customer_fallback_partner_id:
+                                this.state.form.customerFallbackPartnerId || null,
                         }
                         : {}),
                 });

@@ -308,6 +308,11 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                 and settings.order_payment_term_id.id
                 != (vals.get('order_payment_term_id') or False)
             )
+            or (
+                'customer_fallback_partner_id' in vals
+                and settings.customer_fallback_partner_id.id
+                != (vals.get('customer_fallback_partner_id') or False)
+            )
         ))
         if 'order_company_id' in vals:
             target_company_id = vals.get('order_company_id') or False
