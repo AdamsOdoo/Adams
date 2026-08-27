@@ -106,13 +106,13 @@ class TestSetupLocationStep(TransactionCase):
             'shopify_location_active': active,
         })
 
-    def _mark_refresh_succeeded(self):
+    def _mark_refresh_succeeded(self, suffix='current'):
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'inventory_location_sync',
             'state': 'queued',
-            'payload_hash': 'setup-location-current-success',
+            'payload_hash': 'setup-location-%s-success' % suffix,
             'expected_connection_generation':
                 self.store.connection_generation,
         })
@@ -650,14 +650,14 @@ class TestSetupLocationStep(TransactionCase):
         self.store.sudo().write({
             'state': 'connected', 'connection_generation': 1,
         })
-        stale = self._mark_refresh_succeeded()
+        stale = self._mark_refresh_succeeded('stale-activation')
         stale.sudo().write({'expected_connection_generation': 0})
         status = self._as()._activation_requirement_status(
             self.store, self.settings,
         )
         self.assertEqual(status['state'], 'action_required')
 
-        current = self._mark_refresh_succeeded()
+        current = self._mark_refresh_succeeded('current-activation')
         self._cache('gid://shopify/Location/ACTIVATION', 'Activation proof')
         status = self._as()._activation_requirement_status(
             self.store, self.settings,
