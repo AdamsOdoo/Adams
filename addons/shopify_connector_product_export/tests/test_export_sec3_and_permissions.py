@@ -498,10 +498,15 @@ class TestExportSec3AndPermissions(ExportCase):
                 post_activation_webhook['result'], Check.RESULT_PASS,
             )
             with patch.object(Client, '_send', refuse):
-                Setup.with_user(admin).activate(activation_store.id)
+                followed = Setup.with_user(admin).follow_activation(
+                    activation_store.id,
+                )
             activation_store.invalidate_recordset()
             activation_settings.invalidate_recordset()
             self.assertTrue(activation_settings.setup_completed_at)
+            self.assertEqual(
+                followed['store']['setup_completion_state'], 'complete',
+            )
             self.assertEqual(
                 Setup.with_user(admin).get_setup_state(
                     store_id=activation_store.id,

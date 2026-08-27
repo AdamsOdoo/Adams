@@ -115,6 +115,11 @@
                             <div class="sc-band__body">
                                 <div class="sc-band__text">Setup is waiting for verification</div>
                                 <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                                <div t-if="state.activationFollowStillRunning"
+                                     class="sc-band__hint">
+                                    Verification is continuing safely in the background.
+                                    Use Check status below; you do not need to restart setup.
+                                </div>
                             </div>
                         </div>
                         <div t-if="store.setup_completion_state === 'action_required'"
@@ -1004,7 +1009,9 @@
                                 t-att-disabled="state.busy or !canContinue"
                                 t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
                                 t-on-click="() => this.continueStep()">
-                            <span t-if="isLastStep">Activate</span>
+                            <span t-if="isLastStep and store.setup_completion_state === 'pending'">Check status</span>
+                            <span t-elif="isLastStep and store.setup_completion_state === 'ready_to_complete'">Complete setup</span>
+                            <span t-elif="isLastStep">Activate</span>
                             <span t-else="">Continue</span>
                         </button>
                         <button t-if="store.id" class="sc-btn sc_setup_exit"

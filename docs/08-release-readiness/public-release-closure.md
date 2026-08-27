@@ -59,10 +59,10 @@ The branch may become release-ready only when every advertised workflow has exac
 
 | Gate | Candidate | Status | Evidence |
 |---|---|---|---|
-| G0 | `eccc498b` baseline | In progress | Baseline and closure branch frozen |
-| G1 | Pending | Not started | |
-| G2 | Pending | Not started | |
-| G3 | Pending | Not started | |
+| G0 | `eccc498b` baseline | Complete | PR #210 is draft, one-commit baseline, exact base `eccc498b` |
+| G1 | Working candidate | In progress | Static event/latency trace recorded in `backend-responsiveness-architecture.md`; exact runtime timing remains open |
+| G2 | Working candidate | In progress | Activation follower, reachable Check status, one-minute fallback and upgrade migration implemented locally; exact tests pending |
+| G3 | Pending | Not started | Enqueue wake-up exists; priority/backlog and live latency remain unproved |
 | G4 | Pending | Not started | |
 | G5 | Pending | Not started | |
 | G6 | Pending | Not started | |

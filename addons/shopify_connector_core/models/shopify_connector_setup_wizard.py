@@ -1987,6 +1987,25 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 cron.sudo()._trigger()
         return self.get_setup_state(store_id=store.id)
 
+    @api.model
+    def follow_activation(self, store_id):
+        """Follow a durable post-activation proof and finalize when ready.
+
+        The browser polls this bounded, local-only projection after the first
+        activation hand-off.  It never drains jobs and never contacts Shopify.
+        When an installed domain reports ``ready_to_complete``, re-enter the
+        ordinary authoritative activation method: that method reruns readiness,
+        rechecks every lifecycle/credential/domain fence, and owns the single
+        setup-completion write.  All other states are returned unchanged so a
+        pending or actionable result remains truthful and recoverable.
+        """
+        store = self._resolve_store(store_id)
+        state = self.get_setup_state(store_id=store.id)
+        completion = state.get('store', {}).get('setup_completion_state')
+        if completion == 'ready_to_complete':
+            return self.activate(store.id)
+        return state
+
     # ------------------------------------------------------------------
     # Save & Exit, and re-run
     # ------------------------------------------------------------------

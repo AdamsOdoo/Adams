@@ -25,14 +25,16 @@
              a pass processes as many jobs as its slot and the per-job
              handler latency allow, up to the cap. The 5-minute default
              below is unchanged by PERF-1 deliberately — raising it is an
-             operator decision made against measured latency, not a default
-             this packet is entitled to pick for every store. -->
+             operator decision made against measured latency. Public-release
+             closure sets a one-minute fallback: normal enqueue calls still
+             wake this cron immediately, while the interval bounds recovery
+             when a wake-up hint is lost during a restart or worker outage. -->
         <record id="ir_cron_shopify_connector_job_dispatch_drain" model="ir.cron">
             <field name="name">Shopify Connector: Job Dispatch Drain</field>
             <field name="model_id" ref="model_shopify_connector_job_dispatch"/>
             <field name="state">code</field>
             <field name="code">model.run_drain()</field>
-            <field name="interval_number">5</field>
+            <field name="interval_number">1</field>
             <field name="interval_type">minutes</field>
             <field name="active" eval="True"/>
         </record>
