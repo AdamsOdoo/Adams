@@ -120,6 +120,16 @@ class TestUiSetupTours(HttpCase):
         self.env['ir.config_parameter'].sudo().set_param(
             'web.base.url', 'https://s1-tour.example.test',
         )
+        # The Orders setup contract requires an explicit pricelist whose
+        # currency can be compared with Shopify.  Minimal HttpCase databases
+        # do not guarantee that one exists, so make the browser journey's
+        # merchant prerequisite explicit instead of weakening production
+        # readiness for a test-only environment.
+        self.env['product.pricelist'].sudo().create({
+            'name': 'S1 Tour Pricelist',
+            'currency_id': self.env.company.currency_id.id,
+            'company_id': self.env.company.id,
+        })
 
     def test_setup_wizard_traverses_all_twelve_steps(self):
         """Nothing to an activated store, through the browser, in order.
