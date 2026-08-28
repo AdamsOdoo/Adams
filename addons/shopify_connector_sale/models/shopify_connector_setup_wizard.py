@@ -22,6 +22,15 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
         terms = self.env['account.payment.term'].sudo().search(
             [], order='name, id', limit=200,
         )
+        pricelist_domain = [('active', '=', True)]
+        if store and store.company_id:
+            pricelist_domain += [
+                '|', ('company_id', '=', False),
+                ('company_id', '=', store.company_id.id),
+            ]
+        pricelists = self.env['product.pricelist'].sudo().search(
+            pricelist_domain, order='name, id', limit=200,
+        )
         partner_domain = [('active', '=', True)]
         if store and store.company_id:
             partner_domain += [
@@ -32,6 +41,19 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
             partner_domain, order='name, id', limit=200,
         )
         payload['order_setup'] = {
+            'pricelist_id': (
+                settings.order_pricelist_id.id if settings else False
+            ),
+            'pricelists': [
+                {
+                    'id': pricelist.id,
+                    'name': '%s (%s)' % (
+                        pricelist.display_name,
+                        pricelist.currency_id.name,
+                    ),
+                }
+                for pricelist in pricelists
+            ],
             'payment_term_id': (
                 settings.order_payment_term_id.id if settings else False
             ),
@@ -53,6 +75,7 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
     @api.model
     def save_directions(
         self, store_id, enabled_keys,
+        order_pricelist_id='__not_provided__',
         order_payment_term_id='__not_provided__',
         customer_fallback_partner_id='__not_provided__',
     ):
@@ -61,10 +84,27 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
         store = self._resolve_store(store_id)
         keys = set(enabled_keys or [])
         legacy_omitted = (
-            order_payment_term_id == '__not_provided__'
+            order_pricelist_id == '__not_provided__'
+            or order_payment_term_id == '__not_provided__'
             or customer_fallback_partner_id == '__not_provided__'
         )
         if 'sale' in keys and not legacy_omitted:
+            if not order_pricelist_id:
+                raise UserError(_(
+                    'Choose the active pricelist whose currency matches '
+                    'Shopify before enabling Orders.'
+                ))
+            try:
+                pricelist_id = int(order_pricelist_id)
+            except (TypeError, ValueError):
+                raise UserError(_('Choose a valid order pricelist.'))
+            pricelist = self.env['product.pricelist'].sudo().browse(
+                pricelist_id
+            ).exists()
+            if not pricelist or not pricelist.active:
+                raise UserError(_(
+                    'The selected order pricelist is missing or inactive.'
+                ))
             if not order_payment_term_id:
                 raise UserError(_(
                     'Choose the payment term that imported Shopify orders '
@@ -97,6 +137,7 @@ class ShopifyConnectorSetupWizardSaleExtension(models.AbstractModel):
                 ))
             settings = self._settings_for(store)
             settings.write({
+                'order_pricelist_id': pricelist.id,
                 'order_payment_term_id': term.id,
                 'customer_fallback_partner_id': fallback.id,
             })

@@ -20,6 +20,11 @@ class TestSetupOrderDefaults(TransactionCase):
         cls.term = cls.env['account.payment.term'].create({
             'name': 'Shopify setup test term',
         })
+        cls.pricelist = cls.env['product.pricelist'].create({
+            'name': 'Shopify setup test pricelist',
+            'currency_id': cls.env.company.currency_id.id,
+            'company_id': cls.env.company.id,
+        })
         cls.fallback = cls.env['res.partner'].create({
             'name': 'Shopify setup fallback customer',
         })
@@ -50,12 +55,23 @@ class TestSetupOrderDefaults(TransactionCase):
         self.assertEqual(result['tier'], self.Readiness.ESSENTIAL)
         self.assertEqual(result['result'], self.Readiness.RESULT_FAIL)
         self.assertIn('order payment term', result['reason'])
+        self.assertIn('order pricelist', result['reason'])
         self.assertIn('fallback customer', result['reason'])
 
     def test_directions_refuses_orders_without_explicit_term(self):
         with self.assertRaisesRegex(UserError, 'Choose the payment term'):
             self.Setup.save_directions(
                 self.store.id, ['sale'], order_payment_term_id=None,
+                order_pricelist_id=self.pricelist.id,
+                customer_fallback_partner_id=self.fallback.id,
+            )
+        self.assertFalse(self.settings.sale_domain_enabled)
+
+    def test_directions_refuses_orders_without_explicit_pricelist(self):
+        with self.assertRaisesRegex(UserError, 'Choose the active pricelist'):
+            self.Setup.save_directions(
+                self.store.id, ['sale'], order_pricelist_id=None,
+                order_payment_term_id=self.term.id,
                 customer_fallback_partner_id=self.fallback.id,
             )
         self.assertFalse(self.settings.sale_domain_enabled)
@@ -71,10 +87,12 @@ class TestSetupOrderDefaults(TransactionCase):
     def test_directions_saves_term_and_readiness_passes(self):
         payload = self.Setup.save_directions(
             self.store.id, ['sale'], order_payment_term_id=self.term.id,
+            order_pricelist_id=self.pricelist.id,
             customer_fallback_partner_id=self.fallback.id,
         )
         self.assertTrue(self.settings.sale_domain_enabled)
         self.assertEqual(self.settings.order_payment_term_id, self.term)
+        self.assertEqual(self.settings.order_pricelist_id, self.pricelist)
         self.assertEqual(
             payload['order_setup']['payment_term_id'], self.term.id,
         )
@@ -97,4 +115,9 @@ class TestSetupOrderDefaults(TransactionCase):
         self.settings.write({
             'customer_fallback_partner_id': self.fallback.id,
         })
+        self.assertTrue(self.settings.setup_readiness_stale_since)
+
+    def test_pricelist_is_readiness_relevant(self):
+        self.settings.sudo().write({'setup_readiness_stale_since': False})
+        self.settings.write({'order_pricelist_id': self.pricelist.id})
         self.assertTrue(self.settings.setup_readiness_stale_since)

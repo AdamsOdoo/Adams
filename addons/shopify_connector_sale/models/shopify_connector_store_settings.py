@@ -304,6 +304,11 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                 != (vals.get('order_company_id') or False)
             )
             or (
+                'order_pricelist_id' in vals
+                and settings.order_pricelist_id.id
+                != (vals.get('order_pricelist_id') or False)
+            )
+            or (
                 'order_payment_term_id' in vals
                 and settings.order_payment_term_id.id
                 != (vals.get('order_payment_term_id') or False)

@@ -480,6 +480,23 @@
                             </ul>
                             <div t-if="isDomainEnabled('sale')"
                                  class="sc_setup__field sc_setup_order_defaults">
+                                <label for="sc_setup_order_pricelist">
+                                    Pricelist for imported orders
+                                </label>
+                                <select id="sc_setup_order_pricelist"
+                                        class="o_input sc_setup_order_pricelist"
+                                        t-model="state.form.orderPricelistId">
+                                    <option value="">Choose a pricelist…</option>
+                                    <t t-foreach="(state.data.order_setup || {}).pricelists || []"
+                                       t-as="pricelist" t-key="pricelist.id">
+                                        <option t-att-value="pricelist.id"
+                                                t-esc="pricelist.name"/>
+                                    </t>
+                                </select>
+                                <small>
+                                    Choose the active pricelist whose currency matches the
+                                    Shopify shop currency. This is required before Orders can run.
+                                </small>
                                 <label for="sc_setup_order_payment_term">
                                     Payment term for imported orders
                                 </label>

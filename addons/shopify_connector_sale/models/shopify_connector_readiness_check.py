@@ -35,6 +35,10 @@ class ShopifyConnectorReadinessCheckSaleExtension(models.AbstractModel):
             missing.append(_('order company'))
         if not settings.order_payment_term_id:
             missing.append(_('order payment term'))
+        if not settings.order_pricelist_id:
+            missing.append(_('order pricelist'))
+        elif not settings.order_pricelist_id.active:
+            missing.append(_('active order pricelist'))
         if not settings.customer_fallback_partner_id:
             missing.append(_('fallback customer'))
         if missing:
@@ -49,7 +53,7 @@ class ShopifyConnectorReadinessCheckSaleExtension(models.AbstractModel):
         return self._check_result(
             'sale_order_defaults', self.ESSENTIAL, self.RESULT_PASS,
             _(
-                'The imported-order company, payment term, and fallback '
-                'customer are configured.'
+                'The imported-order company, pricelist, payment term, and '
+                'fallback customer are configured.'
             ),
         )

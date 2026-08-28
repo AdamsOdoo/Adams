@@ -107,6 +107,7 @@ export class ShopifyConnectorSetupWizard extends Component {
                 name: "",
                 shopDomain: "",
                 enabledDomains: [],
+                orderPricelistId: "",
                 orderPaymentTermId: "",
                 customerFallbackPartnerId: "",
                 matching: "",
@@ -379,6 +380,9 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.orderPaymentTermId = String(
             (data.order_setup && data.order_setup.payment_term_id) || ""
         );
+        this.state.form.orderPricelistId = String(
+            (data.order_setup && data.order_setup.pricelist_id) || ""
+        );
         this.state.form.customerFallbackPartnerId = String(
             (data.order_setup && data.order_setup.fallback_partner_id) || ""
         );
@@ -619,6 +623,8 @@ export class ShopifyConnectorSetupWizard extends Component {
                     enabled_keys: this.state.form.enabledDomains,
                     ...(this.state.data.order_setup
                         ? {
+                            order_pricelist_id:
+                                this.state.form.orderPricelistId || null,
                             order_payment_term_id:
                                 this.state.form.orderPaymentTermId || null,
                             customer_fallback_partner_id:

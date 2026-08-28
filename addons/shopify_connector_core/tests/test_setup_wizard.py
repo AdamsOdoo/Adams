@@ -782,6 +782,13 @@ class TestSetupWizardSteps(SetupWizardCase):
                 'name': 'Setup scheduler contract term',
             })
             direction_kwargs['order_payment_term_id'] = term.id
+        if 'order_pricelist_id' in settings._fields:
+            pricelist = self.env['product.pricelist'].create({
+                'name': 'Setup scheduler contract pricelist',
+                'currency_id': store.company_id.currency_id.id,
+                'company_id': store.company_id.id,
+            })
+            direction_kwargs['order_pricelist_id'] = pricelist.id
         if 'customer_fallback_partner_id' in settings._fields:
             fallback = self.env['res.partner'].create({
                 'name': 'Setup scheduler contract fallback',
