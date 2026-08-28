@@ -215,6 +215,21 @@ registry.category("web_tour.tours").add("shopify_connector_s1_setup_tour", {
             run: "click",
         },
         {
+            trigger: ".sc_setup_order_pricelist",
+            content: "Choose the required pricelist for imported orders.",
+            run() {
+                const select = document.querySelector(
+                    ".sc_setup_order_pricelist"
+                );
+                const option = Array.from(select.options).find((o) => o.value);
+                if (!option) {
+                    throw new Error("no order pricelist is available");
+                }
+                select.value = option.value;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            },
+        },
+        {
             trigger: ".sc_setup_order_payment_term",
             content: "Choose the required default for imported orders.",
             run() {
