@@ -1,6 +1,6 @@
 {
     'name': 'Shopify Connector Inventory',
-    'version': '19.0.1.12.0',
+    'version': '19.0.1.12.1',
     'summary': (
         'Guarded Odoo-to-Shopify available-inventory synchronization with '
         'explicit location mappings, pair bindings, preview-first activation, '
