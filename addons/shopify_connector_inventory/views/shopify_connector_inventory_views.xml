@@ -323,6 +323,7 @@
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
+                            invisible="status != 'review'"
                             groups="shopify_connector_core.group_shopify_connector_admin"/>
                     <!--
                         The TD-020 closure. A previewed/confirmed pair used to
