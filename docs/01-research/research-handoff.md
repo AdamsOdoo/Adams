@@ -1,5 +1,56 @@
 # Research Handoff (rolling)
 
+## V2 product and architecture gate — 2026-08-29
+
+## Current session
+
+- **Date:** 2026-08-29
+- **Scope:** docs-only V2 product experience, target architecture and refactor-vs-replacement recommendation.
+- **Base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.
+- **Current implementation inspected:** draft PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`; not modified.
+
+## Outcome
+
+- Proposed a calm Odoo-native operations workspace centered on Overview, Needs Attention, domain records, Runs and Settings.
+- Proposed a modular-monolith target with application commands/queries, domain policies, shared runtime and small Shopify gateways.
+- Recommended staged refactoring with bounded replacement of API-client, dispatch, store/setup orchestration and composed UI internals.
+- Preserved accepted bindings, lifecycle data, module identities, authority rules, retry taxonomy, mutation safety, webhook deduplication and company/generation fences.
+- Ground-up rewrite is not recommended unless Stage 0–2 proof gates show the existing contracts cannot support safe extraction.
+
+## Sources and evidence
+
+- Repository governance, accepted ADRs, quality/rejection logs, accepted U0 prototype and current release implementation.
+- Shopify official webhook, API-limit and app-design documentation; accessible 2026-08-29.
+- Odoo 19 official Owl, services, performance, security and testing documentation; accessible 2026-08-29.
+- Public VentorTech, Teqstars, Emipro and Webkul documentation/screens/tutorials; vendor evidence, accessible 2026-08-29.
+- Full source classifications and links: `docs/v2/04-evidence-and-competitor-decisions.md`.
+
+## Open review questions
+
+1. Approve the V2 information architecture and experience measures?
+2. Approve the target internal boundaries without changing accepted addon identities yet?
+3. Approve Stage 0/1 only before funding later replacement stages?
+4. What representative pilot volumes and operational SLOs should become binding?
+5. What soak period is required before removing compatibility paths?
+
+## Learning feedback loop
+
+- **New issues discovered:** none classified as a new defect occurrence. Large-file concentration and webhook-addon fragmentation are architecture risks, not proven defects.
+- **Repeated patterns:** existing evidence-classification and premature-architecture rules were applied; competitor claims were not promoted to implementation facts.
+- **Rules/checklists updated:** none.
+- **Rejected approaches added:** none. Existing RA-001–RA-023 remain binding and were not re-proposed.
+- **Technical debt added:** none accepted; candidates are routed through Stage 0 measurement.
+- **Architecture concerns:** compatibility seams, job-to-run projection, gateway extraction and webhook packaging are recorded in the V2 assessment.
+- **Required gates:** characterization, migration/rollback, concurrency, ambiguous-mutation, performance, accessibility and usability evidence.
+- **Future prompt change:** no.
+
+## Recommended next session
+
+Run a strict product/architecture review of this package. If accepted, authorize only Stage 0 baseline/characterization and the Stage 1 read-model vertical slice; no broad implementation yet.
+
+---
+
+
 ### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
 
 - **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
