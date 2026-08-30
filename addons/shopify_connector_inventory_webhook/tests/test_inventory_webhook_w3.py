@@ -345,7 +345,9 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertTrue(service._level_gid_matches_authoritative_identity(
             level,
             'gid://shopify/InventoryItem/8001',
-            'gid://shopify/Location/7001',
+            # InventoryLevel and Location are independent Shopify resources;
+            # their numeric suffixes are not required to be equal.
+            'gid://shopify/Location/9001',
         ))
         self.assertFalse(service._level_gid_matches_authoritative_identity(
             level,
@@ -355,7 +357,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertFalse(service._level_gid_matches_authoritative_identity(
             level,
             'gid://shopify/InventoryItem/8001',
-            'gid://shopify/Location/9001',
+            'gid://shopify/Location/not-a-number',
         ))
         for invalid in (
             'gid://shopify/InventoryLevel/7001',
@@ -387,7 +389,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                         'id': 'gid://shopify/InventoryItem/8001',
                         'tracked': True,
                     },
-                    'location': {'id': 'gid://shopify/Location/7001'},
+                    'location': {'id': 'gid://shopify/Location/9001'},
                     'quantities': [{
                         'name': 'available',
                         'quantity': 7,
