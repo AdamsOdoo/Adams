@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | Accepted DEC-008/009/010/011/012/013/014 and rejected approaches RA-001–RA-023 | Accessible in repository | Fact | Preserve accepted module, identity, retry, inventory, fulfillment and operator-flow invariants. |
 | Accepted U0 prototype (`docs/09-ui-prototype`) | Accessible in repository | Fact | Preserve ranked dashboard, selective Owl, Odoo-native views, accessibility, responsive and RTL baseline. |
-| Current draft release PR #210, head `44da1e…` | Accessible in GitHub | Fact | Treat current code as migration source; do not modify the release PR. |
+| Draft release PR #210 snapshot `44da1e…` inspected; live head `f77bfcc…` observed at final verification | Accessible in GitHub | Fact | Treat the inspected snapshot as evidence, not a permanently current head. Do not modify the release PR; Wave 1 re-freezes and characterizes the accepted implementation head. |
 | Large core API/setup/store/credential/dispatch and setup UI files observed at release head | Accessible in GitHub | Fact | Prioritize characterization and seam extraction; file size alone is a risk signal, not proof of incorrectness. |
 | Core + domain + product-export + webhook addon family at release head | Accessible in GitHub | Fact | Preserve domain family; evaluate webhook satellite consolidation only with lifecycle proof. |
 

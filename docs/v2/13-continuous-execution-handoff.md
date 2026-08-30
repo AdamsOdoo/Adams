@@ -41,6 +41,7 @@ approved secret location or connection mechanism instead.
 | Accepted planning base | `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b` |
 | Input head for this correction | `c395101c498ea6d2ba8fc1d263537a2c32bd17ee` |
 | Current code implementation | none; PR #210 remains untouched |
+| V1 evidence state | snapshot `44da1e006…` inspected; live PR #210 head `f77bfcc25…` observed and must be re-frozen in Wave 1 |
 | Active wave | pre-implementation architecture/governance correction |
 | External mutations | none |
 | Release status | no V2 release candidate; V1 public release remains separately frozen until qualified |
@@ -131,4 +132,3 @@ The next chat must:
 
 If branch state contradicts the handoff, branch state and committed evidence win; record the
 discrepancy before continuing.
-

@@ -3,7 +3,7 @@
 > **Status:** implementation-ready architecture/product package — docs only, 2026-08-30.  
 > **Interactive design:** [Shopify Connector V2 Blueprint](https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site).  
 > **Planning base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.  
-> **Current implementation evidence:** draft release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`.  
+> **Inspected V1 evidence snapshot:** draft release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`. The live PR head was `f77bfcc25e63615e6226dd9a9329f8f943593cb2` at final verification and remains outside this docs PR; Wave 1 re-freezes the accepted implementation head.  
 > **Authority:** no production code is changed here. A separately authorized implementation run executes continuously through five evidence checkpoints; internal task IDs do not require repeated user approval.
 
 ## Outcome

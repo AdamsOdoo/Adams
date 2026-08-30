@@ -2,7 +2,7 @@
 
 > **Status:** implementation-ready target.  
 > **Decision:** modular monolith in Odoo 19; staged refactor with bounded internal replacement.  
-> **Compatibility baseline:** release candidate PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`.
+> **Inspected compatibility snapshot:** release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`. Its live head had advanced to `f77bfcc25e63615e6226dd9a9329f8f943593cb2` at final verification; Wave 1 must freeze and re-characterize the accepted implementation head before extraction.
 
 ## 1. Architectural rules
 

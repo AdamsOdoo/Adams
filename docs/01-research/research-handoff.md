@@ -8,6 +8,7 @@
 - **Correction input:** `c395101c498ea6d2ba8fc1d263537a2c32bd17ee`.
 - **Blueprint correction commit:** `a375bd777f4d579e52f26a4b44dab859e9767c81`.
 - **Production impact:** none; V1 release PR #210 and all connector production code remain untouched.
+- **V1 evidence state:** snapshot `44da1e006…` was inspected; live PR #210 head `f77bfcc25e63615e6226dd9a9329f8f943593cb2` was observed at final verification and must be re-frozen/characterized in Wave 1.
 - **Purpose:** replace obsolete P00-only/21-PR execution wording and close the V1, foundation, journey, administration, responsiveness and continuity gaps.
 
 ### Locked outcome
