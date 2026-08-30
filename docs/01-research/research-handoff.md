@@ -1,5 +1,143 @@
 # Research Handoff (rolling)
 
+## V2 continuous implementation-readiness correction — 2026-08-30
+
+### Scope and identity
+
+- **Branch/PR:** `codex/v2-product-architecture-gate`, draft PR #211.
+- **Correction input:** `c395101c498ea6d2ba8fc1d263537a2c32bd17ee`.
+- **Blueprint correction commit:** `a375bd777f4d579e52f26a4b44dab859e9767c81`.
+- **Production impact:** none; V1 release PR #210 and all connector production code remain untouched.
+- **V1 evidence state:** snapshot `44da1e006…` was inspected; live PR #210 head `f77bfcc25e63615e6226dd9a9329f8f943593cb2` was observed at final verification and must be re-frozen/characterized in Wave 1.
+- **Purpose:** replace obsolete P00-only/21-PR execution wording and close the V1, foundation, journey, administration, responsiveness and continuity gaps.
+
+### Locked outcome
+
+- V1 release lessons are explicit characterization/regression inputs: reachable onboarding, active progress/recovery, priority/backlog/restart proof, event-to-visible-state latency and complete user evidence.
+- Production UI wiring is blocked until the shared command/gateway/runtime/security/migration/performance foundation passes on one candidate.
+- U1–U14 prove onboarding, additional stores, products, orders, inventory, fulfillment, trigger parity, uncertainty/recovery, operations, lifecycle, roles, upgrade/rollback and two complete Shopify↔Odoo merchant loops.
+- Administrator settings, non-configurable safety controls, store lifecycle and multiple-store isolation/management are locked in the data/API and UX contracts.
+- Near-real-time targets are measured and honest; immediate drain plus one-minute recovery scheduling avoids new broker/worker infrastructure.
+- Refunds/returns and payouts extend typed optional domain registries without speculative core tables or a generic workflow engine.
+- P00–P20 remain 21 bounded work IDs inside one continuous five-wave program, one integration branch and one exact candidate PR; they are not approval phases.
+- Root `CLAUDE.md`, `AGENTS.md` and `docs/v2/13-continuous-execution-handoff.md` now require proactive committed handoff before a work chat becomes context-constrained.
+
+### Current blueprint audit
+
+- 60 locked decisions.
+- 28 rejected-pattern checks.
+- 27 traced requirements.
+- 14 mandatory end-to-end journeys.
+- Relative-link, Markdown-fence and duplicate-ID checks passed.
+- All 16 updated/new blueprint and governance files were verified against their remote Git blob SHAs.
+
+### Continuation
+
+One integrated architecture/execution review remains. After explicit implementation authorization, start Wave 1 from the accepted exact `Shopify-connector` head and continue automatically through Waves 2–5 when evidence gates pass. Stop only on the documented safety, evidence or external-authority conditions. Use `docs/v2/13-continuous-execution-handoff.md` as the live cross-chat checkpoint.
+
+This entry supersedes only the stale P00-only, mandatory-per-PR, count and continuation statements in the immediately following 2026-08-30 blueprint-closure entry. All prior research and release history below remains preserved.
+
+---
+
+## V2 implementation blueprint closure — 2026-08-30
+
+### Current session
+
+- **Scope:** completed the docs-only product, UX, backend, data/API, migration, testing, observability, release and execution package before implementation.
+- **Planning branch/PR:** `codex/v2-product-architecture-gate`, draft PR #211.
+- **Planning base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.
+- **Implementation evidence:** release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`; not modified.
+- **Visual artifact:** interactive V2 blueprint at `https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site`.
+
+### Outcome
+
+- Kept the recommendation: staged refactoring with bounded internal replacement, not blank rewrite or V1 restyling.
+- Locked the Odoo-native operations workspace and all shell, screen, component, loading/empty/error, responsive, RTL, accessibility and copy contracts.
+- Defined exact modular-monolith packages, dependency direction, commands/queries, RPC facades, Shopify gateways, transaction/claim/retry/readback, webhook and security boundaries.
+- Distinguished run/request, existing job, new execution attempt and existing mutation intent/certainty evidence.
+- Preserved stable addons/models/XML IDs/bindings/jobs/logs/mutation evidence, current uniqueness, role IDs, company/same-store/generation fences and error taxonomy.
+- Defined additive run/attempt schema, versioned DTOs/commands/problem codes, idempotency layers and a complete field/capability source-of-truth matrix.
+- Defined expand/backfill/dual-read/switch/soak/contract migration, store-scoped UI/gateway/runtime modes, risk-ordered mutation cutover, canary cohorts, automatic halt and rollback runbooks.
+- Defined test profiles/lanes, domain/fault/security/UX matrices, performance budgets, SLOs, alerts and exact-SHA release evidence.
+- Defined P00–P20 with dependencies, allowed/forbidden files, acceptance and rollback; P20 webhook consolidation is optional.
+- Added 50 locked V2 decisions, 23 rejected-pattern checks, requirement/screen/contract/test/packet traceability and a lighter-model operating handoff with stop/report prompts.
+
+### Current implementation facts reconciled
+
+- Core retains store, credential/settings/location, job/log, mutation, lease/dispatch, readiness, dashboard and setup model seams.
+- Domain family remains product, product export, sale, inventory, fulfillment, webhook and four webhook satellites.
+- Existing binding/store/job/webhook/mutation constraints and current role implication graph were inspected at PR #210 head.
+- Current Shopify API constant is `2026-07` and fails closed on a missing/mismatched served-version header.
+- Concentration remains highest in inventory, product export, order/product import, store/setup/credential, dispatch/API and webhook subscription files; extraction order is characterized and packeted.
+
+### Sources and classifications
+
+- Repository governance, accepted ADRs/rejections, U0 evidence and PR #210 implementation: repository fact.
+- Shopify webhook/API-limit/app-design documentation and Odoo 19 Owl/services/performance/security/testing documentation: official fact/guidance.
+- VentorTech, Teqstars, Emipro and Webkul public screens/docs/tutorials: competitor/vendor claims only; used for interaction decisions, not technical truth.
+- Full links/classification: `docs/v2/04-evidence-and-competitor-decisions.md`.
+
+### Learning feedback loop
+
+- **New defect occurrence:** none; this session changed planning/design only.
+- **Architecture risk clarified:** “attempt” was split into execution attempt versus the existing remote mutation-intent record to avoid retry/certainty ambiguity.
+- **Rejected approaches:** none superseded; the V2 regression checklist makes them reviewable per PR.
+- **Technical debt accepted:** none. Temporary flags/facades require owner and removal issue and cannot survive contraction silently.
+- **Open implementation choice:** none for P00. Later work stops only on the evidence/authorization conditions already documented.
+- **Required first implementation:** P00 baseline, characterization and restore proof only after the five-part architecture gate is accepted.
+
+---
+## V2 product and architecture gate — 2026-08-29
+
+## Current session
+
+- **Date:** 2026-08-29
+- **Scope:** docs-only V2 product experience, target architecture and refactor-vs-replacement recommendation.
+- **Base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.
+- **Current implementation inspected:** draft PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`; not modified.
+
+## Outcome
+
+- Proposed a calm Odoo-native operations workspace centered on Overview, Needs Attention, domain records, Runs and Settings.
+- Proposed a modular-monolith target with application commands/queries, domain policies, shared runtime and small Shopify gateways.
+- Recommended staged refactoring with bounded replacement of API-client, dispatch, store/setup orchestration and composed UI internals.
+- Preserved accepted bindings, lifecycle data, module identities, authority rules, retry taxonomy, mutation safety, webhook deduplication and company/generation fences.
+- Ground-up rewrite is not recommended unless Stage 0–2 proof gates show the existing contracts cannot support safe extraction.
+
+## Sources and evidence
+
+- Repository governance, accepted ADRs, quality/rejection logs, accepted U0 prototype and current release implementation.
+- Shopify official webhook, API-limit and app-design documentation; accessible 2026-08-29.
+- Odoo 19 official Owl, services, performance, security and testing documentation; accessible 2026-08-29.
+- Public VentorTech, Teqstars, Emipro and Webkul documentation/screens/tutorials; vendor evidence, accessible 2026-08-29.
+- Full source classifications and links: `docs/v2/04-evidence-and-competitor-decisions.md`.
+
+## Open review questions
+
+1. Approve the V2 information architecture and experience measures?
+2. Approve the target internal boundaries without changing accepted addon identities yet?
+3. Approve Stage 0/1 only before funding later replacement stages?
+4. What representative pilot volumes and operational SLOs should become binding?
+5. What soak period is required before removing compatibility paths?
+
+## Learning feedback loop
+
+- **New issues discovered:** none classified as a new defect occurrence. Large-file concentration and webhook-addon fragmentation are architecture risks, not proven defects.
+- **Repeated patterns:** existing evidence-classification and premature-architecture rules were applied; competitor claims were not promoted to implementation facts.
+- **Rules/checklists updated:** none.
+- **Rejected approaches added:** none. Existing RA-001–RA-023 remain binding and were not re-proposed.
+- **Technical debt added:** none accepted; candidates are routed through Stage 0 measurement.
+- **Architecture concerns:** compatibility seams, job-to-run projection, gateway extraction and webhook packaging are recorded in the V2 assessment.
+- **Required gates:** characterization, migration/rollback, concurrency, ambiguous-mutation, performance, accessibility and usability evidence.
+- **Future prompt change:** no.
+
+## Recommended next session
+
+Run a strict product/architecture review of this package. If accepted, authorize only Stage 0 baseline/characterization and the Stage 1 read-model vertical slice; no broad implementation yet.
+
+---
+
+
 ### CORE-R2 — Foundation Slice 1 EXACT-HEAD RUNTIME CLOSURE (Odoo.sh build 34818964 @ `c0d4559`; draft PR #156, 2026-07-13)
 
 - **Session role:** runtime-closure operator. Re-ran the complete runtime matrix
