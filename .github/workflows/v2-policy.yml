@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -40,8 +41,10 @@ jobs:
           cache: pip
           cache-dependency-path: addons/requirements.txt
 
-      - name: Install GraphQL validator dependency
-        run: python -m pip install -r addons/requirements.txt
+      - name: Install pinned GraphQL validator dependency
+        # Mirror tools/run_connector_suite.sh. addons/requirements.txt is
+        # intentionally empty and therefore cannot satisfy this analysis tool.
+        run: python -m pip install graphql-core==3.2.6
 
       - name: Verify exact checkout
         run: test "$(git rev-parse HEAD)" = "$SOURCE_HEAD_SHA"
