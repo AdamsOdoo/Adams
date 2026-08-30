@@ -5,7 +5,7 @@
 
 ## 1. Migration invariants
 
-Every migration PR must prove all of the following:
+Every migration-bearing implementation checkpoint must prove all of the following:
 
 - store IDs, canonical domains, company ownership and connection generations are unchanged;
 - stable model names, tables and XML IDs remain resolvable;
@@ -80,6 +80,14 @@ All persistent changes use:
 7. **Contract:** remove old local code/columns only in a later release after backups and lifecycle proof.
 
 Do not add a non-null column with a computed default to a large table in one blocking migration. Create nullable, backfill in bounded batches, validate, then add constraint in a later transaction/window.
+
+### Continuous execution versus safe cutover
+
+M0–M9 are evidence checkpoints inside the single five-wave implementation program; they are not eleven user approval phases and do not require eleven PRs. The implementation owner proceeds automatically when the automated gate is green, records a coherent commit/checkpoint, and fixes/retests ordinary failures without asking permission. Production code is presented as one integrated candidate PR unless branch protection requires otherwise.
+
+This does not turn production deployment into a big bang. Backend contracts, gateway, runtime, security, migrations and production-shaped qualification must be green before production UI wiring or remote-mutation cutover. Store-scoped flags and cohorts limit blast radius after the complete candidate exists. M10 contraction is explicitly post-release cleanup and cannot delay V2 user value.
+
+Execution pauses only for a safety invariant, unexplained compatibility/data loss, unavailable required environment/credential, a destructive migration outside the approved design, or a material scope/architecture change. These are authority or safety stops—not routine review ceremonies.
 
 ## 5. Stage-by-stage cutover
 
@@ -241,7 +249,7 @@ Exit gate:
 - zero duplicate writes across concurrency/worker-kill/network fault tests;
 - no first push without mapping, current observation, fingerprint and Administrator confirmation;
 - readback applied/not-applied/inconclusive paths are all proven;
-- target store has at least seven continuous days or 10,000 mutation intents (whichever comes later) without a safety invariant violation.
+- the exact candidate completes at least 10,000 deterministic inventory intents across load/fault fixtures and the canary completes 72 continuous hours under real event handling without a safety invariant violation; low merchant volume does not create an indefinite calendar wait.
 
 Rollback: stop new V2 inventory admission; complete verification for in-flight mutation attempts; switch mode to `subscriptions`, `read_only` or `legacy` as evidence permits. Never undo a confirmed quantity automatically.
 
@@ -259,7 +267,7 @@ Exit gate:
 - protected fields never appear eligible;
 - stale preview and changed authority fail closed;
 - create/update idempotency, duplicate/binding risk and uncertainty tests pass;
-- target store has seven continuous days or 5,000 catalog mutation intents (whichever comes later) without a safety violation.
+- the exact candidate completes at least 5,000 deterministic catalog intents across load/fault fixtures and the canary completes 72 continuous hours under real event handling without a safety violation.
 
 Rollback: disable V2 export admission; verify in-flight writes; keep imported/bound records unchanged.
 
@@ -279,7 +287,7 @@ Exit gate:
 - duplicate creation and notification tests cover timeout before/after send, worker death and webhook/reconciliation races;
 - no second mutation occurs while outcome is uncertain;
 - fulfillment-order location/line eligibility tests pass;
-- target store has 14 continuous days or 2,000 fulfillment mutation intents (whichever comes later) without a safety violation.
+- the exact candidate completes at least 2,000 deterministic fulfillment intents across duplicate/timeout/restart fixtures and the canary completes seven continuous days under real event handling without a safety violation.
 
 Rollback: block new V2 fulfillment admission; resolve every in-flight uncertain attempt; return future events to legacy only after operation-scope ownership is clear.
 
@@ -323,18 +331,16 @@ Rollback: code-level forward fix. A schema contract migration requires a separat
 
 ## 6. Cutover cohorts
 
-Use the smallest applicable cohort count; never fabricate percentages when only a few stores exist.
+These are deployment expansion controls after the integrated candidate is built and qualified, not additional development phases. Use the smallest meaningful population; never fabricate percentages when only a few stores exist.
 
 | Cohort | Membership | Minimum observation |
 | --- | --- | --- |
-| 0 — Test | isolated Shopify test store + disposable Odoo database | complete automated/UAT matrix |
-| 1 — Internal pilot | 1 internal/noncritical real store | domain-specific soak gate |
-| 2 — Controlled | next 1–3 stores, deliberately varied volume/workflow | 72 hours after last added store plus domain soak cumulative |
-| 3 — Broad | 25% of eligible stores or next 5 stores, whichever is smaller | 7 days |
-| 4 — Majority | 50% of eligible stores | 7 days |
-| 5 — All | all eligible stores | 14 days before contraction clock starts |
+| 0 — Exact-candidate test | isolated Shopify test store + disposable Odoo database | complete automated, fault, performance and UAT matrix |
+| 1 — Canary | one internal/noncritical real store | 72 hours plus the stricter domain-specific gate above |
+| 2 — Controlled | next 1–3 deliberately varied stores, or every remaining store when the population is smaller | 72 hours after the last addition with all SLOs green |
+| 3 — All eligible/default | all remaining eligible stores | seven days stable before declaring default rollout complete; 14 days before contraction clock starts |
 
-A cohort does not advance on calendar alone; all gates and alert thresholds must stay green.
+An automated cohort controller/report may recommend advancement when every gate is green; an owner records the change. Safety failure halts automatically. Insufficient real transaction volume is supplemented by exact-candidate deterministic stress/fault evidence and never silently waived.
 
 ## 7. Automatic halt conditions
 
@@ -400,7 +406,7 @@ The core addon is not casually uninstalled in a migration test containing mercha
 
 ## 11. Migration acceptance record
 
-Every cutover PR includes:
+Every cutover checkpoint/evidence bundle includes:
 
 - exact source/target commit and database fixture hash;
 - schema/row-count/constraint diff;

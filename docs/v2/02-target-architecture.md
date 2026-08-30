@@ -19,6 +19,23 @@ flowchart TB
 
 Dependency direction is enforced: presentation → application → domain/runtime ports → adapters. Domain code never imports controllers, UI components or raw HTTP transport.
 
+### 1.1 Foundation-first construction gate
+
+V2 production frontend wiring begins only after the foundation proves all of the following
+on the accepted exact base:
+
+1. V1 compatibility/data/behavior inventory and restore fixture;
+2. enforced package dependency direction and stable command/query/error contracts;
+3. typed Shopify transport/executor/gateway with bounded pagination and cost evidence;
+4. authorization, company/store/generation and secret/PII boundaries;
+5. run/job/execution-attempt/mutation-intent semantics, concurrency and failure recovery;
+6. fresh install, warm upgrade, interruption/resume and rollback against additive schema;
+7. real read DTOs and allowed-action contracts with query/performance budgets.
+
+UI component experiments may consume fixed DTO fixtures, but cannot define backend truth,
+security, authority or state transitions. This prevents repeating V1's pattern of strong
+backend pieces that were not assembled and proven as complete user journeys.
+
 ## 2. Bounded contexts and addon posture
 
 Preserve the accepted domain-aligned addon family and stable technical names during migration:
@@ -33,6 +50,29 @@ Preserve the accepted domain-aligned addon family and stable technical names dur
 | Fulfillment | picking-triggered FulfillmentOrder orchestration, tracking updates, verification | inventory mapping ownership |
 
 The four domain-specific webhook addons in the current implementation are candidates to fold into their owning domain addons **only after** install/upgrade/uninstall and XML-ID migration proof. The generic receiver and inbox remain core. This is packaging cleanup, not a new webhook architecture.
+
+### 2.1 Future-domain extension contract
+
+Refunds/returns, payouts, metafields, Markets/Catalogs and other later capabilities are
+not implemented speculatively in this release. The foundation nevertheless provides small,
+typed extension seams so they do not require a core rewrite:
+
+| Extension seam | Later domain contribution |
+| --- | --- |
+| operation registry | named command/query, role, readiness and side-effect summary |
+| handler registry | explicit job handler and mutation readback strategy |
+| Shopify gateway port | checked-in GraphQL operations and normalized DTOs |
+| readiness registry | scopes, mappings, accounting/default prerequisites |
+| attention provider | domain-owned review/recovery projection |
+| evidence provider | contextual record panel and run-timeline events |
+| webhook topic registry | validated topic → domain observation handler |
+| settings provider | typed per-store fields and validation, not a generic JSON bag |
+
+A future `shopify_connector_refund` may depend on core/sale/stock/accounting contracts and
+a future `shopify_connector_payout` on core/accounting contracts. Core must not import
+either optional domain. Each owns its bindings, policies, gateways, tests and migrations.
+Do not create their models/addons now; prove the extension seam with one minimal fake
+registration contract test rather than speculative production abstractions.
 
 ## 3. Internal layering
 
@@ -95,6 +135,24 @@ Keep request/run, job, execution attempt and remote mutation intent distinct. A 
 
 Priority lanes are explicit: interactive recovery and webhook admission outrank scheduled reconciliation; bounded aging prevents starvation. Per-store operation-scope keys serialize conflicting writes. Workers claim with database-safe locking and short transactions; network calls are never made while holding broad business-record locks.
 
+### 4.1 Near-real-time without fragile infrastructure
+
+The responsive path remains inside Odoo:
+
+1. Shopify webhook or sanctioned Odoo event durably admits a minimal envelope/job;
+2. enqueue triggers the existing drain seam immediately after the local transaction is safe;
+3. priority lanes claim webhook/interactive work ahead of scheduled backlogs;
+4. domain processing reads current Shopify state, commits bounded Odoo work and exposes the
+   run result;
+5. the active UI follows that run at a bounded cadence, while idle dashboards poll quietly;
+6. one-minute scheduled drain and domain reconciliation recover lost wake-ups, restarts,
+   missed webhooks and drift.
+
+This is measured **near-real-time**, not an exactly-once or zero-latency promise. The HTTP
+webhook never waits for business work; no separate broker/worker is introduced. If exact
+Odoo.sh measurements cannot meet the targets below, profile queue/worker/query/API cost
+first and change concurrency/batches/indexes before considering new infrastructure.
+
 ## 5. Data and compatibility contracts
 
 - Existing binding identity and uniqueness remain the idempotency anchor for entities.
@@ -138,7 +196,7 @@ Metrics must drive operations rather than vanity:
 - uncertain-mutation count and verification resolution time;
 - freshness per store/workflow.
 
-Proposed initial SLOs for pilot validation, not promises: webhook acknowledgement p95 < 2 s; interactive command admission p95 < 3 s; no silent ambiguous mutation; zero cross-company processing; 100% of terminal/manual-review outcomes have an operator-facing action or explicit “no safe action”. Tune volume-based SLOs after production baselining.
+Initial qualification objectives, preserving the stronger V1 closure contract: webhook acknowledgement p95 ≤1 s and maximum <5 s; durable delivery/job creation p95 ≤2 s; admitted webhook/interactive work starts p95 ≤5 s; Shopify event to final visible Odoo state p95 ≤15 s and p99 ≤60 s for supported non-bulk workflows; manual action visible feedback ≤1 s; active-run terminal refresh ≤5 s. No silent ambiguous mutation, cross-company processing or unexplained pending job is accepted. These are qualification targets until production evidence supports a merchant commitment.
 
 ## 9. Testing architecture
 
@@ -164,3 +222,6 @@ Every architecture seam needs a characterization test before extraction. New and
 - No unbounded ORM scans, N+1 screen aggregations or unbounded payload/log retention.
 - Feature flags are store-scoped, auditable and fail-safe; they are migration controls, not permanent architecture.
 - The backend contract precedes visual implementation. Mocked UI prototypes use the same DTO/state vocabulary that production services will expose.
+- Add an abstraction only to isolate a side effect/boundary or serve at least two concrete consumers; no speculative generic framework for future features.
+- Use Odoo ORM/framework batching, prefetch and indexes first; SQL or new infrastructure requires measured evidence.
+- Extend later domains through typed registrations and optional addons; core never grows a conditional ladder for refunds, payouts or other future capabilities.

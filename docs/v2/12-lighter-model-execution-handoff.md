@@ -1,6 +1,6 @@
 # V2 Lighter-Model Execution Handoff
 
-> **Purpose:** let a lower-cost implementation model execute one bounded packet without reconstructing product or architecture decisions.  
+> **Purpose:** let a lower-cost implementation model execute the authorized five-wave program continuously without reconstructing product or architecture decisions or pausing after every internal work item.  
 > **Authority:** this file routes work; the referenced contracts remain authoritative.
 
 ## 1. Before touching code
@@ -10,12 +10,13 @@ Read completely, in this order:
 1. repository-root `AGENTS.md` and `CLAUDE.md`;
 2. `docs/v2/README.md`;
 3. `docs/v2/11-decision-and-traceability-register.md`;
-4. the selected packet in `docs/v2/10-implementation-roadmap.md`;
-5. the packet’s primary blueprint documents from the map below;
-6. current rolling `docs/01-research/research-handoff.md` entries relevant to the touched subsystem;
-7. current source/tests at the exact implementation base.
+4. `docs/v2/13-continuous-execution-handoff.md` and its current checkpoint;
+5. the active wave and work-item IDs in `docs/v2/10-implementation-roadmap.md`;
+6. the active work’s primary blueprint documents from the map below;
+7. relevant current `docs/01-research/research-handoff.md` entries only when platform/research facts are implicated;
+8. current source/tests at the exact implementation base.
 
-Do not implement directly on the docs branch. Create the packet branch from the accepted `Shopify-connector` implementation head recorded at the gate. Verify the exact SHA and clean scope before editing.
+Do not implement directly on the docs branch. Create the single V2 integration branch from the accepted `Shopify-connector` implementation head recorded at the gate. Verify the exact SHA and clean scope before editing; all later chats continue from the recorded exact head.
 
 ## 2. Document routing map
 
@@ -26,20 +27,21 @@ Do not implement directly on the docs branch. Create the packet branch from the 
 | Model fields/DTOs/commands/errors/authority | `07-data-and-api-contracts.md` |
 | Migration/flags/canary/rollback | `08-migration-and-cutover-blueprint.md` |
 | Tests/performance/SLO/release | `09-test-observability-release-blueprint.md` |
-| Exact PR scope/order | `10-implementation-roadmap.md` |
+| Exact wave/work-item scope/order | `10-implementation-roadmap.md` |
 | Locked/rejected choices and traceability | `11-decision-and-traceability-register.md` |
 | Platform/competitor evidence | `04-evidence-and-competitor-decisions.md` |
 | Refactor-vs-replace escalation | `03-refactor-vs-replacement.md` |
+| Cross-chat checkpoint and resume | `13-continuous-execution-handoff.md` |
 
-## 3. One-packet operating procedure
+## 3. Continuous work-item operating procedure
 
 ### Step 1 — Establish facts
 
 Record:
 
-- selected packet ID/title;
+- active wave plus selected work-item ID(s)/title;
 - exact base branch and SHA;
-- current PR/issue if any;
+- current integration branch/candidate PR/issue if any;
 - changed/dirty files before work;
 - relevant current model/method/XML IDs and tests;
 - accepted decisions/rejected approaches implicated;
@@ -47,15 +49,15 @@ Record:
 
 Never assume the old snapshot in these docs is the current implementation head. Use it as migration evidence, then inspect the actual base.
 
-### Step 2 — Write the packet contract in the PR/plan
+### Step 2 — Write the work contract in the plan/handoff
 
 Copy and fill:
 
 ```markdown
-Packet: Pxx — <title>
+Wave/work: Wn / Pxx[, Pyy] — <title>
 Outcome: <one sentence>
 Base SHA: <exact>
-Depends on: <merged packet/SHA>
+Depends on: <green checkpoint/SHA>
 Allowed files: <exact paths/globs>
 Forbidden files: <exact paths/globs>
 Preserved invariants: <decision IDs>
@@ -66,7 +68,7 @@ Rollback: <exact mode/code path>
 Evidence files updated: <paths>
 ```
 
-If the task cannot be expressed inside one roadmap packet, stop and ask the orchestrator to split or revise the roadmap. Do not improvise a broader packet.
+P IDs may be combined only under the roadmap’s same-boundary rule. If the requested outcome materially exceeds the authorized wave, changes locked architecture or requires new external authority, stop with evidence. Otherwise refine it into smaller coherent commits and continue without seeking permission for each commit.
 
 ### Step 3 — Inspect before modifying
 
@@ -78,7 +80,7 @@ If the task cannot be expressed inside one roadmap packet, stop and ask the orch
 
 ### Step 4 — Implement smallest vertical change
 
-- Use existing compatibility seam or create the packet-specified seam first.
+- Use the existing compatibility seam or create the active-work-specified seam first.
 - Keep old/new local paths switchable where migration requires it.
 - Do not perform drive-by formatting, renaming or abstraction.
 - Do not change tests solely to accept a different result unless the blueprint explicitly changes that result.
@@ -90,12 +92,12 @@ If the task cannot be expressed inside one roadmap packet, stop and ask the orch
 1. syntax/import/lint for touched files;
 2. focused unit/contract/ORM tests;
 3. relevant addon/module suite;
-4. dependency/security/concurrency/fault tests required by packet;
+4. dependency/security/concurrency/fault tests required by the active work;
 5. fresh/warm/lifecycle tests when triggered;
 6. browser/visual/a11y tests when triggered;
 7. full connector suite;
 8. performance/evidence comparison;
-9. exact-SHA environment/UAT only where the packet authorizes it.
+9. exact-SHA environment/UAT only where the authorized wave requires it.
 
 Do not skip a cheaper failure and continue to expensive qualification.
 
@@ -113,15 +115,19 @@ Answer every RA-V2 check in `11`. Also confirm:
 - no N+1/unbounded scan;
 - no permanent flag/facade without removal issue.
 
-### Step 7 — Publish only complete evidence
+### Step 7 — Checkpoint and continue
 
-Commit a coherent packet on its branch. Update the rolling research handoff without deleting history. Open/update a draft PR with exact evidence, risks, rollback and remaining blockers. Do not mark ready, merge, deploy broadly or advance a canary unless the user explicitly authorizes that stage and its gate passes.
+Commit each coherent work item on the integration branch, update traceability/evidence and refresh `13-continuous-execution-handoff.md`. Update the single candidate PR with exact evidence, risks, rollback and remaining blockers. When the current gate is green, advance to the next work item/wave automatically.
+
+Before the current chat approaches its context limit—or whenever tool output starts truncating, the active state becomes hard to restate exactly, or a long gate will outlive the chat—create and verify a safe checkpoint, then hand off according to document `13`. The next chat verifies branch/SHA/dirty state and resumes the first named action; it does not restart research or repeat completed work.
+
+Do not merge or deploy outside the authorization already granted. Final ready-for-review status follows the exact-candidate gate; broad production rollout still follows the bounded cohort authority and safety controls.
 
 ## 4. Stop conditions
 
 Stop implementation and report evidence if any of these occur:
 
-- actual base/governance conflicts with the packet;
+- actual base/governance conflicts with the active work contract;
 - required predecessor is not merged/accepted;
 - a stable model/XML ID/constraint must change to proceed;
 - current behavior cannot be characterized;
@@ -142,26 +148,26 @@ The correct output is a bounded blocker report and a proposed decision update—
 
 If evidence shows a blueprint decision must change:
 
-1. stop the packet before dependent implementation;
+1. stop the affected work before dependent implementation;
 2. state the conflicting fact with file/test/official-source evidence;
 3. identify affected V2 decision IDs, requirements, DTOs, tests, packets and migration path;
 4. propose the smallest alternatives with tradeoffs;
 5. update architecture docs only after review acceptance;
-6. resume from a revised packet.
+6. resume from the revised work contract.
 
 Never reinterpret “implementation-ready” as permission to ignore new facts.
 
-## 6. Packet completion report template
+## 6. Work checkpoint/completion report template
 
 ```markdown
 ## Outcome
 <what now works>
 
 ## Identity
-- Packet: Pxx
+- Wave/work: Wn / Pxx[, Pyy]
 - Base: <sha>
 - Head: <sha>
-- PR: <url>
+- Integration branch/candidate PR: <name/url>
 
 ## Changed
 - <bounded changes>
@@ -183,23 +189,27 @@ Never reinterpret “implementation-ready” as permission to ignore new facts.
 <mode/code path and in-flight handling>
 
 ## Remaining
-<none, or exact blocker; do not hide deferred work>
+<next exact work item, none, or exact blocker; do not hide deferred work>
+
+## Continuity
+- Handoff updated: <path/commit>
+- Receiving action: <one exact first action>
 ```
 
 ## 7. Suggested implementation prompt
 
-Use this with the implementation model, filling only bracketed values:
+Use this once to start or resume the implementation model, filling only bracketed values:
 
 ```text
-Implement exactly packet [Pxx — title] from docs/v2/10-implementation-roadmap.md in AdamsOdoo/Adams.
+Execute the authorized V2 implementation program from active Wave [Wn], beginning with [Pxx — title], in AdamsOdoo/Adams. Continue automatically through the remaining work items and waves while their evidence gates pass; P IDs are traceability units, not approval stops.
 
-Before acting, read AGENTS.md, CLAUDE.md, docs/v2/README.md, docs/v2/11-decision-and-traceability-register.md, this handoff, the complete selected packet, and every blueprint document routed to that packet. Inspect the actual current base [branch] at exact SHA [sha]; preserve user changes.
+Before acting, read AGENTS.md, CLAUDE.md, docs/v2/README.md, docs/v2/11-decision-and-traceability-register.md, this handoff, docs/v2/13-continuous-execution-handoff.md, the complete active wave/work items, and every blueprint document routed to them. Inspect the actual integration branch [branch] at exact SHA [sha]; preserve user changes and verify the current checkpoint instead of repeating finished work.
 
-Scope is only the packet's allowed files and outcome. Treat its forbidden files, V2 decisions, accepted repository ADRs and rejected approaches as hard constraints. Add characterization tests before extracting behavior. Use the specified compatibility seam, DTO/state vocabulary, security checks, migration modes, performance budgets and rollback. Do not add external services, change stable model/XML/binding identity, perform blind mutation retries, persist raw payloads, expose secrets/PII, broaden permissions, or weaken tests.
+Scope is the active wave and bounded work-item contracts. Treat forbidden files, V2 decisions, accepted repository ADRs and rejected approaches as hard constraints. Build and qualify the shared backend foundation before production UI wiring. Add characterization tests before extracting behavior. Use the specified compatibility seam, DTO/state vocabulary, security checks, migration modes, performance budgets and rollback. Do not add external services, change stable model/XML/binding identity, perform blind mutation retries, persist raw payloads, expose secrets/PII, broaden permissions, or weaken tests.
 
-Verify in the order defined in docs/v2/12-lighter-model-execution-handoff.md and run every packet-specific gate. Update evidence, traceability and the rolling research handoff. If facts conflict with the packet or a stop condition occurs, stop and return an evidence-backed blocker instead of improvising.
+Verify in the order defined in this handoff and run every active-work/wave gate. Update evidence, traceability and the continuous handoff. Fix and retest ordinary failures without asking for renewed permission. If facts conflict with locked architecture, authority or a stop condition occurs, stop and return an evidence-backed blocker instead of improvising.
 
-Do not merge, mark ready, deploy broadly or advance rollout without explicit authorization. End with the packet completion report including exact base/head SHA, tests/evidence and rollback.
+Commit coherent checkpoints to the single integration branch and keep one candidate PR current. When context approaches its limit, checkpoint and hand over before losing state; the receiving chat verifies exact SHA and continues the first named action. Do not merge or deploy outside granted authority. End only at a blocker or completed exact-candidate/rollout gate, using the checkpoint report with exact base/head SHA, tests/evidence, rollback and next action.
 ```
 
 ## 8. Review prompts by specialty
@@ -209,53 +219,54 @@ Use after implementation; these are reviews, not permission to mutate unrelated 
 ### Backend/runtime reviewer
 
 ```text
-Review packet Pxx for transaction boundaries, claims/locks, idempotency, generation/store fences, state transitions, retry/readback certainty, evidence durability and rollback. Trace every remote call and possible failure point. Report findings by severity with exact file/behavior evidence; do not implement fixes unless asked.
+Review work item(s) Pxx for transaction boundaries, claims/locks, idempotency, generation/store fences, state transitions, retry/readback certainty, evidence durability and rollback. Trace every remote call and possible failure point. Report findings by severity with exact file/behavior evidence; do not implement fixes unless asked.
 ```
 
 ### Security reviewer
 
 ```text
-Review packet Pxx for ACL/record-rule plus service authorization, active-company/same-store isolation, direct-RPC bypass, secret/PII/redaction, webhook/GraphQL input handling and count/aggregate leakage. Test every role and forged identifier. Report findings and required gates; do not broaden access.
+Review work item(s) Pxx for ACL/record-rule plus service authorization, active-company/same-store isolation, direct-RPC bypass, secret/PII/redaction, webhook/GraphQL input handling and count/aggregate leakage. Test every role and forged identifier. Report findings and required gates; do not broaden access.
 ```
 
 ### Frontend/UX reviewer
 
 ```text
-Review packet Pxx against docs/v2/05-ux-design-blueprint.md and the live reference. Verify hierarchy, copy, every response state, keyboard/focus/screen-reader behavior, 375/768/1366/1440, RTL, permissions, RPC/query count and no console/overflow. Do not trade required evidence or Odoo-native behavior for visual similarity.
+Review work item(s) Pxx against docs/v2/05-ux-design-blueprint.md and the live reference. Verify hierarchy, copy, every response state, keyboard/focus/screen-reader behavior, 375/768/1366/1440, RTL, permissions, RPC/query count and no console/overflow. Do not trade required evidence or Odoo-native behavior for visual similarity.
 ```
 
 ### Migration/release reviewer
 
 ```text
-Review packet Pxx on a production-shaped copy for expand/backfill/dual-read/switch/rollback, fresh/warm/uninstall lifecycle, row/constraint/XML identity, interruption/resume, locks, exact-SHA evidence and canary halt conditions. No remote mutation during migration.
+Review work item(s) Pxx on a production-shaped copy for expand/backfill/dual-read/switch/rollback, fresh/warm/uninstall lifecycle, row/constraint/XML identity, interruption/resume, locks, exact-SHA evidence and canary halt conditions. No remote mutation during migration.
 ```
 
 ## 9. Orchestrator checklist
 
-Before assigning a packet:
+Before starting/resuming a wave:
 
-- predecessor gate accepted;
+- predecessor evidence gate green;
 - exact base SHA supplied;
-- issue/PR and single owner assigned;
+- integration branch/candidate PR and single integration owner identified;
 - required official platform fact refreshed;
 - test environment/data profile available;
 - mutation test store/authority explicitly bounded if applicable;
-- independent reviewer named for security/mutation/release packet;
-- no parallel packet conflicts on the same models/contracts/store;
+- independent review lens available for security/mutation/release work;
+- no overlapping work-item conflicts on the same models/contracts/store;
 - expected evidence and decision deadline stated.
 
-After a packet:
+After each coherent checkpoint:
 
 - changed files match allowlist;
-- tests/evidence match packet, not only author summary;
-- decisions/traceability/handoff updated;
+- tests/evidence match the work contract, not only author summary;
+- decisions/traceability/continuous handoff updated;
 - flags/facades have owner/removal issue;
-- PR remains draft until gate review;
-- next packet receives the accepted exact head, never an assumed branch tip.
+- candidate PR remains draft until exact-candidate qualification;
+- next work item/chat receives the verified exact head, never an assumed branch tip;
+- green gate advances automatically; blocker gate records the stop condition and affected downstream work.
 
 ## 10. What the implementation model must not decide
 
-The following are already decided and must not be relitigated inside a packet:
+The following are already decided and must not be relitigated inside an implementation work item:
 
 - refactor versus blank rewrite;
 - modular monolith versus microservices/external queue;
@@ -269,6 +280,7 @@ The following are already decided and must not be relitigated inside a packet:
 - uncertain mutation readback;
 - migration modes/order/soak and automatic halt conditions;
 - accessibility/performance/security/release gates.
+- foundation-first production UI order;
+- the one-program/five-wave execution and proactive handoff protocol;
 
 Only new repository or official-platform evidence can reopen one through the deviation procedure.
-

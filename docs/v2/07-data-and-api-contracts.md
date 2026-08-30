@@ -34,6 +34,31 @@ The following current models remain compatibility APIs:
 
 No migration changes their `_name`, `_table` or existing XML IDs. Existing record IDs remain stable.
 
+#### Store cardinality, isolation and settings ownership
+
+- One canonical Shopify shop domain maps to one connector store identity; reconnecting never creates a second identity for the same shop.
+- One Odoo company may own multiple Shopify stores. A database may contain stores for multiple permitted companies. There is no application-level store-count cap.
+- Every credential, settings row, mapping, binding, checkpoint, run, job and rollout flag is store-scoped even when two stores share a company.
+- Store children must match both `store_id` and the store-derived `company_id`; same company is not permission to cross store boundaries.
+- A store has one effective `shopify.connector.store.settings` record. Historic configuration is represented by the connection/configuration generation and audit evidence, not competing active settings rows.
+- Canonical domain and company are editable only while the store is an evidence-free draft. Once bindings/jobs/business evidence exist, changes require the explicit migration path; ordinary Settings cannot retarget the identity.
+
+The logical Administrator settings contract is locked below. Existing physical V1 fields are adapted rather than duplicated; any missing physical field is added only in its owning domain addon.
+
+| Group | Locked logical keys | New-draft default |
+| --- | --- | --- |
+| Workflows | `product_import`, `product_export`, `order_import`, `inventory_push`, `fulfillment_export` | all disabled until explicitly selected in setup |
+| Trigger posture | per-workflow `manual`, `scheduled`, `webhook`, `odoo_event`, `reconciliation`; supported cadence | manual available only for enabled/ready operations; every automatic trigger disabled until its readiness/subscription check passes; reconciliation enabled on activation for every enabled sync domain |
+| Product/price authority | first-sync direction, imported field allowlist, media refresh, price/pricelist authority, export field allowlist, attribute-conflict policy | no export authority; no fuzzy/name auto-binding; import preserves protected local fields |
+| Orders/customers | financial-status/confirmation policy, manual gateway allowlist, import window, pending-payment handling, test-order inclusion, fallback partner | import creates no unsupported automatic confirmation; ambiguous customer/gateway state goes to review |
+| Odoo defaults | company, warehouse, sales team, currency-compatible pricelist, payment term, fiscal position, tax/payment/shipping mappings | unset and readiness-blocking where required |
+| Inventory | exact Shopify↔Odoo location mappings, authority, scheduled posture, first-push state | remote mutation disabled; first push unconfirmed |
+| Fulfillment | direction, tracking posture and effective customer-notification policy | remote mutation disabled until selected and ready; notification must be explicit in every mutation command/evidence |
+| Lifecycle | activation/pause/disconnect/retire plus per-workflow pause | draft; connection test is the only remote operation allowed before readiness |
+| Advanced migration | `v2_ui_mode`, `v2_gateway_mode`, `v2_runtime_mode` | `legacy`; Administrator-only and removed after contraction |
+
+The following are constants, not settings: Shopify API version/documents, retry and pagination hard ceilings, binding/idempotency/operation-scope algorithms, generation/tenant fences, mutation verification, raw credential visibility and security retention floors.
+
 ### 2.2 New `shopify.connector.run`
 
 One record represents one user or system request that may create multiple jobs.
@@ -333,6 +358,14 @@ The launcher first calls `get_operation_options_v1(store_id)` and receives regis
 
 The browser does not invent operation names or free-form domains.
 
+### 5.7 Store administration DTOs
+
+`get_store_list_v1(company_ids, state_filter, search, limit, cursor)` returns a bounded page of permitted stores with safe identity, company, connection/activation/runtime health, enabled workflows, freshness, attention count, setup continuation and `allowed_actions`. `All stores` is a read-only aggregate; every write still names exactly one store and company.
+
+`get_store_settings_v1(store_id)` returns the grouped logical settings above, effective values, inherited/default source, field schema, readiness impact, last-change evidence and per-field/group `allowed_actions`. It returns credential presence/verification metadata only. Domain addons register their own typed settings fragments; unknown free-form keys are rejected.
+
+`get_store_admin_summary_v1(store_id)` returns identity immutability reasons, connection generation, lifecycle state, installed capability posture, desired/actual webhook subscriptions, latest readiness result and the permitted pause/disconnect/retire actions. Counts are scoped through the same company/store rules as record lists.
+
 ## 6. Write commands
 
 ### 6.1 Common write shape
@@ -398,6 +431,17 @@ The handler reloads the source, recomputes allowed transitions and rejects stale
 - `retry_job_v1(job_id, reason)`: only legal for returned retry action; re-admission occurs; uncertain mutation blocks and routes to verification.
 - `cancel_job_v1(job_id, reason)`: cancellation request, not a claim that in-flight remote work was undone.
 - manual mutation resolution remains Administrator-only and requires disposition, evidence/reason and acknowledged consequence.
+
+### 6.6 Store administration and settings writes
+
+- `create_store_v1`: Administrator-only; accepts name, canonical `.myshopify.com` domain and permitted company; rejects duplicate identity and returns a draft store plus setup route.
+- `save_store_settings_group_v1`: accepts one registered group, its current revision/fingerprint and typed values; validates cross-field/domain readiness, increments the relevant configuration generation and returns refreshed settings/readiness.
+- `set_workflow_state_v1`: enable, pause, resume or disable one registered workflow; enabling requires installed producer and readiness, while disabling blocks new admission without deleting history.
+- `pause_store_v1` / `resume_store_v1`: audited admission controls; resume reruns mandatory readiness.
+- `disconnect_store_v1`: revokes local credential/subscription posture according to the accepted lifecycle contract, increments generation and preserves business/evidence records.
+- `retire_store_v1`: prevents new work and hides the store from default daily views; it never hard-deletes bindings, runs or audit history.
+
+No initial V2 command clones settings between stores. A future copy operation must have an explicit allowlist of non-secret defaults, name both source and destination, never copy mappings/bindings/checkpoints/credentials, and rerun destination readiness.
 
 ## 7. Problem/error DTO
 
@@ -470,7 +514,18 @@ Each registered operation has a checked-in GraphQL document, variable schema, no
 | Fulfillment | read fulfillment orders/fulfillments, create/update tracking, reread fulfillment result |
 | Webhook subscriptions | list desired/current subscriptions, create/delete through reconciliation plan |
 
-Exact GraphQL fields remain governed by the pinned operation documents and contract fixtures. A schema/version bump is a dedicated PR that revalidates every operation and served-version header behavior.
+### 10.1 Future domain registration contract
+
+Refunds and payouts are planned additive addons, not dormant V2 behavior:
+
+| Future addon | Depends on | Must own before activation |
+| --- | --- | --- |
+| `shopify_connector_refund` | core, sale and the relevant stock/accounting integration | refund/return observations, authority and eligibility policy, financial/stock mutations, idempotency/readback, settings/readiness, attention/evidence, ACLs and end-to-end journeys |
+| `shopify_connector_payout` | core, sale and Odoo accounting | payout/balance-transaction gateway, accounting mapping/reconciliation policy, immutable financial evidence, settings/readiness, attention/evidence, ACLs and end-to-end journeys |
+
+Both register through the existing typed operation, handler, readiness, settings, attention and record-evidence interfaces. They may extend workflow selections through an additive migration. Neither may put arbitrary JSON business logic in core, reuse an unrelated job type, bypass accounting/stock controls or assume that Shopify delivery equals accounting finality.
+
+Exact GraphQL fields remain governed by the pinned operation documents and contract fixtures. A schema/version bump is a dedicated checkpoint that revalidates every operation and served-version header behavior.
 
 ## 11. Retention and privacy contract
 
@@ -482,7 +537,7 @@ Exact GraphQL fields remain governed by the pinned operation documents and contr
 - Request/response payloads: store digests and bounded allowlisted observations, not raw bodies by default.
 - Manual reasons: redact email/phone/secret patterns and cap length before persistence.
 
-A change to retention is a separate privacy/lifecycle decision with upgrade and audit consequences; implementation PRs may not invent a new default.
+A change to retention is a separate privacy/lifecycle decision with upgrade and audit consequences; implementation work may not invent a new default.
 
 ## 12. Contract test fixtures
 

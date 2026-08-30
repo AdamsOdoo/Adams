@@ -14,6 +14,10 @@ The V2 test pyramid has five mandatory proof classes:
 
 A green unit suite cannot compensate for a missing mutation, migration or permission proof.
 
+The backend foundation has its own release-blocking certificate before production UI wiring: contract/authorization, Shopify gateway, durable runtime, concurrency/restart, security/isolation, migration/rollback and performance/backlog lanes must all be green on the same candidate. Frontend prototypes and contract mocks may run earlier; a production screen cannot conceal an unqualified backend path.
+
+Testing is economical: changed-scope static/unit/contract tests run on every coherent checkpoint, domain integration and browser journeys run when their slice closes, and the full lifecycle/concurrency/performance/exact-SHA matrix runs at wave gates and candidate freeze. A failed gate reruns its affected lane and downstream dependencies, not every unrelated test after every edit.
+
 ## 2. Test data profiles
 
 All data is synthetic or anonymized through an approved process. No merchant credential or copied customer PII enters fixtures.
@@ -39,7 +43,7 @@ Stage 0 records environment CPU/RAM/PostgreSQL/Odoo worker configuration with ev
 - pure policy, state-transition, fingerprint and retry tests;
 - secret/PII pattern scan on changed files and test output.
 
-Target: under 10 minutes; required on every PR.
+Target: under 10 minutes; required on every coherent implementation checkpoint.
 
 ### Lane B — Odoo unit/integration
 
@@ -51,7 +55,7 @@ Target: under 10 minutes; required on every PR.
 - webhook ingestion/dispatch and readiness;
 - cron/drain/stale-owner behavior.
 
-Required on every implementation PR touching backend behavior.
+Required on every checkpoint touching backend behavior.
 
 ### Lane C — Lifecycle
 
@@ -85,7 +89,7 @@ Required for JS/XML/SCSS/view changes; full role matrix before release.
 - idempotency validity-window and operation-scope contention;
 - no remote duplicate assertions in the fake Shopify ledger.
 
-Required for runtime, gateway, webhook and mutation-domain PRs.
+Required for runtime, gateway, webhook and mutation-domain checkpoints.
 
 ### Lane F — Performance and soak
 
@@ -97,7 +101,7 @@ Required for runtime, gateway, webhook and mutation-domain PRs.
 - 30–60 minute steady-state synthetic soak;
 - canary telemetry from the staged release.
 
-Nightly and release-gate; a bounded microbenchmark accompanies relevant PRs.
+Nightly and release-gate; a bounded microbenchmark accompanies every relevant implementation checkpoint.
 
 ## 4. Behavior test matrix
 
@@ -190,6 +194,25 @@ Every state transition table is parameterized from the production vocabulary so 
 - unrecognized/external subscriptions are never deleted by name or callback guess;
 - missing scope/callback drift readiness and failback with current subscriptions intact.
 
+### 4.8 Store administration and settings
+
+- create first and additional stores, duplicate-domain rejection and evidence-free draft edits;
+- multiple stores in one company and stores across active/permitted companies;
+- no cross-store settings, mapping, binding, count, run or command leakage;
+- each grouped setting default, allowed value, installed-producer visibility and readiness impact;
+- workflow enable/pause/resume/disable with active and queued work;
+- credential replace, scope loss/repair, pause, disconnect, reconnect and retire;
+- no ordinary deletion/retargeting after bindings or audit evidence exist;
+- no API-version, retry, identity, safety-fence or credential-read bypass exposed as a setting.
+
+### 4.9 Extension contracts
+
+- registries reject duplicate/unknown operation, handler, readiness, settings, attention and evidence keys;
+- mutation handlers cannot register without typed payload, authorization, idempotency and verification plan;
+- an installed synthetic domain can add a workflow/settings/readiness/attention/evidence slice without changing core control flow;
+- an uninstalled domain leaves no callable operation or dangling menu while historic evidence remains safe;
+- future refund and payout addons must add domain, accounting/stock, migration, privacy and complete journey suites before their workflow can be enabled.
+
 ## 5. Security verification
 
 ### 5.1 Automated authorization matrix
@@ -218,31 +241,67 @@ For Auditor, User/Operator, Reviewer, Administrator and no-access, verify model 
 
 Release output must contain zero high/critical findings and zero known secret/tenant leaks.
 
-## 6. Frontend journey tests
+## 6. Complete end-to-end journey tests
 
-### Journey U1 — First setup
+These journeys are business contracts, not screenshot tours. Each asserts Odoo records, Shopify/fake-ledger effects, bindings, jobs/attempts, attention, audit, freshness and the browser-visible result. Every journey covers success plus its named blocking/failure/recovery branches.
 
-Create draft store → save credential → test connection/scopes → configure workflows/authority/defaults → map locations → see grouped readiness → activate. Cover invalid token, missing scope, save/resume, stale generation and keyboard-only completion.
+### Journey U1 — First store onboarding
 
-### Journey U2 — Daily operation
+Create draft store → save credential → test identity/version/scopes → select workflows/authority/triggers → configure Odoo defaults → map locations → review grouped readiness → activate → land on a truthful Overview. Cover invalid token, wrong shop, missing scope, save/resume, stale generation, no-side-effect draft and keyboard/mobile completion.
 
-Open Overview → identify highest-impact issue within 10 seconds → open filtered attention item → inspect evidence/impact/consequence → resolve → follow resulting run → return to affected record.
+### Journey U2 — Additional stores and companies
 
-### Journey U3 — Safe inventory first push
+Add a second store in the same company and another in a separately permitted company → configure independently → switch stores and `All stores` aggregate → prove distinct credentials, settings, mappings, bindings, checkpoints and runs. Forge cross-store/company URLs/RPC/child IDs and assert fail-closed behavior and zero count leakage.
 
-Map location → preview current/proposed values → verify Odoo authority → confirm as Administrator → observe run/result. Prove Operator cannot bypass confirmation and changed mapping/quantity invalidates preview.
+### Journey U3 — Product import, variant matching and refresh
 
-### Journey U4 — Ambiguous product match
+Launch bounded import manually → paginate and normalize products/variants/images → bind exact identities → route ambiguous SKU/barcode/reference candidates to review → resolve → resume → refresh changed and deleted remote state → reconcile a missed webhook/checkpoint overlap without duplicates or protected-field overwrite.
 
-Open match evidence → compare deterministic candidates → select/bind or leave for review → provide reason when required → resume held job → verify audit.
+### Journey U4 — Product publication and update
 
-### Journey U5 — Uncertain fulfillment
+Select an unlinked Odoo product → show missing prerequisites → distinguish link/first publication/continuous update → preview field authority and diff → reject stale fingerprint → publish/update → read back canonical Shopify GIDs → show partial `userErrors` and uncertainty without duplicate creation.
 
-Validate picking → observe `Verifying Shopify` after interrupted response → confirm resubmit disabled → readback resolves → timeline shows accepted/verified distinction and notification value.
+### Journey U5 — Customer and order intake
 
-### Journey U6 — Permissions
+Receive Shopify order by webhook and scheduled overlap → resolve customer/binding/payment-gateway policy → verify taxes, discounts, shipping, tips, currency, lines and totals → create the intended quotation/order exactly once → handle pending/paid/cancelled/test/manual-gateway variants → surface composition/total ambiguity for review without silently rewriting completed Odoo operations.
 
-Exercise menus, counts, direct URLs/RPC and actions for each role/company. No-access user sees no connector records or counter leakage.
+### Journey U6 — Inventory mapping, first push and continuous sync
+
+Discover locations → map exact Shopify↔Odoo locations → observe both quantities → generate preview/delta/fingerprint → Administrator confirms first authority transfer → push and read back → coalesce rapid Odoo stock events → throttle/batch safely → invalidate stale mapping/quantity previews → reconcile drift. Operator cannot bypass first-push confirmation.
+
+### Journey U7 — Fulfillment and tracking
+
+Validate a full/partial picking → choose eligible Shopify FulfillmentOrder/location/lines → display the effective customer-notification value → create fulfillment/update tracking → read back and bind → process related webhook → show evidence on picking/order/run. Cover ineligible lines, already fulfilled, changed tracking and no-op paths.
+
+### Journey U8 — Trigger and recovery parity
+
+Run the same supported domain intent through manual, scheduled, webhook and Odoo-event admission → verify common command/runtime/evidence semantics and priority → suppress/coalesce duplicates → simulate delayed, duplicate, out-of-order and missed webhooks → let scheduled reconciliation repair freshness without creating a second business effect.
+
+### Journey U9 — Failure, retry and uncertain mutation recovery
+
+Inject throttle, auth/scope loss, validation, pre-send network failure, after-send interruption, worker death and restart → apply bounded retry only where absence is certain → prioritize readback for uncertain mutation → resolve applied/not-applied/inconclusive → require manual evidence at the cap → prove resubmit remains disabled until safe.
+
+### Journey U10 — Daily operations and Needs Attention
+
+Open Overview → identify highest-impact issue within 10 seconds → filter/open one attention item → understand evidence, impact and consequence → perform the exact allowed action → follow live run progress to terminal/attention → return to affected Odoo record → verify health/freshness/counts update within the UI budget.
+
+### Journey U11 — Connection and store lifecycle
+
+Rotate credential → detect scope/version drift → repair → pause/resume one workflow and whole store → disconnect while work is queued/in flight → safely settle/verify → reconnect the same identity/generation lineage → retire without deleting bindings/history → reject unsafe domain/company retargeting.
+
+### Journey U12 — Roles, companies and direct access
+
+Exercise menus, native views, composed screens, counters, direct URLs/RPC and every write action for Auditor, User/Operator, Reviewer, Administrator and no-access across company switches. Assert field-level secret/PII redaction, same-store checks and no information leakage through empty states or suggestions.
+
+### Journey U13 — Install, upgrade, restart and rollback
+
+Fresh-install supported addon combinations → warm-upgrade a V1 production-shaped database → interrupt/resume backfill → restart workers with queued/running/uncertain jobs → uninstall/reinstall domain addons with historic evidence → lower store-scoped modes → reconcile → prove rollback does not lose mutation evidence or recreate remote effects.
+
+### Journey U14 — Complete merchant loops
+
+Prove two exact cross-domain stories on one frozen candidate: (A) Shopify product/order event → Odoo product/customer/order → location-aware inventory state → Odoo picking → Shopify fulfillment/tracking/readback; and (B) Odoo product → approved Shopify publication → Odoo stock change → Shopify inventory update/readback → storefront order returns through path A. Repeat with two stores sharing a company and inject one recoverable failure mid-loop.
+
+Refunds and payouts are not falsely included in V2. Their future addons must append complete merchant/accounting/stock journeys of equivalent depth before release.
 
 Moderated usability acceptance:
 
@@ -254,7 +313,7 @@ Moderated usability acceptance:
 
 ## 7. Performance budgets
 
-Stage 0 records exact baselines; each relevant PR commits before/after evidence. The following are hard initial ceilings unless the baseline is stricter:
+Stage 0 records exact baselines; each relevant checkpoint commits before/after evidence. The following are hard initial ceilings unless the baseline is stricter:
 
 | Operation | Budget |
 | --- | --- |
@@ -263,8 +322,12 @@ Stage 0 records exact baselines; each relevant PR commits before/after evidence.
 | Attention detail | p95 ≤ 500 ms, ≤12 SQL queries |
 | Run detail (200 timeline events) | p95 ≤ 700 ms, ≤18 SQL queries |
 | Setup read/save non-remote step | p95 ≤ 500 ms, ≤15 SQL queries |
-| Interactive command admission | p95 < 3 s excluding asynchronous work |
-| Webhook acknowledgement | p95 < 2 s, p99 < 4 s |
+| Interactive command visible admission feedback | p95 ≤ 1 s excluding asynchronous work |
+| Webhook acknowledgement | p95 ≤ 1 s; no accepted request ≥5 s |
+| Webhook delivery to durable job evidence | p95 ≤ 2 s |
+| Due interactive/webhook job to worker start | p95 ≤ 5 s when local capacity and Shopify budget are available |
+| Single-record event to Odoo terminal/attention state | p95 ≤ 15 s, p99 ≤ 60 s excluding explicit Shopify throttle/outage |
+| Active run terminal state to browser refresh | p95 ≤ 5 s |
 | Drain claim transaction | p95 ≤ 250 ms for configured batch |
 | Browser largest composed view | no page-level overflow; usable interaction ≤2.5 s on test profile |
 
@@ -276,7 +339,7 @@ Additional gates:
 - migration lock that blocks ordinary connector writes >2 seconds requires a maintenance-window plan;
 - memory has no monotonic growth across the steady-state soak beyond runtime warm-up tolerance recorded in Stage 0.
 
-If a hard ceiling is impossible on the measured environment, the PR stops and records evidence; it does not silently relax the value.
+If a hard ceiling is impossible on the measured environment, the affected work stops and records evidence; it does not silently relax the value.
 
 ## 8. Service-level objectives and indicators
 
@@ -284,8 +347,11 @@ If a hard ceiling is impossible on the measured environment, the PR stops and re
 
 | SLI | Pilot objective |
 | --- | --- |
-| Webhook acknowledgement | 99.5% under 2 seconds over 7 days |
-| Interactive admission | 99% under 3 seconds over 7 days |
+| Webhook acknowledgement | 99.5% at or under 1 second and 100% under 5 seconds over 7 days |
+| Delivery-to-job durability | 99% at or under 2 seconds over 7 days |
+| Interactive visible admission | 99% at or under 1 second over 7 days |
+| Single-record event completion | 95% at or under 15 seconds and 99% at or under 60 seconds, excluding evidenced Shopify throttle/outage |
+| Active UI terminal refresh | 99% at or under 5 seconds |
 | Scheduled read jobs | 99% reach terminal/attention within configured schedule + 15 minutes |
 | Actionable outcome quality | 100% terminal/manual-review outcomes expose action or explicit no-safe-action |
 | Mutation certainty | 100% possible-after-send failures enter verification; zero blind replay |
@@ -405,7 +471,7 @@ V2 is release-ready only when:
 - all required CI lanes and complete release matrix pass;
 - no S1/S2 and no unowned S3 defect remains;
 - performance budgets and pilot SLOs are met;
-- exact UAT journeys pass on the supported environment;
+- U1–U14 pass end to end on the exact candidate and supported environment;
 - accessibility/RTL/responsive/role checks pass;
 - every in-flight/uncertain mutation can be explained and resolved;
 - backup, restore, halt and rollback drills are evidenced;

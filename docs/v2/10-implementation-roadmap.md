@@ -1,27 +1,26 @@
 # V2 Implementation Roadmap
 
-> **Status:** ordered PR execution plan.  
-> **Rule:** one packet per PR, based on the accepted predecessor. Do not combine packets to “save time.”  
-> **Starting point:** create the first implementation branch from the current accepted `Shopify-connector` head after the architecture gate is approved—not from this docs branch and not from release PR #210 unless that exact head has become the branch baseline.
+> **Status:** continuous five-wave execution plan.  
+> **Rule:** P00–P20 are bounded traceability/work-item IDs, not 21 phases, approval requests or mandatory PRs. After implementation authorization, execute Waves 1–5 continuously on one integration branch and present one qualified candidate PR with coherent reviewable commits.  
+> **Starting point:** create the implementation branch from the then-current accepted `Shopify-connector` head—not from this docs branch and not from release PR #210 unless that exact head has become the accepted baseline.
 
-## 1. Program gates
+## 1. Continuous five-wave program
 
-| Gate | Required packets | Decision unlocked |
+| Wave | Internal work items | Outcome and automatic gate |
 | --- | --- | --- |
-| G0 Baseline | P00 | architecture extraction may start |
-| G1 Product/read contracts | P01–P04 | V2 pilot UI over legacy execution |
-| G2 Shopify boundary | P05–P08 | normalized gateway available to runtimes |
-| G3 Runtime reads | P09–P10 | V2 runtime canary for read-only work |
-| G4 Mutations | P11–P14 | capability-by-capability remote-write canary |
-| G5 Complete experience | P15–P16 | default V2 UX candidate |
-| G6 Release | P17–P18 | cohort rollout and default mode |
-| G7 Contraction | P19–P20 | one supported path and optional packaging cleanup |
+| W1 — Baseline and contracts | P00–P02 | V1 behavior/recovery evidence, dependency rules and versioned read/command contracts are reproducible; no production behavior changes |
+| W2 — Shared backend foundation | P05–P10 plus the backend portion of P15 | Shopify boundary, durable runtime, security, multistore/settings/readiness, migrations, restart and measured performance are green before production UI wiring |
+| W3 — Domain reliability | P11–P14 | subscriptions, inventory, product export and fulfillment use the proven runtime with domain-specific uncertainty/readback tests |
+| W4 — Complete product experience | P03, P04 and the UI portion of P16 | Odoo-native shell, setup, store administration, Overview, Attention, Runs and all domain/contextual screens implement the locked contracts |
+| W5 — Exact-candidate qualification and rollout | P17–P18 | U1–U14, lifecycle, security, accessibility, performance, live test-store UAT and staged deployment gates pass on one exact SHA |
 
-Approval at one gate does not pre-approve later packets.
+P19 contraction and P20 optional packaging consolidation are post-release maintenance; they are not required to deliver V2. Within W1–W5, a green evidence gate advances automatically. An ordinary failing test is fixed and rerun; it is not a request for renewed user permission. Pause only on the stop conditions in `CLAUDE.md` and `13-continuous-execution-handoff.md`.
 
-## 2. Universal PR contract
+The work remains reviewable through coherent commits tagged with one or more P IDs. P IDs may be combined when they share the same dependency boundary and test gate; they must be split when combining them would mix a remote mutation with an uncharacterized policy/schema change.
 
-Every implementation PR must include:
+## 2. Universal implementation-checkpoint contract
+
+Every coherent implementation checkpoint must record:
 
 - one-sentence user/engineering outcome;
 - exact base/head SHA and dependency packet;
@@ -30,11 +29,11 @@ Every implementation PR must include:
 - characterization test added before extraction;
 - behavior, security, lifecycle and performance evidence required by the slice;
 - fault/rollback statement;
-- docs/evidence/traceability update;
+- docs/evidence/traceability update and active-wave handoff state;
 - no unrelated formatting or cleanup;
 - a removal issue for every migration flag/facade introduced.
 
-Merge order is linear unless a packet explicitly says it can branch after the same gate. Rebase after predecessor merge; do not stack changes on a stale internal API.
+Dependency order is authoritative even when work is locally parallelized. Non-overlapping contract-fixture/prototype work may branch after the same stable seam, but all work is reconciled onto the integration branch and the affected gates rerun before the next wave. No work continues on a stale internal API.
 
 ## 3. Packet index
 
@@ -43,8 +42,8 @@ Merge order is linear unless a packet explicitly says it can branch after the sa
 | P00 | Reproducible V1 baseline and restore proof | none | missing characterization |
 | P01 | Enforced packages, vocabularies and public contracts | none | premature behavior change |
 | P02 | V2 read DTOs over legacy records | none | incorrect aggregation/tenant leak |
-| P03 | V2 shell and Overview pilot | none | mock/contract drift |
-| P04 | Attention and Run evidence pilot | none | unsafe action exposure |
+| P03 | V2 shell and Overview | none | Odoo-shell/contract drift |
+| P04 | Attention and Run evidence experience | none | unsafe action exposure |
 | P05 | Shopify compatibility facade and transport foundation | none | response/error drift |
 | P06 | Core/product/sale read gateway extraction | none | pagination/checkpoint drift |
 | P07 | Inventory/fulfillment/webhook read extraction | none | domain read semantics |
@@ -55,8 +54,8 @@ Merge order is linear unless a packet explicitly says it can branch after the sa
 | P12 | Inventory mutation V2 canary | yes, scoped | blind overwrite/duplicate |
 | P13 | Product-export mutation V2 canary | yes, scoped | authority/stale preview |
 | P14 | Fulfillment mutation V2 canary | yes, scoped | duplicate shipment/notification |
-| P15 | Store lifecycle/readiness backend + setup UI | diagnostic only | credential/readiness bypass |
-| P16 | Complete domain UX/evidence panels | uses approved commands | UI authorization/state gaps |
+| P15 | Store lifecycle/settings/multistore/readiness backend | diagnostic only | credential/readiness/tenant bypass |
+| P16 | Complete setup/admin/domain UX and evidence panels | uses approved commands | UI authorization/state gaps |
 | P17 | Security/performance/accessibility/release closure | controlled test | qualification gaps |
 | P18 | Cohort rollout and default V2 mode | controlled production cohorts | operational regression |
 | P19 | Remove compatibility paths/migration flags | no new behavior | premature contraction |
@@ -99,7 +98,7 @@ Rollback: remove analysis-only additions; no database/product change.
 
 ### P01 — Contracts and dependency skeleton
 
-**Depends on:** P00/G0.  
+**Depends on:** P00.  
 **Outcome:** target package boundaries and state/DTO contracts exist without changing execution.
 
 Changes:
@@ -161,16 +160,16 @@ Acceptance:
 
 Rollback: leave legacy UI calling none of the new methods.
 
-### P03 — V2 shell and Overview pilot
+### P03 — V2 shell and Overview
 
-**Depends on:** P02/G1-read.  
-**Outcome:** production Odoo pilot matches the approved visual hierarchy using real DTOs.
+**Depends on:** P02, P10 and the backend portion of P15; executes in W4.  
+**Outcome:** the production Odoo surface matches the approved visual hierarchy using the proven backend and real DTOs.
 
 Changes:
 
 - add V2 menu/action context, store switcher, health band, workflow cards, attention preview and activity summary;
 - add shared tokens/status/loading/empty/error components;
-- add `v2_ui_mode` temporarily only if P09 has not yet added the complete mode set; use the exact final field/value contract and migrate no later;
+- use the final `v2_ui_mode` contract already introduced and migration-tested by the foundation;
 - retain legacy technical menus for administrators.
 
 Allowed:
@@ -194,7 +193,7 @@ Rollback: set UI mode `legacy`; assets remain inert.
 
 ### P04 — Needs Attention and Run experience
 
-**Depends on:** P03.  
+**Depends on:** P03 and the qualified P10 runtime.  
 **Outcome:** operators can resolve evidence-backed items and investigate runs without technical logs.
 
 Changes:
@@ -219,13 +218,13 @@ Acceptance:
 - all attention providers/actions and stale/concurrent submits tested;
 - direct RPC role/scope matrix passes;
 - uncertain mutation shows verification and cannot retry;
-- U2/U4/U5 read/recovery journeys pass with fake/local side effects only.
+- U3/U9/U10 read/recovery journeys pass with deterministic local/fake-ledger effects.
 
 Rollback: UI mode legacy; explicit methods remain compatible delegates.
 
 ### P05 — Shopify transport/executor compatibility facade
 
-**Depends on:** P04/G1.  
+**Depends on:** P02.  
 **Outcome:** one typed Shopify boundary exists with zero domain behavior change.
 
 Changes:
@@ -311,7 +310,7 @@ Rollback: gateway mode `legacy`.
 
 ### P08 — Mutation gateway extraction under legacy runtime
 
-**Depends on:** P07/G2-read.  
+**Depends on:** P07.  
 **Outcome:** checked-in mutation operations and typed results exist, but the accepted legacy admission/runtime still controls when they execute.
 
 Changes:
@@ -341,7 +340,7 @@ Rollback: route facade to legacy implementation; current job/mutation evidence r
 
 ### P09 — Additive run/attempt schema and migration controls
 
-**Depends on:** P08/G2.  
+**Depends on:** P08.  
 **Outcome:** target runtime records and store modes install/upgrade safely without changing execution.
 
 Changes:
@@ -373,7 +372,7 @@ Rollback: old compatible code on expanded schema; flags `legacy`.
 
 ### P10 — V2 coordinator and read-only runtime
 
-**Depends on:** P09/G3-schema.  
+**Depends on:** P09.  
 **Outcome:** diagnostic/import/scan/reconciliation reads use runs, attempts, safe claims and priority lanes.
 
 Changes:
@@ -404,7 +403,7 @@ Rollback: stop admission, settle claims, mode `legacy`.
 
 ### P11 — Webhook-subscription desired-state cutover
 
-**Depends on:** P10/G3.  
+**Depends on:** P10.  
 **Outcome:** subscription create/delete reconciliation is the first V2-admin mutation, with exact desired/current readback and no change to webhook ingestion.
 
 Changes:
@@ -435,7 +434,7 @@ Rollback: stop V2 subscription admission; read back outstanding intent; set runt
 
 ### P12 — Inventory mutation V2 vertical slice
 
-**Depends on:** accepted P11 and P10/G3 runtime evidence.  
+**Depends on:** P11 and qualified P10 runtime evidence.  
 **Outcome:** the first merchant-data V2 mutation proves admission → intent → send → readback → operator result.
 
 Changes:
@@ -504,50 +503,52 @@ Acceptance:
 
 - complete Section 4.6 matrix, including worker death/webhook/readback races;
 - no duplicate fulfillment/notification in fake ledger or controlled UAT;
-- explicit notification evidence and 14-day/2,000-intent soak gate;
+- explicit notification evidence, 2,000 exact-candidate deterministic fault/load intents and seven-day canary gate;
 - independent review of mutation/readback logic.
 
 Rollback: block admission; verify every in-flight intent before legacy ownership resumes; mode `product_export` or lower.
 
-### P15 — Store lifecycle, readiness and guided setup
+### P15 — Store lifecycle, settings, multistore and readiness backend
 
-**Depends on:** P10 minimum; may develop in parallel with P11–P14 only after shared contracts are stable, but merges after conflicts are reconciled.  
-**Outcome:** concentrated store/setup orchestration becomes explicit commands/queries and the six-step production setup ships.
+**Depends on:** P10; the backend portion completes in W2 before production UI and may be extended only through registered domain contracts in W3.  
+**Outcome:** concentrated store/setup orchestration becomes explicit commands/queries and the complete Administrator/multistore contract is proven.
 
 Changes:
 
 - extract store lifecycle, credential and readiness services behind stable model methods;
-- implement setup DTO/writes, resumable progress and activation fingerprint;
-- build six-step Owl setup with every response state;
+- implement store list/administration/settings/setup DTOs and writes, resumable progress and activation fingerprint;
+- enforce canonical-domain identity, one effective settings record, multiple stores per company, company/store isolation and no designed store-count cap;
+- register typed per-domain workflow/settings/readiness fragments and lifecycle actions;
 - preserve credential storage, scopes, generation/disconnect behavior.
 
 Allowed:
 
-- core application/query/store/setup/credential/readiness and setup UI/tests;
+- core application/query/store/setup/credential/readiness services, migrations and tests;
 - narrow domain readiness providers.
 
 Forbidden:
 
 - credential schema/lifecycle claims beyond current contract, remote business mutations;
-- giant settings form or client-side activation decision.
+- production setup/settings UI, giant settings form or client-side activation decision.
 
 Acceptance:
 
 - hotspot orchestration shrinks into cohesive services;
-- secret/role/generation/readiness/fresh-warm tests;
-- U1 keyboard/RTL/responsive and save/resume tours;
-- UI mode rollback to legacy setup.
+- secret/role/generation/readiness/fresh-warm/multistore tests;
+- every Administrator setting default, validation, readiness impact and lifecycle transition in `07-data-and-api-contracts.md` passes direct-service and RPC authorization tests;
+- foundation performance/isolation certificate includes the 5-store and 20-store profiles.
 
-Rollback: legacy setup/lifecycle delegates; credential/data intact.
+Rollback: legacy setup/lifecycle delegates; credential/data and store identities remain intact.
 
 ### P16 — Complete domain UX and contextual evidence
 
-**Depends on:** P04, P11–P15/G4.  
-**Outcome:** Products, Orders, Inventory and Fulfillment implement the full approved V2 experience.
+**Depends on:** P03, P04 and P11–P15; executes in W4 only after the backend foundation/domain gates are green.  
+**Outcome:** onboarding, store administration, Products, Orders, Inventory and Fulfillment implement the full approved V2 experience.
 
 Changes:
 
 - native list/search/form fields and saved filters;
+- six-step setup, Manage stores, grouped Settings and lifecycle/readiness surfaces over P15 contracts;
 - contextual evidence panels/smart buttons;
 - matching, product diff, location/first-push and fulfillment timeline focused components;
 - final operation launcher over registered operation DTO;
@@ -565,7 +566,7 @@ Forbidden:
 Acceptance:
 
 - all UX screen/response/accessibility/role contracts;
-- U2–U6 tours and moderated task measures;
+- U1–U12 browser journeys and moderated task measures; backend/fake-ledger assertions are not replaced by tours;
 - query/RPC/visual budgets and no overflow/console errors;
 - legacy technical evidence remains accessible to admins.
 
@@ -573,13 +574,13 @@ Rollback: `v2_ui_mode=legacy` independent of backend mode.
 
 ### P17 — Integrated hardening and exact-candidate qualification
 
-**Depends on:** P16/G5.  
+**Depends on:** P16 and all W1–W4 gates.  
 **Outcome:** one immutable candidate passes the complete security, lifecycle, performance, accessibility, recovery and UAT matrix.
 
 Changes:
 
 - no feature expansion;
-- fix only evidence-proven release blockers in bounded commits/PRs if needed, then restart exact-candidate qualification;
+- fix only evidence-proven release blockers in bounded commits on the integration branch, then freeze a new SHA and restart affected/downstream exact-candidate qualification;
 - generate release evidence bundle and independent verdict;
 - rehearse halt/rollback and database restore.
 
@@ -593,7 +594,7 @@ Forbidden:
 
 Acceptance:
 
-- all of `09-test-observability-release-blueprint.md` on exact SHA;
+- the foundation certificate plus all of `09-test-observability-release-blueprint.md`, including U1–U14, on the exact SHA;
 - zero S1/S2/unowned S3;
 - release verdict accepted.
 
@@ -601,12 +602,12 @@ Rollback: candidate is not rolled out.
 
 ### P18 — Cohort rollout and default mode
 
-**Depends on:** accepted P17/G6-candidate.  
+**Depends on:** accepted exact candidate from P17.  
 **Outcome:** V2 advances through defined cohorts with live telemetry and proven failback.
 
 Changes:
 
-- mode changes and release evidence only unless a separate defect PR is required;
+- mode changes and release evidence only; a material defect returns to the integration branch, creates a new candidate SHA and reruns affected/downstream gates;
 - cohort-by-cohort SLO/incident/rollback review;
 - set `v2_ui_mode=default`, gateway/runtime modes to approved values only after all gates.
 
@@ -617,7 +618,7 @@ Forbidden:
 Acceptance:
 
 - every cohort meets minimum observation and zero halt condition;
-- all stores complete 14-day all-V2 observation before contraction clock;
+- all eligible stores complete the streamlined cohort/domain gates in `08-migration-and-cutover-blueprint.md`; the 14-day all-V2 observation starts only the optional contraction clock;
 - support/release notes and operator runbooks ready.
 
 Rollback: per-store or global mode reversal using the migration runbook.
@@ -630,7 +631,7 @@ Rollback: per-store or global mode reversal using the migration runbook.
 Changes:
 
 - call/dependency/runtime evidence proves unused facades;
-- remove one subsystem’s old path per PR if needed;
+- remove one subsystem’s old path per coherent contraction checkpoint if needed;
 - migrate modes to fixed V2/default and delete expired flags;
 - keep stable public model/XML/data surfaces unless separately approved.
 
@@ -665,22 +666,24 @@ Acceptance:
 - addon count reduction has a measured maintenance benefit;
 - if proof fails, keep satellites. P20 is not required for V2 release.
 
-## 5. Parallelism rules
+## 5. Parallelism and efficiency rules
 
 Permitted after contracts stabilize:
 
-- P03 UI can proceed while P05 begins only after P02 is merged; they touch different seams but must rebase before merge.
-- P06 domain read gateways may be split into sequential domain PRs if review size is too large; operation-family order remains.
-- P15 setup extraction may develop beside mutation slices after P10, but it merges only after shared core conflicts are resolved and rerun.
-- UI component work may use contract fixtures; production wiring waits for its backend packet.
+- contract-fixture, static prototype and documentation work may proceed while W2 backend code is built, but production UI wiring waits for the full foundation certificate;
+- independent domain gateway/handler tests may be developed against stable public ports with non-overlapping file ownership;
+- long lifecycle/performance lanes run at wave gates while unaffected static/unit work continues on a separate checkpoint;
+- a failing lane reruns the affected scope plus downstream dependencies instead of restarting every expensive lane after each small fix.
 
 Not permitted:
 
+- overlapping edits to shared runtime/store/security files by different owners;
 - parallel mutation cutovers on the same store;
-- runtime schema and first mutation in one PR;
-- gateway extraction and business-policy change in one PR;
-- packaging consolidation before contraction.
+- runtime schema and first remote mutation in one uncharacterized checkpoint;
+- gateway extraction combined with a business-authority change;
+- production UI orchestration before W2/W3 backend contracts it consumes;
+- packaging consolidation before post-release contraction.
 
 ## 6. Roadmap completion criteria
 
-The implementation program is complete when P18 is accepted and V2 is the safe default. P19 removes temporary complexity after soak. P20 is optional and cannot delay user value unless lifecycle evidence shows the current packaging itself is unsafe.
+The implementation program is complete when one exact candidate has passed the foundation and U1–U14 qualification, P18 has made V2 the safe default through the defined cohorts, release evidence is immutable, and the continuous handoff has no unresolved blocker. P19 removes temporary complexity after soak. P20 is optional and cannot delay user value unless lifecycle evidence shows the current packaging itself is unsafe.

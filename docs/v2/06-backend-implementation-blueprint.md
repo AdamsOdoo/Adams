@@ -19,6 +19,32 @@ These are release-blocking, not suggestions:
 9. Use database uniqueness and claim/lease controls for correctness; UI disablement and in-process locks are not correctness mechanisms.
 10. Add no external worker, event bus, queue framework, cache service or deployable.
 
+### 1.1 Foundation-first construction gate
+
+Production V2 screens may not be wired to mutable workflows until the shared backend foundation proves all seven conditions below on production-shaped fixtures:
+
+1. versioned command/query contracts and server-side authorization;
+2. Shopify transport, GraphQL executor, cost governor and normalized gateway boundary;
+3. durable run/job/attempt/mutation-certainty records with legal state transitions;
+4. bounded claim, priority, retry, stale-owner recovery and restart behavior;
+5. company/store/generation isolation, secret redaction and least-privilege access;
+6. additive migration, warm-upgrade, rollback and compatibility evidence; and
+7. measured latency, throughput, query count, API cost and backlog behavior against the budgets in `09-test-observability-release-blueprint.md`.
+
+The visual prototype and DTO tests may progress earlier, but no production UI is allowed to become an alternative orchestration engine. Once this gate is green, domain slices and their UI can be added without rediscovering reliability rules.
+
+### 1.2 Deliberate extensibility
+
+V2 is extensible by registered domain contracts, not by a generic workflow engine. A future capability such as refunds or payouts supplies:
+
+- its own addon and persistent business/evidence models;
+- typed commands, normalized Shopify gateway operations and read DTO providers;
+- readiness checks, settings schema, attention providers and record-level evidence;
+- explicit authority, idempotency, reconciliation and mutation-verification policy; and
+- ACL, company/store rules, migrations, retention and complete journey tests.
+
+Core owns only the small registries and interfaces required by the current domains. It does not add speculative refund/payout tables, arbitrary JSON rule bags, dynamic model names or user-authored execution graphs. This keeps the foundation stable without paying complexity for features that are not yet implemented.
+
 ## 2. Target dependency map
 
 ```mermaid
@@ -283,6 +309,18 @@ Locked lanes, highest first:
 
 Within a lane order by `available_at`, `lane_priority`, then ID. Every 15 minutes of wait improves effective priority by one step up to—but never above—`interactive`; reconciliation cannot displace safety verification. This rule is pure, deterministic and unit-tested.
 
+### 7.6 Near-real-time execution path
+
+“Near real time” means measured event-to-visible-outcome latency, not a promise that every Shopify operation is synchronous:
+
+1. webhook, Odoo business event or interactive command durably admits work in its local transaction;
+2. after that transaction commits, the sanctioned enqueue path requests the existing bounded drain immediately;
+3. the worker claims by lane priority, with safety verification always ahead of new mutations;
+4. active V2 screens refresh/subscription-poll the affected run until terminal or attention state, while passive screens use a slower bounded refresh; and
+5. the one-minute scheduled drain and reconciliation remain recovery paths for missed triggers, delayed webhooks and drift.
+
+Targets are: webhook acknowledgement p95 at or below one second and always below five seconds; durable delivery-to-job evidence within two seconds; worker start within five seconds when capacity and Shopify budget are available; Shopify/Odoo event to local terminal state p95 within 15 seconds and p99 within 60 seconds for single-record work; interactive feedback within one second; and active UI terminal refresh within five seconds. Bulk operations remain asynchronous and expose throughput, progress and a truthful estimate instead of pretending to be instant.
+
 ## 8. Transaction and side-effect boundaries
 
 ### 8.1 Read operations
@@ -503,7 +541,7 @@ Extraction order is characterization → facade → pure policy/adapter extracti
 
 - New domain/application modules contain no raw SQL/HTTP unless they are the named adapter.
 - Cyclomatic complexity above 10 or nesting above 4 in changed code requires refactoring or a written safety justification.
-- No changed production file grows beyond 750 lines; hotspot files must decrease after their extraction PR.
+- No changed production file grows beyond 750 lines; hotspot files must decrease after their extraction checkpoint.
 - Public methods are typed/documented at the contract boundary; internal trivial helpers need no ceremonial docstrings.
 - All timestamps are UTC in persistence and localized only in presentation.
 - Money is never represented as binary float in new contracts; use decimal string plus currency.
@@ -523,12 +561,15 @@ A backend slice is complete only when:
 - logs and returned problems contain no secret/PII leak;
 - rollback is a store-scoped mode switch or forward-compatible code rollback, not database restoration;
 - the old path remains available until the defined soak gate;
-- evidence and the decision/traceability register are updated in the same PR.
+- evidence and the decision/traceability register are updated in the same coherent checkpoint.
 
 ## 17. Official engineering references
 
 - [Shopify Admin API rate limits](https://shopify.dev/docs/api/usage/limits)
+- [Shopify idempotent requests](https://shopify.dev/docs/api/usage/idempotent-requests)
 - [Shopify webhook engineering guidance](https://shopify.dev/docs/apps/build/webhooks)
 - [Odoo 19 backend security](https://www.odoo.com/documentation/19.0/developer/reference/backend/security.html)
 - [Odoo 19 performance guidance](https://www.odoo.com/documentation/19.0/developer/reference/backend/performance.html)
 - [Odoo 19 testing guidance](https://www.odoo.com/documentation/19.0/developer/reference/backend/testing.html)
+- [Odoo 19 scheduled actions](https://www.odoo.com/documentation/19.0/developer/reference/backend/actions.html#scheduled-actions-ir-cron)
+- [Odoo 19 coding guidelines](https://www.odoo.com/documentation/19.0/contributing/development/coding_guidelines.html)

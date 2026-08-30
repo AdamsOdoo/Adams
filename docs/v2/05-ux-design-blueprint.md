@@ -42,6 +42,9 @@ The connector owns one Odoo application root. The primary order is fixed:
 
 `V2 Blueprint` exists only in the design reference and is not a production menu. Technical objects—job logs, webhook deliveries, mutation evidence and raw readiness diagnostics—live under an Administrator-only technical submenu or contextual smart buttons. There is no separate Error Center or Sync Center.
 
+`Manage stores` is reached from the persistent store switcher, not added as a ninth daily
+operations menu. It becomes visible only to users allowed to create/configure stores.
+
 ### 3.2 Persistent context
 
 The header always shows:
@@ -54,11 +57,16 @@ The header always shows:
 
 Store selection is encoded in the Odoo action context and URL state where supported. It is never held only in a custom JavaScript singleton. Changing the active company revalidates or clears the selected store.
 
+The switcher contains only permitted stores and an optional `All stores` health summary.
+`All stores` is read-only aggregation; every command requires one explicit store. A user
+cannot infer inaccessible store counts, names or health from the switcher or summary.
+
 ### 3.3 Surface selection
 
 | Surface | Implementation choice | Reason |
 | --- | --- | --- |
 | Overview | Owl client action | Composes multiple bounded read projections and live action state |
+| Manage stores | Native Odoo list/form plus guided add-store action | Multi-store administration without a second custom shell |
 | Needs Attention | Odoo list/search plus Owl detail panel | Native filtering with evidence-rich resolution |
 | Products, Orders | Native list/form/search | High-density record work and familiar Odoo behavior |
 | Inventory | Native lists plus focused preview wizard | Mapping and guarded first-push decision |
@@ -68,6 +76,25 @@ Store selection is encoded in the Odoo action context and URL state where suppor
 | Matching/diff | Focused Owl dialog/client action | Side-by-side evidence and explicit selection |
 
 No client-side router, global state library or direct Shopify request is permitted.
+
+### 3.4 Odoo-shell compatibility gate
+
+Before production component implementation, create one bounded Odoo 19 shell spike using
+the pinned Odoo SHA. It must prove:
+
+- shared connector navigation can move between Owl client actions and native list/form
+  actions without a second router or webclient patch;
+- the selected store/action context survives supported navigation and is revalidated on
+  company change;
+- the optional dark navigation emphasis, control panel, breadcrumbs, dialogs and mobile
+  drawer do not conflict with Odoo Enterprise/Community assets;
+- 375/768/1366/1440 and RTL work without page-level overflow;
+- native keyboard, focus, notification and action-service behavior remains intact.
+
+If pixel-identical persistent side navigation would require replacing Odoo routing or
+patching the global webclient, use Odoo-native menus while preserving the blueprint's
+hierarchy, tokens and information density. That adaptation is compatibility, not a visual
+redesign. The standalone prototype is never embedded in an iframe or shipped as a SPA.
 
 ## 4. Visual system
 
@@ -214,6 +241,44 @@ Setup is six resumable steps:
 6. Review and activate
 
 Each step saves durable non-secret values explicitly. Credential replacement uses a separate write-only command and returns presence/verification metadata only. The final review groups readiness as `Action required`, `Passed` and `Not applicable`; activation is server-blocked if any mandatory check fails or the snapshot generation is stale.
+
+After onboarding, Settings edits the same durable records and is grouped by progressive
+disclosure rather than a giant tabbed form:
+
+| Group | Administrator controls | Validation/behavior |
+| --- | --- | --- |
+| Store and connection | display name, canonical domain before first connection, owning company before protected data, replace credential, test/repair, activate/pause/disconnect/retire | token never readable; identity/company changes are blocked or migrated once bindings/evidence exist |
+| Workflows | enable/disable Product Import, Product Export, Orders/Customers, Inventory and Fulfillment | enabling or changing a workflow stales readiness; dependent work stays blocked until valid |
+| Automation | manual/scheduled/webhook/Odoo-event/reconciliation posture, per-workflow pause/resume and supported cadence | last success, next run and freshness visible; no control whose producer is absent |
+| Product and pricing | first-sync source, price authority, imported media, refresh policy, attribute-conflict policy and export field authority | protected fields and name/fuzzy auto-binding cannot be enabled |
+| Orders and customers | confirmation policy, manual-gateway policy/list, import window, pending-payment expiry, test-order inclusion and fallback partner | policies preview the resulting quotation/confirmation/review behavior |
+| Odoo defaults | warehouse, matching-currency pricelist, sales team, payment term, fiscal position and required tax/payment/shipping mappings | company/currency/accounting compatibility validated before activation/import |
+| Inventory and locations | explicit Shopify↔Odoo location mappings, scheduled push posture and first-push status | first push always requires current observation, preview fingerprint and Administrator confirmation |
+| Fulfillment | Odoo-controlled or exact bidirectional mode, tracking and customer-notification posture | mode switch is verified; effective notification value is explicit per command/run |
+| Security and evidence | permitted role posture, redacted audit/retention summary and technical evidence links | users/companies remain managed through Odoo groups/rules; no secret/PII reveal |
+| Advanced rollout | temporary UI/gateway/runtime migration modes and rollback reason | Administrator-only, audited, collapsed and removed after contraction |
+
+Not configurable in ordinary Settings: pinned API version, GraphQL documents/endpoints,
+binding/idempotency/operation-scope rules, tenant/generation fences, mutation verification,
+retry/pagination hard safety bounds or raw credentials. The Administrator controls product
+policy, not the ability to bypass correctness.
+
+### 6.9 Store management and multiple stores
+
+The store-management list shows permitted store name, canonical domain, company,
+connection/activation state, overall health, enabled workflows, freshness and active
+attention count. Actions are `Add store`, `Resume setup`, `Open`, `Repair connection`,
+`Pause`, `Disconnect` and `Retire` as returned by server authorization.
+
+- Adding another store creates an isolated draft and starts the same six-step setup.
+- Each store owns credentials, settings, generation, mappings, bindings, checkpoints,
+  runs/jobs and rollout modes.
+- Multiple stores may share one company; same-company does not permit cross-store child
+  records or commands.
+- No configuration is cloned automatically. A future explicit copy wizard may copy only
+  allowlisted non-secret defaults and must run readiness independently.
+- There is no designed store-count licensing cap; performance is qualified against the
+  multi-store profiles in `09-test-observability-release-blueprint.md`.
 
 ## 7. Complete response-state matrix
 

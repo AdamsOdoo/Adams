@@ -57,15 +57,25 @@
 | V2-D048 | WCAG 2.2 AA, 375/768/1366/1440 and RTL are release gates. | Premium inclusive UX. | P03, P04, P15–P17 |
 | V2-D049 | Performance budgets are hard ceilings; impossible values stop for evidence/review rather than silent relaxation. | Prevents architecture by optimism. | every relevant packet |
 | V2-D050 | V2 is default-ready at P18; contraction/packaging are later and cannot delay user value. | Separates release from cleanup. | P18–P20 |
+| V2-D051 | V1 release failures—unreachable onboarding, weak progress/recovery hierarchy, unproved event-to-state latency/backlog behavior and backend-heavy evidence—are explicit V2 regression contracts. | Prevents repeating costly V1 mistakes. | P00, P03–P18 |
+| V2-D052 | Production UI wiring waits for a same-candidate foundation certificate covering contracts, gateway, runtime, security/isolation, migration/rollback and performance/restart. | Visual polish cannot compensate for an unstable execution base. | W1–W2 before P03/P04/P16 |
+| V2-D053 | U1–U14 are mandatory end-to-end business journeys; tours alone do not satisfy them. | Proves complete operator and merchant outcomes across systems. | P16–P17 |
+| V2-D054 | P00–P20 are traceability IDs inside one continuous five-wave program and one integrated candidate PR, not 21 approval phases. | Preserves reviewability without artificial waiting. | P00–P18 |
+| V2-D055 | Cross-chat continuity is proactive and committed: checkpoint before context exhaustion, then verify SHA/branch/status in the receiving chat. | Keeps long execution safe and continuous. | every wave |
+| V2-D056 | Near-real-time is measured event-to-visible-state latency with immediate durable admission/drain plus one-minute recovery scheduling; it is never marketed as instantaneous/exactly-once. | Responsive operation with honest distributed-system limits. | P10–P18 |
+| V2-D057 | Multiple stores are first-class, independently scoped identities with no designed licensing/count cap; same company never relaxes same-store checks. | Merchant scalability and tenant safety. | P02, P09, P15–P18 |
+| V2-D058 | Post-onboarding Administrator controls are grouped typed settings/lifecycle actions; safety algorithms, API version, secrets and identity fences are not configurable. | Powerful administration without bypass switches. | P15–P16 |
+| V2-D059 | Refunds and payouts extend typed domain registries through additive addons; core gets no speculative generic workflow/data framework. | Future capability without present overengineering. | future addons; registry tests P01/P17 |
+| V2-D060 | The V2 shell must pass Odoo action/context/asset/responsive/RTL compatibility; if custom persistent navigation requires a webclient/router fork, use the Odoo-native fallback. | Maintains Odoo compatibility and upgradeability. | P03, P16–P17 |
 
 ## 2. Default parameters
 
 | Parameter | Default | Change authority |
 | --- | --- | --- |
 | Contract version | `1` | breaking-change review |
-| Shopify API version | `2026-07` | dedicated schema revalidation PR |
+| Shopify API version | `2026-07` | dedicated schema revalidation checkpoint |
 | Webhook envelope retention | 30 days | privacy/lifecycle ADR |
-| Webhook retention batch | 2,000 rows | measured performance PR |
+| Webhook retention batch | 2,000 rows | measured performance decision |
 | Backfill batch | 2,000 rows, lower if baseline demands | migration owner with evidence |
 | Retry schedule | 30-second base, ×2, 30-minute cap, ±20% jitter; stop at 12 scheduled retries or 24 hours | error-policy ADR/domain stricter override |
 | Priority aging | one priority step per 15 minutes; ceiling interactive | runtime review |
@@ -75,15 +85,19 @@
 | Run timeline initial page | 200 events | UX/performance review |
 | Mandatory viewport tests | 375, 768, 1366, 1440 px + RTL | design-system review |
 | Contraction soak | 2 releases and 14 days at all-V2, whichever later | architecture/release gate |
-| Fulfillment cutover soak | 14 days or 2,000 intents, whichever later | safety/release gate |
-| Inventory cutover soak | 7 days or 10,000 intents, whichever later | safety/release gate |
-| Product-export cutover soak | 7 days or 5,000 intents, whichever later | safety/release gate |
+| Immediate drain recovery | enqueue requests bounded drain after commit; one-minute scheduled drain remains fallback | runtime/performance ADR |
+| Webhook acknowledgement | p95 ≤1 second; no accepted request ≥5 seconds | performance/safety review |
+| Single-record event completion | p95 ≤15 seconds, p99 ≤60 seconds excluding evidenced Shopify throttle/outage | performance/release review |
+| Active/passive UI freshness | active run observes terminal state within 5 seconds; passive Overview refresh defaults to 30 seconds | UX/performance review |
+| Fulfillment cutover evidence | 2,000 exact-candidate deterministic fault/load intents + 7-day canary | safety/release gate |
+| Inventory cutover evidence | 10,000 exact-candidate deterministic fault/load intents + 72-hour canary | safety/release gate |
+| Product-export cutover evidence | 5,000 exact-candidate deterministic fault/load intents + 72-hour canary | safety/release gate |
 
 Volume-dependent values are not guessed: P00 records the target environment and hard budgets from `09-test-observability-release-blueprint.md`; failure to produce them blocks P01/P02 performance acceptance.
 
 ## 3. Rejected-approach regression checklist
 
-The repository’s accepted RA register remains authoritative. The implementer must also answer `No` to each question below in every PR description.
+The repository’s accepted RA register remains authoritative. The implementer must also answer `No` to each question below at every wave/candidate review.
 
 | Check | Rejected pattern |
 | --- | --- |
@@ -110,33 +124,45 @@ The repository’s accepted RA register remains authoritative. The implementer m
 | RA-V2-21 | Does it add a permanent flag/facade without owner/removal gate? |
 | RA-V2-22 | Does it copy competitor feature breadth or dashboard density without user need? |
 | RA-V2-23 | Does it remove tests/relax assertions to make a candidate green? |
+| RA-V2-24 | Does it wire production UI before the shared backend foundation certificate is green? |
+| RA-V2-25 | Does it turn internal work IDs into mandatory approval/PR ceremonies that add no safety evidence? |
+| RA-V2-26 | Does it add speculative refund/payout tables, arbitrary JSON rules or a generic workflow engine to core? |
+| RA-V2-27 | Does `All stores` or same-company aggregation permit a cross-store write, child reference or count leak? |
+| RA-V2-28 | Does material execution state exist only in chat output instead of a committed checkpoint/handoff? |
 
-Any `Yes` blocks the PR until an explicit accepted ADR supersedes the rejection.
+Any `Yes` blocks the affected checkpoint until an explicit accepted ADR supersedes the rejection.
 
 ## 4. Requirement traceability matrix
 
 | Req | Product requirement | Screen/UX | Backend/data contract | Primary tests | Packet |
 | --- | --- | --- | --- | --- | --- |
-| R001 | Operator knows store safety within seconds. | Overview health band | overview DTO, health/freshness projection | U2, query/security | P02–P03 |
-| R002 | Human work is ranked by impact. | Needs Attention | provider aggregation/severity/action DTO | provider/unit/U2 | P02–P04 |
-| R003 | Every exception names owner, evidence, action and consequence. | resolution detail | attention detail/command | stale/role/audit/U2 | P04 |
-| R004 | Setup is guided, resumable and cannot activate unsafely. | six-step setup | setup DTO/commands/readiness fingerprint | U1/security/lifecycle | P15 |
-| R005 | Credential is write-only. | credential step | guarded service; metadata-only reads | secret/RPC tests | P15 |
+| R001 | Operator knows store safety within seconds. | Overview health band | overview DTO, health/freshness projection | U10, query/security | P02–P03 |
+| R002 | Human work is ranked by impact. | Needs Attention | provider aggregation/severity/action DTO | provider/unit/U10 | P02–P04 |
+| R003 | Every exception names owner, evidence, action and consequence. | resolution detail | attention detail/command | stale/role/audit/U9/U10 | P04 |
+| R004 | Setup is guided, resumable and cannot activate unsafely. | six-step setup | setup DTO/commands/readiness fingerprint | U1/security/lifecycle | P15–P16 |
+| R005 | Credential is write-only. | credential step | guarded service; metadata-only reads | secret/RPC tests | P15–P16 |
 | R006 | Store/company isolation is fail-closed. | store switcher/all screens | record rules + service recheck | multi-company matrix | all, esp. P02/P09 |
 | R007 | Matching never guesses by name. | matching flow | binding/deterministic policy | binding/match matrix | P06/P16 |
 | R008 | Product writes show field authority and current diff. | product preview | authority policy/fingerprint | product export matrix | P13/P16 |
 | R009 | Order commercial evidence is preserved. | order evidence panel | order DTO/binding/total policy | order matrix | P06/P16 |
-| R010 | First inventory push cannot overwrite blindly. | mapping/preview | mapping/binding/preview/mutation command | inventory matrix/U3 | P12/P16 |
-| R011 | Fulfillment/notification is explicit and duplicate-safe. | fulfillment timeline | mutation intent/readback/notification command | fulfillment faults/U5 | P14/P16 |
+| R010 | First inventory push cannot overwrite blindly. | mapping/preview | mapping/binding/preview/mutation command | inventory matrix/U6 | P12/P16 |
+| R011 | Fulfillment/notification is explicit and duplicate-safe. | fulfillment timeline | mutation intent/readback/notification command | fulfillment faults/U7/U9 | P14/P16 |
 | R012 | Uncertain writes are verified before retry. | run/fulfillment state | mutation certainty + verification | fault ledger | P08/P11–P14 |
-| R013 | Users see a narrative, not logs. | Run detail | run/job/attempt/log DTO | timeline/role/U2/U5 | P02/P04/P09–P10 |
+| R013 | Users see a narrative, not logs. | Run detail | run/job/attempt/log DTO | timeline/role/U9/U10 | P02/P04/P09–P10 |
 | R014 | Webhooks acknowledge fast, reconcile gaps and converge connector-owned subscriptions. | freshness/run/readiness evidence | HMAC/dedup/inbox/reconciler/subscription desired state | webhook/load/fault tests | preserve/P07/P10/P11 |
 | R015 | Shopify cost is bounded and observable. | run technical evidence | executor/cost governor/attempt metrics | contract/performance | P05–P10 |
 | R016 | Existing customer data survives V2. | unchanged identities | preserved models/constraints; additive schema | lifecycle/migration | P00/P09/P19 |
 | R017 | Rollout/failback is store-scoped. | admin technical settings | three migration modes/generation | rollback/canary | P09–P18 |
-| R018 | UI is premium, accessible, responsive and RTL-ready. | all composed screens | versioned DTOs/state matrix | D lane/U1–U6 | P03/P04/P15–P17 |
+| R018 | UI is premium, accessible, responsive and RTL-ready. | all composed screens | versioned DTOs/state matrix | D lane/U1–U12 | P03/P04/P16–P17 |
 | R019 | Connector is lighter and easier to maintain. | simpler navigation | small cohesive packages; no duplicate sources | dependency/complexity/perf | P01–P19 |
 | R020 | Release decision is evidence-based. | no direct screen | evidence bundle/SLO/halt rules | complete qualification | P17–P18 |
+| R021 | V1 mistakes cannot recur silently. | setup, progress, recovery and freshness states | characterization contracts and latency/backlog evidence | V1 regression set/U1/U9/U10/U13 | P00/P17 |
+| R022 | Complete merchant outcomes work across both systems. | all domain/contextual screens | cross-domain commands, bindings and evidence | U1–U14 | P16–P17 |
+| R023 | Backend is strong before product UI depends on it. | contract fixtures before live wiring | foundation certificate | foundation lanes A/B/C/E/F | P00–P15 before P03/P04/P16 |
+| R024 | Administrator can safely manage settings and multiple stores. | Manage stores, setup, Settings | typed settings/store administration/lifecycle contracts | U1/U2/U11/U12 | P15–P17 |
+| R025 | Event-driven work is near-real-time and honestly measured. | live run progress/freshness | immediate admission/drain, priority, fallback reconciliation | latency/backlog/restart/U8–U10 | P10–P18 |
+| R026 | Refunds/payouts can be added without redesigning core. | future registered domain surfaces | typed extension registries and addon ownership | synthetic extension/uninstall tests | P01/P17 + future addon |
+| R027 | Long implementation continues safely across chats. | no product screen | committed checkpoint/handoff protocol | receiving-chat SHA/status verification | every wave |
 
 ## 5. Screen-to-contract matrix
 
@@ -149,7 +175,9 @@ Any `Yes` blocks the PR until an explicit accepted ADR supersedes the rejection.
 | Inventory | native ORM/read DTO | preview/start/resolve methods | mapping, inventory read/mutation gateway |
 | Fulfillment | native ORM/read DTO | registered mutation/recovery action | fulfillment handler/readback |
 | Runs | native list/read `get_run_v1` | retry/cancel/resolve methods | run/job/attempt/log/mutation evidence |
-| Settings/setup | `get_setup_v1` | save/replace/test/activate methods | lifecycle, credential, readiness providers |
+| Manage stores | `get_store_list_v1` | create/pause/resume/disconnect/retire named methods | store lifecycle, company/store rules, readiness summary |
+| Settings | `get_store_settings_v1` | grouped typed settings/workflow-state methods | lifecycle, settings and domain readiness providers |
+| Setup | `get_setup_v1` | save/replace/test/activate methods | lifecycle, credential, settings and readiness providers |
 | Operation launcher | `get_operation_options_v1` | `start_operation_v1` | operation registry/command bus |
 
 ## 6. Risk ownership
@@ -180,14 +208,15 @@ These are the only planned inputs that can age independently of the repository a
 
 Implementation must use official Shopify/Odoo documentation for platform facts. Vendor/competitor documentation may inform product comparison but cannot override safety contracts.
 
-## 8. Architecture gate sign-off
+## 8. Architecture and execution gate sign-off
 
-Reviewers record `approve`, `approve with named change`, or `reject` for:
+One integrated gate records `approve`, `approve with named change`, or `reject` for:
 
-1. product/UX contract (`01`, `05`);
-2. backend/data/API contract (`02`, `06`, `07`);
-3. migration/release contract (`03`, `08`, `09`);
-4. roadmap/execution contract (`10`, `12`);
-5. decision/rejection/traceability register (this file).
+1. product, complete journeys and UX contract (`01`, `05`, U1–U14 in `09`);
+2. backend foundation, data/API and extension contracts (`02`, `06`, `07`);
+3. migration, performance, release and rollback contract (`03`, `08`, `09`);
+4. five-wave roadmap and lighter-model operating contract (`10`, `12`);
+5. V1 lessons, competitor evidence and rejected patterns (`04`, this file); and
+6. continuous execution/handoff protocol (`13`, `CLAUDE.md`, `AGENTS.md`).
 
-Implementation begins with P00 only after all five are approved or every named change is incorporated. There are no unresolved architecture choices for P00; later packets may stop only on evidence conditions already defined here.
+Once that gate and implementation authorization are recorded, W1–W5 proceed as one program without packet-by-packet approval. Automatic evidence gates and the documented stop conditions remain binding; routine fixes and handoffs do not pause for confirmation.

@@ -1,50 +1,71 @@
-# AGENTS.md — Proposed Future Agents (not yet active)
+# AGENTS.md — Execution Ownership and Review Lenses
 
-> This file lists **proposed** automation agents for the Odoo 19 Shopify
-> Connector project. **None of these agents are active.** They are documented
-> here so ChatGPT (the strategy/control room) can review and shape the
-> automation plan *before* any agent is built.
->
-> **Do not create functioning agents now.** Premature automation can encode
-> weak or unverified assumptions into the workflow. Agents will be created later,
-> only after the research workflow has stabilised and ChatGPT approves.
->
-> Governance authority for the project is `CLAUDE.md`. If this file and
-> `CLAUDE.md` ever disagree, `CLAUDE.md` wins.
+> `CLAUDE.md` is the project governance authority. This file defines how one or
+> more implementation/review agents cooperate without creating an uncontrolled swarm.
 
-## Status legend
+## 1. Operating model
 
-- **Proposed** — described here; not built; not callable.
-- (Future) **Approved** — ChatGPT has approved building it.
-- (Future) **Active** — implemented under `/.claude/agents/` and in use.
+One lead implementation owner is accountable for the active coherent scope, integration
+state and handoff. “Agent” below is a responsibility lens; it does not require a separate
+process or model. One capable implementation model may perform every lens sequentially.
 
-All agents below are **Proposed**.
+Parallel work is optional, never assumed. It is allowed only when the user or execution
+environment authorizes it, files do not overlap, contracts are already stable, and one
+owner will integrate and rerun the affected gates.
 
-## Proposed agents
+## 2. Required responsibility lenses
 
-| Agent | Status | Intended purpose | Intended scope / guardrails (when built) |
-| --- | --- | --- | --- |
-| **competitor-research-agent** | Proposed | Deep-dive one competitor connector (Webkul, Teqstars, Emipro, VentorTech, Softhealer, official ecommerce_shopify) into a cited, comparable profile. | Read-only research (web read + repo read); no write/code; must cite and classify every claim; never bypass auth. |
-| **shopify-api-research-agent** | Proposed | Establish official Shopify platform facts: Admin REST/GraphQL, webhooks, scopes, versioning, rate limits, bulk ops, idempotency, app-review requirements. | Read-only; prefer official Shopify docs; always state the API version a fact applies to. |
-| **odoo-architecture-research-agent** | Proposed | Identify correct Odoo 19 extension points and modularity boundaries (sale/stock/product/account/delivery, ir.cron/queue, external IDs/mapping, security). | Read-only; prefer official Odoo 19 docs; may read repo but never modify it. |
-| **ux-benchmark-agent** | Proposed | Benchmark setup/onboarding and operational UX across connectors (connect flows, mapping wizards, error surfaces, screenshots). | Read-only; cite screenshot sources; separate observation from UX opinion. |
-| **qa-review-agent** | Proposed | Apply the PR/review checklist and the issue taxonomy to a deliverable; surface defects, missing citations, and unsupported assumptions. | Read-only review; classifies findings; routes them to the correct `/docs/05-qa` log; does not fix code. |
-| **prompt-control-agent** | Proposed | Maintain and improve the reusable prompts/templates and enforce the learning rules between sessions. | Docs-only; edits `/docs/06-prompts/**`; no code; changes reviewed by ChatGPT. |
+| Lens | Responsibility | Must not do |
+| --- | --- | --- |
+| Lead implementer | Own exact base, scope, integration, tests, evidence and rollback | delegate accountability or merge incomplete evidence |
+| V1 compatibility | Trace current behavior/data and prevent recurrence of known V1 defects | preserve an error merely because it exists in V1 |
+| Shopify integration | Validate GraphQL, webhooks, scopes, cost, idempotency and readback against the pinned API | invent fields or rely on vendor/competitor behavior |
+| Odoo architecture | Validate ORM, transactions, security, cron, modules, views, migrations and lifecycle against pinned Odoo 19 | add non-native infrastructure without evidence |
+| Domain/product | Validate authority, matching, totals, quantity, fulfillment and future extension seams | broaden current release scope silently |
+| UX/accessibility | Validate complete journeys, Odoo-native composition, roles, responsive/RTL and recovery clarity | optimize screenshots at the expense of evidence or safety |
+| Reliability/security | Trace concurrency, retries, uncertain mutations, tenant isolation, secrets, PII and failure injection | accept hidden buttons or `sudo()` as authorization |
+| Release reviewer | Independently verify exact candidate, migration, live readback and rollback evidence | approve from the author summary alone |
 
-## Why defer
+Where team size permits, the final mutation-safety/security/release verdict is performed
+by someone other than the author of the last material change. On a single-agent run,
+perform a fresh evidence-based review pass and record that independence is logical, not
+organizational.
 
-- The research methodology and feature taxonomy are not yet stable; an agent
-  built now would bake in assumptions we may reject.
-- ChatGPT should review the proposed roles, scopes, and guardrails first.
-- Each agent, when built, must be **narrow, safe, read-only (or docs-only)**,
-  and must embed the citation, claim-classification, and handoff requirements
-  from `CLAUDE.md`.
+## 3. Editing and integration rules
 
-## Activation criteria (future)
+- One owner edits a model/contract/subsystem at a time.
+- Research/review may run beside implementation only when it does not mutate overlap.
+- No agent silently moves from review into unrelated implementation.
+- Every result is committed to GitHub with exact files, tests and evidence.
+- Conflicting recommendations are resolved against `CLAUDE.md`, accepted V2 decisions,
+  official platform facts and actual repository behavior before code continues.
+- The continuous program does not pause for routine internal handoffs; the lead owner
+  integrates and advances when the automatic evidence gate passes.
 
-An agent moves Proposed → Approved → Active only when:
+## 4. Continuous handoff
 
-1. The research workflow it supports is stable and documented.
-2. ChatGPT approves its purpose, scope, and guardrails.
-3. Its definition is added under `/.claude/agents/` with least-privilege tools
-   and the project's citation/handoff rules baked in.
+Before a chat/session/context switch, the active owner updates
+`docs/v2/13-continuous-execution-handoff.md` with:
+
+- exact branch, base and head;
+- active wave and task ID;
+- completed and in-progress behavior;
+- changed/uncommitted files;
+- tests run and tests still required;
+- external environment state without secrets;
+- known defects/blockers and whether intentionally deferred to the end;
+- rollback point and exact first next action.
+
+The receiving owner verifies the head and handoff before acting, continues from the
+first next action, and does not repeat completed research or implementation.
+
+## 5. Prohibited coordination patterns
+
+- uncontrolled agent swarms;
+- overlapping edits to the same contracts/models;
+- large fan-out without synthesis ownership;
+- agent conclusions that exist only in chat;
+- marking a gate complete from summaries without test/evidence inspection;
+- restarting from an old prompt or stale branch after a handoff;
+- including credentials, access tokens or customer PII in agent prompts/handoffs.
+

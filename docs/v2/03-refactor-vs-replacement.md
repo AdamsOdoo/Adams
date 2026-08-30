@@ -47,9 +47,9 @@ Therefore “keep everything and restyle it” will not produce the target. Seve
 - Define versioned application command/query DTOs and V2 state vocabulary.
 - Introduce Overview, Attention and Run projections over existing models without changing execution.
 - Add server-side aggregation and query budgets.
-- Prototype V2 navigation against those real contracts behind an administrator-only store flag.
+- Validate the approved prototype against real DTO fixtures and Odoo-shell feasibility; do not wire production frontend yet.
 
-**Exit:** V2 screens can render honest state from V1 execution; no duplicate source of truth.
+**Exit:** stable read contracts can render every required state from V1 execution fixtures; no duplicate source of truth. Production UI waits for the Shopify boundary/runtime foundation.
 
 ### Stage 2 — Shopify gateway extraction
 
@@ -100,7 +100,8 @@ Even then, replace internals using coexistence and data migration. Do not discar
 
 ## 6. Program controls
 
-Each stage is a separate reviewed PR series with:
+The stages execute continuously after program authorization. They are automatic evidence
+checkpoints, not separate user approval cycles. Each coherent implementation unit records:
 
 - explicit allowed/forbidden files and dependency direction;
 - invariant checklist tied to accepted ADRs and rejected approaches;
@@ -113,6 +114,11 @@ Each stage is a separate reviewed PR series with:
 
 No stage is accepted merely because tests are green; the proof must cover the failure mode introduced by that stage.
 
-## 7. Initial sizing posture
+## 7. Delivery posture
 
-Do not estimate the complete V2 before Stage 0. Size by independently shippable outcomes: read models, gateway extraction, runtime lane, store lifecycle, individual UI journeys, and packaging cleanup. The first funding decision should authorize the baseline plus one vertical slice—Overview → Attention → run evidence over existing execution—because it tests the architecture and product experience without mutation risk.
+The user has selected one continuous implementation program. Stage 0 still measures the
+unknowns and may refine internal effort estimates, but it does not force a new authorization
+request before every subsystem. Work proceeds foundation → gateway/runtime → domains/setup →
+complete UI → qualification whenever the owning evidence gate passes. Use coherent commits,
+targeted tests and rollback points; keep post-release contraction/packaging outside the critical
+path. Stop only on a defined safety, evidence or external-authority condition.

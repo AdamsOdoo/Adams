@@ -16,6 +16,7 @@ V2 turns the connector from a collection of configuration and sync surfaces into
 | Recovery is a workflow | Errors name the owner, safe next action, retry eligibility and evidence—not raw stack traces. |
 | Odoo-native | Familiar lists, forms, filters, chatter and access rules; custom Owl only where live composition materially improves work. |
 | Honest freshness | “Last observed”, “next check” and “data through” replace vague “real-time” claims. |
+| Near-real-time when events exist | Webhook and Odoo-event work is admitted immediately, visibly progresses and targets measured seconds-to-state; scheduled reconciliation remains the recovery net. |
 | Accessible without color | Text, icon, position and focus state convey every status. |
 
 ## 2. Navigation and information architecture
@@ -34,6 +35,12 @@ The app header contains a persistent store switcher and health summary. The prim
 | Settings | Is the store correctly configured? | Odoo form + guided setup/readiness |
 
 “Sync Center” and “Error Center” become views over **Runs** and **Needs Attention**, not separate concepts users must learn. Technical logs remain available to authorized administrators from a run.
+
+When more than one permitted store exists, the store switcher offers `Manage stores`.
+That surface lists connection/activation/health/company/workflow freshness, creates a new
+draft store, resumes setup, repairs/disconnects or retires a store, and never merges data or
+configuration across stores implicitly. An optional `All stores` summary ranks store-level
+health and attention but launches every operation inside one explicit store scope.
 
 ## 3. Core journeys
 
@@ -94,6 +101,25 @@ The run detail tells a narrative:
 
 Users navigate from any Odoo record to its connector evidence and back to the run without searching logs.
 
+### 3.6 Complete end-to-end coverage
+
+The product is not complete when setup, one dashboard and isolated service methods work.
+Every advertised journey is traced from actor/input through authorization, admission,
+Shopify/Odoo side effects, readback, business-record result, operator evidence and recovery:
+
+- first store and additional-store onboarding;
+- product/variant import, deterministic matching, refresh and controlled export;
+- customer and order import with currencies, totals, taxes, discounts, shipping and payment policy;
+- inventory mapping, first push, continuous changes, drift and reconciliation;
+- fulfillment/tracking with partial/error/uncertain outcomes and explicit notification;
+- manual, scheduled, webhook and Odoo-event triggers;
+- duplicate, delayed, missed and out-of-order event convergence;
+- pause, reconnect, credential replacement, disconnect, retire and resume;
+- Administrator, Operator, Reviewer, Auditor and no-access behavior;
+- install, upgrade, rollback and interrupted-work recovery.
+
+`09-test-observability-release-blueprint.md` owns the executable U1–U14 journey matrix.
+
 ## 4. Screen contracts
 
 | Screen | Must show | Primary action | Must not do |
@@ -101,11 +127,13 @@ Users navigate from any Odoo record to its connector evidence and back to the ru
 | Overview | store state, freshness, ≤3 active exceptions, workflow health, recent activity | Resolve top issue or launch operation | nine equal metric cards; success noise |
 | Needs Attention | severity, workflow, impact, age, owner, safe next action | Open resolution | collapse technical failure and human review into one color-only state |
 | Store setup | progress, saved state, validation evidence, consequences | Continue / activate | imply a token can be read back; activate through failed readiness |
+| Store management | every permitted store, company, connection/activation/health/freshness | Add, resume, repair or retire one store | expose inaccessible counts; apply one store’s policy to another |
 | Matching | incoming identity, authoritative keys, advisory evidence, candidates, existing binding conflicts | Bind/select/leave for review when genuinely ambiguous | fuzzy/name-only automatic matching |
 | Product preview | source/target value, authority, protected fields, validation, affected variants | Confirm eligible changes | offer confirm while authority or validation is unresolved |
 | Location mapping | Shopify location, Odoo location, conflict/unmapped evidence | Save mapping / preview first push | infer mapping from names and write immediately |
 | Run detail | timeline, attempts, error classification, readback, affected objects | Context-specific recovery | show stack trace as primary explanation |
 | Record panel | binding, last observed, last successful run, active hold, Shopify link | Open run / resolve | duplicate an entire technical form inside each business record |
+| Settings | connection/scopes, workflows, automation, authority, defaults, mappings, notifications, retention and advanced rollout | Save one validated group / rerun readiness | duplicate onboarding state; expose secret or unsafe bypass |
 
 ## 5. State model
 
@@ -126,7 +154,7 @@ The UI renders human labels and keeps internal tokens in diagnostics only. Fresh
 
 | Role | Can see | Can act |
 | --- | --- | --- |
-| Administrator | all stores, settings, credentials posture, technical evidence | connect, configure, activate/pause, destructive approvals, security-sensitive recovery |
+| Administrator | all stores permitted by active-company/store rules, settings, credentials posture, technical evidence | add/connect/configure/activate/pause/retire stores, destructive approvals, security-sensitive recovery |
 | Operator | assigned companies/stores and operational evidence | launch safe operations, fix mappings, retry eligible failures |
 | Reviewer | review queues and evidence needed for decisions | approve/reject/manual bind/skip with reason |
 | Auditor | redacted history and configuration snapshots | export/read evidence only |
@@ -158,3 +186,6 @@ The accepted U0 prototype remains historical input. The implementation-level hie
 - Common operational tasks require no navigation into technical models.
 - All critical flows pass keyboard, focus, contrast, 375/768/1366 viewport and RTL checks.
 - Screen readers receive status text and live-progress announcements without noisy polling updates.
+- Every advertised workflow passes its full backend → Shopify/Odoo → UI/readback journey, including failure and recovery.
+- A permitted Administrator can add and operate two stores in one company without data, count, settings or job leakage.
+- Interactive feedback appears within one second; active work follows measured near-real-time targets while idle views remain quiet.
