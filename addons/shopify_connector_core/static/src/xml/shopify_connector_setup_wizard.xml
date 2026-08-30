@@ -115,6 +115,11 @@
                             <div class="sc-band__body">
                                 <div class="sc-band__text">Setup is waiting for verification</div>
                                 <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                                <div t-if="state.activationFollowStillRunning"
+                                     class="sc-band__hint">
+                                    Verification is continuing safely in the background.
+                                    Use Check status below; you do not need to restart setup.
+                                </div>
                             </div>
                         </div>
                         <div t-if="store.setup_completion_state === 'action_required'"
@@ -124,6 +129,12 @@
                             <div class="sc-band__body">
                                 <div class="sc-band__text">Setup needs an operator action</div>
                                 <div class="sc-band__hint" t-esc="store.setup_completion_message"/>
+                                <button t-if="store.setup_completion_action_xmlid"
+                                        type="button"
+                                        class="btn btn-sm btn-outline-primary mt-2 sc_setup__completion_action_button"
+                                        t-on-click="openSetupCompletionAction">
+                                    <t t-esc="store.setup_completion_action_label"/>
+                                </button>
                             </div>
                         </div>
 
@@ -467,6 +478,61 @@
                                     </li>
                                 </t>
                             </ul>
+                            <div t-if="isDomainEnabled('sale')"
+                                 class="sc_setup__field sc_setup_order_defaults">
+                                <label for="sc_setup_order_pricelist">
+                                    Pricelist for imported orders
+                                </label>
+                                <select id="sc_setup_order_pricelist"
+                                        class="o_input sc_setup_order_pricelist"
+                                        t-model="state.form.orderPricelistId">
+                                    <option value="">Choose a pricelist…</option>
+                                    <t t-foreach="(state.data.order_setup || {}).pricelists || []"
+                                       t-as="pricelist" t-key="pricelist.id">
+                                        <option t-att-value="pricelist.id"
+                                                t-esc="pricelist.name"/>
+                                    </t>
+                                </select>
+                                <small>
+                                    Choose the active pricelist whose currency matches the
+                                    Shopify shop currency. This is required before Orders can run.
+                                </small>
+                                <label for="sc_setup_order_payment_term">
+                                    Payment term for imported orders
+                                </label>
+                                <select id="sc_setup_order_payment_term"
+                                        class="o_input sc_setup_order_payment_term"
+                                        t-model="state.form.orderPaymentTermId">
+                                    <option value="">Choose a payment term…</option>
+                                    <t t-foreach="(state.data.order_setup || {}).payment_terms || []"
+                                       t-as="term" t-key="term.id">
+                                        <option t-att-value="term.id"
+                                                t-esc="term.name"/>
+                                    </t>
+                                </select>
+                                <small>
+                                    Every Shopify order imported into Odoo uses this term.
+                                    It is required when Orders is enabled and can be changed
+                                    later in Sync Rules.
+                                </small>
+                                <label for="sc_setup_customer_fallback">
+                                    Fallback customer for incomplete Shopify profiles
+                                </label>
+                                <select id="sc_setup_customer_fallback"
+                                        class="o_input sc_setup_customer_fallback"
+                                        t-model="state.form.customerFallbackPartnerId">
+                                    <option value="">Choose a fallback customer…</option>
+                                    <t t-foreach="(state.data.order_setup || {}).fallback_partners || []"
+                                       t-as="partner" t-key="partner.id">
+                                        <option t-att-value="partner.id"
+                                                t-esc="partner.name"/>
+                                    </t>
+                                </select>
+                                <small>
+                                    Used only when an order has no usable customer email.
+                                    This prevents the first scheduled import from failing.
+                                </small>
+                            </div>
                         </t>
 
                         <!-- ===== location_mapping ===== -->
@@ -1004,7 +1070,9 @@
                                 t-att-disabled="state.busy or !canContinue"
                                 t-att-aria-describedby="state.errorMessage ? 'sc_setup_error' : false"
                                 t-on-click="() => this.continueStep()">
-                            <span t-if="isLastStep">Activate</span>
+                            <span t-if="isLastStep and store.setup_completion_state === 'pending'">Check status</span>
+                            <span t-elif="isLastStep and store.setup_completion_state === 'ready_to_complete'">Complete setup</span>
+                            <span t-elif="isLastStep">Activate</span>
                             <span t-else="">Continue</span>
                         </button>
                         <button t-if="store.id" class="sc-btn sc_setup_exit"

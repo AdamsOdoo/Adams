@@ -200,7 +200,9 @@ class ShopifyConnectorWebhookController(http.Controller):
         )
         identity = Delivery._minimal_resource_identity(payload)
         try:
-            _delivery, _duplicate = Delivery._ingest(
+            delivery, duplicate = Delivery.with_context(
+                inline_webhook_expansion=True,
+            )._ingest(
                 store,
                 delivery_id=delivery_id,
                 event_id=event_id,
@@ -219,5 +221,12 @@ class ShopifyConnectorWebhookController(http.Controller):
                 store.id, type(exc).__name__,
             )
             return self._response(500)
-        # No business processing, domain import, or remote read runs inline.
-        return self._response(200)
+        # No business processing, domain import, or remote read runs before
+        # the acknowledgement.  Once Werkzeug has sent and closed the empty
+        # 200 response, opportunistically dispatch only this delivery's
+        # durable chain on fresh transactions.  Any failure leaves the
+        # committed queued jobs for the ordinary cron recovery path.
+        response = self._response(200)
+        if not duplicate:
+            Delivery._dispatch_delivery_after_response(delivery, response)
+        return response

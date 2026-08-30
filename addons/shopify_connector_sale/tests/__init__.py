@@ -19,6 +19,7 @@ from . import test_order_scan_triggers
 from . import test_sec3_company_isolation
 from . import test_ui_u2_sale
 from . import test_ui_u2_action_tours
+from . import test_setup_order_defaults
 
 # Batch 2 checkpoint 1: canonical Store Settings classification.
 from . import test_canonical_store_settings_sale

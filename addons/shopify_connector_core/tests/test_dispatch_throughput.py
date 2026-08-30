@@ -40,7 +40,9 @@ real commit.
 """
 
 import ast
+import importlib.util
 import os
+from pathlib import Path
 import time
 from unittest.mock import patch
 import uuid
@@ -172,6 +174,25 @@ class TestDispatchThroughput(TransactionCase):
                 payload_hash=str(uuid.uuid4()),
             )
         trigger.assert_called_once()
+
+    def test_public_release_fallback_cadence_and_upgrade(self):
+        cron = self.env.ref(
+            'shopify_connector_core.ir_cron_shopify_connector_job_dispatch_drain'
+        )
+        cron.write({'interval_number': 5, 'interval_type': 'minutes'})
+        path = (
+            Path(__file__).resolve().parents[1]
+            / 'migrations' / '19.0.1.28.0' / 'post-migrate.py'
+        )
+        spec = importlib.util.spec_from_file_location(
+            'shopify_connector_core_1_28_post_migrate', path,
+        )
+        migration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(migration)
+        migration.migrate(self.env.cr, '19.0.1.27.0')
+        cron.invalidate_recordset()
+        self.assertEqual(cron.interval_number, 1)
+        self.assertEqual(cron.interval_type, 'minutes')
 
     # ------------------------------------------------------------------
     # Cron progress + time budget (D-PERF1-1)

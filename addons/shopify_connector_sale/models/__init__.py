@@ -1,5 +1,7 @@
 from . import shopify_connector_customer_binding
 from . import shopify_connector_store_settings
+from . import shopify_connector_setup_wizard
+from . import shopify_connector_readiness_check
 from . import shopify_connector_res_partner
 from . import shopify_connector_customer_importer
 from . import shopify_connector_order_binding

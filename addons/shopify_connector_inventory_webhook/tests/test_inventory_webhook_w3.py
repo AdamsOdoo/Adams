@@ -144,6 +144,82 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
             registry.topic_spec(INVENTORY_WEBHOOK_TOPIC)['include_fields'],
             INVENTORY_WEBHOOK_INCLUDE_FIELDS,
         )
+        self.assertTrue(registry.inline_expand_safe(INVENTORY_WEBHOOK_TOPIC))
+
+    def test_http_context_expands_to_child_without_waiting_for_parent_worker(self):
+        store = self._store('inline-expansion')
+        level_gid = (
+            'gid://shopify/InventoryLevel/7010?inventory_item_id=8010'
+        )
+        at = fields.Datetime.to_datetime('2026-08-22 08:00:00')
+        digest = hashlib.sha256(b'inline-expansion').hexdigest()
+        delivery, duplicate = self.env[
+            'shopify.connector.webhook.delivery'
+        ].with_context(inline_webhook_expansion=True)._ingest(
+            store,
+            delivery_id='w3-inline-delivery',
+            event_id='w3-inline-event',
+            topic=INVENTORY_WEBHOOK_TOPIC,
+            shop_domain=store.shop_domain,
+            api_version=SHOPIFY_API_VERSION,
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=at,
+            payload_digest=digest,
+            payload_size=192,
+            payload_identity={
+                'admin_graphql_api_id': level_gid,
+                'updated_at': fields.Datetime.to_string(at),
+            },
+        )
+        self.assertFalse(duplicate)
+        self.assertEqual(delivery.state, 'processed')
+        self.assertEqual(delivery.job_id.state, 'queued')
+        child = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', INVENTORY_OBSERVATION_JOB_TYPE),
+            ('shopify_target_gid', '=', level_gid),
+        ])
+        self.assertEqual(len(child), 1)
+        self.assertEqual(child.job_source, 'webhook')
+
+    def test_inline_expansion_failure_preserves_parent_recovery_job(self):
+        store = self._store('inline-fallback')
+        Delivery = self.env['shopify.connector.webhook.delivery']
+        with patch.object(
+            type(Delivery), '_process_queued',
+            side_effect=ValidationError('synthetic local expansion failure'),
+        ):
+            with self.assertLogs(
+                'odoo.addons.shopify_connector_webhook.models.'
+                'shopify_connector_webhook_delivery',
+                level='WARNING',
+            ):
+                delivery, duplicate = Delivery.with_context(
+                    inline_webhook_expansion=True,
+                )._ingest(
+                    store,
+                    delivery_id='w3-inline-fallback-delivery',
+                    event_id='w3-inline-fallback-event',
+                    topic=INVENTORY_WEBHOOK_TOPIC,
+                    shop_domain=store.shop_domain,
+                    api_version=SHOPIFY_API_VERSION,
+                    triggered_at=fields.Datetime.now(),
+                    source_updated_at=fields.Datetime.now(),
+                    payload_digest=hashlib.sha256(
+                        b'inline-fallback',
+                    ).hexdigest(),
+                    payload_size=192,
+                    payload_identity={
+                        'admin_graphql_api_id': (
+                            'gid://shopify/InventoryLevel/7011?'
+                            'inventory_item_id=8011'
+                        ),
+                    },
+                )
+        self.assertFalse(duplicate)
+        delivery.invalidate_recordset()
+        self.assertEqual(delivery.state, 'queued')
+        self.assertEqual(delivery.job_id.state, 'queued')
 
     def test_registry_extension_is_add_only_and_fails_closed_on_collision(self):
         registry = self.env['shopify.connector.webhook.registry']
@@ -269,7 +345,9 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertTrue(service._level_gid_matches_authoritative_identity(
             level,
             'gid://shopify/InventoryItem/8001',
-            'gid://shopify/Location/7001',
+            # InventoryLevel and Location are independent Shopify resources;
+            # their numeric suffixes are not required to be equal.
+            'gid://shopify/Location/9001',
         ))
         self.assertFalse(service._level_gid_matches_authoritative_identity(
             level,
@@ -279,7 +357,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
         self.assertFalse(service._level_gid_matches_authoritative_identity(
             level,
             'gid://shopify/InventoryItem/8001',
-            'gid://shopify/Location/9001',
+            'gid://shopify/Location/not-a-number',
         ))
         for invalid in (
             'gid://shopify/InventoryLevel/7001',
@@ -311,7 +389,7 @@ class TestShopifyConnectorInventoryWebhookW3(TransactionCase):
                         'id': 'gid://shopify/InventoryItem/8001',
                         'tracked': True,
                     },
-                    'location': {'id': 'gid://shopify/Location/7001'},
+                    'location': {'id': 'gid://shopify/Location/9001'},
                     'quantities': [{
                         'name': 'available',
                         'quantity': 7,

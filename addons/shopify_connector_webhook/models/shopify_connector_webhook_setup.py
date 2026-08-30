@@ -209,6 +209,25 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
         return False
 
     @api.model
+    def _stale_callback_review(self, store):
+        """Return the first preserved predecessor callback, if any.
+
+        The reconciliation parent can succeed after truthfully reading
+        Shopify while leaving a mismatched live callback untouched for an
+        administrator.  Such a subscription has no child mutation job yet,
+        so it is not represented by ``_child_setup_work``.  Project it
+        explicitly instead of blaming the successful parent job.
+        """
+        return self.env[
+            'shopify.connector.webhook.subscription'
+        ].sudo().search([
+            ('store_id', '=', store.id),
+            ('expected', '=', True),
+            ('state', '=', 'manual_review'),
+            ('shopify_subscription_gid', '!=', False),
+        ], order='id asc', limit=1)
+
+    @api.model
     def _webhook_setup_status(self, store, settings):
         """Return a non-secret operator projection of the setup hand-off."""
         if not store or not settings:
@@ -234,6 +253,10 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
                 'message': 'Complete connection setup before webhook proof is collected.',
                 'job_id': False,
             }
+
+        requirement = self._activation_requirement_status(store, settings)
+        if requirement.get('state') != 'ready':
+            return requirement
 
         # A bootstrap read may have populated rows while the store was still
         # setup-incomplete.  That evidence is useful, but it is not the
@@ -271,6 +294,26 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
                     'readiness again, then activate to complete setup.'
                 ),
                 'job_id': False,
+            }
+
+        stale_callback = self._stale_callback_review(store)
+        if connected_job_proof and stale_callback:
+            return {
+                'state': 'action_required',
+                'code': 'stale_callback_review_required',
+                'message': (
+                    'The store is connected, but Shopify still has preserved '
+                    'subscriptions that point to a predecessor connector. '
+                    'Review Webhook subscriptions and approve replacement of '
+                    'the exact stale callbacks; nothing was deleted '
+                    'automatically.'
+                ),
+                'job_id': job.id,
+                'action_xmlid': (
+                    'shopify_connector_webhook.'
+                    'action_shopify_connector_webhook_subscription'
+                ),
+                'action_label': 'Review webhook subscriptions',
             }
 
         if job and job.state in ACTIVE_SETUP_JOB_STATES:
@@ -327,9 +370,10 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
     @api.model
     def _activation_completion_policy(self, store, settings):
         """Defer completion once, then allow it only on stored proof."""
+        parent = super()._activation_completion_policy(store, settings)
         status = self._webhook_setup_status(store, settings)
         if status['state'] == 'ready_to_complete':
-            return {'complete': True}
+            return parent
 
         # A missing HMAC secret, a blocked parent, or a failed child is an
         # explicit operator action.  Do not turn any of those states into a
@@ -391,6 +435,8 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
     @api.model
     def _activation_completion_guard(self, store, settings):
         """Revalidate lifecycle, credential and webhook proof under locks."""
+        if not super()._activation_completion_guard(store, settings):
+            return False
         locked_state, locked_generation = store._lock_store_for_lifecycle()
         Credential = self.env['shopify.connector.store.credential']
         credential_version = Credential._lifecycle_credential_version(
@@ -422,5 +468,11 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
             'setup_completion_code': status.get('code', False),
             'setup_completion_message': status['message'],
             'setup_completion_job_id': status['job_id'],
+            'setup_completion_action_xmlid': status.get(
+                'action_xmlid', False,
+            ),
+            'setup_completion_action_label': status.get(
+                'action_label', False,
+            ),
         })
         return payload

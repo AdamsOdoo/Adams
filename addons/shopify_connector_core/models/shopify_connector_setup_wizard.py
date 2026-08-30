@@ -1829,6 +1829,28 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         return {'complete': True}
 
     @api.model
+    def _activation_post_transition(self, store, settings):
+        """Admit domain-owned proof work after the connection epoch changes.
+
+        The lifecycle transition deliberately creates a new connection
+        generation.  Domain evidence from the setup-incomplete generation is
+        therefore audit history, not proof for the connected generation.  An
+        installed addon may use this seam to enqueue a fresh, read-only proof
+        job.  It must not contact Shopify in this request.
+        """
+        del store, settings
+        return True
+
+    @api.model
+    def _activation_requirement_status(self, store, settings):
+        """Composable local status for domain proof required after connect."""
+        del store, settings
+        return {
+            'state': 'ready', 'code': 'core_ready', 'message': '',
+            'job_id': False,
+        }
+
+    @api.model
     def _activation_preflight(self, store, settings):
         """Return whether an installed domain permits lifecycle activation.
 
@@ -1917,6 +1939,10 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         if store.state != 'connected':
             store.action_activate()
             store.invalidate_recordset()
+        # Re-acquire any domain proof invalidated by the new connection
+        # generation.  This is a queue admission only; Shopify is never
+        # contacted from the activation request.
+        self._activation_post_transition(store, settings)
         # A modular domain may need a post-connection, asynchronous proof
         # (for example a webhook subscription read-back) before setup is
         # truthfully complete.  The hook runs only after the lifecycle
@@ -1986,6 +2012,25 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             if cron:
                 cron.sudo()._trigger()
         return self.get_setup_state(store_id=store.id)
+
+    @api.model
+    def follow_activation(self, store_id):
+        """Follow a durable post-activation proof and finalize when ready.
+
+        The browser polls this bounded, local-only projection after the first
+        activation hand-off.  It never drains jobs and never contacts Shopify.
+        When an installed domain reports ``ready_to_complete``, re-enter the
+        ordinary authoritative activation method: that method reruns readiness,
+        rechecks every lifecycle/credential/domain fence, and owns the single
+        setup-completion write.  All other states are returned unchanged so a
+        pending or actionable result remains truthful and recoverable.
+        """
+        store = self._resolve_store(store_id)
+        state = self.get_setup_state(store_id=store.id)
+        completion = state.get('store', {}).get('setup_completion_state')
+        if completion == 'ready_to_complete':
+            return self.activate(store.id)
+        return state
 
     # ------------------------------------------------------------------
     # Save & Exit, and re-run

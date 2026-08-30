@@ -457,11 +457,12 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
         """Cross-check a composite level GID with exact read identities.
 
         ``location_gid`` is not guessed from a webhook numeric field and is
-        not interpolated into the level GID.  It must be the exact canonical
-        ``Location`` GID returned by Shopify, while both the parameterized
-        level GID's embedded inventory-item component and its level component
-        must equal the exact authoritative ``InventoryItem`` and ``Location``
-        GID suffixes.
+        not interpolated into the level GID. It must be the exact canonical
+        ``Location`` GID returned by Shopify. The parameterized level GID's
+        embedded inventory-item component must equal the authoritative
+        ``InventoryItem`` suffix. The InventoryLevel object's own numeric
+        suffix is an independent resource identity and must not be equated to
+        the Location suffix.
         """
         composite = _parse_inventory_level_gid(level_gid)
         item_id = _canonical_simple_gid(
@@ -475,7 +476,6 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             and item_id
             and location_id
             and composite['inventory_item_id'] == item_id
-            and composite['level_id'] == location_id
         )
 
     @api.model

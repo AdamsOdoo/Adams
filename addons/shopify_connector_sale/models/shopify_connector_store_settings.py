@@ -297,6 +297,28 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                 )
 
     def write(self, vals):
+        readiness_changed = self.filtered(lambda settings: (
+            (
+                'order_company_id' in vals
+                and settings.order_company_id.id
+                != (vals.get('order_company_id') or False)
+            )
+            or (
+                'order_pricelist_id' in vals
+                and settings.order_pricelist_id.id
+                != (vals.get('order_pricelist_id') or False)
+            )
+            or (
+                'order_payment_term_id' in vals
+                and settings.order_payment_term_id.id
+                != (vals.get('order_payment_term_id') or False)
+            )
+            or (
+                'customer_fallback_partner_id' in vals
+                and settings.customer_fallback_partner_id.id
+                != (vals.get('customer_fallback_partner_id') or False)
+            )
+        ))
         if 'order_company_id' in vals:
             target_company_id = vals.get('order_company_id') or False
             for settings in self:
@@ -313,7 +335,10 @@ class ShopifyConnectorStoreSettingsCustomerExtension(models.Model):
                         'Order company cannot change after an order binding '
                         'or tax mapping exists for the store.'
                     )
-        return super().write(vals)
+        result = super().write(vals)
+        if readiness_changed:
+            readiness_changed._mark_setup_readiness_stale()
+        return result
 
     @api.model
     def _sec3_parent_scope_relations(self):

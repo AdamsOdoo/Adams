@@ -771,10 +771,33 @@ class TestSetupWizardSteps(SetupWizardCase):
     def test_selected_read_workflows_enable_their_schedulers(self):
         """Choosing a workflow is the complete onboarding decision."""
         store = self._ready_store()
-        self._as(self.admin_a).save_directions(
-            store.id, ['product_import', 'sale'],
-        )
         settings = self._settings(store)
+        direction_kwargs = {}
+        # When the optional sale add-on owns an imported-order default, the
+        # cross-add-on contract must satisfy that prerequisite before it can
+        # assert that onboarding admitted the scheduler.  Core-only installs
+        # have neither the field nor the extended RPC argument.
+        if 'order_payment_term_id' in settings._fields:
+            term = self.env['account.payment.term'].create({
+                'name': 'Setup scheduler contract term',
+            })
+            direction_kwargs['order_payment_term_id'] = term.id
+        if 'order_pricelist_id' in settings._fields:
+            pricelist = self.env['product.pricelist'].create({
+                'name': 'Setup scheduler contract pricelist',
+                'currency_id': store.company_id.currency_id.id,
+                'company_id': store.company_id.id,
+            })
+            direction_kwargs['order_pricelist_id'] = pricelist.id
+        if 'customer_fallback_partner_id' in settings._fields:
+            fallback = self.env['res.partner'].create({
+                'name': 'Setup scheduler contract fallback',
+                'company_id': store.company_id.id,
+            })
+            direction_kwargs['customer_fallback_partner_id'] = fallback.id
+        self._as(self.admin_a).save_directions(
+            store.id, ['product_import', 'sale'], **direction_kwargs,
+        )
         if 'product_scheduled_sync_enabled' in settings._fields:
             self.assertTrue(settings.product_scheduled_sync_enabled)
         if 'order_scheduled_sync_enabled' in settings._fields:

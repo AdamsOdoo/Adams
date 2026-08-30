@@ -2307,6 +2307,10 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         return Job.sudo().search([
             ('store_id', '=', store.id),
             ('job_type', '=', JOB_TYPE_LOCATION_SYNC),
+            (
+                'expected_connection_generation', '=',
+                store.connection_generation,
+            ),
             ('state', 'not in', TERMINAL_JOB_STATES),
         ], order='id desc', limit=1)
 
@@ -2573,7 +2577,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
                 # Retry the preserved logical run.  A new row would discard
                 # the failure lineage the setup surface is asking to recover.
                 existing.with_user(self.env.user).action_manual_retry()
-            self._trigger_dispatch_after_location_refresh()
+            self._trigger_dispatch_after_location_refresh(existing)
             return existing
         previous = self.env['shopify.connector.job'].sudo().search([
             ('store_id', '=', store.id),
@@ -2585,19 +2589,24 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             == store.connection_generation
         ):
             previous.with_user(self.env.user).action_manual_retry()
-            self._trigger_dispatch_after_location_refresh()
+            self._trigger_dispatch_after_location_refresh(previous)
             return previous
         job = self._enqueue_location_sync(store, job_source=job_source)
-        self._trigger_dispatch_after_location_refresh()
+        self._trigger_dispatch_after_location_refresh(job)
         return job
 
     @api.model
-    def _trigger_dispatch_after_location_refresh(self):
-        """Schedule the governed dispatcher promptly after this RPC commits.
+    def _trigger_dispatch_after_location_refresh(self, job=None):
+        """Dispatch an interactive location read after commit, with cron fallback.
 
-        This preserves the queue boundary: the screen never calls Shopify.
-        It only asks Odoo to run the existing dispatcher without waiting for
-        its five-minute fallback cadence.
+        ``ir.cron._trigger()`` is only a durable wake-up hint; on Odoo.sh its
+        scheduler granularity can leave an onboarding screen waiting for about
+        a minute.  A setup location read is remote-read replay-safe, so after
+        the admission transaction commits we may process that *exact* job on a
+        fresh cursor through the ordinary dispatcher.  The HTTP transaction
+        still never contacts Shopify and an exception leaves the committed job
+        queued for the normal cron.  Ordinary/manual refreshes keep the same
+        path too, but only the exact admitted location-read job is eligible.
         """
         cron = self.env.ref(
             'shopify_connector_core.'
@@ -2606,6 +2615,59 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         )
         if cron:
             cron.sudo()._trigger()
+        if not job or job.job_type != JOB_TYPE_LOCATION_SYNC:
+            return True
+        commit = getattr(self.env.cr, 'commit', None)
+        if getattr(commit, '__name__', '') == 'forbidden':
+            return True
+
+        registry = self.env.registry
+        uid = self.env.uid
+        context = dict(self.env.context)
+        job_id = job.id
+
+        def dispatch_exact_location_read_after_commit():
+            side_cr = registry.cursor()
+            try:
+                side_env = api.Environment(side_cr, uid, context)
+                side_job = side_env['shopify.connector.job'].browse(
+                    job_id,
+                ).exists()
+                if not side_job:
+                    side_cr.rollback()
+                    return False
+                claimable = side_job._claimable_domain()
+                locked = side_job.try_lock_for_update().filtered_domain(
+                    claimable,
+                )
+                if (
+                    not locked
+                    or locked.job_type != JOB_TYPE_LOCATION_SYNC
+                    or locked.job_source not in (
+                        'setup_readiness_check', 'manual_sync',
+                    )
+                ):
+                    side_cr.rollback()
+                    return False
+                side_env['shopify.connector.job.dispatch']._dispatch_one(
+                    locked,
+                )
+                side_cr.flush()
+                side_cr.commit()
+                return True
+            except Exception:  # noqa: BLE001 - durable cron is the fallback
+                side_cr.rollback()
+                _logger.exception(
+                    'Immediate location-read dispatch failed for job %s; '
+                    'the durable cron fallback remains scheduled.', job_id,
+                )
+                return False
+            finally:
+                side_cr.close()
+
+        self.env.cr.postcommit.add(
+            dispatch_exact_location_read_after_commit,
+        )
         return True
 
     @api.model

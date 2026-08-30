@@ -51,6 +51,88 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
     _inherit = 'shopify.connector.setup.wizard'
 
     @api.model
+    def _activation_post_transition(self, store, settings):
+        """Queue current-generation location proof during activation."""
+        result = super()._activation_post_transition(store, settings)
+        if not settings.inventory_domain_enabled:
+            return result
+        refresh = self.env[
+            'shopify.connector.inventory.service'
+        ].location_refresh_state(store)
+        if refresh.get('state') != 'succeeded':
+            self.env[
+                'shopify.connector.inventory.service'
+            ]._setup_refresh_shopify_locations(store.id)
+        return result
+
+    @api.model
+    def _activation_requirement_status(self, store, settings):
+        """Require fresh locations and valid mappings in this generation."""
+        parent = super()._activation_requirement_status(store, settings)
+        if parent.get('state') != 'ready':
+            return parent
+        if not settings.inventory_domain_enabled:
+            return parent
+        payload = self._setup_location_payload(store, settings)
+        refresh = payload.get('refresh') or {}
+        state = refresh.get('state')
+        if state in ('waiting', 'running'):
+            return {
+                'state': 'pending',
+                'code': 'location_proof_pending',
+                'job_id': refresh.get('job_id'),
+                'message': (
+                    'Connected; verifying Shopify locations for this '
+                    'connection before setup completes. Location job #%s is '
+                    '%s.' % (refresh.get('job_id'), state)
+                ),
+            }
+        if state == 'succeeded' and payload.get('mapping_complete'):
+            return parent
+        if state == 'failed':
+            message = refresh.get('reason') or (
+                'The Shopify location verification did not finish safely.'
+            )
+        elif state == 'succeeded':
+            message = (
+                '%d active Shopify location(s) still need an explicit Odoo '
+                'location mapping.' % payload.get('unmapped_count', 0)
+            )
+        else:
+            message = (
+                'Shopify locations have not been verified for the current '
+                'connection.'
+            )
+        return {
+            'state': 'action_required',
+            'code': 'location_proof_required',
+            'job_id': refresh.get('job_id'),
+            'message': message,
+        }
+
+    @api.model
+    def _activation_completion_policy(self, store, settings):
+        parent = super()._activation_completion_policy(store, settings)
+        if parent and not parent.get('complete', True):
+            return parent
+        status = self._activation_requirement_status(store, settings)
+        if status.get('state') == 'ready':
+            return parent
+        return {
+            'complete': False,
+            'job_id': status.get('job_id'),
+            'message': status.get('message'),
+        }
+
+    @api.model
+    def _activation_completion_guard(self, store, settings):
+        if not super()._activation_completion_guard(store, settings):
+            return False
+        return self._activation_requirement_status(
+            store, settings,
+        ).get('state') == 'ready'
+
+    @api.model
     def _setup_location_payload(self, store, settings):
         """Cached Shopify locations, their mapping state, and the Odoo targets.
 
@@ -135,14 +217,43 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
     @api.model
     def _eligible_odoo_location_count(self, store):
         """How many internal Odoo locations this caller could map, in total."""
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         try:
             return self.env['stock.location'].search_count(domain)
         except AccessError:
             return 0
+
+    @api.model
+    def _setup_eligible_odoo_location_domain(self, store):
+        """Valid setup targets, excluding already-used/overlapping branches.
+
+        The authoritative mapping service still enforces the invariant.  This
+        projection prevents the wizard from offering choices it already knows
+        that service must refuse: a location already mapped for this store, or
+        one of its ancestors/descendants, would count the same physical stock
+        under two Shopify locations.
+        """
+        domain = [('usage', '=', 'internal')]
+        company = store.company_id
+        if company:
+            domain.append(('company_id', 'in', [False, company.id]))
+        Mapping = self.env['shopify.connector.location.mapping']
+        mapped = Mapping.search([
+            ('store_id', '=', store.id),
+        ]).mapped('odoo_location_id')
+        if not mapped:
+            return domain
+        Location = self.env['stock.location']
+        descendants = Location.search([('id', 'child_of', mapped.ids)])
+        conflicting_ids = set(descendants.ids)
+        for location in mapped:
+            conflicting_ids.update(
+                int(item) for item in (location.parent_path or '').split('/')
+                if item
+            )
+        if conflicting_ids:
+            domain.append(('id', 'not in', sorted(conflicting_ids)))
+        return domain
 
     @api.model
     def _setup_eligible_odoo_locations(self, store):
@@ -158,10 +269,7 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         list of unusable choices is worse than an honest empty one.
         """
         Location = self.env['stock.location']
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         try:
             locations = Location.search(
                 domain,
@@ -271,10 +379,7 @@ class ShopifyConnectorSetupWizardInventoryExtension(models.AbstractModel):
         # side == 'odoo' -- searched as the calling user, deliberately, for
         # the same reason `_setup_eligible_odoo_locations` is: Odoo's own
         # `stock.location` access decides what this operator may see.
-        domain = [('usage', '=', 'internal')]
-        company = store.company_id
-        if company:
-            domain.append(('company_id', 'in', [False, company.id]))
+        domain = self._setup_eligible_odoo_location_domain(store)
         if query:
             domain.append(('complete_name', 'ilike', query))
         Location = self.env['stock.location']

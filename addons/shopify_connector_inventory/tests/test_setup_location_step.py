@@ -11,6 +11,7 @@ fails the test if it is reached.
 """
 
 import json
+from pathlib import Path
 from unittest.mock import patch
 
 from odoo import fields
@@ -28,6 +29,18 @@ _UNSET = object()
 
 @tagged('post_install', '-at_install')
 class TestSetupLocationStep(TransactionCase):
+
+    def test_setup_location_refresh_has_exact_postcommit_fast_path(self):
+        """Interactive reads must not depend only on cron granularity."""
+        source = Path(
+            __file__,
+        ).parents[1].joinpath(
+            'models', 'shopify_connector_inventory_service.py',
+        ).read_text()
+        self.assertIn('postcommit.add', source)
+        self.assertIn('try_lock_for_update().filtered_domain', source)
+        self.assertIn("locked.job_type != JOB_TYPE_LOCATION_SYNC", source)
+        self.assertIn('the durable cron fallback remains scheduled', source)
 
     @classmethod
     def setUpClass(cls):
@@ -106,13 +119,13 @@ class TestSetupLocationStep(TransactionCase):
             'shopify_location_active': active,
         })
 
-    def _mark_refresh_succeeded(self):
+    def _mark_refresh_succeeded(self, suffix='current'):
         job = self.env['shopify.connector.job'].sudo().create({
             'store_id': self.store.id,
             'job_source': 'setup_readiness_check',
             'job_type': 'inventory_location_sync',
             'state': 'queued',
-            'payload_hash': 'setup-location-current-success',
+            'payload_hash': 'setup-location-%s-success' % suffix,
             'expected_connection_generation':
                 self.store.connection_generation,
         })
@@ -225,6 +238,41 @@ class TestSetupLocationStep(TransactionCase):
                 location.company_id.id,
                 (False, self.store.company_id.id),
             )
+
+    def test_setup_does_not_offer_mapped_or_overlapping_stock_branches(self):
+        parent = self.env['stock.location'].create({
+            'name': 'Mapped branch parent',
+            'usage': 'internal',
+            'location_id': self.warehouse.view_location_id.id,
+        })
+        mapped = self.env['stock.location'].create({
+            'name': 'Mapped branch target',
+            'usage': 'internal',
+            'location_id': parent.id,
+        })
+        child = self.env['stock.location'].create({
+            'name': 'Mapped branch child',
+            'usage': 'internal',
+            'location_id': mapped.id,
+        })
+        self._cache('gid://shopify/Location/USED', 'Used location')
+        self._as().save_location_mapping(
+            self.store.id, 'gid://shopify/Location/USED', mapped.id,
+        )
+
+        payload = self._as().get_setup_state(self.store.id)[
+            'location_mapping'
+        ]
+        offered = {entry['id'] for entry in payload['odoo_locations']}
+        self.assertNotIn(parent.id, offered)
+        self.assertNotIn(mapped.id, offered)
+        self.assertNotIn(child.id, offered)
+        self.assertIn(self.location_b.id, offered)
+
+        page = self._as().search_location_options(
+            self.store.id, 'odoo', 'Mapped branch', 0,
+        )
+        self.assertEqual(page['items'], [])
 
     def test_map_wizard_domain_follows_store_company_and_keeps_server_fence(self):
         """The modal must not offer an allowed-but-foreign internal location.
@@ -609,6 +657,71 @@ class TestSetupLocationStep(TransactionCase):
         )
         self.assertEqual(check['state'], 'blocking')
         self.assertIn('connection', check['reason'].lower())
+
+    def test_activation_admits_fresh_location_proof_after_generation_change(self):
+        """The setup must not strand itself on its pre-connect evidence."""
+        old = self.env['shopify.connector.job'].sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'inventory_location_sync',
+            'state': 'queued',
+            'payload_hash': 'pre-activation-location-proof',
+            'expected_connection_generation': 0,
+        })
+        self.store.sudo().write({
+            'state': 'connected', 'connection_generation': 1,
+        })
+
+        with patch.object(
+            type(self.Service), '_trigger_dispatch_after_location_refresh',
+            lambda _service, _job=None: True,
+        ):
+            self._as()._activation_post_transition(
+                self.store, self.settings,
+            )
+
+        jobs = self.env['shopify.connector.job'].sudo().search([
+            ('store_id', '=', self.store.id),
+            ('job_type', '=', 'inventory_location_sync'),
+        ], order='id asc')
+        self.assertEqual(len(jobs), 2)
+        self.assertEqual(jobs[0], old)
+        self.assertEqual(jobs[1].expected_connection_generation, 1)
+        self.assertEqual(jobs[1].job_source, 'manual_sync')
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'pending')
+        self.assertEqual(status['job_id'], jobs[1].id)
+
+    def test_activation_requirement_needs_current_refresh_and_complete_mapping(self):
+        self.store.sudo().write({
+            'state': 'connected', 'connection_generation': 1,
+        })
+        stale = self._mark_refresh_succeeded('stale-activation')
+        stale.sudo().write({'expected_connection_generation': 0})
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'action_required')
+
+        current = self._mark_refresh_succeeded('current-activation')
+        self._cache('gid://shopify/Location/ACTIVATION', 'Activation proof')
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(current.expected_connection_generation, 1)
+        self.assertEqual(status['state'], 'action_required')
+
+        self._as().save_location_mapping(
+            self.store.id,
+            'gid://shopify/Location/ACTIVATION',
+            self.location_a.id,
+        )
+        status = self._as()._activation_requirement_status(
+            self.store, self.settings,
+        )
+        self.assertEqual(status['state'], 'ready')
 
     def test_readiness_requires_a_mapping_while_inventory_is_enabled(self):
         state = self._as().run_readiness(self.store.id)

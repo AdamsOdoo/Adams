@@ -167,6 +167,51 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
             self.assertTrue(registry.topic_spec('products/update'))
         else:
             self.assertEqual(registry.topic_spec('products/update'), False)
+        self.assertFalse(registry.inline_expand_safe('app/uninstalled'))
+
+    def test_inline_context_never_runs_lifecycle_handler(self):
+        store = self.env['shopify.connector.store'].create({
+            'name': 'W1 inline lifecycle fence',
+            'shop_domain': 'w1-inline-lifecycle.myshopify.com',
+            'api_version': '2026-07',
+            'state': 'connected',
+        })
+        delivery, duplicate = self.env[
+            'shopify.connector.webhook.delivery'
+        ].with_context(inline_webhook_expansion=True)._ingest(
+            store,
+            delivery_id='w1-inline-lifecycle-delivery',
+            event_id='w1-inline-lifecycle-event',
+            topic='app/uninstalled',
+            shop_domain=store.shop_domain,
+            api_version='2026-07',
+            triggered_at=fields.Datetime.now(),
+            source_updated_at=False,
+            payload_digest=hashlib.sha256(b'inline-lifecycle').hexdigest(),
+            payload_size=32,
+            payload_identity={},
+        )
+        self.assertFalse(duplicate)
+        self.assertEqual(delivery.state, 'queued')
+        self.assertEqual(store.state, 'connected')
+
+        callbacks = []
+
+        class Response:
+            @staticmethod
+            def call_on_close(callback):
+                callbacks.append(callback)
+
+        returned = self.env[
+            'shopify.connector.webhook.delivery'
+        ]._dispatch_delivery_after_response(delivery, Response())
+        self.assertEqual(len(callbacks), 1)
+        self.assertIsInstance(returned, Response)
+        # Registration alone must not process the parent inside the ingress
+        # transaction.  Werkzeug invokes the callback only after closing the
+        # already-produced acknowledgement response.
+        self.assertEqual(delivery.state, 'queued')
+        self.assertEqual(delivery.job_id.state, 'queued')
 
     def test_latest_reconciled_at_ignores_unreconciled_rows(self):
         older = datetime(2026, 8, 23, 18, 4, 19)
@@ -725,8 +770,13 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertNotIn("type='json2'", controller)
         self.assertIn('return http.Response(', controller)
         self.assertNotIn('from werkzeug.wrappers import Response', controller)
-        self.assertIn('Delivery._ingest(', controller)
+        self.assertIn('Delivery.with_context(', controller)
+        self.assertIn('inline_webhook_expansion=True', controller)
+        self.assertIn(')._ingest(', controller)
         self.assertNotIn('process_delivery(', controller)
+        self.assertIn('call_on_close', delivery)
+        self.assertIn('_dispatch_delivery_after_response', controller)
+        self.assertNotIn('_dispatch_one(', controller)
         self.assertIn('UNIQUE(store_id, delivery_id)', delivery)
         self.assertIn('if api_version != SHOPIFY_API_VERSION:', delivery)
         self.assertIn("'api_version': SHOPIFY_API_VERSION", delivery)
@@ -785,6 +835,8 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn('setup_completion_state', wizard_js)
         self.assertIn('connected_job_proof', webhook_setup)
         self.assertIn('expected_connection_generation', webhook_setup)
+        self.assertIn('_activation_requirement_status', webhook_setup)
+        self.assertIn('super()._activation_completion_policy', webhook_setup)
         self.assertIn('Setup is waiting for verification',
                       (core_root / 'static' / 'src' / 'xml' /
                        'shopify_connector_setup_wizard.xml').read_text())
@@ -800,6 +852,24 @@ class TestShopifyConnectorWebhookW1(TransactionCase):
         self.assertIn("'state': 'ready_to_complete'", setup)
         self.assertIn('job.expected_connection_generation', setup)
         self.assertNotIn("setup_completed_at': fields.Datetime.now()", setup)
+
+    def test_setup_projects_preserved_stale_callbacks_truthfully(self):
+        addon_root = Path(__file__).resolve().parents[1]
+        setup = (addon_root / 'models' /
+                 'shopify_connector_webhook_setup.py').read_text()
+        core_root = addon_root.parent / 'shopify_connector_core'
+        wizard_js = (core_root / 'static' / 'src' / 'js' /
+                     'shopify_connector_setup_wizard.js').read_text()
+        wizard_xml = (core_root / 'static' / 'src' / 'xml' /
+                      'shopify_connector_setup_wizard.xml').read_text()
+        self.assertIn('def _stale_callback_review', setup)
+        self.assertIn("'stale_callback_review_required'", setup)
+        self.assertIn("'setup_completion_action_xmlid'", setup)
+        self.assertIn("'setup_completion_action_label'", setup)
+        self.assertIn('nothing was deleted', setup)
+        self.assertIn('openSetupCompletionAction', wizard_js)
+        self.assertIn('this.state.errorMessage = ""', wizard_js)
+        self.assertIn('sc_setup__completion_action_button', wizard_xml)
 
     def test_activation_fences_are_fresh_and_client_secret_gate_is_truthful(self):
         store = (Path(__file__).resolve().parents[2] / 'shopify_connector_core' /

@@ -67,6 +67,14 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
     # `inventory_push_sync` dispatch.
     pending_target_available = fields.Float(readonly=True)
 
+    # UI affordance only. The backend remains the release authority and
+    # revalidates the exact job count, attempt disposition, and subreason under
+    # row locks. This non-stored flag prevents offering that privileged route
+    # on healthy pairs while avoiding a second, stale binding-level state.
+    has_blocked_inventory_job = fields.Boolean(
+        compute='_compute_has_blocked_inventory_job',
+    )
+
     # MBQ-38 first-push confirmation record (D-013-4).
     first_push_state = fields.Selection(
         selection=FIRST_PUSH_STATE_SELECTION,
@@ -95,6 +103,29 @@ class ShopifyConnectorInventoryLevelBinding(models.Model):
         'An inventory-level binding for this product-variant binding and '
         'mapped location already exists for this store.',
     )
+
+    def _compute_has_blocked_inventory_job(self):
+        blocked_ids = set()
+        if self.ids:
+            groups = self.env['shopify.connector.job'].sudo()._read_group(
+                domain=[
+                    ('res_model', '=',
+                     'shopify.connector.inventory.level.binding'),
+                    ('res_id', 'in', self.ids),
+                    ('job_type', 'in', (
+                        'inventory_activate',
+                        'inventory_set_quantities',
+                    )),
+                    ('state', '=', 'blocked_manual_review'),
+                ],
+                groupby=['res_id'],
+                aggregates=['__count'],
+            )
+            blocked_ids = {
+                res_id for res_id, count in groups if count == 1
+            }
+        for binding in self:
+            binding.has_blocked_inventory_job = binding.id in blocked_ids
 
     def _odoo_binding_field_name(self):
         # Composite identity (variant x location) -- not a single

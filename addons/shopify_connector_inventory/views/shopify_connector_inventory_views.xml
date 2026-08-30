@@ -323,7 +323,9 @@
                     -->
                     <button name="%(action_shopify_connector_inventory_recheck_wizard)d"
                             type="action" string="Verify Now"
+                            invisible="not has_blocked_inventory_job"
                             groups="shopify_connector_core.group_shopify_connector_admin"/>
+                    <field name="has_blocked_inventory_job" invisible="1"/>
                     <!--
                         The TD-020 closure. A previewed/confirmed pair used to
                         be a dead end: the remap guard (correctly) refuses to

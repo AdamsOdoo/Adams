@@ -68,7 +68,19 @@ const FIRST_STEP_KEY = "welcome";
 
 // Finite one-shot backoff: no interval survives the setup session and no
 // browser loop claims a background run must finish within an arbitrary time.
-const LOCATION_REFRESH_BACKOFF_MS = [250, 500, 1000, 2000];
+const LOCATION_REFRESH_BACKOFF_MS = [
+    250, 500, 1000, 2000, 4000,
+    8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000,
+];
+// Activation can hand off to a durable webhook reconciliation chain. Follow
+// that chain long enough for the normal exact-build path to finish, then leave
+// an explicit Check status action instead of trapping the merchant on a
+// disabled Activate button. The server remains authoritative on every poll.
+const ACTIVATION_FOLLOW_BACKOFF_MS = [
+    250, 500, 1000, 2000, 4000,
+    10000, 10000, 10000, 10000, 10000, 10000, 10000,
+    10000, 10000, 10000, 10000, 10000, 10000,
+];
 
 export class ShopifyConnectorSetupWizard extends Component {
     static template = "shopify_connector_core.SetupWizard";
@@ -95,6 +107,9 @@ export class ShopifyConnectorSetupWizard extends Component {
                 name: "",
                 shopDomain: "",
                 enabledDomains: [],
+                orderPricelistId: "",
+                orderPaymentTermId: "",
+                customerFallbackPartnerId: "",
                 matching: "",
                 price: "",
                 notification: false,
@@ -131,12 +146,16 @@ export class ShopifyConnectorSetupWizard extends Component {
             // the server still validates both identities on every save.
             locationMappingChoices: {},
             locationRefreshStillRunning: false,
+            activationFollowStillRunning: false,
         });
 
         this.locationRefreshJobId = null;
         this.locationRefreshFollowGeneration = 0;
         this.locationRefreshTimer = null;
         this.locationRefreshTimerResolve = null;
+        this.activationFollowGeneration = 0;
+        this.activationFollowTimer = null;
+        this.activationFollowTimerResolve = null;
 
         onWillStart(async () => {
             await this._load(
@@ -148,6 +167,8 @@ export class ShopifyConnectorSetupWizard extends Component {
         onWillUnmount(() => {
             this.locationRefreshFollowGeneration += 1;
             this._cancelLocationRefreshTimer();
+            this.activationFollowGeneration += 1;
+            this._cancelActivationFollowTimer();
         });
 
         // A11y: focus moves to the step heading on advance, so a keyboard or
@@ -276,7 +297,15 @@ export class ShopifyConnectorSetupWizard extends Component {
             // activation fence.  Mirror that decision in the client so a
             // screen which says "Blocked" never presents an enabled primary
             // action that is guaranteed to be refused.
-            return Boolean(this.summary.can_activate);
+            return Boolean(
+                this.summary.can_activate ||
+                (
+                    this.store.state === "connected" &&
+                    ["pending", "ready_to_complete"].includes(
+                        this.store.setup_completion_state
+                    )
+                )
+            );
         }
         if (
             this.state.stepKey === "location_mapping" &&
@@ -348,6 +377,15 @@ export class ShopifyConnectorSetupWizard extends Component {
         this.state.form.enabledDomains = (data.domains || [])
             .filter((d) => d.enabled)
             .map((d) => d.key);
+        this.state.form.orderPaymentTermId = String(
+            (data.order_setup && data.order_setup.payment_term_id) || ""
+        );
+        this.state.form.orderPricelistId = String(
+            (data.order_setup && data.order_setup.pricelist_id) || ""
+        );
+        this.state.form.customerFallbackPartnerId = String(
+            (data.order_setup && data.order_setup.fallback_partner_id) || ""
+        );
         // Deliberately NOT seeded from the stored values. The source-of-truth
         // step requires an explicit choice, and pre-selecting whatever the
         // backend default happens to be is precisely how a default becomes
@@ -583,6 +621,16 @@ export class ShopifyConnectorSetupWizard extends Component {
                 ok = await this._call("save_directions", {
                     store_id: storeId,
                     enabled_keys: this.state.form.enabledDomains,
+                    ...(this.state.data.order_setup
+                        ? {
+                            order_pricelist_id:
+                                this.state.form.orderPricelistId || null,
+                            order_payment_term_id:
+                                this.state.form.orderPaymentTermId || null,
+                            customer_fallback_partner_id:
+                                this.state.form.customerFallbackPartnerId || null,
+                        }
+                        : {}),
                 });
                 break;
             case "location_mapping":
@@ -620,16 +668,30 @@ export class ShopifyConnectorSetupWizard extends Component {
                 ok = true;
                 break;
             case "review":
+                if (
+                    this.store.state === "connected" &&
+                    ["pending", "ready_to_complete"].includes(
+                        this.store.setup_completion_state
+                    )
+                ) {
+                    await this._followActivation();
+                    return;
+                }
                 ok = await this._call("activate", { store_id: storeId });
                 if (ok) {
-                    if (["pending", "action_required"].includes(
-                        this.store.setup_completion_state
-                    )) {
+                    if (this.store.setup_completion_state === "action_required") {
+                        this.state.errorMessage =
+                            this.store.setup_completion_message ||
+                            _t("Activation needs an operator action.");
+                        return;
+                    }
+                    if (this.store.setup_completion_state === "pending") {
                         this.notification.add(
                             this.store.setup_completion_message ||
                             _t("Setup is waiting for verification before it can be completed."),
                             { type: "warning" }
                         );
+                        await this._followActivation();
                         return;
                     }
                     this.notification.add(
@@ -711,6 +773,82 @@ export class ShopifyConnectorSetupWizard extends Component {
         if (this.locationRefreshTimerResolve) {
             this.locationRefreshTimerResolve();
             this.locationRefreshTimerResolve = null;
+        }
+    }
+
+    _waitForActivationFollow(delay, generation) {
+        return new Promise((resolve) => {
+            if (generation !== this.activationFollowGeneration) {
+                resolve();
+                return;
+            }
+            this.activationFollowTimerResolve = resolve;
+            this.activationFollowTimer = setTimeout(() => {
+                this.activationFollowTimer = null;
+                this.activationFollowTimerResolve = null;
+                resolve();
+            }, delay);
+        });
+    }
+
+    _cancelActivationFollowTimer() {
+        if (this.activationFollowTimer !== null) {
+            clearTimeout(this.activationFollowTimer);
+            this.activationFollowTimer = null;
+        }
+        if (this.activationFollowTimerResolve) {
+            this.activationFollowTimerResolve();
+            this.activationFollowTimerResolve = null;
+        }
+    }
+
+    async _followActivation() {
+        this._cancelActivationFollowTimer();
+        const generation = ++this.activationFollowGeneration;
+        this.state.activationFollowStillRunning = false;
+        for (const delay of ACTIVATION_FOLLOW_BACKOFF_MS) {
+            await this._waitForActivationFollow(delay, generation);
+            if (generation !== this.activationFollowGeneration) {
+                return;
+            }
+            const ok = await this._call("follow_activation", {
+                store_id: this.store.id,
+            });
+            if (!ok || generation !== this.activationFollowGeneration) {
+                return;
+            }
+            if (this.store.setup_completion_state === "complete") {
+                this.notification.add(
+                    _t("Store activated. Synchronization is now running."),
+                    { type: "success" }
+                );
+                this.action.doAction(
+                    "shopify_connector_core.action_shopify_connector_dashboard"
+                );
+                return;
+            }
+            if (this.store.setup_completion_state === "action_required") {
+                // The completion band already renders the server's truthful
+                // operator projection and optional recovery action.  Do not
+                // duplicate the same condition as a generic refusal banner.
+                this.state.errorMessage = "";
+                return;
+            }
+            if (![
+                "pending", "ready_to_complete",
+            ].includes(this.store.setup_completion_state)) {
+                return;
+            }
+        }
+        if (generation === this.activationFollowGeneration) {
+            this.state.activationFollowStillRunning = true;
+        }
+    }
+
+    openSetupCompletionAction() {
+        const actionXmlid = this.store.setup_completion_action_xmlid;
+        if (actionXmlid) {
+            this.action.doAction(actionXmlid);
         }
     }
 

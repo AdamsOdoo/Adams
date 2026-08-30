@@ -120,6 +120,16 @@ class TestUiSetupTours(HttpCase):
         self.env['ir.config_parameter'].sudo().set_param(
             'web.base.url', 'https://s1-tour.example.test',
         )
+        # The Orders setup contract requires an explicit pricelist whose
+        # currency can be compared with Shopify.  Minimal HttpCase databases
+        # do not guarantee that one exists, so make the browser journey's
+        # merchant prerequisite explicit instead of weakening production
+        # readiness for a test-only environment.
+        self.env['product.pricelist'].sudo().create({
+            'name': 'S1 Tour Pricelist',
+            'currency_id': self.env.company.currency_id.id,
+            'company_id': self.env.company.id,
+        })
 
     def test_setup_wizard_traverses_all_twelve_steps(self):
         """Nothing to an activated store, through the browser, in order.
@@ -837,15 +847,10 @@ class TestUiC4LocationRefreshTours(HttpCase):
         admissions, admissions_lock = self._install_admission_observer(
             fixture, [(1, first_dispatch), (2, reopen_dispatch)],
         )
-        thread, findings = self._start_dispatcher(
-            fixture, [first_dispatch, reopen_dispatch],
-        )
-
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_dispatch_tour',
             login=fixture['login'],
         )
-        self._assert_worker_clean(thread, findings)
         with admissions_lock:
             admitted_ids = list(admissions)
         with calls_lock:
@@ -888,15 +893,10 @@ class TestUiC4LocationRefreshTours(HttpCase):
         admissions, admissions_lock = self._install_admission_observer(
             fixture, [(1, first_dispatch), (2, retry_dispatch)],
         )
-        thread, findings = self._start_dispatcher(
-            fixture, [first_dispatch, retry_dispatch],
-        )
-
         self.start_tour(
             '/odoo', 'shopify_connector_s1_location_refresh_failure_tour',
             login=fixture['login'],
         )
-        self._assert_worker_clean(thread, findings)
         with admissions_lock:
             admitted_ids = list(admissions)
         with calls_lock:
