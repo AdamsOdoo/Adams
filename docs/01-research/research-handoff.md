@@ -1,5 +1,43 @@
 # Research Handoff (rolling)
 
+## V2 continuous implementation-readiness correction — 2026-08-30
+
+### Scope and identity
+
+- **Branch/PR:** `codex/v2-product-architecture-gate`, draft PR #211.
+- **Correction input:** `c395101c498ea6d2ba8fc1d263537a2c32bd17ee`.
+- **Blueprint correction commit:** `a375bd777f4d579e52f26a4b44dab859e9767c81`.
+- **Production impact:** none; V1 release PR #210 and all connector production code remain untouched.
+- **Purpose:** replace obsolete P00-only/21-PR execution wording and close the V1, foundation, journey, administration, responsiveness and continuity gaps.
+
+### Locked outcome
+
+- V1 release lessons are explicit characterization/regression inputs: reachable onboarding, active progress/recovery, priority/backlog/restart proof, event-to-visible-state latency and complete user evidence.
+- Production UI wiring is blocked until the shared command/gateway/runtime/security/migration/performance foundation passes on one candidate.
+- U1–U14 prove onboarding, additional stores, products, orders, inventory, fulfillment, trigger parity, uncertainty/recovery, operations, lifecycle, roles, upgrade/rollback and two complete Shopify↔Odoo merchant loops.
+- Administrator settings, non-configurable safety controls, store lifecycle and multiple-store isolation/management are locked in the data/API and UX contracts.
+- Near-real-time targets are measured and honest; immediate drain plus one-minute recovery scheduling avoids new broker/worker infrastructure.
+- Refunds/returns and payouts extend typed optional domain registries without speculative core tables or a generic workflow engine.
+- P00–P20 remain 21 bounded work IDs inside one continuous five-wave program, one integration branch and one exact candidate PR; they are not approval phases.
+- Root `CLAUDE.md`, `AGENTS.md` and `docs/v2/13-continuous-execution-handoff.md` now require proactive committed handoff before a work chat becomes context-constrained.
+
+### Current blueprint audit
+
+- 60 locked decisions.
+- 28 rejected-pattern checks.
+- 27 traced requirements.
+- 14 mandatory end-to-end journeys.
+- Relative-link, Markdown-fence and duplicate-ID checks passed.
+- All 16 updated/new blueprint and governance files were verified against their remote Git blob SHAs.
+
+### Continuation
+
+One integrated architecture/execution review remains. After explicit implementation authorization, start Wave 1 from the accepted exact `Shopify-connector` head and continue automatically through Waves 2–5 when evidence gates pass. Stop only on the documented safety, evidence or external-authority conditions. Use `docs/v2/13-continuous-execution-handoff.md` as the live cross-chat checkpoint.
+
+This entry supersedes only the stale P00-only, mandatory-per-PR, count and continuation statements in the immediately following 2026-08-30 blueprint-closure entry. All prior research and release history below remains preserved.
+
+---
+
 ## V2 implementation blueprint closure — 2026-08-30
 
 ### Current session
