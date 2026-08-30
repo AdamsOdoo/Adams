@@ -1,6 +1,6 @@
 # V2 Target Architecture
 
-> **Classification:** Recommendation for review. Existing accepted ADRs remain authoritative until a reviewed ADR explicitly changes them.
+> **Classification:** implementation-ready target for architecture-gate review. Existing accepted ADRs remain authoritative until a reviewed ADR explicitly changes them.
 
 ## 1. Architectural objective
 
@@ -25,7 +25,7 @@ Preserve the accepted domain-aligned addon family and stable technical names dur
 
 | Context | Owns | Does not own |
 | --- | --- | --- |
-| Core/runtime | stores, credential handle, capabilities, jobs/runs/attempts, redacted logs, transport, throttle budget, webhook inbox, handler registry, shared binding contract, readiness registry | product/order/inventory/fulfillment mappings |
+| Core/runtime | stores, credential handle, capabilities, runs/jobs/execution attempts/mutation evidence, redacted logs, transport, throttle budget, webhook inbox, handler registry, shared binding contract, readiness registry | product/order/inventory/fulfillment mappings |
 | Product | product/variant import, bindings, matching and evidence | catalog mutations |
 | Product export | preview, approval and controlled catalog mutations | import matching |
 | Sale | customer/order import, bindings, total evidence | inventory or fulfillment execution |
@@ -91,7 +91,7 @@ stateDiagram-v2
     Running --> Terminal: non-recoverable
 ```
 
-Keep request/run, job and attempt distinct. A retry creates an attempt, not a duplicate business request. Append-only observations preserve throttle, error, readback and actor evidence. Existing job rows may be projected into this model before any schema migration.
+Keep request/run, job, execution attempt and remote mutation intent distinct. A retry creates an execution attempt, not a duplicate business request; the existing `shopify.connector.mutation.attempt` remains the durable certainty record for one remote-write intent. Append-only observations preserve throttle, error, readback and actor evidence. Existing job rows are projected through opaque `job:<id>` run references before additive run/execution-attempt schema is introduced.
 
 Priority lanes are explicit: interactive recovery and webhook admission outrank scheduled reconciliation; bounded aging prevents starvation. Per-store operation-scope keys serialize conflicting writes. Workers claim with database-safe locking and short transactions; network calls are never made while holding broad business-record locks.
 

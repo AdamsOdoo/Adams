@@ -1,55 +1,97 @@
-# Shopify Connector V2 — Product and Architecture Gate
+# Shopify Connector V2 — Implementation Blueprint
 
-> **Status:** Recommendation for review — docs only, 2026-08-29.  
-> **Base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.  
+> **Status:** implementation-ready architecture/product package — docs only, 2026-08-30.  
+> **Interactive design:** [Shopify Connector V2 Blueprint](https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site).  
+> **Planning base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.  
 > **Current implementation evidence:** draft release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`.  
-> **Authority:** this package does not authorize implementation or supersede accepted ADRs. It proposes the V2 product contract and an evidence-based delivery strategy.
+> **Authority:** no production code is changed here. Implementation begins with packet P00 only after the architecture gate is accepted.
 
 ## Outcome
 
-**Recommendation:** build V2 through **staged refactoring with bounded internal replacement**, not a ground-up rewrite and not cosmetic renovation of V1.
+Build V2 through **staged refactoring with bounded internal replacement**.
 
-Preserve the proven safety assets: Odoo records and bindings, stable model/XML identifiers, module installation data, job history, idempotency and serialization rules, mutation admission/readback safeguards, webhook deduplication, company/store-generation fences, retry taxonomy, and accepted domain authority rules.
+Preserve customer data and proven safety: stores, bindings, model/XML identities, module lifecycle, jobs/logs, mutation evidence, idempotency/operation scopes, retry taxonomy, webhook deduplication, company/store-generation fences and domain authority rules.
 
-Replace behind compatibility seams: the oversized API client, store/setup orchestration, job-dispatch internals, duplicated webhook packaging, read-model aggregation, and the production UI shell. A deeper replacement becomes justified only if the proof gates in the delivery assessment fail.
+Replace concentrated internals behind compatibility seams: Shopify API client, setup/store orchestration, job dispatch/runtime, server read aggregation and the composed production UI. A deeper replacement is permitted only if the defined proof gates show the existing persistent contracts cannot support safe extraction.
 
-## Package
+## Start here
 
-| Document | Purpose |
+| Need | Read |
 | --- | --- |
-| [V2 product experience](./01-product-experience.md) | Product promise, navigation, screens, journeys, states, roles, visual and accessibility contract |
-| [V2 target architecture](./02-target-architecture.md) | Runtime layers, bounded contexts, contracts, data safety, observability, testing, deployment constraints |
-| [Refactor vs replacement assessment](./03-refactor-vs-replacement.md) | Evidence, decision matrix, staged route, replacement triggers, gates and rollback |
-| [Evidence and competitor decisions](./04-evidence-and-competitor-decisions.md) | Current-product inputs, official references, competitor patterns and explicit learn/avoid decisions |
+| Approve product scope and operator experience | [01 Product experience](./01-product-experience.md) and [05 UX/design blueprint](./05-ux-design-blueprint.md) |
+| Approve target backend | [02 Target architecture](./02-target-architecture.md), [06 Backend blueprint](./06-backend-implementation-blueprint.md), [07 Data/API contracts](./07-data-and-api-contracts.md) |
+| Approve refactor/cutover safety | [03 Assessment](./03-refactor-vs-replacement.md), [08 Migration blueprint](./08-migration-and-cutover-blueprint.md) |
+| Approve proof/release bar | [09 Test/observability/release](./09-test-observability-release-blueprint.md) |
+| Assign implementation work | [10 PR roadmap](./10-implementation-roadmap.md), [12 lighter-model handoff](./12-lighter-model-execution-handoff.md) |
+| Audit choices and coverage | [11 Decision/traceability register](./11-decision-and-traceability-register.md) |
+| Review evidence/competition | [04 Evidence and competitor decisions](./04-evidence-and-competitor-decisions.md) |
+
+## Complete package
+
+| # | Document | Binding purpose |
+| --- | --- | --- |
+| 01 | [Product experience](./01-product-experience.md) | product promise, navigation, journeys, states, roles and success measures |
+| 02 | [Target architecture](./02-target-architecture.md) | modular-monolith direction, contexts and runtime posture |
+| 03 | [Refactor vs replacement](./03-refactor-vs-replacement.md) | preserve/refactor/replace matrix, escalation evidence and stage gates |
+| 04 | [Evidence and competitors](./04-evidence-and-competitor-decisions.md) | official sources, repository facts, competitor patterns and learn/avoid decisions |
+| 05 | [UX and visual design blueprint](./05-ux-design-blueprint.md) | exact shell, tokens, components, screens, response states, responsive/RTL/a11y and frontend structure |
+| 06 | [Backend implementation blueprint](./06-backend-implementation-blueprint.md) | packages, dependencies, commands/queries, runtime, transaction, Shopify, webhook and security boundaries |
+| 07 | [Data and API contracts](./07-data-and-api-contracts.md) | persistent models, additive schema, DTOs, commands, errors, idempotency and source-of-truth matrix |
+| 08 | [Migration and cutover blueprint](./08-migration-and-cutover-blueprint.md) | modes, expand/backfill/switch, subsystem cutovers, cohorts, halt and rollback |
+| 09 | [Test, observability and release blueprint](./09-test-observability-release-blueprint.md) | test profiles/lanes, behavior matrices, budgets, SLOs, alerts and exact release evidence |
+| 10 | [Implementation roadmap](./10-implementation-roadmap.md) | 21 ordered PR packets with allowed/forbidden scope, gates and rollback |
+| 11 | [Decision and traceability register](./11-decision-and-traceability-register.md) | 50 locked decisions, parameters, rejected-pattern checks and requirement mapping |
+| 12 | [Lighter-model execution handoff](./12-lighter-model-execution-handoff.md) | precise read/act/test/stop/report protocol and reusable implementation/review prompts |
 
 ## V2 north star
 
-The operator should be able to answer four questions within seconds:
+An operator answers within seconds:
 
-1. Is each store safe and operational?
-2. What needs human attention now?
-3. What changed, why, and what will happen next?
-4. Can I act without creating duplicates, overwriting authority, or guessing the result of a remote write?
+1. Is this store safe and operational?
+2. What needs a person now?
+3. What changed, why, and what happens next?
+4. Can I act without duplicates, overwritten authority or a guessed remote result?
 
-The product is a calm Odoo-native control plane, not a generic synchronization dashboard and not a second ERP.
+The product is a calm Odoo-native operations workspace, not a generic dashboard and not a second ERP.
 
-## Non-negotiable guardrails
+## Non-negotiable invariants
 
-- Shopify GraphQL Admin API remains behind a single integration boundary.
-- Webhooks are hints: verify, deduplicate, enqueue, reconcile.
-- Every mutation passes admission, idempotency/serialization, observation and terminal-result gates.
-- Ambiguous mutation outcomes are read back before retry; never blind-retried.
-- Shopify/Odoo source-of-truth is explicit per field or operation.
-- Standard Odoo list/form/search views remain the default; Owl is reserved for the few interaction-dense surfaces.
-- No new SPA router, global browser state store, external worker, giant addon, or per-feature addon explosion.
-- No internal refactor may force a customer to reconnect a store or discard existing bindings/job evidence.
+- Shopify GraphQL Admin API is behind one typed, versioned integration boundary.
+- Webhooks are verified/deduplicated hints; reconciliation covers missed/duplicate/out-of-order delivery.
+- Every mutation passes authorization, company/store/generation, idempotency/scope, durable intent, observation and terminal-result gates.
+- Any possible-after-send ambiguity is read back before retry.
+- Source of truth is explicit by capability/field; matching never guesses from a name.
+- Inventory first push requires explicit mapping, current observation, preview and Administrator confirmation.
+- Fulfillment customer notification is explicit and audited.
+- Standard Odoo views remain default; selective Owl owns only composed/dense workflows.
+- No SPA router, global browser store, raw frontend Shopify calls, external worker, giant addon or per-feature addon explosion.
+- No V2 refactor forces reconnect, binding recreation or loss of operational evidence.
+- No permission fix uses UI hiding, `sudo()` aggregation or context-flag authorization.
+- No old path/flag is removed before coexistence, canary, rollback and soak gates.
 
-## Approval gates
+## Implementation order
 
-This package asks reviewers to approve three things separately:
+```mermaid
+flowchart TB
+    B["P00 baseline"] --> C["P01–P04 contracts + read UX"]
+    C --> G["P05–P08 Shopify gateways"]
+    G --> R["P09–P10 additive runtime"]
+    R --> M["P11–P14 mutations by risk"]
+    M --> U["P15–P16 complete UX"]
+    U --> Q["P17–P18 qualify + roll out"]
+    Q --> X["P19–P20 contract/optional packaging"]
+```
 
-1. **Product gate:** the information architecture, journeys, states and screen contracts are the desired V2 experience.
-2. **Architecture gate:** the layer boundaries and compatibility contracts are the target internal design.
-3. **Delivery gate:** proceed with Stage 0/1 proof work; do not approve the full migration until compatibility, performance and rollback evidence passes.
+Backend contracts and real read models precede production UI wiring. Read-only runtime precedes any V2 mutation. Connector-owned webhook subscriptions prove desired-state administration first; inventory precedes product export; fulfillment is last. Contraction is after release, never a prerequisite for user value.
 
-No V2 production code should begin before those three review outcomes are recorded.
+## Architecture gate
+
+Review and record five decisions:
+
+1. approve product/UX (`01`, `05`);
+2. approve backend/data/API (`02`, `06`, `07`);
+3. approve migration/release (`03`, `08`, `09`);
+4. approve roadmap/execution protocol (`10`, `12`);
+5. approve locked decisions/rejections/traceability (`11`).
+
+When accepted, authorize **P00 only**. Each later packet is unlocked by its predecessor gate and evidence. The package leaves no design or architecture choice to the implementation model; it may stop only on a defined evidence conflict or authorization boundary.

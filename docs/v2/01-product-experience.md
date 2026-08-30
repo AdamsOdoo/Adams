@@ -1,6 +1,6 @@
 # V2 Product Experience
 
-> **Classification:** Recommendation for review. This refines the accepted U0 visual principles and DEC-012 operator flows; it does not silently replace them.
+> **Classification:** implementation-ready product contract for architecture-gate review. This refines the accepted U0 visual principles and DEC-012 operator flows; it does not silently replace them.
 
 ## 1. Product promise
 
@@ -147,7 +147,7 @@ Record rules and service-layer authorization both apply. Buttons are not securit
 - responsive shell at tablet/mobile widths, keyboard-complete flows and mirrored RTL;
 - platform FontAwesome icons in production; no bespoke icon language unless a real gap is proven.
 
-The accepted U0 prototype remains a visual baseline. V2 first corrects the information architecture and contracts; high-fidelity screens follow after product-gate acceptance.
+The accepted U0 prototype remains historical input. The implementation-level hierarchy, states and composition are now demonstrated in the [interactive V2 blueprint](https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site) and specified in `05-ux-design-blueprint.md`. Production remains Odoo-native and uses the documented DTO/security contracts rather than copying the prototype as a standalone SPA.
 
 ## 8. Experience acceptance measures
 

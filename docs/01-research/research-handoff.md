@@ -1,5 +1,53 @@
 # Research Handoff (rolling)
 
+## V2 implementation blueprint closure — 2026-08-30
+
+### Current session
+
+- **Scope:** completed the docs-only product, UX, backend, data/API, migration, testing, observability, release and execution package before implementation.
+- **Planning branch/PR:** `codex/v2-product-architecture-gate`, draft PR #211.
+- **Planning base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.
+- **Implementation evidence:** release PR #210 at `44da1e006eb19f93e685bc9993935153292b84f7`; not modified.
+- **Visual artifact:** interactive V2 blueprint at `https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site`.
+
+### Outcome
+
+- Kept the recommendation: staged refactoring with bounded internal replacement, not blank rewrite or V1 restyling.
+- Locked the Odoo-native operations workspace and all shell, screen, component, loading/empty/error, responsive, RTL, accessibility and copy contracts.
+- Defined exact modular-monolith packages, dependency direction, commands/queries, RPC facades, Shopify gateways, transaction/claim/retry/readback, webhook and security boundaries.
+- Distinguished run/request, existing job, new execution attempt and existing mutation intent/certainty evidence.
+- Preserved stable addons/models/XML IDs/bindings/jobs/logs/mutation evidence, current uniqueness, role IDs, company/same-store/generation fences and error taxonomy.
+- Defined additive run/attempt schema, versioned DTOs/commands/problem codes, idempotency layers and a complete field/capability source-of-truth matrix.
+- Defined expand/backfill/dual-read/switch/soak/contract migration, store-scoped UI/gateway/runtime modes, risk-ordered mutation cutover, canary cohorts, automatic halt and rollback runbooks.
+- Defined test profiles/lanes, domain/fault/security/UX matrices, performance budgets, SLOs, alerts and exact-SHA release evidence.
+- Defined P00–P20 with dependencies, allowed/forbidden files, acceptance and rollback; P20 webhook consolidation is optional.
+- Added 50 locked V2 decisions, 23 rejected-pattern checks, requirement/screen/contract/test/packet traceability and a lighter-model operating handoff with stop/report prompts.
+
+### Current implementation facts reconciled
+
+- Core retains store, credential/settings/location, job/log, mutation, lease/dispatch, readiness, dashboard and setup model seams.
+- Domain family remains product, product export, sale, inventory, fulfillment, webhook and four webhook satellites.
+- Existing binding/store/job/webhook/mutation constraints and current role implication graph were inspected at PR #210 head.
+- Current Shopify API constant is `2026-07` and fails closed on a missing/mismatched served-version header.
+- Concentration remains highest in inventory, product export, order/product import, store/setup/credential, dispatch/API and webhook subscription files; extraction order is characterized and packeted.
+
+### Sources and classifications
+
+- Repository governance, accepted ADRs/rejections, U0 evidence and PR #210 implementation: repository fact.
+- Shopify webhook/API-limit/app-design documentation and Odoo 19 Owl/services/performance/security/testing documentation: official fact/guidance.
+- VentorTech, Teqstars, Emipro and Webkul public screens/docs/tutorials: competitor/vendor claims only; used for interaction decisions, not technical truth.
+- Full links/classification: `docs/v2/04-evidence-and-competitor-decisions.md`.
+
+### Learning feedback loop
+
+- **New defect occurrence:** none; this session changed planning/design only.
+- **Architecture risk clarified:** “attempt” was split into execution attempt versus the existing remote mutation-intent record to avoid retry/certainty ambiguity.
+- **Rejected approaches:** none superseded; the V2 regression checklist makes them reviewable per PR.
+- **Technical debt accepted:** none. Temporary flags/facades require owner and removal issue and cannot survive contraction silently.
+- **Open implementation choice:** none for P00. Later work stops only on the evidence/authorization conditions already documented.
+- **Required first implementation:** P00 baseline, characterization and restore proof only after the five-part architecture gate is accepted.
+
+---
 ## V2 product and architecture gate — 2026-08-29
 
 ## Current session

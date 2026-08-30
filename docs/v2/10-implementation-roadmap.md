@@ -1,0 +1,686 @@
+# V2 Implementation Roadmap
+
+> **Status:** ordered PR execution plan.  
+> **Rule:** one packet per PR, based on the accepted predecessor. Do not combine packets to “save time.”  
+> **Starting point:** create the first implementation branch from the current accepted `Shopify-connector` head after the architecture gate is approved—not from this docs branch and not from release PR #210 unless that exact head has become the branch baseline.
+
+## 1. Program gates
+
+| Gate | Required packets | Decision unlocked |
+| --- | --- | --- |
+| G0 Baseline | P00 | architecture extraction may start |
+| G1 Product/read contracts | P01–P04 | V2 pilot UI over legacy execution |
+| G2 Shopify boundary | P05–P08 | normalized gateway available to runtimes |
+| G3 Runtime reads | P09–P10 | V2 runtime canary for read-only work |
+| G4 Mutations | P11–P14 | capability-by-capability remote-write canary |
+| G5 Complete experience | P15–P16 | default V2 UX candidate |
+| G6 Release | P17–P18 | cohort rollout and default mode |
+| G7 Contraction | P19–P20 | one supported path and optional packaging cleanup |
+
+Approval at one gate does not pre-approve later packets.
+
+## 2. Universal PR contract
+
+Every implementation PR must include:
+
+- one-sentence user/engineering outcome;
+- exact base/head SHA and dependency packet;
+- allowed and forbidden file list;
+- compatibility invariants affected;
+- characterization test added before extraction;
+- behavior, security, lifecycle and performance evidence required by the slice;
+- fault/rollback statement;
+- docs/evidence/traceability update;
+- no unrelated formatting or cleanup;
+- a removal issue for every migration flag/facade introduced.
+
+Merge order is linear unless a packet explicitly says it can branch after the same gate. Rebase after predecessor merge; do not stack changes on a stale internal API.
+
+## 3. Packet index
+
+| Packet | Outcome | Remote writes | Primary risk |
+| --- | --- | --- | --- |
+| P00 | Reproducible V1 baseline and restore proof | none | missing characterization |
+| P01 | Enforced packages, vocabularies and public contracts | none | premature behavior change |
+| P02 | V2 read DTOs over legacy records | none | incorrect aggregation/tenant leak |
+| P03 | V2 shell and Overview pilot | none | mock/contract drift |
+| P04 | Attention and Run evidence pilot | none | unsafe action exposure |
+| P05 | Shopify compatibility facade and transport foundation | none | response/error drift |
+| P06 | Core/product/sale read gateway extraction | none | pagination/checkpoint drift |
+| P07 | Inventory/fulfillment/webhook read extraction | none | domain read semantics |
+| P08 | Mutation gateway extraction under legacy runtime | existing legacy path only | changed write payload/normalization |
+| P09 | Additive run/attempt schema and mode controls | none | upgrade/lifecycle |
+| P10 | V2 coordinator for read-only work | none | concurrency/checkpoints |
+| P11 | Webhook-subscription desired-state cutover | yes, scoped admin writes | lost/duplicate subscription |
+| P12 | Inventory mutation V2 canary | yes, scoped | blind overwrite/duplicate |
+| P13 | Product-export mutation V2 canary | yes, scoped | authority/stale preview |
+| P14 | Fulfillment mutation V2 canary | yes, scoped | duplicate shipment/notification |
+| P15 | Store lifecycle/readiness backend + setup UI | diagnostic only | credential/readiness bypass |
+| P16 | Complete domain UX/evidence panels | uses approved commands | UI authorization/state gaps |
+| P17 | Security/performance/accessibility/release closure | controlled test | qualification gaps |
+| P18 | Cohort rollout and default V2 mode | controlled production cohorts | operational regression |
+| P19 | Remove compatibility paths/migration flags | no new behavior | premature contraction |
+| P20 | Optional webhook addon consolidation | no semantic change | install/uninstall/XML-ID breakage |
+
+## 4. Detailed packets
+
+### P00 — Baseline, characterization and recovery evidence
+
+**Depends on:** architecture/product gate approval.  
+**Outcome:** V1 behavior, compatibility surface, performance and database restore are reproducible.
+
+Changes:
+
+- generate the six evidence files listed in `08-migration-and-cutover-blueprint.md`;
+- add bounded tools/tests to inventory models, fields, XML IDs, constraints, imports and Shopify operations;
+- add golden fixtures around API client, store, credential, setup, dispatch and each large domain service;
+- capture Tiny/CI-target baseline; schedule nightly/stress generation separately;
+- prove backup/restore and fresh/warm lifecycle on an isolated database.
+
+Allowed:
+
+- `docs/v2/evidence/**`, `docs/v2/**` status/traceability;
+- test fixtures/tests and non-production analysis tools;
+- CI wiring needed to run those checks.
+
+Forbidden:
+
+- production addon behavior/schema/view/security changes;
+- test weakening, skipped existing suite or generated merchant data.
+
+Acceptance:
+
+- compatibility inventory is deterministic across two clean runs;
+- golden tests fail when a selected current invariant is deliberately perturbed;
+- restore integrity matches row counts, sampled identities and constraints;
+- exact commands/environment/SHA are recorded.
+
+Rollback: remove analysis-only additions; no database/product change.
+
+### P01 — Contracts and dependency skeleton
+
+**Depends on:** P00/G0.  
+**Outcome:** target package boundaries and state/DTO contracts exist without changing execution.
+
+Changes:
+
+- add `application`, `domain`, `integration/shopify` and `runtime` package skeletons;
+- add immutable command/result, normalized error/state and DTO dataclasses;
+- add dependency rule checker and handler/attention/operation registry primitives;
+- add `shopify.connector.ui.facade` and application facade with no-op/legacy-delegating explicit methods behind tests;
+- document/import only stable public contracts.
+
+Allowed:
+
+- new core packages, minimal `__init__.py` wiring, facade AbstractModels;
+- pure unit/contract tests and boundary CI.
+
+Forbidden:
+
+- moving existing logic, schema changes, new menus/assets, remote request changes;
+- generic arbitrary command/model dispatch.
+
+Acceptance:
+
+- dependency checker catches reverse-import fixture;
+- duplicate registry keys/unknown operations fail closed;
+- all current tests pass unchanged;
+- production request count/payload is identical.
+
+Rollback: remove inert packages/facades.
+
+### P02 — Overview, Attention and Run read models
+
+**Depends on:** P01.  
+**Outcome:** complete V2 read contracts project existing execution safely.
+
+Changes:
+
+- implement `get_overview_v1`, attention search/detail providers and `get_run_v1` for `job:<id>`;
+- add provider adapters for manual-review jobs, mutation uncertainty, product match decisions, missing inventory mappings and readiness failures;
+- add common envelope, freshness and allowed-action projection;
+- add query instrumentation and budgets.
+
+Allowed:
+
+- core query/application packages and UI facade;
+- small read-only provider modules in owning domain addons;
+- tests/evidence.
+
+Forbidden:
+
+- persistent attention/run schema, remote calls from read DTOs, job transitions;
+- `sudo()` to make aggregate counts work; raw stack traces/PII.
+
+Acceptance:
+
+- seeded source states map to DTO golden fixtures;
+- no count/ID leakage across roles/companies/stores;
+- Overview ≤20 queries/800 ms on CI-target profile; no N+1 by page size;
+- allowed actions match direct server authorization tests.
+
+Rollback: leave legacy UI calling none of the new methods.
+
+### P03 — V2 shell and Overview pilot
+
+**Depends on:** P02/G1-read.  
+**Outcome:** production Odoo pilot matches the approved visual hierarchy using real DTOs.
+
+Changes:
+
+- add V2 menu/action context, store switcher, health band, workflow cards, attention preview and activity summary;
+- add shared tokens/status/loading/empty/error components;
+- add `v2_ui_mode` temporarily only if P09 has not yet added the complete mode set; use the exact final field/value contract and migrate no later;
+- retain legacy technical menus for administrators.
+
+Allowed:
+
+- core `static/src`, views/actions/menus and UI field/security wiring;
+- Owl/HOOT/tours/SCSS/evidence.
+
+Forbidden:
+
+- backend execution/gateway changes, mock production data, custom router/global store;
+- replacing native product/order lists.
+
+Acceptance:
+
+- one initial RPC, all response states, role/store/company switches;
+- keyboard/contrast/reduced-motion and 375/768/1366/1440/RTL screenshots;
+- no console error/overflow; visual review against the live blueprint;
+- `legacy` mode returns immediately to current navigation.
+
+Rollback: set UI mode `legacy`; assets remain inert.
+
+### P04 — Needs Attention and Run experience
+
+**Depends on:** P03.  
+**Outcome:** operators can resolve evidence-backed items and investigate runs without technical logs.
+
+Changes:
+
+- implement list/detail attention workspace and run timeline;
+- implement explicit `resolve_attention_v1`, `retry_job_v1`, `cancel_job_v1` by delegating to accepted existing services;
+- add stale `state_version`, reason/consequence/audit handling;
+- add contextual links to Odoo records and restricted technical details.
+
+Allowed:
+
+- application recovery commands, provider resolution adapters, core UI/views/tests;
+- no new business transition beyond existing accepted actions.
+
+Forbidden:
+
+- generic retry-all, new matching/authority algorithms, mutation replay;
+- arbitrary polymorphic model access from client refs.
+
+Acceptance:
+
+- all attention providers/actions and stale/concurrent submits tested;
+- direct RPC role/scope matrix passes;
+- uncertain mutation shows verification and cannot retry;
+- U2/U4/U5 read/recovery journeys pass with fake/local side effects only.
+
+Rollback: UI mode legacy; explicit methods remain compatible delegates.
+
+### P05 — Shopify transport/executor compatibility facade
+
+**Depends on:** P04/G1.  
+**Outcome:** one typed Shopify boundary exists with zero domain behavior change.
+
+Changes:
+
+- place a facade in front of current API-client public calls;
+- extract endpoint/version/header validation, HTTPS transport, response limits, GraphQL normalization, redaction and cost observations;
+- keep every old model method signature as a delegate;
+- add transport/executor contract fixtures and fault injection.
+
+Allowed:
+
+- core integration package, API-client compatibility edits, tools/redaction and tests;
+
+Forbidden:
+
+- domain query documents/call-site migration, mutation behavior, store/job schema;
+- user-configurable API version, business conditionals in transport.
+
+Acceptance:
+
+- old/new facade outputs/errors identical for golden fixtures;
+- served-version mismatch fails closed;
+- variables/headers/logs pass secret probes;
+- existing live request count/cost unchanged.
+
+Rollback: old API client method bodies remain recoverable behind facade mode.
+
+### P06 — Core, product and sale read gateways
+
+**Depends on:** P05.  
+**Outcome:** store/location/product/order/customer reads return normalized DTOs; importer behavior stays compatible.
+
+Changes in order:
+
+- capability/store identity and locations;
+- product/variant reads and pagination;
+- order/customer reads, checkpoint/overlap and commercial evidence;
+- call-site migration one family at a time;
+- deterministic `compare_reads` sampling and mismatch evidence.
+
+Allowed:
+
+- core/product/sale integration gateways and narrow importer compatibility changes;
+- fixtures/tests/evidence.
+
+Forbidden:
+
+- writes, binding/matching/total policy changes, checkpoint schema changes;
+- raw Shopify dictionaries beyond gateway.
+
+Acceptance:
+
+- zero unexplained normalized mismatch over full fixtures + 1,000 generated cases;
+- pagination/checkpoints/optional fields/error/cost parity;
+- importer characterization and performance budgets pass;
+- hotspot files materially shrink or their gateway responsibility does.
+
+Rollback: per-store gateway mode `legacy`; no data migration.
+
+### P07 — Inventory, fulfillment and webhook-subscription read gateways
+
+**Depends on:** P06.  
+**Outcome:** remaining read families cross typed gateways with parity.
+
+Allowed:
+
+- core/inventory/fulfillment/webhook integration read modules and narrow delegates;
+- contract/fault/performance tests.
+
+Forbidden:
+
+- quantity/fulfillment/subscription mutations; first-push/notification policy changes;
+- webhook ingestion/dedup redesign.
+
+Acceptance:
+
+- inventory item/location, FulfillmentOrder/fulfillment and subscription desired/current facts match legacy normalization;
+- cost/pagination and missing/stale resource behavior covered;
+- no read leaks raw payload/PII;
+- per-family legacy switch works.
+
+Rollback: gateway mode `legacy`.
+
+### P08 — Mutation gateway extraction under legacy runtime
+
+**Depends on:** P07/G2-read.  
+**Outcome:** checked-in mutation operations and typed results exist, but the accepted legacy admission/runtime still controls when they execute.
+
+Changes:
+
+- extract inventory, product export, fulfillment and subscription mutation documents/variables/results;
+- define exact domain readback methods/plans;
+- route existing handler calls through compatibility gateways;
+- compare canonical request variables and normalized responses in fixtures; never shadow live writes.
+
+Allowed:
+
+- integration mutation gateways, narrow legacy call-site delegates, tests/evidence.
+
+Forbidden:
+
+- new retry/cutover/runtime schema, changed authority/mapping/notification values;
+- multiple mutation calls for comparison.
+
+Acceptance:
+
+- canonical variables match legacy for all fixtures;
+- success/userErrors/top-level/timeout-before/after-send classifications pass;
+- every mutation spec has a readback plan;
+- fake Shopify ledger proves exactly one send per admitted job.
+
+Rollback: route facade to legacy implementation; current job/mutation evidence remains.
+
+### P09 — Additive run/attempt schema and migration controls
+
+**Depends on:** P08/G2.  
+**Outcome:** target runtime records and store modes install/upgrade safely without changing execution.
+
+Changes:
+
+- add run and execution-attempt models, security/rules/views;
+- add nullable job fields and indexes;
+- add all three store settings modes exactly as specified;
+- add migration/backfill framework and legacy run-ref compatibility;
+- update uninstall historic evidence rules.
+
+Allowed:
+
+- core models/security/data/views/migrations/tests/evidence;
+- no cron/dispatcher behavior change.
+
+Forbidden:
+
+- non-null big-table rewrite, fake mutation attempts, automatic remote work;
+- removing/retyping current job states or fields.
+
+Acceptance:
+
+- complete fresh/warm/interrupted/resumed/lifecycle matrix;
+- old runtime passes unchanged on expanded schema;
+- same-store/company/service-write/append-only constraints pass;
+- target/stress backfill meets lock/batch budgets.
+
+Rollback: old compatible code on expanded schema; flags `legacy`.
+
+### P10 — V2 coordinator and read-only runtime
+
+**Depends on:** P09/G3-schema.  
+**Outcome:** diagnostic/import/scan/reconciliation reads use runs, attempts, safe claims and priority lanes.
+
+Changes:
+
+- implement admission, coordinator, claimant, executor, observations, retry policy and read-only handlers;
+- keep existing drain cron external ID/call seam;
+- route only registered non-mutation job types when runtime mode is `read_only`;
+- project new run/attempt evidence into V2 UI.
+
+Allowed:
+
+- core runtime/application/model delegates and read-only domain handlers;
+- concurrency/fault/performance tests.
+
+Forbidden:
+
+- any mutation handler, new external queue/worker, removal of legacy dispatcher;
+- network call inside claim transaction.
+
+Acceptance:
+
+- claim/kill/stale-owner/priority-aging/dependency/cancellation tests;
+- checkpoint atomicity and no duplicate page effects;
+- target throughput/cost/latency within budget;
+- canary read-only mode and failback drill pass.
+
+Rollback: stop admission, settle claims, mode `legacy`.
+
+### P11 — Webhook-subscription desired-state cutover
+
+**Depends on:** P10/G3.  
+**Outcome:** subscription create/delete reconciliation is the first V2-admin mutation, with exact desired/current readback and no change to webhook ingestion.
+
+Changes:
+
+- implement a desired-state planner from enabled topics, scopes and callback identity;
+- register subscription create/delete handlers and exact list/readback verification;
+- route only `v2_runtime_mode=subscriptions` pilot stores;
+- preserve HMAC receiver, delivery dedup, payload-free envelope and satellite handler registration.
+
+Allowed:
+
+- webhook application/domain/runtime adapters, bounded core registration, readiness/subscription tests and evidence.
+
+Forbidden:
+
+- receiver/controller/delivery schema redesign, domain synchronization changes, satellite consolidation;
+- deleting an unrecognized subscription without explicit ownership evidence.
+
+Acceptance:
+
+- desired/current diff is deterministic and scoped to connector-owned callback/topic identity;
+- duplicate create/delete, timeout after send and list-readback paths pass in the fake ledger;
+- missing scopes/callback mismatch block readiness with safe remediation;
+- controlled test store converges twice from clean and drifted states;
+- failback leaves current subscriptions intact and reconciliation explains every difference.
+
+Rollback: stop V2 subscription admission; read back outstanding intent; set runtime mode `read_only`/`legacy`; do not mass-delete.
+
+### P12 — Inventory mutation V2 vertical slice
+
+**Depends on:** accepted P11 and P10/G3 runtime evidence.  
+**Outcome:** the first merchant-data V2 mutation proves admission → intent → send → readback → operator result.
+
+Changes:
+
+- implement inventory command/handler/verification and UI preview integration;
+- retain bindings/location/first-push models and accepted quantity service semantics;
+- cut over only `v2_runtime_mode=inventory` pilot stores (cumulatively includes subscriptions);
+- add fake-ledger and controlled test-store UAT.
+
+Allowed:
+
+- inventory application/domain/runtime adapters, bounded core registration, UI preview/tests/evidence.
+
+Forbidden:
+
+- product/fulfillment mutation work, binding schema rewrite, blind first push;
+- bulk retry of uncertain pairs.
+
+Acceptance:
+
+- complete Section 4.5 test matrix and all halt conditions;
+- zero duplicate writes in fault/concurrency suite;
+- fingerprint/mapping/generation/Administrator gates;
+- test-store end-to-end and required soak/canary evidence.
+
+Rollback: inventory admission off; readback in-flight intents; mode `subscriptions`/`read_only`/`legacy` as evidence permits.
+
+### P13 — Product-export mutation V2 slice
+
+**Depends on:** accepted P12 soak.  
+**Outcome:** field-authority preview and catalog writes use the V2 runtime.
+
+Allowed:
+
+- product-export application/domain/runtime adapters, diff UI/tests/evidence;
+- bounded core registration.
+
+Forbidden:
+
+- product import matching redesign, fulfillment changes, unsafe automatic creation;
+
+Acceptance:
+
+- field authority/protection/preview-stale/duplicate/readback matrix;
+- one send per intent; no shadow writes;
+- controlled UAT and product-export soak gate;
+- legacy switch/reconciliation drill.
+
+Rollback: product-export admission off; verify in-flight mutations; mode `inventory` or lower.
+
+### P14 — Fulfillment mutation V2 slice
+
+**Depends on:** accepted P13 and all lower-risk runtime evidence.  
+**Outcome:** fulfillment create/tracking/notification uses the V2 runtime with strongest uncertainty gate.
+
+Allowed:
+
+- fulfillment application/domain/runtime adapters, timeline integration/tests/evidence;
+- bounded core registration.
+
+Forbidden:
+
+- hidden/default notification at dispatch, broad picking logic redesign, inventory work;
+
+Acceptance:
+
+- complete Section 4.6 matrix, including worker death/webhook/readback races;
+- no duplicate fulfillment/notification in fake ledger or controlled UAT;
+- explicit notification evidence and 14-day/2,000-intent soak gate;
+- independent review of mutation/readback logic.
+
+Rollback: block admission; verify every in-flight intent before legacy ownership resumes; mode `product_export` or lower.
+
+### P15 — Store lifecycle, readiness and guided setup
+
+**Depends on:** P10 minimum; may develop in parallel with P11–P14 only after shared contracts are stable, but merges after conflicts are reconciled.  
+**Outcome:** concentrated store/setup orchestration becomes explicit commands/queries and the six-step production setup ships.
+
+Changes:
+
+- extract store lifecycle, credential and readiness services behind stable model methods;
+- implement setup DTO/writes, resumable progress and activation fingerprint;
+- build six-step Owl setup with every response state;
+- preserve credential storage, scopes, generation/disconnect behavior.
+
+Allowed:
+
+- core application/query/store/setup/credential/readiness and setup UI/tests;
+- narrow domain readiness providers.
+
+Forbidden:
+
+- credential schema/lifecycle claims beyond current contract, remote business mutations;
+- giant settings form or client-side activation decision.
+
+Acceptance:
+
+- hotspot orchestration shrinks into cohesive services;
+- secret/role/generation/readiness/fresh-warm tests;
+- U1 keyboard/RTL/responsive and save/resume tours;
+- UI mode rollback to legacy setup.
+
+Rollback: legacy setup/lifecycle delegates; credential/data intact.
+
+### P16 — Complete domain UX and contextual evidence
+
+**Depends on:** P04, P11–P15/G4.  
+**Outcome:** Products, Orders, Inventory and Fulfillment implement the full approved V2 experience.
+
+Changes:
+
+- native list/search/form fields and saved filters;
+- contextual evidence panels/smart buttons;
+- matching, product diff, location/first-push and fulfillment timeline focused components;
+- final operation launcher over registered operation DTO;
+- remove duplicate Sync/Error navigation from V2 mode only.
+
+Allowed:
+
+- domain views/static tests and read-query providers; bounded core shared components.
+
+Forbidden:
+
+- business/runtimes changes to fit visuals, recreating native Odoo primitives;
+- hidden actions not backed by returned allowed-action contract.
+
+Acceptance:
+
+- all UX screen/response/accessibility/role contracts;
+- U2–U6 tours and moderated task measures;
+- query/RPC/visual budgets and no overflow/console errors;
+- legacy technical evidence remains accessible to admins.
+
+Rollback: `v2_ui_mode=legacy` independent of backend mode.
+
+### P17 — Integrated hardening and exact-candidate qualification
+
+**Depends on:** P16/G5.  
+**Outcome:** one immutable candidate passes the complete security, lifecycle, performance, accessibility, recovery and UAT matrix.
+
+Changes:
+
+- no feature expansion;
+- fix only evidence-proven release blockers in bounded commits/PRs if needed, then restart exact-candidate qualification;
+- generate release evidence bundle and independent verdict;
+- rehearse halt/rollback and database restore.
+
+Allowed:
+
+- tests/evidence/runbooks and narrowly proven fixes;
+
+Forbidden:
+
+- scope expansion, skipped/relaxed tests, candidate mutation during qualification;
+
+Acceptance:
+
+- all of `09-test-observability-release-blueprint.md` on exact SHA;
+- zero S1/S2/unowned S3;
+- release verdict accepted.
+
+Rollback: candidate is not rolled out.
+
+### P18 — Cohort rollout and default mode
+
+**Depends on:** accepted P17/G6-candidate.  
+**Outcome:** V2 advances through defined cohorts with live telemetry and proven failback.
+
+Changes:
+
+- mode changes and release evidence only unless a separate defect PR is required;
+- cohort-by-cohort SLO/incident/rollback review;
+- set `v2_ui_mode=default`, gateway/runtime modes to approved values only after all gates.
+
+Forbidden:
+
+- combining rollout with architecture cleanup or schema contraction.
+
+Acceptance:
+
+- every cohort meets minimum observation and zero halt condition;
+- all stores complete 14-day all-V2 observation before contraction clock;
+- support/release notes and operator runbooks ready.
+
+Rollback: per-store or global mode reversal using the migration runbook.
+
+### P19 — Compatibility and flag contraction
+
+**Depends on:** two successful connector release cycles and minimum 14 days at all-V2 after P18, explicit approval.  
+**Outcome:** remove legacy internal paths and migration modes while retaining history/data contracts.
+
+Changes:
+
+- call/dependency/runtime evidence proves unused facades;
+- remove one subsystem’s old path per PR if needed;
+- migrate modes to fixed V2/default and delete expired flags;
+- keep stable public model/XML/data surfaces unless separately approved.
+
+Forbidden:
+
+- dropping binding/job/history tables, webhook packaging changes, unrelated cleanup.
+
+Acceptance:
+
+- complete suite/lifecycle/performance again;
+- one supported path and no stale imports/config values;
+- backup/restore/forward-fix plan.
+
+### P20 — Optional webhook addon consolidation
+
+**Depends on:** P19 and a separate ADR proving value.  
+**Outcome:** domain topic registration may move into owning addons without changing ingestion, history or supported install combinations.
+
+Changes:
+
+- preserve/migrate XML IDs, data and historic job selection behavior;
+- test every install/upgrade/uninstall/reinstall combination;
+- generic HMAC/inbox/subscription core remains `shopify_connector_webhook`.
+
+Forbidden:
+
+- receiver/dedup/runtime semantic rewrite or one giant addon.
+
+Acceptance:
+
+- lifecycle matrix and database evidence show no orphan/lost history;
+- addon count reduction has a measured maintenance benefit;
+- if proof fails, keep satellites. P20 is not required for V2 release.
+
+## 5. Parallelism rules
+
+Permitted after contracts stabilize:
+
+- P03 UI can proceed while P05 begins only after P02 is merged; they touch different seams but must rebase before merge.
+- P06 domain read gateways may be split into sequential domain PRs if review size is too large; operation-family order remains.
+- P15 setup extraction may develop beside mutation slices after P10, but it merges only after shared core conflicts are resolved and rerun.
+- UI component work may use contract fixtures; production wiring waits for its backend packet.
+
+Not permitted:
+
+- parallel mutation cutovers on the same store;
+- runtime schema and first mutation in one PR;
+- gateway extraction and business-policy change in one PR;
+- packaging consolidation before contraction.
+
+## 6. Roadmap completion criteria
+
+The implementation program is complete when P18 is accepted and V2 is the safe default. P19 removes temporary complexity after soak. P20 is optional and cannot delay user value unless lifecycle evidence shows the current packaging itself is unsafe.
