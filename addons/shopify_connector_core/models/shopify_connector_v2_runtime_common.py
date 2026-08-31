@@ -9,6 +9,7 @@ from datetime import timedelta, timezone
 import re
 
 from ..domain.immutability import to_plain
+from ..domain.runtime_modes import runtime_mode_includes, runtime_modes_including
 from ..runtime.p10_coordinator import RuntimeBoundaryError
 from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES
 from ..tools.redaction import redact
@@ -16,6 +17,7 @@ from .shopify_connector_job import MANUAL_REVIEW_SUBREASON_SELECTION
 
 
 V2_RUNTIME_MODE = 'read_only'
+V2_READ_ONLY_RUNTIME_MODES = runtime_modes_including(V2_RUNTIME_MODE)
 V2_MAX_CLAIM_BATCH = 100
 _UTC = timezone.utc
 _ACTIVE_RUN_STATES = ('admitted', 'running', 'waiting')
@@ -118,6 +120,7 @@ def _owner_cleanup():
 __all__ = [
     'V2_MAX_CLAIM_BATCH',
     'V2_RUNTIME_MODE',
+    'V2_READ_ONLY_RUNTIME_MODES',
     'V2RuntimeClaimLost',
     '_ACTIVE_ATTEMPT_OUTCOMES',
     '_ACTIVE_RUN_STATES',
@@ -135,4 +138,5 @@ __all__ = [
     '_safe_transition_message',
     '_utc',
     '_worker',
+    'runtime_mode_includes',
 ]

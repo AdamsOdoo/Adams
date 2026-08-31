@@ -34,6 +34,8 @@ from .shopify_connector_v2_runtime_common import (
     _utc,
     _worker,
     V2RuntimeClaimLost,
+    V2_READ_ONLY_RUNTIME_MODES,
+    runtime_mode_includes,
 )
 from .shopify_connector_v2_runtime_repository import (
     OdooReadOnlyRuntimeRepository,
@@ -49,7 +51,6 @@ _READ_ONLY_ENQUEUE_FIELDS = frozenset((
     'res_model', 'res_id', 'shopify_target_gid',
     'lane', 'lane_priority', 'available_at',
 ))
-
 
 class ShopifyConnectorV2Runtime(models.AbstractModel):
     """Named, administrator-gated V2 runtime service."""
@@ -71,14 +72,38 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
         return _worker('worker:odoo:%d:%d' % (os.getpid(), self.env.uid))
 
     @api.model
+    def _extend_v2_read_only_handler_specs(self):
+        """Return additive domain-owned read specs.
+
+        A domain addon overrides this method, calls ``super()``, and appends
+        explicit ``ReadOnlyHandlerSpec`` values.  Core intentionally does not
+        import product/sale/other domain modules.  Until a claim-fenced
+        transport adapter is available, extensions must remain local-only;
+        the coordinator does not make network calls or hold a database lock
+        around one.
+        """
+        return ()
+
+    @api.model
     def _get_v2_read_only_handler_specs(self):
-        """Explicit core read handler seam; domains append, never replace."""
-        return (
+        """Return the bounded core registry plus additive domain specs."""
+        specs = (
             ReadOnlyHandlerSpec(
                 'core_dispatch_selftest',
                 self._handle_core_dispatch_selftest,
+                operation_kind='diagnostic',
             ),
         )
+        additions = self._extend_v2_read_only_handler_specs()
+        if not isinstance(additions, (tuple, list)):
+            raise RuntimeBoundaryError(
+                'V2 read-only handler extensions must be a bounded sequence.'
+            )
+        if len(specs) + len(additions) > V2_MAX_CLAIM_BATCH:
+            raise RuntimeBoundaryError(
+                'V2 read-only handler registration exceeds its bound.'
+            )
+        return specs + tuple(additions)
 
     @api.model
     def _handle_core_dispatch_selftest(self, claim):
@@ -113,7 +138,9 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
         self._assert_runtime_actor()
         return bool(self.env[
             'shopify.connector.store.settings'
-        ].search_count([('v2_runtime_mode', '=', V2_RUNTIME_MODE)]))
+        ].search_count([(
+            'v2_runtime_mode', 'in', V2_READ_ONLY_RUNTIME_MODES,
+        )]))
 
     @api.model
     def enqueue_read_only_job(self, run, values):
@@ -142,7 +169,9 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
         ].sudo().search([('store_id', '=', store.id)], limit=1)
         if (
             not settings
-            or settings.v2_runtime_mode != V2_RUNTIME_MODE
+            or not runtime_mode_includes(
+                settings.v2_runtime_mode, V2_RUNTIME_MODE,
+            )
             or store.state != 'connected'
         ):
             raise ValidationError(

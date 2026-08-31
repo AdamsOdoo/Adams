@@ -242,19 +242,19 @@ LIFECYCLE_PURPOSE_STATES = {
     'reconnect_probe': ('reconnect_needed', 'disconnected'),
 }
 
-# Batch B2: a business read names the domain whose claimed job owns it. The
-# mapping is deliberately fixed and prefix-based over the immutable job_type;
-# callers cannot invent a generic purpose to borrow another domain's job.
+# Fixed purposes bind each business read to its immutable job vocabulary.
 BUSINESS_READ_PURPOSE_JOB_PREFIXES = {
     'inventory': ('inventory_',),
     'fulfillment': ('fulfillment_',),
+    'product_scan': ('=product_import_scan',),
+    'product_import': ('=product_import_sync',),
+    'customer_import': ('=customer_import_sync',),
+    'order_scan': ('=order_import_scan',),
+    'order_import': ('=order_import_sync',),
+    'webhook': ('webhook_',),
     'product_export': ('product_export_',),
 }
-
-# The only pre-activation business read. This is deliberately an exact triple,
-# not another prefix or a store-state bypass: the inventory location refresh
-# admitted by guided setup exists to produce the cache used by onboarding
-# readiness. Every other business read remains connected-only.
+# The exact guided-setup location refresh is the only pre-activation read.
 SETUP_BUSINESS_READ_JOBS = frozenset({
     ('inventory', 'setup_readiness_check', 'inventory_location_sync'),
 })
@@ -312,24 +312,16 @@ class ShopifyQuiescedError(Exception):
     `connected`, the store's persisted `connection_generation` no longer matches
     the job's captured `expected_connection_generation`, no real job was
     supplied, or the job belongs to another store. It carries no token and no
-    payload; `str(exc)` is a safe, generic message. In the full CORE-R2 design a
-    dispatcher maps this to a `skipped` job (analysis §18) — that routing is a
-    later slice and is not wired here.
+    payload; `str(exc)` is a safe, generic message.
     """
 
 
 class ShopifyConnectorApiClient(models.AbstractModel):
     """Read-only Shopify Admin GraphQL transport boundary (Task 003 + CORE-R2).
 
-    Stateless, no table. Public entry points are `execute()` (the pre-existing
-    read-only call used by test-connection/readiness) and, added by the CORE-R2
-    foundation slice, `execute_business()` — a committed-admission-lease context
-    manager (AR-047; analysis §9.1). `_send()` is the only method containing an
-    actual HTTP call and is the transport-injection seam tests override. No method
-    on this model can construct a request body containing the GraphQL mutation
-    keyword followed by a selection/argument — there is no mutation-capable
-    method, no retry loop (retry policy belongs to the job layer, DEC-009), and no
-    domain-sync method.
+    Stateless, no table. `execute()` serves lifecycle reads; guarded business
+    calls use committed admission leases. `_send()` is the sole HTTP seam.
+    Retry policy remains at the job layer, never inside this client.
 
     **Credential access is read exactly once per admitted business call.**
     `_admit` reads the token once under a `FOR SHARE` store-row lock and passes
@@ -338,12 +330,6 @@ class ShopifyConnectorApiClient(models.AbstractModel):
     only sanctioned `sudo()` remains the pre-existing Task 002 `_get_access_token`
     the admission calls once.
 
-    **Foundation-slice dormancy.** `execute_business`/`_admit`/`_release_lease`
-    and the `call.lease` table are delivered here but no production call site uses
-    them yet; the legacy `execute()` path is unchanged and still the only live
-    caller. The `_send` token parameter is optional so the unchanged `execute()`
-    (and the transport-seam tests that patch `_send(store, body)`) keep working;
-    it becomes mandatory when `execute()` is privatized in a later CORE-R2 slice.
     """
 
     _name = 'shopify.connector.api.client'
@@ -594,32 +580,27 @@ class ShopifyConnectorApiClient(models.AbstractModel):
 
     @contextmanager
     def execute_business_read(
-        self, job, store, query, variables=None, purpose=None,
+        self, job, store, query, variables=None, purpose=None, *, claim=None,
     ):
-        """Issue one job-owned read under the business admission lease.
-
-        This is the named read counterpart to Layer 2 mutation admission. A
-        fixed domain purpose must match the claimed job's immutable type; the
-        job and store must share identity/company; the job must be running; and
-        the existing generation-fenced admission owns a committed lease for
-        the entire caller ``with`` body. Mutations are always refused here.
-        """
+        """Issue one purpose-bound, job-owned read under a call lease."""
         variables = variables or {}
         self._validate_graphql_operation(query, variables, mutation_context=None)
         if self._graphql_contains_mutation(query):
             raise UserError(
                 'Business-read admission accepts GraphQL queries only.'
             )
-        if not store.shop_domain or not store.api_version:
+        if claim is None and (not store.shop_domain or not store.api_version):
             raise UserError(
                 'A shop domain and API version are required before '
                 'contacting Shopify.'
             )
-        lease_key, token = self._admit_business_read(job, store, purpose)
+        lease_key, token, transport_store = self._admit_business_read(
+            job, store, purpose, claim=claim,
+        )
         try:
             body = {'query': query, 'variables': variables}
             try:
-                response = self._send(store, body, token)
+                response = self._send(transport_store, body, token)
             except ShopifyClientError:
                 raise
             except requests.exceptions.RequestException as exc:
@@ -628,7 +609,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     reason=REASON_TEMPORARY,
                     technical_detail='transport_error',
                 )
-            result = self._normalize_response(store, response)
+            result = self._normalize_response(transport_store, response)
             yield result
         except BaseException as primary_error:
             try:
@@ -639,7 +620,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         else:
             self._release_lease(lease_key)
 
-    def _admit_business_read(self, job, store, purpose):
+    def _admit_business_read(self, job, store, purpose, *, claim=None):
         """Atomically validate read ownership and commit its call lease."""
         prefixes = BUSINESS_READ_PURPOSE_JOB_PREFIXES.get(purpose)
         if not prefixes:
@@ -650,31 +631,34 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyQuiescedError(
                 'A business Shopify read requires a valid job.'
             )
-        if store.company_id.id not in self.env.companies.ids:
+        if (
+            claim is None
+            and store.company_id.id not in self.env.companies.ids
+        ):
             raise ShopifyQuiescedError(
                 'The target store company is outside the active company scope.'
             )
-        # The dispatcher claims queued -> running in its owning transaction
-        # and deliberately does not commit before invoking the handler.  An
-        # independent lease transaction can therefore only see the last
-        # committed state (normally ``queued``); requiring ``running`` in that
-        # transaction would refuse every genuine first read.  Validate the
-        # protected worker record here, while the side transaction below owns
-        # the live store/generation gate and commits the lease.
-        if job.state != 'running':
+        if claim is None and job.state != 'running':
             raise ShopifyQuiescedError(
                 'A business Shopify read requires the claimed running job.'
             )
         setup_business_read = (
             purpose, job.job_source, job.job_type,
         ) in SETUP_BUSINESS_READ_JOBS
-        # Refresh client-credentials tokens before opening the side transaction,
-        # never under a store-row lock. The credential service performs its own
-        # fresh committed state check. Its setup-business purpose is narrower
-        # than the general setup probe family, so reconnect-needed/disconnected
-        # stores cannot contact Shopify in the interval before the final gate.
+        claim_snapshot = None
+        if claim is not None:
+            claim_snapshot = self._preflight_business_read_claim(
+                job, store, claim,
+            )
+        credential_store = (
+            store if claim_snapshot is None else SimpleNamespace(
+                id=store.id,
+                shop_domain=claim_snapshot.store.shop_domain,
+                api_version=claim_snapshot.store.api_version,
+            )
+        )
         self.env['shopify.connector.store.credential']._ensure_access_token(
-            store,
+            credential_store,
             purpose=(
                 'setup_business_read' if setup_business_read
                 else 'business'
@@ -683,31 +667,37 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         lifetime = timedelta(seconds=_CALL_LEASE_LIFETIME_SECONDS)
         side_cr = self.env.registry.cursor()
         try:
-            side_cr.execute(
-                "SELECT j.store_id, j.job_source, j.job_type, "
-                "j.expected_connection_generation, s.company_id, s.state, "
-                "s.connection_generation "
-                "FROM shopify_connector_job j "
-                "JOIN shopify_connector_store s ON s.id = j.store_id "
-                "WHERE j.id = %s AND s.id = %s FOR SHARE OF s",
-                (job.id, store.id),
-            )
-            row = side_cr.fetchone()
-            if not row:
-                raise ShopifyQuiescedError(
-                    'This job does not belong to the target store.'
+            if claim is not None:
+                (
+                    job_store_id, job_source, job_type, expected_generation,
+                    store_company_id, store_state, store_generation,
+                    shop_domain, api_version, claim_worker_ref,
+                ) = self._claimed_business_read_values(
+                    side_cr, job, store, claim, claim_snapshot,
                 )
-            (
-                job_store_id, job_source, job_type, expected_generation,
-                store_company_id, store_state, store_generation,
-            ) = row
-            # The job's immutable store foreign key is the ownership boundary.
-            # ``job.company_id`` is a stored related field derived from that
-            # same store and may still be awaiting recomputation immediately
-            # after enqueue; comparing it here adds no security fact and can
-            # falsely refuse an otherwise valid claimed job.  The target
-            # store's live company is checked against the active environment
-            # immediately below.
+            else:
+                side_cr.execute(
+                    "SELECT j.store_id, j.job_source, j.job_type, "
+                    "j.expected_connection_generation, s.company_id, s.state, "
+                    "s.connection_generation, s.shop_domain, s.api_version "
+                    "FROM shopify_connector_job j "
+                    "JOIN shopify_connector_store s ON s.id = j.store_id "
+                    "WHERE j.id = %s AND s.id = %s FOR SHARE OF s",
+                    (job.id, store.id),
+                )
+                row = side_cr.fetchone()
+                if not row:
+                    raise ShopifyQuiescedError(
+                        'This job does not belong to the target store.'
+                    )
+                (
+                    job_store_id, job_source, job_type, expected_generation,
+                    store_company_id, store_state, store_generation,
+                    shop_domain, api_version,
+                ) = row
+                claim_worker_ref = None
+            # The immutable store foreign key is the ownership boundary; the
+            # fresh store company is checked against the active environment.
             if job_store_id != store.id:
                 raise ShopifyQuiescedError(
                     'This job and store do not share scope ownership.'
@@ -717,7 +707,8 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                     'The target store company is outside the active company '
                     'scope.'
                 )
-            if not any(job_type.startswith(prefix) for prefix in prefixes):
+            if not any((job_type == owner[1:] if owner.startswith('=') else
+                        job_type.startswith(owner)) for owner in prefixes):
                 raise ShopifyQuiescedError(
                     'This job does not own the requested business-read purpose.'
                 )
@@ -733,6 +724,11 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             if expected_generation != store_generation:
                 raise ShopifyQuiescedError(
                     'This store was reconnected; the Shopify call is refused.'
+                )
+            if not shop_domain or not api_version:
+                raise UserError(
+                    'A shop domain and API version are required before '
+                    'contacting Shopify.'
                 )
             side_env = api.Environment(side_cr, self.env.uid, self.env.context)
             side_store = side_env['shopify.connector.store'].browse(store.id)
@@ -751,7 +747,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 'store_id': store.id,
                 'lease_key': lease_key,
                 'job_id': job.id,
-                'worker_ref': self._lease_worker_ref(),
+                'worker_ref': claim_worker_ref or self._lease_worker_ref(),
                 'admitted_at': admitted_at,
                 'expires_at': admitted_at + lifetime,
             })
@@ -761,7 +757,11 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise
         finally:
             side_cr.close()
-        return lease_key, token
+        return lease_key, token, SimpleNamespace(
+            id=store.id,
+            shop_domain=shop_domain,
+            api_version=api_version,
+        )
 
     @contextmanager
     def execute_business(

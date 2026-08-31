@@ -33,6 +33,7 @@ from shopify_connector_core.runtime.p10_coordinator import (  # noqa: E402
     ReadOnlyCoordinator,
     ReadOnlyHandlerRegistry,
     ReadOnlyHandlerSpec,
+    READ_ONLY_OPERATION_KINDS,
     RuntimeBoundaryError,
     admit_read_only,
 )
@@ -218,6 +219,39 @@ class TestCoordinator(unittest.TestCase):
                 ReadOnlyHandlerSpec("core.read", lambda _item: Succeeded())
                 for _ in range(MAX_CLAIM_BATCH + 1)
             ))
+
+    def test_handler_registration_has_explicit_read_operation_kind(self):
+        self.assertEqual(
+            READ_ONLY_OPERATION_KINDS,
+            frozenset(("diagnostic", "import", "scan", "reconciliation")),
+        )
+        specs = tuple(
+            ReadOnlyHandlerSpec(
+                "core.%s" % kind,
+                lambda _item: Succeeded(),
+                operation_kind=kind,
+            )
+            for kind in sorted(READ_ONLY_OPERATION_KINDS)
+        )
+        registry = ReadOnlyHandlerRegistry(specs)
+        self.assertEqual(registry.keys(), tuple(spec.handler_key for spec in specs))
+        with self.assertRaises(ValueError):
+            ReadOnlyHandlerSpec(
+                "core.mutation-kind",
+                lambda _item: Succeeded(),
+                operation_kind="mutation",
+            )
+
+    def test_production_runtime_has_additive_domain_seam_without_domain_imports(self):
+        source = (CORE / "models" / "shopify_connector_v2_runtime.py").read_text()
+        self.assertIn("_extend_v2_read_only_handler_specs", source)
+        self.assertIn("_handler_registry", source)
+        self.assertNotIn("_get_v2_read_only_job_types", source)
+        self.assertNotIn("_get_v2_read_only_handler_keys", source)
+        self.assertNotIn("shopify_connector_product", source)
+        self.assertNotIn("shopify_connector_sale", source)
+        self.assertNotIn("execute_business(", source)
+        self.assertNotIn("requests.", source)
 
 
 if __name__ == "__main__":

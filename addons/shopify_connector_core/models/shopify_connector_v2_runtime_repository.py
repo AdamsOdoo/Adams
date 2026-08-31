@@ -30,6 +30,7 @@ from ..runtime.contracts import (
 from ..runtime.p10_sql import build_claim_statement
 from .shopify_connector_v2_runtime_common import (
     V2_RUNTIME_MODE,
+    runtime_mode_includes,
     _ACTIVE_ATTEMPT_OUTCOMES,
     _ACTIVE_RUN_STATES,
     _GENERATION_ERROR_CLASS,
@@ -143,7 +144,9 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                     or settings.company_id != store.company_id
                     or store.company_id.id not in self._company_ids(side_env)
                     or store.state != 'connected'
-                    or settings.v2_runtime_mode != V2_RUNTIME_MODE
+                    or not runtime_mode_includes(
+                        settings.v2_runtime_mode, V2_RUNTIME_MODE,
+                    )
                     or job.expected_connection_generation
                     != store.connection_generation
                     or run.expected_connection_generation
@@ -302,7 +305,7 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
             return 'company_identity'
         if claim.company_id != store_company_id:
             return 'company_identity'
-        if settings_mode != V2_RUNTIME_MODE:
+        if not runtime_mode_includes(settings_mode, V2_RUNTIME_MODE):
             return 'runtime_mode'
         if store_state != 'connected' or run_state not in _ACTIVE_RUN_STATES:
             return 'store_state'

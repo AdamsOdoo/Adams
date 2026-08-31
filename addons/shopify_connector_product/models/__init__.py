@@ -6,3 +6,7 @@ from . import shopify_connector_product_variant_binding
 from . import shopify_connector_product_match_decision
 from . import shopify_connector_product_importer
 from . import shopify_connector_product_scan
+from . import shopify_connector_product_scan_p06
+# Product query documents and explicit gateway methods are registered only
+# after their owning importer/scan modules have defined the exact constants.
+from . import shopify_connector_read_gateway

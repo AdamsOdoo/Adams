@@ -869,6 +869,35 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     ),
                 ))
                 continue
+            remote_topic = remote.get('topic')
+            remote_digest = remote.get('uri_digest')
+            if (
+                remote_topic != subscription.topic_enum
+                or not remote_digest
+                or remote_digest
+                != subscription.expected_callback_url_digest
+            ):
+                subscription._service_write(dict(
+                    base,
+                    state='manual_review',
+                    actual_topic=remote_topic or False,
+                    actual_uri_digest=remote_digest or False,
+                    actual_api_version=(
+                        remote.get('observed_api_version') or False
+                    ),
+                    actual_format=remote.get('format') or False,
+                    actual_include_fields=remote.get('include_fields') or [],
+                    last_error=(
+                        'The retired webhook subscription identity now has '
+                        'an unproven topic or callback owner. No remote delete '
+                        'was issued; review the preserved evidence manually.'
+                    ),
+                    operator_note=(
+                        'Retired-topic cleanup requires the exact GID, topic, '
+                        'and connector callback digest from the fresh read.'
+                    ),
+                ))
+                continue
             active_delete = Job.search([
                 ('store_id', '=', store.id),
                 ('job_type', '=', 'webhook_subscription_delete'),

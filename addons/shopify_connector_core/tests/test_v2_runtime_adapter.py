@@ -119,9 +119,11 @@ class TestV2RuntimeAdapter(TransactionCase):
         )
         self.assertEqual(ids, (41,))
         self.assertEqual(cursor.params[:4], (NOW.replace(tzinfo=None),) * 4)
-        self.assertEqual(cursor.params[4], (7,))
-        self.assertEqual(cursor.params[5], NOW.replace(tzinfo=None))
-        self.assertEqual(cursor.params[6], 3)
+        self.assertEqual(cursor.params[4][0], 'read_only')
+        self.assertEqual(cursor.params[4][-1], 'all')
+        self.assertEqual(cursor.params[5], (7,))
+        self.assertEqual(cursor.params[6], NOW.replace(tzinfo=None))
+        self.assertEqual(cursor.params[7], 3)
         self.assertEqual(len(cursor.params), cursor.query.count('%s'))
         self.assertIn('FOR UPDATE OF j, r, s, ss SKIP LOCKED', cursor.query)
         self.assertIn(
@@ -152,7 +154,7 @@ class TestV2RuntimeAdapter(TransactionCase):
         self.assertIn('r.cancel_requested_at IS NULL', query)
         self.assertIn("dep.state IN ('succeeded', 'skipped')", query)
         self.assertIn('j.mutation_attempt_id IS NULL', query)
-        self.assertIn("ss.v2_runtime_mode = 'read_only'", query)
+        self.assertIn("ss.v2_runtime_mode IN %s", query)
 
     def test_scope_recheck_fails_closed_on_both_generation_mismatches(self):
         claim = _claim()
@@ -265,6 +267,8 @@ class TestV2RuntimeAdapter(TransactionCase):
         source = inspect.getsource(ShopifyConnectorV2Runtime)
         self.assertIn('_get_v2_read_only_handler_specs', source)
         self.assertIn('ReadOnlyHandlerSpec(', source)
+        self.assertIn('_extend_v2_read_only_handler_specs', source)
+        self.assertIn("operation_kind='diagnostic'", source)
         self.assertNotIn('mutation=True', source)
         self.assertNotIn('execute_business(', source)
         self.assertNotIn('requests.', source)

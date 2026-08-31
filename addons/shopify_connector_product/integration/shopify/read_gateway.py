@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-import math
+import re
 from typing import Any
 
 from odoo.addons.shopify_connector_core.integration.shopify.read_contracts import (
@@ -92,20 +92,22 @@ def _optional_int(value: Any, field_name: str) -> int | None:
     return value
 
 
-def _price(value: Any) -> float | None:
-    """Mirror the V1 product normalizer's optional decimal-to-float rule."""
+_DECIMAL_PRICE_RE = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
+
+
+def _price(value: Any) -> str | None:
+    """Retain Shopify money losslessly as a JSON-safe decimal string."""
 
     if value is None:
         return None
-    if isinstance(value, bool):
+    if not isinstance(value, str):
         raise ReadShapeError("invalid_shape", "Shopify product read returned an invalid price.")
-    if value == "":
+    value = value.strip()
+    if not value:
         return None
-    try:
-        result = float(value)
-    except (TypeError, ValueError):
-        return None
-    return result if math.isfinite(result) else None
+    if not _DECIMAL_PRICE_RE.fullmatch(value):
+        raise ReadShapeError("invalid_shape", "Shopify product read returned an invalid price.")
+    return value
 
 
 def _selected_options(value: Any) -> tuple["SelectedOptionDTO", ...]:
@@ -217,8 +219,8 @@ class VariantDTO:
     gid: str
     sku: str | None
     barcode: str | None
-    price: float | None
-    compare_at_price: float | None
+    price: str | None
+    compare_at_price: str | None
     selected_options: tuple[SelectedOptionDTO, ...]
     option_values: str | None
     image_url: str | None
@@ -241,9 +243,7 @@ class VariantDTO:
                 shopify_gid(self.inventory_item_gid, "variant.inventoryItem.id", kind="InventoryItem"),
             )
         for name in ("price", "compare_at_price"):
-            value = getattr(self, name)
-            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)):
-                raise ValueError(f"variant.{name} must be a finite number or None")
+            object.__setattr__(self, name, _price(getattr(self, name)))
         if any(not isinstance(item, SelectedOptionDTO) for item in self.selected_options):
             raise TypeError("variant.selected_options must contain SelectedOptionDTO values")
         object.__setattr__(self, "selected_options", tuple(self.selected_options))
@@ -491,6 +491,84 @@ class ProductReadGateway:
         )
 
 
+def scan_page_from_gateway_result(result: Any) -> dict[str, Any]:
+    """Adapt one normalized scan result to the producer's internal page.
+
+    The product scan producer still owns child admission, durable checkpoints,
+    and its job-facing error vocabulary.  The core Odoo adapter returns the
+    pure gateway's JSON-safe ``ReadResult`` mapping, so this small compatibility
+    adapter translates that mapping without re-reading (or reconstructing) a
+    raw Shopify response.  Validation remains strict at this boundary: a
+    malformed typed result must not look like an empty/terminal page and move a
+    scan checkpoint past work that was never observed.
+    """
+
+    if not isinstance(result, Mapping):
+        raise ReadShapeError(
+            "invalid_result",
+            "The Shopify product scan gateway returned an invalid result.",
+            PRODUCT_SCAN_OPERATION.operation_name,
+        )
+    if result.get("operation_name") != PRODUCT_SCAN_OPERATION.operation_name:
+        raise ReadShapeError(
+            "operation_mismatch",
+            "The Shopify product scan gateway returned the wrong operation.",
+            PRODUCT_SCAN_OPERATION.operation_name,
+        )
+    value = _mapping(result.get("value"), "scan result value")
+    items = value.get("items")
+    if (
+        isinstance(items, (str, bytes, Mapping))
+        or not isinstance(items, Sequence)
+    ):
+        raise ReadShapeError(
+            "invalid_shape",
+            "The Shopify product scan gateway returned invalid items.",
+            PRODUCT_SCAN_OPERATION.operation_name,
+        )
+    nodes: list[dict[str, Any]] = []
+    for item in items:
+        item = _mapping(item, "scan result item")
+        summary = ProductSummaryDTO(
+            item.get("gid"),
+            item.get("updated_at"),
+            item.get("status"),
+        )
+        nodes.append({
+            "id": summary.gid,
+            "updatedAt": summary.updated_at,
+            "status": summary.status,
+        })
+
+    has_next = value.get("has_more")
+    if not isinstance(has_next, bool):
+        raise ReadShapeError(
+            "pagination_invalid",
+            "The Shopify product scan gateway returned invalid page metadata.",
+            PRODUCT_SCAN_OPERATION.operation_name,
+        )
+    cursor = shopify_cursor(value.get("cursor"))
+    next_cursor = shopify_cursor(value.get("next_cursor"))
+    if has_next:
+        if next_cursor is None or next_cursor == cursor:
+            raise ReadShapeError(
+                "cursor_loop",
+                "The Shopify product scan gateway did not advance its cursor.",
+                PRODUCT_SCAN_OPERATION.operation_name,
+            )
+    elif next_cursor is not None:
+        raise ReadShapeError(
+            "pagination_invalid",
+            "The Shopify product scan gateway returned a terminal page with a cursor.",
+            PRODUCT_SCAN_OPERATION.operation_name,
+        )
+    return {
+        "nodes": nodes,
+        "has_next": has_next,
+        "end_cursor": next_cursor,
+    }
+
+
 __all__ = [
     "PRODUCT_READ_OPERATION",
     "PRODUCT_SCAN_OPERATION",
@@ -499,6 +577,7 @@ __all__ = [
     "ProductOptionValueDTO",
     "ProductReadGateway",
     "ProductSummaryDTO",
+    "scan_page_from_gateway_result",
     "SelectedOptionDTO",
     "VariantDTO",
 ]

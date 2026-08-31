@@ -8,6 +8,7 @@ They are removed only after the documented all-V2 soak period.
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
+from ..domain.runtime_modes import V2_RUNTIME_MODE_ORDER
 from ..tools.redaction import redact
 
 
@@ -21,14 +22,17 @@ V2_GATEWAY_MODE_SELECTION = [
     ('compare_reads', 'Compare Reads'),
     ('v2', 'V2'),
 ]
+_V2_RUNTIME_MODE_LABELS = {
+    'legacy': 'Legacy',
+    'read_only': 'Read Only',
+    'subscriptions': 'Subscriptions',
+    'inventory': 'Inventory',
+    'product_export': 'Product Export',
+    'fulfillment': 'Fulfillment',
+    'all': 'All V2',
+}
 V2_RUNTIME_MODE_SELECTION = [
-    ('legacy', 'Legacy'),
-    ('read_only', 'Read Only'),
-    ('subscriptions', 'Subscriptions'),
-    ('inventory', 'Inventory'),
-    ('product_export', 'Product Export'),
-    ('fulfillment', 'Fulfillment'),
-    ('all', 'All V2'),
+    (key, _V2_RUNTIME_MODE_LABELS[key]) for key in V2_RUNTIME_MODE_ORDER
 ]
 
 V2_MODE_FIELDS = frozenset((

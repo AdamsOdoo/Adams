@@ -11,8 +11,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from ..domain.runtime_modes import runtime_modes_including
+
 
 _UTC = timedelta(0)
+_READ_ONLY_MODES = runtime_modes_including("read_only")
 
 
 def _utc_db_value(value: datetime) -> datetime:
@@ -31,8 +34,9 @@ def build_claim_statement(
     """Build one bounded V2 claim statement and its ordered parameters.
 
     The SQL parameter order is deliberately returned with the statement:
-    four due/reconciliation timestamps, the company tuple from the WHERE
-    clause, the aging clock used by ``ORDER BY``, and the final row limit.
+    four due/reconciliation timestamps, the cumulative-mode tuple, the company
+    tuple from the WHERE clause, the aging clock used by ``ORDER BY``, and the
+    final row limit.
     Never reorder this tuple without changing the SQL text at the same time.
     """
     now_value = _utc_db_value(now)
@@ -97,7 +101,7 @@ def build_claim_statement(
            AND r.state IN ('admitted', 'running', 'waiting')
            AND r.cancel_requested_at IS NULL
            AND s.state = 'connected'
-           AND ss.v2_runtime_mode = 'read_only'
+           AND ss.v2_runtime_mode IN %s
            AND j.company_id IS NOT NULL
            AND j.company_id = s.company_id
            AND r.company_id = s.company_id
@@ -128,6 +132,7 @@ def build_claim_statement(
         now_value,
         now_value,
         now_value,
+        _READ_ONLY_MODES,
         company_ids,
         now_value,
         limit,

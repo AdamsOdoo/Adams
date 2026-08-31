@@ -743,7 +743,8 @@ class TestApiClient(TransactionCase):
             return FakeResponse(200, json_body=_success_body())
 
         with patch.object(
-            ClientClass, '_admit_business_read', return_value=('lease', 'token'),
+            ClientClass, '_admit_business_read',
+            return_value=('lease', 'token', self.store),
         ), patch.object(ClientClass, '_send', fake_send), patch.object(
             ClientClass, '_release_lease', side_effect=released.append,
         ):

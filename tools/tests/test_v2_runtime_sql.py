@@ -34,9 +34,14 @@ class TestClaimStatement(unittest.TestCase):
         query, params = build_claim_statement(NOW, (7, 11), 3)
         self.assertEqual(len(params), query.count("%s"))
         self.assertEqual(params[:4], (NOW.replace(tzinfo=None),) * 4)
-        self.assertEqual(params[4], (7, 11))
-        self.assertEqual(params[5], NOW.replace(tzinfo=None))
-        self.assertEqual(params[6], 3)
+        self.assertEqual(
+            params[4],
+            ("read_only", "subscriptions", "inventory", "product_export",
+             "fulfillment", "all"),
+        )
+        self.assertEqual(params[5], (7, 11))
+        self.assertEqual(params[6], NOW.replace(tzinfo=None))
+        self.assertEqual(params[7], 3)
         self.assertLess(query.index("s.company_id IN %s"), query.index("ORDER BY"))
         self.assertIn("FOR UPDATE OF j, r, s, ss SKIP LOCKED", query)
         self.assertIn("LIMIT %s", query)
@@ -59,7 +64,7 @@ class TestClaimStatement(unittest.TestCase):
             "r.expected_configuration_generation =\n               ss.configuration_generation",
             query,
         )
-        self.assertIn("ss.v2_runtime_mode = 'read_only'", query)
+        self.assertIn("ss.v2_runtime_mode IN %s", query)
         self.assertIn("j.mutation_attempt_id IS NULL", query)
         self.assertIn("dep.state IN ('succeeded', 'skipped')", query)
 

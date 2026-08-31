@@ -16,6 +16,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ADAPTER = ROOT / "addons/shopify_connector_core/models/shopify_connector_domain_read_gateway.py"
 
+P07_PROVIDERS = {
+    "inventory": (
+        "addons/shopify_connector_inventory/models/shopify_connector_inventory_p07_gateway.py",
+        "InventoryReadGateway",
+        "addons/shopify_connector_inventory/models/__init__.py",
+        "shopify_connector_inventory_p07_read_adapter",
+        "shopify_connector_inventory_p07_gateway",
+    ),
+    "fulfillment": (
+        "addons/shopify_connector_fulfillment/models/shopify_connector_fulfillment_p07_gateway.py",
+        "FulfillmentReadGateway",
+        "addons/shopify_connector_fulfillment/models/__init__.py",
+        "shopify_connector_fulfillment_p07_read_adapter",
+        "shopify_connector_fulfillment_p07_gateway",
+    ),
+    "webhook": (
+        "addons/shopify_connector_webhook/models/shopify_connector_webhook_p07_gateway.py",
+        "WebhookSubscriptionReadGateway",
+        "addons/shopify_connector_webhook/models/__init__.py",
+        "shopify_connector_webhook_p07_read_adapter",
+        "shopify_connector_webhook_p07_gateway",
+    ),
+}
+
 
 MIGRATED_CALLS = {
     "addons/shopify_connector_inventory/models/shopify_connector_inventory_p07_read_adapter.py": (
@@ -70,14 +94,45 @@ class P07ReadIntegrationTests(unittest.TestCase):
             "addons/shopify_connector_webhook/integration/shopify/webhook_subscription_read_gateway.py",
         ):
             source = (ROOT / relative).read_text(encoding="utf-8")
-            # Odoo-loaded adapters use the canonical addon namespace.  Pure
-            # V2 gateways may use the package namespace so the dependency
-            # policy can inspect them without importing the Odoo framework.
-            self.assertTrue(
-                "from odoo.addons.shopify_connector_core.domain.immutability"
-                in source
-                or "from shopify_connector_core.domain.immutability" in source
+            self.assertIn(
+                "from odoo.addons.shopify_connector_core.domain.immutability",
+                source,
             )
+            self.assertNotIn(
+                "from shopify_connector_core.domain.immutability", source
+            )
+
+    def test_optional_domain_gateways_are_registered_by_owning_addons(self):
+        core = ADAPTER.read_text(encoding="utf-8")
+        for addon in (
+            "shopify_connector_inventory.integration",
+            "shopify_connector_fulfillment.integration",
+            "shopify_connector_webhook.integration",
+        ):
+            self.assertNotIn(addon, core)
+
+        for family, (
+            relative,
+            gateway_name,
+            init_relative,
+            callsite_name,
+            provider_name,
+        ) in P07_PROVIDERS.items():
+            with self.subTest(family=family):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertIn('_inherit = "shopify.connector.read.gateway"', source)
+                self.assertIn('family == "%s"' % family, source)
+                self.assertIn(gateway_name, source)
+                self.assertIn("operation_documents", source)
+                self.assertIn("super()._p07_gateway(family)", source)
+                self.assertIn("def _p07_raise_typed_error", source)
+
+                init_source = (ROOT / init_relative).read_text(encoding="utf-8")
+                before = "from . import %s" % callsite_name
+                after = "from . import %s" % provider_name
+                self.assertIn(before, init_source)
+                self.assertIn(after, init_source)
+                self.assertLess(init_source.index(before), init_source.index(after))
 
     def test_every_migrated_read_method_has_explicit_reversible_delegate(self):
         for relative, names in MIGRATED_CALLS.items():
@@ -96,11 +151,12 @@ class P07ReadIntegrationTests(unittest.TestCase):
         calls = _call_attributes(tree)
         self.assertFalse(calls & {"create", "write", "unlink", "sudo"})
         self.assertIn("execute_business_read", calls)
-        self.assertIn("execute_business", calls)
+        self.assertNotIn("execute_business", calls)
         self.assertIn("_admit_lifecycle", calls)
         self.assertIn("_send_lifecycle", calls)
         self.assertIn("_assert_store", calls)
         self.assertIn("_store_mode", calls)
+        self.assertIn("_p07_raise_typed_error", calls)
         for operation in (
             "InventoryPairRead",
             "InventoryObservation",

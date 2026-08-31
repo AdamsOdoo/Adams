@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from shopify_connector_core.domain.runtime_modes import runtime_mode_includes
 from shopify_connector_core.integration.shopify.mutation_contracts import (
     MutationOutcome,
     MutationRequest,
@@ -110,9 +111,10 @@ class SubscriptionRuntimeAdmission:
     cancel_requested: bool = False
 
     def __post_init__(self) -> None:
-        if self.runtime_mode != RUNTIME_MODE:
+        if not runtime_mode_includes(self.runtime_mode, RUNTIME_MODE):
             raise SubscriptionRuntimeError(
-                "runtime_mode", "Subscription mutations require subscriptions mode."
+                "runtime_mode",
+                "Subscription mutations require subscriptions capability.",
             )
         _positive_int(self.store_id, "store_id")
         _positive_int(self.company_id, "company_id")

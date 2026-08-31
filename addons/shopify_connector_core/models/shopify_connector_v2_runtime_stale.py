@@ -13,6 +13,7 @@ from ..runtime.p10_coordinator import ClaimedWork
 from ..runtime.p10_stale_owner import StaleOwnerInput, StaleOwnerPolicy
 from .shopify_connector_v2_runtime_common import (
     V2_RUNTIME_MODE,
+    V2_READ_ONLY_RUNTIME_MODES,
     V2_MAX_CLAIM_BATCH,
     _UTC,
     _ACTIVE_RUN_STATES,
@@ -52,7 +53,7 @@ class StaleOwnerRepositoryMixin:
                    AND j.current_attempt_token = a.claim_token
                    AND a.outcome IN ('claimed', 'running')
                    AND COALESCE(a.heartbeat_at, a.claimed_at) <= %s
-                   AND ss.v2_runtime_mode = 'read_only'
+                   AND ss.v2_runtime_mode IN %s
                    AND j.company_id = s.company_id
                    AND r.company_id = s.company_id
                    AND ss.company_id = s.company_id
@@ -61,7 +62,7 @@ class StaleOwnerRepositoryMixin:
                  LIMIT %s
                  FOR UPDATE OF j SKIP LOCKED
             """,
-            [_db_datetime(cutoff), companies, limit],
+            [_db_datetime(cutoff), V2_READ_ONLY_RUNTIME_MODES, companies, limit],
         )
         job_ids = tuple(row[0] for row in env.cr.fetchall())
         rows = []
@@ -91,14 +92,15 @@ class StaleOwnerRepositoryMixin:
                        AND j.current_attempt_token = a.claim_token
                        AND a.outcome IN ('claimed', 'running')
                        AND COALESCE(a.heartbeat_at, a.claimed_at) <= %s
-                       AND ss.v2_runtime_mode = 'read_only'
+                       AND ss.v2_runtime_mode IN %s
                        AND j.company_id = s.company_id
                        AND r.company_id = s.company_id
                        AND ss.company_id = s.company_id
                        AND s.company_id IN %s
                      FOR UPDATE OF a, r, s, ss SKIP LOCKED
                 """,
-                [job_id, _db_datetime(cutoff), companies],
+                [job_id, _db_datetime(cutoff), V2_READ_ONLY_RUNTIME_MODES,
+                 companies],
             )
             row = env.cr.fetchone()
             if row:
@@ -156,7 +158,7 @@ class StaleOwnerRepositoryMixin:
                     or store.state != 'connected'
                     or run.state not in _ACTIVE_RUN_STATES
                     or run.cancel_requested_at
-                    or _mode != V2_RUNTIME_MODE
+                    or _mode not in V2_READ_ONLY_RUNTIME_MODES
                     or job_connection != store_connection
                     or run_connection != store_connection
                     or job_configuration != settings_configuration

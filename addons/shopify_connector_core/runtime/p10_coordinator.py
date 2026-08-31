@@ -43,6 +43,18 @@ EXECUTION_PHASE = "execution"
 FINALIZE_TRANSACTION = "finalize_transaction"
 _UTC = timedelta(0)
 
+# P10 deliberately keeps the handler vocabulary small and explicit.  The
+# category is descriptive metadata used by addon registration seams; it is
+# not a fallback lookup key and it never changes the claim/finalize protocol.
+# Domain addons can therefore register their own import/scan/reconciliation
+# readers without making core import a domain module.
+READ_ONLY_OPERATION_KINDS = frozenset({
+    "diagnostic",
+    "import",
+    "scan",
+    "reconciliation",
+})
+
 
 def _utc(value: datetime, field_name: str) -> datetime:
     if not isinstance(value, datetime):
@@ -153,11 +165,20 @@ class UnknownReadHandler(LookupError):
 
 @dataclass(frozen=True, slots=True)
 class ReadOnlyHandlerSpec:
-    """One explicit non-mutation handler registration."""
+    """One explicit non-mutation handler registration.
+
+    ``operation_kind`` is intentionally metadata rather than dispatch
+    behavior.  The handler key remains the only lookup identity, so a domain
+    addon must register each read operation explicitly.  The current P10
+    executor is local-only: a handler that needs Shopify I/O must first gain a
+    claim-fenced transport seam; registering a callable here does not itself
+    provide that fence.
+    """
 
     handler_key: str
     handler: Callable[[ClaimedWork], HandlerResult]
     mutation: bool = False
+    operation_kind: str = "diagnostic"
 
     def __post_init__(self) -> None:
         require_key(self.handler_key, "handler_key")
@@ -167,6 +188,14 @@ class ReadOnlyHandlerSpec:
             raise TypeError("mutation must be bool")
         if self.mutation:
             raise ValueError("mutation handlers are not admitted by P10")
+        if (
+            not isinstance(self.operation_kind, str)
+            or self.operation_kind not in READ_ONLY_OPERATION_KINDS
+        ):
+            raise ValueError(
+                "unsupported read-only operation kind: %r"
+                % (self.operation_kind,)
+            )
 
 
 class ReadOnlyHandlerRegistry:
@@ -194,6 +223,10 @@ class ReadOnlyHandlerRegistry:
             return self._handlers[handler_key]
         except KeyError as exc:
             raise UnknownReadHandler(handler_key) from exc
+
+    def keys(self) -> tuple[str, ...]:
+        """Return the bounded explicit key snapshot for admission/claiming."""
+        return tuple(self._handlers)
 
 
 class ReadOnlyRuntimeRepository(Protocol):
@@ -531,6 +564,7 @@ __all__ = [
     "ReadOnlyHandlerRegistry",
     "ReadOnlyHandlerSpec",
     "ReadOnlyRuntimeRepository",
+    "READ_ONLY_OPERATION_KINDS",
     "RuntimeBoundaryError",
     "UnknownReadHandler",
     "admit_read_only",

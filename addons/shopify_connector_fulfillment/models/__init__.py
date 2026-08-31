@@ -9,6 +9,9 @@ from . import shopify_connector_store_settings
 from . import shopify_connector_job
 from . import shopify_connector_readiness_check
 from . import shopify_connector_fulfillment_reader
+# The location query belongs to fulfillment; extend the shared core gateway
+# only after the reader has declared its exact checked-in document.
+from . import shopify_connector_read_gateway
 from . import shopify_connector_fulfillment_create_strategy
 from . import shopify_connector_fulfillment_tracking_strategy
 from . import shopify_connector_fulfillment_admission
@@ -23,3 +26,4 @@ from . import stock_picking
 # P07 final read dispatch layer; it delegates V1 through a private context
 # marker and keeps fulfillment selection/mutation siblings unchanged.
 from . import shopify_connector_fulfillment_p07_read_adapter
+from . import shopify_connector_fulfillment_p07_gateway

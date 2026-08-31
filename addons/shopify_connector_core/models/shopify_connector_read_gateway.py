@@ -60,11 +60,15 @@ class _AuthorizedReadDelegate:
         documents: Mapping[str, str],
         *,
         job: Any = None,
+        purpose: str | None = None,
+        claim: Any = None,
         allow_lifecycle: bool = False,
     ) -> None:
         self.client = client
         self.documents = documents
         self.job = job
+        self.purpose = purpose
+        self.claim = claim
         self.allow_lifecycle = allow_lifecycle
 
     def execute(self, store: Any, document: str, variables: Mapping[str, Any]) -> Any:
@@ -76,10 +80,19 @@ class _AuthorizedReadDelegate:
                 )
             # Core setup/identity reads retain the exact public client path.
             return self.client.execute(store, document, variables)
-        # The existing admission gate validates the job/store/company,
-        # generation, credential and query shape.  The context is entered and
-        # left here so the pure gateway sees the normalized legacy result.
-        with self.client.execute_business(self.job, store, document, variables) as result:
+        if not self.purpose:
+            raise ReadGatewayError(
+                "purpose_required",
+                "A Shopify domain read requires a fixed admission purpose.",
+            )
+        with self.client.execute_business_read(
+            self.job,
+            store,
+            document,
+            variables,
+            purpose=self.purpose,
+            claim=self.claim,
+        ) as result:
             return result
 
     def execute_read(
@@ -153,64 +166,28 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
         return mode
 
     @api.model
+    def _extend_documents(
+        self, names: set[str] | frozenset[str], documents: dict[str, str],
+    ) -> dict[str, str]:
+        """Domain addons append their own checked-in query documents."""
+        del names
+        return documents
+
+    @api.model
     def _documents(self, names: set[str] | frozenset[str]) -> dict[str, str]:
-        """Load only exact query constants from the owning addons."""
+        """Load exact core documents, then invoke domain-owned extensions."""
 
         documents: dict[str, str] = {}
         if "ConnectorTestConnection" in names:
             from .shopify_connector_store import TEST_CONNECTION_QUERY
 
             documents["ConnectorTestConnection"] = TEST_CONNECTION_QUERY
-        if "ConnectorFulfillmentLocations" in names:
-            # Fulfillment is optional for core installation; this import is
-            # reached only by the explicit location read method.
-            from odoo.addons.shopify_connector_fulfillment.models.shopify_connector_fulfillment_reader import (
-                LOCATIONS_QUERY,
-            )
-
-            documents["ConnectorFulfillmentLocations"] = LOCATIONS_QUERY
-        if names & {"ConnectorProductScan", "ConnectorProductImport"}:
-            from odoo.addons.shopify_connector_product.models.shopify_connector_product_importer import (
-                PRODUCT_IMPORT_QUERY,
-            )
-            from odoo.addons.shopify_connector_product.models.shopify_connector_product_scan import (
-                PRODUCT_SCAN_QUERY,
-            )
-
-            documents.update({
-                "ConnectorProductScan": PRODUCT_SCAN_QUERY,
-                "ConnectorProductImport": PRODUCT_IMPORT_QUERY,
-            })
-        if "ConnectorCustomerImport" in names:
-            from odoo.addons.shopify_connector_sale.models.shopify_connector_customer_importer import (
-                CUSTOMER_IMPORT_QUERY,
-            )
-
-            documents["ConnectorCustomerImport"] = CUSTOMER_IMPORT_QUERY
-        if names & {
-            "ConnectorOrderScan",
-            "ConnectorOrderHeader",
-            "ConnectorOrderLineItemsPage",
-            "ConnectorOrderShippingLinesPage",
-            "ConnectorOrderDiscountApplicationsPage",
-        }:
-            from odoo.addons.shopify_connector_sale.models.shopify_connector_order_importer import (
-                ORDER_DISCOUNT_APPLICATIONS_PAGE_QUERY,
-                ORDER_HEADER_QUERY,
-                ORDER_LINE_ITEMS_PAGE_QUERY,
-                ORDER_SHIPPING_LINES_PAGE_QUERY,
-            )
-            from odoo.addons.shopify_connector_sale.models.shopify_connector_order_scan import (
-                ORDER_SCAN_QUERY,
-            )
-
-            documents.update({
-                "ConnectorOrderScan": ORDER_SCAN_QUERY,
-                "ConnectorOrderHeader": ORDER_HEADER_QUERY,
-                "ConnectorOrderLineItemsPage": ORDER_LINE_ITEMS_PAGE_QUERY,
-                "ConnectorOrderShippingLinesPage": ORDER_SHIPPING_LINES_PAGE_QUERY,
-                "ConnectorOrderDiscountApplicationsPage": ORDER_DISCOUNT_APPLICATIONS_PAGE_QUERY,
-            })
+        documents = self._extend_documents(names, documents)
+        if not isinstance(documents, dict) or any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in documents.items()
+        ):
+            raise UserError("A Shopify read document provider is malformed.")
         missing = set(names) - set(documents)
         if missing:
             raise UserError(
@@ -226,6 +203,8 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
         job: Any,
         names: set[str] | frozenset[str],
         *,
+        purpose: str | None = None,
+        claim: Any = None,
         allow_lifecycle: bool = False,
     ) -> tuple[ReadCompatibilityAdapter, str, dict[str, str]]:
         documents = self._documents(names)
@@ -234,6 +213,8 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
             client,
             documents,
             job=job,
+            purpose=purpose,
+            claim=claim,
             allow_lifecycle=allow_lifecycle,
         )
         return (
@@ -282,11 +263,18 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
         reader: Callable[[ReadCompatibilityAdapter], ReadResult[Any]],
         variables: Mapping[str, Any],
         *,
+        purpose: str | None = None,
+        claim: Any = None,
         allow_lifecycle: bool = False,
     ) -> ReadResult[Any]:
         store = self._assert_store(store)
         adapter, mode, _documents = self._adapter(
-            store, job, names, allow_lifecycle=allow_lifecycle
+            store,
+            job,
+            names,
+            purpose=purpose,
+            claim=claim,
+            allow_lifecycle=allow_lifecycle,
         )
         if mode == "legacy":
             return reader(adapter)
@@ -376,215 +364,8 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
                 store, cursor=cursor, progress=progress
             ),
             {"cursor": cursor},
+            purpose="fulfillment",
         )
         return self._rpc(result)
-
-    @api.model
-    def read_product_page(
-        self,
-        job: Any,
-        store: Any,
-        *,
-        query: str = "",
-        cursor: str | None = None,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_product.integration.shopify.read_gateway import (
-            PRODUCT_SCAN_OPERATION,
-            ProductReadGateway,
-        )
-
-        variables = {
-            "first": PRODUCT_SCAN_OPERATION.page_size,
-            "after": cursor,
-            "query": query,
-        }
-        result = self._run(
-            store,
-            job,
-            PRODUCT_SCAN_OPERATION,
-            {"ConnectorProductScan"},
-            lambda adapter: ProductReadGateway(adapter).read_product_page(
-                store, query=query, cursor=cursor, progress=progress
-            ),
-            variables,
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_product(
-        self,
-        job: Any,
-        store: Any,
-        product_gid: str,
-        *,
-        cursor: str | None = None,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_product.integration.shopify.read_gateway import (
-            PRODUCT_READ_OPERATION,
-            ProductReadGateway,
-        )
-
-        variables = {"id": product_gid, "cursor": cursor}
-        result = self._run(
-            store,
-            job,
-            PRODUCT_READ_OPERATION,
-            {"ConnectorProductImport"},
-            lambda adapter: ProductReadGateway(adapter).read_product(
-                store, product_gid, cursor=cursor, progress=progress
-            ),
-            variables,
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_customer(self, job: Any, store: Any, customer_gid: str) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            CUSTOMER_READ_OPERATION,
-            CustomerReadGateway,
-        )
-
-        result = self._run(
-            store,
-            job,
-            CUSTOMER_READ_OPERATION,
-            {"ConnectorCustomerImport"},
-            lambda adapter: CustomerReadGateway(adapter).read_customer(store, customer_gid),
-            {"id": customer_gid},
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_order_scan_page(
-        self,
-        job: Any,
-        store: Any,
-        *,
-        query: str = "",
-        cursor: str | None = None,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            ORDER_SCAN_OPERATION,
-            OrderReadGateway,
-        )
-
-        variables = {
-            "first": ORDER_SCAN_OPERATION.page_size,
-            "after": cursor,
-            "query": query,
-        }
-        result = self._run(
-            store,
-            job,
-            ORDER_SCAN_OPERATION,
-            {"ConnectorOrderScan"},
-            lambda adapter: OrderReadGateway(adapter).read_order_scan_page(
-                store, query=query, cursor=cursor, progress=progress
-            ),
-            variables,
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_order_header(self, job: Any, store: Any, order_gid: str) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            ORDER_HEADER_OPERATION,
-            OrderReadGateway,
-        )
-
-        result = self._run(
-            store,
-            job,
-            ORDER_HEADER_OPERATION,
-            {"ConnectorOrderHeader"},
-            lambda adapter: OrderReadGateway(adapter).read_order_header(store, order_gid),
-            {"id": order_gid},
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_order_line_items_page(
-        self,
-        job: Any,
-        store: Any,
-        order_gid: str,
-        *,
-        cursor: str,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            ORDER_LINE_ITEMS_OPERATION,
-            OrderReadGateway,
-        )
-
-        result = self._run(
-            store,
-            job,
-            ORDER_LINE_ITEMS_OPERATION,
-            {"ConnectorOrderLineItemsPage"},
-            lambda adapter: OrderReadGateway(adapter).read_order_line_items_page(
-                store, order_gid, cursor=cursor, progress=progress
-            ),
-            {"id": order_gid, "after": cursor},
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_order_shipping_lines_page(
-        self,
-        job: Any,
-        store: Any,
-        order_gid: str,
-        *,
-        cursor: str,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            ORDER_SHIPPING_LINES_OPERATION,
-            OrderReadGateway,
-        )
-
-        result = self._run(
-            store,
-            job,
-            ORDER_SHIPPING_LINES_OPERATION,
-            {"ConnectorOrderShippingLinesPage"},
-            lambda adapter: OrderReadGateway(adapter).read_order_shipping_lines_page(
-                store, order_gid, cursor=cursor, progress=progress
-            ),
-            {"id": order_gid, "after": cursor},
-        )
-        return self._rpc(result)
-
-    @api.model
-    def read_order_discount_applications_page(
-        self,
-        job: Any,
-        store: Any,
-        order_gid: str,
-        *,
-        cursor: str,
-        progress: CursorProgress | None = None,
-    ) -> dict[str, Any]:
-        from odoo.addons.shopify_connector_sale.integration.shopify.read_gateway import (
-            ORDER_DISCOUNT_APPLICATIONS_OPERATION,
-            OrderReadGateway,
-        )
-
-        result = self._run(
-            store,
-            job,
-            ORDER_DISCOUNT_APPLICATIONS_OPERATION,
-            {"ConnectorOrderDiscountApplicationsPage"},
-            lambda adapter: OrderReadGateway(adapter).read_order_discount_applications_page(
-                store, order_gid, cursor=cursor, progress=progress
-            ),
-            {"id": order_gid, "after": cursor},
-        )
-        return self._rpc(result)
-
 
 __all__ = ["ShopifyConnectorReadGateway"]

@@ -306,12 +306,29 @@ class ShopifyConnectorWebhookSubscriptionV2Reconciliation(models.Model):
         by_topic = {record.topic_enum: record for record in expected}
         now = fields.Datetime.now()
         epoch = self._credential_epoch(store)
+        if plan.blocked:
+            for decision in plan.decisions:
+                if decision.action != 'block':
+                    continue
+                record = by_topic.get(decision.topic)
+                if record:
+                    record._service_write({
+                        'state': 'manual_review',
+                        'last_reconciled_at': now,
+                        'hmac_credential_epoch': epoch,
+                        'last_error': (
+                            'Subscription reconciliation requires operator '
+                            'review: %s.' % decision.reason_code
+                        ),
+                    })
+            return expected
+        executable = {decision.key for decision in plan.require_executable()}
         for decision in plan.decisions:
             record = by_topic.get(decision.topic)
             if not record:
                 continue
             observed = decision.observed
-            if decision.action == 'keep' and observed and not plan.blocked:
+            if decision.action == 'keep' and observed:
                 record._service_write({
                     'state': 'active',
                     'shopify_subscription_gid': observed.id,
@@ -325,14 +342,11 @@ class ShopifyConnectorWebhookSubscriptionV2Reconciliation(models.Model):
                     'last_error': False,
                     'operator_note': False,
                 })
-            elif decision.action == 'block':
-                record._service_write({
-                    'state': 'manual_review',
-                    'last_reconciled_at': now,
-                    'hmac_credential_epoch': epoch,
-                    'last_error': 'Subscription reconciliation requires operator review: %s.' % decision.reason_code,
-                })
-            elif decision.action == 'delete' and observed:
+            elif (
+                decision.action == 'delete'
+                and decision.key in executable
+                and observed
+            ):
                 record._service_write({
                     'state': 'queued',
                     'shopify_subscription_gid': observed.id,
@@ -345,7 +359,11 @@ class ShopifyConnectorWebhookSubscriptionV2Reconciliation(models.Model):
                     'hmac_credential_epoch': epoch,
                 })
                 self._enqueue_subscription_mutation(record, 'delete', source)
-            elif decision.action == 'create' and not decision.depends_on:
+            elif (
+                decision.action == 'create'
+                and decision.key in executable
+                and not decision.depends_on
+            ):
                 record._service_write({
                     'state': 'missing',
                     'last_reconciled_at': now,

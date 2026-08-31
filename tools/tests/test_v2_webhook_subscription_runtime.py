@@ -283,6 +283,14 @@ class P11RuntimeTests(unittest.TestCase):
                 with self.assertRaises(SubscriptionRuntimeError):
                     _admission(**change)
 
+    def test_admission_accepts_every_cumulative_subscription_mode(self):
+        for mode in (
+            "subscriptions", "inventory", "product_export", "fulfillment",
+            "all",
+        ):
+            with self.subTest(mode=mode):
+                self.assertEqual(_admission(runtime_mode=mode).runtime_mode, mode)
+
     def test_result_and_admission_are_immutable(self):
         admission = _admission()
         with self.assertRaisesRegex((AttributeError, TypeError), ""):

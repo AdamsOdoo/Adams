@@ -9,6 +9,7 @@ from . import shopify_connector_webhook_readiness
 from . import shopify_connector_webhook_setup
 # P07 reversible subscription read call-site layer.
 from . import shopify_connector_webhook_p07_read_adapter
+from . import shopify_connector_webhook_p07_gateway
 # P11 subscriptions-mode runtime cutover; legacy/read-only paths remain
 # selected by the store-scoped mode fence.
 from . import shopify_connector_webhook_subscription_v2_runtime

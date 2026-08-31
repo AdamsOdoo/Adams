@@ -102,11 +102,6 @@ class _AuthorizedP07Delegate:
                 self.lifecycle_snapshot["token"],
                 dict(variables),
             )
-        if self.webhook:
-            with self.client.execute_business(
-                self.job, self.store, document, dict(variables),
-            ) as result:
-                return result
         with self.client.execute_business_read(
             self.job,
             self.store,
@@ -145,29 +140,17 @@ class ShopifyConnectorDomainReadGateway(models.AbstractModel):
 
     @api.model
     def _p07_gateway(self, family: str):
-        """Return the owning pure gateway, its exact documents and error type."""
+        """Resolve an installed domain provider through addon inheritance."""
 
-        if family == "inventory":
-            from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_read_gateway import (
-                InventoryReadGateway,
-            )
-
-            return InventoryReadGateway, dict(InventoryReadGateway.operation_documents)
-        if family == "fulfillment":
-            from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_read_gateway import (
-                FulfillmentReadGateway,
-            )
-
-            return FulfillmentReadGateway, dict(FulfillmentReadGateway.operation_documents)
-        if family == "webhook":
-            from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_read_gateway import (
-                WebhookSubscriptionReadGateway,
-            )
-
-            return WebhookSubscriptionReadGateway, dict(
-                WebhookSubscriptionReadGateway.operation_documents
-            )
+        del family
         raise UserError("The requested Shopify domain read is not installed.")
+
+    @api.model
+    def _p07_raise_typed_error(self, family: str, exc: Exception):
+        """Let the owning addon restore its established V1 exception contract."""
+
+        del family
+        raise exc
 
     @api.model
     def _p07_run(
@@ -202,7 +185,10 @@ class ShopifyConnectorDomainReadGateway(models.AbstractModel):
             lifecycle=lifecycle,
         )
         if mode == "v2":
-            return typed_reader(delegate)
+            try:
+                return typed_reader(delegate)
+            except Exception as exc:
+                return self._p07_raise_typed_error(family, exc)
 
         # ``compare_reads`` uses the same deterministic sample primitive as
         # P06.  The legacy result is returned even when typed parsing fails.

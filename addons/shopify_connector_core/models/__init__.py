@@ -7,6 +7,10 @@
 # already in place.
 from . import shopify_connector_scope_mixin
 from . import shopify_connector_api_client
+# Claim-fenced P10 read admission extends the established transport boundary.
+# It must load after the client owner and before any runtime can register a
+# network-capable read handler.
+from . import shopify_connector_api_client_v2_read_claim
 # The final V2 admission hook is isolated from the protected API client.  It
 # runs on the second validation call made inside `_send`, after
 # `execute_business` has completed credential/access work and immediately
@@ -15,8 +19,8 @@ from . import shopify_connector_api_client_v2_runtime
 # P06 read gateway adapter: explicit core/product/sale read methods over the
 # existing authorized API client; no table, writes, or lifecycle transitions.
 from . import shopify_connector_read_gateway
-# P07 inventory/fulfillment/webhook read compatibility methods extend the
-# single authorized core gateway model; optional domain imports stay lazy.
+# P07 shared compatibility runtime.  Optional domain gateways register through
+# inheritance in their owning addons; core imports no domain implementation.
 from . import shopify_connector_domain_read_gateway
 from . import shopify_connector_store
 # Keep the legacy store lifecycle implementation compact.  The server-side
@@ -34,7 +38,6 @@ from . import shopify_connector_store_settings
 from . import shopify_connector_store_settings_security
 from . import shopify_connector_store_settings_v2
 from . import shopify_connector_command_result
-from . import shopify_connector_p15_command_replay
 from . import shopify_connector_pii_retention
 from . import shopify_connector_location
 from . import shopify_connector_binding_mixin
@@ -73,6 +76,10 @@ from . import shopify_connector_ui_facade
 # P01/P02 explicit application seam.  It delegates only named read methods to
 # the UI facade; no generic dispatch or write command is exposed yet.
 from . import shopify_connector_application_facade
+# P15 command replay extends the application facade, so it must be registered
+# after the facade owner.  Loading it with the command-result model above makes
+# a fresh Odoo registry fail before any connector test or migration can run.
+from . import shopify_connector_p15_command_replay
 # P04 explicit recovery adapters.  The base attention command contract is
 # registered first; retry and administrator cancellation extend the same named
 # application facade without introducing a generic dispatcher.

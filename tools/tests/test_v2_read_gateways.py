@@ -364,18 +364,22 @@ class TestP06ReadGatewayContracts(unittest.TestCase):
         adapter_source = (
             CORE_ROOT / "models" / "shopify_connector_read_gateway.py"
         ).read_text(encoding="utf-8")
+        product_adapter_source = (
+            PRODUCT_ROOT / "models" / "shopify_connector_read_gateway.py"
+        ).read_text(encoding="utf-8")
+        sale_adapter_source = (
+            SALE_ROOT / "models" / "shopify_connector_read_gateway.py"
+        ).read_text(encoding="utf-8")
         self.assertNotIn("import requests", adapter_source)
         self.assertNotIn(".sudo(", adapter_source)
-        for method in (
-            "read_store_capability",
-            "read_location_page",
-            "read_product_page",
-            "read_product",
-            "read_customer",
-            "read_order_scan_page",
-            "read_order_header",
-        ):
+        for method in ("read_store_capability", "read_location_page"):
             self.assertIn("def %s" % method, adapter_source)
+        for method in ("read_product_page", "read_product"):
+            self.assertIn("def %s" % method, product_adapter_source)
+            self.assertNotIn("def %s" % method, adapter_source)
+        for method in ("read_customer", "read_order_scan_page", "read_order_header"):
+            self.assertIn("def %s" % method, sale_adapter_source)
+            self.assertNotIn("def %s" % method, adapter_source)
 
         # Importing through an installed Odoo addon path must resolve the same
         # contract module object used by product/sale gateways.  A duplicate
@@ -536,7 +540,8 @@ class TestP06ReadGatewayContracts(unittest.TestCase):
         adapter, legacy, _typed = _adapter(source)
         result = ProductReadGateway(adapter).read_product("store", "gid://shopify/Product/3")
         self.assertEqual(len(legacy.calls), 1)
-        self.assertEqual(result.value.variants.items[0].price, 19.99)
+        self.assertEqual(result.value.variants.items[0].price, "19.99")
+        self.assertEqual(result.value.variants.items[0].compare_at_price, "25.00")
         self.assertFalse(result.value.variants.items[0].inventory_tracked)
         self.assertTrue(result.value.variants.items[0].inventory_tracked_known)
         self.assertEqual(json.loads(json.dumps(result.as_dict()))["value"]["variants"]["items"][0]["sku"], "ENG-L")
@@ -656,6 +661,11 @@ class TestP06ReadGatewayContracts(unittest.TestCase):
             _optional_int(False, "position")
         with self.assertRaises(ReadGatewayError):
             _price(True)
+        with self.assertRaises(ReadGatewayError):
+            _price(19.99)
+        with self.assertRaises(ReadGatewayError):
+            _price("NaN")
+        self.assertEqual(_price("19.9900"), "19.9900")
 
     def test_product_and_variant_identity_cannot_overlap_across_pages(self):
         source = _FixtureSource()

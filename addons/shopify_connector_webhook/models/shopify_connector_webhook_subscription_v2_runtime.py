@@ -9,6 +9,9 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 
 from odoo.addons.shopify_connector_core.domain.immutability import to_plain
+from odoo.addons.shopify_connector_core.domain.runtime_modes import (
+    runtime_mode_includes,
+)
 from odoo.addons.shopify_connector_core.models.shopify_connector_api_client import (
     ShopifyClientError,
     ShopifyQuiescedError,
@@ -93,7 +96,9 @@ class ShopifyConnectorWebhookSubscriptionV2(models.Model):
         return bool(
             settings
             and 'v2_runtime_mode' in settings._fields
-            and settings.v2_runtime_mode == 'subscriptions'
+            and runtime_mode_includes(
+                settings.v2_runtime_mode, 'subscriptions',
+            )
         )
 
     @api.model
@@ -118,7 +123,9 @@ class ShopifyConnectorWebhookSubscriptionV2(models.Model):
         settings = self._v2_settings(store)
         if (
             not settings
-            or settings.v2_runtime_mode != 'subscriptions'
+            or not runtime_mode_includes(
+                settings.v2_runtime_mode, 'subscriptions',
+            )
             or store.state != 'connected'
             or job.company_id != store.company_id
             or run.store_id != store
@@ -167,7 +174,9 @@ class ShopifyConnectorWebhookSubscriptionV2(models.Model):
         settings = self._v2_settings(store)
         if (
             not settings
-            or settings.v2_runtime_mode != 'subscriptions'
+            or not runtime_mode_includes(
+                settings.v2_runtime_mode, 'subscriptions',
+            )
             or store.state != 'connected'
             or store.company_id not in self.env.companies
         ):
@@ -229,7 +238,7 @@ class ShopifyConnectorWebhookSubscriptionV2(models.Model):
             'scope_summary': 'Webhook subscription %s' % action,
             'scope_fingerprint': payload_hash,
             'configuration_snapshot': {
-                'runtime_mode': 'subscriptions',
+                'runtime_mode': settings.v2_runtime_mode,
                 'configuration_generation': settings.configuration_generation,
                 'topic': subscription.topic_enum,
                 'action': action,
@@ -303,9 +312,14 @@ class ShopifyConnectorWebhookSubscriptionV2(models.Model):
                 and subscription.actual_uri_digest
                 == subscription.expected_callback_url_digest
             )
+            removed_cleanup_owned = removed_cleanup and connector_owned
             if not active_topic and not removed_cleanup:
                 raise ValidationError('The V2 subscription topic is not active.')
-            if not (removed_cleanup or stale_callback_cleanup or connector_owned):
+            if not (
+                removed_cleanup_owned
+                or stale_callback_cleanup
+                or connector_owned
+            ):
                 raise ValidationError(
                     'A V2 delete cannot remove a callback identity that is '
                     'not connector-owned.'
