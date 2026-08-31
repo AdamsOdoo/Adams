@@ -21,26 +21,19 @@ def _namespace(name: str, path: Path) -> None:
         sys.modules[name] = package
 
 
-for _addon in ("shopify_connector_core", "shopify_connector_webhook"):
-    _root = ROOT / "addons" / _addon
-    _namespace(_addon, _root)
-    _namespace(_addon + ".domain", _root / "domain")
-    _namespace(_addon + ".integration", _root / "integration")
-    _namespace(_addon + ".integration.shopify", _root / "integration" / "shopify")
-
-# The P07 read gateway is intentionally loaded through the canonical Odoo
-# addon namespace.  These namespaces are package-only test shims; importing
-# the DTOs still performs no Odoo or network work.
 _namespace("odoo", ROOT)
 _namespace("odoo.addons", ROOT / "addons")
-_namespace("odoo.addons.shopify_connector_core", ROOT / "addons" / "shopify_connector_core")
-_namespace(
-    "odoo.addons.shopify_connector_core.domain",
-    ROOT / "addons" / "shopify_connector_core" / "domain",
-)
+
+for _addon in ("shopify_connector_core", "shopify_connector_webhook"):
+    _root = ROOT / "addons" / _addon
+    _prefix = "odoo.addons." + _addon
+    _namespace(_prefix, _root)
+    _namespace(_prefix + ".domain", _root / "domain")
+    _namespace(_prefix + ".integration", _root / "integration")
+    _namespace(_prefix + ".integration.shopify", _root / "integration" / "shopify")
 
 
-from shopify_connector_webhook.integration.shopify.webhook_subscription_planner import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_planner import (  # noqa: E402
     MAX_CURRENT_SUBSCRIPTIONS,
     MAX_GRANTED_SCOPES,
     MAX_TOPIC_SPECS,
@@ -51,7 +44,7 @@ from shopify_connector_webhook.integration.shopify.webhook_subscription_planner 
     WebhookTopicSpec,
     plan_webhook_subscriptions,
 )
-from shopify_connector_webhook.integration.shopify.webhook_subscription_contract_adapter import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_contract_adapter import (  # noqa: E402
     P08_CALLBACK_URL_DIGEST_KEY,
     P11_CALLBACK_URI_DIGEST_KEY,
     adapt_p07_collection,
@@ -59,11 +52,11 @@ from shopify_connector_webhook.integration.shopify.webhook_subscription_contract
     adapt_p08_target,
     adapt_p08_targets,
 )
-from shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (  # noqa: E402
     WEBHOOK_SUBSCRIPTION_CREATE_OPERATION,
     WEBHOOK_SUBSCRIPTION_DELETE_OPERATION,
 )
-from shopify_connector_webhook.integration.shopify.webhook_subscription_read_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_read_gateway import (  # noqa: E402
     WebhookSubscriptionCollectionDTO,
     WebhookSubscriptionDTO,
     WebhookSubscriptionPageDTO,

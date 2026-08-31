@@ -28,23 +28,27 @@ def _namespace(name: str, path: Path) -> None:
         sys.modules[name] = package
 
 
+_namespace("odoo", ROOT)
+_namespace("odoo.addons", ROOT / "addons")
+
 for _addon in ("shopify_connector_core", "shopify_connector_webhook"):
     _root = ROOT / "addons" / _addon
-    _namespace(_addon, _root)
-    _namespace(_addon + ".domain", _root / "domain")
-    _namespace(_addon + ".integration", _root / "integration")
-    _namespace(_addon + ".integration.shopify", _root / "integration" / "shopify")
+    _prefix = "odoo.addons." + _addon
+    _namespace(_prefix, _root)
+    _namespace(_prefix + ".domain", _root / "domain")
+    _namespace(_prefix + ".integration", _root / "integration")
+    _namespace(_prefix + ".integration.shopify", _root / "integration" / "shopify")
 
 
-from shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
     MutationTransportError,
 )
-from shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (  # noqa: E402
     WebhookSubscriptionMutationGateway,
     WEBHOOK_SUBSCRIPTION_CREATE_OPERATION,
     WEBHOOK_SUBSCRIPTION_MUTATION_REGISTRY,
 )
-from shopify_connector_webhook.integration.shopify.webhook_subscription_runtime import (  # noqa: E402
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_runtime import (  # noqa: E402
     SubscriptionMutationRuntime,
     SubscriptionReadback,
     SubscriptionRuntimeAdmission,

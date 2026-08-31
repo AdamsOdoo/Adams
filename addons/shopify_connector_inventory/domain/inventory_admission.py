@@ -14,7 +14,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
 
 from .inventory_mutation import (
     DEFAULT_MAX_OBSERVATION_AGE_SECONDS,

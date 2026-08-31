@@ -6,8 +6,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
-from shopify_connector_core.integration.shopify.mutation_contracts import (
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (
     MutationOutcome,
     MutationRequest,
     MutationResult,

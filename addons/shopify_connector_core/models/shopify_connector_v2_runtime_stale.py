@@ -31,15 +31,64 @@ class StaleOwnerRepositoryMixin:
     Candidate selection locks jobs first; detail locking then follows the same
     order used by finalization.
     """
-    def _stale_sql(self, env, cutoff, limit):
+
+    def _finish_cancelled_stale(
+        self, side_env, attempt, job, run, finished_at,
+    ):
+        """Terminalize a stale owner after its run cancellation request.
+
+        Cancellation is an explicit local lifecycle decision.  It does not
+        depend on remote-outcome evidence and must never be routed through the
+        stale-owner duplicate-risk/verification policy: once the run is
+        cancel-requested, the active attempt and its job are durably cancelled
+        under the locks acquired by ``_stale_sql``.
+        """
+        reason = run.cancel_reason or 'Cancellation requested.'
+        attempt._finish_service(
+            'cancelled',
+            safe_message='Read-only work was cancelled before completion.',
+            error_class=None,
+            error_code='cancellation_requested',
+            retry_decision='none',
+            next_retry_at=None,
+            observations={'cancel_requested': True, 'owner_lost': True},
+            finished_at=_db_datetime(finished_at),
+        )
+        values = _owner_cleanup()
+        values.update({
+            'state': 'cancelled',
+            'error_class': False,
+            'next_retry_at': False,
+            'cancel_reason': reason,
+            'manual_review_subreason': False,
+            'finished_at': _db_datetime(finished_at),
+        })
+        job.sudo().write(values)
+        job._log_transition(
+            'state_change',
+            'Stale V2 read-only owner cancelled by the run request.',
+            from_state='running',
+            to_state='cancelled',
+        )
+        # The normal projection reaches the cancelled terminal run once this
+        # child is the last active job.  It also preserves the established
+        # behavior for a multi-job run whose other children still need their
+        # own cancellation sweep pass.
+        self._refresh_run_state(side_env, run)
+
+    def _stale_sql(self, env, cutoff, limit, handler_keys):
         # Lock jobs first, then fetch/lock their attempts and scope parents.
         # The first query intentionally locks only ``j``; a multi-table
         # ``FOR UPDATE`` on the candidate scan could let PostgreSQL acquire an
-        # attempt before its job and deadlock with finalization.
+        # attempt before its job and deadlock with finalization.  Once a job is
+        # held, detail locks block and follow the same deterministic order as
+        # finalization: attempt -> run -> store -> settings.  The final joined
+        # read has no lock clause because all five rows are already held.
         companies = self._company_ids(env)
         env.cr.execute(
             """
-                SELECT j.id
+                SELECT j.id, j.current_attempt_token, j.run_id, j.store_id,
+                       j.job_type, j.job_type IN %s AS handler_registered
                   FROM shopify_connector_job j
                   JOIN shopify_connector_job_attempt a ON a.job_id = j.id
                   JOIN shopify_connector_run r
@@ -49,11 +98,15 @@ class StaleOwnerRepositoryMixin:
                   JOIN shopify_connector_store_settings ss
                     ON ss.store_id = s.id
                  WHERE j.run_id IS NOT NULL
+                   AND j.mutation_attempt_id IS NULL
                    AND j.state = 'running'
                    AND j.current_attempt_token = a.claim_token
                    AND a.outcome IN ('claimed', 'running')
                    AND COALESCE(a.heartbeat_at, a.claimed_at) <= %s
-                   AND ss.v2_runtime_mode IN %s
+                   AND (
+                        ss.v2_runtime_mode IN %s
+                        OR r.cancel_requested_at IS NOT NULL
+                   )
                    AND j.company_id = s.company_id
                    AND r.company_id = s.company_id
                    AND ss.company_id = s.company_id
@@ -62,11 +115,80 @@ class StaleOwnerRepositoryMixin:
                  LIMIT %s
                  FOR UPDATE OF j SKIP LOCKED
             """,
-            [_db_datetime(cutoff), V2_READ_ONLY_RUNTIME_MODES, companies, limit],
+            [tuple(handler_keys), _db_datetime(cutoff),
+             V2_READ_ONLY_RUNTIME_MODES, companies, limit],
         )
-        job_ids = tuple(row[0] for row in env.cr.fetchall())
+        job_rows = tuple(env.cr.fetchall())
+        details = []
+        for candidate in job_rows:
+            job_id = candidate[0]
+            # ``current_attempt_token``, ``run_id`` and ``store_id`` were read
+            # from the locked job row.  Keeping those identities fixed while
+            # acquiring each detail lock prevents a changed relation from
+            # making the later scope read lock an unrelated record.
+            (
+                _job_id, claim_token, run_id, store_id, job_type,
+                handler_registered,
+            ) = candidate
+            env.cr.execute(
+                """
+                    SELECT id
+                      FROM shopify_connector_job_attempt
+                     WHERE job_id = %s
+                       AND claim_token = %s
+                       AND outcome IN ('claimed', 'running')
+                       AND COALESCE(heartbeat_at, claimed_at) <= %s
+                     FOR UPDATE
+                """,
+                [job_id, claim_token, _db_datetime(cutoff)],
+            )
+            attempt_row = env.cr.fetchone()
+            if not attempt_row:
+                continue
+            details.append((
+                job_id, claim_token, run_id, store_id, attempt_row[0],
+                job_type, bool(handler_registered),
+            ))
+
+        if not details:
+            return ()
+        run_ids = tuple(sorted({row[2] for row in details}))
+        store_ids = tuple(sorted({row[3] for row in details}))
+        env.cr.execute(
+            """SELECT id FROM shopify_connector_run
+                 WHERE id IN %s ORDER BY id FOR UPDATE""",
+            [run_ids],
+        )
+        locked_runs = {row[0] for row in env.cr.fetchall()}
+        env.cr.execute(
+            """SELECT id FROM shopify_connector_store
+                 WHERE id IN %s ORDER BY id FOR UPDATE""",
+            [store_ids],
+        )
+        locked_stores = {row[0] for row in env.cr.fetchall()}
+        env.cr.execute(
+            """SELECT id, store_id
+                 FROM shopify_connector_store_settings
+                WHERE store_id IN %s
+                ORDER BY store_id, id FOR UPDATE""",
+            [store_ids],
+        )
+        settings_by_store = {}
+        for settings_id, settings_store_id in env.cr.fetchall():
+            settings_by_store.setdefault(settings_store_id, settings_id)
+
         rows = []
-        for job_id in job_ids:
+        for (
+            job_id, claim_token, run_id, store_id, attempt_id, job_type,
+            handler_registered,
+        ) in details:
+            settings_id = settings_by_store.get(store_id)
+            if (
+                run_id not in locked_runs
+                or store_id not in locked_stores
+                or not settings_id
+            ):
+                continue
             env.cr.execute(
                 """
                     SELECT a.id, a.job_id, a.claim_token, a.worker_ref,
@@ -79,32 +201,36 @@ class StaleOwnerRepositoryMixin:
                            ss.configuration_generation, ss.v2_runtime_mode
                       FROM shopify_connector_job j
                       JOIN shopify_connector_job_attempt a
-                        ON a.job_id = j.id
+                        ON a.id = %s AND a.job_id = j.id
+                       AND a.claim_token = %s
                       JOIN shopify_connector_run r
                         ON r.id = j.run_id AND r.store_id = j.store_id
                       JOIN shopify_connector_store s
                         ON s.id = j.store_id AND s.id = r.store_id
                       JOIN shopify_connector_store_settings ss
-                        ON ss.store_id = s.id
+                        ON ss.id = %s AND ss.store_id = s.id
                      WHERE j.id = %s
                        AND j.run_id IS NOT NULL
+                       AND j.mutation_attempt_id IS NULL
                        AND j.state = 'running'
                        AND j.current_attempt_token = a.claim_token
                        AND a.outcome IN ('claimed', 'running')
                        AND COALESCE(a.heartbeat_at, a.claimed_at) <= %s
-                       AND ss.v2_runtime_mode IN %s
+                       AND (
+                            ss.v2_runtime_mode IN %s
+                            OR r.cancel_requested_at IS NOT NULL
+                       )
                        AND j.company_id = s.company_id
                        AND r.company_id = s.company_id
                        AND ss.company_id = s.company_id
                        AND s.company_id IN %s
-                     FOR UPDATE OF a, r, s, ss SKIP LOCKED
                 """,
-                [job_id, _db_datetime(cutoff), V2_READ_ONLY_RUNTIME_MODES,
-                 companies],
+                [attempt_id, claim_token, settings_id, job_id,
+                 _db_datetime(cutoff), V2_READ_ONLY_RUNTIME_MODES, companies],
             )
             row = env.cr.fetchone()
             if row:
-                rows.append(row)
+                rows.append(row + (job_type, handler_registered))
         return tuple(rows)
 
     def sweep_stale_read_only(self, *, now=None, limit=V2_MAX_CLAIM_BATCH):
@@ -116,7 +242,8 @@ class StaleOwnerRepositoryMixin:
         )
         processed = 0
         with self._transaction() as side_env:
-            rows = self._stale_sql(side_env, cutoff, limit)
+            handler_keys = tuple(self._registered_read_only_handler_keys())
+            rows = self._stale_sql(side_env, cutoff, limit, handler_keys)
             Attempt = side_env['shopify.connector.job.attempt']
             Job = side_env['shopify.connector.job']
             Run = side_env['shopify.connector.run']
@@ -126,7 +253,8 @@ class StaleOwnerRepositoryMixin:
                     claimed_at, heartbeat_at, job_connection,
                     job_configuration, run_id, run_connection,
                     run_configuration, store_connection,
-                    settings_configuration, _mode,
+                    settings_configuration, _mode, job_type,
+                    handler_registered,
                 ) = row
                 attempt = Attempt.browse(attempt_id).exists()
                 job = Job.browse(job_id).exists()
@@ -164,7 +292,16 @@ class StaleOwnerRepositoryMixin:
                     or job_configuration != settings_configuration
                     or run_configuration != settings_configuration
                 )
-                if type(raw_remote) is not str or raw_remote not in {
+                if run.cancel_requested_at:
+                    self._finish_cancelled_stale(
+                        side_env, attempt, job, run, now,
+                    )
+                    processed += 1
+                    continue
+                if not handler_registered:
+                    decision_action = 'quarantine'
+                    decision_reason = 'unregistered_read_handler'
+                elif type(raw_remote) is not str or raw_remote not in {
                     'none', 'not_attempted', 'pre_send', 'failed_clean',
                     'pending', 'in_flight', 'uncertain', 'succeeded',
                 }:
@@ -195,7 +332,7 @@ class StaleOwnerRepositoryMixin:
                     attempt_no=attempt.attempt_no,
                     claim_token=token,
                     worker_ref=worker_ref,
-                    handler_key=job.job_type,
+                    handler_key=job_type,
                     lane=job.lane or 'reconciliation',
                     expected_generation=int(job_connection or 0),
                     expected_configuration_generation=int(

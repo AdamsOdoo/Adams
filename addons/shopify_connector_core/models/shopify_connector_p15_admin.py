@@ -9,6 +9,7 @@ named commands.
 from .shopify_connector_p15_shared import (
     P15_CAPACITY_ADVISORY_CLASSID,
     P15_COMMAND_NAMES,
+    P15_CONFIGURATION_POLICY_FIELDS,
     P15_CURSOR_RE,
     P15_EDITABLE_SETTINGS_GROUP_FIELDS,
     P15_MAX_LIST_LIMIT,
@@ -34,6 +35,7 @@ from .shopify_connector_p15_commands import ShopifyConnectorP15ApplicationFacade
 
 __all__ = [
     "P15_COMMAND_NAMES",
+    "P15_CONFIGURATION_POLICY_FIELDS",
     "P15_EDITABLE_SETTINGS_GROUP_FIELDS",
     "P15_SETTINGS_GROUP_FIELDS",
     "ShopifyConnectorP15ApplicationFacade",

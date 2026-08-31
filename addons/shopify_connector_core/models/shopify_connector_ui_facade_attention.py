@@ -18,6 +18,8 @@ from ..domain.states import Role
 
 
 class ShopifyConnectorUiFacadeAttentionMixin:
+    __slots__ = ()
+
     @api.model
     def search_attention_v1(
         self,

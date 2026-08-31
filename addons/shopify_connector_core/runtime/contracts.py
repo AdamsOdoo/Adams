@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any, Union
 
 from ..domain.immutability import freeze_value
+from .p10_decisions import KNOWN_ERROR_CLASSES
 
 def _observations(value: Mapping[str, Any]) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
@@ -87,11 +88,19 @@ class NeedsReview:
     reason_code: str
     required_action: str
     observations: Mapping[str, Any] = field(default_factory=dict)
+    error_class: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("reason_code", "required_action"):
             if not isinstance(getattr(self, name), str) or not getattr(self, name).strip():
                 raise ValueError(f"{name} must be non-empty")
+        if self.error_class is not None:
+            if not isinstance(self.error_class, str):
+                raise TypeError("error_class must be a string or None")
+            if not self.error_class.strip():
+                raise ValueError("error_class must be non-empty when supplied")
+            if self.error_class not in KNOWN_ERROR_CLASSES:
+                raise ValueError("error_class must be an allowlisted source class")
         object.__setattr__(self, "observations", _observations(self.observations))
 
 

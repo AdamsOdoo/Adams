@@ -15,7 +15,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, Callable
 
-from odoo import api, models
+from odoo import SUPERUSER_ID, api, models
 from odoo.exceptions import AccessError, MissingError, UserError
 
 from ..integration.shopify.read_comparison import (
@@ -237,21 +237,58 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
         self,
         job: Any,
         evidence: ReadComparisonEvidence,
+        *,
+        claim: Any = None,
     ) -> None:
         if not job:
             return
         # The sanctioned append-only log path redacts again.  The payload is
         # already digest-only; no response, variables, PII or credentials are
         # persisted.
-        self.env["shopify.connector.job.log"]._system_append(
-            job,
-            "verification_read",
-            "P06 %s read comparison %s."
-            % (evidence.operation_name, "matched" if evidence.equal else "differed"),
-            technical_detail=json.dumps(
-                evidence.as_dict(), sort_keys=True, separators=(",", ":")
-            ),
+        def append(env, target):
+            env["shopify.connector.job.log"]._system_append(
+                target,
+                "verification_read",
+                "P06 %s read comparison %s."
+                % (
+                    evidence.operation_name,
+                    "matched" if evidence.equal else "differed",
+                ),
+                technical_detail=json.dumps(
+                    evidence.as_dict(), sort_keys=True, separators=(",", ":")
+                ),
+            )
+
+        if claim is None:
+            append(self.env, job)
+            return
+        cursor = self.env.registry.cursor()
+        side_env = api.Environment(
+            cursor,
+            SUPERUSER_ID,
+            dict(self.env.context, allowed_company_ids=[claim.company_id]),
         )
+        try:
+            side_job = side_env["shopify.connector.job"].browse(
+                claim.job_id,
+            ).exists()
+            if (
+                not side_job
+                or side_job.id != job.id
+                or side_job.store_id.id != claim.store_id
+                or side_job.company_id.id != claim.company_id
+                or side_job.run_id.id != claim.run_id
+            ):
+                cursor.rollback()
+                return
+            append(side_env, side_job)
+            side_env.flush_all()
+            cursor.commit()
+        except Exception:
+            cursor.rollback()
+            raise
+        finally:
+            cursor.close()
 
     @api.model
     def _run(
@@ -311,7 +348,7 @@ class ShopifyConnectorReadGateway(models.AbstractModel):
             )
         else:
             evidence = compare_values(operation.operation_name, legacy_result, typed_result)
-        self._record_comparison(job, evidence)
+        self._record_comparison(job, evidence, claim=claim)
         return legacy_result
 
     @staticmethod

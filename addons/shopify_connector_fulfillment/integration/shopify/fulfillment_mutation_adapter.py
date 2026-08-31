@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from shopify_connector_core.integration.shopify.mutation_contracts import MutationRequest, MutationResult
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import MutationRequest, MutationResult
 
 from ...domain.fulfillment_mutation import (
     FULFILLMENT_CREATE_OPERATION,

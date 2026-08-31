@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import api, fields, models
 
 
 class ShopifyConnectorStoreSettingsProduct(models.Model):
@@ -11,6 +11,27 @@ class ShopifyConnectorStoreSettingsProduct(models.Model):
     """
 
     _inherit = 'shopify.connector.store.settings'
+
+    @api.model
+    def _additional_protected_settings_fields(self):
+        """Protect durable product-scan state from generic ORM/RPC writes."""
+        return super()._additional_protected_settings_fields() | frozenset((
+            'product_last_import_checkpoint_at',
+            'product_last_import_success_at',
+            'product_scan_window_start_at',
+            'product_scan_window_end_at',
+            'product_scan_cursor',
+            'product_scan_latest_at',
+            'product_scan_page_count',
+            'product_scan_generation',
+        ))
+
+    @api.model
+    def _additional_settings_write_surfaces(self):
+        """Expose one named service seam for future product scan writers."""
+        return super()._additional_settings_write_surfaces() | frozenset((
+            '_product_scan',
+        ))
 
     # D-010B-6: per-store off switch for primary/variant image import.
     # Default True (basic image/media import is on by default).

@@ -15,7 +15,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from shopify_connector_core.integration.shopify.mutation_contracts import MAX_MUTATION_TEXT
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import MAX_MUTATION_TEXT
 
 from .webhook_subscription_mutation_gateway import (
     SHOPIFY_API_VERSION,

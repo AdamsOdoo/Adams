@@ -31,6 +31,42 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         return self._recovery_ui()._state_version(run, _RUN_STATE_VERSION_FIELDS)
 
     @api.model
+    def _recovery_lock_cancel_scope(self, run, store):
+        """Lock cancellable job roots before the run, without waiting on claims.
+
+        Claim/finalize owns a job before it owns the run.  Cancellation follows
+        that same order and skips a job already owned by a worker; the durable
+        run request still makes that worker settle at its normal boundary.
+        """
+        self.env.cr.execute(
+            """
+                SELECT id
+                  FROM shopify_connector_job
+                 WHERE run_id = %s
+                   AND store_id = %s
+                   AND company_id = %s
+                   AND state IN %s
+                   AND superseded_by_job_id IS NULL
+                 ORDER BY id
+                 LIMIT %s
+                 FOR UPDATE SKIP LOCKED
+            """,
+            [run.id, store.id, self.env.company.id,
+             tuple(sorted(_CANCELLABLE_STATES)),
+             _MAX_CHILDREN_PER_CANCEL + 1],
+        )
+        child_ids = tuple(row[0] for row in self.env.cr.fetchall())
+        self.env.cr.execute(
+            """SELECT id FROM shopify_connector_run
+                 WHERE id = %s AND store_id = %s AND company_id = %s
+                 FOR UPDATE""",
+            [run.id, store.id, self.env.company.id],
+        )
+        if not self.env.cr.fetchone():
+            return ()
+        return child_ids
+
+    @api.model
     def _recovery_cancel_v2_or_legacy(
         self, target, context, reason, expected_version, current_version,
     ):
@@ -81,6 +117,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
                 envelope=context.envelope,
                 store=target.store,
             )
+        child_ids = self._recovery_lock_cancel_scope(run, target.store)
         run.invalidate_recordset()
         current_run_version = self._recovery_run_state_version(run)
         if expected_version is not None and expected_version != current_run_version:
@@ -105,17 +142,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         run._request_cancel_service(reason)
 
         Job = self.env["shopify.connector.job"]
-        children = Job.search(
-            [
-                ("run_id", "=", run.id),
-                ("store_id", "=", target.store.id),
-                ("company_id", "=", self.env.company.id),
-                ("state", "in", tuple(_CANCELLABLE_STATES)),
-                ("superseded_by_job_id", "=", False),
-            ],
-            order="id asc",
-            limit=_MAX_CHILDREN_PER_CANCEL + 1,
-        )
+        children = Job.browse(child_ids).exists().sorted("id")
         settled = 0
         pending_running = Job.search_count(
             [
@@ -128,6 +155,16 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         )
         protected = 0
         for child in children[:_MAX_CHILDREN_PER_CANCEL]:
+            child.invalidate_recordset()
+            if (
+                child.run_id != run
+                or child.store_id != target.store
+                or child.company_id != self.env.company
+                or child.state not in _CANCELLABLE_STATES
+                or child.superseded_by_job_id
+            ):
+                protected += 1
+                continue
             # A mutation-evidence-linked child is never generically cancelled,
             # even when its physical state is queued.  Its accepted mutation
             # service owns the eventual verification decision.

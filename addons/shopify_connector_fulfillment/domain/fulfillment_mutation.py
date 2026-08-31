@@ -11,7 +11,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
 
 
 FULFILLMENT_CREATE_OPERATION = "fulfillment_create"

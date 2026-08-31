@@ -26,6 +26,8 @@ from ..domain.store_admin import MAX_SUPPORTED_STORES
 
 
 class ShopifyConnectorUiFacadeOverviewMixin:
+    __slots__ = ()
+
     @api.model
     def get_overview_v1(self, store_id):
         """Return one store's bounded Overview read model.

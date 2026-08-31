@@ -59,6 +59,9 @@ from . import shopify_connector_job_dispatch
 # Shared V2 mutation admission is an inherited seam loaded after the
 # protected dispatcher; domain addons extend its registries with super().
 from . import shopify_connector_v2_mutation_dispatch
+# Final legacy-claim fence resolves the composed V2 mutation registry without
+# enlarging either protected V1 hotspot.
+from . import shopify_connector_job_v2_claim_fence
 from . import shopify_connector_stale_owner_sweep
 # P10 bounded read-only repository/runtime adapter.  Imported after both
 # target abstract services so its compatibility overrides register safely.

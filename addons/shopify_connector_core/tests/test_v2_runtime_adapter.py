@@ -115,17 +115,18 @@ class TestV2RuntimeAdapter(TransactionCase):
     def test_claim_sql_executes_bounded_generation_fenced_statement(self):
         cursor = _RecordingCursor()
         ids = OdooReadOnlyRuntimeRepository._claim_sql(
-            _fake_sql_env(cursor), NOW, 3,
+            _fake_sql_env(cursor), NOW, 3, ('core_dispatch_selftest',),
         )
         self.assertEqual(ids, (41,))
-        self.assertEqual(cursor.params[:4], (NOW.replace(tzinfo=None),) * 4)
-        self.assertEqual(cursor.params[4][0], 'read_only')
-        self.assertEqual(cursor.params[4][-1], 'all')
-        self.assertEqual(cursor.params[5], (7,))
-        self.assertEqual(cursor.params[6], NOW.replace(tzinfo=None))
-        self.assertEqual(cursor.params[7], 3)
+        self.assertEqual(cursor.params[0], ('core_dispatch_selftest',))
+        self.assertEqual(cursor.params[1:5], (NOW.replace(tzinfo=None),) * 4)
+        self.assertEqual(cursor.params[5][0], 'read_only')
+        self.assertEqual(cursor.params[5][-1], 'all')
+        self.assertEqual(cursor.params[6], (7,))
+        self.assertEqual(cursor.params[7], NOW.replace(tzinfo=None))
+        self.assertEqual(cursor.params[8], 3)
         self.assertEqual(len(cursor.params), cursor.query.count('%s'))
-        self.assertIn('FOR UPDATE OF j, r, s, ss SKIP LOCKED', cursor.query)
+        self.assertIn('FOR UPDATE OF j SKIP LOCKED', cursor.query)
         self.assertIn(
             'j.expected_connection_generation = s.connection_generation',
             cursor.query,
@@ -148,7 +149,7 @@ class TestV2RuntimeAdapter(TransactionCase):
     def test_claim_sql_has_dependency_and_cancellation_fences(self):
         cursor = _RecordingCursor(rows=())
         OdooReadOnlyRuntimeRepository._claim_sql(
-            _fake_sql_env(cursor), NOW, 1,
+            _fake_sql_env(cursor), NOW, 1, ('core_dispatch_selftest',),
         )
         query = cursor.query
         self.assertIn('r.cancel_requested_at IS NULL', query)
@@ -242,26 +243,63 @@ class TestV2RuntimeAdapter(TransactionCase):
     def test_finalization_and_stale_paths_lock_job_before_children(self):
         finalizer = inspect.getsource(OdooReadOnlyRuntimeRepository._lock_claim)
         stale = inspect.getsource(OdooReadOnlyRuntimeRepository._stale_sql)
-        self.assertLess(finalizer.index('SELECT id'), finalizer.index('SELECT j.id'))
+        self.assertLess(
+            finalizer.index('FROM shopify_connector_job'),
+            finalizer.index('FROM shopify_connector_job_attempt'),
+        )
+        self.assertLess(
+            finalizer.index('FROM shopify_connector_job_attempt'),
+            finalizer.index('FROM shopify_connector_run'),
+        )
+        self.assertLess(
+            finalizer.index('FROM shopify_connector_run'),
+            finalizer.index('FROM shopify_connector_store'),
+        )
+        self.assertLess(
+            finalizer.index('FROM shopify_connector_store'),
+            finalizer.index('FROM shopify_connector_store_settings'),
+        )
         self.assertIn('FOR UPDATE SKIP LOCKED', finalizer)
-        self.assertIn('FOR UPDATE OF a, r, s, ss SKIP LOCKED', finalizer)
-        self.assertLess(stale.index('SELECT j.id'), stale.index('SELECT a.id'))
+        self.assertNotIn('FOR UPDATE OF a, r, s, ss SKIP LOCKED', finalizer)
+        self.assertIn('FOR UPDATE\n', finalizer)
+        self.assertLess(
+            stale.index('FROM shopify_connector_job j'),
+            stale.index('FROM shopify_connector_job_attempt'),
+        )
+        self.assertLess(
+            stale.index('FROM shopify_connector_job_attempt'),
+            stale.index('FROM shopify_connector_run'),
+        )
+        self.assertLess(
+            stale.index('FROM shopify_connector_run'),
+            stale.index('FROM shopify_connector_store'),
+        )
+        self.assertLess(
+            stale.index('FROM shopify_connector_store'),
+            stale.index('FROM shopify_connector_store_settings'),
+        )
         self.assertIn('FOR UPDATE OF j SKIP LOCKED', stale)
-        self.assertIn('FOR UPDATE OF a, r, s, ss SKIP LOCKED', stale)
+        self.assertNotIn('FOR UPDATE OF a, r, s, ss SKIP LOCKED', stale)
 
-    def test_stale_sql_uses_bounded_two_step_job_first_locking(self):
+    def test_stale_sql_uses_bounded_sequential_job_first_locking(self):
         detail = (
             91, 41, str(uuid.uuid4()), 'worker:test', 'running',
             NOW.replace(tzinfo=None), NOW.replace(tzinfo=None), 4, 9,
             12, 4, 9, 4, 9, 'read_only',
         )
-        cursor = _SequenceCursor(detail_rows=(detail,))
+        cursor = _SequenceCursor(
+            job_ids=((41, detail[2], 12, 7),),
+            detail_rows=((91,), (12,), (7,), (33,), detail),
+        )
         repository = OdooReadOnlyRuntimeRepository(_fake_sql_env(cursor))
         rows = repository._stale_sql(_fake_sql_env(cursor), NOW, 1)
         self.assertEqual(rows, (detail,))
-        self.assertEqual(len(cursor.queries), 2)
+        self.assertEqual(len(cursor.queries), 6)
         self.assertEqual(cursor.params[0][-1], 1)
         self.assertEqual(cursor.params[1][0], 41)
+        self.assertEqual(cursor.params[2][0], 12)
+        self.assertEqual(cursor.params[3][0], 7)
+        self.assertEqual(cursor.params[4][0], 7)
 
     def test_only_explicit_non_mutation_handlers_are_registered(self):
         source = inspect.getsource(ShopifyConnectorV2Runtime)

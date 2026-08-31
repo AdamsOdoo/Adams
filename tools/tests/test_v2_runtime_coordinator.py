@@ -54,9 +54,15 @@ def claim(job_id=1, handler_key="core.read", *, worker="worker:test", mutation=F
         handler_key=handler_key,
         lane="interactive",
         expected_generation=4,
-        payload={"page": 1},
+        payload={"page": 1, "workflow": "core", "operation": "read.test"},
         mutation=mutation,
     )
+
+
+def handler_spec(handler_key, handler, **values):
+    values.setdefault("allowed_workflows", ("core",))
+    values.setdefault("allowed_operations", ("read.test",))
+    return ReadOnlyHandlerSpec(handler_key, handler, **values)
 
 
 class FakeRepository:
@@ -66,8 +72,10 @@ class FakeRepository:
         self.finalized = []
         self.fail_finalize = False
 
-    def claim_due(self, *, now, worker_ref, limit, phase):
-        self.events.append(("claim", now, worker_ref, limit, phase))
+    def claim_due(self, *, now, worker_ref, limit, phase, handler_keys):
+        self.events.append((
+            "claim", now, worker_ref, limit, phase, tuple(handler_keys),
+        ))
         return self.claims
 
     def finalize_attempt(self, *, claim, result, finished_at, phase):
@@ -92,7 +100,7 @@ class TestClaimedWork(unittest.TestCase):
 
 class TestCoordinator(unittest.TestCase):
     def registry(self, handler):
-        return ReadOnlyHandlerRegistry((ReadOnlyHandlerSpec("core.read", handler),))
+        return ReadOnlyHandlerRegistry((handler_spec("core.read", handler),))
 
     def test_claim_then_handler_then_finalize_order_is_explicit(self):
         repo = FakeRepository((claim(),))
@@ -109,6 +117,7 @@ class TestCoordinator(unittest.TestCase):
         self.assertEqual([item[0] for item in repo.events], ["claim", "finalize"])
         self.assertEqual(repo.events[0][4], CLAIM_TRANSACTION)
         self.assertEqual(repo.events[1][3], FINALIZE_TRANSACTION)
+        self.assertEqual(repo.events[0][5], ("core.read",))
         self.assertEqual(report.items[0].outcome, "succeeded")
         json.dumps(report.as_dict())
 
@@ -132,6 +141,36 @@ class TestCoordinator(unittest.TestCase):
         )
         self.assertEqual(len(repo.finalized), 3)
 
+    def test_malformed_retry_preserves_a_known_source_error_class(self):
+        repo = FakeRepository((claim(),))
+        ReadOnlyCoordinator(
+            repo,
+            self.registry(lambda _item: Retryable(
+                "shopify_throttling_rate_limit", NOW,
+            )),
+            "worker:test",
+        ).run_once(now=NOW)
+        result = repo.finalized[0][1]
+        self.assertIsInstance(result, NeedsReview)
+        self.assertEqual(result.reason_code, "invalid_retry_schedule")
+        self.assertEqual(
+            result.error_class, "shopify_throttling_rate_limit",
+        )
+
+    def test_unknown_retry_class_is_normalized_without_persisting_it(self):
+        repo = FakeRepository((claim(),))
+        ReadOnlyCoordinator(
+            repo,
+            self.registry(lambda _item: Retryable(
+                "unregistered_remote_error", NOW + timedelta(seconds=30),
+            )),
+            "worker:test",
+        ).run_once(now=NOW)
+        result = repo.finalized[0][1]
+        self.assertIsInstance(result, NeedsReview)
+        self.assertEqual(result.reason_code, "unknown_error_class")
+        self.assertEqual(result.error_class, "unknown_system_error")
+
     def test_unknown_or_raising_handler_fails_closed_to_manual_review(self):
         unknown_repo = FakeRepository((claim(handler_key="core.unknown"),))
         unknown = ReadOnlyCoordinator(
@@ -146,6 +185,30 @@ class TestCoordinator(unittest.TestCase):
         ).run_once(now=NOW)
         self.assertEqual(raising.items[0].reason_code, "read_handler_exception")
         self.assertNotIn("secret payload", str(raising.as_dict()))
+
+    def test_handler_is_never_called_for_a_different_run_contract(self):
+        invoked = []
+        item = claim()
+        mismatched = ClaimedWork(
+            job_id=item.job_id,
+            store_id=item.store_id,
+            attempt_no=item.attempt_no,
+            claim_token=item.claim_token,
+            worker_ref=item.worker_ref,
+            handler_key=item.handler_key,
+            lane=item.lane,
+            expected_generation=item.expected_generation,
+            payload={"workflow": "product", "operation": "product.import.scan"},
+        )
+        repo = FakeRepository((mismatched,))
+        report = ReadOnlyCoordinator(
+            repo,
+            self.registry(lambda _item: invoked.append(True) or Succeeded()),
+            "worker:test",
+        ).run_once(now=NOW)
+        self.assertEqual(invoked, [])
+        self.assertEqual(report.items[0].reason_code, "handler_run_mismatch")
+        self.assertIsInstance(repo.finalized[0][1], NeedsReview)
 
     def test_claim_batch_is_bounded_and_identity_is_checked(self):
         too_many = FakeRepository(tuple(claim(index) for index in range(1, MAX_CLAIM_BATCH + 2)))
@@ -213,11 +276,20 @@ class TestCoordinator(unittest.TestCase):
 
     def test_mutation_handlers_cannot_enter_registry(self):
         with self.assertRaises(ValueError):
-            ReadOnlyHandlerSpec("core.write", lambda _item: Succeeded(), mutation=True)
+            handler_spec("core.write", lambda _item: Succeeded(), mutation=True)
         with self.assertRaises(ValueError):
             ReadOnlyHandlerRegistry(tuple(
-                ReadOnlyHandlerSpec("core.read", lambda _item: Succeeded())
+                handler_spec("core.read", lambda _item: Succeeded())
                 for _ in range(MAX_CLAIM_BATCH + 1)
+            ))
+        registry = ReadOnlyHandlerRegistry()
+        for index in range(MAX_CLAIM_BATCH):
+            registry.register(handler_spec(
+                "core.read.%d" % index, lambda _item: Succeeded(),
+            ))
+        with self.assertRaises(ValueError):
+            registry.register(handler_spec(
+                "core.read.too_many", lambda _item: Succeeded(),
             ))
 
     def test_handler_registration_has_explicit_read_operation_kind(self):
@@ -226,7 +298,7 @@ class TestCoordinator(unittest.TestCase):
             frozenset(("diagnostic", "import", "scan", "reconciliation")),
         )
         specs = tuple(
-            ReadOnlyHandlerSpec(
+            handler_spec(
                 "core.%s" % kind,
                 lambda _item: Succeeded(),
                 operation_kind=kind,
@@ -236,7 +308,7 @@ class TestCoordinator(unittest.TestCase):
         registry = ReadOnlyHandlerRegistry(specs)
         self.assertEqual(registry.keys(), tuple(spec.handler_key for spec in specs))
         with self.assertRaises(ValueError):
-            ReadOnlyHandlerSpec(
+            handler_spec(
                 "core.mutation-kind",
                 lambda _item: Succeeded(),
                 operation_kind="mutation",

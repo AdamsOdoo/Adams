@@ -8,7 +8,7 @@ from enum import Enum
 import re
 from typing import Any
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
 
 from .fulfillment_mutation import (
     FULFILLMENT_CREATE_OPERATION,

@@ -49,6 +49,7 @@ from .shopify_connector_v2_runtime_repository import (
 _READ_ONLY_ENQUEUE_FIELDS = frozenset((
     'job_type', 'job_source', 'payload_hash',
     'res_model', 'res_id', 'shopify_target_gid',
+    'parent_job_id', 'sequence',
     'lane', 'lane_priority', 'available_at',
 ))
 
@@ -92,6 +93,12 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
                 'core_dispatch_selftest',
                 self._handle_core_dispatch_selftest,
                 operation_kind='diagnostic',
+                allowed_workflows=('core',),
+                allowed_operations=(
+                    'core_dispatch_selftest',
+                    'runtime.concurrency',
+                    'runtime.schema.read',
+                ),
             ),
         )
         additions = self._extend_v2_read_only_handler_specs()
@@ -109,6 +116,17 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
     def _handle_core_dispatch_selftest(self, claim):
         del claim
         return Succeeded({'handler': 'core_dispatch_selftest'})
+
+    @api.model
+    def _finalize_v2_read_result(self, *, job, run, claim, result):
+        """Domain hook after terminal/scheduled state is flushed.
+
+        Extensions may admit bounded local follow-up work in the same short
+        finalization transaction.  They must not perform network I/O or alter
+        the finalized parent/attempt evidence.
+        """
+        del job, run, claim, result
+        return None
 
     @api.model
     def _handler_registry(self):
@@ -155,6 +173,10 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
         run.ensure_one()
         if run.state not in _ACTIVE_RUN_STATES:
             raise ValidationError('A V2 job requires an admitted active run.')
+        if run.cancel_requested_at:
+            raise ValidationError(
+                'A cancelled V2 run cannot admit additional read work.'
+            )
         store = run.store_id
         if (
             not store
@@ -193,11 +215,15 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
         job_type = values.get('job_type')
         registry = self._handler_registry()
         try:
-            registry.require(job_type)
+            spec = registry.require(job_type)
         except LookupError as exc:
             raise ValidationError(
                 'The read-only handler is not registered.'
             ) from exc
+        if not spec.allows(run.workflow, run.operation):
+            raise ValidationError(
+                'The read-only handler is not authorized for this run operation.'
+            )
         unknown = sorted(set(values) - _READ_ONLY_ENQUEUE_FIELDS)
         if unknown:
             raise AccessError(
@@ -215,6 +241,19 @@ class ShopifyConnectorV2Runtime(models.AbstractModel):
                 'Read-only admission owns runtime identity and lifecycle fields.'
             )
         vals = dict(values)
+        parent_id = vals.get('parent_job_id')
+        if parent_id:
+            parent = self.env['shopify.connector.job'].sudo().browse(
+                parent_id,
+            ).exists()
+            if (
+                not parent
+                or parent.store_id != store
+                or parent.run_id != run
+            ):
+                raise ValidationError(
+                    'A V2 read-only parent must belong to the same run and store.'
+                )
         vals.update({
             'run_id': run.id,
             'store_id': store.id,

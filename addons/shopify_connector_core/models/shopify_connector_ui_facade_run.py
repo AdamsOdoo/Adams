@@ -12,6 +12,8 @@ from ..domain.states import Role, RunState
 
 
 class ShopifyConnectorUiFacadeRunMixin:
+    __slots__ = ()
+
     @api.model
     def get_run_v1(self, store_id, run_ref):
         """Return one bounded legacy-job or aggregate-run projection.

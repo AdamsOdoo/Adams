@@ -397,6 +397,7 @@ class V2RuntimeObservationMixin:
                     worker_ref='p10-fixture-claim-%s' % uuid.uuid4(),
                     limit=limit or len(store_info.get('job_ids', ())) or 1,
                     phase=CLAIM_TRANSACTION,
+                    handler_keys=('core_dispatch_selftest',),
                 )
                 return tuple(claims)
         finally:

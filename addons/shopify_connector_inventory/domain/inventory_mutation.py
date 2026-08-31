@@ -31,7 +31,7 @@ from enum import Enum
 from math import isfinite
 from typing import Any
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
 
 
 INVENTORY_ACTIVATE_OPERATION = "inventory_activate"

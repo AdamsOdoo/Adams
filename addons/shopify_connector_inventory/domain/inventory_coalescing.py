@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
 
 from .inventory_admission import AdmissionReason
 from .inventory_mutation import CoalescingAction, InventoryMutationPayload, _timestamp, integral_quantity

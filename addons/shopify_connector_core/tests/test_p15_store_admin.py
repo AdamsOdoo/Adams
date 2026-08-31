@@ -204,7 +204,12 @@ class TestP15StoreAdmin(TransactionCase):
         store = self._store()
         app = self.App.with_user(self.admin)
         settings = self.Settings.search([("store_id", "=", store.id)], limit=1)
-        settings._p15_service_write({"configuration_generation": 4})
+        self.env.cr.execute(
+            "UPDATE shopify_connector_store_settings "
+            "SET configuration_generation = 4 WHERE id = %s",
+            (settings.id,),
+        )
+        settings.invalidate_recordset(["configuration_generation"])
         command_id = uuid4()
         payload = {
             "group_key": "sync_domains",

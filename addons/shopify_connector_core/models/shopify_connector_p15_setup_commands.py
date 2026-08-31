@@ -128,14 +128,15 @@ class ShopifyConnectorP15SetupCommands(models.AbstractModel):
                 "setup_wizard_step_key": step_key,
                 "setup_wizard_step": requested_ordinal,
             })
-        write_values["configuration_generation"] = current_generation + 1
         settings._p15_service_write(write_values)
+        settings.invalidate_recordset(["configuration_generation"])
+        accepted_generation = int(settings.configuration_generation or 0)
         return self._p15_ack(
             "completed",
             _("Setup progress saved."),
             command_id=envelope.command_id,
             store_id=store.id,
-            generation=current_generation + 1,
+            generation=accepted_generation,
         )
 
 

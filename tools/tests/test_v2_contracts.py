@@ -574,6 +574,36 @@ class TestDTOAndHandlerOutcomes(unittest.TestCase):
         with self.assertRaises(Exception):
             detail.title = "changed"  # type: ignore[misc]
 
+    def test_needs_review_keeps_observations_as_third_positional_argument(self):
+        observations = {"source": "handler"}
+        review = NeedsReview("ambiguous", "choose a match", observations)
+        self.assertEqual(review.observations["source"], "handler")
+        self.assertIsNone(review.error_class)
+
+    def test_needs_review_accepts_allowlisted_source_error_class_and_is_frozen(self):
+        review = NeedsReview(
+            "ambiguous",
+            "choose a match",
+            {},
+            error_class="mapping_missing",
+        )
+        self.assertEqual(review.error_class, "mapping_missing")
+        with self.assertRaises(Exception):
+            review.error_class = "duplicate_risk"  # type: ignore[misc]
+
+    def test_needs_review_rejects_invalid_source_error_class_values(self):
+        with self.assertRaises(TypeError):
+            NeedsReview("ambiguous", "choose a match", error_class=7)
+        for value in ("", "   "):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                NeedsReview("ambiguous", "choose a match", error_class=value)
+        with self.assertRaises(ValueError):
+            NeedsReview(
+                "ambiguous",
+                "choose a match",
+                error_class="unregistered_source_error",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

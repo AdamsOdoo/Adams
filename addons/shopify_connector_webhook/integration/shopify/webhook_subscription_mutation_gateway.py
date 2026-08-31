@@ -14,7 +14,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from shopify_connector_core.integration.shopify.mutation_contracts import (
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (
     DurableIntentDescriptor,
     MutationGateway,
     MutationGatewayError,
@@ -27,7 +27,7 @@ from shopify_connector_core.integration.shopify.mutation_contracts import (
     require_text,
     response_data,
 )
-from shopify_connector_core.integration.shopify.operation_registry import (
+from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,

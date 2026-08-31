@@ -81,6 +81,34 @@ SETTINGS_INITIAL_CREATE_FIELDS = frozenset(('store_id',))
 class ShopifyConnectorStoreSettingsSecurity(models.Model):
     _inherit = "shopify.connector.store.settings"
 
+    @api.model
+    def _additional_protected_settings_fields(self):
+        """Return protected settings fields owned by an addon.
+
+        The core set above remains the complete core contract.  Domain addons
+        extend it through this small inheritance hook rather than having to
+        edit (or duplicate) the core security boundary.
+        """
+        return frozenset()
+
+    @api.model
+    def _settings_protected_fields(self):
+        """Return the core protected fields plus addon-owned fields."""
+        return (
+            SETTINGS_PROTECTED_FIELDS
+            | self._additional_protected_settings_fields()
+        )
+
+    @api.model
+    def _additional_settings_write_surfaces(self):
+        """Return named protected-write surfaces owned by an addon."""
+        return frozenset()
+
+    @api.model
+    def _settings_write_surfaces(self):
+        """Return the core write surfaces plus addon-owned surfaces."""
+        return SETTINGS_WRITE_SURFACES | self._additional_settings_write_surfaces()
+
     # ------------------------------------------------------------------
     # Closed service write surface
     # ------------------------------------------------------------------
@@ -145,7 +173,7 @@ class ShopifyConnectorStoreSettingsSecurity(models.Model):
         not a caller-controlled boolean/string flag, and validates the surface
         name before doing any write.
         """
-        if surface not in SETTINGS_WRITE_SURFACES:
+        if surface not in self._settings_write_surfaces():
             raise AccessError('Unknown Shopify settings write surface.')
         return self.with_context(**{
             SETTINGS_WRITE_CONTEXT: surface,
@@ -157,12 +185,13 @@ class ShopifyConnectorStoreSettingsSecurity(models.Model):
         return (
             context.get(SETTINGS_SERVICE_SENTINEL_CONTEXT)
             is SETTINGS_SERVICE_SENTINEL
-            and context.get(SETTINGS_WRITE_CONTEXT) in SETTINGS_WRITE_SURFACES
+            and context.get(SETTINGS_WRITE_CONTEXT)
+            in self._settings_write_surfaces()
         )
 
     def write(self, vals):
         """Reject direct mutation of settings identity and safety state."""
-        protected = SETTINGS_PROTECTED_FIELDS.intersection(vals)
+        protected = self._settings_protected_fields().intersection(vals)
         if (
             protected
             and not self.env.su

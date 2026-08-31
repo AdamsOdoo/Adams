@@ -37,6 +37,8 @@ class AttentionCollection(list):
 class ShopifyConnectorUiFacadeAttentionQueryMixin:
     """Push closed attention predicates before bounded provider searches."""
 
+    __slots__ = ()
+
     _ATTENTION_WORKFLOW_TOKENS = {
         "catalog": ("product", "catalog", "export"),
         "orders": ("order", "customer", "sale"),

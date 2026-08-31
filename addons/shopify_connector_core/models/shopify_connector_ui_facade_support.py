@@ -38,6 +38,11 @@ _PHONE_RE = re.compile(r"(?<!\w)\+?\d[\d\s().-]{6,}\d(?!\w)")
 
 
 class ShopifyConnectorUiFacadeSupportMixin:
+    # Odoo 19 replaces registry ``__bases__`` during model setup.  Keep this
+    # plain-Python mixin layout-compatible with ``BaseModel`` so later
+    # ``_inherit = 'shopify.connector.ui.facade'`` extensions install safely.
+    __slots__ = ()
+
     @api.model
     def _current_role(self):
         """Resolve one stable public role from Odoo's implied groups."""

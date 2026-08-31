@@ -303,14 +303,15 @@ class ShopifyConnectorP15ApplicationFacade(models.AbstractModel):
                 store_id=store.id,
                 generation=current_generation,
             )
-        normalized["configuration_generation"] = current_generation + 1
         settings._p15_service_write(normalized)
+        settings.invalidate_recordset(["configuration_generation"])
+        accepted_generation = int(settings.configuration_generation or 0)
         return self._p15_ack(
             "completed",
             _("Store settings saved."),
             command_id=envelope.command_id,
             store_id=store.id,
-            generation=current_generation + 1,
+            generation=accepted_generation,
         )
 
     @api.model
@@ -635,16 +636,12 @@ class ShopifyConnectorP15ApplicationFacade(models.AbstractModel):
             settings.action_start_mode2_switch()
         else:
             settings.action_rollback_to_mode1()
-        # Mode switch methods own their durable state transitions; generation
-        # is the P15 stale-submit fence and is advanced only after that named
-        # service accepted the request.
-        settings._p15_service_write({
-            "configuration_generation": current_generation + 1,
-        })
+        settings.invalidate_recordset(["configuration_generation"])
+        accepted_generation = int(settings.configuration_generation or 0)
         return self._p15_ack(
             "accepted",
             _("Fulfillment mode change accepted for verification."),
             command_id=envelope.command_id,
             store_id=store.id,
-            generation=current_generation + 1,
+            generation=accepted_generation,
         )

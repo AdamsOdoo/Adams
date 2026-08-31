@@ -159,6 +159,24 @@ P15_EDITABLE_SETTINGS_GROUP_FIELDS = {
     for key, fields_list in P15_SETTINGS_GROUP_FIELDS.items()
 }
 
+# One authoritative policy vocabulary drives the generation fence.  Runtime
+# progress/checkpoint fields are intentionally absent; every merchant choice,
+# setup-state choice, V2 mode and effective fulfillment policy is present.
+P15_CONFIGURATION_POLICY_FIELDS = frozenset(
+    set().union(*P15_EDITABLE_SETTINGS_GROUP_FIELDS.values())
+    | {
+        "setup_step_payloads",
+        "setup_wizard_step_key",
+        "setup_wizard_step",
+        "v2_ui_mode",
+        "v2_gateway_mode",
+        "v2_runtime_mode",
+        "fulfillment_operating_mode",
+        "fulfillment_requested_mode",
+        "fulfillment_notification_confirmed",
+    }
+)
+
 P15_SETTINGS_GROUP_LABELS = {
     "sync_domains": "Synchronization domains",
     "direction_policy": "Direction and source of truth",
@@ -232,6 +250,7 @@ __all__ = [
     "P15_COMMAND_NAMES",
     "P15_UI_ACTION_KEYS",
     "P15_CURSOR_RE",
+    "P15_CONFIGURATION_POLICY_FIELDS",
     "P15_EDITABLE_SETTINGS_GROUP_FIELDS",
     "P15_MAX_LIST_LIMIT",
     "P15_MAX_SEARCH_LENGTH",

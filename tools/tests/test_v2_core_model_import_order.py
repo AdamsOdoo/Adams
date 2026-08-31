@@ -9,6 +9,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODELS_INIT = ROOT / "addons/shopify_connector_core/models/__init__.py"
+UI_FACADE_MIXINS = {
+    "ShopifyConnectorUiFacadeSupportMixin": "shopify_connector_ui_facade_support.py",
+    "ShopifyConnectorUiFacadeAttentionMixin": "shopify_connector_ui_facade_attention.py",
+    "ShopifyConnectorUiFacadeAttentionQueryMixin": "shopify_connector_ui_facade_attention_query.py",
+    "ShopifyConnectorUiFacadeOverviewMixin": "shopify_connector_ui_facade_overview.py",
+    "ShopifyConnectorUiFacadeRunMixin": "shopify_connector_ui_facade_run.py",
+}
 
 
 def _relative_imports(path: Path) -> list[str]:
@@ -45,6 +52,32 @@ class CoreModelImportOrderTests(unittest.TestCase):
             imports.index("shopify_connector_scope_mixin"),
             imports.index("shopify_connector_api_client"),
         )
+
+    def test_ui_facade_plain_mixins_are_layout_safe_for_odoo_extensions(self):
+        """Odoo 19 replaces registry ``__bases__`` during model setup."""
+        for class_name, filename in UI_FACADE_MIXINS.items():
+            path = ROOT / "addons/shopify_connector_core/models" / filename
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            node = next(
+                item for item in tree.body
+                if isinstance(item, ast.ClassDef) and item.name == class_name
+            )
+            slots = next(
+                (
+                    item.value
+                    for item in node.body
+                    if isinstance(item, ast.Assign)
+                    and any(
+                        isinstance(target, ast.Name)
+                        and target.id == "__slots__"
+                        for target in item.targets
+                    )
+                ),
+                None,
+            )
+            with self.subTest(class_name=class_name):
+                self.assertIsInstance(slots, ast.Tuple)
+                self.assertEqual(slots.elts, [])
 
 
 if __name__ == "__main__":

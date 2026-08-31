@@ -39,8 +39,8 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         backend_pids = []
         original_claim_sql = OdooReadOnlyRuntimeRepository._claim_sql
 
-        def synchronized_claim_sql(cls, env, now, limit):
-            job_ids = original_claim_sql(env, now, limit)
+        def synchronized_claim_sql(cls, env, now, limit, handler_keys):
+            job_ids = original_claim_sql(env, now, limit, handler_keys)
             # Both callers have executed production's SELECT ... SKIP LOCKED;
             # the winner still holds its row lock while this barrier releases.
             barrier.wait(timeout=self.WORKER_TIMEOUT_SECONDS)
@@ -56,6 +56,7 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
                     worker_ref=worker_ref,
                     limit=1,
                     phase=CLAIM_TRANSACTION,
+                    handler_keys=('core_dispatch_selftest',),
                 )
                 return tuple(claims)
             finally:
@@ -106,6 +107,128 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         self.assertEqual(attempts[0][2], claims[0].worker_ref)
         self.assertEqual(attempts[0][3], 'running')
 
+    def test_cross_run_multi_job_scope_locks_are_globally_ordered(self):
+        """Opposite cross-run batches serialize instead of deadlocking."""
+        fixture = self._create_fixture(company_count=2, job_count=2)
+        left = (
+            fixture['stores'][0]['job_ids'][0],
+            fixture['stores'][1]['job_ids'][1],
+        )
+        right = (
+            fixture['stores'][0]['job_ids'][1],
+            fixture['stores'][1]['job_ids'][0],
+        )
+        ready = threading.Barrier(2)
+
+        def lock_batch(job_ids):
+            cr, env = self._new_env(
+                allowed_company_ids=tuple(fixture['company_ids']),
+            )
+            try:
+                cr.execute(
+                    'SELECT id FROM shopify_connector_job '
+                    'WHERE id = ANY(%s) ORDER BY id FOR UPDATE',
+                    (list(job_ids),),
+                )
+                self.assertEqual(len(cr.fetchall()), 2)
+                ready.wait(timeout=self.WORKER_TIMEOUT_SECONDS)
+                locked = OdooReadOnlyRuntimeRepository(
+                    env,
+                )._lock_claim_batch_scopes(env, job_ids)
+                return tuple(sorted(locked))
+            finally:
+                cr.rollback()
+                cr.close()
+
+        with patch.object(type(self.registry), '_lock', threading.RLock()):
+            records = self._run_threads({
+                'left': lambda: lock_batch(left),
+                'right': lambda: lock_batch(right),
+            })
+        self.assertEqual(records['left'], tuple(sorted(left)))
+        self.assertEqual(records['right'], tuple(sorted(right)))
+
+    def test_claim_vs_cancellation_uses_job_before_run_without_deadlock(self):
+        """Cancellation skips the claimed root, records run intent, and exits."""
+        fixture = self._create_fixture(job_count=1)
+        store_info = fixture['stores'][0]
+        claim_has_job = threading.Event()
+        cancel_has_run = threading.Event()
+        original_lock_scopes = (
+            OdooReadOnlyRuntimeRepository._lock_claim_batch_scopes
+        )
+
+        def synchronized_lock_scopes(repository, side_env, job_ids):
+            claim_has_job.set()
+            if not cancel_has_run.wait(self.WORKER_TIMEOUT_SECONDS):
+                raise TimeoutError('cancellation did not acquire the run lock')
+            return original_lock_scopes(repository, side_env, job_ids)
+
+        def claim_worker():
+            cr, env = self._new_env(
+                allowed_company_ids=(store_info['company_id'],),
+            )
+            try:
+                return tuple(OdooReadOnlyRuntimeRepository(env).claim_due(
+                    now=NOW,
+                    worker_ref='p10-cancel-race-claim',
+                    limit=1,
+                    phase=CLAIM_TRANSACTION,
+                    handler_keys=('core_dispatch_selftest',),
+                ))
+            finally:
+                cr.rollback()
+                cr.close()
+
+        def cancel_worker():
+            if not claim_has_job.wait(self.WORKER_TIMEOUT_SECONDS):
+                raise TimeoutError('claim did not acquire the job lock')
+            cr, env = self._new_env(
+                allowed_company_ids=(store_info['company_id'],),
+            )
+            try:
+                run = env['shopify.connector.run'].browse(
+                    fixture['run_ids'][0],
+                )
+                store = env['shopify.connector.store'].browse(
+                    fixture['store_ids'][0],
+                )
+                child_ids = env[
+                    'shopify.connector.application.facade'
+                ]._recovery_lock_cancel_scope(run, store)
+                cancel_has_run.set()
+                run._request_cancel_service('P10 lock-order regression')
+                env.flush_all()
+                cr.commit()
+                return tuple(child_ids)
+            finally:
+                cr.rollback()
+                cr.close()
+
+        with patch.object(type(self.registry), '_lock', threading.RLock()), \
+             self._real_registry_cursor(), patch.object(
+                 OdooReadOnlyRuntimeRepository,
+                 '_lock_claim_batch_scopes',
+                 new=synchronized_lock_scopes,
+             ):
+            records = self._run_threads({
+                'claim': claim_worker,
+                'cancel': cancel_worker,
+            })
+        self.assertEqual(records['cancel'], ())
+        self.assertEqual(records['claim'], ())
+        self.assertEqual(
+            self._observe(
+                'SELECT j.state, j.current_attempt_token, '
+                'r.cancel_requested_at IS NOT NULL '
+                'FROM shopify_connector_job j '
+                'JOIN shopify_connector_run r ON r.id = j.run_id '
+                'WHERE j.id = %s',
+                (fixture['job_ids'][0],),
+            ),
+            [('queued', None, True)],
+        )
+
     def test_finalizer_vs_stale_owner_is_bounded_and_job_first(self):
         """A finalizer holding the job row makes stale sweep skip, not deadlock."""
         fixture = self._create_fixture(job_count=1)
@@ -143,13 +266,19 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         stale_source = inspect.getsource(original_stale_sql)
         self.assertLess(
             lock_source.index('FOR UPDATE SKIP LOCKED'),
-            lock_source.index('FOR UPDATE OF a, r, s, ss SKIP LOCKED'),
+            lock_source.index('FROM shopify_connector_job_attempt'),
             'production finalization must lock the job before detail rows',
         )
         self.assertLess(
             stale_source.index('FOR UPDATE OF j SKIP LOCKED'),
-            stale_source.index('FOR UPDATE OF a, r, s, ss SKIP LOCKED'),
+            stale_source.index('FROM shopify_connector_job_attempt'),
             'production stale sweep must lock the job before detail rows',
+        )
+        self.assertNotIn(
+            'FOR UPDATE OF a, r, s, ss SKIP LOCKED', lock_source,
+        )
+        self.assertNotIn(
+            'FOR UPDATE OF a, r, s, ss SKIP LOCKED', stale_source,
         )
 
         def synchronized_lock_claim(repository, side_env, work):
@@ -183,9 +312,13 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
             ):
                 return original_lock_claim(repository, side_env, work)
 
-        def synchronized_stale_sql(repository, env, cutoff, limit):
+        def synchronized_stale_sql(
+            repository, env, cutoff, limit, handler_keys,
+        ):
             stale_started.set()
-            return original_stale_sql(repository, env, cutoff, limit)
+            return original_stale_sql(
+                repository, env, cutoff, limit, handler_keys,
+            )
 
         def finalize_worker():
             cr, env = self._new_env(
@@ -252,6 +385,108 @@ class TestV2RuntimeClaimConcurrency(V2RuntimeConcurrencyMixin, TransactionCase):
         )
         self.assertEqual(observed, [('succeeded', 'succeeded', 'succeeded')])
 
+    def test_stale_owner_after_run_cancellation_finishes_cancelled(self):
+        """A cancellation request never becomes stale-owner duplicate risk."""
+        fixture = self._create_fixture(job_count=1)
+        claims = self._claim_fixture(fixture, limit=1)
+        self.assertEqual(len(claims), 1)
+        claim = claims[0]
+
+        run = self.env['shopify.connector.run'].browse(
+            fixture['run_ids'][0],
+        )
+        run._request_cancel_service('P10 cancellation test')
+        self.env.flush_all()
+        self.env.cr.commit()
+
+        stale_at = NOW - timedelta(hours=1)
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                'UPDATE shopify_connector_job_attempt '
+                'SET claimed_at = %s, heartbeat_at = %s '
+                'WHERE job_id = %s AND claim_token = %s',
+                (
+                    stale_at.replace(tzinfo=None),
+                    stale_at.replace(tzinfo=None),
+                    claim.job_id,
+                    claim.claim_token,
+                ),
+            )
+            cr.commit()
+        finally:
+            cr.rollback()
+            cr.close()
+
+        cr, env = self._new_env(
+            allowed_company_ids=(fixture['stores'][0]['company_id'],),
+        )
+        try:
+            count = OdooReadOnlyRuntimeRepository(env).sweep_stale_read_only(
+                now=NOW, limit=1,
+            )
+        finally:
+            cr.rollback()
+            cr.close()
+        self.assertEqual(count, 1)
+        self.assertEqual(
+            self._observe(
+                'SELECT j.state, a.outcome, r.state, '
+                'j.manual_review_subreason '
+                'FROM shopify_connector_job j '
+                'JOIN shopify_connector_job_attempt a ON a.job_id = j.id '
+                'JOIN shopify_connector_run r ON r.id = j.run_id '
+                'WHERE j.id = %s',
+                (claim.job_id,),
+            ),
+            [('cancelled', 'cancelled', 'cancelled', None)],
+        )
+
+    def test_stale_job_with_removed_handler_is_quarantined_not_replayed(self):
+        fixture = self._create_fixture(job_count=1)
+        claim = self._claim_fixture(fixture, limit=1)[0]
+        stale_at = NOW - timedelta(hours=1)
+        cr = self._open_bounded()
+        try:
+            cr.execute(
+                "UPDATE shopify_connector_job SET job_type = %s WHERE id = %s",
+                ('removed_read_handler', claim.job_id),
+            )
+            cr.execute(
+                'UPDATE shopify_connector_job_attempt '
+                'SET claimed_at = %s, heartbeat_at = %s '
+                'WHERE job_id = %s AND claim_token = %s',
+                (stale_at.replace(tzinfo=None), stale_at.replace(tzinfo=None),
+                 claim.job_id, claim.claim_token),
+            )
+            cr.commit()
+        finally:
+            cr.rollback()
+            cr.close()
+        cr, env = self._new_env(
+            allowed_company_ids=(fixture['stores'][0]['company_id'],),
+        )
+        try:
+            processed = OdooReadOnlyRuntimeRepository(
+                env,
+            ).sweep_stale_read_only(now=NOW, limit=1)
+        finally:
+            cr.rollback()
+            cr.close()
+        self.assertEqual(processed, 1)
+        self.assertEqual(
+            self._observe(
+                'SELECT j.state, j.manual_review_subreason, '
+                'a.outcome, a.error_code '
+                'FROM shopify_connector_job j '
+                'JOIN shopify_connector_job_attempt a ON a.job_id = j.id '
+                'WHERE j.id = %s',
+                (claim.job_id,),
+            ),
+            [('blocked_manual_review', 'duplicate_risk',
+              'owner_lost', 'unregistered_read_handler')],
+        )
+
 
 @tagged(
     'post_install', '-at_install', '-standard',
@@ -275,6 +510,7 @@ class TestV2RuntimeScopeAndProjection(
                     worker_ref='p10-company-a',
                     limit=2,
                     phase=CLAIM_TRANSACTION,
+                    handler_keys=('core_dispatch_selftest',),
                 )
         finally:
             cr.rollback()

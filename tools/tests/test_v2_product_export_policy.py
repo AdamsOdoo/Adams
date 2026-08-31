@@ -23,19 +23,23 @@ def _namespace(name: str, path: Path) -> None:
         sys.modules[name] = package
 
 
+_namespace("odoo", ROOT)
+_namespace("odoo.addons", ROOT / "addons")
+
 for _addon in ("shopify_connector_core", "shopify_connector_product_export"):
     _root = ROOT / "addons" / _addon
-    _namespace(_addon, _root)
-    _namespace(_addon + ".domain", _root / "domain")
-    _namespace(_addon + ".integration", _root / "integration")
-    _namespace(_addon + ".integration.shopify", _root / "integration" / "shopify")
-    _namespace(_addon + ".application", _root / "application")
+    _prefix = "odoo.addons." + _addon
+    _namespace(_prefix, _root)
+    _namespace(_prefix + ".domain", _root / "domain")
+    _namespace(_prefix + ".integration", _root / "integration")
+    _namespace(_prefix + ".integration.shopify", _root / "integration" / "shopify")
+    _namespace(_prefix + ".application", _root / "application")
 
 
-from shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
     MutationTransportError,
 )
-from shopify_connector_product_export.application.product_export_commands import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.application.product_export_commands import (  # noqa: E402
     DurableMediaProgress,
     FakeMutationLedger,
     ProductExportCommand,
@@ -44,41 +48,41 @@ from shopify_connector_product_export.application.product_export_commands import
     build_gateway_requests,
     validate_command,
 )
-from shopify_connector_product_export.domain.product_export_authority import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.domain.product_export_authority import (  # noqa: E402
     FieldAuthority,
     desired_product_scalars,
     desired_variant_fields,
     field_authority_diff,
     validate_export_fields,
 )
-from shopify_connector_product_export.domain.product_export_binding import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.domain.product_export_binding import (  # noqa: E402
     ExportPath,
     VariantChange,
     VariantPlan,
     decide_create_or_update,
     plan_variant_operations,
 )
-from shopify_connector_product_export.domain.product_export_preview import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.domain.product_export_preview import (  # noqa: E402
     PreviewSnapshot,
     reject_stale_preview,
 )
-from shopify_connector_product_export.domain.product_export_readback import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.domain.product_export_readback import (  # noqa: E402
     BindingNamespaceReadEvidence,
     ReadbackVerdict,
     attest_binding_namespace_read,
     evaluate_remote_readback,
 )
-from shopify_connector_product_export.domain.product_export_sequence import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.domain.product_export_sequence import (  # noqa: E402
     MediaCandidate,
     intent_fingerprint,
     plan_export_sequence,
     scope_key,
 )
-from shopify_connector_product_export.integration.shopify.product_export_mutation_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.integration.shopify.product_export_mutation_gateway import (  # noqa: E402
     PRODUCT_EXPORT_MUTATION_REGISTRY,
     ProductExportMutationGateway,
 )
-from shopify_connector_product_export.integration.shopify.product_media_mutation_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_product_export.integration.shopify.product_media_mutation_gateway import (  # noqa: E402
     MEDIA_FILE_CREATE_READ_QUERY,
     PRODUCT_MEDIA_MUTATION_REGISTRY,
     ProductMediaMutationGateway,

@@ -1,9 +1,4 @@
-"""Odoo repository for bounded V2 claim and finalization transactions.
-
-Claim/finalization use short-lived side cursors and lock the job before
-attempt or scope rows.  Stale-owner recovery is supplied by the adjacent
-repository mixin so each production file stays focused and reviewable.
-"""
+"""Short-transaction Odoo repository for the bounded V2 runtime."""
 
 from contextlib import contextmanager
 from datetime import timedelta
@@ -18,7 +13,7 @@ from ..runtime.p10_coordinator import (
     ClaimedWork,
     RuntimeBoundaryError,
 )
-from ..runtime.p10_decisions import project_run_state
+from ..runtime.p10_decisions import KNOWN_ERROR_CLASSES, project_run_state
 from ..runtime.contracts import (
     NeedsReview,
     NeedsVerification,
@@ -28,6 +23,7 @@ from ..runtime.contracts import (
     TerminalFailure,
 )
 from ..runtime.p10_sql import build_claim_statement
+from ..runtime.p10_repository_locks import lock_claim_batch_scopes
 from .shopify_connector_v2_runtime_common import (
     V2_RUNTIME_MODE,
     runtime_mode_includes,
@@ -48,16 +44,11 @@ from .shopify_connector_v2_runtime_common import (
 from .shopify_connector_v2_runtime_stale import StaleOwnerRepositoryMixin
 
 
-class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
-    """Repository port backed by short-lived Odoo side-cursor transactions.
+_HANDLER_KEYS_UNSET = object()
 
-    ``claim_due`` and ``finalize_attempt`` each open, lock, write, commit and
-    close their own cursor.  Consequently the coordinator cannot accidentally
-    hold an Odoo row lock while a read handler performs Shopify I/O.  The
-    explicit commit/rollback hooks are validating no-ops for the pure
-    coordinator boundary because this adapter has already closed its side
-    cursor before returning.
-    """
+
+class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
+    """Repository port backed by short-lived Odoo side cursors."""
 
     def __init__(self, env):
         self.env = env
@@ -65,13 +56,7 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
     @contextmanager
     def _transaction(self):
         cursor = self.env.registry.cursor()
-        # All ORM service surfaces used below are intentionally privileged only
-        # after the public model service has checked its administrator/cron
-        # boundary.  Scope and generation checks remain explicit SQL predicates
-        # and are never delegated to sudo/record-rule visibility.  Building
-        # the side environment as the Odoo superuser is the supported
-        # equivalent of elevating a recordset; ``Environment`` itself is not a
-        # recordset and must not rely on a version-specific ``env.sudo()``.
+        # Public services authorize first; SQL still enforces scope/generation.
         side_env = api.Environment(cursor, SUPERUSER_ID, dict(self.env.context))
         try:
             yield side_env
@@ -105,22 +90,54 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
         return ids or (env.company.id,)
 
     @classmethod
-    def _claim_sql(cls, env, now, limit):
-        """Lock a bounded due set with deterministic priority and SKIP LOCKED."""
+    def _claim_sql(cls, env, now, limit, handler_keys):
+        """Lock a bounded due set with deterministic priority and SKIP LOCKED.
+
+        ``handler_keys`` is intentionally required at this SQL boundary.  The
+        caller must derive it from the committed read-only registry before
+        asking PostgreSQL to lock anything; a post-claim Python dispatch check
+        would leave pre-C2 mutation rows claimable.
+        """
         query, params = build_claim_statement(
-            now, cls._company_ids(env), limit,
+            now, cls._company_ids(env), limit, handler_keys=handler_keys,
         )
         env.cr.execute(query, params)
         return tuple(row[0] for row in env.cr.fetchall())
 
-    def claim_due(self, *, now, worker_ref, limit, phase):
+    def _registered_read_only_handler_keys(self):
+        """Return the current bounded registry snapshot for legacy callers.
+
+        The coordinator always supplies this snapshot explicitly.  Direct
+        adapter callers from older domain tests are kept compatible by
+        resolving the same model-level registry, never by widening the SQL
+        predicate to every V2 job type.
+        """
+        registry = self.env[
+            'shopify.connector.v2.runtime'
+        ]._handler_registry()
+        return registry.keys()
+
+    def _lock_claim_batch_scopes(self, side_env, job_ids):
+        return lock_claim_batch_scopes(side_env, job_ids)
+
+    def claim_due(
+        self, *, now, worker_ref, limit, phase,
+        handler_keys=_HANDLER_KEYS_UNSET,
+    ):
         self._check_phase(phase, CLAIM_TRANSACTION)
         now = _utc(now)
         worker_ref = _worker(worker_ref)
         limit = _positive_limit(limit)
+        if handler_keys is _HANDLER_KEYS_UNSET:
+            handler_keys = self._registered_read_only_handler_keys()
         claims = []
         with self._transaction() as side_env:
-            job_ids = self._claim_sql(side_env, now, limit)
+            job_ids = self._claim_sql(
+                side_env, now, limit, handler_keys,
+            )
+            locked_job_ids = set(
+                self._lock_claim_batch_scopes(side_env, job_ids)
+            )
             Job = side_env['shopify.connector.job']
             Attempt = side_env['shopify.connector.job.attempt']
             for job_id in job_ids:
@@ -128,9 +145,12 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                 if not job:
                     continue
                 job.ensure_one()
-                # The SQL row lock includes the run/store/settings rows.  The
-                # values below are fresh under that lock and are copied into
+                if job_id not in locked_job_ids:
+                    continue
+                # The values below are fresh under the deterministic
+                # job->attempt->run->store->settings locks and are copied into
                 # the immutable handoff object before the cursor commits.
+                job.invalidate_recordset()
                 run = job.run_id
                 store = job.store_id
                 settings = side_env[
@@ -216,7 +236,18 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                     operation_scope_key=job.operation_scope_key or None,
                     payload={
                         'job_type': job.job_type,
+                        'workflow': run.workflow,
                         'operation': run.operation,
+                        # Retry inputs are copied while the claim transaction
+                        # owns fresh job/run rows.  Handlers must not read
+                        # these lifecycle values back through the long-lived
+                        # cron environment: a previous side-cursor
+                        # finalization may otherwise leave its ORM cache one
+                        # retry behind.
+                        'retry_count': int(job.retry_count or 0),
+                        'run_requested_at': _utc(
+                            fields.Datetime.to_datetime(run.requested_at)
+                        ).isoformat(),
                         'res_model': job.res_model or None,
                         'res_id': int(job.res_id) if job.res_id else None,
                         'shopify_target_gid': job.shopify_target_gid or None,
@@ -227,24 +258,92 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
     def _lock_claim(self, side_env, claim):
         # Every finalization starts by locking the job row.  The stale-owner
         # sweep follows this same first step, so those two recovery paths never
-        # acquire the attempt lock before the job lock.  The second query then
-        # locks the attempt and its scope parents after ownership of the job is
-        # established.  Keeping the order explicit matters because a single
-        # multi-table ``FOR UPDATE`` clause does not guarantee planner lock
-        # order and can otherwise deadlock finalization against stale sweep.
+        # acquire the attempt lock before the job lock.  Detail rows are then
+        # locked one at a time, in this exact blocking order:
+        # job -> attempt -> run -> store -> settings.  A multi-table
+        # ``FOR UPDATE ... SKIP LOCKED`` clause leaves lock acquisition order
+        # to the planner and can report a false claim loss when a detail row is
+        # briefly held by a legitimate finalizer; blocking after the job lock
+        # avoids that failure while retaining non-blocking candidate choice at
+        # the job root.
         side_env.cr.execute(
             """
-                SELECT id
+                SELECT id, store_id, run_id
                   FROM shopify_connector_job
                  WHERE id = %s
                  FOR UPDATE SKIP LOCKED
             """,
             [claim.job_id],
         )
+        job_row = side_env.cr.fetchone()
+        if not job_row:
+            raise V2RuntimeClaimLost(
+                'The V2 read-only claim is no longer available.'
+            )
+        _job_id, store_id, run_id = job_row
+        side_env.cr.execute(
+            """
+                SELECT id
+                  FROM shopify_connector_job_attempt
+                 WHERE job_id = %s
+                   AND claim_token = %s
+                 FOR UPDATE
+            """,
+            [claim.job_id, claim.claim_token],
+        )
+        attempt_row = side_env.cr.fetchone()
+        if not attempt_row:
+            raise V2RuntimeClaimLost(
+                'The V2 read-only claim is no longer available.'
+            )
+        attempt_id = attempt_row[0]
+        side_env.cr.execute(
+            """
+                SELECT id
+                  FROM shopify_connector_run
+                 WHERE id = %s
+                 FOR UPDATE
+            """,
+            [run_id],
+        )
         if not side_env.cr.fetchone():
             raise V2RuntimeClaimLost(
                 'The V2 read-only claim is no longer available.'
             )
+        side_env.cr.execute(
+            """
+                SELECT id
+                  FROM shopify_connector_store
+                 WHERE id = %s
+                 FOR UPDATE
+            """,
+            [store_id],
+        )
+        if not side_env.cr.fetchone():
+            raise V2RuntimeClaimLost(
+                'The V2 read-only claim is no longer available.'
+            )
+        side_env.cr.execute(
+            """
+                SELECT id
+                  FROM shopify_connector_store_settings
+                 WHERE store_id = %s
+                 ORDER BY id
+                 LIMIT 1
+                 FOR UPDATE
+            """,
+            [store_id],
+        )
+        settings_row = side_env.cr.fetchone()
+        if not settings_row:
+            raise V2RuntimeClaimLost(
+                'The V2 read-only claim is no longer available.'
+            )
+        settings_id = settings_row[0]
+        # All five rows are now held by this transaction.  This final read
+        # only reconstructs the stable scope tuple consumed by
+        # ``_scope_mismatch``; it intentionally has no multi-table lock
+        # clause of its own.
         side_env.cr.execute(
             """
                 SELECT j.id, j.store_id, j.company_id, j.run_id,
@@ -261,17 +360,17 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                        ss.v2_runtime_mode
                   FROM shopify_connector_job j
                   JOIN shopify_connector_job_attempt a
-                    ON a.job_id = j.id AND a.claim_token = %s
+                    ON a.id = %s AND a.job_id = j.id
+                       AND a.claim_token = %s
                   JOIN shopify_connector_run r
                     ON r.id = j.run_id
                   JOIN shopify_connector_store s
                     ON s.id = j.store_id
                   JOIN shopify_connector_store_settings ss
-                    ON ss.store_id = s.id
+                    ON ss.id = %s AND ss.store_id = s.id
                  WHERE j.id = %s
-                 FOR UPDATE OF a, r, s, ss SKIP LOCKED
             """,
-            [claim.claim_token, claim.job_id],
+            [attempt_id, claim.claim_token, settings_id, claim.job_id],
         )
         row = side_env.cr.fetchone()
         if not row:
@@ -462,6 +561,11 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                     'retry_cap_or_schedule_invalid',
                     'Review the read operation retry evidence before retrying.',
                     observations,
+                    error_class=(
+                        result.error_class
+                        if result.error_class in KNOWN_ERROR_CLASSES
+                        else 'unknown_system_error'
+                    ),
                 )
             else:
                 job_outcome = 'retry_waiting'
@@ -481,7 +585,11 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
                 observations,
             )
         if isinstance(result, NeedsReview):
-            error_class, subreason = _manual_reason(result.reason_code)
+            mapped_error_class, subreason = _manual_reason(result.reason_code)
+            error_class = (
+                _safe_error_class(result.error_class, mapped_error_class)
+                if result.error_class else mapped_error_class
+            )
             job_outcome = 'blocked_manual_review'
             attempt_outcome = 'manual_review'
             retry_decision = 'review'
@@ -563,6 +671,18 @@ class OdooReadOnlyRuntimeRepository(StaleOwnerRepositoryMixin):
             safe_message,
             from_state='running',
             to_state=job_outcome,
+        )
+        # A terminal computed operation scope must reach PostgreSQL before a
+        # domain extension admits a same-scope continuation.  The hook stays
+        # inside this finalization transaction: hook failure rolls back the
+        # attempt outcome, parent transition and any follow-up admission as
+        # one unit, while Shopify I/O remains forbidden here.
+        job.flush_recordset(['state', 'operation_scope_key'])
+        side_env['shopify.connector.v2.runtime']._finalize_v2_read_result(
+            job=job,
+            run=run,
+            claim=claim,
+            result=result,
         )
         self._refresh_run_state(side_env, run)
 

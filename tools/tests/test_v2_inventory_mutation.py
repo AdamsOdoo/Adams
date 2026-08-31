@@ -27,36 +27,40 @@ def _namespace(name: str, path: Path) -> None:
         sys.modules[name] = package
 
 
+_namespace("odoo", ROOT)
+_namespace("odoo.addons", ROOT / "addons")
+
 for _addon in ("shopify_connector_core", "shopify_connector_inventory"):
     _root = ROOT / "addons" / _addon
-    _namespace(_addon, _root)
-    _namespace(_addon + ".domain", _root / "domain")
-    _namespace(_addon + ".integration", _root / "integration")
-    _namespace(_addon + ".integration.shopify", _root / "integration" / "shopify")
-    _namespace(_addon + ".application", _root / "application")
+    _prefix = "odoo.addons." + _addon
+    _namespace(_prefix, _root)
+    _namespace(_prefix + ".domain", _root / "domain")
+    _namespace(_prefix + ".integration", _root / "integration")
+    _namespace(_prefix + ".integration.shopify", _root / "integration" / "shopify")
+    _namespace(_prefix + ".application", _root / "application")
 
 
-from shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
     MutationOutcome,
     MutationTransportError,
 )
-from shopify_connector_inventory.application.inventory_mutation import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.application.inventory_mutation import (  # noqa: E402
     InventoryMutationApplication,
     _build_attested_confirmation,
 )
-from shopify_connector_inventory.integration.shopify.inventory_mutation_adapter import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_mutation_adapter import (  # noqa: E402
     InventoryMutationAdapterError,
     InventoryMutationRequestAdapter,
 )
-from shopify_connector_inventory.domain.inventory_coalescing import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.domain.inventory_coalescing import (  # noqa: E402
     CoalescingAction,
     decide_inventory_coalescing,
 )
-from shopify_connector_inventory.domain.inventory_admission import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.domain.inventory_admission import (  # noqa: E402
     AdmissionReason,
     InventoryAdmissionPolicy,
 )
-from shopify_connector_inventory.domain.inventory_mutation import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.domain.inventory_mutation import (  # noqa: E402
     FirstPushConfirmation,
     InventoryMappingSnapshot,
     InventoryMutationPayload,
@@ -65,7 +69,7 @@ from shopify_connector_inventory.domain.inventory_mutation import (  # noqa: E40
     canonical_preview_fingerprint,
     derive_inventory_operation_scope,
 )
-from shopify_connector_inventory.domain.inventory_readback import (  # noqa: E402
+from odoo.addons.shopify_connector_inventory.domain.inventory_readback import (  # noqa: E402
     ReadbackOutcome,
     evaluate_inventory_readback,
 )

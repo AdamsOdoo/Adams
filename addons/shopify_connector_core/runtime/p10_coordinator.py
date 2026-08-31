@@ -179,6 +179,8 @@ class ReadOnlyHandlerSpec:
     handler: Callable[[ClaimedWork], HandlerResult]
     mutation: bool = False
     operation_kind: str = "diagnostic"
+    allowed_workflows: tuple[str, ...] = ()
+    allowed_operations: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_key(self.handler_key, "handler_key")
@@ -196,6 +198,25 @@ class ReadOnlyHandlerSpec:
                 "unsupported read-only operation kind: %r"
                 % (self.operation_kind,)
             )
+        for name in ("allowed_workflows", "allowed_operations"):
+            values = getattr(self, name)
+            if not isinstance(values, tuple) or not values:
+                raise ValueError(f"{name} must be a non-empty tuple")
+            if len(values) > MAX_CLAIM_BATCH:
+                raise ValueError(f"{name} exceeds its bound")
+            for value in values:
+                require_key(value, name)
+            if len(set(values)) != len(values):
+                raise ValueError(f"{name} must contain unique values")
+
+    def allows(self, workflow: Any, operation: Any) -> bool:
+        """Return whether this exact run contract may invoke the handler."""
+        return bool(
+            isinstance(workflow, str)
+            and isinstance(operation, str)
+            and workflow in self.allowed_workflows
+            and operation in self.allowed_operations
+        )
 
 
 class ReadOnlyHandlerRegistry:
@@ -213,6 +234,8 @@ class ReadOnlyHandlerRegistry:
     def register(self, spec: ReadOnlyHandlerSpec) -> None:
         if not isinstance(spec, ReadOnlyHandlerSpec):
             raise TypeError("registry accepts ReadOnlyHandlerSpec values only")
+        if len(self._handlers) >= MAX_CLAIM_BATCH:
+            raise ValueError("handler registry exceeds its bound")
         if spec.handler_key in self._handlers:
             raise ValueError("duplicate read-only handler key")
         self._handlers[spec.handler_key] = spec
@@ -246,11 +269,15 @@ class ReadOnlyRuntimeRepository(Protocol):
         worker_ref: str,
         limit: int,
         phase: str,
+        handler_keys: Sequence[str],
     ) -> Sequence[ClaimedWork]:
         """Return at most ``limit`` committed, read-only claims.
 
         ``phase`` must be ``CLAIM_TRANSACTION``.  It lets an adapter assert
         that this method is used only for its short DB-only transaction.
+        ``handler_keys`` is the bounded snapshot from the coordinator's
+        explicit read-only registry.  The adapter must carry it into the SQL
+        claim predicate; it is not an advisory post-claim dispatch filter.
         """
 
     def finalize_attempt(
@@ -414,11 +441,13 @@ def _normalize_result(result: HandlerResult, now: datetime) -> HandlerResult:
             return NeedsReview(
                 "unknown_error_class",
                 "The read operation returned an unregistered error class.",
+                error_class="unknown_system_error",
             )
         if result.retry_at <= now:
             return NeedsReview(
                 "invalid_retry_schedule",
                 "The read operation returned an invalid retry schedule.",
+                error_class=result.error_class,
             )
     return result
 
@@ -454,6 +483,7 @@ class ReadOnlyCoordinator:
             worker_ref=self.worker_ref,
             limit=limit,
             phase=CLAIM_TRANSACTION,
+            handler_keys=self.handlers.keys(),
         )
         if not isinstance(claims, Sequence) or isinstance(claims, (str, bytes)):
             raise RuntimeBoundaryError("claim repository returned an unbounded result")
@@ -491,7 +521,16 @@ class ReadOnlyCoordinator:
         for claim in claims:
             try:
                 spec = self.handlers.require(claim.handler_key)
-                result = spec.handler(claim)
+                workflow = claim.payload.get("workflow")
+                operation = claim.payload.get("operation")
+                if not spec.allows(workflow, operation):
+                    result = NeedsReview(
+                        "handler_run_mismatch",
+                        "The read handler is not authorized for this run operation.",
+                        {"handler_key": claim.handler_key},
+                    )
+                else:
+                    result = spec.handler(claim)
                 if not isinstance(result, (
                     Succeeded, Skipped, Retryable, NeedsVerification,
                     NeedsReview, TerminalFailure,

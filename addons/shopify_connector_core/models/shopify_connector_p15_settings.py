@@ -1,15 +1,16 @@
 """P15 settings-row uniqueness and generation-fenced service writes."""
 
+import json
+
 from psycopg2 import IntegrityError
 
 from odoo import _, api, models
 from odoo.exceptions import UserError, ValidationError
 
 from .shopify_connector_p15_shared import (
-    P15_EDITABLE_SETTINGS_GROUP_FIELDS,
+    P15_CONFIGURATION_POLICY_FIELDS,
     P15_SERVICE_SENTINEL,
     P15_SERVICE_SENTINEL_CONTEXT,
-    P15_SETTINGS_GROUP_FIELDS,
 )
 from .shopify_connector_store_settings_security import (
     SETTINGS_SERVICE_SENTINEL,
@@ -94,50 +95,70 @@ class ShopifyConnectorP15Settings(models.Model):
         return surface.write(values)
 
     def write(self, vals):
-        """Advance configuration generation for ordinary editable writes.
+        """Bump each changed policy row once, regardless of write surface."""
 
-        The generation is not caller-selectable.  The P15 grouped service
-        writes it atomically with the validated values; an ordinary legacy
-        editable settings write gets a serialized monotonic bump here.  Root,
-        migration, and existing connector system writers remain untouched.
-        """
-
-        tracked = set(vals or {}).intersection(
-            set().union(*P15_SETTINGS_GROUP_FIELDS.values())
-        )
-        service_write = (
-            self.env.context.get(P15_SERVICE_SENTINEL_CONTEXT)
-            is P15_SERVICE_SENTINEL
-        )
+        vals = dict(vals or {})
+        # Generation is derived evidence, never a caller-selected setting.
+        vals.pop("configuration_generation", None)
+        tracked = tuple(sorted(
+            set(vals).intersection(P15_CONFIGURATION_POLICY_FIELDS)
+            .intersection(self._fields)
+        ))
         before = {}
-        if tracked and not self.env.su and not service_write:
-            for record in self:
-                before[record.id] = {
-                    name: record[name] for name in tracked if name in record._fields
-                }
+        if tracked and self:
             self.flush_recordset()
             self.env.cr.execute(
                 "SELECT id FROM shopify_connector_store_settings "
                 "WHERE id IN %s ORDER BY id FOR UPDATE",
-                (tuple(self.ids),),
+                (tuple(sorted(self.ids)),),
             )
+            locked = {row[0] for row in self.env.cr.fetchall()}
+            if locked != set(self.ids):
+                raise UserError(_(
+                    "A store settings record changed while it was being saved."
+                ))
+            self.invalidate_recordset(list(tracked))
+            for record in self.sorted("id"):
+                before[record.id] = {
+                    name: self._p15_generation_value(record[name])
+                    for name in tracked
+                }
+        if not vals:
+            return True
         result = super().write(vals)
-        if tracked and not self.env.su and not service_write:
-            changed = False
-            for record in self:
-                old = before.get(record.id, {})
-                if any(old.get(name) != record[name] for name in tracked):
-                    changed = True
-                    break
-            if changed and "configuration_generation" in self._fields:
-                self.flush_recordset()
-                self.env.cr.execute(
-                    "SELECT MAX(configuration_generation) "
-                    "FROM shopify_connector_store_settings WHERE id IN %s",
-                    (tuple(self.ids),),
-                )
-                generation = int(self.env.cr.fetchone()[0] or 0) + 1
-                self._p15_service_write({
-                    "configuration_generation": generation,
-                })
+        changed_ids = []
+        if tracked:
+            self.invalidate_recordset(list(tracked))
+            for record in self.sorted("id"):
+                if any(
+                    before[record.id][name]
+                    != self._p15_generation_value(record[name])
+                    for name in tracked
+                ):
+                    changed_ids.append(record.id)
+        for record_id in changed_ids:
+            self.env.cr.execute(
+                "UPDATE shopify_connector_store_settings "
+                "SET configuration_generation = "
+                "COALESCE(configuration_generation, 0) + 1 "
+                "WHERE id = %s",
+                (record_id,),
+            )
+        if changed_ids:
+            self.invalidate_recordset(["configuration_generation"])
         return result
+
+    @api.model
+    def _p15_generation_value(self, value):
+        """Normalize policy values for exact pre/post comparisons."""
+        if hasattr(value, "ids"):
+            return tuple(value.ids)
+        if isinstance(value, dict):
+            return json.dumps(
+                value, sort_keys=True, separators=(",", ":"), default=str,
+            )
+        if isinstance(value, list):
+            return json.dumps(
+                value, sort_keys=True, separators=(",", ":"), default=str,
+            )
+        return value

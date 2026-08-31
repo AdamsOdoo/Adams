@@ -23,25 +23,29 @@ def _namespace(name: str, path: Path) -> None:
         sys.modules[name] = module
 
 
+_namespace("odoo", ROOT)
+_namespace("odoo.addons", ROOT / "addons")
+
 for _addon in ("shopify_connector_core", "shopify_connector_fulfillment"):
     _root = ROOT / "addons" / _addon
-    _namespace(_addon, _root)
-    _namespace(_addon + ".domain", _root / "domain")
-    _namespace(_addon + ".application", _root / "application")
-    _namespace(_addon + ".integration", _root / "integration")
-    _namespace(_addon + ".integration.shopify", _root / "integration" / "shopify")
-    _namespace(_addon + ".runtime", _root / "runtime")
+    _prefix = "odoo.addons." + _addon
+    _namespace(_prefix, _root)
+    _namespace(_prefix + ".domain", _root / "domain")
+    _namespace(_prefix + ".application", _root / "application")
+    _namespace(_prefix + ".integration", _root / "integration")
+    _namespace(_prefix + ".integration.shopify", _root / "integration" / "shopify")
+    _namespace(_prefix + ".runtime", _root / "runtime")
 
 
-from shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
+from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts import (  # noqa: E402
     MutationOutcome,
     MutationResult,
     MutationTransportError,
 )
-from shopify_connector_fulfillment.domain.fulfillment_admission import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.domain.fulfillment_admission import (  # noqa: E402
     FulfillmentAdmissionPolicy,
 )
-from shopify_connector_fulfillment.domain.fulfillment_mutation import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.domain.fulfillment_mutation import (  # noqa: E402
     FULFILLMENT_CREATE_OPERATION,
     FULFILLMENT_TRACKING_UPDATE_OPERATION,
     AdmissionReason,
@@ -53,24 +57,24 @@ from shopify_connector_fulfillment.domain.fulfillment_mutation import (  # noqa:
     derive_fulfillment_operation_scope,
     notification_evidence,
 )
-from shopify_connector_fulfillment.domain.fulfillment_readback import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.domain.fulfillment_readback import (  # noqa: E402
     FulfillmentReadback,
     ReadbackOutcome,
     evaluate_fulfillment_readback,
 )
-from shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_adapter import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_adapter import (  # noqa: E402
     FulfillmentMutationRequestAdapter,
 )
-from shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_gateway import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_mutation_gateway import (  # noqa: E402
     FULFILLMENT_MUTATION_REGISTRY,
     FulfillmentMutationGateway,
 )
-from shopify_connector_fulfillment.runtime.fulfillment_mutation_runtime import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.runtime.fulfillment_mutation_runtime import (  # noqa: E402
     FulfillmentMutationRuntime,
     FulfillmentRuntimeError,
     FulfillmentRuntimeAdmission,
 )
-from shopify_connector_fulfillment.application.fulfillment_mutation import (  # noqa: E402
+from odoo.addons.shopify_connector_fulfillment.application.fulfillment_mutation import (  # noqa: E402
     FulfillmentMutationApplication,
 )
 

@@ -191,7 +191,13 @@ class P10ReadClaimFenceTests(unittest.TestCase):
         )
         positions = tuple(extension.index(marker) for marker in lock_markers)
         self.assertEqual(positions, tuple(sorted(positions)))
-        self.assertEqual(extension.count("FOR SHARE"), 5)
+        self.assertEqual(extension.count("{lock_clause}"), 5)
+        self.assertIn(
+            'lock_clause = "FOR UPDATE" if for_update else "FOR SHARE"',
+            extension,
+        )
+        self.assertIn("for_update=True", extension)
+        self.assertIn("_validate_v2_read_claim_for_update", extension)
         self.assertNotIn("FOR SHARE OF", extension)
         self.assertIn(
             "snapshot.endpoint != preflight_snapshot.endpoint", extension,

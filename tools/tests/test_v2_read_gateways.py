@@ -372,6 +372,12 @@ class TestP06ReadGatewayContracts(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertNotIn("import requests", adapter_source)
         self.assertNotIn(".sudo(", adapter_source)
+        self.assertIn("self.env.registry.cursor()", adapter_source)
+        self.assertIn("_record_comparison(job, evidence, claim=claim)", adapter_source)
+        self.assertLess(
+            adapter_source.index("append(side_env, side_job)"),
+            adapter_source.index("cursor.commit()"),
+        )
         for method in ("read_store_capability", "read_location_page"):
             self.assertIn("def %s" % method, adapter_source)
         for method in ("read_product_page", "read_product"):
