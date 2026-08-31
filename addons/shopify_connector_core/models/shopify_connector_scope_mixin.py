@@ -53,6 +53,7 @@ import logging
 
 from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
+from odoo.tools.sql import table_exists
 
 _logger = logging.getLogger(__name__)
 
@@ -175,6 +176,13 @@ class ShopifyConnectorScopeMixin(models.AbstractModel):
         plausible and both destructive; picking one would rewrite operational
         history on a guess. The row is hidden and named in the log instead.
         """
+        # A later addon can load the current Python registry while an older
+        # installed core module is deliberately left untouched. In that
+        # W2-only compatibility probe, additive core models are known to the
+        # registry but their tables do not exist yet. The core upgrade owns
+        # creating them; an init-time historic-row sweep must not query them.
+        if not table_exists(self.env.cr, self._table):
+            return 0
         relations = self._sec3_parent_scope_relations()
         if not relations:
             return 0

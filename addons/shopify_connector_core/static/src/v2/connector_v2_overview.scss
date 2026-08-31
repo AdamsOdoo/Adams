@@ -1,0 +1,221 @@
+// Overview-specific controls, workflow cards and activity summary.
+.o_sc_v2 {
+    .sc-v2-store-switcher {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: var(--sc-space-2);
+        min-inline-size: 0;
+
+        &__label {
+            color: var(--sc-muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        &__control {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--sc-space-2);
+            min-inline-size: 0;
+        }
+    }
+
+    .sc-v2-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-inline-size: 40px;
+        min-block-size: 40px;
+        border-radius: 50%;
+        background: var(--sc-ink);
+        color: var(--sc-surface);
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .sc-v2-section {
+        min-inline-size: 0;
+        margin-block-end: var(--sc-space-5);
+        border: 1px solid var(--sc-line);
+        border-radius: var(--sc-radius-panel);
+        padding: var(--sc-space-5);
+        background: var(--sc-surface);
+        box-shadow: var(--sc-shadow-quiet);
+
+        &__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--sc-space-3);
+            min-inline-size: 0;
+            margin-block-end: var(--sc-space-4);
+
+            > * {
+                min-inline-size: 0;
+            }
+        }
+
+        &__title {
+            margin: 0;
+            font-size: 19px;
+            line-height: 1.25;
+            overflow-wrap: anywhere;
+        }
+    }
+
+    .sc-v2-workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--sc-space-3);
+    }
+
+    .sc-v2-workflow-card {
+        @include connector-v2-focus;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sc-space-3);
+        min-inline-size: 0;
+        border: 1px solid var(--sc-line);
+        border-radius: var(--sc-radius-control);
+        padding: var(--sc-space-4);
+        background: var(--sc-surface-soft);
+        color: var(--sc-ink);
+        text-align: start;
+        @include connector-v2-motion;
+
+        &:hover {
+            border-color: var(--sc-line-strong);
+            background: var(--sc-surface);
+            box-shadow: var(--sc-shadow-quiet);
+        }
+
+        &__topline,
+        &__bottomline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--sc-space-2);
+            min-inline-size: 0;
+        }
+
+        &__name {
+            @include connector-v2-wrap-anywhere;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        &__meta {
+            @include connector-v2-wrap-anywhere;
+            min-block-size: 21px;
+            color: var(--sc-muted);
+            font-size: 12px;
+        }
+
+        &__bottomline {
+            align-items: center;
+            margin-block-start: auto;
+            color: var(--sc-muted);
+            font-size: 12px;
+        }
+
+        &__attention {
+            color: var(--sc-warning);
+        }
+    }
+
+    .sc-v2-attention-preview,
+    .sc-v2-attention__rows {
+        display: flex;
+        flex-direction: column;
+        min-inline-size: 0;
+    }
+
+    .sc-v2-attention-row-container {
+        min-inline-size: 0;
+
+        &:first-child .sc-v2-attention-row {
+            border-block-start: 1px solid var(--sc-line);
+        }
+    }
+
+    .sc-v2-attention-row {
+        @include connector-v2-focus;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: var(--sc-space-3);
+        inline-size: 100%;
+        min-inline-size: 0;
+        border: 0;
+        border-block-end: 1px solid var(--sc-line);
+        padding: var(--sc-space-3) 0;
+        background: transparent;
+        color: var(--sc-ink);
+        text-align: start;
+
+        &:hover,
+        &--selected {
+            background: var(--sc-surface-soft);
+        }
+
+        &__content {
+            display: flex;
+            flex-direction: column;
+            min-inline-size: 0;
+            gap: 2px;
+
+            strong,
+            span {
+                @include connector-v2-wrap-anywhere;
+            }
+
+            span {
+                color: var(--sc-ink-soft);
+                font-size: 12px;
+            }
+        }
+
+        &__meta,
+        &__age {
+            color: var(--sc-muted) !important;
+            font-size: 11px !important;
+        }
+
+        &__age {
+            white-space: nowrap;
+        }
+    }
+
+    .sc-v2-activity__summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--sc-space-3);
+    }
+
+    .sc-v2-activity__metric {
+        display: flex;
+        flex-direction: column;
+        gap: var(--sc-space-1);
+        min-inline-size: 0;
+        border-inline-start: 3px solid var(--sc-success);
+        padding-inline-start: var(--sc-space-3);
+
+        strong {
+            @include connector-v2-wrap-anywhere;
+            font-size: 20px;
+        }
+
+        span {
+            color: var(--sc-muted);
+            font-size: 12px;
+        }
+
+        &--held {
+            border-inline-start-color: var(--sc-warning);
+        }
+    }
+}

@@ -1,0 +1,81 @@
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h2 class="oe_slogan">Shopify Connector Lite for Odoo 19</h2>
+    <h3 class="oe_slogan">Reliable visibility into products, customers, and orders</h3>
+    <p class="oe_mt32">
+      The DEC-029 Lite edition installs the shared connector substrate plus
+      product import and supported customer/order synchronization. It is the
+      read-first edition for operators who want Shopify evidence and records
+      available in Odoo without installing connector write-back domains.
+    </p>
+    <p>
+      Its installation closure includes the generic webhook foundation and
+      separate product and order webhook accelerators. Supported events enter
+      the existing asynchronous read jobs; scheduled reconciliation remains
+      the loss-recovery backstop. No timing or exactly-once promise is made.
+    </p>
+    <p>
+      Lite is a thin <strong>meta-application</strong>. It adds no models,
+      views, data records, scheduled actions, controllers, credentials, or
+      Shopify requests of its own. The direct domain modules and webhook
+      satellites remain independently identifiable and own their security and
+      lifecycle rules.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_dark">
+  <div class="oe_row oe_spaced">
+    <h3>Included edition scope</h3>
+    <div class="row">
+      <div class="col-md-6">
+        <ul>
+          <li>Store setup, readiness, jobs, logs, and operator recovery</li>
+          <li>Product and variant import with guarded matching</li>
+          <li>Customer import and supported order synchronization</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <ul>
+          <li>Scheduled and manual read/reconciliation workflows</li>
+          <li>Supported product and order event acceleration</li>
+          <li>Explicit review for ambiguous or unsupported remote states</li>
+          <li>Durable run, retry, and recovery evidence</li>
+        </ul>
+      </div>
+    </div>
+    <p class="oe_mt16">
+      Lite contains no connector write-back modules. The edition boundary is
+      module possession; it is not a billing, entitlement, or license-key
+      mechanism. Standard Odoo behavior remains outside the connector edition
+      boundary.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container">
+  <div class="oe_row oe_spaced">
+    <h3>Operationally explicit</h3>
+    <p>
+      Installation does not create a Shopify connection or transmit data.
+      Configure a store and credentials in Odoo after installation, following
+      the connector's setup guidance. Unsupported or ambiguous states are
+      surfaced for review rather than silently guessed.
+    </p>
+    <p class="text-muted">
+      No listing screenshots are published in this candidate because the
+      available captures include surfaces outside Lite. The repository's
+      visual evidence uses synthetic fixtures, does not represent a live
+      Shopify store, and is not Odoo.sh/UAT acceptance evidence.
+    </p>
+  </div>
+</section>
+
+<section class="oe_container oe_separator">
+  <div class="oe_row oe_spaced">
+    <p class="text-muted">
+      License: LGPL-3. Compatible target: Odoo 19. Future domains are not
+      included or implied by Lite.
+    </p>
+  </div>
+</section>

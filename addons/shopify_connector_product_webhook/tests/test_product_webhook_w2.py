@@ -138,7 +138,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             w1_root / 'migrations' / '19.0.1.1.0' / 'post-migrate.py'
         ).read_text()
         runner = (root.parents[1] / 'tools' / 'run_connector_suite.sh').read_text()
-        self.assertIn("'version': '19.0.1.3.0'", w1_manifest)
+        self.assertIn("'version': '19.0.1.4.0'", w1_manifest)
         self.assertIn("'version': '19.0.0.3.0'", w2_manifest)
         self.assertIn('information_schema.columns', migration)
         self.assertIn('expected_include_fields', migration)

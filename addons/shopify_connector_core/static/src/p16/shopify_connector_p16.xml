@@ -1,0 +1,615 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+    P16 Administrator/multistore presentation contracts.
+
+    This template is intentionally isolated from the current manifest until
+    the W2 Odoo-shell/asset compatibility gate.  It has no menu or global
+    webclient patch.  Native list/form actions are defined in the companion
+    P16 XML view file; this Owl action is limited to the composed grouped
+    settings/setup interactions that cannot be expressed as one flat form.
+-->
+<templates xml:space="preserve">
+
+    <t t-name="shopify_connector_core.P16StatePanel">
+        <section t-att-class="'sc-p16-state sc-p16-state--' + meta.tone"
+                 t-att-role="isError ? 'alert' : 'status'"
+                 t-att-aria-live="isError ? 'assertive' : 'polite'"
+                 t-att-aria-busy="state === 'loading' || state === 'refreshing' ? 'true' : undefined">
+            <div class="sc-p16-state__icon" aria-hidden="true">
+                <i t-att-class="'fa ' + meta.icon"/>
+            </div>
+            <div class="sc-p16-state__body">
+                <h2 class="sc-p16-state__title" t-esc="title"/>
+                <p class="sc-p16-state__detail" t-esc="detail"/>
+                <button t-if="action"
+                        type="button"
+                        class="btn btn-outline-primary"
+                        t-att-disabled="props.busy ? 'disabled' : undefined"
+                        t-on-click="invokeAction">
+                    <t t-esc="action.label || 'Try again'"/>
+                </button>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16StoreList">
+        <section class="sc-p16-store-list" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-toolbar">
+                <div>
+                    <h2 t-att-id="titleId">Connected stores</h2>
+                    <p class="text-muted">Each store has separate credentials, settings, jobs and evidence.</p>
+                </div>
+                <div class="sc-p16-toolbar__actions">
+                    <button type="button" class="btn btn-primary"
+                            t-if="props.canAddStore"
+                            t-on-click="newStore">
+                        <i class="fa fa-plus me-1" aria-hidden="true"/> Add store
+                    </button>
+                    <button t-if="canNativeList" type="button" class="btn btn-secondary"
+                            t-on-click="nativeList"
+                            title="Open the native Odoo list and saved filters">
+                        Native list
+                    </button>
+                </div>
+            </div>
+
+            <form class="sc-p16-search" t-on-submit.prevent="submitSearch" role="search">
+                <label t-att-for="searchId">Search permitted stores</label>
+                <div class="input-group">
+                    <input t-att-id="searchId" type="search" class="form-control"
+                           t-att-value="props.search || ''"
+                           placeholder="Store name or canonical domain"
+                           t-on-input="searchInput"/>
+                    <button type="submit" class="btn btn-outline-secondary">Search</button>
+                </div>
+                <small class="text-muted">Search is evaluated by the server within the active company.</small>
+            </form>
+
+            <t t-if="state === 'loading' || state === 'refreshing'">
+                <P16StatePanel state="state"
+                               title="state === 'refreshing' ? 'Refreshing stores' : 'Loading stores'"
+                               detail="'The server is loading the bounded active-company store list.'"
+                               busy="true"/>
+            </t>
+            <t t-elif="state === 'terminal_error' || state === 'retryable_error'">
+                <P16StatePanel state="state"
+                               detail="props.errorMessage"
+                               action="{ label: 'Retry' }"
+                               onAction.bind="retry"/>
+            </t>
+            <t t-elif="state === 'empty' || state === 'filtered_empty'">
+                <P16StatePanel state="state"
+                               detail="state === 'filtered_empty' ? 'Clear the search to review permitted stores.' : 'Add a store to begin the guided setup.'"
+                               action="props.canAddStore ? { label: 'Add store' } : null"
+                               onAction.bind="newStore"/>
+            </t>
+            <t t-else="">
+                <div class="sc-p16-store-list__meta" role="status">
+                    <span><t t-esc="items.length"/> permitted store(s)</span>
+                    <span t-if="capacity.maximum">Capacity <t t-esc="capacity.maximum"/></span>
+                </div>
+                <div class="sc-p16-store-list__rows" role="list">
+                    <t t-foreach="items" t-as="item" t-key="itemStoreId(item)">
+                        <article t-att-class="'sc-p16-store-card' + (isSelected(item) ? ' sc-p16-store-card--selected' : '')"
+                                 role="listitem">
+                            <div class="sc-p16-store-card__identity">
+                                <h3 t-esc="storeName(item)"/>
+                                <p><code t-esc="storeDomain(item)"/></p>
+                                <span class="sc-p16-status" t-att-data-state="storeFromItem(item).connection">
+                                    <t t-esc="stateLabel(item)"/>
+                                </span>
+                            </div>
+                            <div class="sc-p16-store-card__facts" role="list">
+                                <div role="listitem"><strong t-esc="item.attention_count || 0"/> attention</div>
+                                <div role="listitem"><strong t-esc="workflowCount(item)"/> workflows enabled</div>
+                                <div role="listitem"><strong t-esc="setupResumeLabel(item)"/> setup resume</div>
+                            </div>
+                            <div class="sc-p16-store-card__actions" role="group" aria-label="Store actions">
+                                <button t-if="canOpen(item)" type="button" class="btn btn-primary" t-on-click="() => this.open(item)">Open</button>
+                                <button t-if="canReadiness(item)" type="button" class="btn btn-outline-secondary" t-on-click="() => this.readiness(item)">Readiness</button>
+                                <button type="button" class="btn btn-outline-secondary"
+                                        t-if="hasServerAction(item, 'open_setup')"
+                                        t-on-click="() => this.resume(item)">
+                                    Resume setup
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary"
+                                        t-if="hasServerAction(item, 'open_store_settings')"
+                                        t-on-click="() => this.settings(item)">
+                                    Settings
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary"
+                                        t-if="hasServerAction(item, 'open_setup')"
+                                        t-on-click="() => this.diagnostics(item)">
+                                    Diagnostics
+                                </button>
+                            </div>
+                        </article>
+                    </t>
+                </div>
+                <div t-if="hasMore" class="sc-p16-pagination">
+                    <button type="button" class="btn btn-outline-secondary" t-on-click="nextPage">Load next permitted stores</button>
+                    <small class="text-muted">The server caps pages at ten stores.</small>
+                </div>
+            </t>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16PhaseRail">
+        <nav class="sc-p16-phase-rail" aria-label="Six setup phases">
+            <ol>
+                <t t-foreach="rows" t-as="phase" t-key="phase.key">
+                    <li t-att-class="'sc-p16-phase sc-p16-phase--' + phaseState(phase)">
+                        <div class="sc-p16-phase__heading">
+                            <span class="sc-p16-phase__number"><t t-esc="phaseNumber(phase)"/></span>
+                            <span t-esc="phase.label"/>
+                        </div>
+                        <ol class="sc-p16-phase__steps">
+                            <t t-foreach="phase.steps" t-as="step" t-key="step.step_key">
+                                <li>
+                                    <button type="button"
+                                            t-att-class="'sc-p16-step' + (step.step_key === currentStep ? ' sc-p16-step--current' : '')"
+                                            t-att-aria-current="step.step_key === currentStep ? 'step' : undefined"
+                                            t-on-click="() => this.choose(step)">
+                                        <span t-esc="step.label || step.step_key"/>
+                                        <span class="sc-p16-step__state" t-esc="stepStateLabel(step)"/>
+                                    </button>
+                                </li>
+                            </t>
+                        </ol>
+                    </li>
+                </t>
+            </ol>
+        </nav>
+    </t>
+
+    <t t-name="shopify_connector_core.P16SetupStepControls">
+        <section class="sc-p16-setup-controls" aria-label="Setup choices">
+            <p class="text-muted">
+                These choices are saved as named semantic setup values. They
+                do not activate a workflow or send a Shopify mutation.
+            </p>
+            <div t-if="fields.length" class="sc-p16-setup-controls__fields">
+                <t t-foreach="fields" t-as="field" t-key="field.key">
+                    <div class="mb-3 sc-p16-setup-control">
+                        <t t-if="field.type === 'boolean'">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input"
+                                       t-att-id="fieldId(field)"
+                                       t-att-checked="value(field) ? 'checked' : undefined"
+                                       t-att-disabled="props.busy ? 'disabled' : undefined"
+                                       t-on-change="(ev) => this.input(field, ev)"/>
+                                <label class="form-check-label" t-att-for="fieldId(field)" t-esc="field.label"/>
+                            </div>
+                        </t>
+                        <t t-else="">
+                            <label class="form-label" t-att-for="fieldId(field)" t-esc="field.label"/>
+                            <select class="form-select"
+                                    t-att-id="fieldId(field)"
+                                    t-att-disabled="props.busy ? 'disabled' : undefined"
+                                    t-on-change="(ev) => this.input(field, ev)">
+                                <option value="">Choose…</option>
+                                <t t-foreach="choices(field)" t-as="choice" t-key="choice.value">
+                                    <option t-att-value="choice.value"
+                                            t-att-selected="String(value(field)) === String(choice.value) ? 'selected' : undefined"
+                                            t-esc="choice.label"/>
+                                </t>
+                            </select>
+                        </t>
+                    </div>
+                </t>
+            </div>
+            <p t-else="" class="text-muted">
+                No installed field owns this setup choice in the current package.
+            </p>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16ReadinessPanel">
+        <section class="sc-p16-readiness" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-panel-heading">
+                <div>
+                    <p class="sc-p16-eyebrow">Server-owned evidence</p>
+                    <h2 t-att-id="titleId">Readiness</h2>
+                </div>
+                <span t-att-class="'sc-p16-result sc-p16-result--' + overallState"
+                      t-esc="overallLabel"/>
+            </div>
+            <p t-if="readiness.checked_at" class="text-muted">
+                Checked <time t-att-datetime="readiness.checked_at" t-esc="readiness.checked_at"/>
+            </p>
+            <div t-if="readiness.stale" class="alert alert-warning" role="alert">
+                Settings or connection evidence changed after this check. Refresh before making an activation decision.
+            </div>
+            <ul t-if="checks.length" class="sc-p16-check-list">
+                <t t-foreach="checks" t-as="check" t-key="check.code">
+                    <li t-att-class="checkClass(check)">
+                        <div>
+                            <strong t-esc="checkName(check)"/>
+                            <span class="sc-p16-check__owner" t-esc="check.owner"/>
+                        </div>
+                        <span class="sc-p16-check__result" t-esc="checkLabel(check)"/>
+                        <p t-esc="check.reason"/>
+                    </li>
+                </t>
+            </ul>
+            <P16StatePanel t-else=""
+                           state="'empty'"
+                           title="'Readiness has not run yet'"
+                           detail="'Run the diagnostic path to obtain current server evidence.'"/>
+            <div class="sc-p16-panel-actions" role="group" aria-label="Readiness actions">
+                <button t-if="canAction('test_connection')" type="button" class="btn btn-outline-secondary" t-on-click="runTest" t-att-disabled="props.busy ? 'disabled' : undefined">
+                    Test connection
+                </button>
+                <button t-if="canAction('refresh_readiness')" type="button" class="btn btn-outline-secondary" t-on-click="runReadiness" t-att-disabled="props.busy ? 'disabled' : undefined">
+                    Refresh readiness
+                </button>
+                <button t-if="canAction('activate_store')"
+                        type="button" class="btn btn-primary"
+                        t-on-click="activate"
+                        t-att-disabled="!canPresentActivation || props.busy ? 'disabled' : undefined">
+                    Request activation
+                </button>
+            </div>
+            <p class="text-muted sc-p16-server-note">The server reruns mandatory checks and validates the current generation and fingerprint when any command is submitted.</p>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16SettingsGroups">
+        <section class="sc-p16-settings" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-panel-heading">
+                <div>
+                    <p class="sc-p16-eyebrow">Administrator settings</p>
+                    <h2 t-att-id="titleId">Grouped Settings</h2>
+                </div>
+                <span class="text-muted">Generation <t t-esc="props.settings.configuration_generation || 0"/></span>
+            </div>
+            <t t-if="groups.length">
+                <article t-foreach="groups" t-as="group" t-key="group.key" class="sc-p16-settings-group">
+                    <header class="sc-p16-settings-group__header">
+                        <div>
+                            <h3 t-esc="group.label"/>
+                            <p t-if="group.readiness_impact" class="text-muted">Changes here require a fresh readiness result.</p>
+                        </div>
+                        <code t-esc="group.fingerprint"/>
+                    </header>
+                    <div class="sc-p16-settings-group__fields">
+                        <t t-foreach="group.fields" t-as="field" t-key="field.key">
+                            <div class="sc-p16-setting-field">
+                                <label t-att-for="fieldId(group, field)" t-esc="field.label || field.key"/>
+                                <span t-if="field.readiness_impact" class="badge text-bg-warning">Readiness input</span>
+                                <t t-if="fieldIsReadOnly(field)">
+                                    <output class="sc-p16-setting-field__readonly" t-att-id="fieldId(group, field)">
+                                        <t t-esc="fieldText(field, fieldValue(group, field))"/>
+                                    </output>
+                                    <small class="text-muted">Connector-owned evidence; use its named command.</small>
+                                </t>
+                                <t t-elif="field.value_type === 'boolean'">
+                                    <input type="checkbox" class="form-check-input"
+                                           t-att-id="fieldId(group, field)"
+                                           t-att-checked="fieldValue(group, field) ? 'checked' : undefined"
+                                           t-att-disabled="fieldDisabled(group, field) ? 'disabled' : undefined"
+                                           t-on-change="(ev) => this.input(group, field, ev)"/>
+                                    <small t-esc="fieldText(field, fieldValue(group, field))"/>
+                                </t>
+                                <t t-elif="field.value_type === 'selection'">
+                                    <select class="form-select"
+                                            t-att-id="fieldId(group, field)"
+                                            t-att-disabled="fieldDisabled(group, field) ? 'disabled' : undefined"
+                                            t-on-change="(ev) => this.input(group, field, ev)">
+                                        <option value="">Choose…</option>
+                                        <t t-foreach="choices(field)" t-as="choice" t-key="choice.value">
+                                            <option t-att-value="choice.value"
+                                                    t-att-selected="String(fieldValue(group, field)) === String(choice.value) ? 'selected' : undefined"
+                                                    t-esc="choice.label"/>
+                                        </t>
+                                    </select>
+                                </t>
+                                <t t-elif="field.value_type === 'integer' || field.value_type === 'number' || field.value_type === 'reference'">
+                                    <input type="number" class="form-control"
+                                           t-att-id="fieldId(group, field)"
+                                           t-att-value="fieldValue(group, field)"
+                                           t-att-disabled="fieldDisabled(group, field) ? 'disabled' : undefined"
+                                           t-on-input="(ev) => this.input(group, field, ev)"/>
+                                </t>
+                                <t t-else="">
+                                    <textarea class="form-control" rows="2"
+                                              t-att-id="fieldId(group, field)"
+                                              t-att-disabled="fieldDisabled(group, field) ? 'disabled' : undefined"
+                                              t-on-input="(ev) => this.input(group, field, ev)"><t t-esc="fieldValue(group, field)"/></textarea>
+                                </t>
+                            </div>
+                        </t>
+                    </div>
+                    <footer t-if="canSave(group)" class="sc-p16-settings-group__footer">
+                        <button type="button" class="btn btn-primary" t-on-click="() => this.save(group)" t-att-disabled="props.busy ? 'disabled' : undefined">
+                            Save <t t-esc="group.label"/>
+                        </button>
+                        <span class="text-muted">The server checks this group fingerprint again.</span>
+                    </footer>
+                </article>
+            </t>
+            <P16StatePanel t-else=""
+                           state="'empty'"
+                           title="'No settings groups are installed'"
+                           detail="'Optional domains register their own settings fragments; no hidden controls are created.'"/>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16CredentialPanel">
+        <section class="sc-p16-credential" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-panel-heading">
+                <div>
+                    <p class="sc-p16-eyebrow">Write-only credential path</p>
+                    <h2 t-att-id="titleId">Credential</h2>
+                </div>
+                <span t-if="credentialPresent" class="sc-p16-result sc-p16-result--success">Credential on file</span>
+                <span t-else="" class="sc-p16-result sc-p16-result--warning">Credential required</span>
+            </div>
+            <p class="text-muted">Existing credential values are never read or rendered. Leave the fields blank only when you do not intend to replace the credential.</p>
+            <div class="mb-3">
+                <label t-att-for="modeId">Acquisition path</label>
+                    <select t-att-id="modeId" class="form-select" t-on-change="setMode"
+                            t-att-value="state.mode"
+                            t-att-disabled="props.busy ? 'disabled' : undefined">
+                    <option value="offline_access_token">Offline access token</option>
+                    <option value="dev_dashboard_client_credentials">Dev Dashboard Client ID and secret</option>
+                </select>
+            </div>
+            <div t-if="state.mode === 'offline_access_token'" class="mb-3">
+                <label t-att-for="tokenId">New access token</label>
+                <input t-att-id="tokenId" t-ref="token" type="password" class="form-control"
+                       autocomplete="new-password" t-att-disabled="props.busy ? 'disabled' : undefined"/>
+            </div>
+            <div t-else="" class="row g-3">
+                <div class="col-md-6">
+                    <label t-att-for="clientId">Client ID</label>
+                    <input t-att-id="clientId" t-ref="clientId" type="text" class="form-control"
+                           autocomplete="off" t-att-disabled="props.busy ? 'disabled' : undefined"/>
+                </div>
+                <div class="col-md-6">
+                    <label t-att-for="clientSecretId">Client secret</label>
+                    <input t-att-id="clientSecretId" t-ref="clientSecret" type="password" class="form-control"
+                           autocomplete="new-password" t-att-disabled="props.busy ? 'disabled' : undefined"/>
+                </div>
+            </div>
+            <div class="sc-p16-panel-actions">
+                <button type="button" class="btn btn-primary" t-on-click="submit" t-att-disabled="props.busy ? 'disabled' : undefined">Replace credential</button>
+                <button type="button" class="btn btn-outline-secondary" t-on-click="testConnection" t-att-disabled="props.busy || !credentialPresent ? 'disabled' : undefined">Test connection</button>
+            </div>
+            <p class="text-muted sc-p16-server-note">The server stores the submitted value through the guarded credential service and returns metadata only.</p>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16LifecyclePanel">
+        <section class="sc-p16-lifecycle" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-panel-heading">
+                <div>
+                    <p class="sc-p16-eyebrow">Lifecycle truth</p>
+                    <h2 t-att-id="titleId">Store lifecycle</h2>
+                </div>
+                <span class="sc-p16-result" t-esc="stateLabel"/>
+            </div>
+            <p class="text-muted">The server-returned lifecycle actions below are scoped to this exact store.</p>
+            <div t-if="canRequest('retire')" class="mb-2">
+                <label class="form-label" for="p16-retire-reason">Retirement reason</label>
+                <input id="p16-retire-reason" type="text" class="form-control" maxlength="512"
+                       t-on-input="setReason" placeholder="Explain why this store is being retired"/>
+            </div>
+            <div class="sc-p16-panel-actions" role="group" aria-label="Lifecycle commands">
+                <button t-if="state === 'connected' &amp;&amp; canRequest('pause')"
+                        type="button" class="btn btn-outline-warning" t-on-click="() => this.request('pause')">Pause</button>
+                <button t-if="(state === 'reconnect_needed' || state === 'disconnected' || activationState === 'paused') &amp;&amp; canRequest('resume')"
+                        type="button" class="btn btn-primary" t-on-click="() => this.request('resume')">Resume and recheck</button>
+                <button t-if="state !== 'disconnecting' &amp;&amp; state !== 'disconnected' &amp;&amp; canRequest('disconnect')"
+                        type="button" class="btn btn-outline-danger" t-on-click="() => this.request('disconnect')">Disconnect</button>
+                <button t-if="state === 'disconnected' &amp;&amp; canRequest('retire')"
+                        type="button" class="btn btn-outline-danger" t-on-click="() => this.request('retire')">Retire</button>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16DiagnosticsPanel">
+        <section class="sc-p16-diagnostics" t-att-aria-labelledby="titleId">
+            <div class="sc-p16-panel-heading">
+                <div>
+                    <p class="sc-p16-eyebrow">Administrator-only evidence</p>
+                    <h2 t-att-id="titleId">Technical diagnostics</h2>
+                </div>
+                <span class="text-muted">Generation <t t-esc="summary.configuration_generation || 0"/></span>
+            </div>
+            <p class="text-muted">This panel is safe metadata only. Raw credentials, authorization headers, webhook bodies and unredacted PII are never rendered.</p>
+            <dl class="sc-p16-diagnostics__grid">
+                <div><dt>Credential</dt><dd t-esc="credentials.present ? 'Present' : 'Missing'"/></div>
+                <div><dt>Credential verification</dt><dd t-esc="credentials.verified ? 'Verified' : 'Not verified'"/></div>
+                <div><dt>Webhook desired</dt><dd t-esc="webhooks.desired ? 'Yes' : 'No'"/></div>
+                <div><dt>Webhook actual</dt><dd t-esc="webhooks.actual ? 'Ready' : 'Not ready'"/></div>
+                <div><dt>Lifecycle</dt><dd t-esc="lifecycleLabel"/></div>
+                <div><dt>Connection generation</dt><dd t-esc="summary.connection_generation || 0"/></div>
+                <div><dt>Canonical domain</dt><dd><code t-esc="identity.shop_domain &amp;&amp; identity.shop_domain.value || 'Unavailable'"/></dd></div>
+                <div><dt>Owning company</dt><dd t-esc="identity.company_id &amp;&amp; identity.company_id.value || 'Unavailable'"/></div>
+            </dl>
+            <div class="sc-p16-diagnostics__readiness">
+                <P16ReadinessPanel readiness="summary.readiness" busy="props.busy" onRefresh.bind="refresh" onTestConnection.bind="testConnection" onActivate.bind="activate"/>
+            </div>
+        </section>
+    </t>
+
+    <t t-name="shopify_connector_core.P16Admin">
+        <main class="o_sc_p16_admin" t-att-dir="appDirection" t-att-aria-labelledby="pageTitleId">
+            <header class="sc-p16-page-header">
+                <div class="sc-p16-page-header__identity">
+                    <p class="sc-p16-eyebrow">Shopify Connector · Administrator</p>
+                    <h1 t-att-id="pageTitleId" t-esc="activeSurfaceTitle"/>
+                    <p t-if="activeStoreId" class="text-muted"><span t-esc="selectedStoreName"/> · <code t-esc="selectedStore.shop_domain"/></p>
+                </div>
+                <div class="sc-p16-page-header__actions">
+                    <button t-if="state.surface !== 'list' &amp;&amp; state.surface !== 'create'" type="button" class="btn btn-link" t-on-click="backToList">Back to stores</button>
+                    <button t-if="state.surface === 'list'" type="button" class="btn btn-outline-secondary" t-on-click="refreshList">Refresh</button>
+                </div>
+            </header>
+
+                <div t-if="state.commandMessage" t-att-class="'alert ' + (state.commandState === 'conflict' || state.commandState === 'stale' ? 'alert-warning' : state.commandState === 'terminal_error' || state.commandState === 'unavailable' ? 'alert-danger' : 'alert-info')" role="alert" aria-live="assertive">
+                <t t-esc="state.commandMessage"/>
+            </div>
+            <div t-if="state.surfaceMessage &amp;&amp; state.surface !== 'list'" class="alert alert-warning" role="alert">
+                <t t-esc="state.surfaceMessage"/>
+            </div>
+
+            <t t-if="state.surface === 'list'">
+                <P16StoreList envelope="state.listEnvelope"
+                              state="state.listState"
+                              errorMessage="surfaceError"
+                              selectedStoreId="state.selectedStoreId"
+                              search="state.search"
+                              canAddStore="canShowAddStore"
+                              nativeAction="nativeManageAction"
+                              onOpen.bind="openStore"
+                              onResume.bind="openSetup"
+                              onReadiness.bind="openReadiness"
+                              onSettings.bind="openSettings"
+                              onDiagnostics.bind="openDiagnostics"
+                              onNewStore.bind="newStore"
+                              onRetry.bind="refreshList"
+                              onSearchInput.bind="onSearchInput"
+                              onSearch.bind="onSearch"
+                              onNextPage.bind="onNextPage"
+                              onNativeList.bind="openNativeManageStores"/>
+            </t>
+
+            <t t-elif="state.surface === 'create'">
+                <section class="sc-p16-create" t-att-aria-labelledby="createTitleId">
+                    <div class="sc-p16-panel-heading">
+                        <div>
+                            <p class="sc-p16-eyebrow">Isolated draft</p>
+                            <h2 t-att-id="createTitleId">Add a Shopify store</h2>
+                        </div>
+                        <span class="text-muted">Capacity enforced by the server</span>
+                    </div>
+                    <p class="text-muted">Only the store label and canonical Shopify identity are entered here. Credentials, readiness and lifecycle state are established through their named services.</p>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="p16-create-name">Store name</label>
+                            <input id="p16-create-name" type="text" class="form-control"
+                                   t-att-value="state.createName"
+                                   t-on-input="(ev) => this.onCreateName(ev.target.value)"/>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="p16-create-domain">Canonical Shopify domain</label>
+                            <input id="p16-create-domain" type="text" class="form-control"
+                                   placeholder="shop-name.myshopify.com"
+                                   t-att-value="state.createDomain"
+                                   t-on-input="(ev) => this.onCreateDomain(ev.target.value)"/>
+                            <small class="text-muted">Lowercase *.myshopify.com without a scheme or path.</small>
+                        </div>
+                    </div>
+                    <div class="sc-p16-panel-actions">
+                        <button type="button" class="btn btn-primary" t-on-click="submitCreate" t-att-disabled="createDisabled ? 'disabled' : undefined">Create draft and open setup</button>
+                        <button type="button" class="btn btn-link" t-on-click="backToList">Cancel</button>
+                    </div>
+                </section>
+            </t>
+
+            <t t-elif="state.surface === 'setup'">
+                <section class="sc-p16-setup" t-att-aria-labelledby="setupTitleId">
+                    <P16PhaseRail setup="setup" onSelect.bind="selectSetupStep"/>
+                    <div class="sc-p16-setup__workspace">
+                        <div class="sc-p16-panel-heading">
+                            <div>
+                                <p class="sc-p16-eyebrow">Phase <t t-esc="(phaseForStep(setupCurrentStep.step_key) || {}).label || 'Setup'"/></p>
+                            <h2 t-att-id="setupTitleId"><t t-esc="setupCurrentStep.label || setupCurrentStep.step_key"/></h2>
+                            </div>
+                            <span class="text-muted">Step <t t-esc="setupStepIndex"/> of <t t-esc="setupStepCount"/></span>
+                        </div>
+                        <t t-if="setupCurrentStep.step_key === 'welcome' || setupCurrentStep.step_key === 'identity'">
+                            <p>Set up one isolated Shopify store. Nothing is activated until the server accepts the readiness and activation checks.</p>
+                            <dl class="sc-p16-summary-list"><div><dt>Store</dt><dd t-esc="selectedStoreName"/></div><div><dt>Canonical domain</dt><dd><code t-esc="selectedStore.shop_domain"/></dd></div></dl>
+                        </t>
+                        <P16CredentialPanel t-elif="setupCurrentStep.step_key === 'credential'"
+                                            store="selectedStore"
+                                            busy="state.commandState === 'loading'"
+                                            onReplace.bind="replaceCredential"
+                                            onTestConnection.bind="testConnection"/>
+                        <t t-elif="setupCurrentStep.step_key === 'test_connection' || setupCurrentStep.step_key === 'final_readiness' || setupCurrentStep.step_key === 'review'">
+                            <P16ReadinessPanel readiness="setup.readiness"
+                                               busy="state.commandState === 'loading'"
+                                               onTestConnection.bind="testConnection"
+                                               onRefresh.bind="() => this._loadSurface('setup')"
+                                               onActivate.bind="activate"/>
+                            <div t-if="setup.activation_preview" class="sc-p16-preview" role="note">
+                                <strong>Activation preview</strong>
+                                <span>Credential <t t-esc="setup.activation_preview.credential_present ? 'present' : 'required'"/></span>
+                                <span>Readiness fingerprint <code t-esc="setup.activation_preview.readiness_fingerprint"/></span>
+                            </div>
+                        </t>
+                        <t t-elif="setupCurrentStep.step_key === 'directions' || setupCurrentStep.step_key === 'source_of_truth' || setupCurrentStep.step_key === 'notification' || setupCurrentStep.step_key === 'first_push'">
+                            <P16SetupStepControls stepKey="setupCurrentStep.step_key"
+                                                  values="setupValues"
+                                                  busy="state.commandState === 'loading'"
+                                                  onChange.bind="onSetupValueChange"/>
+                        </t>
+                        <t t-elif="setupCurrentStep.step_key === 'scopes' || setupCurrentStep.step_key === 'location_mapping'">
+                            <p>The server-owned scope and location evidence is shown after its diagnostic provider completes. Continue only after reviewing the returned evidence.</p>
+                            <P16ReadinessPanel readiness="setup.readiness"
+                                               busy="state.commandState === 'loading'"
+                                               onRefresh.bind="() => this._loadSurface('setup')"
+                                               onTestConnection.bind="testConnection"/>
+                        </t>
+                        <div class="sc-p16-setup__actions" role="group" aria-label="Setup navigation">
+                            <button type="button" class="btn btn-primary" t-on-click="advanceSetup" t-att-disabled="state.commandState === 'loading' ? 'disabled' : undefined">
+                                <t t-if="setupHasNext">Save step and continue</t><t t-else="">Save final step</t>
+                            </button>
+                            <button type="button" class="btn btn-link" t-on-click="backToList">Leave setup; progress is saved</button>
+                        </div>
+                    </div>
+                </section>
+            </t>
+
+            <t t-elif="state.surface === 'settings'">
+                <section class="sc-p16-detail-layout">
+                    <aside class="sc-p16-detail-nav" aria-label="Store administration surfaces">
+                        <button type="button" class="btn btn-link" t-on-click="() => this.openReadiness(activeStoreId)">Readiness</button>
+                        <button type="button" class="btn btn-link" t-on-click="() => this.openSetup(activeStoreId)">Setup</button>
+                        <button type="button" class="btn btn-link" t-if="canManageSelected" t-on-click="() => this.openDiagnostics(activeStoreId)">Diagnostics</button>
+                    </aside>
+                    <P16SettingsGroups settings="settings"
+                                       drafts="state.settingsDrafts"
+                                       busy="state.commandState === 'loading'"
+                                       onChange.bind="onSettingChange"
+                                       onSave.bind="saveSettingsGroup"/>
+                </section>
+            </t>
+
+            <t t-elif="state.surface === 'readiness'">
+                <section t-if="readinessState === 'terminal_error' || readinessState === 'retryable_error'" class="sc-p16-detail-layout">
+                    <P16StatePanel state="readinessState" detail="surfaceError" action="{ label: 'Retry' }" onAction.bind="retrySurface"/>
+                </section>
+                <section t-else="" class="sc-p16-detail-layout">
+                    <P16ReadinessPanel readiness="readiness"
+                                       busy="state.commandState === 'loading'"
+                                       onTestConnection.bind="testConnection"
+                                       onRefresh.bind="refreshReadiness"
+                                       onActivate.bind="activate"/>
+                    <aside class="sc-p16-detail-nav" aria-label="Store administration surfaces">
+                        <button type="button" class="btn btn-link" t-if="canManageSelected" t-on-click="() => this.openSetup(activeStoreId)">Setup</button>
+                        <button type="button" class="btn btn-link" t-if="canManageSelected" t-on-click="() => this.openSettings(activeStoreId)">Settings</button>
+                        <button type="button" class="btn btn-link" t-if="canManageSelected" t-on-click="() => this.openDiagnostics(activeStoreId)">Diagnostics</button>
+                    </aside>
+                </section>
+            </t>
+
+            <t t-elif="state.surface === 'diagnostics'">
+                <section t-if="diagnosticsState !== 'success'" class="sc-p16-detail-layout">
+                    <P16StatePanel state="diagnosticsState" detail="surfaceError" action="{ label: 'Retry diagnostics' }" onAction.bind="retrySurface"/>
+                </section>
+                <section t-else="" class="sc-p16-detail-layout">
+                    <P16DiagnosticsPanel summary="diagnostics"
+                                         busy="state.commandState === 'loading'"
+                                         onRefresh.bind="refreshReadiness"
+                                         onTestConnection.bind="testConnection"
+                                         onActivate.bind="activate"/>
+                    <P16LifecyclePanel summary="diagnostics" busy="state.commandState === 'loading'" onRequest.bind="requestLifecycle"/>
+                </section>
+            </t>
+        </main>
+    </t>
+</templates>

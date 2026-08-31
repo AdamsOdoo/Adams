@@ -1,346 +1,217 @@
-# CLAUDE.md — Project Governance Contract
+# CLAUDE.md — Shopify Connector Project Governance
 
-> **MVP role-model supersession — 2026-07-25.** [The dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) supersede conflicting role assignments below: Claude is the independent reviewer unless a dated product-owner instruction explicitly assigns a separate Claude session another role; Sol/Codex is the implementation worker; Runtime Claude is the runtime verifier; ChatGPT is strategic control room. No session may combine roles or self-accept.
+> **Status:** V2 product/architecture correction and implementation preparation.
+> Production connector code remains gated until the user explicitly authorizes the
+> implementation run. Once that run is authorized, the implementation owner proceeds
+> continuously through the accepted execution program without requesting approval at
+> every internal checkpoint.
 
-> **Read this file at the start of every session before doing anything else.**
-> It is the governance contract for the premium **Odoo 19 ↔ Shopify Connector**
-> project. If a task prompt conflicts with this file, stop and raise the
-> conflict in your reply rather than silently choosing one.
->
-> **If your session's work is based on `mvp/program-integration`** (the MVP
-> completion program), read **§13 (MVP Program Control-Room)** below first —
-> it records a scoped, explicit change to the roles and process in §2/§6 for
-> that program only. Everything else in this file still applies unchanged.
+## 1. Objective
 
----
+Build a premium Odoo 19 ↔ Shopify connector that is reliable, responsive,
+understandable to non-technical operators, modular without fragmentation, and safe to
+extend with later domains such as refunds, returns and payouts.
 
-## 1. Project purpose
+The connector must outperform market alternatives through operational clarity,
+failure recovery, mutation safety, installation simplicity and Odoo-native user
+experience. Feature-count claims are not a substitute for proven behavior.
 
-Build a best-in-class, modular, reliable connector that synchronises commerce
-data (catalog, inventory, orders, customers, fulfilment, pricing/tax) between
-**Odoo 19** and **Shopify**, to a higher quality bar than existing market
-offerings. We do the research, governance, and architecture work *in writing,
-in GitHub, first* so that implementation — when authorised — is fast, correct,
-and defensible.
+## 2. Authority and source of truth
 
-## 2. Roles and operating model
+Authority is resolved in this order:
 
-This project is run by two cooperating roles:
+1. the user's latest explicit instruction and authorization boundary;
+2. this file and repository-root `AGENTS.md`;
+3. accepted V2 contracts under `docs/v2/`;
+4. accepted ADRs and `docs/05-qa/rejected-approaches-log.md`;
+5. the current implementation work item.
 
-| Role | Who | Responsibility |
-| --- | --- | --- |
-| **Execution / research / documentation worker** | **Claude (Claude Code)** | Inspect the repo, perform research, write/maintain documentation and governance files, register sources, run the learning loop, and produce handoffs and (later, when authorised) implementation. Works in small, scoped sessions and commits to GitHub. |
-| **Strategy / control room / reviewer** | **ChatGPT** | Sets strategy and architecture direction, controls prompting, and performs **strict review** of Claude's output directly in the repo/PRs. Approves phase transitions and gates implementation. |
+If two authorities materially conflict, stop at a safe checkpoint and report the
+exact conflict. Do not silently select the easier interpretation.
 
-**Claude executes; ChatGPT directs and reviews.** Claude does not self-authorise
-strategy, architecture finalization, or implementation — those are gated on
-ChatGPT review/approval (see §6, §8).
+GitHub is the project source of truth. Decisions, code, tests, evidence, handoffs and
+release verdicts must be committed. Chat output alone is not a deliverable.
 
-## 3. GitHub is the single source of truth
+## 3. Current program state
 
-- Every research output, decision, lesson, methodology, and plan is a **file in
-  this repository**, committed and pushed. Chat answers are not deliverables.
-- If it is not in GitHub, it does not exist for this project.
-- Produce/update the file first, then summarize in chat. Commit with clear
-  messages. Work on the session's designated branch; never commit to `main`.
+- V1 release qualification remains separate from V2 design work.
+- PR #211 is the docs-only V2 product, architecture and execution blueprint.
+- PR #210 is implementation evidence/current V1 reference and must not be modified by
+  V2 documentation work.
+- V2 production code begins only after explicit user authorization.
+- Authorization to start the V2 implementation program authorizes continuous progress
+  through its already-approved internal gates. Repeated confirmation is not required
+  unless a stop condition or new external authority is encountered.
 
-## Branch governance
+## 4. Execution model
 
-- `main` is stable only.
-- Do not commit directly to `main`.
-- Do not open sprint PRs directly into `main`.
-- Plain `dev` is an existing separate pipeline branch and must be left untouched
-  unless ChatGPT explicitly changes policy.
-- `dev/Shopify-connector` must not be used because plain `dev` already exists and
-  Git cannot store both branch refs.
-- `Shopify-connector` is the dedicated project integration branch for this
-  Shopify Connector project.
-- Sprint branches must branch from `Shopify-connector`.
-- Sprint PRs must target `Shopify-connector`.
-- Promotion from `Shopify-connector` to `main` requires explicit ChatGPT approval.
+Use one continuous delivery program, not twenty-one separate conversations or approval
+cycles. The program is organized into five evidence checkpoints in
+`docs/v2/10-implementation-roadmap.md`:
 
-## High-power research mode
+1. V1 baseline and contracts;
+2. shared backend foundation: Shopify boundary, runtime, security, migration, store lifecycle and settings;
+3. domain workflow reliability and mutation readback;
+4. complete Odoo-native product experience;
+5. exact-candidate qualification and controlled rollout.
 
-Claude is allowed to use strong research capabilities, parallel agents, broad
-source collection, verification passes, and deep synthesis when the task
-genuinely requires it.
+Internal task IDs remain useful for traceability, tests and rollback, but they are not
+mandatory standalone PRs or reasons to pause. Use a program branch, coherent commits
+and one final candidate PR unless a technically independent change genuinely benefits
+from separate review.
 
-The goal is not to minimize tool use. The goal is to produce trustworthy,
-state-of-the-art work.
+Only one implementation owner edits an overlapping subsystem at a time. Specialist
+review lenses may operate in parallel when they do not mutate overlapping files.
 
-However, large fan-out must be intentional and reviewable.
+## 5. Foundation-first rule
 
-Before launching a large parallel-agent workflow, Claude must define:
+Production UI must not be built on guessed behavior. Before production frontend wiring:
 
-- why high-power mode is needed
-- what each agent/workstream will investigate
-- what sources are authoritative
-- what files will be updated
-- what the stop condition is
-- how findings will be synthesized and verified
-- how unsupported claims will be prevented
+- characterize V1 behavior and database compatibility;
+- establish typed Shopify gateways and normalized errors;
+- establish command/query contracts, authorization and tenant fences;
+- prove the job/run/attempt/mutation-certainty runtime;
+- prove install, upgrade, rollback, concurrency, throttling and failure recovery;
+- expose stable read DTOs and allowed-action contracts.
 
-Large fan-out is encouraged for major research sprints, competitor benchmarking,
-official API verification, UX/UI benchmark research, architecture tradeoff
-research, and quality/security/performance review — but it must stay within the
-allowed files and current phase gate.
+Visual component scaffolding may use contract fixtures, but it cannot become production
+truth until the owning backend contract passes its gate.
 
-For small patch/revision sessions, do not launch large fan-out. Use the minimum
-research needed.
+## 6. Architecture invariants
 
-If high-power mode is not explicitly authorized in the prompt but appears
-necessary, stop and ask ChatGPT for approval or propose a small fan-out plan. If
-high-power mode is explicitly authorized, proceed within scope and document the
-plan/result in the handoff.
+- Remain an Odoo modular monolith; do not add a broker, external worker, cache service
+  or microservice without measured evidence and a new ADR.
+- Preserve stable addon/model/table/XML IDs, binding identity, store identity, jobs,
+  logs, mutation evidence and customer data through additive migration.
+- Keep Shopify I/O behind typed, versioned domain gateways.
+- Keep HTTP requests, claims and database transactions short; never hold broad Odoo
+  business locks across network calls.
+- Use durable idempotency, operation scopes and readback verification. Never blindly
+  replay a mutation whose remote outcome may have occurred.
+- Treat webhooks as fast hints; verify HMAC/delivery identity and reconcile missed,
+  duplicate and out-of-order events.
+- Enforce active-company, exact-store and configuration-generation checks at admission
+  and immediately before side effects.
+- Keep credentials write-only and redact secrets, raw payloads and PII.
+- Prefer standard Odoo views/services/components; use Owl only where composition or
+  live interaction materially improves the task.
+- Matching never guesses from names. Inventory first push and fulfillment notification
+  remain explicit, previewed and audited.
 
-## 4. Research-first rule
+## 7. Simplicity and engineering discipline
 
-We are in a **research & governance phase**. Understanding the market,
-competitors, the Shopify platform, and Odoo 19 architecture comes **before**
-any design or code. Claims must be evidence-based and traceable (§7).
+Reliability does not justify speculative infrastructure.
 
-## 5. No coding until approved
+- Add an abstraction only when it isolates an external side effect, enforces a domain
+  boundary, or has at least two concrete consumers.
+- Do not create generic repositories, event buses, caches, state machines or plugin
+  frameworks for hypothetical future use.
+- Extend through small typed registries for real operations, readiness providers,
+  attention providers and gateway handlers.
+- Batch ORM work, bound pagination and searches, prefetch deliberately, index measured
+  hot paths and remove N+1 behavior.
+- Prefer Odoo ORM and framework primitives; use reviewed SQL only after profiling proves
+  the ORM path cannot meet an accepted budget.
+- Keep methods cohesive, state transitions explicit and error codes stable.
+- No unrelated cleanup or formatting inside a behavioral change.
 
-**Do not write connector code until ChatGPT explicitly approves the transition
-to implementation.** In the research/governance phase, the only writable
-artifacts are Markdown documentation and governance files (and `.claude/`
-governance assets when authorised).
+Implementation follows official Shopify and Odoo 19 documentation plus the actual
+pinned code/schema. Refresh any version-sensitive platform fact before the owning work.
 
-You **must not** during this phase:
+## 8. Testing efficiently
 
-- create Odoo modules or any actual module directory,
-- write Python models, XML views, manifests, controllers, security files, data
-  files, migrations, or tests,
-- create CI workflows, Dockerfiles, or `requirements*.txt`,
-- modify existing module code (including `addons/adams_base`),
-- refactor source code, install dependencies, or run destructive commands.
+Testing is continuous but economically ordered:
 
-If a task seems to require code, **stop and ask** — do not assume the gate has
-been lifted.
+1. syntax, import, lint and structural checks for touched files;
+2. focused policy/contract/ORM tests;
+3. affected domain integration and fault tests;
+4. lifecycle, concurrency, browser and performance gates when triggered;
+5. the complete connector suite and exact-SHA qualification once the candidate freezes.
 
-## 6. Small, scoped sessions only
+Do not run the most expensive suite after every small edit. Do not defer all testing to
+the end. A failed cheap gate stops the expensive gate. A candidate change reopens only
+the affected gate and its downstream dependencies.
 
-- One clearly scoped objective per session. Do not silently expand scope.
-- Prefer multiple small commits with clear messages over one large change.
-- Stop when the scoped task is complete; do not roll forward into the next
-  session's work or into implementation.
+## 9. Complete user journeys
 
-## 7. Citation requirements
+Every advertised workflow must be proven end to end across backend, Odoo UI and live
+Shopify readback where applicable. The authoritative journey matrix is in
+`docs/v2/09-test-observability-release-blueprint.md` and includes setup, multi-store,
+products/variants, customers/orders, inventory, fulfillment/tracking, manual and
+scheduled work, webhooks/reconciliation, failure recovery, permissions, disconnect,
+upgrade and rollback.
 
-For every claim derived from an external source:
+A backend test or attractive screen alone does not complete a journey.
 
-1. **Cite it** — vendor/product name + exact URL.
-2. **Record access status** — Accessible / Partial / Blocked, and the date
-   accessed (use the date provided in the session; never invent one).
-3. **Quote or paraphrase precisely** — mark direct quote vs paraphrase; do not
-   embellish.
-4. **Capture, don't just link** — save high-value excerpts under
-   `/docs/00-source-materials` so research survives link rot.
-5. **No unsupported claims** — if you cannot cite it, log it as an open
-   question; do not assert it.
-6. **Respect access controls** — never bypass authentication walls (e.g.
-   private Google Docs / Confluence). Record them as blocked.
+## 10. Branch and change governance
 
-Methodology detail lives in `/docs/01-research/research-methodology.md`.
+- Never commit directly to `main`.
+- Keep plain `dev` untouched unless the user explicitly changes policy.
+- `Shopify-connector` is the integration base; implementation branches start from its
+  accepted exact SHA.
+- Preserve unrelated user changes and inspect the worktree/branch before editing.
+- Record exact base/head SHA, changed files, tests, external effects and rollback.
+- Do not merge, publish broadly or modify staging/production unless explicitly within
+  the authorized execution boundary.
 
-## 8. Claim classification (label everything)
+Each coherent implementation unit records allowed paths, forbidden paths, acceptance
+criteria, tests, migration impact and rollback. These may be sections of one continuous
+program rather than separate PRs.
 
-Every statement in research/architecture docs must be classifiable as exactly
-one of the following, and labelled where ambiguity is possible:
+## 11. Research and competitor evidence
 
-| Class | Meaning | Evidence bar |
-| --- | --- | --- |
-| **Fact** | Verifiable, independently true (e.g. an Odoo 19 ORM behaviour, a Shopify API limit). | Official/primary source cited. |
-| **Competitor claim** | What a vendor *says* about their product. | Vendor source cited; treated as a claim, not proven truth. |
-| **Inference** | Our interpretation/deduction from evidence. | Reasoning + the evidence it rests on. |
-| **Recommendation** | A proposed course of action. | Tied to facts/inferences; subject to ChatGPT review. |
-| **Decision** | An accepted choice. | Only in `/docs/04-decisions` (ADR), after review. |
-| **Open question** | Unknown / unverified / needs follow-up. | Logged so it is not forgotten. |
+- Platform facts use official Shopify/Odoo sources and state the relevant version.
+- Competitor features are vendor claims unless independently exercised.
+- Screen observations identify the exact public page, screenshot or video.
+- Facts, competitor claims, inferences, recommendations and accepted decisions remain
+  distinguishable.
+- Do not repeat a rejected approach unless its documented revisit condition is met.
 
-Never present a competitor claim as a fact, or an inference/recommendation as a
-decision.
+Competitor research informs product decisions; it never overrides platform safety or
+actual repository behavior.
 
-## 9. Future implementation task requirements (when the gate opens)
+## 12. Stop conditions
 
-When implementation is authorised, **every implementation task** must specify:
+Stop and preserve evidence only when:
 
-- **Allowed files** — the exact files/paths the task may create or modify.
-- **Forbidden files** — what it must not touch (and the no-scope-creep rule).
-- **Acceptance criteria** — observable conditions that define success.
-- **Tests** — the unit/integration tests that must exist and pass (including
-  edge cases and prior defects).
-- **Rollback notes** — how to safely revert the change.
-- **Definition of done** — code + tests pass, review checklist satisfied, debt
-  logged, handoff updated, and the change is modular and isolated.
+- the exact base or predecessor contract is missing or contradictory;
+- migration cannot preserve identity/data/history;
+- a remote mutation has no deterministic admission/idempotency/readback strategy;
+- official Shopify/Odoo behavior contradicts the design;
+- security requires broader access, exposed credentials or weakened tenant isolation;
+- a test must be weakened or a safety invariant bypassed;
+- staging/production/customer authority outside the granted boundary is required;
+- overlapping user changes cannot be preserved safely;
+- an automatic release halt condition fires.
 
-The template for this is `/docs/06-prompts/implementation-task-template.md`.
-Modularity principles: the connector must be **isolated from existing
-customer/base code** such as `adams_base`, but the final structure may be a
-**modular connector addon family** under `/addons`. Exact module boundaries are
-**not final** and must be validated through research and architecture review —
-do not bias the project toward one giant connector module. Favour clear layering
-(transport / mapping / orchestration / domain / UI), idempotency and
-duplicate-prevention by design, and resilience (error handling, retry/recovery,
-rate-limit awareness) as first-class concerns.
+Ordinary test failures, implementation defects and expected refactoring decisions are
+work to resolve, not reasons to request repeated authorization.
 
-## 10. Hard rule — do not repeat rejected approaches
+## 13. Continuous chat/session handoff
 
-**Do not re-propose or re-introduce an approach recorded in
-`/docs/05-qa/rejected-approaches-log.md`** unless its documented **revisit
-condition** is met — and if it is, say so explicitly and route it through the
-architecture-review log. Before proposing any design, check that log.
+The implementation may span multiple work chats. Continuity is mandatory:
 
-## 11. Allowed / forbidden files (research-phase guardrail)
+- update `docs/v2/13-continuous-execution-handoff.md` after every material checkpoint,
+  before a context-heavy chat approaches its limit, and before switching chats;
+- commit and push a safe checkpoint before handoff whenever the tree is coherent;
+- record exact branch/base/head, current wave/task, completed work, active changes,
+  tests, environment/external state, blockers deferred to the end, rollback and the
+  first next action;
+- never copy credentials or raw PII into the handoff;
+- the next chat reads this file, the latest commit and relevant evidence before acting;
+- do not repeat completed work or rely on chat memory when GitHub evidence exists;
+- never claim work continues in the background after the active turn ends.
 
-During this phase, treat the per-sprint allowed-files list as authoritative.
-The general guardrail is:
+Handoff happens early enough to preserve reasoning and state, not after context is
+already exhausted.
 
-- **Allowed:** Markdown under `/docs/**`, `/.claude/**` READMEs, and the root
-  governance files `CLAUDE.md`, `AGENTS.md`, `README.md`, `.gitignore`.
-- **Forbidden:** `*.py`, `*.xml`, `*.csv`, any `*/__manifest__.py`,
-  `*/models/*`, `*/views/*`, `*/controllers/*`, `*/security/*`, `*/data/*`,
-  `*/tests/*`, `*/migrations/*`, `requirements*.txt`, `Dockerfile`,
-  `docker-compose*`, `.github/workflows/*`, and any actual Odoo module
-  directory.
+## 14. Start-of-work checklist
 
-## 12. Mandatory handoff after each session
-
-End every session by updating `/docs/01-research/research-handoff.md` using
-`/docs/06-prompts/session-handoff-template.md`, including the **Learning
-feedback loop** section, and by running the end-of-session learning review
-(`/docs/05-qa/quality-feedback-loop.md`). Provide the exact next-session prompt.
-A session is **not complete** until the quality gate is satisfied.
-
-See also `/docs/05-qa/quality-feedback-loop.md` §10 (Phase-exit criteria) and
-§11 (documentation maintenance rule) — both currently
-`[Recommendation — becomes binding when merged by ChatGPT]`.
-
-## 13. MVP Program Control-Room (addendum, 2026-07-15)
-
-> This section is additive. It does not erase, retract, or reinterpret §1–§12
-> above for any work outside the MVP completion program. It records a
-> deliberate, product-owner-instructed, scoped change to the operating model
-> for work based on `mvp/program-integration` only. Full basis:
-> [`DEC-032-mvp-autonomous-execution-model.md`](docs/04-decisions/DEC-032-mvp-autonomous-execution-model.md)
-> (Accepted, 2026-07-15), amended by
-> [`DEC-039-mvp-claude-implementation-worker-expansion.md`](docs/04-decisions/DEC-039-mvp-claude-implementation-worker-expansion.md)
-> (Accepted, 2026-07-22) and
-> [`DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md`](docs/04-decisions/DEC-040-mvp-cadence-claude-builder-reviewer-ui-priority.md)
-> (Accepted, 2026-07-22) — see those decisions before assuming Claude cannot
-> implement, or that ChatGPT must review every gate, in this program; the
-> rules below reflect both amendments.
-
-- **Default roles as of DEC-040 (2026-07-22): Claude builds and Claude
-  reviews; ChatGPT is the strategic control room; Sol is an available
-  secondary builder.** Claude is the default implementation worker *and*
-  the default gate reviewer for `mvp/program-integration` work. **GPT-5.6
-  Sol remains an authorized implementation worker** (DEC-039) but is no
-  longer assumed default. **ChatGPT** sets/approves scope, priority, and
-  timeline, resolves hard-stops needing a commercial judgment call, and is
-  the escalation point — but is not required to line-review every wave gate.
-  The product owner remains final authority on promotion to
-  `Shopify-connector`/`main`.
-- **The two roles must never be collapsed into one session.** A Claude
-  session that implements a task/wave must not self-review, self-accept,
-  ready-mark, or merge that work. **Independent Claude review is the
-  default routine gate for every wave/batch** (DEC-040) — satisfied by
-  either a **separate top-level Claude session** reviewing from scratch, or
-  a **fresh subagent invocation** (via the `Agent` tool), instructed to
-  adversarially re-verify — never to summarize or rubber-stamp.
-  **ChatGPT review is a strategic control-room option (a spot-check or
-  escalation path), not a prerequisite for a routine gate.**
-  - **Memoryless means no memory of the implementer's reasoning, not
-    repository-blind.** The reviewer's briefing excludes the implementing
-    session's reasoning, its defenses of its own choices, and any
-    selective summary meant to sway the verdict — but it independently
-    reads the exact base/head checkout, the complete PR diff, the
-    governing DECs and implementation packets, the acceptance criteria,
-    the actual Odoo 19 source, automated-test output, genuine Odoo.sh
-    runtime evidence for code batches, screenshots/browser evidence where
-    relevant, and current official sources when a version-dependent fact
-    needs verification. A diff-only review does not satisfy this for
-    Tier 1 work.
-  - **The review is durable and non-suppressible.** The complete
-    independent-review report is posted verbatim to the PR, stating the
-    exact reviewed SHA. The implementing session may not rewrite,
-    selectively summarize, suppress, override, accept, ready-mark, or
-    merge it. A `REVISE` verdict is resolved through one consolidated
-    correction. After an `ACCEPT`, a **separate top-level closure
-    session** (or another explicitly authorized independent actor) —
-    never the implementing session — verifies the exact accepted SHA and
-    that the required evidence still corresponds to it before
-    ready-marking or merging. Reviewer silence, a partial report, or a
-    summary-only report is never acceptance.
-  See DEC-039/DEC-040 for the full rule.
-- **Batch size (DEC-040): target a full wave, or a large, coherent,
-  independently-revertable slice of one, per iteration** — not many small
-  correction cycles. Tier 3 (wording/polish) issues found mid-batch are
-  fixed inline, never spun into a separate cycle. Review scrutiny **scales
-  up, not down, with batch size** — evidence (tests + genuine Odoo.sh
-  runtime results) is never skipped to move faster; speed comes from
-  batching scope, not skipping evidence. **UI (Wave 5 / U0) is a priority
-  parallel track** under this same large-batch cadence — see DEC-040.
-  **Runtime rule scope:** mandatory automated tests plus genuine Odoo.sh
-  runtime evidence (exact tested SHA, proportional to the batch's risk and
-  size) apply to **every implementation/code batch**, regardless of size —
-  never skipped. A **documentation/governance-only batch** does not
-  require an irrelevant Odoo.sh runtime campaign; it is verified by
-  repository/diff/path/link/consistency checks appropriate to the change,
-  must never fabricate runtime evidence, and must never weaken the
-  runtime requirement for a later code batch.
-- **The checkpoint remains protected.** `checkpoint/core-r2-readonly-uat-2026-07-15`
-  (commit `acd8c4691e72cf5590f2a56228b08f183b76cd9a`, recorded in issue #165)
-  is never modified, reset, or force-pushed by this program. `mvp/program-integration`
-  was created from that exact commit and is where every macro-wave PR lands.
-- **The macro-wave process supersedes the prior micro-session workflow
-  (§2, §6) only for work based on `mvp/program-integration`.** Whichever
-  worker implements (Claude, by default, or Sol) may work autonomously
-  inside an authorized wave/batch without per-commit approval; a Claude
-  session acting independently (never the implementing session itself)
-  reviews and gates each wave's merge using
-  [`docs/06-prompts/claude-mvp-wave-review-template.md`](docs/06-prompts/claude-mvp-wave-review-template.md).
-  Every other CLAUDE.md rule (citation discipline §7, claim classification
-  §8, allowed/forbidden-files discipline §9/§11 adapted per wave, the
-  rejected-approaches rule §10, and the handoff/quality-loop requirement §12)
-  still applies in full to this program — only the "one clearly scoped
-  objective per session, ChatGPT reviews every step" cadence is superseded,
-  and only here.
-- **All other branch protections remain unchanged.** `Shopify-connector` and
-  `main` keep their existing rules exactly as written in this file's Branch
-  Governance section; this program never branches from or targets either.
-  PR #150 and PR #151 remain protected references for this program (their
-  code content is already integrated into the checkpoint; see
-  [`mvp-completion-program.md`](docs/07-implementation-plan/mvp-completion-program.md)
-  §2 for the evidence) and are not to be closed, merged, or edited without an
-  explicit control-room/product-owner decision recorded in that file's §9.
-- **Feature coding by Claude is now authorized under this addendum**, per
-  DEC-039 (2026-07-22), strictly subject to the no-self-acceptance rule
-  above: an implementing Claude session's role for its own work stays
-  execution only — it never doubles as that work's independent review,
-  acceptance, ready-marking, or merge. Independent Claude review (a
-  separate top-level session or a fresh subagent, per the mechanism above)
-  is the **default** gate for this; ChatGPT strategic spot-checks and a
-  separate closure session for ready-marking/merge remain available and
-  required exactly where this section says so — governance, audit, wave
-  review, and release-gating for a Claude-implemented PR is never
-  performed by the session that implemented it.
-- The live status of this program is tracked in
-  [`docs/07-implementation-plan/mvp-program-state.md`](docs/07-implementation-plan/mvp-program-state.md)
-  — read it for current wave/blocker/decision status; do not rely on this
-  addendum's text staying current on those details.
-
----
-
-### Quick start for any session
-
-1. Read this file, the latest handoff, and `/docs/06-prompts/claude-learning-rules.md`.
-2. Confirm the current phase, the allowed/forbidden files, and that the no-code
-   gate still applies.
-3. Do only the scoped task; cite and classify every claim; write to GitHub.
-4. Run the end-of-session learning review and update the handoff.
-5. End with the exact next-session prompt. Then stop and await independent
-   review before any acceptance, ready-marking, or merge. For work under
-   §13 (`mvp/program-integration`), that review is **independent Claude
-   review by default** (DEC-040), with ChatGPT as strategic control
-   room/spot-check rather than a routine line reviewer. Outside §13,
-   await ChatGPT review as before.
+1. Read this file, `AGENTS.md`, `docs/v2/README.md`, the current execution handoff and
+   the documents routed to the active wave.
+2. Confirm exact base SHA, branch, authorization boundary and preserved user changes.
+3. Confirm the backend predecessor and cheap test gate are green.
+4. Implement only the active coherent scope while continuing autonomously through the
+   program when its gate passes.
+5. Update tests, evidence, traceability and the continuity handoff before publishing a
+   checkpoint.

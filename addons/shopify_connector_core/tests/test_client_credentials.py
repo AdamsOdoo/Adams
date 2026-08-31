@@ -194,6 +194,10 @@ class TestExchangeRequestShape(ClientCredentialsCase):
             'the client-secret POST must not follow redirects',
         )
         self.assertIs(
+            captured.get('stream'), True,
+            'the client-secret response must be bounded before JSON decode',
+        )
+        self.assertIs(
             captured.get('verify'), True,
             'TLS verification must stay enabled on the token exchange',
         )

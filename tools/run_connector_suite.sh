@@ -13,11 +13,12 @@
 #      verifies it on every run so a cached checkout can never silently execute
 #      a different Odoo
 #   2. installs the connector modules into a disposable PostgreSQL database
-#   3. runs FOUR passes, each into its own database with its own log:
+#   3. runs FIVE passes, each into its own database with its own log:
 #        * fresh install + standard suite
 #        * warm `-u` update + standard suite (issue #193: not interchangeable)
 #        * the complete NON-STANDARD tag suite
 #        * W2-only install over an older installed W1 (no W1 upgrade)
+#        * candidate-only DEC-029 Lite and Full meta-addon installs
 #   4. verifies the checked-out connector commit against the commit the caller
 #      says this run is testing ($SOURCE_HEAD_SHA), and ABORTS on a mismatch
 #   5. writes durable per-pass logs and a machine-readable summary under
@@ -25,10 +26,10 @@
 #      head and base, the event type, the worktree state, the exact Odoo SHA
 #      and the Python/PostgreSQL versions
 #
-# Why the third pass exists. Eight connector test classes are tagged
-# `-standard`, which is correct -- they are expensive and some spawn real OS
-# processes -- but it also means `--test-enable` alone NEVER runs them. Four of
-# them are the genuine concurrency proofs. Before this, running them required an
+# Why the third pass exists. Connector test classes in NONSTANDARD_TAGS are
+# tagged `-standard`, which is correct -- they are expensive and some spawn
+# real OS processes -- but it also means `--test-enable` alone NEVER runs them.
+# Several are genuine concurrency proofs. Before this, running them required an
 # operator to remember an optional `--tags` argument, so in practice they were
 # never run at all and "full suite green" silently excluded them. They are now
 # part of the default run and the tag list lives in this file, next to the code
@@ -44,6 +45,7 @@
 # Usage
 #   tools/run_connector_suite.sh [--fresh-only|--warm-only] [--skip-nonstandard]
 #                                [--skip-w2-only-install]
+#                                [--skip-meta-install]
 #                                [--tags <extra-test-tags>]
 #   tools/run_connector_suite.sh --self-test    # fail-closed assertions only
 #
@@ -60,11 +62,25 @@
 
 set -euo pipefail
 
+# Runtime regression passes continue to exercise the complete engineering
+# family, including webhook satellites.  DEC-029 marketplace meta-addons are
+# intentionally a separate candidate-only install pass below.
 MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_inventory_webhook,shopify_connector_sale_webhook,shopify_connector_fulfillment_webhook"
+META_MODULES="shopify_connector_lite,shopify_connector_full"
+# The direct domain sets remain DEC-029's six-module boundary.  The explicit
+# closure also installs the generic webhook foundation and the separate domain
+# satellites required by the near-real-time contract; P20 consolidation is not
+# being performed here.
+META_LITE_EXPECTED="shopify_connector_lite,shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_sale_webhook"
+META_FULL_EXPECTED="shopify_connector_full,shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook,shopify_connector_product_webhook,shopify_connector_sale_webhook,shopify_connector_inventory_webhook,shopify_connector_fulfillment_webhook"
 W1_ONLY_MODULES="shopify_connector_core,shopify_connector_product,shopify_connector_sale,shopify_connector_inventory,shopify_connector_fulfillment,shopify_connector_product_export,shopify_connector_webhook"
+# The addon release moves for P11's production model/dispatch extension.  The
+# schema-verification migration remains separately named: it is the existing
+# .3.0 migration and no new database migration is required by P11.
+W1_WEBHOOK_VERSION="19.0.1.4.0"
 W1_WEBHOOK_SCHEMA_VERSION="19.0.1.3.0"
 W2_PRODUCT_WEBHOOK_VERSION="19.0.0.3.0"
-W3_INVENTORY_WEBHOOK_VERSION="19.0.0.4.0"
+W3_INVENTORY_WEBHOOK_VERSION="19.0.0.5.0"
 W2_ONLY_INSTALL_ORIGIN="7443250ae42a0c3fadba9bf0ef9991e1826b77b5"
 W2_ONLY_INSTALL_TEST_TAGS="/shopify_connector_webhook,/shopify_connector_product_webhook"
 # `account` and `stock` are installed explicitly. They are NOT connector
@@ -120,7 +136,7 @@ EXTRA_MODULES="account,stock"
 # overtake the exchange it is racing. This class opens genuine `db_connect`
 # sessions with distinct backend PIDs, and its first half is written to run
 # unchanged against the vulnerable head as a before/after reproducer.
-NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race,shopify_connector_tax_mapping_race"
+NONSTANDARD_TAGS="shopify_connector_product_callsite_lifecycle,sc010b_performance,shopify_connector_customer_matching_benchmark,shopify_connector_customer_matching_concurrency,shopify_connector_customer_callsite_lifecycle,shopify_connector_order_discovery_concurrency,shopify_connector_drain_throughput,shopify_connector_hoot,shopify_connector_visual,shopify_connector_export_mutation_route,shopify_connector_export_reconcile_race,shopify_connector_credential_provenance_race,shopify_connector_tax_mapping_race,shopify_connector_v2_runtime_concurrency"
 
 # --- The browser-evidence contract (TD-010) ----------------------------------
 #
@@ -253,11 +269,17 @@ MIGRATION_FROM_REFS=(
     "50b770a315b53f0c05f0b8867bb801d75c6476ef"
     "0a15b176e60b77bf2f40195a9961591c788e14f8"
 )
+# Keep old-tree upgrades explicitly scoped to the legacy engineering module
+# set.  The DEC-029 meta-addons are introduced only in the candidate checkout;
+# putting them in this variable would make every historical ref appear to need
+# modules that did not exist when it was recorded.
+MIGRATION_MODULES="$MODULES"
 RUN_MIGRATION=1
+RUN_META_INSTALL=1
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
-        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --fresh-only)       RUN_WARM=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; RUN_META_INSTALL=0; shift ;;
+        --warm-only)        RUN_FRESH=0; RUN_NONSTANDARD=0; RUN_MIGRATION=0; RUN_W2_ONLY_INSTALL=0; RUN_META_INSTALL=0; shift ;;
         # Deliberately opt-OUT, never opt-in. Forgetting a flag must never be
         # the reason a concurrency proof went unrun.
         --skip-nonstandard) RUN_NONSTANDARD=0; shift ;;
@@ -265,7 +287,8 @@ while [[ $# -gt 0 ]]; do
         # version-to-version upgrade must say so in the summary, which it does.
         --skip-migration)   RUN_MIGRATION=0; shift ;;
         --skip-w2-only-install) RUN_W2_ONLY_INSTALL=0; shift ;;
-        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_ONLY_INSTALL=0; shift ;;
+        --skip-meta-install) RUN_META_INSTALL=0; shift ;;
+        --migration-only)   RUN_FRESH=0; RUN_WARM=0; RUN_NONSTANDARD=0; RUN_W2_ONLY_INSTALL=0; RUN_META_INSTALL=0; shift ;;
         # Override the upgrade origins (space-separated refs), for a one-off
         # check against some other ancestor.
         --migration-from)   read -r -a MIGRATION_FROM_REFS <<< "$2"; shift 2 ;;
@@ -522,9 +545,9 @@ verify_connector_module_inventory() {
     esac
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py" ]]; then
         evidence_fail "shopify_connector_webhook manifest is missing from the checkout"
-    elif ! grep -Fq "'version': '${W1_WEBHOOK_SCHEMA_VERSION}'" \
+    elif ! grep -Fq "'version': '${W1_WEBHOOK_VERSION}'" \
         "${REPO_ROOT}/addons/shopify_connector_webhook/__manifest__.py"; then
-        evidence_fail "shopify_connector_webhook manifest is not bumped for the includeFields schema"
+        evidence_fail "shopify_connector_webhook manifest is not at the current P11 release version"
     fi
     if [[ ! -f "${REPO_ROOT}/addons/shopify_connector_webhook/migrations/${W1_WEBHOOK_SCHEMA_VERSION}/post-migrate.py" ]]; then
         evidence_fail "shopify_connector_webhook schema-verification migration is missing"
@@ -1174,11 +1197,71 @@ FRESH_STATUS="skipped"; FRESH_RESULT=""
 WARM_STATUS="skipped";  WARM_RESULT=""
 NONSTD_STATUS="skipped"; NONSTD_RESULT=""
 W2_ONLY_INSTALL_STATUS="skipped"; W2_ONLY_INSTALL_RESULT=""
+META_INSTALL_STATUS="skipped"; META_INSTALL_RESULT=""
+META_LITE_STATUS="skipped"; META_LITE_RESULT=""
+META_FULL_STATUS="skipped"; META_FULL_RESULT=""
 W2_ONLY_INSTALL_DB=""
 W2_ONLY_INSTALL_COLUMNS=""
 W2_ONLY_INSTALL_W1_VERSION=""
 W2_ONLY_INSTALL_W2_VERSION=""
 OVERALL=0
+
+# --- DEC-029 candidate meta-addon installs ----------------------------------
+#
+# This pass deliberately installs the candidate meta-addons from the current
+# checkout only.  It never runs against an older migration tree and it never
+# changes MODULES/MIGRATION_MODULES.  The version-to-version migration loop
+# below therefore remains compatible with historical refs that predate these
+# two new addon directories.
+run_meta_install_edition() {  # run_meta_install_edition <edition> <meta> <expected>
+    local edition="$1" meta="$2" expected="$3" db logfile module state
+    local status_var="META_${edition^^}_STATUS"
+    local result_var="META_${edition^^}_RESULT"
+    db="connector_meta_${edition}_$$"
+    logfile="${ARTIFACT_DIR}/meta-${edition}-install.log"
+    log "DEC-029 ${edition} meta install -> ${db}"
+    dropdb --if-exists "$db" 2>/dev/null || true
+    createdb "$db"
+    if ! run_odoo "$db" "$logfile" -i "$meta"; then
+        evidence_fail "meta-${edition}: installing ${meta} failed"
+        printf -v "$status_var" '%s' "fail"
+        printf -v "$result_var" '%s' "$(result_line "$logfile")"
+        return 1
+    fi
+    for module in ${expected//,/ }; do
+        state="$(psql -tAc \
+            "SELECT state FROM ir_module_module WHERE name = '${module}'" "$db" \
+            | tr -d '[:space:]')"
+        if [[ "$state" != "installed" ]]; then
+            evidence_fail "meta-${edition}: expected ${module}=installed, got ${state:-missing}"
+            printf -v "$status_var" '%s' "fail"
+            printf -v "$result_var" '%s' "module ${module} is ${state:-missing}"
+            return 1
+        fi
+    done
+    printf -v "$status_var" '%s' "pass"
+    printf -v "$result_var" '%s' "$(result_line "$logfile")"
+    return 0
+}
+
+run_meta_install() {
+    local result=0
+    run_meta_install_edition lite shopify_connector_lite "$META_LITE_EXPECTED" || result=1
+    run_meta_install_edition full shopify_connector_full "$META_FULL_EXPECTED" || result=1
+    if [[ "$result" -eq 0 ]]; then
+        META_INSTALL_STATUS="pass"
+        META_INSTALL_RESULT="Lite and Full candidate meta-addons installed"
+    else
+        META_INSTALL_STATUS="fail"
+        META_INSTALL_RESULT="one or more candidate meta-addon installs failed"
+        OVERALL=1
+    fi
+    return "$result"
+}
+
+if [[ $RUN_META_INSTALL -eq 1 ]]; then
+    run_meta_install || true
+fi
 
 # --- Pass 1: fresh install ---------------------------------------------------
 if [[ $RUN_FRESH -eq 1 ]]; then
@@ -1390,7 +1473,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
         # 1. install the OLD tree
         if ! ( cd "$ODOO_SRC" && "$VENV/bin/python" odoo-bin -c "$OLD_CONF" \
                 -d "$DB" --stop-after-init --log-level=warn \
-                -i "${MODULES},${EXTRA_MODULES}" ) \
+                -i "${MIGRATION_MODULES},${EXTRA_MODULES}" ) \
                 > "${ARTIFACT_DIR}/${label}-install.log" 2>&1; then
             log "FATAL: installing ${short} failed; see ${label}-install.log"
             MIGRATION_OVERALL="fail"; OVERALL=1
@@ -1403,7 +1486,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
             | tr '\n' ' ')"
         log "${label}: installed versions ${BEFORE_VERSIONS}"
         # 2. upgrade the CANDIDATE tree onto it, with the standard suite
-        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}.log" -u "$MODULES" \
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}.log" -u "$MIGRATION_MODULES" \
                 --test-enable "${STANDARD_TAG_ARGS[@]}"; then
             MIG_STATUS="pass"
         else
@@ -1424,7 +1507,7 @@ if [[ $RUN_MIGRATION -eq 1 ]]; then
 was not a version-to-version upgrade at all"
         fi
         # 3. idempotency: a SECOND update must be green and run nothing again
-        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}-again.log" -u "$MODULES" \
+        if run_odoo "$DB" "${ARTIFACT_DIR}/${label}-again.log" -u "$MIGRATION_MODULES" \
                 --test-enable "${STANDARD_TAG_ARGS[@]}"; then
             MIG_AGAIN="pass"
         else
@@ -1448,7 +1531,8 @@ was not a version-to-version upgrade at all"
 fi
 
 # --- Pass 3: the non-standard tag suite --------------------------------------
-# The eight `-standard` classes, run explicitly by tag. This pass gets its own
+# Every class in the authoritative NONSTANDARD_TAGS inventory, run explicitly
+# by tag. This pass gets its own
 # database and its own log because several of these tests spawn real OS
 # processes and commit; mixing them into the standard log made it impossible to
 # tell which pass produced which residue.
@@ -1536,6 +1620,8 @@ cat > "$SUMMARY" <<EOF
   "postgres": "$(psql -tAc 'select version();' postgres 2>/dev/null | head -1)",
   "postgres_server_version": "$(psql -tAc 'show server_version;' postgres 2>/dev/null | head -1 | tr -d '[:space:]')",
   "modules": "${MODULES}",
+  "meta_modules": "${META_MODULES}",
+  "migration_modules": "${MIGRATION_MODULES}",
   "extra_modules": "${EXTRA_MODULES}",
   "standard_tags": "${STANDARD_TAGS}",
   "extra_test_tags": "${TEST_TAGS}",
@@ -1547,6 +1633,7 @@ cat > "$SUMMARY" <<EOF
                                "runs_migration_scripts": false,
                                "note": "Odoo runs an upgrade script only when the installed version is strictly lower than the manifest version, so this pass executes none by construction and is NOT migration evidence. The genuine upgrades are in migration_passes."},
     "w2_only_install_over_old_w1": {"status": "${W2_ONLY_INSTALL_STATUS}", "result": "${W2_ONLY_INSTALL_RESULT}", "db": "${W2_ONLY_INSTALL_DB}", "origin": "${W2_ONLY_INSTALL_ORIGIN}", "w1_version_after": "${W2_ONLY_INSTALL_W1_VERSION}", "w2_version_after": "${W2_ONLY_INSTALL_W2_VERSION}", "jsonb_columns": "${W2_ONLY_INSTALL_COLUMNS}", "log": "w2-only-install.log", "kind": "W2 -i over installed old W1; W1 is not upgraded"},
+    "dec029_meta_install": {"status": "${META_INSTALL_STATUS}", "result": "${META_INSTALL_RESULT}", "lite": {"status": "${META_LITE_STATUS}", "result": "${META_LITE_RESULT}", "log": "meta-lite-install.log"}, "full": {"status": "${META_FULL_STATUS}", "result": "${META_FULL_RESULT}", "log": "meta-full-install.log"}, "kind": "candidate-only meta-addon install; excluded from migration module set"},
     "nonstandard_tags":       {"status": "${NONSTD_STATUS}", "result": "${NONSTD_RESULT}", "log": "nonstandard.log"}
   },
   "migration_passes": {

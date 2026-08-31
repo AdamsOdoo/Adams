@@ -1,0 +1,64 @@
+// V2 connector styles.  The entrypoint owns only the root and the import
+// order; every visual surface lives in a scoped partial below.
+@import "tokens";
+@import "utilities";
+
+// Keep the root deliberately small so Odoo can load this inert package beside
+// the historical connector styles without leaking selectors into the webclient.
+.o_sc_v2 {
+    @include connector-v2-tokens;
+
+    box-sizing: border-box;
+    min-block-size: 100%;
+    min-inline-size: 0;
+    overflow-x: clip;
+    background: var(--sc-canvas);
+    color: var(--sc-ink);
+    font-family: var(--sc-font-stack);
+    font-size: 14px;
+    line-height: 1.45;
+
+    *,
+    *::before,
+    *::after {
+        box-sizing: inherit;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--sc-focus);
+        outline-offset: 2px;
+    }
+
+    button,
+    select {
+        font: inherit;
+    }
+
+    button {
+        @include connector-v2-touch-target;
+        cursor: pointer;
+    }
+
+    button:disabled,
+    select:disabled {
+        cursor: not-allowed;
+        opacity: 0.62;
+    }
+
+    .sc-v2__viewport {
+        inline-size: 100%;
+        max-inline-size: 1440px;
+        margin-inline: auto;
+        padding: var(--sc-space-6) clamp(var(--sc-space-4), 3vw, var(--sc-space-7));
+    }
+}
+
+// Each partial owns a cohesive surface and scopes its selectors under the
+// connector root.  Keep this order stable: primitives, health, overview,
+// attention, run evidence, then responsive overrides.
+@import "connector_v2_base";
+@import "connector_v2_health";
+@import "connector_v2_overview";
+@import "connector_v2_attention";
+@import "connector_v2_run";
+@import "connector_v2_responsive";

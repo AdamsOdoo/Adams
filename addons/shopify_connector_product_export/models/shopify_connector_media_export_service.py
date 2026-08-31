@@ -78,6 +78,14 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
 from odoo.addons.shopify_connector_core.tools.search_syntax import (
     search_term,
 )
+from odoo.addons.shopify_connector_product_export.integration.shopify.product_media_mutation_gateway import (
+    MEDIA_ASSOCIATE_DOCUMENT,
+    MEDIA_ASSOCIATE_READ_QUERY,
+    MEDIA_FILE_CREATE_DOCUMENT,
+    MEDIA_FILE_CREATE_READ_QUERY,
+    MEDIA_STAGE_DOCUMENT,
+    MEDIA_STAGE_READ_QUERY,
+)
 
 from .shopify_connector_product_export_service import (
     ERROR_CLASS_BINDING_CONFLICT,
@@ -349,7 +357,6 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
             preview.store_id, step['step'], row,
             preview.remote_product_gid or False,
         )
-
     @api.model
     def _media_payload_hash(self, row, step_type):
         """TD-011: the payload hash carries the row's resume ordinal.
@@ -665,13 +672,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 'Media export requires this store to declare Odoo as the '
                 'media source of truth.',
             )
-        operation = (
-            'mutation ProductExportMediaStage('
-            '$input: [StagedUploadInput!]!) { '
-            'stagedUploadsCreate(input: $input) { '
-            'stagedTargets { url resourceUrl parameters { name value } } '
-            'userErrors { field message } } }'
-        )
+        operation = MEDIA_STAGE_DOCUMENT
         variables = {
             'input': [{
                 'filename': local_snapshot['filename'],
@@ -750,10 +751,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         dispatcher can compare what was SEEN against what was expected.
         """
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportMediaStageIdentity { '
-            'shop { myshopifyDomain } }'
-        )
+        query = MEDIA_STAGE_READ_QUERY
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             attempt.store_id,
@@ -908,13 +906,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
                 'The image has not been uploaded to a staged target yet.',
             )
-        operation = (
-            'mutation ProductExportMediaFileCreate('
-            '$files: [FileCreateInput!]!) { '
-            'fileCreate(files: $files) { '
-            'files { id fileStatus alt } '
-            'userErrors { code field message } } }'
-        )
+        operation = MEDIA_FILE_CREATE_DOCUMENT
         variables = {
             'files': [{
                 'originalSource': row.staged_resource_url,
@@ -972,12 +964,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         snapshot = attempt.preconditions_snapshot or {}
         filename = snapshot.get('filename')
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportMediaFind($query: String!) { '
-            'files(first: 5, query: $query) { nodes { id fileStatus '
-            '... on MediaImage { image { url } } } } '
-            'shop { myshopifyDomain } }'
-        )
+        query = MEDIA_FILE_CREATE_READ_QUERY
         # Connector-generated and deterministic today (`odoo-<id>-<checksum>`),
         # so this is not a live defect -- it is the same missing encoding as
         # the SKU gate, and it goes through the same helper so it cannot
@@ -1223,13 +1210,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
                 ERROR_CLASS_CONFIGURATION, SUBREASON_BINDING_CONFLICT,
                 'There is no bound Shopify product to associate media with.',
             )
-        operation = (
-            'mutation ProductExportMediaAssociate('
-            '$files: [FileUpdateInput!]!) { '
-            'fileUpdate(files: $files) { '
-            'files { id fileStatus alt } '
-            'userErrors { code field message } } }'
-        )
+        operation = MEDIA_ASSOCIATE_DOCUMENT
         variables = {
             'files': [{
                 'id': row.shopify_gid,
@@ -1283,12 +1264,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
         store = attempt.store_id
         snapshot = attempt.preconditions_snapshot or {}
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportMediaAssociated($id: ID!) { '
-            'product(id: $id) { id media(first: 50) { nodes { id '
-            '... on MediaImage { id fileStatus } } } } '
-            'shop { myshopifyDomain } }'
-        )
+        query = MEDIA_ASSOCIATE_READ_QUERY
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,
@@ -1300,6 +1276,7 @@ class ShopifyConnectorMediaExportService(models.AbstractModel):
 
     @api.model
     def _reconcile_media_associate_result(self, attempt, result):
+        snapshot = attempt.preconditions_snapshot or {}
         data = (result or {}).get('data') or {}
         identity = (data.get('shop') or {}).get('myshopifyDomain')
         Service = self.env['shopify.connector.product.export.service']

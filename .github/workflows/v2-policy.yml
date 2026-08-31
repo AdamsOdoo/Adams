@@ -1,0 +1,97 @@
+# Fast, deterministic V2 policy gate.  It has no Odoo database and no Shopify
+# credentials; expensive install/update/browser/concurrency runs remain in the
+# connector-suite workflow and are triggered only by published coherent chunks.
+
+name: V2 policy and compatibility
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - Shopify-connector
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2-policy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Static contracts and frozen V1 surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Frozen evidence may intentionally point at the immediately prior
+          # code commit while the current commit contains only the generated
+          # evidence.  Full history lets the checker resolve that exact source
+          # instead of silently relabelling the current filesystem.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: addons/requirements.txt
+
+      - name: Install pinned GraphQL validator dependency
+        # Mirror tools/run_connector_suite.sh. addons/requirements.txt is
+        # intentionally empty and therefore cannot satisfy this analysis tool.
+        run: python -m pip install graphql-core==3.2.6
+
+      - name: Verify exact checkout
+        run: test "$(git rev-parse HEAD)" = "$SOURCE_HEAD_SHA"
+
+      - name: Run fast V2 policy and contract tests
+        run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
+
+      - name: Enforce static addon policy
+        run: python tools/v2_static_policy.py --repo-root .
+
+      - name: Enforce V2 package dependency direction
+        run: |
+          for package_root in \
+            addons/shopify_connector_core \
+            addons/shopify_connector_fulfillment \
+            addons/shopify_connector_inventory \
+            addons/shopify_connector_product \
+            addons/shopify_connector_product_export \
+            addons/shopify_connector_sale \
+            addons/shopify_connector_webhook; do
+            python tools/v2_dependency_policy.py --package-root "$package_root"
+          done
+
+      - name: Enforce changed production file size
+        run: python tools/v2_change_size_policy.py --repo-root .
+
+      - name: Check frozen compatibility artifacts
+        # --check reads the frozen source SHA and proves the current connector
+        # addon surface still matches it.  It never ignores provenance.
+        run: python tools/v2_repository_baseline.py --check
+
+      - name: Validate Shopify GraphQL documents
+        run: python tools/validate_shopify_graphql.py
+
+      - name: Compile analysis tools
+        run: >-
+          python -m py_compile
+          tools/v2_repository_baseline.py
+          tools/v2_static_policy.py
+          tools/v2_dependency_policy.py
+          tools/v2_change_size_policy.py
+          tools/perf0_baseline.py
+          tools/validate_shopify_graphql.py
+
+      - name: Check patch whitespace
+        run: git diff --check HEAD^

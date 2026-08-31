@@ -393,7 +393,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             [('store_id', '=', store.id)], limit=1,
         )
         if not settings:
-            settings = Settings.sudo().create({'store_id': store.id})
+            settings = Settings.sudo()._settings_service_create('_setup', {'store_id': store.id})
         return settings
 
     # ------------------------------------------------------------------
@@ -456,13 +456,13 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             raise UserError(_('That is not a setup step.'))
         current_key = self._resume_key(settings)
         if SETUP_STEP_ORDER[step_key] > SETUP_STEP_ORDER[current_key]:
-            settings.sudo().write({
+            settings.sudo()._settings_service_write('_setup', {
                 'setup_wizard_step_key': step_key,
                 'setup_wizard_step': SETUP_STEP_ORDER[step_key],
             })
             return step_key
         if settings.setup_wizard_step_key != current_key:
-            settings.sudo().write({
+            settings.sudo()._settings_service_write('_setup', {
                 'setup_wizard_step_key': current_key,
                 'setup_wizard_step': SETUP_STEP_ORDER[current_key],
             })
@@ -1364,7 +1364,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 raise UserError(_(
                     'A store already exists for this Shopify shop domain.'
                 ))
-            store = self.env['shopify.connector.store'].sudo().create({
+            store = self.env['shopify.connector.store'].sudo()._store_service_create('_setup', {
                 'name': name,
                 'shop_domain': shop_domain,
                 'company_id': company.id,
@@ -1605,7 +1605,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             )
         if 'order_scheduled_sync_enabled' in settings._fields:
             values['order_scheduled_sync_enabled'] = 'sale' in keys
-        settings.sudo().write(values)
+        settings.sudo()._settings_service_write('_setup', values)
         if changed:
             # `domain_flag_enablement` and `mapped_location` both read these
             # flags, so a readiness result recorded before this write no
@@ -1748,7 +1748,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
                 'default: this decides whether Odoo prices can overwrite '
                 'Shopify prices.'
             ))
-        settings.sudo().write({
+        settings.sudo()._settings_service_write('_setup', {
             'product_first_sync_source': matching,
             'price_source_of_truth': price,
         })
@@ -1779,7 +1779,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         values = {'notification_default_enabled': enabled}
         if 'fulfillment_notification_confirmed' in settings._fields:
             values['fulfillment_notification_confirmed'] = enabled
-        settings.sudo().write(values)
+        settings.sudo()._settings_service_write('_setup', values)
         self._record_progress(settings, 'notification')
         return self.get_setup_state(store_id=store.id)
 
@@ -1798,7 +1798,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
             settings.inventory_domain_enabled
             and 'inventory_scheduled_sync_enabled' in settings._fields
         ):
-            settings.sudo().write({
+            settings.sudo()._settings_service_write('_setup', {
                 'inventory_scheduled_sync_enabled': True,
             })
         self._record_progress(settings, 'first_push')
@@ -1960,7 +1960,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         # result leaves setup incomplete and re-renders the truthful state.
         if not self._activation_completion_guard(store, settings):
             return self.get_setup_state(store_id=store.id)
-        settings.sudo().write({
+        settings.sudo()._settings_service_write('_setup', {
             'setup_wizard_step_key': 'review',
             'setup_wizard_step': SETUP_STEP_COUNT,
             'setup_completed_at': fields.Datetime.now(),
@@ -2069,7 +2069,7 @@ class ShopifyConnectorSetupWizard(models.AbstractModel):
         """
         store = self._resolve_store(store_id)
         settings = self._settings_for(store)
-        settings.sudo().write({
+        settings.sudo()._settings_service_write('_setup', {
             'setup_wizard_step_key': SETUP_STEP_KEYS[0],
             'setup_wizard_step': 1,
             'setup_last_rerun_at': fields.Datetime.now(),

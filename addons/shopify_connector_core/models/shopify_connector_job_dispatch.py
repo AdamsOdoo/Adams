@@ -8,6 +8,7 @@ from odoo import api, fields, models
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.service.model import PG_CONCURRENCY_EXCEPTIONS_TO_RETRY
 
+from ..domain.retry_policy import RETRY_WINDOW_SECONDS
 from ..tools.redaction import redact
 from .shopify_connector_job import (
     BUSINESS_JOB_SOURCES,
@@ -61,7 +62,7 @@ RETRY_BASE_DELAY_SECONDS = 30
 RETRY_MULTIPLIER = 2
 RETRY_MAX_DELAY_SECONDS = 30 * 60
 RETRY_JITTER_FRACTION = 0.2
-RETRY_WINDOW_HOURS = 24
+RETRY_WINDOW_HOURS = RETRY_WINDOW_SECONDS // (60 * 60)
 # unknown_system_error's own "single safety-net auto-retry, then human"
 # posture (architecture gate §E) -- a distinct, smaller attempt budget
 # than the general auto-retry classes below.
@@ -566,7 +567,6 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'shopify.connector.mutation.attempt'
             ].search([
                 ('job_id', '=', locked.id),
-                ('attempt_token', '=', locked.current_attempt_token),
             ], limit=1)
             if attempt and attempt.transport_attempted:
                 self._recover_committed_attempt_to_reconciliation(
@@ -1066,6 +1066,14 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
             )
             return
         original = attempt.job_id
+        locked_lineage = attempt._lock_with_original_job(original)
+        if not locked_lineage:
+            raise JobHandlerError(
+                'shopify_temporary_server_network', 'The original mutation '
+                'job is busy; reconciliation will retry.',
+                'Original mutation job lock was unavailable.',
+            )
+        original, attempt = locked_lineage
         if attempt.observed_outcome == 'pending':
             self._block_original_job(
                 original,
@@ -1385,21 +1393,15 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
         attempt = self.env['shopify.connector.mutation.attempt'].search([
             ('job_id', '=', job_id),
         ], limit=1)
-        if attempt:
-            if attempt.attempt_token == token:
-                self._recover_committed_attempt_to_reconciliation(
-                    job,
-                    attempt,
-                    'c2_discovered_during_pre_c2_recovery',
-                    'dispatcher_recovery',
-                )
-            else:
-                self._block_original_job(
-                    job,
-                    'duplicate_risk',
-                    'duplicate_risk',
-                    'Concurrent attempt evidence blocked C2.',
-                )
+        if attempt and attempt.transport_attempted:
+            self._recover_committed_attempt_to_reconciliation(
+                job, attempt, 'c2_discovered_during_pre_c2_recovery',
+                'dispatcher_recovery')
+        elif attempt:
+            self._block_original_job(
+                job, 'duplicate_risk', 'duplicate_risk',
+                'Concurrent malformed attempt evidence blocked C2.',
+            )
         elif job.current_attempt_token == token and job.state == 'running':
             job.sudo().write(self._owner_cleanup_values())
             self._schedule_retry_or_fail(
@@ -1577,47 +1579,48 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
 
     @api.model
     def _ensure_reconciliation_job(self, original_job, attempt, strategy=None):
+        Job = self.env['shopify.connector.job']
+        locked_lineage = attempt._lock_with_original_job(original_job)
+        if not locked_lineage:
+            return Job.browse()
+        locked_original_job, locked_attempt = locked_lineage
         try:
             strategy = strategy or self._validated_mutation_strategy(
-                attempt.mutation_domain
+                locked_attempt.mutation_domain
             )
         except ValidationError:
             self._block_original_job(
-                original_job,
+                locked_original_job,
                 'no_reconciliation_strategy',
                 'no_reconciliation_strategy',
                 'No valid reconciliation strategy exists for this attempt.',
             )
-            return self.env['shopify.connector.job']
-        locked_attempt = attempt.try_lock_for_update()
-        if not locked_attempt:
-            return self.env['shopify.connector.job']
-        Job = self.env['shopify.connector.job']
+            return Job.browse()
         existing = Job.search([
-            ('mutation_attempt_id', '=', attempt.id),
+            ('mutation_attempt_id', '=', locked_attempt.id),
         ], limit=1)
         if existing:
             if (
                 existing.state in ('succeeded', 'failed_final', 'cancelled')
-                and attempt.effective_disposition() == 'unresolved'
-                and original_job.state != 'blocked_manual_review'
+                and locked_attempt.effective_disposition() == 'unresolved'
+                and locked_original_job.state != 'blocked_manual_review'
             ):
                 self._block_original_job(
-                    original_job,
+                    locked_original_job,
                     'duplicate_risk',
                     'duplicate_risk',
                     'The reconciliation job is terminal while unresolved.',
                 )
             return existing
         return Job.sudo().create({
-            'store_id': original_job.store_id.id,
+            'store_id': locked_original_job.store_id.id,
             'job_source': 'reconciliation',
             'job_type': strategy['reconciliation_job_type'],
             'state': 'queued',
-            'payload_hash': 'reconcile:%s' % attempt.attempt_token,
-            'mutation_attempt_id': attempt.id,
+            'payload_hash': 'reconcile:%s' % locked_attempt.attempt_token,
+            'mutation_attempt_id': locked_attempt.id,
             'expected_connection_generation':
-                attempt.expected_connection_generation,
+                locked_attempt.expected_connection_generation,
         })
 
     @api.model
@@ -1804,7 +1807,6 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
                 'dispatch -- skipped without invoking a handler.'
             )
             return
-
         handler = self._get_handlers().get(job.job_type)
         if handler is None:
             job._transition_failed_final(
@@ -1915,28 +1917,26 @@ class ShopifyConnectorJobDispatch(models.AbstractModel):
     def _schedule_retry_or_fail(
         self, job, error_class, reason, technical_detail, max_attempts,
     ):
-        """Bounded retries only -- no infinite retries under any
-        circumstance (DEC-009). Fails permanently once either the
-        attempt budget or the 24-hour retry window is exhausted,
-        whichever comes first."""
+        """Stop bounded retries at the attempt or 24-hour deadline."""
+        now = fields.Datetime.now()
         new_retry_count = job.retry_count + 1
-        started_at = job.started_at or fields.Datetime.now()
-        elapsed = fields.Datetime.now() - started_at
-        if (
-            new_retry_count > max_attempts
-            or elapsed > timedelta(hours=RETRY_WINDOW_HOURS)
-        ):
-            # The job did attempt and fail again -- persist the
-            # exhausted attempt count (one more than its last recorded
-            # retry_count), not just the terminal state.
+        started_at = job.started_at or now
+        deadline = started_at + timedelta(seconds=RETRY_WINDOW_SECONDS)
+        if new_retry_count > max_attempts or now > deadline:
+            # Persist the exhausted attempt count, not only terminal state.
             job._transition_failed_final(
                 error_class=error_class, message=reason,
-                technical_detail=technical_detail,
-                retry_count=new_retry_count,
+                technical_detail=technical_detail, retry_count=new_retry_count,
             )
             return
         delay_seconds = self._retry_delay_seconds(new_retry_count - 1)
-        next_retry_at = fields.Datetime.now() + timedelta(seconds=delay_seconds)
+        next_retry_at = now + timedelta(seconds=delay_seconds)
+        if next_retry_at > deadline:
+            job._transition_failed_final(
+                error_class=error_class, message=reason,
+                technical_detail=technical_detail, retry_count=new_retry_count,
+            )
+            return
         job._transition_retry_waiting(
             next_retry_at=next_retry_at, retry_count=new_retry_count,
             error_class=error_class, message=reason,

@@ -525,27 +525,31 @@ class TestThrottleBackpressure(TransactionCase):
 
         from odoo.addons.shopify_connector_core.models import (
             shopify_connector_api_client as client_module,
+            shopify_connector_api_response as response_module,
         )
 
-        source = inspect.getsource(
+        client_source = inspect.getsource(
             client_module.ShopifyConnectorApiClient._normalize_response
         )
-        self.assertIn('_record_throttle_status', source)
+        self.assertIn('normalize_response', client_source)
+        response_source = inspect.getsource(response_module.normalize_response)
+        self.assertIn('record_throttle_status_isolated', response_source)
+        self.assertIn('if throttle_status and store:', response_source)
 
     def test_response_telemetry_uses_a_deferred_isolated_write(self):
         """Telemetry cannot invalidate the business transaction snapshot."""
         import inspect
 
         from odoo.addons.shopify_connector_core.models import (
-            shopify_connector_api_client as client_module,
+            shopify_connector_api_response as response_module,
         )
 
         source = inspect.getsource(
-            client_module.ShopifyConnectorApiClient
-            ._record_throttle_status_isolated
+            response_module.record_throttle_status_isolated
         )
         self.assertIn('registry.cursor()', source)
         self.assertIn('try_lock_for_update()', source)
+        self.assertIn('_record_throttle_status', source)
         self.assertIn('side_cr.commit()', source)
         self.assertIn('postcommit.add', source)
         self.assertIn('postrollback.add', source)

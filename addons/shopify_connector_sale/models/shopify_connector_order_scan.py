@@ -16,8 +16,6 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
     JobHandlerError,
     REPLAY_POLICY_REMOTE_READ_REPLAY_SAFE,
 )
-
-
 _logger = logging.getLogger(__name__)
 
 ORDER_SCAN_PAGE_SIZE = 100
@@ -281,7 +279,6 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
         entity_job_source, collected_candidates=None, start_cursor=None,
         page_limit=ORDER_SCAN_PAGE_LIMIT, resumable=False,
     ):
-        client = self.env['shopify.connector.api.client']
         # GraphQL nullable String variables must use JSON null on the first
         # page.  Python ``False`` serializes as JSON false, which Shopify
         # correctly refuses to coerce to ``String`` before executing the
@@ -319,30 +316,10 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
                     'data_shape_schema_mismatch',
                     'The order scan page ceiling was exceeded.',
                 )
-            try:
-                with client.execute_business(
-                    job, store, ORDER_SCAN_QUERY,
-                    variables={
-                        'first': ORDER_SCAN_PAGE_SIZE,
-                        'after': cursor,
-                        'query': query_filter,
-                    },
-                ) as result:
-                    if (
-                        not isinstance(result, dict)
-                        or not isinstance(result.get('data'), dict)
-                    ):
-                        raise JobHandlerError(
-                            'data_shape_schema_mismatch',
-                            'Shopify order scan returned an invalid response '
-                            'envelope.',
-                        )
-                    connection = result['data'].get('orders')
-                    page = self._validate_page(connection, seen_cursors, seen_gids)
-            except ShopifyClientError as exc:
-                raise JobHandlerError(
-                    exc.error_class, exc.reason, exc.technical_detail,
-                ) from exc
+            page = self._read_order_scan_page(
+                job, store, query_filter=query_filter, cursor=cursor,
+                seen_cursors=seen_cursors, seen_gids=seen_gids,
+            )
             page_count += 1
             counts['pages'] = page_count
             page_counts = {
@@ -409,6 +386,29 @@ class ShopifyConnectorOrderScan(models.AbstractModel):
                     'The order scan cursor did not make progress.',
                 )
             cursor = page['end_cursor']
+
+    @api.model
+    def _read_order_scan_page(self, job, store, *, query_filter, cursor, seen_cursors, seen_gids):
+        """Execute and validate one page using the unchanged V1 delegate."""
+        client = self.env['shopify.connector.api.client']
+        try:
+            with client.execute_business(
+                job, store, ORDER_SCAN_QUERY,
+                variables={'first': ORDER_SCAN_PAGE_SIZE, 'after': cursor,
+                           'query': query_filter},
+            ) as result:
+                if (
+                    not isinstance(result, dict)
+                    or not isinstance(result.get('data'), dict)
+                ):
+                    raise JobHandlerError(
+                        'data_shape_schema_mismatch',
+                        'Shopify order scan returned an invalid response envelope.',
+                    )
+                return self._validate_page(result['data'].get('orders'), seen_cursors, seen_gids)
+        except ShopifyClientError as exc:
+            raise JobHandlerError(exc.error_class, exc.reason,
+                                  exc.technical_detail) from exc
 
     @api.model
     def _validate_page(self, connection, seen_cursors, seen_gids):

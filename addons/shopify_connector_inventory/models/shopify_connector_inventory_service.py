@@ -29,6 +29,14 @@ from odoo.addons.shopify_connector_core.models.shopify_connector_job_dispatch im
 from odoo.addons.shopify_connector_core.models.shopify_connector_mutation_attempt import (
     INCONCLUSIVE_RECONCILIATION_CAP,
 )
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_mutation_gateway import (
+    INVENTORY_ACTIVATE_DOCUMENT,
+    INVENTORY_SET_QUANTITIES_DOCUMENT,
+)
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_read_gateway import (
+    INVENTORY_PAIR_QUERY,
+    LOCATIONS_QUERY,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -796,26 +804,44 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
             return super()._ensure_reconciliation_job(
                 original_job, attempt, strategy,
             )
+        Job = self.env['shopify.connector.job']
+        # Reconciliation is rooted at the original mutation job.  Lock it
+        # before the attempt so an inventory recovery caller cannot hold only
+        # the attempt while blocking a C3/reconciliation worker that follows
+        # the global job -> attempt order.
+        locked_original_job = Job.browse(
+            original_job.id
+        ).try_lock_for_update()
+        if not locked_original_job:
+            return Job.browse()
+        locked_original_job.invalidate_recordset()
+        locked_attempt = self.env[
+            'shopify.connector.mutation.attempt'
+        ].browse(attempt.id).try_lock_for_update()
+        if not locked_attempt:
+            return Job.browse()
+        # All identity, token, generation and disposition reads below are
+        # deliberately made from the freshly locked attempt.
+        locked_attempt.invalidate_recordset()
+        if locked_attempt.job_id != locked_original_job:
+            self._block_original_job(
+                locked_original_job,
+                ERROR_CLASS_STORE_IDENTITY, SUBREASON_STORE_IDENTITY,
+                'The durable inventory attempt is not owned by the '
+                'original job.',
+            )
+            return Job.browse()
         try:
             strategy = strategy or self._validated_mutation_strategy(
-                attempt.mutation_domain
+                locked_attempt.mutation_domain
             )
         except ValidationError:
             self._block_original_job(
-                original_job,
+                locked_original_job,
                 ERROR_CLASS_NO_STRATEGY, SUBREASON_NO_STRATEGY,
                 'No valid reconciliation strategy exists for this attempt.',
             )
-            return self.env['shopify.connector.job']
-        locked_attempt = attempt.try_lock_for_update()
-        if not locked_attempt:
-            return self.env['shopify.connector.job']
-        # Every subsequent identity/domain/token/generation/disposition
-        # read uses `locked_attempt`, never the pre-lock `attempt`
-        # reference (PR #182 comment 5029906989 item 1): the lock exists
-        # precisely to prevent acting on a value a concurrent writer may
-        # have already changed.
-        Job = self.env['shopify.connector.job']
+            return Job.browse()
         existing = Job.search([
             ('mutation_attempt_id', '=', locked_attempt.id),
         ], limit=1)
@@ -823,7 +849,7 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
             if (
                 existing.state in TERMINAL_JOB_STATES
                 and locked_attempt.effective_disposition() == 'unresolved'
-                and original_job.state != 'blocked_manual_review'
+                and locked_original_job.state != 'blocked_manual_review'
             ):
                 # `duplicate_risk` is a valid core registry value but is
                 # outside Task 013's frozen nine-value `error_class`
@@ -832,18 +858,19 @@ class ShopifyConnectorJobDispatchInventoryExtension(models.AbstractModel):
                 # `data_shape_schema_mismatch`; `duplicate_risk` is only
                 # ever valid in the subreason position.
                 self._block_original_job(
-                    original_job,
+                    locked_original_job,
                     ERROR_CLASS_DATA_SHAPE, SUBREASON_DUPLICATE_RISK,
                     'The reconciliation job is terminal while unresolved.',
                 )
             return existing
         return Job.sudo().create({
-            'store_id': original_job.store_id.id,
+            'store_id': locked_original_job.store_id.id,
             'job_source': 'reconciliation',
             'job_type': strategy['reconciliation_job_type'],
             'state': 'queued',
             'payload_hash': 'reconcile:%s:%s:%s' % (
-                original_job.store_id.id, locked_attempt.mutation_domain,
+                locked_original_job.store_id.id,
+                locked_attempt.mutation_domain,
                 locked_attempt.attempt_token,
             ),
             'mutation_attempt_id': locked_attempt.id,
@@ -1786,15 +1813,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         items 2/4).
         """
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query InventoryPairRead($itemId: ID!, $locationId: ID!) { '
-            'inventoryItem(id: $itemId) { id tracked '
-            'inventoryLevel(locationId: $locationId) { id '
-            'item { id } location { id } '
-            'quantities(names: ["available"]) { name quantity updatedAt '
-            '} } } '
-            'shop { myshopifyDomain } }'
-        )
+        query = INVENTORY_PAIR_QUERY
         requested_item_gid = binding.shopify_inventory_item_gid
         requested_location_gid = binding.location_mapping_id.shopify_gid
         variables = {
@@ -2775,13 +2794,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         cursor = None
         upserted = 0
         while True:
-            query = (
-                'query LocationsSync($cursor: String) { '
-                'locations(first: 100, after: $cursor, '
-                'includeInactive: false) { '
-                'edges { cursor node { id name } } '
-                'pageInfo { hasNextPage } } }'
-            )
+            query = LOCATIONS_QUERY
             try:
                 with client.execute_business_read(
                     job, store, query, {'cursor': cursor}, purpose='inventory',
@@ -4159,15 +4172,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
         )
 
         idempotency_key = str(uuid.uuid4())
-        operation = (
-            'mutation InventorySetQuantities($input: '
-            'InventorySetQuantitiesInput!, $idempotencyKey: String!) { '
-            'inventorySetQuantities(input: $input) '
-            '@idempotent(key: $idempotencyKey) { '
-            'inventoryAdjustmentGroup { reason referenceDocumentUri '
-            'changes { name delta quantityAfterChange } } '
-            'userErrors { code field message } } }'
-        )
+        operation = INVENTORY_SET_QUANTITIES_DOCUMENT
         variables = {
             'input': {
                 'name': 'available',
@@ -4806,18 +4811,7 @@ class ShopifyConnectorInventoryService(models.AbstractModel):
             raise InventoryActivationSupersededError(observed_level_gid)
 
         idempotency_key = str(uuid.uuid4())
-        operation = (
-            'mutation InventoryActivate($inventoryItemId: ID!, '
-            '$locationId: ID!, $available: Int!, '
-            '$idempotencyKey: String!) { '
-            'inventoryActivate(inventoryItemId: $inventoryItemId, '
-            'locationId: $locationId, available: $available, '
-            'stockAtLegacyLocation: false) '
-            '@idempotent(key: $idempotencyKey) { '
-            'inventoryLevel { id item { id } location { id } '
-            'quantities(names: ["available"]) { name quantity } } '
-            'userErrors { field message } } }'
-        )
+        operation = INVENTORY_ACTIVATE_DOCUMENT
         variables = {
             'inventoryItemId': local_snapshot['inventory_item_gid'],
             'locationId': local_snapshot['location_gid'],

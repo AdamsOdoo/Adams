@@ -65,12 +65,12 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
         """
         if not store or not store.credential_present:
             return False
-        credential = self.env[
-            'shopify.connector.store.credential'
-        ].sudo().search([('store_id', '=', store.id)], limit=1)
+        credential = self.env['shopify.connector.store.credential'].sudo().search(
+            [('store_id', '=', store.id)], limit=1,
+        )
         if not credential or credential.credential_state == 'absent':
             return False
-        if credential.client_secret:
+        if self.env['shopify.connector.store.credential']._get_client_secret(store):
             return False
         if credential.auth_mode == AUTH_MODE_OFFLINE:
             message = (
@@ -400,7 +400,7 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
             job = Subscription._enqueue_store_reconcile(
                 store, source='setup_readiness_check',
             )
-        settings.sudo().write({
+        settings.sudo()._settings_service_write('_setup', {
             # Keep the operator on the final review step when reopening.  It
             # is a resume point, not completion evidence.
             'setup_wizard_step_key': 'review',
@@ -421,7 +421,7 @@ class ShopifyConnectorWebhookSetup(models.AbstractModel):
         """Refuse impossible offline-token webhook setup before activation."""
         gate = self._webhook_client_secret_gate(store)
         if gate:
-            settings.sudo().write({
+            settings.sudo()._settings_service_write('_setup', {
                 'setup_wizard_step_key': 'review',
                 'setup_wizard_step': SETUP_STEP_COUNT,
             })

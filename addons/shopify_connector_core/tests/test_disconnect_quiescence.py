@@ -734,7 +734,7 @@ class TestBusinessAdmission(TransactionCase):
         Cred = type(self.env['shopify.connector.store.credential'])
         posted = {}
 
-        def fake_post(url, json=None, headers=None, timeout=None):
+        def fake_post(url, json=None, headers=None, timeout=None, **kwargs):
             posted['headers'] = headers
             return FakeResponse(200, json_body={'data': {}})
 

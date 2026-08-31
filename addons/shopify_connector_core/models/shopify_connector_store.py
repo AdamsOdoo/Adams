@@ -1,5 +1,6 @@
 import json
 import logging
+import math
 import uuid
 
 from odoo import api, fields, models
@@ -19,7 +20,6 @@ from .shopify_connector_job_dispatch import (
 )
 
 _logger = logging.getLogger(__name__)
-
 # TD-014 (PERF-1 / D-PERF1-4). Head-room thresholds as a fraction of the
 # store's own `maximumAvailable`, so they hold for any plan size rather
 # than encoding a bucket the connector does not control (MBQ-51 stays
@@ -56,7 +56,6 @@ query ConnectorTestConnection {
   currentAppInstallation { accessScopes { handle } }
 }
 """
-
 
 class ShopifyConnectorStore(models.Model):
     """The DEC-006 store-scoping anchor every other core model references.
@@ -198,7 +197,6 @@ class ShopifyConnectorStore(models.Model):
         ondelete='set null',
     )
     disconnect_completed_at = fields.Datetime(readonly=True)
-
     # SEC-3 (#197) ownership root. Every durable connector record derives its
     # company from the store it belongs to, so this one field is the single
     # place company ownership is decided for the whole connector.
@@ -227,12 +225,10 @@ class ShopifyConnectorStore(models.Model):
              'credential, binding and log derived from this store inherits '
              'this company.',
     )
-
     _shop_domain_uniq = models.Constraint(
         'UNIQUE(shop_domain)',
         'A store already exists for this Shopify shop domain.',
     )
-
     @api.constrains('api_version')
     def _check_api_version_is_the_connector_constant(self):
         """TD-008: the stored version may only ever be the constant.
@@ -324,7 +320,7 @@ class ShopifyConnectorStore(models.Model):
         if not values:
             return False
         available, maximum, restore_rate = values
-        self.sudo().write({
+        self.sudo()._store_service_write('_throttle', {
             'api_throttle_available': available,
             'api_throttle_maximum': maximum,
             'api_throttle_restore_rate': restore_rate,
@@ -343,11 +339,13 @@ class ShopifyConnectorStore(models.Model):
         """
         if not isinstance(throttle_status, dict):
             return False
-        try:
-            available = float(throttle_status.get('currentlyAvailable'))
-            maximum = float(throttle_status.get('maximumAvailable'))
-            restore_rate = float(throttle_status.get('restoreRate') or 0.0)
-        except (TypeError, ValueError):
+        raw_values = tuple(throttle_status.get(name) for name in (
+            'currentlyAvailable', 'maximumAvailable', 'restoreRate'))
+        if any(type(value) not in (int, float) for value in raw_values):
+            return False
+        available, maximum, restore_rate = map(float, raw_values)
+        if not all(math.isfinite(value) for value in (
+            available, maximum, restore_rate)):
             return False
         if maximum <= 0 or available < 0 or restore_rate < 0:
             return False
@@ -410,7 +408,7 @@ class ShopifyConnectorStore(models.Model):
             return False
         if ratio < THROTTLE_DEFER_RATIO:
             if self.api_health_state != 'throttled':
-                self.sudo().write({
+                self.sudo()._store_service_write('_throttle', {
                     'api_health_state': 'throttled',
                     'api_health_reason': (
                         'Shopify API head-room is %.0f%% of this store\'s '
@@ -427,7 +425,7 @@ class ShopifyConnectorStore(models.Model):
             self.api_health_state == 'throttled'
             and ratio >= THROTTLE_RECOVER_RATIO
         ):
-            self.sudo().write({
+            self.sudo()._store_service_write('_throttle', {
                 'api_health_state': 'normal',
                 'api_health_reason': False,
             })
@@ -564,7 +562,7 @@ class ShopifyConnectorStore(models.Model):
                     'store to another company is not supported.'
                     % (store.company_id.display_name,)
                 )
-            store.company_id = company
+            store._store_service_write('_company_assignment', {'company_id': company.id})
 
     def _ensure_connector_admin_boundary(self):
         """Refuse a non-Administrator caller at a public action boundary
@@ -775,7 +773,7 @@ class ShopifyConnectorStore(models.Model):
                 "store's configured domain — check the domain and "
                 "reconnect."
             )
-            self.write({
+            self._store_service_write('_connection_probe', {
                 'last_test_connection_result': 'fail',
                 'last_test_connection_at': fields.Datetime.now(),
                 'last_test_connection_reason': redact(reason),
@@ -794,7 +792,7 @@ class ShopifyConnectorStore(models.Model):
         access_scopes = (
             data.get('currentAppInstallation') or {}
         ).get('accessScopes') or []
-        self.write({
+        self._store_service_write('_connection_probe', {
             'last_test_connection_result': 'pass',
             'last_test_connection_at': fields.Datetime.now(),
             'last_test_connection_reason': False,
@@ -818,7 +816,7 @@ class ShopifyConnectorStore(models.Model):
         # reaches `_apply_probe_failure` with the configuration error class
         # instead of arriving here. Recording "degraded but verified" was
         # the softer disposition this ruling deliberately removes.
-        self.write({
+        self._store_service_write('_connection_probe', {
             'api_health_state': 'normal',
             'api_health_reason': False,
         })
@@ -861,7 +859,7 @@ class ShopifyConnectorStore(models.Model):
         """
         self.ensure_one()
         JobLog = self.env['shopify.connector.job.log']
-        self.write({
+        self._store_service_write('_connection_probe', {
             'last_test_connection_result': 'fail',
             'last_test_connection_at': fields.Datetime.now(),
             'last_test_connection_reason': redact(exc.reason),
@@ -1092,6 +1090,13 @@ class ShopifyConnectorStore(models.Model):
         # once the locked state is already connected.
         if locked_state == 'connected':
             return None
+        Settings = self.env['shopify.connector.store.settings']
+        settings = Settings.search([('store_id', '=', self.id)], limit=1)
+        if settings:
+            Settings._p15_lock_generation(settings)
+            settings.invalidate_recordset(['setup_readiness_stale_since'])
+            if settings.setup_readiness_stale_since:
+                raise UserError('Cannot activate until readiness is rerun.')
         if not self.credential_present:
             raise UserError(
                 'Cannot activate: no credential is present for this '
@@ -1132,7 +1137,7 @@ class ShopifyConnectorStore(models.Model):
             )
         # Consume the generation read under the held lock and bump it exactly
         # once -- the single successful-activation transition (analysis §8/§9.2).
-        self.write({
+        self._store_service_write('_lifecycle', {
             'state': 'connected',
             'connection_generation': locked_generation + 1,
         })
@@ -1314,7 +1319,7 @@ class ShopifyConnectorStore(models.Model):
         """
         self.ensure_one()
         new_generation = locked_generation + 1
-        self.write({
+        self._store_service_write('_lifecycle', {
             'state': 'disconnecting',
             'connection_generation': new_generation,
             'disconnect_status': 'requested',
@@ -1421,7 +1426,7 @@ class ShopifyConnectorStore(models.Model):
         exchanging = self.env[
             'shopify.connector.store.credential'
         ]._token_exchange_in_flight(self)
-        self.write({
+        self._store_service_write('_lifecycle', {
             'disconnect_open_lease_count': count,
             'disconnect_oldest_admitted_at': oldest,
         })
@@ -1451,7 +1456,7 @@ class ShopifyConnectorStore(models.Model):
                 # one can be read.
                 self._finalize_disconnect_timed_out(leases)
         else:
-            self.write({
+            self._store_service_write('_lifecycle', {
                 'disconnect_status': 'quiescing',
                 'disconnect_status_reason': (
                     '%d call lease(s), %d unresolved mutation attempt(s), '
@@ -1477,7 +1482,7 @@ class ShopifyConnectorStore(models.Model):
             'remain. Credentials were preserved.'
             % (lease_count, len(attempts), len(reconciliations))
         )
-        self.write({
+        self._store_service_write('_lifecycle', {
             'disconnect_status': 'timed_out',
             'disconnect_status_reason': reason,
             'disconnect_open_lease_count': lease_count,
@@ -1487,12 +1492,7 @@ class ShopifyConnectorStore(models.Model):
 
     def action_force_disconnect(self, reason):
         self.ensure_one()
-        if not self.env.user.has_group(
-            'shopify_connector_core.group_shopify_connector_admin'
-        ):
-            raise AccessError(
-                'Only a Shopify Connector Administrator may force disconnect.'
-            )
+        self._ensure_connector_admin_boundary()
         if not isinstance(reason, str) or not reason.strip():
             raise UserError('A non-empty force-disconnect reason is required.')
         safe_reason = redact(reason.strip())
@@ -1532,7 +1532,7 @@ class ShopifyConnectorStore(models.Model):
             )
         )
         if attempts or reconciliations or leases:
-            self.write({
+            self._store_service_write('_lifecycle', {
                 'state': 'disconnecting',
                 'disconnect_status': 'timed_out',
                 'disconnect_status_reason': audit,
@@ -1560,7 +1560,7 @@ class ShopifyConnectorStore(models.Model):
         self.env[
             'shopify.connector.store.credential'
         ]._clear_token_under_store_lock(self)
-        self.write({
+        self._store_service_write('_lifecycle', {
             'state': 'disconnected',
             'disconnect_status': 'completed',
             'disconnect_status_reason': (
@@ -1607,7 +1607,7 @@ class ShopifyConnectorStore(models.Model):
         self.env[
             'shopify.connector.store.credential'
         ]._clear_token_under_store_lock(self)
-        self.write({
+        self._store_service_write('_lifecycle', {
             'state': 'disconnected',
             'disconnect_status': 'timed_out',
             'disconnect_status_reason': reason,
@@ -1662,7 +1662,7 @@ class ShopifyConnectorStore(models.Model):
                 'store.'
             )
         if not self.credential_present:
-            self.write({'state': 'reconnect_needed'})
+            self._store_service_write('_lifecycle', {'state': 'reconnect_needed'})
             self._create_lifecycle_audit_job(
                 'Reconnect attempted with no stored credential; remains '
                 'reconnect_needed.'
@@ -1731,7 +1731,7 @@ class ShopifyConnectorStore(models.Model):
         if reconnect_ok:
             # A successful reconnect is a generation-changing transition -- bump
             # the epoch exactly once, consuming the generation read under the lock.
-            self.write({
+            self._store_service_write('_lifecycle', {
                 'state': 'connected',
                 'connection_generation': locked_generation + 1,
             })
@@ -1743,7 +1743,7 @@ class ShopifyConnectorStore(models.Model):
                 )
             )
         elif not already_marked_reconnect_needed:
-            self.write({'state': 'reconnect_needed'})
+            self._store_service_write('_lifecycle', {'state': 'reconnect_needed'})
             self._create_lifecycle_audit_job(
                 'Reconnect evidence insufficient; remains reconnect_needed '
                 '(test-connection: %s, readiness: %s).' % (
@@ -1793,7 +1793,7 @@ class ShopifyConnectorStore(models.Model):
                 'one-way).' % locked_state
             )
             return None
-        self.write({'state': 'reconnect_needed'})
+        self._store_service_write('_lifecycle', {'state': 'reconnect_needed'})
         message = 'Store marked reconnect_needed.'
         if reason:
             message = 'Store marked reconnect_needed: %s' % redact(reason)
