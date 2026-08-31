@@ -1,0 +1,270 @@
+{
+  "schema_version": 1,
+  "source_v1_sha": "f77bfcc25e63615e6226dd9a9329f8f943593cb2",
+  "status": "foundation_contract_only",
+  "status_rule": "A journey becomes passed only when every required assertion axis is evidenced on one exact candidate SHA.",
+  "required_assertion_axes": [
+    "browser_visible_state",
+    "odoo_business_records",
+    "bindings_and_mappings",
+    "jobs_runs_and_attempts",
+    "attention_and_recovery",
+    "audit_and_freshness",
+    "shopify_or_fake_ledger_effect",
+    "authoritative_remote_readback"
+  ],
+  "journeys": [
+    {
+      "id": "U1",
+      "title": "First store onboarding",
+      "actors": ["Administrator"],
+      "fixture_id": "journey.first_store.v1",
+      "trigger_paths": ["setup_wizard"],
+      "ui_contracts": ["setup", "overview", "settings"],
+      "backend_assertions": [
+        "draft edits have no Shopify side effect",
+        "credential identity, served API version and scopes are verified",
+        "workflow authority, defaults and location mappings persist by semantic step_key",
+        "activation is admitted only from current grouped readiness"
+      ],
+      "remote_assertions": ["read-only identity/scope/location calls only", "truthful active store identity"],
+      "failure_branches": ["invalid credential", "wrong shop", "missing scope", "stale generation", "save and resume"],
+      "proof_packets": ["P00", "P15", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U2",
+      "title": "Additional stores and companies",
+      "actors": ["Administrator", "Operator", "Auditor"],
+      "fixture_id": "journey.multistore.v1",
+      "trigger_paths": ["add_store", "store_switch", "company_switch"],
+      "ui_contracts": ["store_management", "store_switcher", "all_stores_overview"],
+      "backend_assertions": [
+        "credentials, settings, mappings, bindings, checkpoints and runs remain store scoped",
+        "active-company and exact-store checks apply to records, counts, suggestions and commands",
+        "retired and disconnected stores remain distinguishable"
+      ],
+      "remote_assertions": ["each call uses the selected store identity and credential generation"],
+      "failure_branches": ["duplicate domain", "forged child ID", "inactive company", "partial all-stores health"],
+      "proof_packets": ["P02", "P15", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U3",
+      "title": "Product import, matching and refresh",
+      "actors": ["Operator", "Reviewer"],
+      "fixture_id": "journey.product_import.v1",
+      "trigger_paths": ["manual", "scheduled", "webhook", "reconciliation"],
+      "ui_contracts": ["operation_launcher", "products", "matching", "attention", "run_detail"],
+      "backend_assertions": [
+        "pagination and checkpoint overlap are bounded",
+        "remote GID binding wins and names never auto-match",
+        "ambiguous deterministic keys route to review",
+        "refresh and deleted-remote state preserve protected Odoo fields"
+      ],
+      "remote_assertions": ["product and variant reads only", "missed event repair creates no duplicate binding"],
+      "failure_branches": ["ambiguous SKU/barcode/reference", "page failure", "deleted remote product", "missed webhook"],
+      "proof_packets": ["P06", "P10", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U4",
+      "title": "Product publication and update",
+      "actors": ["Operator", "Reviewer", "Administrator"],
+      "fixture_id": "journey.product_export.v1",
+      "trigger_paths": ["manual_preview", "approved_command"],
+      "ui_contracts": ["product_preview", "attention", "run_detail", "record_evidence"],
+      "backend_assertions": [
+        "link, first publication and continuous update are distinct intents",
+        "field authority and diff fingerprint are explicit",
+        "stale preview cannot mutate",
+        "canonical product/variant/media bindings are unique"
+      ],
+      "remote_assertions": ["typed mutation plan", "canonical GID readback", "no duplicate after uncertain send"],
+      "failure_branches": ["missing prerequisites", "partial userErrors", "stale authority", "after-send uncertainty"],
+      "proof_packets": ["P08", "P09", "P13", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U5",
+      "title": "Customer and order intake",
+      "actors": ["Operator", "Reviewer"],
+      "fixture_id": "journey.order_intake.v1",
+      "trigger_paths": ["webhook", "scheduled", "manual", "reconciliation"],
+      "ui_contracts": ["orders", "attention", "run_detail", "record_evidence"],
+      "backend_assertions": [
+        "customer and order bindings remain exactly once per store",
+        "tax, discount, shipping, tip, currency, line and total evidence is retained",
+        "manual gateway and commercial ambiguity are reviewed",
+        "cancelled, voided or expired Shopify state blocks unsafe fulfillment without rewriting completed Odoo work"
+      ],
+      "remote_assertions": ["order/customer reads only", "overlap import yields one Odoo intent"],
+      "failure_branches": ["guest customer", "ambiguous customer", "total mismatch", "post-import cancellation"],
+      "proof_packets": ["P06", "P10", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U6",
+      "title": "Inventory first push and continuous sync",
+      "actors": ["Operator", "Reviewer", "Administrator"],
+      "fixture_id": "journey.inventory.v1",
+      "trigger_paths": ["manual", "scheduled", "webhook", "odoo_event", "reconciliation"],
+      "ui_contracts": ["locations", "inventory_preview", "attention", "run_detail"],
+      "backend_assertions": [
+        "location mapping is exact and store scoped",
+        "first push requires observations, preview, fingerprint and Administrator confirmation",
+        "rapid stock changes coalesce without blind overwrite",
+        "mapping, quantity or warehouse-tree drift invalidates stale authority"
+      ],
+      "remote_assertions": ["inventory item/location readback", "one effective quantity mutation per safe scope"],
+      "failure_branches": ["missing mapping", "stale preview", "throttle", "after-send uncertainty", "warehouse tree move"],
+      "proof_packets": ["P07", "P08", "P09", "P12", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U7",
+      "title": "Fulfillment and tracking",
+      "actors": ["Operator", "Reviewer"],
+      "fixture_id": "journey.fulfillment.v1",
+      "trigger_paths": ["odoo_event", "manual", "scheduled", "webhook", "reconciliation"],
+      "ui_contracts": ["delivery_evidence", "order_evidence", "attention", "run_detail"],
+      "backend_assertions": [
+        "eligible FulfillmentOrder, location and lines are selected",
+        "full/partial intent and effective customer notification are explicit",
+        "fulfillment and picking binding is unique",
+        "tracking update and no-op are distinguishable"
+      ],
+      "remote_assertions": ["fulfillment/tracking mutation readback", "no duplicate shipment or notification"],
+      "failure_branches": ["ineligible lines", "already fulfilled", "changed tracking", "after-send uncertainty"],
+      "proof_packets": ["P07", "P08", "P09", "P14", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U8",
+      "title": "Trigger and recovery parity",
+      "actors": ["Operator", "Administrator"],
+      "fixture_id": "journey.trigger_parity.v1",
+      "trigger_paths": ["manual", "scheduled", "webhook", "odoo_event", "reconciliation"],
+      "ui_contracts": ["operation_launcher", "overview", "run_detail"],
+      "backend_assertions": [
+        "all triggers admit the same typed domain intent",
+        "priority, duplicate suppression and evidence semantics are shared",
+        "duplicate, delayed, out-of-order and missed webhooks converge through reconciliation"
+      ],
+      "remote_assertions": ["one business effect independent of trigger path"],
+      "failure_branches": ["duplicate webhook", "out-of-order webhook", "missed webhook", "scheduled overlap"],
+      "proof_packets": ["P10", "P11", "P12", "P13", "P14", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U9",
+      "title": "Failure, retry and uncertain mutation recovery",
+      "actors": ["Operator", "Reviewer", "Administrator"],
+      "fixture_id": "journey.failure_recovery.v1",
+      "trigger_paths": ["fault_injection", "worker_restart", "manual_resolution"],
+      "ui_contracts": ["attention", "run_detail", "record_evidence"],
+      "backend_assertions": [
+        "clean pre-send failure and possible after-send effect are different states",
+        "bounded retry is allowed only when absence is certain",
+        "readback resolves applied/not-applied/inconclusive without blind replay",
+        "manual evidence is required at the uncertainty cap"
+      ],
+      "remote_assertions": ["fake ledger proves zero duplicate remote effect"],
+      "failure_branches": ["throttle", "auth/scope loss", "validation", "pre-send failure", "after-send interruption", "worker death"],
+      "proof_packets": ["P05", "P09", "P10", "P12", "P13", "P14", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U10",
+      "title": "Daily operations and Needs Attention",
+      "actors": ["Operator", "Reviewer", "Administrator", "Auditor"],
+      "fixture_id": "journey.daily_operations.v1",
+      "trigger_paths": ["overview", "attention_action", "run_follow"],
+      "ui_contracts": ["overview", "attention", "run_detail", "record_evidence"],
+      "backend_assertions": [
+        "highest-impact issue is ranked and scoped truthfully",
+        "allowed action is server-authorized and state-version checked",
+        "terminal state updates overview, freshness and affected record evidence"
+      ],
+      "remote_assertions": ["no UI action creates an unapproved mutation"],
+      "failure_branches": ["stale screen", "forbidden role", "offline store", "uncertain mutation has no retry action"],
+      "proof_packets": ["P02", "P03", "P04", "P10", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U11",
+      "title": "Connection and store lifecycle",
+      "actors": ["Administrator", "Auditor"],
+      "fixture_id": "journey.store_lifecycle.v1",
+      "trigger_paths": ["credential_rotate", "pause", "disconnect", "reconnect", "retire"],
+      "ui_contracts": ["store_management", "settings", "readiness", "run_detail"],
+      "backend_assertions": [
+        "credential replacement and scope/version drift increment the correct generation fence",
+        "pause/disconnect settles or verifies queued and in-flight work",
+        "reconnect preserves identity lineage and retire preserves bindings/history",
+        "unsafe domain/company retargeting is rejected"
+      ],
+      "remote_assertions": [
+        "connector-owned subscription state is read back",
+        "custom-app token revocation remains an explicit merchant action when Shopify cannot be revoked by the connector"
+      ],
+      "failure_branches": ["scope loss", "queued work", "in-flight uncertainty", "subscription cleanup failure", "external token revocation pending"],
+      "proof_packets": ["P09", "P11", "P15", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U12",
+      "title": "Roles, companies and direct access",
+      "actors": ["no_access", "Auditor", "Operator", "Reviewer", "Administrator"],
+      "fixture_id": "journey.authorization.v1",
+      "trigger_paths": ["menu", "direct_url", "direct_rpc", "company_switch"],
+      "ui_contracts": ["all_v2_surfaces"],
+      "backend_assertions": [
+        "model, facade and button authorization use one capability contract",
+        "active company and exact store apply to records, counts, empty states and suggestions",
+        "credentials and protected PII never enter a response"
+      ],
+      "remote_assertions": ["unauthorized calls have zero transport or mutation effect"],
+      "failure_branches": ["forged ref", "inactive company", "wrong store", "stale company switch", "hidden-button direct RPC"],
+      "proof_packets": ["P01", "P02", "P15", "P16", "P17"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U13",
+      "title": "Install, upgrade, restart and rollback",
+      "actors": ["Administrator", "release_operator"],
+      "fixture_id": "journey.lifecycle_migration.v1",
+      "trigger_paths": ["fresh_install", "warm_upgrade", "interrupted_backfill", "worker_restart", "mode_rollback"],
+      "ui_contracts": ["admin_lifecycle_status_or_explicit_runbook"],
+      "backend_assertions": [
+        "supported addon combinations install in dependency order",
+        "V1 record IDs, bindings, jobs, logs and mutation evidence survive warm upgrade",
+        "backfill resumes idempotently and restart quarantines uncertain work",
+        "backup/restore identity samples and constraints match",
+        "lowering store modes does not duplicate remote effects"
+      ],
+      "remote_assertions": ["rollback and restart create no new remote mutation"],
+      "failure_branches": ["migration interruption", "worker death", "domain uninstall/reinstall", "rollback with uncertain job"],
+      "proof_packets": ["P00", "P09", "P17", "P18"],
+      "current_status": "pending_execution"
+    },
+    {
+      "id": "U14",
+      "title": "Complete merchant loops",
+      "actors": ["Administrator", "Operator", "Reviewer"],
+      "fixture_id": "journey.complete_loops.v1",
+      "trigger_paths": ["shopify_to_odoo", "odoo_to_shopify", "two_store_repeat"],
+      "ui_contracts": ["setup", "overview", "all_domain_records", "attention", "run_detail"],
+      "backend_assertions": [
+        "Shopify product/order becomes the intended Odoo product/customer/order/inventory/picking evidence",
+        "Odoo product publication and stock update read back before the storefront order returns through the first path",
+        "two stores in one company remain isolated throughout",
+        "one after-send uncertainty terminates safely as verified or manual-review without duplicate effect"
+      ],
+      "remote_assertions": ["canonical cross-domain readback for product, inventory, order and fulfillment", "fake/live ledger contains no duplicate mutation"],
+      "failure_branches": ["recoverable read failure", "after-send mutation uncertainty", "terminal manual review", "store switch during run"],
+      "proof_packets": ["P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18"],
+      "current_status": "pending_execution"
+    }
+  ]
+}

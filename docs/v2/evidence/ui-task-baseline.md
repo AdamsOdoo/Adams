@@ -5,21 +5,21 @@
 
 ## Provenance
 
-- Source ref: `f77bfcc25e63615e6226dd9a9329f8f943593cb2`
-- Source SHA: `f77bfcc25e63615e6226dd9a9329f8f943593cb2`
-- Generator schema: `1`
+- Source ref: `78f2a09c984a78bd85db2c6b0bdde69c6630e428`
+- Source SHA: `78f2a09c984a78bd85db2c6b0bdde69c6630e428`
+- Generator schema: `2`
 
 ## Inventory counts
 
 | Surface | Count |
 | --- | ---: |
 | Menus | 46 |
-| Window actions | 43 |
+| Window actions | 45 |
 | Client actions | 4 |
-| Views | 102 |
-| JavaScript components | 3 |
+| Views | 108 |
+| JavaScript components | 21 |
 | Registered tours | 42 |
-| Static XML template files | 3 |
+| Static XML template files | 6 |
 
 ## Menus and actions
 
@@ -28,10 +28,12 @@
 | `shopify_connector_core.action_shopify_connector_dashboard` | `ir.actions.client` | `addons/shopify_connector_core/views/shopify_connector_dashboard_views.xml` |
 | `shopify_connector_core.action_shopify_connector_error_center` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_job_views.xml` |
 | `shopify_connector_core.action_shopify_connector_health` | `ir.actions.client` | `addons/shopify_connector_core/views/shopify_connector_dashboard_views.xml` |
+| `shopify_connector_core.action_shopify_connector_job_attempt` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_runtime_views.xml` |
 | `shopify_connector_core.action_shopify_connector_job_cancel_wizard` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_ui_wizard_views.xml` |
 | `shopify_connector_core.action_shopify_connector_job_log` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_job_log_views.xml` |
 | `shopify_connector_core.action_shopify_connector_mutation_attempt` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_mutation_attempt_views.xml` |
 | `shopify_connector_core.action_shopify_connector_mutation_resolution_wizard` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_ui_wizard_views.xml` |
+| `shopify_connector_core.action_shopify_connector_run` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_runtime_views.xml` |
 | `shopify_connector_core.action_shopify_connector_setup_wizard` | `ir.actions.client` | `addons/shopify_connector_core/views/shopify_connector_setup_views.xml` |
 | `shopify_connector_core.action_shopify_connector_store` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_store_views.xml` |
 | `shopify_connector_core.action_shopify_connector_store_settings_canonical` | `ir.actions.act_window` | `addons/shopify_connector_core/views/shopify_connector_store_settings_views.xml` |
@@ -123,9 +125,27 @@
 
 | Component | Source |
 | --- | --- |
+| `AttentionWorkspace` | `addons/shopify_connector_core/static/src/v2/connector_v2_attention.js` |
+| `HealthBand` | `addons/shopify_connector_core/static/src/v2/connector_v2_overview.js` |
+| `Overview` | `addons/shopify_connector_core/static/src/v2/connector_v2_overview.js` |
+| `P16CredentialPanel` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16DiagnosticsPanel` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16LifecyclePanel` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16PhaseRail` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16ReadinessPanel` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16SettingsGroups` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16SetupStepControls` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_setup_controls.js` |
+| `P16StatePanel` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `P16StoreList` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_components.js` |
+| `RunTimeline` | `addons/shopify_connector_core/static/src/v2/connector_v2_run.js` |
 | `ShopifyConnectorDashboard` | `addons/shopify_connector_core/static/src/js/shopify_connector_dashboard.js` |
 | `ShopifyConnectorExportDiff` | `addons/shopify_connector_product_export/static/src/js/shopify_connector_export_diff.js` |
+| `ShopifyConnectorP16Admin` | `addons/shopify_connector_core/static/src/p16/shopify_connector_p16_admin.js` |
 | `ShopifyConnectorSetupWizard` | `addons/shopify_connector_core/static/src/js/shopify_connector_setup_wizard.js` |
+| `ShopifyConnectorV2Action` | `addons/shopify_connector_core/static/src/v2/connector_v2_action_controller.js` |
+| `StateMessage` | `addons/shopify_connector_core/static/src/v2/connector_v2_status.js` |
+| `StatusPill` | `addons/shopify_connector_core/static/src/v2/connector_v2_status.js` |
+| `StoreSwitcher` | `addons/shopify_connector_core/static/src/v2/connector_v2_overview.js` |
 
 ## Registered browser tours
 

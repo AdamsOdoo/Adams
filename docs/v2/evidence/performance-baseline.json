@@ -1,89 +1,13 @@
 {
-  "absence_semantics": "unmeasured values are null, never zero",
-  "database_access": false,
-  "existing_perf0_scenarios": [
-    "job_enqueue",
-    "job_drain",
-    "layer2_intent",
-    "layer2_outcome",
-    "layer2_reconcile",
-    "order_binding_projection",
-    "inventory_pair_projection",
-    "fulfillment_evidence_projection",
-    "order_scan_admission",
-    "inventory_push_scan_admission",
-    "fulfillment_reconciliation_admission",
-    "fulfillment_ledger_reconcile",
-    "binding_lookup",
-    "lock_skiplocked",
-    "job_claim_contention"
-  ],
-  "generator": "tools/v2_repository_baseline.py",
-  "network_access": false,
-  "runtime_required": {
-    "backlog_restart_and_event_to_visible_state": null,
-    "ci_target_profile": null,
-    "command": "tools/perf0_baseline.py -c <odoo.conf> -d <isolated-db> --output <json>",
-    "environment": null,
-    "latency_query_api_cost_memory_lock_results": null,
-    "tiny_profile": null
-  },
-  "schema_version": 1,
-  "source_ref": "f77bfcc25e63615e6226dd9a9329f8f943593cb2",
-  "source_sha": "f77bfcc25e63615e6226dd9a9329f8f943593cb2",
-  "status": "runtime_measurement_pending",
-  "v2_initial_budgets": [
-    {
-      "budget": "p95 ≤ 800 ms server time, ≤20 SQL queries, one RPC",
-      "operation": "Overview initial read, CI target profile"
-    },
-    {
-      "budget": "p95 ≤ 700 ms, ≤15 SQL queries",
-      "operation": "Attention search first page (80 rows)"
-    },
-    {
-      "budget": "p95 ≤ 500 ms, ≤12 SQL queries",
-      "operation": "Attention detail"
-    },
-    {
-      "budget": "p95 ≤ 700 ms, ≤18 SQL queries",
-      "operation": "Run detail (200 timeline events)"
-    },
-    {
-      "budget": "p95 ≤ 500 ms, ≤15 SQL queries",
-      "operation": "Setup read/save non-remote step"
-    },
-    {
-      "budget": "p95 ≤ 1 s excluding asynchronous work",
-      "operation": "Interactive command visible admission feedback"
-    },
-    {
-      "budget": "p95 ≤ 1 s; no accepted request ≥5 s",
-      "operation": "Webhook acknowledgement"
-    },
-    {
-      "budget": "p95 ≤ 2 s",
-      "operation": "Webhook delivery to durable job evidence"
-    },
-    {
-      "budget": "p95 ≤ 5 s when local capacity and Shopify budget are available",
-      "operation": "Due interactive/webhook job to worker start"
-    },
-    {
-      "budget": "p95 ≤ 15 s, p99 ≤ 60 s excluding explicit Shopify throttle/outage",
-      "operation": "Single-record event to Odoo terminal/attention state"
-    },
-    {
-      "budget": "p95 ≤ 5 s",
-      "operation": "Active run terminal state to browser refresh"
-    },
-    {
-      "budget": "p95 ≤ 250 ms for configured batch",
-      "operation": "Drain claim transaction"
-    },
-    {
-      "budget": "no page-level overflow; usable interaction ≤2.5 s on test profile",
-      "operation": "Browser largest composed view"
-    }
-  ]
+"absence_semantics":"unmeasured values are null, never zero",
+"database_access":false,
+"existing_perf0_scenarios":["job_enqueue","job_drain","layer2_intent","layer2_outcome","layer2_reconcile","order_binding_projection","inventory_pair_projection","fulfillment_evidence_projection","order_scan_admission","inventory_push_scan_admission","fulfillment_reconciliation_admission","fulfillment_ledger_reconcile","binding_lookup","lock_skiplocked","job_claim_contention"],
+"generator":"tools/v2_repository_baseline.py",
+"network_access":false,
+"runtime_required":{"backlog_restart_and_event_to_visible_state":null,"ci_target_profile":null,"command":"tools/perf0_baseline.py -c <odoo.conf> -d <isolated-db> --output <json>","environment":null,"latency_query_api_cost_memory_lock_results":null,"tiny_profile":null},
+"schema_version":2,
+"source_ref":"78f2a09c984a78bd85db2c6b0bdde69c6630e428",
+"source_sha":"78f2a09c984a78bd85db2c6b0bdde69c6630e428",
+"status":"runtime_measurement_pending",
+"v2_initial_budgets":[{"budget":"p95 ≤ 800 ms server time, ≤20 SQL queries, one RPC","operation":"Overview initial read, CI target profile"},{"budget":"p95 ≤ 700 ms, ≤15 SQL queries","operation":"Attention search first page (80 rows)"},{"budget":"p95 ≤ 500 ms, ≤12 SQL queries","operation":"Attention detail"},{"budget":"p95 ≤ 700 ms, ≤18 SQL queries","operation":"Run detail (200 timeline events)"},{"budget":"p95 ≤ 500 ms, ≤15 SQL queries","operation":"Setup read/save non-remote step"},{"budget":"p95 ≤ 1 s excluding asynchronous work","operation":"Interactive command visible admission feedback"},{"budget":"p95 ≤ 1 s; no accepted request ≥5 s","operation":"Webhook acknowledgement"},{"budget":"p95 ≤ 2 s","operation":"Webhook delivery to durable job evidence"},{"budget":"p95 ≤ 5 s when local capacity and Shopify budget are available","operation":"Due interactive/webhook job to worker start"},{"budget":"p95 ≤ 15 s, p99 ≤ 60 s excluding explicit Shopify throttle/outage","operation":"Single-record event to Odoo terminal/attention state"},{"budget":"p95 ≤ 5 s","operation":"Active run terminal state to browser refresh"},{"budget":"p95 ≤ 250 ms for configured batch","operation":"Drain claim transaction"},{"budget":"no page-level overflow; usable interaction ≤2.5 s on test profile","operation":"Browser largest composed view"}]
 }
