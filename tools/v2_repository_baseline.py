@@ -954,12 +954,23 @@ def _write_outputs(output_dir: Path, outputs: dict[str, Any]) -> None:
         # These are machine-readable ledgers and can become large as the
         # connector grows.  Canonical compact JSON keeps Git/PR payloads and
         # evidence transport bounded without dropping any evidence fields.
-        content = value if isinstance(value, str) else json.dumps(
-            value,
-            sort_keys=True,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ) + "\n"
+        # Keep top-level keys on separate lines so provenance-only evidence
+        # commits remain reviewable without expanding every nested record.
+        if isinstance(value, str):
+            content = value
+        else:
+            items = (
+                json.dumps(key, ensure_ascii=False)
+                + ":"
+                + json.dumps(
+                    value[key],
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                for key in sorted(value)
+            )
+            content = "{\n" + ",\n".join(items) + "\n}\n"
         (output_dir / name).write_text(content, encoding="utf-8")
 
 
