@@ -34,21 +34,20 @@ approved secret location or connection mechanism instead.
 
 ## 3. Current implementation checkpoint
 
-- Recorded at (UTC): `2026-08-31T13:14:43Z`
-- Owner/model/chat: Codex GPT-5.6 Sol implementation owner; bounded GPT-5.6 Luna
-  implementation and independent-review lenses
+- Recorded at (UTC): `2026-08-31T22:42:26Z`
+- Owner/model/chat: Codex GPT-5.6 Sol implementation owner with an independent local review pass
 - Branch: `codex/v2-continuous-implementation`
 - Accepted V1 implementation base SHA: `f77bfcc25e63615e6226dd9a9329f8f943593cb2`
 - Approved V2 blueprint source SHA: `3914004e27630b09b211e3d2ee92a8e6d9a0e55e`
-- Last completed remote source SHA: `96114438da1eac7a1f61b8711ccfcb197d6df262`
-- Exact source tree: `7883b0f519b79043cb966ffcf72b45b2e1213477`
-- Equivalent reviewed local source commit: `dc2b0bea3b240103372ceef706c316fb2114175e`
+- Last completed remote source SHA: `9e1ca0f2cb6017b5031558e4528818090ad854f0`
+- Exact source tree: `b6ac802ff462a82057f86b81a33b9ceff2fe17d3`
+- Equivalent reviewed local source commit: `91cdefb0272dc73b95615f7c24923041f125130b`
 - Evidence SHA: this documentation-only checkpoint immediately following the remote source
   SHA; resolve its exact identity from the branch head to avoid a self-referential commit hash
 - Current remote implementation-branch head: this evidence checkpoint after publication
 - Candidate frozen: no
-- Active wave/task: qualify the exact evidence head once, then implement the first real P10
-  product-scan handler over the completed P06/P07 read and claim-fence foundations
+- Active wave/task: publish and qualify the exact P10 evidence checkpoint, then continue the
+  remaining P12-P16 domain/runtime and user-journey implementation in bounded vertical slices
 - Authorization/environment boundary: continuous dev-branch implementation and controlled
   server-to-server test-store use authorized; PR #210, PR #211, staging and production remain
   untouched unless explicitly routed by the implementation program
@@ -62,69 +61,68 @@ approved secret location or connection mechanism instead.
   Runtime-only evidence remains explicitly pending rather than inferred.
 - Implemented substantial P02 Overview/Needs Attention/Run projections and P15 store/setup/
   settings controls, including independent multi-store configuration capped at ten stores.
-- Hardened command replay against generation drift and made async P15/V2 reads and commands
-  fail closed when navigation, company, store, selection or component context changes.
+- Hardened command replay against generation drift and centralized configuration-generation
+  ownership so accepted policy changes increment exactly once while scan progress does not.
 - Separated durable mutation lineage from mutable job projections; mutation admission validates
   job/attempt/run/store/settings lineage before credential access and again under lock before
   lease creation. Uncertain mutations remain query-only until reconciled.
-- Extracted P06 product and sale read documents/gateways and P07 inventory, fulfillment and
-  webhook providers behind domain-owned contracts; core no longer dynamically imports optional
-  domain Python modules.
-- Routed typed P06/P07 calls through purpose-authorized reads, added exact product/sale purpose
-  mappings, and preserved the accepted V1 error taxonomy at the integration boundaries.
-- Replaced product money floats with validated exact decimal strings.
-- Implemented the P10 read-claim transport fence with typed immutable snapshots, ordered
-  `job -> attempt -> run -> store -> settings` locks, credential access only after claim proof,
-  fresh locked endpoint use and a final proof before lease creation. No lock spans Shopify I/O.
-- Closed P11 cumulative-mode, global-blocker, callback-ownership, registry-order and exception-
-  classification source defects. P11 runtime qualification still requires Odoo/PostgreSQL.
-- Published remote source `96114438da1eac7a1f61b8711ccfcb197d6df262`; its GitHub tree
-  `7883b0f519b79043cb966ffcf72b45b2e1213477` is byte-identical to the tested local tree.
+- Extracted P06/P07 domain reads and mutation providers behind typed, purpose-authorized
+  contracts while preserving the accepted V1 error taxonomy and legacy routes.
+- Implemented the production P10 product-scan handler with claim-aware page reads, immutable
+  workflow/operation binding, durable per-page progress, safe continuation and monotonic
+  checkpoints. Configuration drift rejects the page before local effects.
+- Closed the independent P1 findings: cancellation/finalization lock inversion, cross-run
+  multi-job batch deadlock, stale-handler retry, missing handler/run binding and regressing
+  product-scan checkpoints.
+- Added the V1/V2 claim fence: runless legacy jobs remain claimable, while run-linked V2 jobs
+  require an explicit registered job type both before and under the claim lock.
+- Stale read jobs whose handler disappeared now enter manual review as
+  `unregistered_read_handler`; mutation attempts remain excluded from this recovery path.
+- Added focused dependency-free tests and real two-connection Odoo/PostgreSQL barrier
+  regressions for opposite cross-run batches, claim/cancellation ordering and stale handlers.
+- Published remote source `9e1ca0f2cb6017b5031558e4528818090ad854f0`; all 64 uploaded blob
+  hashes matched the reviewed local Git objects and GitHub produced exact tree
+  `b6ac802ff462a82057f86b81a33b9ceff2fe17d3`.
 - Regenerated the six repository baseline artifacts twice against that exact remote source;
   both runs were byte-identical and the baseline check passed.
 
 ### In progress
 
-- Publish this exact-source evidence/handoff as a fast-forward checkpoint and qualify the exact
-  remote evidence head through one coherent GitHub CI run.
-- Implement the first production P10 product-scan slice: claim-aware page reads, durable
-  per-page checkpointing, safe child idempotency and same-run continuation after parent scope
-  release. The legacy V1 route must remain unchanged.
+- Publish this exact-source evidence/handoff as a fast-forward documentation checkpoint and
+  qualify the exact remote head through one coherent GitHub CI run.
+- Continue the remaining backend domain runtime slices only after that checkpoint is coherent;
+  do not mix new production code into the evidence commit.
 
 ### Changed/uncommitted files
 
-- Production source and tests are clean at remote source `96114438`; the reviewed local source
-  tree is identical.
-- Only `docs/v2/13-continuous-execution-handoff.md` and the six regenerated
-  `docs/v2/evidence/` artifacts are intentionally uncommitted at this point. Do not mix new
-  production edits into the evidence checkpoint.
+- Production source and tests are clean at remote source `9e1ca0f2`; the reviewed local source
+  tree is byte-identical.
+- Only `docs/v2/13-continuous-execution-handoff.md`, `docs/v2/evidence/README.md` and the six
+  regenerated evidence artifacts are intentionally uncommitted. Do not mix production edits
+  into this evidence checkpoint.
 
 ### Verification completed
 
-- Complete dependency-free suite: **415 tests passed** on the exact source tree.
+- Complete dependency-free suite: **446 tests passed** on the exact source tree.
 - Python compilation and `git diff --check`: passed.
 - Static policy, all seven addon dependency-direction policies and changed-production-file
   size policy: passed.
 - Shopify GraphQL schema validation: **48 documents passed** against Admin API `2026-07`
   using pinned `graphql-core==3.2.6` in a temporary dependency directory.
-- Focused corrected-claim review: 43 tests passed; no remaining claim-fence lock-order,
-  endpoint-snapshot, MRO/import-order, schema, credential-before-authorization or tenant-
-  isolation defect was found.
+- Independent diff review found no unsafe mutation path; it caught and closed the wall-clock
+  scan-window inversion and source-size violations before publication.
 - Deterministic evidence generation: two independent runs were byte-identical; repository
-  baseline `--check` passed against exact remote source `96114438`.
-- Existing remote connector suite `33331564061` and V2 policy `33331564058` passed at the
-  earlier checkpoint `7fa08b8`; the new exact evidence head still requires CI.
+  baseline `--check` passed against exact remote source `9e1ca0f2`.
+- The exact remote branch head and source tree were verified after a non-force fast-forward.
 
 ### Verification still required
 
-- The first real P10 domain handler is not implemented. The claim fence is intentionally
-  dormant until a handler propagates immutable claimed work through each remote read and local
-  page commit; do not describe P10 as end-to-end complete before that proof.
-- Odoo-backed registry/ORM/security/concurrency tests, fresh install, warm update, migrations,
-  backup/restore, uninstall and measured performance require CI/Odoo.sh because local Odoo and
-  PostgreSQL are unavailable.
-- P10 production reads plus P12 inventory, P13 product export and P14 fulfillment runtime
-  integrations remain before the backend foundation is complete.
+- Execute the newly added two-connection Odoo/PostgreSQL barrier regressions in CI; local
+  scratch has neither Odoo nor PostgreSQL.
+- Odoo-backed registry/ORM/security tests, fresh install, warm update, migrations,
+  backup/restore, uninstall and measured performance require the coherent remote gate.
+- P12 inventory, P13 product export and P14 fulfillment runtime integrations remain before the
+  backend foundation is complete.
 - V2/P16 production assets remain deliberately unmanifested/inert. Products, Orders,
   Inventory, Fulfillment and Settings production surfaces, all-store health, responsive/RTL/
   accessibility browser proof and U1-U14 end-to-end journeys remain pending.
@@ -133,36 +131,34 @@ approved secret location or connection mechanism instead.
 
 ### External state (no secrets)
 
-- Odoo build/database alias: no new build created for source `96114438`; exact-head remote
-  qualification begins after the evidence checkpoint is published.
-- Shopify test-store alias: no external mutation made in this checkpoint.
+- Odoo build/database alias: no exact-source build result recorded yet; qualification begins
+  after this evidence checkpoint is published.
+- Shopify test-store alias: no external mutation made in this source/evidence checkpoint.
 - Store UI/gateway/runtime modes: V2/P16 production assets remain unmanifested/inert; cumulative
   runtime modes exist in source but are not release-qualified.
 - Running/queued/uncertain work: none created.
 
 ### Defects and blockers
 
-- No known source-level blocker prevents publishing this extraction/safety checkpoint.
-- The absence of a real P10 product handler is a deliberate next-gate functional gap, not a
-  completed capability. Product/sale claim propagation must be proven end to end there.
-- Product completion is not release completion: P10/P12-P16 integrations and every U1-U14
+- No known source-level blocker prevents publishing this P10 checkpoint.
+- Runtime qualification is an evidence gap, not an inferred pass: Odoo/PostgreSQL, browser,
+  performance and live-Shopify results remain pending until executed on an exact remote SHA.
+- Product completion is not release completion: P12-P16 integrations and every U1-U14
   end-to-end journey are still formally pending.
 - Near-real-time mechanics exist by design (webhooks, immediate bounded worker drain, scheduled
   reconciliation and adaptive UI polling), but the 15/60-second SLO is unmeasured and must not
   be claimed until exact-SHA load and live-store evidence exists.
-- Local scratch lacks PostgreSQL/Odoo. Unavailable runtime evidence must stay pending rather
-  than being inferred from dependency-free tests.
 
 ### Rollback
 
-- Remote source checkpoint `96114438da1eac7a1f61b8711ccfcb197d6df262` is the exact rollback
+- Remote source checkpoint `9e1ca0f2cb6017b5031558e4528818090ad854f0` is the exact rollback
   point for this source wave; its tree is independently verified against the local checkpoint.
-- Previous remote rollback remains `5cc812296b26e81deaa5fb0c41c7626485fe4e83`.
+- Previous remote rollback remains `96114438da1eac7a1f61b8711ccfcb197d6df262`.
 
 ### First next action
 
-- Publish and verify this evidence checkpoint, observe one exact-head connector/policy CI gate,
-  then implement the P10 product-scan slice without rerunning expensive suites prematurely.
+- Publish and verify this evidence checkpoint, observe the exact-head connector/policy CI gate,
+  then continue the next backend vertical slice without rerunning expensive suites prematurely.
 
 ## 4. Implementation checkpoint template
 
