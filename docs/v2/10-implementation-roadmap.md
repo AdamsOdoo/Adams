@@ -517,7 +517,9 @@ Changes:
 
 - extract store lifecycle, credential and readiness services behind stable model methods;
 - implement store list/administration/settings/setup DTOs and writes, resumable progress and activation fingerprint;
-- enforce canonical-domain identity, one effective settings record, multiple stores per company, company/store isolation and no designed store-count cap;
+- enforce canonical-domain identity, one effective settings record, multiple
+  stores per company, company/store isolation and the inherited ten-store
+  fail-closed support limit until exact-candidate evidence authorizes a change;
 - register typed per-domain workflow/settings/readiness fragments and lifecycle actions;
 - preserve credential storage, scopes, generation/disconnect behavior.
 

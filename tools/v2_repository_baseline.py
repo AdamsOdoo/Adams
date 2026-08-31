@@ -27,7 +27,7 @@ from typing import Any, Iterable
 from xml.etree import ElementTree
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 CONNECTOR_PREFIX = "shopify_connector_"
 OUTPUT_NAMES = (
     "compatibility-baseline.json",
@@ -38,8 +38,10 @@ OUTPUT_NAMES = (
     "ui-task-baseline.md",
 )
 GRAPHQL_OPERATION = re.compile(
-    r"^\s*(query|mutation)\s+([_A-Za-z][_0-9A-Za-z]*)\s*", re.DOTALL
+    r"^\s*(query|mutation)\b(?:\s+([_A-Za-z][_0-9A-Za-z]*))?",
+    re.DOTALL,
 )
+GRAPHQL_DOCUMENT_START = re.compile(r"^\s*(query|mutation)\b[^\{]*\{")
 GRAPHQL_VARIABLE = re.compile(r"\$([_A-Za-z][_0-9A-Za-z]*)\s*:")
 SQL_INDEX = re.compile(
     r"CREATE\s+(UNIQUE\s+)?INDEX(?:\s+IF\s+NOT\s+EXISTS)?\s+"
@@ -86,6 +88,87 @@ def _expr(node: ast.AST | None) -> str | None:
         return None
 
 
+_UNRESOLVED = object()
+
+
+def _resolve_static_value(
+    node: ast.AST | None, constants: dict[str, Any]
+) -> Any:
+    """Resolve a dependency-free module literal, if it is statically known.
+
+    ``ast.literal_eval`` deliberately does not resolve names.  Selection
+    declarations in the addons commonly put their literal list in a module
+    constant, so resolve names that point at literals while keeping arbitrary
+    calls/attributes/operators opaque.  A small amount of sequence/string
+    concatenation is safe and useful for constants assembled from literals.
+    """
+    if node is None:
+        return _UNRESOLVED
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError):
+        pass
+    if isinstance(node, ast.Name):
+        return constants.get(node.id, _UNRESOLVED)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left = _resolve_static_value(node.left, constants)
+        right = _resolve_static_value(node.right, constants)
+        if left is not _UNRESOLVED and right is not _UNRESOLVED:
+            try:
+                return left + right
+            except (TypeError, ValueError):
+                return _UNRESOLVED
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        values = [_resolve_static_value(item, constants) for item in node.elts]
+        if all(value is not _UNRESOLVED for value in values):
+            container = {
+                ast.List: list,
+                ast.Tuple: tuple,
+                ast.Set: set,
+            }[type(node)]
+            try:
+                return container(values)
+            except (TypeError, ValueError):
+                return _UNRESOLVED
+    if isinstance(node, ast.Dict):
+        keys = [_resolve_static_value(item, constants) for item in node.keys]
+        values = [_resolve_static_value(item, constants) for item in node.values]
+        if all(item is not _UNRESOLVED for item in keys + values):
+            try:
+                return dict(zip(keys, values))
+            except (TypeError, ValueError):
+                return _UNRESOLVED
+    return _UNRESOLVED
+
+
+def _module_literal_constants(tree: ast.Module) -> dict[str, Any]:
+    """Collect statically known module-level assignments in source order."""
+    constants: dict[str, Any] = {}
+    for node in tree.body:
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = node.value
+        resolved = _resolve_static_value(value, constants)
+        if resolved is _UNRESOLVED:
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        for target in targets:
+            if isinstance(target, ast.Name):
+                constants[target.id] = resolved
+    return constants
+
+
+def _selection_values(value: Any) -> list[str] | None:
+    if not isinstance(value, (list, tuple)):
+        return None
+    values: list[str] = []
+    for item in value:
+        if not isinstance(item, (list, tuple)) or not item:
+            return None
+        values.append(str(item[0]))
+    return values
+
+
 def _sha256_text(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
@@ -107,6 +190,50 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
+def _is_connector_addon_path(path: str) -> bool:
+    parts = path.replace("\\", "/").split("/")
+    return (
+        len(parts) >= 2
+        and parts[0] == "addons"
+        and parts[1].startswith(CONNECTOR_PREFIX)
+    )
+
+
+def _connector_surface_drift(root: Path, source_sha: str) -> list[str]:
+    """Return connector-addon paths differing from the resolved source tree."""
+    tracked = _git(
+        root,
+        "diff",
+        "--name-only",
+        "--no-renames",
+        source_sha,
+        "--",
+        "addons",
+    ).splitlines()
+    untracked = _git(
+        root,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "addons",
+    ).splitlines()
+    return sorted({
+        path
+        for path in tracked + untracked
+        if _is_connector_addon_path(path)
+    })
+
+
+def _assert_connector_surface_matches_source(root: Path, source_sha: str) -> None:
+    drift = _connector_surface_drift(root, source_sha)
+    if drift:
+        raise BaselineError(
+            "connector addon working-tree mismatch with source SHA "
+            f"{source_sha}: {', '.join(drift)}"
+        )
+
+
 def _connector_addons(root: Path) -> list[Path]:
     return sorted(
         path.parent
@@ -125,7 +252,9 @@ def _manifest(addon: Path) -> dict[str, Any]:
     return value
 
 
-def _field_from_assignment(name: str, call: ast.Call) -> dict[str, Any] | None:
+def _field_from_assignment(
+    name: str, call: ast.Call, constants: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
     if not isinstance(call.func, ast.Attribute):
         return None
     if not isinstance(call.func.value, ast.Name) or call.func.value.id != "fields":
@@ -144,14 +273,12 @@ def _field_from_assignment(name: str, call: ast.Call) -> dict[str, Any] | None:
     selection_node = keywords.get("selection")
     if selection_node is None and call.args and field_type == "Selection":
         selection_node = call.args[0]
-    selection = _literal(selection_node)
-    selection_values: list[str] | None = None
-    if isinstance(selection, (list, tuple)):
-        selection_values = [
-            str(item[0])
-            for item in selection
-            if isinstance(item, (list, tuple)) and item
-        ]
+    static_constants = constants or {}
+    selection = _resolve_static_value(selection_node, static_constants)
+    selection_values = _selection_values(selection)
+    selection_add_node = keywords.get("selection_add")
+    selection_add = _resolve_static_value(selection_add_node, static_constants)
+    selection_add_values = _selection_values(selection_add)
     return {
         "name": name,
         "type": field_type,
@@ -166,6 +293,10 @@ def _field_from_assignment(name: str, call: ast.Call) -> dict[str, Any] | None:
         "ondelete": _literal(keywords.get("ondelete")),
         "selection_values": selection_values,
         "selection_expression": None if selection_values is not None else _expr(selection_node),
+        "selection_add_values": selection_add_values,
+        "selection_add_expression": (
+            None if selection_add_values is not None else _expr(selection_add_node)
+        ),
     }
 
 
@@ -174,7 +305,7 @@ def _constraint_from_assignment(name: str, call: ast.Call) -> dict[str, Any] | N
         return None
     if not isinstance(call.func.value, ast.Name) or call.func.value.id != "models":
         return None
-    if call.func.attr not in {"Constraint", "Index"}:
+    if call.func.attr not in {"Constraint", "Index", "UniqueIndex"}:
         return None
     return {
         "name": name,
@@ -193,23 +324,52 @@ def _decorator_name(node: ast.AST) -> str:
     return _expr(target) or ""
 
 
+def _model_kind(bases: list[str]) -> str:
+    """Return the Odoo model family represented by direct class bases."""
+    if any(
+        base in {"TransientModel", "models.TransientModel"}
+        or base.endswith(".TransientModel")
+        for base in bases
+    ):
+        return "transient"
+    if any(
+        base in {"AbstractModel", "models.AbstractModel"}
+        or base.endswith(".AbstractModel")
+        for base in bases
+    ):
+        return "abstract"
+    return "model"
+
+
+def _raw_indexes_from_source(root: Path, path: Path, source: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": match.group(2),
+            "unique": bool(match.group(1)),
+            "source": _relative(root, path),
+        }
+        for match in SQL_INDEX.finditer(source)
+    ]
+
+
 def _models_from_python(root: Path, addon: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     models: list[dict[str, Any]] = []
     raw_indexes: list[dict[str, Any]] = []
     for path in sorted(addon.rglob("*.py")):
-        if "tests" in path.parts or "migrations" in path.parts:
+        if "tests" in path.parts:
             continue
         source = path.read_text(encoding="utf-8")
+        raw_indexes.extend(_raw_indexes_from_source(root, path, source))
+        if "migrations" in path.parts:
+            # Migration scripts are scanned for raw DDL but never inspected as
+            # model declarations: they are historical transformations, not
+            # registry classes.
+            continue
         try:
             tree = ast.parse(source, filename=str(path))
         except SyntaxError as exc:
             raise BaselineError(f"cannot parse {_relative(root, path)}: {exc}") from exc
-        for match in SQL_INDEX.finditer(source):
-            raw_indexes.append({
-                "name": match.group(2),
-                "unique": bool(match.group(1)),
-                "source": _relative(root, path),
-            })
+        constants = _module_literal_constants(tree)
         for node in tree.body:
             if not isinstance(node, ast.ClassDef):
                 continue
@@ -234,7 +394,7 @@ def _models_from_python(root: Path, addon: Path) -> tuple[list[dict[str, Any]], 
                             continue
                         attributes[target.id] = value
                         if isinstance(value, ast.Call):
-                            field = _field_from_assignment(target.id, value)
+                            field = _field_from_assignment(target.id, value, constants)
                             if field:
                                 fields.append(field)
                             constraint = _constraint_from_assignment(target.id, value)
@@ -256,8 +416,15 @@ def _models_from_python(root: Path, addon: Path) -> tuple[list[dict[str, Any]], 
                         })
             name = _literal(attributes.get("_name"))
             inherit = _literal(attributes.get("_inherit"))
+            model_kind = _model_kind(bases)
             table = _literal(attributes.get("_table"))
-            if table is None and isinstance(name, str):
+            # An AbstractModel never owns a PostgreSQL table.  Likewise, an
+            # extension class with only _inherit contributes fields/methods to
+            # the inherited registry model and must not get a synthetic table
+            # from a missing _name.
+            if model_kind == "abstract" or not isinstance(name, str):
+                table = None
+            elif table is None:
                 table = name.replace(".", "_")
             sql_constraints = _literal(attributes.get("_sql_constraints"), [])
             if not isinstance(sql_constraints, (list, tuple)):
@@ -275,6 +442,7 @@ def _models_from_python(root: Path, addon: Path) -> tuple[list[dict[str, Any]], 
                 "class": node.name,
                 "source": _relative(root, path),
                 "base_kind": bases,
+                "model_kind": model_kind,
                 "name": name,
                 "inherit": _jsonable(inherit),
                 "table": table,
@@ -286,6 +454,14 @@ def _models_from_python(root: Path, addon: Path) -> tuple[list[dict[str, Any]], 
                 ),
                 "public_methods": sorted(set(public_methods)),
             })
+    # Keep standalone migration SQL in the same raw-DDL inventory while
+    # leaving it out of the Python model pass above.
+    for path in sorted(addon.rglob("*.sql")):
+        if "tests" in path.parts:
+            continue
+        raw_indexes.extend(
+            _raw_indexes_from_source(root, path, path.read_text(encoding="utf-8"))
+        )
     return (
         sorted(models, key=lambda item: (item["source"], item["class"])),
         sorted(raw_indexes, key=lambda item: (item["name"], item["source"])),
@@ -471,15 +647,23 @@ def _graphql_inventory(root: Path, addon_paths: list[Path]) -> dict[str, Any]:
                                 api_version = _literal(value, api_version)
                 if isinstance(node, ast.Constant) and isinstance(node.value, str):
                     document = node.value.strip()
-                    match = GRAPHQL_OPERATION.match(document)
+                    match = (
+                        GRAPHQL_OPERATION.match(document)
+                        if GRAPHQL_DOCUMENT_START.match(document)
+                        else None
+                    )
                     if match and "MutationDispatchSelftest" not in document:
+                        digest = _sha256_text(document)
+                        declared_name = match.group(2)
                         operations.append({
                             "addon": addon.name,
                             "kind": match.group(1),
-                            "name": match.group(2),
+                            "name": declared_name,
+                            "anonymous": declared_name is None,
+                            "inventory_key": declared_name or f"anonymous:{digest[:16]}",
                             "source": _relative(root, path),
                             "line": node.lineno,
-                            "sha256": _sha256_text(document),
+                            "sha256": digest,
                             "variables": sorted(set(GRAPHQL_VARIABLE.findall(document))),
                             "has_cursor_variable": "$after" in document,
                             "has_page_info": "pageInfo" in document,
@@ -495,12 +679,16 @@ def _graphql_inventory(root: Path, addon_paths: list[Path]) -> dict[str, Any]:
                             "source": _relative(root, path),
                             "line": node.lineno,
                         })
+    operations = sorted(
+        operations,
+        key=lambda item: (item["inventory_key"], item["source"], item["line"]),
+    )
     return {
         "schema_version": SCHEMA_VERSION,
         "api_version_literal": api_version,
-        "operations": sorted(
-            operations, key=lambda item: (item["name"], item["source"], item["line"])
-        ),
+        "operation_count": len(operations),
+        "anonymous_operation_count": sum(item["anonymous"] for item in operations),
+        "operations": operations,
         "transport_calls": sorted(
             transport_calls,
             key=lambda item: (item["source"], item["line"], item["method"]),
@@ -513,6 +701,10 @@ def _graphql_inventory(root: Path, addon_paths: list[Path]) -> dict[str, Any]:
                 "Each mutation must be linked manually or by later runtime evidence to "
                 "its idempotency, certainty and readback contract; this static inventory "
                 "does not infer safety from names."
+            ),
+            "anonymous_policy": (
+                "P00 inventories anonymous documents by digest; P01 must name and own every "
+                "operation before its typed registry gate can pass."
             ),
             "version_source": "addons/shopify_connector_core/tools/api_version.py",
             "schema_validator": "tools/validate_shopify_graphql.py",
@@ -629,6 +821,7 @@ def _ui_markdown(
 
 def build_outputs(root: Path, source_ref: str) -> dict[str, Any]:
     source_sha = _git(root, "rev-parse", f"{source_ref}^{{commit}}")
+    _assert_connector_surface_matches_source(root, source_sha)
     provenance = {
         "schema_version": SCHEMA_VERSION,
         "source_ref": source_ref,
@@ -769,11 +962,51 @@ def _normalized_for_check(value: Any) -> Any:
         return {
             key: _normalized_for_check(item)
             for key, item in value.items()
-            if key not in {"source_ref", "source_sha"}
+            if key != "source_ref"
         }
     if isinstance(value, list):
         return [_normalized_for_check(item) for item in value]
     return value
+
+
+def _artifact_source_sha(name: str, value: Any) -> str | None:
+    if name.endswith(".json"):
+        return value.get("source_sha") if isinstance(value, dict) else None
+    match = re.search(r"^- Source SHA: `([^`]+)`$", str(value), re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _frozen_source_sha(output_dir: Path) -> str:
+    """Read the canonical SHA from frozen artifacts for check-mode authority."""
+    canonical_path = output_dir / "compatibility-baseline.json"
+    if not canonical_path.exists():
+        raise BaselineError(f"missing frozen provenance {canonical_path}")
+    try:
+        canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise BaselineError(f"invalid frozen provenance {canonical_path}: {exc}") from exc
+    source_sha = _artifact_source_sha("compatibility-baseline.json", canonical)
+    if not source_sha:
+        raise BaselineError(f"missing source_sha in frozen provenance {canonical_path}")
+    for name in OUTPUT_NAMES:
+        path = output_dir / name
+        if not path.exists() or name == "compatibility-baseline.json":
+            continue
+        try:
+            value = (
+                json.loads(path.read_text(encoding="utf-8"))
+                if name.endswith(".json")
+                else path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            raise BaselineError(f"cannot read frozen provenance {path}: {exc}") from exc
+        other_sha = _artifact_source_sha(name, value)
+        if other_sha and other_sha != source_sha:
+            raise BaselineError(
+                "frozen source SHA mismatch: "
+                f"{canonical_path}={source_sha}, {path}={other_sha}"
+            )
+    return source_sha
 
 
 def _check_outputs(output_dir: Path, outputs: dict[str, Any]) -> None:
@@ -784,13 +1017,33 @@ def _check_outputs(output_dir: Path, outputs: dict[str, Any]) -> None:
             failures.append(f"missing {path}")
             continue
         if name.endswith(".json"):
-            expected = _normalized_for_check(json.loads(path.read_text(encoding="utf-8")))
-            actual = _normalized_for_check(outputs[name])
+            frozen_value = json.loads(path.read_text(encoding="utf-8"))
+            regenerated_value = outputs[name]
+            frozen_sha = _artifact_source_sha(name, frozen_value)
+            regenerated_sha = _artifact_source_sha(name, regenerated_value)
+            if frozen_sha != regenerated_sha:
+                failures.append(
+                    f"source SHA mismatch in {path}: "
+                    f"frozen={frozen_sha!r}, regenerated={regenerated_sha!r}"
+                )
+            expected = _normalized_for_check(frozen_value)
+            actual = _normalized_for_check(regenerated_value)
         else:
             expected_text = path.read_text(encoding="utf-8")
             actual_text = str(outputs[name])
-            expected = re.sub(r"- Source (ref|SHA): `[^`]+`", r"- Source \1: `<ignored>`", expected_text)
-            actual = re.sub(r"- Source (ref|SHA): `[^`]+`", r"- Source \1: `<ignored>`", actual_text)
+            frozen_sha = _artifact_source_sha(name, expected_text)
+            regenerated_sha = _artifact_source_sha(name, actual_text)
+            if frozen_sha != regenerated_sha:
+                failures.append(
+                    f"source SHA mismatch in {path}: "
+                    f"frozen={frozen_sha!r}, regenerated={regenerated_sha!r}"
+                )
+            expected = re.sub(
+                r"- Source ref: `[^`]+`", r"- Source ref: `<ignored>`", expected_text
+            )
+            actual = re.sub(
+                r"- Source ref: `[^`]+`", r"- Source ref: `<ignored>`", actual_text
+            )
         if expected != actual:
             failures.append(f"compatibility drift in {path}")
     if failures:
@@ -815,11 +1068,16 @@ def main(argv: list[str] | None = None) -> int:
     if not output_dir.is_absolute():
         output_dir = root / output_dir
     try:
-        outputs = build_outputs(root, args.source_ref)
         if args.check:
+            # The frozen artifact records the code commit C.  A later
+            # docs/evidence publication commit is allowed as long as its
+            # connector-addon surface is still exactly C.
+            frozen_source_sha = _frozen_source_sha(output_dir)
+            outputs = build_outputs(root, frozen_source_sha)
             _check_outputs(output_dir, outputs)
             print(f"V2 repository baseline matches {output_dir}.")
         else:
+            outputs = build_outputs(root, args.source_ref)
             _write_outputs(output_dir, outputs)
             print(f"Wrote {len(outputs)} V2 baseline artifacts to {output_dir}.")
     except (BaselineError, OSError, json.JSONDecodeError) as exc:

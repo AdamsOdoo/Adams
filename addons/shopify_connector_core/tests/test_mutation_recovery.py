@@ -185,6 +185,25 @@ class TestMutationRecovery(TransactionCase):
         self.assertEqual(job.state, 'succeeded')
         self.assertEqual(reconciliations.state, 'succeeded')
 
+    def test_committed_c2_token_drift_still_reconciles_once(self):
+        job, attempt = self._running(True)
+        job.sudo().write({'current_attempt_token': uuid.uuid4().hex})
+
+        self.Sweep.run_sweep()
+        self.Sweep.run_sweep()
+
+        reconciliations = self.Job.search([
+            ('mutation_attempt_id', '=', attempt.id),
+        ])
+        self.assertEqual(len(reconciliations), 1)
+        self.assertEqual(attempt.observed_outcome, 'uncertain')
+        self.assertNotEqual(
+            attempt.attempt_token, job.current_attempt_token,
+        )
+        self.assertFalse(job.current_attempt_token)
+        self.assertFalse(job.owner_worker_ref)
+        self.assertNotEqual(job.state, 'retry_waiting')
+
     def test_disconnect_preserves_credentials_for_unresolved_attempt(self):
         self.env['shopify.connector.store.credential'].action_set_token(
             self.store, 'shpat_DUMMYDUMMYDUMMY0000000000000000'

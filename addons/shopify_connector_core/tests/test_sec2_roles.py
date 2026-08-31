@@ -27,6 +27,8 @@ No Shopify transport of any kind occurs in this module.
 import importlib.util
 from pathlib import Path
 
+from psycopg2 import IntegrityError
+
 from odoo.exceptions import AccessError
 from odoo.tests.common import TransactionCase, tagged
 from odoo.tools import mute_logger
@@ -386,6 +388,159 @@ class TestSec2Roles(TransactionCase):
         store.write({'name': 'SEC-2 role store (admin edit)'})
         self.store.invalidate_recordset(['name'])
         self.assertEqual(self.store.name, 'SEC-2 role store (admin edit)')
+
+    @mute_logger('odoo.addons.base.models.ir_model', 'odoo.addons.base.models.ir_rule')
+    def test_connector_administrator_cannot_write_store_safety_fields(self):
+        """Readonly lifecycle/ownership fields are server-side protected.
+
+        The Administrator ACL intentionally still grants ordinary label edits;
+        it must not turn the readonly form hints into a lifecycle RPC API.
+        Each attempted value is rejected before a constraint or side effect can
+        run, and a forged JSON-style capability context remains closed.
+        """
+        store = self.env['shopify.connector.store'].with_user(
+            self.role_admin
+        ).browse(self.store.id)
+        protected = {
+            'shop_domain': 'forged-domain.myshopify.com',
+            'state': 'connected',
+            'api_version': '2025-01',
+            'company_id': self.store.company_id.id,
+            'connection_generation': 99,
+            'last_readiness_result': 'pass',
+            'disconnect_status': 'requested',
+        }
+        for field, value in protected.items():
+            with self.subTest(field=field):
+                with self.assertRaises(AccessError):
+                    store.write({field: value})
+        forged = store.with_context(
+            shopify_store_write_surface='_lifecycle',
+            shopify_store_service_sentinel=True,
+        )
+        with self.assertRaises(AccessError):
+            forged.write({'state': 'connected'})
+
+        # The private service helper is the explicit, non-forgeable internal
+        # route and still works for a normal Administrator service call.
+        settings = self.env['shopify.connector.store.settings'].create({
+            'store_id': self.store.id,
+        })
+        settings = settings.with_user(self.role_admin)
+        settings._settings_service_write(
+            '_setup', {'setup_wizard_step': 2},
+        )
+        settings.invalidate_recordset(['setup_wizard_step'])
+        self.assertEqual(settings.setup_wizard_step, 2)
+        with self.assertRaises(AccessError):
+            settings.write({'setup_wizard_step': 3})
+        with self.assertRaises(AccessError):
+            settings.write({'notification_default_enabled': True})
+        with self.assertRaises(AccessError):
+            settings.with_context(
+                shopify_settings_write_surface='_setup',
+                shopify_settings_service_sentinel=True,
+            ).write({'setup_wizard_step': 3})
+
+    @mute_logger(
+        'odoo.addons.base.models.ir_model',
+        'odoo.addons.base.models.ir_rule',
+        'odoo.sql_db',
+    )
+    def test_create_admission_blocks_state_injection_and_duplicate_settings(self):
+        """Create is closed even if a future ACL grants it.
+
+        The shipped ACLs intentionally grant no connector-role create right;
+        the temporary rows below make this test exercise the model seam rather
+        than merely restating that ACL choice.  A private service surface can
+        create the minimal initial shape, while direct ORM/RPC calls cannot
+        seed lifecycle, readiness, generation, fulfillment, or setup state.
+        """
+        Store = self.env['shopify.connector.store']
+        Settings = self.env['shopify.connector.store.settings']
+        admin_group = self._group('group_shopify_connector_admin')
+        for model_name, label in (
+            ('shopify.connector.store', 'store'),
+            ('shopify.connector.store.settings', 'settings'),
+        ):
+            model = self.env['ir.model'].search(
+                [('model', '=', model_name)], limit=1,
+            )
+            self.env['ir.model.access'].create({
+                'name': 'sec2_temp_%s_create' % label,
+                'model_id': model.id,
+                'group_id': admin_group.id,
+                'perm_read': True,
+                'perm_write': True,
+                'perm_create': True,
+                'perm_unlink': False,
+            })
+
+        admin_store = Store.with_user(self.role_admin)
+        with self.assertRaises(AccessError):
+            admin_store.create({
+                'name': 'RPC store without service',
+                'shop_domain': 'rpc-store-without-service.myshopify.com',
+            })
+        with self.assertRaises(AccessError):
+            admin_store.create({
+                'name': 'RPC forged lifecycle store',
+                'shop_domain': 'rpc-forged-lifecycle.myshopify.com',
+                'state': 'connected',
+                'connection_generation': 42,
+                'last_readiness_result': 'pass',
+            })
+        with self.assertRaises(AccessError):
+            admin_store.with_context(
+                shopify_store_create_surface='_setup',
+                shopify_store_service_sentinel=True,
+            ).create({
+                'name': 'RPC forged capability store',
+                'shop_domain': 'rpc-forged-capability.myshopify.com',
+            })
+
+        service_store = admin_store._store_service_create(
+            '_setup', {
+                'name': 'Service-created store',
+                'shop_domain': 'service-created-store.myshopify.com',
+                'company_id': self.store.company_id.id,
+            },
+        )
+        self.assertEqual(service_store.state, 'setup_incomplete')
+        with self.assertRaises(AccessError):
+            admin_store._store_service_create(
+                '_setup', {
+                    'name': 'Service forged state store',
+                    'shop_domain': 'service-forged-state.myshopify.com',
+                    'state': 'connected',
+                },
+            )
+
+        admin_settings = Settings.with_user(self.role_admin)
+        settings = admin_settings._settings_service_create(
+            '_setup', {'store_id': self.store.id},
+        )
+        self.assertEqual(settings.store_id.id, self.store.id)
+        with self.assertRaises(AccessError):
+            admin_settings.create({'store_id': self.store.id})
+        with self.assertRaises(AccessError):
+            admin_settings.create({
+                'store_id': service_store.id,
+                'setup_wizard_step': 9,
+                'fulfillment_operating_mode': 'mode2',
+                'fulfillment_mode_switch_nonce': 'forged',
+            })
+        with self.assertRaises(AccessError):
+            admin_settings.with_context(
+                shopify_settings_create_surface='_setup',
+                shopify_settings_service_sentinel=True,
+            ).create({'store_id': service_store.id})
+
+        # The SQL uniqueness constraint remains the final arbiter if a trusted
+        # root service accidentally attempts a second row.
+        with self.assertRaises(IntegrityError):
+            with self.env.cr.savepoint():
+                Settings.sudo().create({'store_id': self.store.id})
 
     @mute_logger('odoo.addons.base.models.ir_model', 'odoo.addons.base.models.ir_rule')
     def test_no_connector_role_escalates_to_odoo_system_administration(self):

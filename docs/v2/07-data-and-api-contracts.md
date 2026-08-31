@@ -37,7 +37,12 @@ No migration changes their `_name`, `_table` or existing XML IDs. Existing recor
 #### Store cardinality, isolation and settings ownership
 
 - One canonical Shopify shop domain maps to one connector store identity; reconnecting never creates a second identity for the same shop.
-- One Odoo company may own multiple Shopify stores. A database may contain stores for multiple permitted companies. There is no application-level store-count cap.
+- One Odoo company may own multiple Shopify stores and a database may contain
+  stores for multiple permitted companies. The initial V2 supported capacity
+  remains the V1 fail-closed limit of ten stores per database. This is a
+  measured support boundary, not a licensing rule: it may be raised or removed
+  only after the 20-store profile passes the exact-candidate isolation,
+  backlog, latency and query budgets.
 - Every credential, settings row, mapping, binding, checkpoint, run, job and rollout flag is store-scoped even when two stores share a company.
 - Store children must match both `store_id` and the store-derived `company_id`; same company is not permission to cross store boundaries.
 - A store has one effective `shopify.connector.store.settings` record. Historic configuration is represented by the connection/configuration generation and audit evidence, not competing active settings rows.
@@ -73,7 +78,7 @@ One record represents one user or system request that may create multiple jobs.
 | `workflow` | Selection, indexed | yes | `core`, `product`, `product_export`, `sale`, `inventory`, `fulfillment`, `webhook` |
 | `operation` | Char, indexed | yes | registered operation key |
 | `trigger` | Selection, indexed | yes | `user`, `cron`, `webhook`, `odoo_event`, `reconciliation`, `system` |
-| `actor_uid` | Many2one user, set null | no | null only for a recorded system trigger |
+| `actor_uid` | Many2one user, restrict | no | null only for a recorded system trigger; archive users instead of deleting audit identity |
 | `requested_at` | Datetime, indexed | yes | UTC |
 | `admitted_at` | Datetime | no | set after all admission gates |
 | `finished_at` | Datetime, indexed | no | terminal time |
@@ -354,7 +359,13 @@ Credential fields are limited to `present`, `last_replaced_at`, `last_verified_a
 
 The launcher first calls `get_operation_options_v1(store_id)` and receives registered operations only:
 
-`operation_key`, label, workflow, mode (`read`, `preview`, `mutation`, `reconciliation`), required role, available scopes/filter schema, source-of-truth summary, side-effect summary, readiness and disabled reason.
+The current P15 DTO is intentionally narrow: `operation_key`, label, workflow,
+mode (`read` or `reconciliation`), required role, the single available scope
+`store`, an empty `filter_schema`, source-of-truth summary, side-effect
+summary, readiness and disabled reason. The registered options are
+Administrator-only and operate on one exact store. Preview, mutation and
+free-form filter modes are not advertised until a separately reviewed command
+contract exists.
 
 The browser does not invent operation names or free-form domains.
 
@@ -399,11 +410,16 @@ Success:
 
 Payload:
 
-- `operation_key` from server registry;
-- `scope` conforming to the returned operation schema;
-- `execution_mode`: `execute` or `preview`; only supported values accepted;
-- `preview_fingerprint` when confirming a preview;
-- optional human `reason` where the operation policy requires it.
+- `operation_key` from the server registry;
+- no scope, filter, execution-mode, preview-fingerprint or free-form reason
+  fields are accepted in this foundation slice. The operation is always
+  admitted for the exact store named by the command envelope and only when
+  the returned option is ready.
+
+The supported keys are deliberately fewer than the long-term launcher shape:
+the command accepts only `operation_key`, creates/adopts the named bounded
+read/scan or reconciliation job, and returns a job-backed `run_ref`. It never
+dispatches arbitrary model/method names or remote mutations.
 
 Response returns the existing run on duplicate `command_id` or identical idempotency scope; it does not create a second request.
 
@@ -421,7 +437,10 @@ The handler reloads the source, recomputes allowed transitions and rejects stale
 
 ### 6.4 Setup writes
 
-- `save_setup_step_v1`: accepts only fields owned by that numbered step and returns the refreshed setup DTO.
+- `save_setup_step_v1`: requires the canonical durable `step_key`, accepts only
+  fields owned by that semantic step and returns the refreshed setup DTO. A
+  display ordinal is never an address. Legacy numeric progress is translated
+  only by the one-way compatibility map before command validation.
 - `replace_credential_v1`: accepts secret once over Odoo RPC; stores through the guarded credential service; returns no secret or prefix derived from it.
 - `test_connection_v1`: creates auditable diagnostic work, reports served API version and scope posture.
 - `activate_store_v1`: includes readiness snapshot fingerprint; server reruns mandatory checks and generation fence.
@@ -438,7 +457,13 @@ The handler reloads the source, recomputes allowed transitions and rejects stale
 - `save_store_settings_group_v1`: accepts one registered group, its current revision/fingerprint and typed values; validates cross-field/domain readiness, increments the relevant configuration generation and returns refreshed settings/readiness.
 - `set_workflow_state_v1`: enable, pause, resume or disable one registered workflow; enabling requires installed producer and readiness, while disabling blocks new admission without deleting history.
 - `pause_store_v1` / `resume_store_v1`: audited admission controls; resume reruns mandatory readiness.
-- `disconnect_store_v1`: revokes local credential/subscription posture according to the accepted lifecycle contract, increments generation and preserves business/evidence records.
+- `disconnect_store_v1`: blocks new admission, safely settles/verifies queued
+  and in-flight work, reconciles connector-owned subscriptions, removes local
+  credential usability, increments generation and preserves business/evidence
+  records. A merchant-created Shopify custom-app token cannot be remotely
+  revoked by this connector; the result DTO must state that external Shopify
+  revocation remains an explicit Administrator follow-up instead of claiming
+  end-to-end token revocation.
 - `retire_store_v1`: prevents new work and hides the store from default daily views; it never hard-deletes bindings, runs or audit history.
 
 No initial V2 command clones settings between stores. A future copy operation must have an explicit allowlist of non-secret defaults, name both source and destination, never copy mappings/bindings/checkpoints/credentials, and rerun destination readiness.

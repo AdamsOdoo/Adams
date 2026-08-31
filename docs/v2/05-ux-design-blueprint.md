@@ -231,14 +231,23 @@ Technical detail is collapsed and restricted to Administrator/Auditor roles as a
 
 ### 6.8 Settings and setup
 
-Setup is six resumable steps:
+Setup presents six resumable phases over the twelve durable V1 semantic step
+keys.  The phase is visual orientation only; `step_key` is the persistence,
+resume, deep-link and command contract, and its display ordinal is derived:
 
-1. Store and credential
-2. Connection and scopes
-3. Workflows and authority
-4. Odoo defaults
-5. Locations
-6. Review and activate
+1. **Store and credential:** `welcome`, `identity`, `credential`
+2. **Connection and scopes:** `scopes`, `test_connection`
+3. **Workflows:** `directions`
+4. **Locations:** `location_mapping`
+5. **Authority and protections:** `source_of_truth`, `notification`, `first_push`
+6. **Readiness and activation:** `final_readiness`, `review`
+
+This projection preserves the exact durable V1 order.  It does not create a
+second progress model.  The old five-phase projection and legacy numeric
+resume values remain accepted through an explicit compatibility adapter; no
+new command may address setup by ordinal.  Odoo defaults are edited within the
+workflow/authority settings surfaces and validated before final readiness;
+they are not a thirteenth persisted setup step.
 
 Each step saves durable non-secret values explicitly. Credential replacement uses a separate write-only command and returns presence/verification metadata only. The final review groups readiness as `Action required`, `Passed` and `Not applicable`; activation is server-blocked if any mandatory check fails or the snapshot generation is stale.
 
@@ -263,6 +272,12 @@ binding/idempotency/operation-scope rules, tenant/generation fences, mutation ve
 retry/pagination hard safety bounds or raw credentials. The Administrator controls product
 policy, not the ability to bypass correctness.
 
+Disconnect completion distinguishes local connector shutdown, owned
+subscription cleanup and external token revocation. For merchant-created
+custom-app credentials, Shopify-side token revocation is shown as a required
+Administrator follow-up with a durable acknowledgement; the UI never implies
+that removing the local credential revoked the token remotely.
+
 ### 6.9 Store management and multiple stores
 
 The store-management list shows permitted store name, canonical domain, company,
@@ -277,8 +292,11 @@ attention count. Actions are `Add store`, `Resume setup`, `Open`, `Repair connec
   records or commands.
 - No configuration is cloned automatically. A future explicit copy wizard may copy only
   allowlisted non-secret defaults and must run readiness independently.
-- There is no designed store-count licensing cap; performance is qualified against the
-  multi-store profiles in `09-test-observability-release-blueprint.md`.
+- V2 has no licensing-based store cap, but the release support contract keeps
+  V1's fail-closed maximum of ten stores per database until the 20-store
+  performance/isolation profile passes on an exact candidate. The limit may be
+  raised or removed only with that evidence; the architecture itself remains
+  store-scoped rather than hard-coded around one store.
 
 ## 7. Complete response-state matrix
 
@@ -389,4 +407,3 @@ A screen is complete only when:
 - [Shopify app design guidance](https://shopify.dev/docs/apps/design)
 - [Odoo 19 Owl components](https://www.odoo.com/documentation/19.0/developer/reference/frontend/owl_components.html)
 - [Odoo 19 frontend services](https://www.odoo.com/documentation/19.0/developer/reference/frontend/services.html)
-

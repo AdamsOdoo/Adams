@@ -148,10 +148,9 @@ class ShopifyConnectorWebhookSecret(models.Model):
         HTTP response.
         """
         store.ensure_one()
-        credential = self.env[
+        return self.env[
             'shopify.connector.store.credential'
-        ].sudo().search([('store_id', '=', store.id)], limit=1)
-        return credential.client_secret or False
+        ]._get_client_secret(store)
 
     @api.model
     def _client_secrets_for_store(self, store):

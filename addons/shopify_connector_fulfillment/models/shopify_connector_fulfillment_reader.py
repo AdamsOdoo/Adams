@@ -2,6 +2,13 @@ import logging
 
 from odoo import api, fields, models
 
+from odoo.addons.shopify_connector_fulfillment.integration.shopify.fulfillment_read_gateway import (
+    FULFILLMENT_ORDER_LINES_QUERY,
+    FULFILLMENT_ORDERS_QUERY,
+    LOCATIONS_QUERY,
+    ORDER_FULFILLMENTS_QUERY,
+)
+
 _logger = logging.getLogger(__name__)
 
 # Cursor-pagination fail-closed contract (packet §11.4). Decision-critical reads
@@ -10,71 +17,6 @@ _logger = logging.getLogger(__name__)
 # authorize a mutation. Hitting the cap before completeness fails closed.
 PAGE_SIZE = 50
 MAX_PAGES = 100
-
-# Read-only GraphQL documents (queries — never mutations). Fulfillment-order
-# reads deliberately carry NO server-side status filter (a status:open filter
-# would exclude IN_PROGRESS FOs); status is filtered client-side.
-FULFILLMENT_ORDERS_QUERY = (
-    'query($orderId: ID!, $foCursor: String) {\n'
-    '  order(id: $orderId) {\n'
-    '    id\n'
-    '    fulfillmentOrders(first: %(page)d, after: $foCursor) {\n'
-    '      pageInfo { hasNextPage endCursor }\n'
-    '      nodes {\n'
-    '        id\n'
-    '        status\n'
-    '        requestStatus\n'
-    '        assignedLocation { location { id name } }\n'
-    '        supportedActions { action }\n'
-    '      }\n'
-    '    }\n'
-    '  }\n'
-    '}'
-) % {'page': PAGE_SIZE}
-
-FULFILLMENT_ORDER_LINES_QUERY = (
-    'query($foId: ID!, $lineCursor: String) {\n'
-    '  fulfillmentOrder(id: $foId) {\n'
-    '    id\n'
-    '    lineItems(first: %(page)d, after: $lineCursor) {\n'
-    '      pageInfo { hasNextPage endCursor }\n'
-    '      nodes {\n'
-    '        id\n'
-    '        remainingQuantity\n'
-    '        lineItem { id }\n'
-    '      }\n'
-    '    }\n'
-    '  }\n'
-    '}'
-) % {'page': PAGE_SIZE}
-
-ORDER_FULFILLMENTS_QUERY = (
-    'query($orderId: ID!) {\n'
-    '  order(id: $orderId) {\n'
-    '    id\n'
-    '    fulfillments(first: 250) {\n'
-    '        id\n'
-    '        status\n'
-    '        displayStatus\n'
-    '        trackingInfo { number url company }\n'
-    '        fulfillmentLineItems(first: %(page)d) {\n'
-    '          pageInfo { hasNextPage endCursor }\n'
-    '          nodes { id quantity lineItem { id } }\n'
-    '        }\n'
-    '    }\n'
-    '  }\n'
-    '}'
-) % {'page': PAGE_SIZE}
-
-LOCATIONS_QUERY = (
-    'query($cursor: String) {\n'
-    '  locations(first: %(page)d, after: $cursor, includeInactive: true) {\n'
-    '    pageInfo { hasNextPage endCursor }\n'
-    '    nodes { id name isActive }\n'
-    '  }\n'
-    '}'
-) % {'page': PAGE_SIZE}
-
 
 class FulfillmentReadError(Exception):
     """A decision-critical fulfillment read could not complete safely.

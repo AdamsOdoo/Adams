@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import re
 import uuid
@@ -21,9 +22,25 @@ from .shopify_connector_mutation_attempt import canonical_sha256
 
 _logger = logging.getLogger(__name__)
 
+
+def _close_response(response):
+    """Release a response connection after a body-validation rejection."""
+
+    close = getattr(response, 'close', None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:  # pragma: no cover - defensive response-double guard
+        return
+
 # Adjustable planning defaults (not an official Shopify requirement).
 _CONNECT_TIMEOUT_SECONDS = 10
 _READ_TIMEOUT_SECONDS = 20
+# P05 keeps the legacy timeout values and adds an explicit response ceiling at
+# the normalization choke point.  The typed transport uses the same default.
+MAX_RESPONSE_BODY_BYTES = 10 * 1024 * 1024
+_RESPONSE_CHUNK_BYTES = 64 * 1024
 
 # CORE-R2 admission-lease lifetime used to stamp `call.lease.expires_at`. It
 # must exceed the transport budget (connect + read timeouts above) plus a
@@ -54,9 +71,131 @@ ERROR_DATA_SHAPE = 'data_shape_schema_mismatch'
 # introduced -- this is the existing DEC-009 "manual fix then retry" class.
 ERROR_API_VERSION = 'odoo_validation_configuration'
 
+# A Shopify GraphQL code is carried as metadata so P05 can classify it without
+# changing the fixed legacy job taxonomy.  In particular, MAX_COST_EXCEEDED
+# remains ERROR_UNKNOWN for old retry/error-class consumers while the typed
+# facade exposes this exact code as a first-class cost failure.
+ERROR_CODE_MAX_COST_EXCEEDED = 'MAX_COST_EXCEEDED'
+ERROR_CODE_RESPONSE_TOO_LARGE = 'response_too_large'
+ERROR_CODE_INVALID_CONTENT_LENGTH = 'invalid_content_length'
+ERROR_CODE_UNKNOWN_GRAPHQL = 'UNKNOWN_GRAPHQL_ERROR'
+ERROR_CODE_MALFORMED_JSON = 'MALFORMED_JSON'
+ERROR_CODE_INVALID_RESPONSE_BODY = 'INVALID_RESPONSE_BODY'
+ERROR_CODE_RESPONSE_STREAM_ERROR = 'RESPONSE_STREAM_ERROR'
+ERROR_CODE_INVALID_COST_METADATA = 'INVALID_COST_METADATA'
+ERROR_CODE_MALFORMED_GRAPHQL_ERRORS = 'MALFORMED_GRAPHQL_ERRORS'
+ERROR_CODE_INVALID_JSON_DATA = 'INVALID_JSON_DATA'
+
+# ``error_code`` is response-derived and is also copied into several public
+# aliases below.  Keep the surface finite and allowlisted: an arbitrary
+# arbitrary GraphQL extension values stay out of public log/JSON fields.
+_SAFE_ERROR_CODES = frozenset({
+    ERROR_CODE_MAX_COST_EXCEEDED,
+    ERROR_CODE_RESPONSE_TOO_LARGE,
+    ERROR_CODE_INVALID_CONTENT_LENGTH,
+    ERROR_CODE_UNKNOWN_GRAPHQL,
+    ERROR_CODE_MALFORMED_JSON,
+    ERROR_CODE_INVALID_RESPONSE_BODY,
+    ERROR_CODE_RESPONSE_STREAM_ERROR,
+    ERROR_CODE_INVALID_COST_METADATA,
+    ERROR_CODE_MALFORMED_GRAPHQL_ERRORS,
+    ERROR_CODE_INVALID_JSON_DATA,
+    'ACCESS_DENIED',
+    'SHOP_INACTIVE',
+    'THROTTLED',
+    'INTERNAL_SERVER_ERROR',
+    'selectionMismatch',
+    'schemaSelection',
+    'undefinedField',
+})
+
+
+def _safe_error_code(value):
+    """Return only a fixed, bounded machine code for public error fields."""
+
+    if value is None:
+        return None
+    if type(value) is str:
+        try:
+            if value in _SAFE_ERROR_CODES:
+                return value
+        except Exception:
+            pass
+    return ERROR_CODE_UNKNOWN_GRAPHQL
+
+
+def _safe_cost_metadata(value):
+    """Keep only finite numeric cost fields on a normalized exception."""
+
+    if value is None or not isinstance(value, dict):
+        return None
+
+    def finite_number(item):
+        if item is None:
+            return None
+        if type(item) not in (int, float):
+            return None
+        if isinstance(item, float):
+            try:
+                if not math.isfinite(item):
+                    return None
+            except Exception:
+                return None
+        return item
+
+    try:
+        requested = value.get('requestedQueryCost')
+        actual = value.get('actualQueryCost')
+        throttle = value.get('throttleStatus')
+    except Exception:
+        return None
+    result = {
+        'requestedQueryCost': finite_number(requested),
+        'actualQueryCost': finite_number(actual),
+        'throttleStatus': None,
+    }
+    if throttle is not None:
+        if not isinstance(throttle, dict):
+            return None
+        try:
+            maximum = throttle.get('maximumAvailable')
+            currently = throttle.get('currentlyAvailable')
+            restore = throttle.get('restoreRate')
+        except Exception:
+            return None
+        result['throttleStatus'] = {
+            'maximumAvailable': finite_number(maximum),
+            'currentlyAvailable': finite_number(currently),
+            'restoreRate': finite_number(restore),
+        }
+        for field_name in (
+            'maximumAvailable', 'currentlyAvailable', 'restoreRate',
+        ):
+            supplied = {
+                'maximumAvailable': maximum,
+                'currentlyAvailable': currently,
+                'restoreRate': restore,
+            }[field_name]
+            if supplied is not None and result['throttleStatus'][field_name] is None:
+                return None
+    for field_name in ('requestedQueryCost', 'actualQueryCost'):
+        supplied = requested if field_name == 'requestedQueryCost' else actual
+        if supplied is not None and result[field_name] is None:
+            return None
+    if not any(
+        result[field_name] is not None
+        for field_name in ('requestedQueryCost', 'actualQueryCost')
+    ) and not any(
+        (result['throttleStatus'] or {}).get(field_name) is not None
+        for field_name in (
+            'maximumAvailable', 'currentlyAvailable', 'restoreRate',
+        )
+    ):
+        return None
+    return result
+
 # The five mandatory, pairwise-distinct plain-language reasons for the
-# shopify_permission_scope_auth class (AR-027, F1 revision) -- a shared/
-# generic string across any two of them is a review failure.
+# shopify_permission_scope_auth reason registry (AR-027, F1 revision).
 REASON_TOKEN_INVALID = (
     'Your access token appears invalid or was revoked — replace it.'
 )
@@ -125,26 +264,42 @@ class ShopifyClientError(Exception):
     """Normalized error raised by `shopify.connector.api.client.execute()`.
 
     Attributes: `error_class` (one of the fixed job classes), `reason` (the
-    plain-language safe message), `technical_detail` (redacted; carries
-    `extensions.requestId` when present, otherwise a redacted status/body
+    plain-language safe message), `technical_detail` (redacted; carries a
+    safe status/request-id or fixed error marker, never a response-body
     excerpt), and `credential_invalid` (bool, default False -- set only
     for a genuine token-invalid signal, never for a shop-account-state
-    condition). `str(exc)` returns `reason` only -- never the technical
-    detail, never a header, never the token.
+    condition).  P05 additionally carries the optional Shopify
+    `error_code`/`cost` metadata without changing `error_class`. `str(exc)`
+    returns `reason` only -- never the technical detail, never a header, never
+    the token.
     """
 
     def __init__(
         self, error_class, reason, technical_detail=False,
-        credential_invalid=False,
+        credential_invalid=False, error_code=None, cost=None, metadata=None,
     ):
         reason = redact(reason)
         super().__init__(reason)
         self.error_class = error_class
+        self.classification = error_class
         self.reason = reason
         self.technical_detail = (
             redact(technical_detail) if technical_detail else technical_detail
         )
         self.credential_invalid = credential_invalid
+        safe_error_code = _safe_error_code(error_code)
+        self.error_code = safe_error_code
+        # Descriptive aliases make the additive metadata usable by the typed
+        # facade while preserving all existing callers' error_class checks.
+        self.code = safe_error_code
+        self.shopify_error_code = safe_error_code
+        self.classification_code = safe_error_code
+        self.cost = _safe_cost_metadata(cost)
+        self.metadata = redact(metadata) if metadata else metadata
+
+    @property
+    def is_cost_exceeded(self):
+        return self.error_code == ERROR_CODE_MAX_COST_EXCEEDED
 
     def __str__(self):
         return self.reason
@@ -245,9 +400,24 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyClientError(
                 error_class=ERROR_TEMPORARY,
                 reason=REASON_TEMPORARY,
-                technical_detail=redact(str(exc)),
+                technical_detail='transport_error',
             )
         return self._normalize_response(store, response)
+
+    @api.model
+    def _compatibility_facade(self, mode='legacy'):
+        """Return the inert P05 facade around this unchanged public client.
+
+        The import is lazy so loading the legacy Odoo model does not make the
+        new pure integration package a runtime dependency for existing module
+        installation.  The default is explicit legacy delegation; callers can
+        opt into the typed *view* during characterization, and ``rollback()``
+        returns a facade that delegates to this exact implementation again.
+        No domain call site uses this method in P05.
+        """
+        from ..integration.shopify.gateway_facade import ShopifyGatewayFacade
+
+        return ShopifyGatewayFacade(self, mode=mode)
 
     @api.model
     def _admit_lifecycle(self, store, purpose):
@@ -418,7 +588,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyClientError(
                 error_class=ERROR_TEMPORARY,
                 reason=REASON_TEMPORARY,
-                technical_detail=redact(str(exc)),
+                technical_detail='transport_error',
             )
         return self._normalize_response(store, response)
 
@@ -456,7 +626,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 raise ShopifyClientError(
                     error_class=ERROR_TEMPORARY,
                     reason=REASON_TEMPORARY,
-                    technical_detail=redact(str(exc)),
+                    technical_detail='transport_error',
                 )
             result = self._normalize_response(store, response)
             yield result
@@ -693,7 +863,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 raise ShopifyClientError(
                     error_class=ERROR_TEMPORARY,
                     reason=REASON_TEMPORARY,
-                    technical_detail=redact(str(exc)),
+                    technical_detail='transport_error',
                 )
             result = self._normalize_response(transport_store, response)
             yield result
@@ -1084,6 +1254,8 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             json=body,
             headers=headers,
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
+            allow_redirects=False,
+            stream=True,
         )
 
     # ------------------------------------------------------------------
@@ -1131,8 +1303,13 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             raise ShopifyClientError(
                 error_class=ERROR_TEMPORARY,
                 reason=REASON_TEMPORARY,
-                technical_detail=redact(str(exc)),
+                technical_detail='token_exchange_transport_error',
             )
+        # `_send_token_exchange` uses the same streamed response seam as the
+        # GraphQL compatibility path.  Consume/cache it through the bounded
+        # guard before any status handling or JSON decode so a token endpoint
+        # cannot buffer an unbounded response either.
+        self._assert_response_body_limit(response)
         status = getattr(response, 'status_code', 0)
         if 300 <= status < 400:
             # The token endpoint must answer on the validated store domain and
@@ -1251,6 +1428,7 @@ class ShopifyConnectorApiClient(models.AbstractModel):
             },
             timeout=(_CONNECT_TIMEOUT_SECONDS, _READ_TIMEOUT_SECONDS),
             allow_redirects=False,
+            stream=True,
             verify=True,
         )
 
@@ -1313,12 +1491,18 @@ class ShopifyConnectorApiClient(models.AbstractModel):
                 credential_invalid=False,
             )
         if served != SHOPIFY_API_VERSION:
+            safe_served = (
+                served
+                if isinstance(served, str)
+                and re.fullmatch(r'\d{4}-\d{2}', served)
+                else 'invalid'
+            )
             raise ShopifyClientError(
                 error_class=ERROR_API_VERSION,
                 reason=REASON_API_VERSION,
                 technical_detail=redact(
                     'served api version %s != connector %s' % (
-                        served, SHOPIFY_API_VERSION,
+                        safe_served, SHOPIFY_API_VERSION,
                     )
                 ),
                 credential_invalid=False,
@@ -1331,240 +1515,56 @@ class ShopifyConnectorApiClient(models.AbstractModel):
         except Exception:
             return ''
 
+    def _assert_response_body_limit(self, response):
+        from .shopify_connector_api_response import (
+            assert_response_body_limit,
+        )
+
+        return assert_response_body_limit(self, response)
+
     def _technical_detail(self, response, extra=None):
-        parts = ['HTTP %s' % getattr(response, 'status_code', 'unknown')]
-        if extra:
-            parts.append(str(extra))
-        body_excerpt = self._safe_text(response)
-        if body_excerpt:
-            parts.append(body_excerpt)
-        return redact(' '.join(parts))
+        from .shopify_connector_api_response import technical_detail
+
+        return technical_detail(response, extra=extra)
 
     def _parse_throttle_status(self, body):
-        # Verbatim official field names; never hard-coded bucket sizes
-        # (MBQ-51 stays untouched -- this only surfaces the signal).
-        extensions = body.get('extensions') or {}
-        cost = extensions.get('cost') or {}
-        throttle_status = cost.get('throttleStatus')
-        if not throttle_status:
-            return None
-        return {
-            'maximumAvailable': throttle_status.get('maximumAvailable'),
-            'currentlyAvailable': throttle_status.get('currentlyAvailable'),
-            'restoreRate': throttle_status.get('restoreRate'),
-        }
+        from .shopify_connector_api_response import parse_throttle_status
+
+        return parse_throttle_status(body)
+
+    def _parse_cost_metadata(self, body):
+        from .shopify_connector_api_response import parse_cost_metadata
+
+        return parse_cost_metadata(body)
+
+    @staticmethod
+    def _assert_finite_cost_value(value):
+        from .shopify_connector_api_response import (
+            _assert_finite_cost_value,
+        )
+
+        return _assert_finite_cost_value(value)
 
     @api.model
     def _record_throttle_status_isolated(self, store, throttle_status):
-        """Persist response telemetry after the business transaction ends.
-
-        A handler may issue more than one Shopify read.  Recording the first
-        response on ``store`` in the handler transaction takes a row-update
-        lock; the next call's CORE-R2 admission then opens its independent
-        cursor and waits for ``FOR SHARE`` on the same row.  The handler is
-        waiting for that admission while the admission is waiting for the
-        handler to commit: a self-deadlock which leaves the visible run queued
-        and the shared dispatcher occupied.
-
-        Telemetry is observational and already best-effort, so production
-        writes it in its own short, non-blocking transaction *after* the
-        business transaction commits or rolls back.  The timing is
-        load-bearing: committing a side-transaction update of the store while
-        the caller still owns an older REPEATABLE READ snapshot makes a later
-        child-row insert (whose foreign key takes ``FOR KEY SHARE`` on that
-        store) fail with SQLSTATE 40001.  Location discovery exposed exactly
-        that deterministic sequence.
-
-        Post-transaction callbacks preserve the original observational
-        independence on both success and failure, while ensuring the store
-        update cannot invalidate the caller's snapshot.  They run
-        synchronously from ``commit()``/``rollback()``, so same-pass
-        backpressure still sees the durable observation before the dispatcher
-        considers the next claim.  Odoo's TransactionCase cursor forbids
-        commits; there we retain the direct in-transaction write so the
-        deterministic unit tests keep exercising the projection.
-        """
-        commit = getattr(self.env.cr, 'commit', None)
-        if getattr(commit, '__name__', '') == 'forbidden':
-            return store._record_throttle_status(throttle_status)
-
-        registry = self.env.registry
-        uid = self.env.uid
-        context = dict(self.env.context)
-        store_id = store.id
-        payload = dict(throttle_status)
-
-        def persist_after_transaction():
-            side_cr = registry.cursor()
-            try:
-                side_env = api.Environment(side_cr, uid, context)
-                side_store = side_env['shopify.connector.store'].browse(
-                    store_id
-                ).try_lock_for_update()
-                if not side_store:
-                    side_cr.rollback()
-                    return False
-                result = side_store._record_throttle_status(payload)
-                side_cr.commit()
-                return result
-            except Exception:  # noqa: BLE001 - telemetry is best effort
-                side_cr.rollback()
-                _logger.exception(
-                    'Could not persist deferred Shopify rate head-room for '
-                    'store %s; the response itself is unaffected.', store_id,
-                )
-                return False
-            finally:
-                side_cr.close()
-
-        # Exactly one callback runs. Odoo clears the opposite callback set
-        # before executing the completed transaction's callbacks.
-        self.env.cr.postcommit.add(persist_after_transaction)
-        self.env.cr.postrollback.add(persist_after_transaction)
-        return True
-
-    def _error_from_graphql_errors(self, errors, response):
-        first_error = errors[0] if errors else {}
-        extensions = first_error.get('extensions') or {}
-        code = extensions.get('code')
-        message = first_error.get('message') or ''
-        request_id = extensions.get('requestId')
-        extra = (
-            'requestId=%s' % request_id
-            if request_id else message
+        from .shopify_connector_api_response import (
+            record_throttle_status_isolated,
         )
-        technical_detail = self._technical_detail(response, extra=extra)
-        if code == 'ACCESS_DENIED':
-            return ShopifyClientError(
-                ERROR_AUTH, REASON_TOKEN_INVALID, technical_detail,
-                credential_invalid=True,
-            )
-        if code == 'SHOP_INACTIVE':
-            return ShopifyClientError(
-                ERROR_AUTH, REASON_SHOP_INACTIVE, technical_detail,
-                credential_invalid=False,
-            )
-        if code == 'THROTTLED':
-            return ShopifyClientError(
-                ERROR_THROTTLE, REASON_THROTTLED, technical_detail,
-                credential_invalid=False,
-            )
-        if code == 'INTERNAL_SERVER_ERROR':
-            return ShopifyClientError(
-                ERROR_TEMPORARY, REASON_TEMPORARY, technical_detail,
-                credential_invalid=False,
-            )
-        # Shopify's GraphQL layer reports an HTTP-200 response for an invalid
-        # field selection in some Admin API revisions.  ``selectionMismatch``
-        # is the documented extension code seen for an object selected as a
-        # scalar (for example ``WebhookSubscription.apiVersion`` in 2026-07).
-        # Keep the response redacted through the same technical-detail path,
-        # but use the already-supported data-shape job class so operators do
-        # not retry a schema defect as an unknown transport outage.  The
-        # message fallback covers schema-selection errors from revisions that
-        # omit the extension code entirely.
-        normalized_code = str(code or '').replace('_', '').lower()
-        normalized_message = str(message).lower()
-        if (
-            normalized_code in {
-                'selectionmismatch', 'schemaselection', 'undefinedfield',
-            }
-            or 'must have a selection of subfields' in normalized_message
-            or 'selection mismatch' in normalized_message
-        ):
-            return ShopifyClientError(
-                ERROR_DATA_SHAPE, REASON_DATA_SHAPE, technical_detail,
-                credential_invalid=False,
-            )
-        # MAX_COST_EXCEEDED on this tiny query, and anything unclassifiable
-        # (incl. an unknown extensions.code), fall to the single
-        # safety-net path per DEC-009.
-        return ShopifyClientError(
-            ERROR_UNKNOWN, REASON_UNKNOWN, technical_detail,
-            credential_invalid=False,
+
+        return record_throttle_status_isolated(
+            self, store, throttle_status,
+        )
+
+    def _error_from_graphql_errors(self, errors, response, cost=None):
+        from .shopify_connector_api_response import (
+            error_from_graphql_errors,
+        )
+
+        return error_from_graphql_errors(
+            self, errors, response, cost=cost,
         )
 
     def _normalize_response(self, store, response):
-        status_code = getattr(response, 'status_code', None)
-        if status_code == 401:
-            raise ShopifyClientError(
-                ERROR_AUTH, REASON_TOKEN_INVALID,
-                self._technical_detail(response), credential_invalid=True,
-            )
-        if status_code == 402:
-            raise ShopifyClientError(
-                ERROR_AUTH, REASON_SHOP_FROZEN,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if status_code == 423:
-            raise ShopifyClientError(
-                ERROR_AUTH, REASON_SHOP_LOCKED,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if status_code == 403:
-            raise ShopifyClientError(
-                ERROR_AUTH, REASON_SHOP_FRAUDULENT,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if status_code == 429:
-            raise ShopifyClientError(
-                ERROR_THROTTLE, REASON_THROTTLED,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if isinstance(status_code, int) and status_code >= 500:
-            raise ShopifyClientError(
-                ERROR_TEMPORARY, REASON_TEMPORARY,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if status_code != 200:
-            raise ShopifyClientError(
-                ERROR_UNKNOWN, REASON_UNKNOWN,
-                self._technical_detail(response), credential_invalid=False,
-            )
+        from .shopify_connector_api_response import normalize_response
 
-        try:
-            body = response.json()
-        except ValueError:
-            raise ShopifyClientError(
-                ERROR_UNKNOWN, REASON_UNKNOWN,
-                self._technical_detail(response), credential_invalid=False,
-            )
-        if not isinstance(body, dict):
-            raise ShopifyClientError(
-                ERROR_UNKNOWN, REASON_UNKNOWN,
-                self._technical_detail(response), credential_invalid=False,
-            )
-
-        errors = body.get('errors')
-        if errors:
-            raise self._error_from_graphql_errors(errors, response)
-
-        # The version gate runs AFTER the transport/GraphQL error taxonomy so
-        # a 401 or a THROTTLED response keeps its own accurate
-        # classification, and BEFORE any result is returned so no caller can
-        # act on a body served by an unverified schema.
-        served_version = self._assert_served_api_version(response)
-        throttle_status = self._parse_throttle_status(body)
-        # TD-014. The single choke point every successful Shopify response
-        # passes through, for every domain and both read and mutation
-        # paths, so this is where the rate signal becomes durable state.
-        # It was parsed here and returned to callers that ignored it,
-        # which is why PERF-1's backpressure lever could never fire: no
-        # production code had ever written `api_health_state='throttled'`.
-        #
-        # Recording is best-effort by construction. A store row that
-        # cannot be written must never turn a good Shopify response into
-        # a failure, so the result is returned regardless.
-        if throttle_status and store:
-            try:
-                self._record_throttle_status_isolated(store, throttle_status)
-            except Exception:  # noqa: BLE001 - see above
-                _logger.exception(
-                    'Could not record Shopify rate head-room for store %s; '
-                    'the response itself is unaffected.', store.id,
-                )
-        return {
-            'data': body.get('data'),
-            'throttle_status': throttle_status,
-            'served_version': served_version,
-        }
+        return normalize_response(self, store, response)

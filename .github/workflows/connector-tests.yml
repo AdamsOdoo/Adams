@@ -12,9 +12,13 @@
 #     A green run here is not wave acceptance and must never be recorded as one.
 #   * Both a fresh install and a warm `-u` update run, because issue #193 proved
 #     a green fresh install says nothing about the warm path.
-#   * The eight `-standard` test classes -- including four genuine concurrency
-#     proofs -- run as a third pass. `--test-enable` alone never selects them,
-#     which is why they had gone unrun; they are no longer optional here.
+#   * The candidate-only DEC-029 Lite and Full meta-addons are installed on
+#     disposable databases. They are intentionally separate from the legacy
+#     module set used by the old-tree migration passes.
+#   * Every test class in the runner's machine-readable non-standard tag
+#     inventory -- including the genuine concurrency proofs -- runs as a third
+#     pass. `--test-enable` alone never selects these classes, so they are not
+#     optional here and their count is never maintained in prose.
 #   * The Odoo commit is pinned in tools/odoo-pin.txt and verified on every run,
 #     so a restored cache cannot quietly test a different Odoo.
 #   * On a `pull_request` event this checks out the PR HEAD COMMIT, not the
@@ -108,6 +112,14 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             libxml2-dev libxslt1-dev libsasl2-dev libjpeg-dev \
             libpq-dev postgresql-client
+
+      - name: Validate DEC-029 marketplace packages
+        run: |
+          python tools/build_shopify_connector_bundle.py --all-editions --check
+          python -m unittest \
+            tools.tests.test_shopify_connector_packaging \
+            tools.tests.test_shopify_connector_packaging_audit \
+            tools.tests.test_connector_suite_meta_install_contract -v
 
       - name: Cache the Odoo source checkout
         uses: actions/cache@v4

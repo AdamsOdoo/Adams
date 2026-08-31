@@ -32,7 +32,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 2
+          # Frozen evidence may intentionally point at the immediately prior
+          # code commit while the current commit contains only the generated
+          # evidence.  Full history lets the checker resolve that exact source
+          # instead of silently relabelling the current filesystem.
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -49,17 +53,45 @@ jobs:
       - name: Verify exact checkout
         run: test "$(git rev-parse HEAD)" = "$SOURCE_HEAD_SHA"
 
-      - name: Run P00 analyzer unit tests
-        run: python -m unittest tools.tests.test_v2_repository_baseline -v
+      - name: Run fast V2 policy and contract tests
+        run: python -m unittest discover -s tools/tests -p 'test_*.py' -v
+
+      - name: Enforce static addon policy
+        run: python tools/v2_static_policy.py --repo-root .
+
+      - name: Enforce V2 package dependency direction
+        run: |
+          for package_root in \
+            addons/shopify_connector_core \
+            addons/shopify_connector_fulfillment \
+            addons/shopify_connector_inventory \
+            addons/shopify_connector_product \
+            addons/shopify_connector_product_export \
+            addons/shopify_connector_sale \
+            addons/shopify_connector_webhook; do
+            python tools/v2_dependency_policy.py --package-root "$package_root"
+          done
+
+      - name: Enforce changed production file size
+        run: python tools/v2_change_size_policy.py --repo-root .
 
       - name: Check frozen compatibility artifacts
-        run: python tools/v2_repository_baseline.py --source-ref HEAD --check
+        # --check reads the frozen source SHA and proves the current connector
+        # addon surface still matches it.  It never ignores provenance.
+        run: python tools/v2_repository_baseline.py --check
 
       - name: Validate Shopify GraphQL documents
         run: python tools/validate_shopify_graphql.py
 
       - name: Compile analysis tools
-        run: python -m py_compile tools/v2_repository_baseline.py tools/validate_shopify_graphql.py
+        run: >-
+          python -m py_compile
+          tools/v2_repository_baseline.py
+          tools/v2_static_policy.py
+          tools/v2_dependency_policy.py
+          tools/v2_change_size_policy.py
+          tools/perf0_baseline.py
+          tools/validate_shopify_graphql.py
 
       - name: Check patch whitespace
         run: git diff --check HEAD^

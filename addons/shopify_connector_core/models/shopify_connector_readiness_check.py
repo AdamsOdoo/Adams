@@ -139,7 +139,7 @@ class ShopifyConnectorReadinessCheck(models.AbstractModel):
             payload_snapshot=json.dumps(checks),
             from_state='running', to_state='succeeded',
         )
-        store.write({
+        store._store_service_write('_readiness', {
             'last_readiness_result': overall_result,
             'last_readiness_at': fields.Datetime.now(),
         })

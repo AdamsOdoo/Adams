@@ -93,6 +93,18 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
 from odoo.addons.shopify_connector_core.tools.search_syntax import (
     search_term,
 )
+from odoo.addons.shopify_connector_product_export.integration.shopify.product_export_mutation_gateway import (
+    BINDING_DEFINITION_QUERY,
+    BINDING_NAMESPACE_DOCUMENT,
+    PRODUCT_CREATE_DOCUMENT,
+    PRODUCT_CREATE_READ_QUERY,
+    PRODUCT_UPDATE_DOCUMENT,
+    PRODUCT_UPDATE_READ_QUERY,
+    VARIANTS_CREATE_DOCUMENT,
+    VARIANTS_CREATE_READ_QUERY,
+    VARIANTS_UPDATE_DOCUMENT,
+    VARIANTS_UPDATE_READ_QUERY,
+)
 
 from .shopify_connector_product_export_preview import PREVIEW_VALIDITY_HOURS
 from odoo.addons.shopify_connector_product.models.shopify_connector_product_normalization import (
@@ -188,7 +200,6 @@ REMOTE_MEDIA_PAGE_SIZE = 250
 BINDING_METAFIELD_KEY = 'odoo_template_custom_id_v2'
 BINDING_METAFIELD_TYPE = 'id'
 BINDING_METAFIELD_OWNER = 'PRODUCT'
-
 EXPORT_STATUS_TO_SHOPIFY = {
     'draft': 'DRAFT',
     'active': 'ACTIVE',
@@ -576,14 +587,8 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         if not (
             settings and settings.product_export_binding_namespace_ready
         ):
-            definition_query = (
-                'query ProductExportBindingDefinition($key: String!) { '
-                'metafieldDefinitions(first: 1, ownerType: PRODUCT, '
-                'key: $key) { '
-                'nodes { id key type { name } } } shop { myshopifyDomain } }'
-            )
             with client.execute_business(
-                job, store, definition_query,
+                job, store, BINDING_DEFINITION_QUERY,
                 {'key': BINDING_METAFIELD_KEY},
             ) as result:
                 definition_data = (result or {}).get('data') or {}
@@ -1789,13 +1794,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         self, local_snapshot, owner_context,
     ):
         self._assert_confirmed_preview_pre_c2(local_snapshot)
-        operation = (
-            'mutation ProductExportBindingNamespace('
-            '$definition: MetafieldDefinitionInput!) { '
-            'metafieldDefinitionCreate(definition: $definition) { '
-            'createdDefinition { id key namespace type { name } } '
-            'userErrors { code field message } } }'
-        )
+        operation = BINDING_NAMESPACE_DOCUMENT
         variables = {
             'definition': {
                 'key': BINDING_METAFIELD_KEY,
@@ -1853,15 +1852,10 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         """A definition that already exists is the desired end state."""
         store = attempt.store_id
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportBindingDefinition($key: String!) { '
-            'metafieldDefinitions(first: 1, ownerType: PRODUCT, key: $key) { '
-            'nodes { id key type { name } } } shop { myshopifyDomain } }'
-        )
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,
-            query,
+            BINDING_DEFINITION_QUERY,
             {'key': BINDING_METAFIELD_KEY},
             purpose='product_export',
         ) as result:
@@ -2012,18 +2006,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         for merchant_owned in ('collections', 'metafields', 'files'):
             product_input.pop(merchant_owned, None)
 
-        operation = (
-            'mutation ProductExportCreate($input: ProductSetInput!, '
-            '$identifier: ProductSetIdentifiers!) { '
-            'productSet(input: $input, identifier: $identifier, '
-            'synchronous: true) { '
-            'product { id handle title status updatedAt descriptionHtml vendor '
-            'productType tags '
-            'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
-            'selectedOptions { name value } '
-            'inventoryItem { id sku tracked } } } } '
-            'userErrors { code field message } } }' % (MAX_EXPORT_VARIANTS,)
-        )
+        operation = PRODUCT_CREATE_DOCUMENT
         variables = {
             'input': product_input,
             'identifier': {
@@ -2157,17 +2140,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
             'custom_id_value'
         )
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportReconcileCreate('
-            '$identifier: ProductIdentifierInput!) { '
-            'product: productByIdentifier(identifier: $identifier) { '
-            'id title status '
-            'descriptionHtml vendor productType tags updatedAt '
-            'variants(first: %d) { nodes { id sku barcode price compareAtPrice '
-            'selectedOptions { name value } '
-            'inventoryItem { id sku tracked } } } } '
-            'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
-        )
+        query = PRODUCT_CREATE_READ_QUERY
         identifier = {
             'customId': {
                 'key': BINDING_METAFIELD_KEY,
@@ -2538,15 +2511,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         # still exists but is deprecated, and `productUpdate` takes its target
         # through `ProductUpdateIdentifiers` rather than inside the input.
         assert_no_forbidden_keys(variables)
-        operation = (
-            'mutation ProductExportUpdate('
-            '$product: ProductUpdateInput!, '
-            '$identifier: ProductUpdateIdentifiers!) { '
-            'productUpdate(product: $product, identifier: $identifier) { '
-            'product { id updatedAt title descriptionHtml vendor '
-            'productType tags status } '
-            'userErrors { field message } } }'
-        )
+        operation = PRODUCT_UPDATE_DOCUMENT
         self._assert_no_product_set_on_existing(operation, local_snapshot)
         return self._mutation_request(
             JOB_TYPE_UPDATE, local_snapshot, operation, variables,
@@ -2587,11 +2552,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         product_gid = snapshot.get('product_gid')
         expected = snapshot.get('expected') or {}
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportReconcileUpdate($id: ID!) { '
-            'product(id: $id) { id title descriptionHtml vendor productType '
-            'tags status updatedAt } shop { myshopifyDomain } }'
-        )
+        query = PRODUCT_UPDATE_READ_QUERY
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,
@@ -2738,17 +2699,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
                 {key: value for key, value in entry.items() if key != 'id'},
                 'variants[]',
             )
-        operation = (
-            'mutation ProductExportVariantsUpdate($productId: ID!, '
-            '$variants: [ProductVariantsBulkInput!]!, '
-            '$allowPartialUpdates: Boolean) { '
-            'productVariantsBulkUpdate(productId: $productId, '
-            'variants: $variants, '
-            'allowPartialUpdates: $allowPartialUpdates) { '
-            'productVariants { id barcode price compareAtPrice '
-            'inventoryItem { id sku } } '
-            'userErrors { code field message } } }'
-        )
+        operation = VARIANTS_UPDATE_DOCUMENT
         self._assert_no_product_set_on_existing(operation, local_snapshot)
         return self._mutation_request(
             JOB_TYPE_VARIANTS_UPDATE, local_snapshot, operation, variables,
@@ -2784,12 +2735,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         snapshot = attempt.preconditions_snapshot or {}
         expected = snapshot.get('expected_variants') or []
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportReconcileVariants($id: ID!) { '
-            'product(id: $id) { id variants(first: %d) { nodes { id barcode '
-            'price compareAtPrice inventoryItem { id sku } } } } '
-            'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
-        )
+        query = VARIANTS_UPDATE_READ_QUERY
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,
@@ -3014,17 +2960,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         }
         for entry in variants_input:
             assert_no_forbidden_keys(entry, 'variants[]')
-        operation = (
-            'mutation ProductExportVariantsCreate($productId: ID!, '
-            '$variants: [ProductVariantsBulkInput!]!, '
-            '$strategy: ProductVariantsBulkCreateStrategy) { '
-            'productVariantsBulkCreate(productId: $productId, '
-            'variants: $variants, strategy: $strategy) { '
-            'productVariants { id sku barcode price compareAtPrice '
-            'selectedOptions { name value } '
-            'inventoryItem { id sku tracked } } '
-            'userErrors { code field message } } }'
-        )
+        operation = VARIANTS_CREATE_DOCUMENT
         self._assert_no_product_set_on_existing(operation, local_snapshot)
         return self._mutation_request(
             JOB_TYPE_VARIANTS_CREATE, local_snapshot, operation, variables,
@@ -3068,13 +3004,7 @@ class ShopifyConnectorProductExportService(models.AbstractModel):
         snapshot = attempt.preconditions_snapshot or {}
         expected_skus = set(snapshot.get('expected_skus') or [])
         client = self.env['shopify.connector.api.client']
-        query = (
-            'query ProductExportReconcileVariantCreate($id: ID!) { '
-            'product(id: $id) { id variants(first: %d) { nodes { id '
-            'sku barcode price compareAtPrice '
-            'inventoryItem { id sku tracked } } } } '
-            'shop { myshopifyDomain } }' % (MAX_EXPORT_VARIANTS,)
-        )
+        query = VARIANTS_CREATE_READ_QUERY
         with client.execute_business_read(
             reconciliation_job or attempt.job_id,
             store,

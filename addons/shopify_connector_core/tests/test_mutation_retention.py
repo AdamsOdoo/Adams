@@ -1,5 +1,6 @@
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from odoo import fields
 from odoo.tests.common import TransactionCase, tagged
@@ -8,6 +9,7 @@ from ..models.shopify_connector_mutation_attempt import (
     C2_SENTINEL_CONTEXT,
     C2_SIDE_CURSOR_SENTINEL,
 )
+from ..models.shopify_connector_pii_retention import RETENTION_BATCH_SIZE
 
 
 # Issue #193 / #157 -- Odoo 19 test-phase contract. This class's fixtures insert
@@ -86,6 +88,7 @@ class TestMutationRetention(TransactionCase):
         self.assertEqual(attempt.remote_mutation_intent, {'masked': True})
         self.assertEqual(attempt.preconditions_snapshot, {'masked': True})
         self.assertEqual(attempt.remote_evidence_refs, {'masked': True})
+        self.assertTrue(attempt.evidence_masked_at)
         after = attempt.read(list(identity))[0]
         self.assertEqual(identity, after)
 
@@ -145,6 +148,8 @@ class TestMutationRetention(TransactionCase):
         self.assertEqual(attempt.remote_evidence_refs, {'masked': True})
         self.assertEqual(attempt.read(preserved_fields)[0], preserved)
         self.assertTrue(attempt.exists())
+        # A repeated cron invocation is a no-op once the evidence is masked.
+        self.assertEqual(self.Retention._run_attempt_evidence_masking(), 0)
 
     def test_unresolved_uncertain_is_never_masked(self):
         attempt = self._attempt('uncertain')
@@ -167,6 +172,52 @@ class TestMutationRetention(TransactionCase):
             'shopify_connector.layer2_attempt_evidence_retention_days', '7'
         )
         self.assertEqual(self.Retention._attempt_evidence_retention_days(), 7)
+
+    def test_retention_sweeps_use_indexed_bounded_oldest_batches(self):
+        """Retention must not materialize an unbounded aged-table scan."""
+        Attempt = self.Attempt
+        attempt_search_calls = []
+        original_attempt_search = type(Attempt).search
+
+        def capture_attempt_search(records, *args, **kwargs):
+            attempt_search_calls.append((args, kwargs))
+            return original_attempt_search(records, *args, **kwargs)
+
+        with patch.object(
+            type(Attempt), 'search', capture_attempt_search,
+        ):
+            self.Retention._run_attempt_evidence_masking()
+        retention_calls = [
+            kwargs for _args, kwargs in attempt_search_calls
+            if 'limit' in kwargs and 'order' in kwargs
+        ]
+        self.assertTrue(retention_calls)
+        self.assertEqual(retention_calls[0]['limit'], RETENTION_BATCH_SIZE)
+        self.assertEqual(retention_calls[0]['order'], 'resolved_at, id')
+        attempt_domain = attempt_search_calls[0][0][0]
+        self.assertIn(('evidence_masked_at', '=', False), attempt_domain)
+
+        self.env['shopify.connector.store.settings'].sudo().create({
+            'store_id': self.store.id,
+            'log_redaction_retention_days': 1,
+        })
+        JobLog = self.env['shopify.connector.job.log']
+        log_search_calls = []
+        original_log_search = type(JobLog).search
+
+        def capture_log_search(records, *args, **kwargs):
+            log_search_calls.append((args, kwargs))
+            return original_log_search(records, *args, **kwargs)
+
+        with patch.object(type(JobLog), 'search', capture_log_search):
+            self.Retention.run_sweep()
+        log_retention_calls = [
+            kwargs for _args, kwargs in log_search_calls
+            if 'limit' in kwargs and 'order' in kwargs
+        ]
+        self.assertTrue(log_retention_calls)
+        self.assertEqual(log_retention_calls[0]['limit'], RETENTION_BATCH_SIZE)
+        self.assertEqual(log_retention_calls[0]['order'], 'occurred_at, id')
 
     def test_terminal_job_retention_drains_more_than_legacy_daily_inflow(self):
         finished = fields.Datetime.now() - timedelta(days=91)

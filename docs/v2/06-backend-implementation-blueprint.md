@@ -313,8 +313,8 @@ Within a lane order by `available_at`, `lane_priority`, then ID. Every 15 minute
 
 “Near real time” means measured event-to-visible-outcome latency, not a promise that every Shopify operation is synchronous:
 
-1. webhook, Odoo business event or interactive command durably admits work in its local transaction;
-2. after that transaction commits, the sanctioned enqueue path requests the existing bounded drain immediately;
+1. webhook, Odoo business event or interactive command admits work and requests the existing bounded drain in the same local database transaction;
+2. commit makes both the durable work and its wake-up visible atomically; rollback removes both, while an exact post-commit execution may accelerate an explicitly replay-safe read and the scheduled drain remains the recovery path;
 3. the worker claims by lane priority, with safety verification always ahead of new mutations;
 4. active V2 screens refresh/subscription-poll the affected run until terminal or attention state, while passive screens use a slower bounded refresh; and
 5. the one-minute scheduled drain and reconciliation remain recovery paths for missed triggers, delayed webhooks and drift.

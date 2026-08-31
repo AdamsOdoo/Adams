@@ -37,6 +37,9 @@ from odoo.addons.shopify_connector_inventory.models.shopify_connector_inventory_
     ERROR_CLASS_VALIDATION,
     SUBREASON_BINDING_CONFLICT,
 )
+from odoo.addons.shopify_connector_inventory.integration.shopify.inventory_read_gateway import (
+    INVENTORY_LEVEL_QUERY,
+)
 
 from .constants import (
     INVENTORY_OBSERVATION_JOB_TYPE,
@@ -417,19 +420,13 @@ class ShopifyConnectorInventoryObservationService(models.AbstractModel):
             limit=limit,
         )
 
-    INVENTORY_OBSERVATION_QUERY = (
-        'query InventoryObservation($levelId: ID!) { '
-        # The child is intentionally read by the exact InventoryLevel GID
-        # admitted from W1.  ``quantities(names: ["available"])`` is the
-        # authoritative quantity surface; only that quantity's updatedAt is
-        # requested and used for ordering.  InventoryLevel.updatedAt is not a
-        # substitute because it describes the level object, not necessarily
-        # the available quantity that was observed.
-        'inventoryLevel(id: $levelId) { id '
-        'item { id tracked } location { id } '
-        'quantities(names: ["available"]) { name quantity updatedAt } '
-        '} shop { myshopifyDomain } }'
-    )
+    # The child is intentionally read by the exact InventoryLevel GID
+    # admitted from W1.  ``quantities(names: ["available"])`` is the
+    # authoritative quantity surface; only that quantity's updatedAt is
+    # requested and used for ordering.  InventoryLevel.updatedAt is not a
+    # substitute because it describes the level object, not necessarily
+    # the available quantity that was observed.
+    INVENTORY_OBSERVATION_QUERY = INVENTORY_LEVEL_QUERY
 
     @api.model
     def _observation_payload_hash(

@@ -17,6 +17,13 @@ from odoo.addons.shopify_connector_core.tools.api_version import (
     SHOPIFY_API_VERSION,
 )
 from odoo.addons.shopify_connector_core.tools.redaction import redact
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_mutation_gateway import (
+    WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT,
+    WEBHOOK_SUBSCRIPTION_DELETE_DOCUMENT,
+)
+from odoo.addons.shopify_connector_webhook.integration.shopify.webhook_subscription_read_gateway import (
+    SUBSCRIPTIONS_QUERY as SUBSCRIPTION_LIST_QUERY,
+)
 
 
 SUBSCRIPTION_STATES = [
@@ -28,20 +35,6 @@ SUBSCRIPTION_STATES = [
     ('error', 'Error'),
     ('manual_review', 'Manual review'),
 ]
-
-SUBSCRIPTION_LIST_QUERY = """
-query ConnectorWebhookSubscriptions($first: Int!, $after: String) {
-  shop { myshopifyDomain }
-  webhookSubscriptions(first: $first, after: $after) {
-    nodes {
-      id topic uri
-      apiVersion { handle displayName supported }
-      format includeFields
-    }
-    pageInfo { hasNextPage endCursor }
-  }
-}
-"""
 
 _SUBSCRIPTION_SERVICE_CONTEXT = 'shopify_connector_webhook_subscription_service'
 _SUBSCRIPTION_SERVICE_SENTINEL = object()
@@ -309,13 +302,12 @@ class ShopifyConnectorWebhookSubscription(models.Model):
     @api.model
     def _has_hmac_client_secret(self, store):
         """Return whether this store can verify Shopify webhook signatures."""
-        credential = self.env[
-            'shopify.connector.store.credential'
-        ].sudo().search([('store_id', '=', store.id)], limit=1)
+        Credential = self.env['shopify.connector.store.credential']
+        credential = Credential.sudo().search([('store_id', '=', store.id)], limit=1)
         return bool(
             credential
             and credential.credential_state == 'present'
-            and credential.client_secret
+            and Credential._get_client_secret(store)
         )
 
     @api.model
@@ -1443,24 +1435,7 @@ class ShopifyConnectorWebhookSubscription(models.Model):
                     'The callback token changed after the subscription job was '
                     'queued; the remote create was refused.'
                 )
-            operation = """
-mutation ConnectorWebhookSubscriptionCreate(
-  $topic: WebhookSubscriptionTopic!,
-  $webhookSubscription: WebhookSubscriptionInput!
-) {
-  webhookSubscriptionCreate(
-    topic: $topic,
-    webhookSubscription: $webhookSubscription
-  ) {
-    userErrors { field message }
-    webhookSubscription {
-      id topic uri
-      apiVersion { handle displayName supported }
-      format includeFields
-    }
-  }
-}
-"""
+            operation = WEBHOOK_SUBSCRIPTION_CREATE_DOCUMENT
             variables = {
                 'topic': local_snapshot['topic_enum'],
                 'webhookSubscription': {
@@ -1475,14 +1450,7 @@ mutation ConnectorWebhookSubscriptionCreate(
                 },
             }
         else:
-            operation = """
-mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
-  webhookSubscriptionDelete(id: $id) {
-    deletedWebhookSubscriptionId
-    userErrors { field message }
-  }
-}
-"""
+            operation = WEBHOOK_SUBSCRIPTION_DELETE_DOCUMENT
             variables = {'id': local_snapshot['shopify_subscription_gid']}
         return {
             'mutation_domain': owner_context['mutation_domain'],
@@ -1837,7 +1805,7 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
     def _apply_subscription_consequence(
         self, job, attempt, phase, consequence, reconciliation_job=False,
     ):
-        del attempt, reconciliation_job
+        del attempt
         subscription = self.browse(job.res_id).exists()
         if not subscription:
             return True
@@ -1860,7 +1828,9 @@ mutation ConnectorWebhookSubscriptionDelete($id: ID!) {
                     # epoch from the locked current credential.  Payloads and
                     # attempt snapshots are never trusted for HMAC evidence.
                     values['hmac_credential_epoch'] = (
-                        self._hmac_epoch_for_admitted_job(job)
+                        self._hmac_epoch_for_admitted_job(
+                            reconciliation_job or job,
+                        )
                     )
             else:
                 values.update({

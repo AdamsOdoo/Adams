@@ -54,7 +54,7 @@ PROTECTED_JOB_FIELDS = frozenset((
     'original_job_type', 'job_source', 'trigger_origin', 'next_retry_at',
     'started_at', 'finished_at', 'superseded_by_job_id', 'cancel_reason',
     'current_attempt_token', 'owner_worker_ref', 'running_since',
-    'reconciliation_pending_until', 'mutation_attempt_id',
+    'reconciliation_pending_until', 'mutation_attempt_id', 'expected_connection_generation',
 ))
 
 # The Task 005 / DEC-022 §4.2 business-job source subset: job_source

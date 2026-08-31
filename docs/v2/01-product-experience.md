@@ -40,11 +40,16 @@ When more than one permitted store exists, the store switcher offers `Manage sto
 That surface lists connection/activation/health/company/workflow freshness, creates a new
 draft store, resumes setup, repairs/disconnects or retires a store, and never merges data or
 configuration across stores implicitly. An optional `All stores` summary ranks store-level
-health and attention but launches every operation inside one explicit store scope.
+health and attention; the current launcher remains Administrator-only and names one
+explicit store for every operation.
 
 ## 3. Core journeys
 
 ### 3.1 Connect and activate a store
+
+The following are seven user task groups, not seven persisted setup steps.
+They are projected through the six presentation phases and twelve durable
+semantic `step_key` values defined by the UX/data contracts.
 
 1. Name the connection and enter the canonical `*.myshopify.com` domain.
 2. Add the credential in a write-only field; test connectivity and display scopes as pass/missing.
@@ -86,7 +91,17 @@ Bulk actions appear only when every selected item has the same safe transition. 
 
 ### 3.4 Launch an operation
 
-A single operation launcher handles import, export preview, reconciliation and scoped replay. It asks for store, workflow, scope/filter and execution mode. Before confirmation it shows estimated record count, authority, risky side effects, and whether the operation is preview-only. Submission returns a run ID immediately.
+The current backend foundation exposes exactly five Administrator-only named
+controls: read/scan and reconciliation operations for one exact store. Each
+option has an empty filter schema and starts only a bounded read-only job; the
+launcher has no direction selector, filter editor, impact preview or `Preview`
+action. Export, remote mutation, preview confirmation, scoped replay and
+free-form filters remain deferred future extensions rather than advertised
+controls. The five registered keys are `core_readiness_check`,
+`core_test_connection`, `product_import_scan`, `inventory_location_sync` and
+`fulfillment_reconciliation_check`. Submission returns a job-backed run
+reference immediately. A future mutation launcher remains deferred until its
+scope, authority, impact and readback contract is separately implemented.
 
 ### 3.5 Investigate a run
 
@@ -125,6 +140,7 @@ Shopify/Odoo side effects, readback, business-record result, operator evidence a
 | Screen | Must show | Primary action | Must not do |
 | --- | --- | --- | --- |
 | Overview | store state, freshness, ≤3 active exceptions, workflow health, recent activity | Resolve top issue or launch operation | nine equal metric cards; success noise |
+| Operation launcher | one exact store, five named read/scan/reconciliation controls, readiness and side-effect summary | Start one named bounded control | direction/filter editors, impact preview, a `Preview` action, arbitrary dispatch or heavy work in the HTTP request |
 | Needs Attention | severity, workflow, impact, age, owner, safe next action | Open resolution | collapse technical failure and human review into one color-only state |
 | Store setup | progress, saved state, validation evidence, consequences | Continue / activate | imply a token can be read back; activate through failed readiness |
 | Store management | every permitted store, company, connection/activation/health/freshness | Add, resume, repair or retire one store | expose inaccessible counts; apply one store’s policy to another |
@@ -134,6 +150,7 @@ Shopify/Odoo side effects, readback, business-record result, operator evidence a
 | Run detail | timeline, attempts, error classification, readback, affected objects | Context-specific recovery | show stack trace as primary explanation |
 | Record panel | binding, last observed, last successful run, active hold, Shopify link | Open run / resolve | duplicate an entire technical form inside each business record |
 | Settings | connection/scopes, workflows, automation, authority, defaults, mappings, notifications, retention and advanced rollout | Save one validated group / rerun readiness | duplicate onboarding state; expose secret or unsafe bypass |
+| Administrator lifecycle | installed schema/version, migration/backfill state, paused/in-flight work, backup/restore and rollback evidence | Resume safe step / open exact runbook | offer database restore as an ordinary UI action or hide interrupted migration |
 
 ## 5. State model
 
@@ -155,7 +172,7 @@ The UI renders human labels and keeps internal tokens in diagnostics only. Fresh
 | Role | Can see | Can act |
 | --- | --- | --- |
 | Administrator | all stores permitted by active-company/store rules, settings, credentials posture, technical evidence | add/connect/configure/activate/pause/retire stores, destructive approvals, security-sensitive recovery |
-| Operator | assigned companies/stores and operational evidence | launch safe operations, fix mappings, retry eligible failures |
+| Operator | assigned companies/stores and operational evidence | fix mappings and retry eligible failures returned by the server |
 | Reviewer | review queues and evidence needed for decisions | approve/reject/manual bind/skip with reason |
 | Auditor | redacted history and configuration snapshots | export/read evidence only |
 | No access | no connector menus, models, counters or activities | none |

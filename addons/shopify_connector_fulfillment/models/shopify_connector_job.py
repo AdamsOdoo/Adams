@@ -126,12 +126,15 @@ class ShopifyConnectorJobFulfillmentExtension(models.Model):
         if not settings:
             return
         if self.state == 'running' and settings.fulfillment_switch_in_progress:
-            settings.write({'fulfillment_mode_switch_state': 'running'})
+            settings._settings_service_write(
+                '_fulfillment_job',
+                {'fulfillment_mode_switch_state': 'running'},
+            )
         elif (
             self.state == 'retry_waiting'
             and settings.fulfillment_requested_mode == 'mode2'
         ):
-            settings.write({
+            settings._settings_service_write('_fulfillment_job', {
                 'fulfillment_operating_mode': 'mode1',
                 'fulfillment_switch_in_progress': True,
                 'fulfillment_mode_switch_state': 'retry_waiting',
@@ -140,7 +143,7 @@ class ShopifyConnectorJobFulfillmentExtension(models.Model):
                 ),
             })
         elif self.state in ('failed_retryable', 'failed_final'):
-            settings.write({
+            settings._settings_service_write('_fulfillment_job', {
                 'fulfillment_operating_mode': 'mode1',
                 'fulfillment_requested_mode': False,
                 'fulfillment_switch_in_progress': False,

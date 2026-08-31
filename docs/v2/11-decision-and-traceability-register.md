@@ -63,10 +63,12 @@
 | V2-D054 | P00–P20 are traceability IDs inside one continuous five-wave program and one integrated candidate PR, not 21 approval phases. | Preserves reviewability without artificial waiting. | P00–P18 |
 | V2-D055 | Cross-chat continuity is proactive and committed: checkpoint before context exhaustion, then verify SHA/branch/status in the receiving chat. | Keeps long execution safe and continuous. | every wave |
 | V2-D056 | Near-real-time is measured event-to-visible-state latency with immediate durable admission/drain plus one-minute recovery scheduling; it is never marketed as instantaneous/exactly-once. | Responsive operation with honest distributed-system limits. | P10–P18 |
-| V2-D057 | Multiple stores are first-class, independently scoped identities with no designed licensing/count cap; same company never relaxes same-store checks. | Merchant scalability and tenant safety. | P02, P09, P15–P18 |
+| V2-D057 | Multiple stores are first-class, independently scoped identities; same company never relaxes same-store checks. There is no licensing cap, but the inherited fail-closed support boundary remains ten stores/database until an exact-candidate 20-store profile authorizes a change. | Merchant scalability without claiming unmeasured capacity. | P02, P09, P15–P18 |
 | V2-D058 | Post-onboarding Administrator controls are grouped typed settings/lifecycle actions; safety algorithms, API version, secrets and identity fences are not configurable. | Powerful administration without bypass switches. | P15–P16 |
 | V2-D059 | Refunds and payouts extend typed domain registries through additive addons; core gets no speculative generic workflow/data framework. | Future capability without present overengineering. | future addons; registry tests P01/P17 |
 | V2-D060 | The V2 shell must pass Odoo action/context/asset/responsive/RTL compatibility; if custom persistent navigation requires a webclient/router fork, use the Odoo-native fallback. | Maintains Odoo compatibility and upgradeability. | P03, P16–P17 |
+| V2-D061 | Setup progress is addressed only by the twelve durable semantic `step_key` values; five V1 and six V2 presentation phases are projections, and legacy numerics pass through one frozen adapter. | Prevents resume corruption when presentation changes. | P00, P01, P15–P16 |
+| V2-D062 | Disconnect distinguishes local shutdown/subscription cleanup from merchant-owned Shopify custom-app token revocation, which remains an explicit external Administrator action. | Prevents a false security/lifecycle claim. | P01, P15–P17 |
 
 ## 2. Default parameters
 
@@ -85,7 +87,7 @@
 | Run timeline initial page | 200 events | UX/performance review |
 | Mandatory viewport tests | 375, 768, 1366, 1440 px + RTL | design-system review |
 | Contraction soak | 2 releases and 14 days at all-V2, whichever later | architecture/release gate |
-| Immediate drain recovery | enqueue requests bounded drain after commit; one-minute scheduled drain remains fallback | runtime/performance ADR |
+| Immediate drain recovery | enqueue persists the bounded drain wake-up in the admission transaction; an exact post-commit execution may accelerate explicitly replay-safe reads; one-minute scheduled drain remains fallback | runtime/performance ADR |
 | Webhook acknowledgement | p95 ≤1 second; no accepted request ≥5 seconds | performance/safety review |
 | Single-record event completion | p95 ≤15 seconds, p99 ≤60 seconds excluding evidenced Shopify throttle/outage | performance/release review |
 | Active/passive UI freshness | active run observes terminal state within 5 seconds; passive Overview refresh defaults to 30 seconds | UX/performance review |
@@ -178,7 +180,7 @@ Any `Yes` blocks the affected checkpoint until an explicit accepted ADR supersed
 | Manage stores | `get_store_list_v1` | create/pause/resume/disconnect/retire named methods | store lifecycle, company/store rules, readiness summary |
 | Settings | `get_store_settings_v1` | grouped typed settings/workflow-state methods | lifecycle, settings and domain readiness providers |
 | Setup | `get_setup_v1` | save/replace/test/activate methods | lifecycle, credential, settings and readiness providers |
-| Operation launcher | `get_operation_options_v1` | `start_operation_v1` | operation registry/command bus |
+| Operation launcher | `get_operation_options_v1` | `start_operation_v1` | closed P15 read/scan/reconciliation registry; exact store scope only; no filters, preview or mutation dispatch |
 
 ## 6. Risk ownership
 

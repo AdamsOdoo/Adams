@@ -1,0 +1,245 @@
+// Shared primitives.  This file is imported by connector_v2.scss and is
+// intentionally scoped so loading it cannot style another Odoo application.
+.o_sc_v2 {
+    .sc-v2-visually-hidden {
+        position: absolute !important;
+        inline-size: 1px !important;
+        block-size: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    .sc-v2-eyebrow {
+        margin: 0 0 var(--sc-space-1);
+        color: var(--sc-muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        line-height: 1.3;
+        text-transform: uppercase;
+    }
+
+    .sc-v2-page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: var(--sc-space-5);
+        min-inline-size: 0;
+        margin-block-end: var(--sc-space-5);
+
+        > * {
+            min-inline-size: 0;
+        }
+
+        &__title {
+            margin: 0;
+            color: var(--sc-ink);
+            font-size: clamp(26px, 3vw, 32px);
+            font-weight: 700;
+            line-height: 1.15;
+        }
+
+        &__subtitle {
+            max-inline-size: 620px;
+            margin: var(--sc-space-2) 0 0;
+            color: var(--sc-ink-soft);
+            font-size: 15px;
+            overflow-wrap: anywhere;
+        }
+    }
+
+    .sc-v2-button {
+        @include connector-v2-touch-target;
+        @include connector-v2-focus;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--sc-space-2);
+        max-inline-size: 100%;
+        border: 1px solid var(--sc-line-strong);
+        border-radius: var(--sc-radius-control);
+        padding: var(--sc-space-2) var(--sc-space-3);
+        background: var(--sc-surface);
+        color: var(--sc-ink);
+        font-weight: 650;
+        text-align: center;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+        @include connector-v2-motion;
+
+        &:hover:not(:disabled) {
+            background: var(--sc-surface-soft);
+        }
+
+        &--primary {
+            border-color: var(--sc-success);
+            background: var(--sc-success);
+            color: var(--sc-surface);
+
+            &:hover:not(:disabled) {
+                background: var(--sc-ink);
+            }
+        }
+
+        &--secondary {
+            border-color: var(--sc-line-strong);
+            background: var(--sc-surface);
+        }
+
+        &--quiet {
+            border-color: transparent;
+            background: transparent;
+            color: var(--sc-success);
+            padding-inline: var(--sc-space-2);
+
+            &:hover:not(:disabled) {
+                background: var(--sc-success-soft);
+            }
+        }
+
+        &__hint {
+            color: currentColor;
+            font-size: 11px;
+            font-weight: 500;
+        }
+    }
+
+    .sc-v2-link-button {
+        @include connector-v2-focus;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        color: var(--sc-success);
+        text-align: start;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    .sc-v2-select {
+        @include connector-v2-touch-target;
+        @include connector-v2-focus;
+        min-inline-size: 180px;
+        max-inline-size: 100%;
+        border: 1px solid var(--sc-line-strong);
+        border-radius: var(--sc-radius-control);
+        padding: var(--sc-space-2) var(--sc-space-3);
+        background: var(--sc-surface);
+        color: var(--sc-ink);
+    }
+
+    .sc-v2-status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--sc-space-1);
+        max-inline-size: 100%;
+        border: 1px solid transparent;
+        border-radius: var(--sc-radius-pill);
+        padding: var(--sc-space-1) var(--sc-space-2);
+        color: var(--sc-ink-soft);
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+        white-space: normal;
+
+        &__label {
+            min-inline-size: 0;
+        }
+
+        &--success {
+            border-color: var(--sc-success);
+            background: var(--sc-success-soft);
+            color: var(--sc-success);
+        }
+
+        &--info {
+            border-color: var(--sc-info);
+            background: var(--sc-info-soft);
+            color: var(--sc-info);
+        }
+
+        &--warning {
+            border-color: var(--sc-warning);
+            background: var(--sc-warning-soft);
+            color: var(--sc-warning);
+        }
+
+        &--danger {
+            border-color: var(--sc-danger);
+            background: var(--sc-danger-soft);
+            color: var(--sc-danger);
+        }
+
+        &--neutral {
+            border-color: var(--sc-line);
+            background: var(--sc-surface-soft);
+            color: var(--sc-ink-soft);
+        }
+
+        &--compact {
+            padding-block: 2px;
+            font-size: 11px;
+        }
+    }
+
+    .sc-v2-state-message {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--sc-space-4);
+        min-inline-size: 0;
+        border: 1px solid var(--sc-line);
+        border-radius: var(--sc-radius-panel);
+        padding: var(--sc-space-5);
+        background: var(--sc-surface);
+
+        &__icon {
+            flex: 0 0 auto;
+            inline-size: 36px;
+            block-size: 36px;
+            border-radius: 50%;
+            padding-block: 8px;
+            background: var(--sc-surface-soft);
+            color: var(--sc-info);
+            text-align: center;
+        }
+
+        &__body {
+            min-inline-size: 0;
+        }
+
+        &__title {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
+        }
+
+        &__detail {
+            @include connector-v2-wrap-anywhere;
+            margin: var(--sc-space-1) 0 var(--sc-space-3);
+            color: var(--sc-ink-soft);
+        }
+
+        &--warning {
+            border-color: var(--sc-warning);
+
+            .sc-v2-state-message__icon {
+                background: var(--sc-warning-soft);
+                color: var(--sc-warning);
+            }
+        }
+
+        &--danger {
+            border-color: var(--sc-danger);
+
+            .sc-v2-state-message__icon {
+                background: var(--sc-danger-soft);
+                color: var(--sc-danger);
+            }
+        }
+    }
+}

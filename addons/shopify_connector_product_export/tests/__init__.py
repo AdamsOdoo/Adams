@@ -14,6 +14,7 @@ from . import test_u3_hoot_suite
 from . import test_export_apply_handoff
 from . import test_export_search_encoding
 from . import test_export_action_view_binding
+from . import test_product_contract_repair
 from . import test_export_mutation_expiry
 from . import test_media_resume
 from . import test_export_reconnect_reconcile

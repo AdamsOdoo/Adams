@@ -68,12 +68,40 @@ def discover_documents(root=ROOT):
 
 def validate_documents(schema, documents):
     failures = []
+    owners = {}
     for path, lineno, source in documents:
         try:
             document = parse(source)
         except Exception as exc:
             failures.append((path, lineno, 'parse: %s' % exc))
             continue
+        operations = [
+            definition for definition in document.definitions
+            if getattr(definition, 'operation', None) is not None
+        ]
+        if len(operations) != 1:
+            failures.append((
+                path, lineno,
+                'contract: every checked-in document must contain exactly '
+                'one operation; found %d' % len(operations),
+            ))
+        else:
+            name_node = getattr(operations[0], 'name', None)
+            operation_name = getattr(name_node, 'value', None)
+            if not operation_name:
+                failures.append((
+                    path, lineno,
+                    'contract: anonymous Shopify operations are forbidden',
+                ))
+            elif operation_name in owners:
+                owner_path, owner_line = owners[operation_name]
+                failures.append((
+                    path, lineno,
+                    'contract: duplicate operation name %s; first owned by '
+                    '%s:%d' % (operation_name, owner_path, owner_line),
+                ))
+            else:
+                owners[operation_name] = (path, lineno)
         for error in validate(schema, document):
             failures.append((path, lineno, error.message))
     return failures

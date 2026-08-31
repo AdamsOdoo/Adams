@@ -20,3 +20,6 @@ from . import shopify_connector_fulfillment_reconnect
 from . import shopify_connector_ui_store360_fulfillment
 from . import shopify_connector_job_dispatch
 from . import stock_picking
+# P07 final read dispatch layer; it delegates V1 through a private context
+# marker and keeps fulfillment selection/mutation siblings unchanged.
+from . import shopify_connector_fulfillment_p07_read_adapter

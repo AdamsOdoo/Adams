@@ -107,6 +107,16 @@ class TestFulfillmentModeSwitch(TransactionCase):
                 ).id,
             ])],
         })
+        cls.connector_admin = cls.env['res.users'].create({
+            'name': 'FUL Connector Administrator',
+            'login': 'ful-admin-%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_admin'
+                ).id,
+            ])],
+        })
 
     # ------------------------------------------------------------------
     # Job builders
@@ -343,6 +353,30 @@ class TestFulfillmentModeSwitch(TransactionCase):
     def test_start_switch_requires_admin(self):
         with self.assertRaises(AccessError):
             self.settings.with_user(self.non_admin).action_start_mode2_switch()
+
+    def test_admin_cannot_write_fulfillment_safety_state_directly(self):
+        """Mode, nonce, switch, and notification state are service-owned."""
+        settings = self.settings.with_user(self.connector_admin)
+        protected = {
+            'fulfillment_operating_mode': 'mode2',
+            'fulfillment_switch_in_progress': True,
+            'fulfillment_mode_switch_nonce': 'forged-nonce',
+            'fulfillment_requested_mode': 'mode2',
+            'fulfillment_mode_switch_state': 'succeeded',
+            'fulfillment_mode_switch_next_action': 'forged next action',
+            'fulfillment_mode_switch_next_retry_at': fields.Datetime.now(),
+            'fulfillment_mode_switch_is_stale': True,
+            'fulfillment_notification_confirmed': True,
+        }
+        for field, value in protected.items():
+            with self.subTest(field=field):
+                with self.assertRaises(AccessError):
+                    settings.write({field: value})
+        with self.assertRaises(AccessError):
+            settings.with_context(
+                shopify_settings_write_surface='_fulfillment_mode_switch',
+                shopify_settings_service_sentinel=True,
+            ).write({'fulfillment_operating_mode': 'mode2'})
 
     def test_retry_waiting_scan_keeps_request_and_shows_next_retry(self):
         job = self._arm_switch()

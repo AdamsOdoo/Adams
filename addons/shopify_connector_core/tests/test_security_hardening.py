@@ -355,3 +355,13 @@ class TestSecurityHardening(TransactionCase):
         self.assertEqual(len(summary_logs), 1)
         self.assertNotIn('raw@example.com', summary_logs.message)
         self.assertIn('redacted_payload_count=1', summary_logs.message)
+        # A repeated cron drain must not rewrite already-redacted evidence or
+        # append a second summary for the same payload.
+        self.env['shopify.connector.pii.retention'].run_sweep()
+        self.assertEqual(
+            self.Job.search_count([
+                ('store_id', '=', self.store.id),
+                ('job_type', '=', 'core_manual_maintenance'),
+            ]),
+            before + 1,
+        )
