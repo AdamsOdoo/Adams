@@ -34,7 +34,7 @@ approved secret location or connection mechanism instead.
 
 ## 3. Current implementation checkpoint
 
-- Recorded at (UTC): `2026-08-31T22:42:26Z`
+- Recorded at (UTC): `2026-08-31T22:48:39Z`
 - Owner/model/chat: Codex GPT-5.6 Sol implementation owner with an independent local review pass
 - Branch: `codex/v2-continuous-implementation`
 - Accepted V1 implementation base SHA: `f77bfcc25e63615e6226dd9a9329f8f943593cb2`
@@ -88,8 +88,8 @@ approved secret location or connection mechanism instead.
 
 ### In progress
 
-- Publish this exact-source evidence/handoff as a fast-forward documentation checkpoint and
-  qualify the exact remote head through one coherent GitHub CI run.
+- Publish the one-file operation-catalog provenance repair identified by the first evidence-head
+  CI run, then qualify the resulting exact remote head through one coherent GitHub CI run.
 - Continue the remaining backend domain runtime slices only after that checkpoint is coherent;
   do not mix new production code into the evidence commit.
 
@@ -114,6 +114,10 @@ approved secret location or connection mechanism instead.
 - Deterministic evidence generation: two independent runs were byte-identical; repository
   baseline `--check` passed against exact remote source `9e1ca0f2`.
 - The exact remote branch head and source tree were verified after a non-force fast-forward.
+- The first evidence-head policy run passed 444 of 446 tests and exposed only two assertions for
+  the same stale manual operation-catalog source reference. After updating that paired reference,
+  the full **446-test** policy/static/dependency/size/baseline/GraphQL/compile/whitespace gate
+  passed locally again.
 
 ### Verification still required
 
