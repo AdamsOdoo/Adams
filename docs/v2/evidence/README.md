@@ -10,7 +10,7 @@ V2 implementation. Evidence is additive and truthful: an unavailable runtime mea
 | --- | --- |
 | V1 implementation source | PR #210 head `f77bfcc25e63615e6226dd9a9329f8f943593cb2` |
 | V2 approved blueprint source | PR #211 head `3914004e27630b09b211e3d2ee92a8e6d9a0e55e` |
-| Current exact source checkpoint | `78f2a09c984a78bd85db2c6b0bdde69c6630e428` |
+| Current exact source checkpoint | `96114438da1eac7a1f61b8711ccfcb197d6df262` |
 | Implementation branch | `codex/v2-continuous-implementation` |
 | Protected branches/PRs modified | none |
 | Shopify/Odoo external effects for this checkpoint | none |
@@ -41,7 +41,7 @@ reviewable and unmodified.
 ```bash
 python3 -m unittest tools.tests.test_v2_repository_baseline -v
 python3 tools/v2_repository_baseline.py \
-  --source-ref 78f2a09c984a78bd85db2c6b0bdde69c6630e428
+  --source-ref 96114438da1eac7a1f61b8711ccfcb197d6df262
 python3 tools/v2_repository_baseline.py --check
 python3 tools/validate_shopify_graphql.py
 ```
@@ -52,16 +52,17 @@ evidence update in the same reviewed change.
 
 ## P00 repository-check result
 
-- complete dependency-free source/policy suite: 386 passed;
+- complete dependency-free source/policy suite: 415 passed;
 - deterministic generation: two consecutive runs produced identical file digests;
-- compatibility self-check against the exact source tree at `78f2a09c`: passed;
-- declared model classes: 198;
-- literal Shopify GraphQL operation documents: 48, all uniquely named;
+- compatibility self-check against the exact source tree at `96114438`: passed;
+- declared model classes: 207;
+- literal Shopify GraphQL operation documents: 48, all uniquely named and schema-valid
+  against Admin API `2026-07`;
 - P01 gate: every named document must be owned by exactly one typed operation spec;
 - registered browser tours: 42;
-- the frozen combined cross-addon graph catalogs 9 existing cycles and 118 production import
-  occurrences; all seven V2 package-direction policies pass, but cycle elimination is not yet
-  claimed complete;
+- the frozen combined cross-addon graph catalogs 0 cycles and 120 production import
+  occurrences; all seven V2 package-direction policies pass. Odoo registry/runtime proof is
+  still required before treating the repository-derived result as full runtime qualification;
 - database/restore/performance acceptance: not yet claimed.
 
 No generated artifact contains credentials, Shopify payloads or merchant PII.
