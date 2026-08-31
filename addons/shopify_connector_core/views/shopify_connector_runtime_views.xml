@@ -40,7 +40,7 @@
                         domain="[('state', 'not in', ('succeeded', 'partially_succeeded', 'failed_terminal', 'cancelled'))]"/>
                 <filter name="needs_attention" string="Needs Attention"
                         domain="[('state', 'in', ('failed_retryable', 'blocked_manual_review', 'failed_terminal'))]"/>
-                <group expand="0" string="Group By">
+                <group>
                     <filter name="group_store" string="Store" context="{'group_by': 'store_id'}"/>
                     <filter name="group_workflow" string="Workflow" context="{'group_by': 'workflow'}"/>
                     <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
