@@ -951,8 +951,14 @@ def _write_outputs(output_dir: Path, outputs: dict[str, Any]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     for name in OUTPUT_NAMES:
         value = outputs[name]
+        # These are machine-readable ledgers and can become large as the
+        # connector grows.  Canonical compact JSON keeps Git/PR payloads and
+        # evidence transport bounded without dropping any evidence fields.
         content = value if isinstance(value, str) else json.dumps(
-            value, indent=2, sort_keys=True, ensure_ascii=False
+            value,
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
         ) + "\n"
         (output_dir / name).write_text(content, encoding="utf-8")
 
