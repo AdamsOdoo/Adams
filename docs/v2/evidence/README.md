@@ -10,7 +10,7 @@ V2 implementation. Evidence is additive and truthful: an unavailable runtime mea
 | --- | --- |
 | V1 implementation source | PR #210 head `f77bfcc25e63615e6226dd9a9329f8f943593cb2` |
 | V2 approved blueprint source | PR #211 head `3914004e27630b09b211e3d2ee92a8e6d9a0e55e` |
-| Current exact source checkpoint | `9e1ca0f2cb6017b5031558e4528818090ad854f0` |
+| Current exact source checkpoint | `880e70088922eb10dd44426678d578ee4ee7a73a` |
 | Implementation branch | `codex/v2-continuous-implementation` |
 | Protected branches/PRs modified | none |
 | Shopify/Odoo external effects for this checkpoint | none |
@@ -41,7 +41,7 @@ reviewable and unmodified.
 ```bash
 python3 -m unittest tools.tests.test_v2_repository_baseline -v
 python3 tools/v2_repository_baseline.py \
-  --source-ref 9e1ca0f2cb6017b5031558e4528818090ad854f0
+  --source-ref 880e70088922eb10dd44426678d578ee4ee7a73a
 python3 tools/v2_repository_baseline.py --check
 python3 tools/validate_shopify_graphql.py
 ```
@@ -52,9 +52,9 @@ evidence update in the same reviewed change.
 
 ## P00 repository-check result
 
-- complete dependency-free source/policy suite: 446 passed;
+- complete dependency-free source/policy suite: 448 passed;
 - deterministic generation: two consecutive runs produced identical file digests;
-- compatibility self-check against the exact source tree at `9e1ca0f2`: passed;
+- compatibility self-check against the exact source tree at `880e7008`: passed;
 - declared model classes: 211;
 - literal Shopify GraphQL operation documents: 48, all uniquely named and schema-valid
   against Admin API `2026-07`;

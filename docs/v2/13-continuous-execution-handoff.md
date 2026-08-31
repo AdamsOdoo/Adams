@@ -34,20 +34,20 @@ approved secret location or connection mechanism instead.
 
 ## 3. Current implementation checkpoint
 
-- Recorded at (UTC): `2026-08-31T22:48:39Z`
+- Recorded at (UTC): `2026-08-31T23:04:09Z`
 - Owner/model/chat: Codex GPT-5.6 Sol implementation owner with an independent local review pass
 - Branch: `codex/v2-continuous-implementation`
 - Accepted V1 implementation base SHA: `f77bfcc25e63615e6226dd9a9329f8f943593cb2`
 - Approved V2 blueprint source SHA: `3914004e27630b09b211e3d2ee92a8e6d9a0e55e`
-- Last completed remote source SHA: `9e1ca0f2cb6017b5031558e4528818090ad854f0`
-- Exact source tree: `b6ac802ff462a82057f86b81a33b9ceff2fe17d3`
-- Equivalent reviewed local source commit: `91cdefb0272dc73b95615f7c24923041f125130b`
+- Last completed remote source SHA: `880e70088922eb10dd44426678d578ee4ee7a73a`
+- Exact source tree: `8ea4e799ea87953c187dc37f25af584b84e3c977`
+- Equivalent reviewed local source commit: `24238008e3203760b464228433f6a358a75b8f41`
 - Evidence SHA: this documentation-only checkpoint immediately following the remote source
   SHA; resolve its exact identity from the branch head to avoid a self-referential commit hash
 - Current remote implementation-branch head: this evidence checkpoint after publication
 - Candidate frozen: no
-- Active wave/task: publish and qualify the exact P10 evidence checkpoint, then continue the
-  remaining P12-P16 domain/runtime and user-journey implementation in bounded vertical slices
+- Active wave/task: publish and qualify the Odoo 19 install-compatibility repair on top of P10,
+  then continue P12-P16 domain/runtime and user-journey work in bounded vertical slices
 - Authorization/environment boundary: continuous dev-branch implementation and controlled
   server-to-server test-store use authorized; PR #210, PR #211, staging and production remain
   untouched unless explicitly routed by the implementation program
@@ -80,30 +80,36 @@ approved secret location or connection mechanism instead.
   `unregistered_read_handler`; mutation attempts remain excluded from this recovery path.
 - Added focused dependency-free tests and real two-connection Odoo/PostgreSQL barrier
   regressions for opposite cross-run batches, claim/cancellation ordering and stale handlers.
-- Published remote source `9e1ca0f2cb6017b5031558e4528818090ad854f0`; all 64 uploaded blob
-  hashes matched the reviewed local Git objects and GitHub produced exact tree
-  `b6ac802ff462a82057f86b81a33b9ceff2fe17d3`.
+- Published the P10 source and then exact repair source
+  `880e70088922eb10dd44426678d578ee4ee7a73a`; every uploaded blob matched the
+  reviewed local Git object and GitHub produced exact tree
+  `8ea4e799ea87953c187dc37f25af584b84e3c977`.
+- Corrected the two root failures found by the first full Odoo gate: the run search view now
+  follows pinned Odoo 19 RelaxNG attributes, and SEC-3 init-time historic sweeps skip additive
+  models whose tables correctly do not exist during the W2-only compatibility probe.
+- Added dependency-free regressions for both Odoo 19 contracts, derived from pinned Odoo source
+  `30bde9ff758834a4912c5ae55843d3a7dad849f1`.
 - Regenerated the six repository baseline artifacts twice against that exact remote source;
   both runs were byte-identical and the baseline check passed.
 
 ### In progress
 
-- Publish the one-file operation-catalog provenance repair identified by the first evidence-head
-  CI run, then qualify the resulting exact remote head through one coherent GitHub CI run.
+- Publish the regenerated exact-source evidence and handoff, then qualify the resulting remote
+  head through one coherent GitHub policy and full Connector/Odoo 19 CI run.
 - Continue the remaining backend domain runtime slices only after that checkpoint is coherent;
   do not mix new production code into the evidence commit.
 
 ### Changed/uncommitted files
 
-- Production source and tests are clean at remote source `9e1ca0f2`; the reviewed local source
+- Production source and tests are clean at remote source `880e7008`; the reviewed local source
   tree is byte-identical.
-- Only `docs/v2/13-continuous-execution-handoff.md`, `docs/v2/evidence/README.md` and the six
-  regenerated evidence artifacts are intentionally uncommitted. Do not mix production edits
-  into this evidence checkpoint.
+- Only `docs/v2/13-continuous-execution-handoff.md`, `docs/v2/evidence/README.md`, the operation
+  contract catalog and the six regenerated artifacts are intentionally uncommitted. Do not mix
+  production edits into this evidence checkpoint.
 
 ### Verification completed
 
-- Complete dependency-free suite: **446 tests passed** on the exact source tree.
+- Complete dependency-free suite: **448 tests passed** on the exact source tree.
 - Python compilation and `git diff --check`: passed.
 - Static policy, all seven addon dependency-direction policies and changed-production-file
   size policy: passed.
@@ -112,16 +118,22 @@ approved secret location or connection mechanism instead.
 - Independent diff review found no unsafe mutation path; it caught and closed the wall-clock
   scan-window inversion and source-size violations before publication.
 - Deterministic evidence generation: two independent runs were byte-identical; repository
-  baseline `--check` passed against exact remote source `9e1ca0f2`.
+  baseline `--check` passed against exact remote source `880e7008`.
 - The exact remote branch head and source tree were verified after a non-force fast-forward.
 - The first evidence-head policy run passed 444 of 446 tests and exposed only two assertions for
   the same stale manual operation-catalog source reference. After updating that paired reference,
   the full **446-test** policy/static/dependency/size/baseline/GraphQL/compile/whitespace gate
   passed locally again.
+- The repaired evidence head `ec7ff3e` passed the complete remote V2 policy workflow. Its full
+  Connector/Odoo 19 run reached the pinned Odoo/PostgreSQL environment and exposed two root
+  compatibility failures before normal test execution: invalid legacy search-group attributes
+  and an init sweep querying an intentionally absent additive table. Downstream missing-tour and
+  zero-migration reports were consequences, not independent defects. Both roots are fixed in
+  source `880e7008`; the consolidated **448-test** cheap gate is green.
 
 ### Verification still required
 
-- Execute the newly added two-connection Odoo/PostgreSQL barrier regressions in CI; local
+- Re-execute the newly added two-connection Odoo/PostgreSQL barrier regressions in CI; local
   scratch has neither Odoo nor PostgreSQL.
 - Odoo-backed registry/ORM/security tests, fresh install, warm update, migrations,
   backup/restore, uninstall and measured performance require the coherent remote gate.
@@ -144,7 +156,7 @@ approved secret location or connection mechanism instead.
 
 ### Defects and blockers
 
-- No known source-level blocker prevents publishing this P10 checkpoint.
+- No known source-level blocker prevents publishing the repaired P10 checkpoint.
 - Runtime qualification is an evidence gap, not an inferred pass: Odoo/PostgreSQL, browser,
   performance and live-Shopify results remain pending until executed on an exact remote SHA.
 - Product completion is not release completion: P12-P16 integrations and every U1-U14
@@ -155,13 +167,13 @@ approved secret location or connection mechanism instead.
 
 ### Rollback
 
-- Remote source checkpoint `9e1ca0f2cb6017b5031558e4528818090ad854f0` is the exact rollback
+- Remote source checkpoint `880e70088922eb10dd44426678d578ee4ee7a73a` is the exact rollback
   point for this source wave; its tree is independently verified against the local checkpoint.
-- Previous remote rollback remains `96114438da1eac7a1f61b8711ccfcb197d6df262`.
+- Previous remote source rollback remains `9e1ca0f2cb6017b5031558e4528818090ad854f0`.
 
 ### First next action
 
-- Publish and verify this evidence checkpoint, observe the exact-head connector/policy CI gate,
+- Publish and verify this repaired evidence checkpoint, observe the exact-head connector/policy CI gate,
   then continue the next backend vertical slice without rerunning expensive suites prematurely.
 
 ## 4. Implementation checkpoint template
