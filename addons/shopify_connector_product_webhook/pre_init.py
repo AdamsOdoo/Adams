@@ -91,7 +91,18 @@ def pre_init_hook(env):
             % '; '.join(details)
         )
 
+    # product_template exists in Lite too. Only the export-owned anchor proves
+    # that an installed export schema needs this compatibility bridge.
+    cr.execute(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.columns "
+        "WHERE table_schema = current_schema() "
+        "AND table_name = 'product_template' "
+        "AND column_name = 'shopify_export_status')"
+    )
+    export_schema_present = cr.fetchone()[0]
     for table, columns_to_add in _ADDITIVE_COLUMNS.items():
+        if table == 'product_template' and not export_schema_present:
+            continue
         cr.execute('SELECT to_regclass(%s)', (table,))
         if not cr.fetchone()[0]:
             # A full fresh install may load this optional addon before an
@@ -151,6 +162,8 @@ def pre_init_hook(env):
                )
         """
     )
+    if not export_schema_present:
+        return
     cr.execute(
         "UPDATE product_template "
         "SET shopify_export_status_managed = TRUE "

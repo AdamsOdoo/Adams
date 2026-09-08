@@ -38,6 +38,19 @@ from .shopify_connector_run_metadata import (
 )
 
 
+def _validated_run_name(value):
+    """Validate a canonical run reference without applying PII redaction."""
+    if (
+        not isinstance(value, str)
+        or len(value) > 128
+        or not _RUN_NAME_RE.fullmatch(value)
+    ):
+        raise ValidationError(
+            'The run reference must use RUN-YYYYMMDD-sequence format.'
+        )
+    return value
+
+
 class ShopifyConnectorRun(models.Model):
     """One durable request spanning one or more connector jobs."""
 
@@ -308,12 +321,7 @@ class ShopifyConnectorRun(models.Model):
             values['name'] = 'RUN-%s-0000000000' % requested.strftime(
                 '%Y%m%d'
             )
-        else:
-            values['name'] = _safe_text(values['name'], 128)
-        if not _RUN_NAME_RE.match(values['name']):
-            raise ValidationError(
-                'The run reference must use RUN-YYYYMMDD-sequence format.'
-            )
+        values['name'] = _validated_run_name(values['name'])
         return values
 
     @api.model_create_multi
@@ -371,11 +379,7 @@ class ShopifyConnectorRun(models.Model):
                 raise AccessError(
                     'The run-name surface can change only name.'
                 )
-            name = _required_text(vals['name'], 'name', 128)
-            if not _RUN_NAME_RE.match(name):
-                raise ValidationError(
-                    'The run reference must use RUN-YYYYMMDD-sequence format.'
-                )
+            name = _validated_run_name(vals['name'])
             for record in self:
                 if record.state != 'requested' or not record.name.endswith(
                     '-0000000000'

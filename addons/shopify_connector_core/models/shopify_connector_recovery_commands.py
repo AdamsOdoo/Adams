@@ -425,33 +425,33 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
 
     @api.model
     def resolve_attention_v1(self, command):
-        context = self._recovery_parse_envelope(command, "resolve_attention_v1")
+        recovery_context = self._recovery_parse_envelope(command, "resolve_attention_v1")
         try:
-            recovery = AttentionCommand.from_mapping(context.payload)
+            recovery = AttentionCommand.from_mapping(recovery_context.payload)
         except RecoveryContractError as exc:
             raise ValidationError(_("The recovery command payload is invalid.")) from exc
-        store = self._recovery_ui()._require_store(context.envelope.store_id)
-        if store.company_id.id != context.envelope.company_id:
+        store = self._recovery_ui()._require_store(recovery_context.envelope.store_id)
+        if store.company_id.id != recovery_context.envelope.company_id:
             raise AccessError(_("The attention item is outside the active company."))
 
         current_connection, current_configuration, _settings = self._recovery_generation(store)
-        if context.envelope.expected_generation != current_connection:
+        if recovery_context.envelope.expected_generation != current_connection:
             return self._recovery_result(
                 "conflict",
                 _("The store connection changed; refresh before acting."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 attention_ref=recovery.item_ref,
                 conflict_version=current_connection,
             )
         if (
-            context.expected_configuration_generation is not None
-            and context.expected_configuration_generation != current_configuration
+            recovery_context.expected_configuration_generation is not None
+            and recovery_context.expected_configuration_generation != current_configuration
         ):
             return self._recovery_result(
                 "conflict",
                 _("The store configuration changed; refresh before acting."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 attention_ref=recovery.item_ref,
                 conflict_version=current_configuration,
@@ -465,7 +465,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "conflict",
                 _("That attention item is no longer available."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 attention_ref=recovery.item_ref,
             )
@@ -474,7 +474,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "conflict",
                 _("That attention item changed; refresh before acting."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=dto.run_ref,
                 attention_ref=dto.item_ref,
@@ -484,7 +484,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "blocked",
                 _("This action is not available for the current item."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=dto.run_ref,
                 attention_ref=dto.item_ref,
@@ -496,7 +496,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "blocked",
                 _("This provider has no approved recovery service."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=dto.run_ref,
                 attention_ref=dto.item_ref,
@@ -507,7 +507,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "blocked",
                 _("This action is navigation-only or has no approved write service."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=dto.run_ref,
                 attention_ref=dto.item_ref,
@@ -520,7 +520,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "blocked",
                 _("The recovery source is not actionable."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 attention_ref=dto.item_ref,
                 conflict_version=dto.state_version,
@@ -530,11 +530,11 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             run=(getattr(record, "run_id", False) if meta.get("kind") == "job" else False),
             store=store,
         )
-        if target.is_v2 and context.expected_configuration_generation is None:
+        if target.is_v2 and recovery_context.expected_configuration_generation is None:
             return self._recovery_result(
                 "blocked",
                 _("A V2 recovery command must include the configuration generation."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=dto.run_ref,
                 attention_ref=dto.item_ref,
@@ -546,23 +546,23 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                 return self._recovery_result(
                     "blocked",
                     _("Mutation evidence requires remote-outcome verification."),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=store,
                     run_ref="job:%d" % job.id,
                     attention_ref=dto.item_ref,
                     conflict_version=dto.state_version,
                 )
-            expected_configuration = context.expected_configuration_generation
+            expected_configuration = recovery_context.expected_configuration_generation
             generation_conflict = self._recovery_check_generation(
                 target,
-                expected_connection=context.envelope.expected_generation,
+                expected_connection=recovery_context.envelope.expected_generation,
                 expected_configuration=expected_configuration,
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
             )
             if generation_conflict:
                 return self._recovery_conflict(
                     target,
-                    context.envelope,
+                    recovery_context.envelope,
                     attention_ref=dto.item_ref,
                     version=dto.state_version,
                     message=_("The store or run generation changed; refresh before acting."),
@@ -574,7 +574,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                         return self._recovery_result(
                             "blocked",
                             _("This job no longer has a safe retry."),
-                            envelope=context.envelope,
+                            envelope=recovery_context.envelope,
                             store=store,
                             run_ref=target.run_ref,
                             attention_ref=dto.item_ref,
@@ -586,7 +586,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                         return self._recovery_result(
                             "blocked",
                             _("This review is no longer open."),
-                            envelope=context.envelope,
+                            envelope=recovery_context.envelope,
                             store=store,
                             run_ref=target.run_ref,
                             attention_ref=dto.item_ref,
@@ -597,7 +597,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                     return self._recovery_result(
                         "blocked",
                         _("This job action is not approved."),
-                        envelope=context.envelope,
+                        envelope=recovery_context.envelope,
                         store=store,
                         run_ref=target.run_ref,
                         attention_ref=dto.item_ref,
@@ -613,7 +613,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                 ):
                     return self._recovery_conflict(
                         target,
-                        context.envelope,
+                        recovery_context.envelope,
                         attention_ref=dto.item_ref,
                         version=current,
                     )
@@ -621,7 +621,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             job.invalidate_recordset()
             self._recovery_audit_command(
                 job,
-                context.envelope,
+                recovery_context.envelope,
                 recovery.action_key,
                 recovery.reason,
                 before,
@@ -630,7 +630,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "accepted",
                 _("The recovery action was accepted."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=target.run_ref,
             )
@@ -640,7 +640,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                 return self._recovery_result(
                     "blocked",
                     _("An uncertain mutation cannot use a generic recovery action."),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=store,
                     run_ref=dto.run_ref,
                     attention_ref=dto.item_ref,
@@ -655,14 +655,14 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             )
             generation_conflict = self._recovery_check_generation(
                 target,
-                expected_connection=context.envelope.expected_generation,
-                expected_configuration=context.expected_configuration_generation,
-                envelope=context.envelope,
+                expected_connection=recovery_context.envelope.expected_generation,
+                expected_configuration=recovery_context.expected_configuration_generation,
+                envelope=recovery_context.envelope,
             )
             if generation_conflict:
                 return self._recovery_conflict(
                     target,
-                    context.envelope,
+                    recovery_context.envelope,
                     attention_ref=dto.item_ref,
                     version=dto.state_version,
                     message=_("The store or run generation changed; refresh before acting."),
@@ -671,7 +671,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                 return self._recovery_result(
                     "conflict",
                     _("The remote outcome was already changed; refresh before acting."),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=store,
                     run_ref=target.run_ref,
                     attention_ref=dto.item_ref,
@@ -693,7 +693,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
                 )
                 return self._recovery_conflict(
                     target,
-                    context.envelope,
+                    recovery_context.envelope,
                     attention_ref=dto.item_ref,
                     version=fresh,
                     message=_("The mutation decision changed; refresh before acting."),
@@ -702,7 +702,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             job.invalidate_recordset()
             self._recovery_audit_command(
                 job,
-                context.envelope,
+                recovery_context.envelope,
                 recovery.action_key,
                 recovery.reason,
                 before,
@@ -711,7 +711,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
             return self._recovery_result(
                 "accepted",
                 _("The remote outcome decision was recorded."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=store,
                 run_ref=target.run_ref,
             )
@@ -719,7 +719,7 @@ class ShopifyConnectorRecoveryCommands(models.AbstractModel):
         return self._recovery_result(
             "blocked",
             _("This attention provider has no approved command adapter."),
-            envelope=context.envelope,
+            envelope=recovery_context.envelope,
             store=store,
             run_ref=dto.run_ref,
             attention_ref=dto.item_ref,

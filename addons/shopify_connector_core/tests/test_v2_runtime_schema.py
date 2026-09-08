@@ -124,6 +124,16 @@ class TestV2RuntimeSchema(TransactionCase):
     def test_run_service_create_has_store_rooted_company_and_human_reference(self):
         run = self._run()
         self.assertTrue(re.match(r'^RUN-\d{8}-\d+$', run.name), run.name)
+        self.assertEqual(
+            run.name,
+            'RUN-%s-%06d' % (
+                fields.Datetime.to_datetime(run.requested_at).strftime(
+                    '%Y%m%d'
+                ),
+                run.id,
+            ),
+        )
+        self.assertNotIn('*', run.name)
         self.assertEqual(run.store_id, self.store_a)
         self.assertEqual(run.company_id, self.store_a.company_id)
         self.assertEqual(run.state, 'requested')
@@ -195,6 +205,17 @@ class TestV2RuntimeSchema(TransactionCase):
             run._surface('_finish_run').write({
                 'result_summary': 'post-terminal mutation',
             })
+
+    def test_run_reference_validation_does_not_weaken_free_text_redaction(self):
+        run = self._run()
+        run._admit_service()
+        run._transition_service(
+            'running',
+            'Contact +1 415 555 2671 about this diagnostic.',
+        )
+        self.assertIn('***', run.result_summary)
+        self.assertNotIn('415 555 2671', run.result_summary)
+        self.assertRegex(run.name, r'^RUN-[0-9]{8}-[0-9]+$')
 
     def test_attempt_service_create_links_job_run_and_company(self):
         run = self._run()
@@ -315,12 +336,13 @@ class TestV2RuntimeSchema(TransactionCase):
                     attempt_no=1,
                     claim_token=str(uuid.uuid4()),
                 )
-        with self.assertRaises(ValidationError):
-            with self.env.cr.savepoint():
-                self._attempt(
-                    attempt_no=0,
-                    claim_token=str(uuid.uuid4()),
-                )
+        for invalid in (None, False, True, 0, -1, 1.0, '1'):
+            with self.assertRaises(ValidationError, msg=repr(invalid)):
+                with self.env.cr.savepoint():
+                    self._attempt(
+                        attempt_no=invalid,
+                        claim_token=str(uuid.uuid4()),
+                    )
 
     def test_runtime_models_do_not_define_credential_or_payload_fields(self):
         forbidden = {

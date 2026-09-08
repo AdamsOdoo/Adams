@@ -196,7 +196,7 @@ class TestV2ActivationClosure(unittest.TestCase):
         client = source(V2 / "connector_v2_action_recovery.js")
         self.assertGreaterEqual(attention.count('"configuration_generation"'), 2)
         self.assertIn(
-            "target.is_v2 and context.expected_configuration_generation is None",
+            "target.is_v2 and recovery_context.expected_configuration_generation is None",
             recovery,
         )
         self.assertIn("command.expected_configuration_generation = config", client)

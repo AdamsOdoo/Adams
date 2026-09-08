@@ -279,16 +279,15 @@ class ShopifyConnectorJobAttempt(models.Model):
                     'Execution and mutation evidence must share a store.'
                 )
 
-        attempt_no = values.get('attempt_no')
-        if attempt_no in (None, False):
+        if 'attempt_no' not in values:
             previous = self.sudo().search([
                 ('job_id', '=', job.id),
             ], order='attempt_no desc', limit=1)
             attempt_no = (previous.attempt_no if previous else 0) + 1
-        try:
-            attempt_no = int(attempt_no)
-        except (TypeError, ValueError) as exc:
-            raise ValidationError('Attempt number must be an integer.') from exc
+        else:
+            attempt_no = values['attempt_no']
+        if isinstance(attempt_no, bool) or not isinstance(attempt_no, int):
+            raise ValidationError('Attempt number must be an integer.')
         if attempt_no <= 0:
             raise ValidationError('Attempt number must be positive.')
 

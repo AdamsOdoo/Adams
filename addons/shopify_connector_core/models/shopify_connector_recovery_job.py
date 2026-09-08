@@ -69,11 +69,11 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
             ))
         if state_version is not None or reason not in (None, False, ""):
             raise ValidationError(_("Command arguments must be inside the payload."))
-        context = self._recovery_parse_envelope(command_or_ref, endpoint)
+        recovery_context = self._recovery_parse_envelope(command_or_ref, endpoint)
         ref, payload_version, payload_reason = self._recovery_job_payload(
-            context.payload, endpoint=endpoint,
+            recovery_context.payload, endpoint=endpoint,
         )
-        return context, ref, payload_version, payload_reason
+        return recovery_context, ref, payload_version, payload_reason
 
     @api.model
     def _recovery_target_version_for_command(self, target, endpoint):
@@ -83,7 +83,7 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
 
     @api.model
     def _recovery_retry_or_cancel(self, command_or_ref, reason, state_version, endpoint):
-        context, ref, expected_version, safe_reason = (
+        recovery_context, ref, expected_version, safe_reason = (
             self._recovery_command_from_job_input(
                 command_or_ref, reason, state_version, endpoint,
             )
@@ -94,7 +94,7 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
         self._recovery_require_role(required_role)
         target = self._recovery_target_from_ref(
             ref,
-            store_id=context.envelope.store_id,
+            store_id=recovery_context.envelope.store_id,
             action=(
                 "retry_job" if endpoint == "retry_job_v1" else "cancel_job"
             ),
@@ -102,27 +102,27 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
         current_version = self._recovery_target_version_for_command(target, endpoint)
         if expected_version is not None and expected_version != current_version:
             return self._recovery_conflict(
-                target, context.envelope, version=current_version,
+                target, recovery_context.envelope, version=current_version,
             )
-        if target.is_v2 and context.expected_configuration_generation is None:
+        if target.is_v2 and recovery_context.expected_configuration_generation is None:
             return self._recovery_result(
                 "blocked",
                 _("A V2 command must include the configuration generation."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=target.store,
                 run_ref=target.run_ref,
                 conflict_version=current_version,
             )
         generation_conflict = self._recovery_check_generation(
             target,
-            expected_connection=context.envelope.expected_generation,
-            expected_configuration=context.expected_configuration_generation,
-            envelope=context.envelope,
+            expected_connection=recovery_context.envelope.expected_generation,
+            expected_configuration=recovery_context.expected_configuration_generation,
+            envelope=recovery_context.envelope,
         )
         if generation_conflict:
             return self._recovery_conflict(
                 target,
-                context.envelope,
+                recovery_context.envelope,
                 version=current_version,
                 message=_(
                     "The store or run generation changed; refresh before acting."
@@ -131,11 +131,11 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
 
         job = target.job
         if endpoint == "retry_job_v1":
-            if self._recovery_command_audited(job, context.envelope.command_id):
+            if self._recovery_command_audited(job, recovery_context.envelope.command_id):
                 return self._recovery_result(
                     "duplicate",
                     _("This recovery command was already accepted."),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=target.store,
                     run_ref=target.run_ref,
                 )
@@ -146,7 +146,7 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
                         "Mutation evidence requires remote-outcome verification; "
                         "it cannot be retried generically."
                     ),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=target.store,
                     run_ref=target.run_ref,
                     conflict_version=current_version,
@@ -155,7 +155,7 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
                 return self._recovery_result(
                     "blocked",
                     _("This job has no currently returned safe retry action."),
-                    envelope=context.envelope,
+                    envelope=recovery_context.envelope,
                     store=target.store,
                     run_ref=target.run_ref,
                     conflict_version=current_version,
@@ -170,22 +170,22 @@ class ShopifyConnectorRecoveryJobCommands(models.AbstractModel):
                 fresh = self._recovery_target_state_version(target)
                 if fresh != current_version or job.state != "failed_retryable":
                     return self._recovery_conflict(
-                        target, context.envelope, version=fresh,
+                        target, recovery_context.envelope, version=fresh,
                     )
                 raise
             job.invalidate_recordset()
             self._recovery_audit_command(
-                job, context.envelope, "retry_job", safe_reason, before, job.state,
+                job, recovery_context.envelope, "retry_job", safe_reason, before, job.state,
             )
             return self._recovery_result(
                 "accepted",
                 _("The job was safely re-queued."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=target.store,
                 run_ref=target.run_ref,
             )
         return self._recovery_cancel_v2_or_legacy(
-            target, context, safe_reason, expected_version, current_version,
+            target, recovery_context, safe_reason, expected_version, current_version,
         )
 
     @api.model

@@ -68,11 +68,11 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
 
     @api.model
     def _recovery_cancel_v2_or_legacy(
-        self, target, context, reason, expected_version, current_version,
+        self, target, recovery_context, reason, expected_version, current_version,
     ):
         if target.is_v2:
             return self._recovery_cancel_v2_run(
-                target, context, reason, expected_version,
+                target, recovery_context, reason, expected_version,
             )
 
         job = target.job
@@ -83,7 +83,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
                     "A running or terminal job must settle at its service "
                     "boundary."
                 ),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=target.store,
                 run_ref=target.run_ref,
                 conflict_version=current_version,
@@ -93,7 +93,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         job.invalidate_recordset()
         self._recovery_audit_command(
             job,
-            context.envelope,
+            recovery_context.envelope,
             "cancel_job",
             reason,
             before,
@@ -102,19 +102,19 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         return self._recovery_result(
             "accepted",
             _("The job cancellation was recorded."),
-            envelope=context.envelope,
+            envelope=recovery_context.envelope,
             store=target.store,
             run_ref=target.run_ref,
         )
 
     @api.model
-    def _recovery_cancel_v2_run(self, target, context, reason, expected_version):
+    def _recovery_cancel_v2_run(self, target, recovery_context, reason, expected_version):
         run = target.run or (target.job and target.job.run_id)
         if not run:
             return self._recovery_result(
                 "blocked",
                 _("The V2 cancellation run is not available."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=target.store,
             )
         child_ids = self._recovery_lock_cancel_scope(run, target.store)
@@ -123,14 +123,14 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         if expected_version is not None and expected_version != current_run_version:
             return self._recovery_conflict(
                 target,
-                context.envelope,
+                recovery_context.envelope,
                 version=current_run_version,
             )
         if run.cancel_requested_at:
             return self._recovery_result(
                 "duplicate",
                 _("Cancellation was already requested for this run."),
-                envelope=context.envelope,
+                envelope=recovery_context.envelope,
                 store=target.store,
                 run_ref="run:%d" % run.id,
                 conflict_version=current_run_version,
@@ -182,7 +182,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
             child.invalidate_recordset()
             self._recovery_audit_command(
                 child,
-                context.envelope,
+                recovery_context.envelope,
                 "cancel_job",
                 reason,
                 before,
@@ -208,7 +208,7 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
                 "Cancellation was requested; queued read work was settled "
                 "where safe."
             ),
-            envelope=context.envelope,
+            envelope=recovery_context.envelope,
             store=target.store,
             run_ref="run:%d" % run.id,
             pending={

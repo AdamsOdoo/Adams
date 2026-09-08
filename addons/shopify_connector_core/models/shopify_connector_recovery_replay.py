@@ -17,9 +17,9 @@ def recovery_command_replay_endpoint(expected_name):
     def decorate(method):
         @wraps(method)
         def wrapped(self, command, *args, **kwargs):
-            context = self._recovery_parse_envelope(command, expected_name)
+            recovery_context = self._recovery_parse_envelope(command, expected_name)
             result_model = self.env["shopify.connector.command.result"]
-            envelope = context.envelope
+            envelope = recovery_context.envelope
             store_id = envelope.store_id
             result_model._lock_scope(
                 envelope.company_id,
@@ -27,10 +27,10 @@ def recovery_command_replay_endpoint(expected_name):
                 str(envelope.command_id),
                 service_capability=_COMMAND_RESULT_SERVICE_CAPABILITY,
             )
-            payload = dict(context.payload)
-            if context.expected_configuration_generation is not None:
+            payload = dict(recovery_context.payload)
+            if recovery_context.expected_configuration_generation is not None:
                 payload["__expected_configuration_generation"] = (
-                    context.expected_configuration_generation
+                    recovery_context.expected_configuration_generation
                 )
             request_hash = command_request_fingerprint(
                 company_id=envelope.company_id,

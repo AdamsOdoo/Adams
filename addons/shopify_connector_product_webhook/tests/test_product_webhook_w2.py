@@ -172,6 +172,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         self.assertIn('ADD COLUMN IF NOT EXISTS actual_include_fields jsonb', bridge)
         self.assertIn('7443250ae42a0c3fadba9bf0ef9991e1826b77b5', runner)
         pre_init_hook(self.env)
+        pre_init_hook(self.env)
         self.env.cr.execute(
             "SELECT column_name, udt_name FROM information_schema.columns "
             "WHERE table_name = %s AND column_name = ANY(%s)",
@@ -209,12 +210,22 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 'sale_order_scan_cursor',
             },
         )
-        self.env.cr.execute(
-            "SELECT shopify_export_status_managed FROM product_template "
-            "WHERE id = %s",
-            (self.env['product.template'].create({'name': 'Bridge seed'}).id,),
-        )
-        self.assertTrue(self.env.cr.fetchone()[0])
+        if 'shopify_export_status' in self.env['product.template']._fields:
+            self.env.cr.execute(
+                "SELECT shopify_export_status_managed FROM product_template "
+                "WHERE id = %s",
+                (self.env['product.template'].create({'name': 'Bridge seed'}).id,),
+            )
+            self.assertTrue(self.env.cr.fetchone()[0])
+        else:
+            self.env.cr.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = 'product_template' "
+                "AND column_name IN ("
+                "'shopify_export_status', 'shopify_export_status_managed')"
+            )
+            self.assertFalse(self.env.cr.fetchall())
 
     def test_registry_removed_product_topic_queues_exact_gid_cleanup(self):
         """W2 removal leaves no active evidence and queues read-first delete."""
