@@ -1,5 +1,21 @@
 # Astra UI redesign — proposal 01
 
+## Proposal 02 — management dashboard and revised visual direction
+
+The user rejected proposal 01's visual quality as insufficiently premium/modern and identified the missing management dashboard. **Proposal 01 is not approved.** [Proposal 02](./design-review/proposal-02.html) is the current visual review candidate; it retains the earlier local walkthroughs and adds a dedicated Management destination, with Operations separate. Astra remains design owner. Production implementation still awaits the requested design approval.
+
+This restores a requirement already present in [the August two-dashboard contract](../02-product/premium-ux-ui-restructure-delta-2026-08-02.md): commercial performance and connector health must both exist, with independently defined populations. The omission from proposal 01 was not an authorized scope removal.
+
+Visual changes: dark evergreen navigation rail, lighter canvas, restrained green emphasis, clearer typographic scale, compact metric cards, a daily-value chart and consistent rounded surfaces. This remains a prototype; preserve native Odoo menu/action compatibility and do not patch the global webclient merely to reproduce the rail. Such compatibility must be demonstrated before production UI implementation.
+
+Management shows imported Odoo order value, eligible order count, average imported order value, separately disclosed review-held orders, daily trends and observed-order coverage. Clicking a metric explains its definition; changing the period updates the figures and chart; resolving the sample held order updates its inclusion in the selected period. Production drill-downs must use exactly the aggregate's record rules, currency, date field and exclusions. Store/company permissions apply to counters as well as records; aggregates across currencies are prohibited.
+
+The headline is deliberately imported Odoo order value. [Shopify's sales-report definitions](https://help.shopify.com/en/manual/reports-and-analytics/shopify-reports/report-types/default-reports/sales-report) distinguish sales, reversals, taxes/shipping and payments. Our sample eligible-order population and tax-inclusive average are not equivalent to Shopify net sales or Shopify's average order value. No profit, cash-received, conversion-rate or full-store-completeness claim is added without the necessary data contract.
+
+Validation: DOM-adapter smoke checks passed for current/prior-period totals (AED 84,240 / 74,280), metric definitions, review exclusion, resolution inclusion (AED 84,429), and existing navigation. All figures are invented sample data. Browser pixel, responsive, dark-theme, native-shell and accessibility acceptance remain pending; no browser or production pass is claimed. GitHub publication remains blocked by the previously recorded write-access failure.
+
+The original proposal and review rationale follow for traceability.
+
 Date: 2026-09-08. Status: **proposed, awaiting user design approval**.
 Owner: Astra. This is a design checkpoint within the authorized V2 development program, not a new V3 connector or a release approval.
 
