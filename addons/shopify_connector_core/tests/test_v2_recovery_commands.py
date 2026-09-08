@@ -58,6 +58,12 @@ class TestV2RecoveryCommands(TransactionCase):
             "credential_present": True,
             "last_readiness_result": "pass",
         })
+        # These recovery scenarios start from an operational store. Connection
+        # alone leaves P15 activation in draft and blocks business-job setup
+        # before the cancellation/replay assertions can be exercised.
+        store._store_service_write(
+            "_lifecycle", {"activation_state": "active"},
+        )
         settings = cls.Settings._settings_service_create(
             "_canonical_settings", {"store_id": store.id},
         )
@@ -98,6 +104,26 @@ class TestV2RecoveryCommands(TransactionCase):
             job.sudo().write(values)
             job.invalidate_recordset()
         return job
+
+    def test_read_only_business_admission_requires_active_store(self):
+        store = self._store(v2=True)
+        run = self._run(store)
+        for activation in ("draft", "paused", "retired"):
+            with self.subTest(activation=activation):
+                store._store_service_write(
+                    "_lifecycle", {"activation_state": activation},
+                )
+                with self.assertRaises(ValidationError):
+                    self._v2_job(run)
+                self.assertFalse(self.Job.sudo().search([
+                    ("run_id", "=", run.id),
+                ]))
+        store._store_service_write(
+            "_lifecycle", {"activation_state": "active"},
+        )
+        job = self._v2_job(run)
+        self.assertEqual(job.state, "queued")
+        self.assertEqual(job.run_id, run)
 
     @staticmethod
     def _command(user, store, name, payload, *, config=None, command_id=None):

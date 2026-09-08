@@ -34,7 +34,9 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
             'shop_domain': 'w2-product-%s.myshopify.com' % suffix,
             'api_version': SHOPIFY_API_VERSION,
         })
-        store.write({'state': 'connected'})
+        store._store_service_write('_lifecycle', {
+            'state': 'connected', 'activation_state': 'active',
+        })
         self.env['shopify.connector.store.settings'].create({
             'store_id': store.id,
             'product_domain_enabled': True,
@@ -76,6 +78,21 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         active = set(registry.allowed_topics())
         self.assertTrue(set(PRODUCT_WEBHOOK_TOPICS).issubset(active))
         self.assertIn('products/delete', active)
+
+    def test_paused_store_does_not_admit_product_import_child(self):
+        store = self._store('paused')
+        store._store_service_write('_lifecycle', {
+            'activation_state': 'paused',
+        })
+        delivery = self._delivery(
+            store, 'paused', 'gid://shopify/Product/788032119674292998',
+        )
+        delivery._process_queued()
+        self.assertEqual(delivery.state, 'manual_review')
+        self.assertFalse(self.env['shopify.connector.job'].search([
+            ('store_id', '=', store.id),
+            ('job_type', '=', PRODUCT_IMPORT_JOB_TYPE),
+        ]))
 
     def test_delete_delivery_admits_read_first_stale_binding_path(self):
         registry = self.env['shopify.connector.webhook.registry']
@@ -690,6 +707,11 @@ class TestShopifyConnectorProductWebhookGenerationRace(TransactionCase):
                 'shop_domain': 'w2-product-race-%s.myshopify.com' % store_id_seed(),
                 'api_version': SHOPIFY_API_VERSION,
                 'state': 'connected',
+            })
+            # The race must reach parent/child admission, not fail early on
+            # the independent activation gate. Keep the two-cursor proof intact.
+            store._store_service_write('_lifecycle', {
+                'activation_state': 'active',
             })
             env['shopify.connector.store.settings'].create({
                 'store_id': store.id,
