@@ -1,3 +1,5 @@
+> Historical entrypoint: current execution follows AGENTS.md and docs/v2/16-delivery-blueprint.md. UI design is parked by the user. Preserve lessons below; stale branch, model and stop instructions do not override current authority.
+
 # GPT_SOL.md — Orientation for GPT-5.6 Sol
 
 > **Role-model supersession — 2026-07-25.** [The dated role-model addendum](docs/04-decisions/2026-07-25-mvp-role-model-addendum.md) and [DEC-041](docs/04-decisions/DEC-041-evidence-first-process-reallocation.md) are authoritative. Sol/Codex is the MVP implementation worker; ChatGPT is strategic control room; Runtime Claude verifies runtime; separate Claude reviews independently; the product owner is final authority. Live GitHub identity and the current control-room authorization override stale tracker snapshots.

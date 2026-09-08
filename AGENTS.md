@@ -1,71 +1,52 @@
-# AGENTS.md — Execution Ownership and Review Lenses
+# Adams Shopify connector — execution instructions
 
-> `CLAUDE.md` is the project governance authority. This file defines how one or
-> more implementation/review agents cooperate without creating an uncontrolled swarm.
+## Authority and active work
 
-## 1. Operating model
+Follow the user's latest instruction first, this file second, then accepted V2 contracts and ADRs. CLAUDE.md, CHATGPT.md and GPT_SOL.md are compatibility entrypoints/history, not separate authorities. Do not restart from historical prompts.
 
-One lead implementation owner is accountable for the active coherent scope, integration
-state and handoff. “Agent” below is a responsibility lens; it does not require a separate
-process or model. One capable implementation model may perform every lens sequentially.
+Read docs/v2/13-continuous-execution-handoff.md and docs/v2/16-delivery-blueprint.md, verify branch/head and worktree, then load only the owning contract and relevant skill. The user authorized continuous V2 development, testing and Astra/Sol orchestration. **UI redesign is parked until the user resumes it; proposals 01/02 are unapproved.** Backend and delivery work continue without routine approval stops.
 
-Parallel work is optional, never assumed. It is allowed only when the user or execution
-environment authorizes it, files do not overlap, contracts are already stable, and one
-owner will integrate and rerun the affected gates.
+Work on codex/v2-continuous-implementation. Preserve PR #210/#211 and unrelated changes. Never reset, rebase, stash, force-push or discard preserved work. Commit coherent changes; publish using an authorized write connection. If blocked, preserve local commits and record that they are unpublished. Do not claim GitHub contains them.
 
-## 2. Required responsibility lenses
+Only the authorized development environment and Shopify store testin-lzhbzhtc.myshopify.com may be used. Verify exact build, database/company and shop identity before live work. No staging/production, other stores or public release without separate authority. Use the approved secure credential mechanism; never put secrets, customer payloads or PII in prompts, fixtures, commits or evidence.
 
-| Lens | Responsibility | Must not do |
-| --- | --- | --- |
-| Lead implementer | Own exact base, scope, integration, tests, evidence and rollback | delegate accountability or merge incomplete evidence |
-| V1 compatibility | Trace current behavior/data and prevent recurrence of known V1 defects | preserve an error merely because it exists in V1 |
-| Shopify integration | Validate GraphQL, webhooks, scopes, cost, idempotency and readback against the pinned API | invent fields or rely on vendor/competitor behavior |
-| Odoo architecture | Validate ORM, transactions, security, cron, modules, views, migrations and lifecycle against pinned Odoo 19 | add non-native infrastructure without evidence |
-| Domain/product | Validate authority, matching, totals, quantity, fulfillment and future extension seams | broaden current release scope silently |
-| UX/accessibility | Validate complete journeys, Odoo-native composition, roles, responsive/RTL and recovery clarity | optimize screenshots at the expense of evidence or safety |
-| Reliability/security | Trace concurrency, retries, uncertain mutations, tenant isolation, secrets, PII and failure injection | accept hidden buttons or `sudo()` as authorization |
-| Release reviewer | Independently verify exact candidate, migration, live readback and rollback evidence | approve from the author summary alone |
+## Architecture that must survive repairs
 
-Where team size permits, the final mutation-safety/security/release verdict is performed
-by someone other than the author of the last material change. On a single-agent run,
-perform a fresh evidence-based review pass and record that independence is logical, not
-organizational.
+- Odoo 19 modular monolith; preserve addon/model/table/XML IDs, bindings, audit and mutation history. Expand/migrate before switching. Optional modules cannot access another optional owner's schema merely because a shared table exists.
+- Typed Shopify gateways own remote I/O, pinned operations and normalized transport/GraphQL/business errors. Webhooks are authenticated, deduplicated hints; scheduled reconciliation repairs missed/out-of-order events.
+- Commands enforce actor capabilities, company, exact store, activation and configuration/connection generation at admission and before effects. UI hiding, context booleans and broad sudo are not authorization.
+- Durable intent, operation scope, claim fencing and readback prevent duplicate effects. After-send uncertainty remains query-only until resolved; never blindly retry it.
+- Preserve global deterministic lock ordering, run/job/handler binding and monotonic scan checkpoints. SQL is justified for migrations, constraints and concurrency correctness as well as measured performance; explain ownership and transaction boundaries.
+- Framework transactions own normal RPC commits. Independent cursors need explicit lifecycle. Cron progress APIs are not manual-commit workarounds for ordinary business RPCs.
+- Deterministic bindings, explicit inventory first-push approval, protected catalog fields/media, whole-order validation and explicit fulfillment notification remain invariant.
+- No speculative broker, external worker, generic repository layer, event bus or framework. Add an abstraction to enforce an actual boundary, isolate a side effect, or remove demonstrated duplication.
 
-## 3. Editing and integration rules
+## Skills and sources
 
-- One owner edits a model/contract/subsystem at a time.
-- Research/review may run beside implementation only when it does not mutate overlap.
-- No agent silently moves from review into unrelated implementation.
-- Every result is committed to GitHub with exact files, tests and evidence.
-- Conflicting recommendations are resolved against `CLAUDE.md`, accepted V2 decisions,
-  official platform facts and actual repository behavior before code continues.
-- The continuous program does not pause for routine internal handoffs; the lead owner
-  integrates and advances when the automatic evidence gate passes.
+Repository skills live in .agents/skills/. Read directly if discovery is unavailable; do not install global/personal skills for this project.
 
-## 4. Continuous handoff
+| Work | Skill |
+| --- | --- |
+| Models, APIs/webhooks, schema, runtime, security and domain behavior | connector-backend/SKILL.md |
+| Business journeys, native UI, management reporting and usability | connector-journey/SKILL.md |
+| Failure triage, native/lifecycle/live qualification and evidence | connector-qualification/SKILL.md |
 
-Before a chat/session/context switch, the active owner updates
-`docs/v2/13-continuous-execution-handoff.md` with:
+Official platform/model references are routed from blueprint 16. Refresh version-sensitive facts for the touched operation, not the whole research corpus on every packet. Vendor documentation describes competitor behavior, not platform guarantees. Historical failures/rejected approaches remain regression inputs.
 
-- exact branch, base and head;
-- active wave and task ID;
-- completed and in-progress behavior;
-- changed/uncommitted files;
-- tests run and tests still required;
-- external environment state without secrets;
-- known defects/blockers and whether intentionally deferred to the end;
-- rollback point and exact first next action.
+## Astra/Sol coordination and efficiency
 
-The receiving owner verifies the head and handoff before acting, continues from the
-first next action, and does not repeat completed research or implementation.
+One lead owns integration and handoff. Astra handles architecture, cross-domain decisions, mutation/security review and user-facing design when resumed. Sol handles bounded implementation, test repair and evidence extraction. Start Sol medium for straightforward tasks, high for ORM/state/concurrency; use Astra high for difficult integration, raising effort only for unresolved risk. These are initial routing choices, not quota guarantees.
 
-## 5. Prohibited coordination patterns
+Delegate concrete non-overlapping work beside useful lead work. Usually one implementation agent and one lead suffice. Give objective, exact source, owned paths, constraints, acceptance, tests and return format. Reviewers receive raw evidence and criteria, not instructions to agree. The lead inspects the diff; summaries are not proof. Separate-model review is not human/organizational release independence.
 
-- uncontrolled agent swarms;
-- overlapping edits to the same contracts/models;
-- large fan-out without synthesis ownership;
-- agent conclusions that exist only in chat;
-- marking a gate complete from summaries without test/evidence inspection;
-- restarting from an old prompt or stale branch after a handoff;
-- including credentials, access tokens or customer PII in agent prompts/handoffs.
+Use incremental searches and batched independent reads. Do not re-audit unchanged code, request maximal effort universally, or run duplicate full campaigns. Measure actual cost/latency when available; do not manufacture usage promises.
 
+## Evidence and continuation
+
+Run focused checks per coherent change, then affected native gates. Full install/upgrade/concurrency/browser/load/live campaigns belong at integration gates and candidate freeze. Skipped, blocked, simulated or failed checks are never passes. Fix causes before cascades; update stale fixtures through sanctioned surfaces, never weaken production safety.
+
+Every advertised feature needs actor → authorization → input → local/remote effect → verified business result → user evidence → recovery. Native backend proof precedes production UI wiring. Prototype approval does not qualify a workflow.
+
+Update the canonical handoff after material checkpoints: source/head, unpublished changes, behavior, exact checks/results, external state, defects, rollback and first next action. Checkpoint atomic work before context pressure. Never claim an exact chat-limit detector, automatic new-chat creation or background execution after the turn ends.
+
+Routine defects, reversible fixes and already-authorized dev tests are work to complete. Escalate significant new scope/architecture, irrecoverable data risk, access outside authority, or final promotion. Preserve the safe checkpoint and continue independent useful work where possible.

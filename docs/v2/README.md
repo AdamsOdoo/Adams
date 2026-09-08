@@ -1,5 +1,8 @@
 # Shopify Connector V2 — Implementation Blueprint
 
+> Current execution: read [16 Delivery blueprint](./16-delivery-blueprint.md), [13 Handoff](./13-continuous-execution-handoff.md) and root AGENTS.md. Development is authorized; UI design is parked by the user. The older planning metadata below is historical.
+
+
 > **Status:** implementation-ready architecture/product package — docs only, 2026-08-30.  
 > **Interactive design:** [Shopify Connector V2 Blueprint](https://shopify-connector-v2-blueprint.mostafaessam94.chatgpt.site).  
 > **Planning base:** `Shopify-connector` at `dd6ecb8fe2d014989a86618035ef9bf1fe9f0b7b`.  
