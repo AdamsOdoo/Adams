@@ -1,6 +1,14 @@
 # V2 Continuous Execution Handoff
 
-## Latest checkpoint — local-only recovery/webhook qualification repair
+## Latest access checkpoint — GitHub write restored; public push review blocked
+
+- GitHub now reports `push=true` and `admin=true` for AdamsOdoo/Adams. PR #212 was checked before and after the publication attempt and remains at `1c75c10288477b3a902193797360badc9d2aa06a`.
+- Ordinary non-force push of the preserved development branch was rejected by automatic approval review: publishing local history/source to a public repository requires explicit authorization for that public disclosure. This is no longer a GitHub permission failure. Do not bypass via GitHub object APIs or an alternate push route.
+- Prepared source checkpoint: `52d90d43c04c16d40027a6955c3f8d6d1302f0af`, seven preserved local commits / 36 changed files against the published head. Payload includes backend fixes, regression tests, AGENTS/skills, blueprint/handoff documents and the two parked design proposal files; publishing them would not constitute design approval. This documentation-only access checkpoint follows that source.
+- Publication checks: Lite 289 and Full 444 distribution files validate on the prepared source; aggregate diff whitespace and change-size policy pass. The most recent 455-test local pass still applies to unchanged executable source. Native qualification remains pending. No remote ref or live environment changed.
+- Exact next publication action requires explicit user approval of public publication of this preserved payload to `codex/v2-continuous-implementation` / draft PR #212. Then recheck the remote head, use a non-force update, verify the resulting source and inspect matching CI. PR #210/#211 and production/public-release promotion remain outside this action.
+
+## Previous checkpoint — local-only recovery/webhook qualification repair
 
 - User instruction: continue locally while the user resolves GitHub access. No repeated publication attempts or access prompts. UI remains parked. Source parent is `ae5f5b2f66284ff7c370160f8dcd4ff6b6501358`; resolve this local checkpoint with `git rev-parse HEAD`.
 - Corrected operational activation fixtures in `TestV2RecoveryCommands`, `TestShopifyConnectorProductWebhookW2` and its independent-cursor generation-race fixture. The latter still commits its isolated fixture and uses the existing genuine two-connection barriers; no concurrency assertion was replaced with a mock. Source admission and lifecycle rules are unchanged.
