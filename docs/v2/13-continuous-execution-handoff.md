@@ -2,6 +2,8 @@
 
 ## Current execution update — 2026-09-08
 
+Publication blocker: proposal checkpoint committed locally as `bc3d73c00884d78c39ca336a982880b35d750a48`. Ordinary git push failed because no HTTPS credentials were available; GitHub connector `create_tree` returned HTTP 403, `Resource not accessible by integration`. No remote ref was changed. The design can be reviewed inline now; GitHub write access is needed to publish the prepared checkpoint. Do not claim the proposal is already in GitHub. Subsequent local documentation records this blocker. No browser layout pass: remote preview URL was blocked and local Chromium download timed out. DOM-adapter interaction smoke checks passed; native/browser acceptance remains pending.
+
 The user authorized starting the development program, then explicitly requested an Astra-owned UI redesign for approval. Read [17 Astra design review](./17-astra-ui-design-review.md) before any production UI redesign. The old prototype is historical input; do not interpret its previous approval as approval of the new proposal. Backend repair remains authorized while design is reviewed. No staging/production changes or PR #210/#211 changes are authorized by this update.
 
 - Refreshed PR #212 source head: `1c75c10288477b3a902193797360badc9d2aa06a`, branch `codex/v2-continuous-implementation`; complete checkout verified. PR #210 remains `f77bfcc25e63615e6226dd9a9329f8f943593cb2`; PR #211 remains `3914004e27630b09b211e3d2ee92a8e6d9a0e55e`.
