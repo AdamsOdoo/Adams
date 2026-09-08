@@ -1,5 +1,19 @@
 # V2 Continuous Execution Handoff
 
+## Current execution update — 2026-09-08
+
+The user authorized starting the development program, then explicitly requested an Astra-owned UI redesign for approval. Read [17 Astra design review](./17-astra-ui-design-review.md) before any production UI redesign. The old prototype is historical input; do not interpret its previous approval as approval of the new proposal. Backend repair remains authorized while design is reviewed. No staging/production changes or PR #210/#211 changes are authorized by this update.
+
+- Refreshed PR #212 source head: `1c75c10288477b3a902193797360badc9d2aa06a`, branch `codex/v2-continuous-implementation`; complete checkout verified. PR #210 remains `f77bfcc25e63615e6226dd9a9329f8f943593cb2`; PR #211 remains `3914004e27630b09b211e3d2ee92a8e6d9a0e55e`.
+- Fresh local fast baseline: `python -m unittest discover -s tools/tests -p 'test_*.py'` — **448 passed**, 10.796 seconds. This is not a native Odoo runtime pass.
+- Sol performed bounded, read-only diagnosis of exact-source native failures. Real roots: Lite hook accesses export-owned schema; old-core W2 bridge omits current stored fields; canonical RUN identifiers are passed through free-text PII redaction; explicit attempt number zero is mistaken for missing; typed recovery `context` collides with Odoo translation introspection. Many lifecycle failures instead come from legacy fixtures that set connected without active activation. Preserve the production admission gate and update sanctioned operational fixtures. Full/migration/native reruns remain required after fixes.
+- Native CI evidence and its limitations remain as recorded in the rebaseline review; no correction or post-correction native pass has occurred in this checkpoint.
+- Current material edits: proposal 01 and design review/continuity documentation only. Design outcomes are simulated. Baseline rollback remains the source head above.
+- First next actions: finish recording proposal browser checks and publish the coherent design checkpoint; obtain the requested visual/workflow approval before new production UI work; finalize the delivery blueprint and repository skills; repair optional-owner installation and runtime identity roots, then rerun focused native gates. Do not restart completed V1/V2 research or recover P10 again.
+- External state: no fresh Odoo.sh database/source-pin proof or live Shopify journey performed in this checkpoint. Test-store boundary remains `testin-lzhbzhtc.myshopify.com`. Human UAT availability and usage budget remain unconfirmed; these do not block local diagnosis/design.
+
+The August checkpoint below is retained as historical implementation detail. Its “publish P10” wording is stale: source and evidence were already published at the refreshed September head.
+
 > **Purpose:** preserve exact implementation state across long work chats, model changes,
 > context compaction and deliberate session switches without restarting or repeating work.
 
