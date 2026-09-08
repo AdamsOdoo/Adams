@@ -134,6 +134,73 @@ class TestMutationRecovery(TransactionCase):
             })
         return job, attempt
 
+    def _v2_running(self, running_since):
+        if self.store.activation_state != 'active':
+            self.store._p15_set_activation('active')
+        settings = self.env[
+            'shopify.connector.store.settings'
+        ].sudo().search([('store_id', '=', self.store.id)], limit=1)
+        if not settings:
+            settings = self.env[
+                'shopify.connector.store.settings'
+            ].sudo()._settings_service_create(
+                '_canonical_settings', {'store_id': self.store.id},
+            )
+        if settings.v2_runtime_mode != 'all':
+            settings._set_v2_modes_service(
+                {'v2_runtime_mode': 'all'},
+                reason='Layer 2 recovery native regression',
+                expected_configuration_generation=(
+                    settings.configuration_generation
+                ),
+            )
+        run = self.env['shopify.connector.run']._create_service({
+            'store_id': self.store.id,
+            'workflow': 'core',
+            'operation': 'mutation_dispatch_selftest',
+            'trigger': 'system',
+            'scope_summary': 'Layer 2 stale-owner regression',
+            'configuration_snapshot': {},
+        })
+        run._admit_service()
+        token = uuid.uuid4().hex
+        job = self.Job.sudo().create({
+            'store_id': self.store.id,
+            'job_source': 'setup_readiness_check',
+            'job_type': 'mutation_dispatch_selftest',
+            'expected_connection_generation':
+                self.store.connection_generation,
+            'expected_configuration_generation':
+                settings.configuration_generation,
+            'run_id': run.id,
+            'lane': 'interactive',
+            'lane_priority': 100,
+            'available_at': running_since,
+            'sequence': 0,
+            'state': 'running',
+            'payload_hash': uuid.uuid4().hex,
+            'current_attempt_token': token,
+            'owner_worker_ref': 'stale-v2-regression',
+            'running_since': running_since,
+        })
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset(('mutation_dispatch_selftest',)),
+        ):
+            attempt = self.Attempt.with_context(**{
+                C2_SENTINEL_CONTEXT: C2_SIDE_CURSOR_SENTINEL,
+            })._create_attempt_intent({
+                'job_id': job.id,
+                'attempt_token': token,
+                'mutation_domain': 'mutation_dispatch_selftest',
+                'expected_connection_generation':
+                    self.store.connection_generation,
+                'expected_store_identity': self.store.shop_domain,
+                'shopify_idempotency_key': uuid.uuid4().hex,
+            })
+        return job, attempt
+
     def test_c1_without_c2_is_safely_requeued(self):
         job, _attempt = self._running(False)
         self.Sweep.run_sweep()
@@ -203,6 +270,70 @@ class TestMutationRecovery(TransactionCase):
         self.assertFalse(job.current_attempt_token)
         self.assertFalse(job.owner_worker_ref)
         self.assertNotEqual(job.state, 'retry_waiting')
+
+    def test_v2_c2_selection_limits_after_oldest_job_ordering(self):
+        now = fields.Datetime.now()
+        newer_job, newer_attempt = self._v2_running(
+            now - timedelta(hours=1),
+        )
+        older_job, older_attempt = self._v2_running(
+            now - timedelta(hours=2),
+        )
+        self.assertLess(newer_attempt.id, older_attempt.id)
+
+        selected = self.Sweep._stale_v2_attempt_jobs(
+            job_types=frozenset(('mutation_dispatch_selftest',)),
+            cutoff=now - timedelta(minutes=30),
+            limit=1,
+        )
+
+        self.assertEqual(selected, older_job)
+        self.assertNotEqual(selected, newer_job)
+
+    def test_v2_c2_job_drift_is_discovered_and_only_reconciled(self):
+        job, attempt = self._v2_running(
+            fields.Datetime.now() - timedelta(hours=1),
+        )
+        run = attempt.run_id
+        job.sudo().write({
+            'run_id': False,
+            'job_type': 'core_manual_maintenance',
+            'current_attempt_token': False,
+        })
+        Dispatch = self.env['shopify.connector.job.dispatch']
+        with patch.object(
+            type(Dispatch), '_get_v2_mutation_job_types',
+            return_value=frozenset(('mutation_dispatch_selftest',)),
+        ), patch.object(
+            type(Dispatch), '_transport_mutation_dispatch_selftest',
+            side_effect=AssertionError('stale recovery replayed transport'),
+        ) as transport:
+            processed = self.Sweep._sweep_v2_mutation_owners()
+
+        self.assertEqual(processed, 1)
+        attempt.invalidate_recordset()
+        job.invalidate_recordset()
+        self.assertEqual(attempt.observed_outcome, 'uncertain')
+        self.assertFalse(job.current_attempt_token)
+        reconciliation = self.Job.search([
+            ('mutation_attempt_id', '=', attempt.id),
+        ])
+        self.assertEqual(len(reconciliation), 1)
+        self.assertEqual(reconciliation.run_id, run)
+        self.assertEqual(reconciliation.parent_job_id, job)
+        self.assertEqual(reconciliation.lane, 'safety_verification')
+        transport.assert_not_called()
+
+    def test_legacy_lock_contention_keeps_v2_processed_count(self):
+        candidates = Mock()
+        candidates.try_lock_for_update.return_value = self.Job.browse()
+        with patch.object(
+            type(self.Sweep), '_sweep_v2_mutation_owners',
+            return_value=3,
+        ), patch.object(
+            type(self.Job), 'search', return_value=candidates,
+        ):
+            self.assertEqual(self.Sweep.run_sweep(), 3)
 
     def test_disconnect_preserves_credentials_for_unresolved_attempt(self):
         self.env['shopify.connector.store.credential'].action_set_token(

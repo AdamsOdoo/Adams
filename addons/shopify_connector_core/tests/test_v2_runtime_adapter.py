@@ -49,11 +49,10 @@ class _RecordingCursor:
 
 
 class _SequenceCursor:
-    """Small cursor double for the two-step lock-order adapter queries."""
+    """Return one result set per actual sequential lock/read query."""
 
-    def __init__(self, job_ids=((41,),), detail_rows=()):
-        self.job_ids = job_ids
-        self.detail_rows = list(detail_rows)
+    def __init__(self, query_rows):
+        self.query_rows = list(query_rows)
         self.queries = []
         self.params = []
 
@@ -62,12 +61,11 @@ class _SequenceCursor:
         self.params.append(params)
 
     def fetchall(self):
-        if len(self.queries) == 1:
-            return self.job_ids
-        return ()
+        return self.query_rows[len(self.queries) - 1]
 
     def fetchone(self):
-        return self.detail_rows.pop(0) if self.detail_rows else None
+        rows = self.fetchall()
+        return rows[0] if rows else None
 
 
 def _fake_sql_env(cursor, company_ids=(7,)):
@@ -288,18 +286,23 @@ class TestV2RuntimeAdapter(TransactionCase):
             12, 4, 9, 4, 9, 'read_only',
         )
         cursor = _SequenceCursor(
-            job_ids=((41, detail[2], 12, 7),),
-            detail_rows=((91,), (12,), (7,), (33,), detail),
+            query_rows=(
+                ((41, detail[2], 12, 7, 'core_dispatch_selftest', True),),
+                ((91,),), ((12,),), ((7,),), ((33, 7),), (detail,),
+            ),
         )
         repository = OdooReadOnlyRuntimeRepository(_fake_sql_env(cursor))
-        rows = repository._stale_sql(_fake_sql_env(cursor), NOW, 1)
-        self.assertEqual(rows, (detail,))
+        rows = repository._stale_sql(
+            _fake_sql_env(cursor), NOW, 1, ('core_dispatch_selftest',),
+        )
+        self.assertEqual(rows, (detail + ('core_dispatch_selftest', True),))
         self.assertEqual(len(cursor.queries), 6)
+        self.assertEqual(cursor.params[0][0], ('core_dispatch_selftest',))
         self.assertEqual(cursor.params[0][-1], 1)
         self.assertEqual(cursor.params[1][0], 41)
-        self.assertEqual(cursor.params[2][0], 12)
-        self.assertEqual(cursor.params[3][0], 7)
-        self.assertEqual(cursor.params[4][0], 7)
+        self.assertEqual(cursor.params[2][0], (12,))
+        self.assertEqual(cursor.params[3][0], (7,))
+        self.assertEqual(cursor.params[4][0], (7,))
 
     def test_only_explicit_non_mutation_handlers_are_registered(self):
         source = inspect.getsource(ShopifyConnectorV2Runtime)

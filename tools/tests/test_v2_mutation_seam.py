@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import unittest
 from pathlib import Path
 
@@ -115,9 +116,95 @@ class TestV2MutationSeam(unittest.TestCase):
             sweep_method.index("if attempt:"),
             sweep_method.index("_v2_admit_mutation_job(job, phase='stale')"),
         )
-        self.assertIn("('mutation_domain', 'in'", sweep_method)
-        self.assertIn("attempt_candidates.mapped('job_id')", sweep_method)
+        self.assertIn('_stale_v2_attempt_jobs', sweep_method)
+        self.assertNotIn('job_id.running_since', sweep_method)
         self.assertNotIn("('attempt_token', '=', job.current_attempt_token)", sweep_method)
+
+    def test_stale_c2_candidate_query_is_bounded_oldest_job_first(self):
+        sweep = _source(CORE_MODELS / 'shopify_connector_stale_owner_sweep.py')
+        selector_node = _method(sweep, '_stale_v2_attempt_jobs')
+        selector = ast.get_source_segment(sweep, selector_node)
+        method_node = copy.deepcopy(selector_node)
+        method_node.decorator_list = []
+        module = ast.fix_missing_locations(
+            ast.Module(body=[method_node], type_ignores=[])
+        )
+        namespace = {}
+        exec(compile(module, '<stale-v2-selector>', 'exec'), namespace)
+
+        class FakeCursor:
+            def __init__(self):
+                self.query = None
+                self.params = None
+
+            def execute(self, query, params):
+                self.query = query
+                self.params = params
+
+            def fetchall(self):
+                return [(17,), (23,)]
+
+        class FakeModel:
+            def __init__(self):
+                self.flushed = []
+                self.browsed = None
+
+            def sudo(self):
+                return self
+
+            def flush_model(self, fields):
+                self.flushed.append(fields)
+
+            def browse(self, ids):
+                self.browsed = ids
+                return tuple(ids)
+
+        job_model = FakeModel()
+        attempt_model = FakeModel()
+        cursor = FakeCursor()
+
+        class FakeEnv(dict):
+            cr = cursor
+
+        service = type('FakeSweep', (), {
+            'env': FakeEnv({
+                'shopify.connector.job': job_model,
+                'shopify.connector.mutation.attempt': attempt_model,
+            }),
+        })()
+        result = namespace['_stale_v2_attempt_jobs'](
+            service,
+            job_types=frozenset(('z_type', 'a_type')),
+            cutoff='2026-09-08 10:00:00',
+            limit=2,
+        )
+        normalized = ' '.join(cursor.query.split())
+        self.assertIn(
+            'FROM shopify_connector_job AS j',
+            normalized,
+        )
+        self.assertIn('EXISTS (SELECT 1', normalized)
+        self.assertIn('a.job_id = j.id', normalized)
+        self.assertIn('a.mutation_domain = ANY(%s)', normalized)
+        self.assertIn('ORDER BY j.running_since, j.id', normalized)
+        self.assertIn('LIMIT %s', normalized)
+        self.assertEqual(
+            attempt_model.flushed,
+            [['run_id', 'mutation_domain', 'job_id']],
+        )
+        self.assertEqual(job_model.flushed, [['state', 'running_since']])
+        self.assertEqual(
+            cursor.params,
+            ('running', '2026-09-08 10:00:00', ['a_type', 'z_type'], 2),
+        )
+        self.assertEqual(result, (17, 23))
+        self.assertEqual(job_model.browsed, [17, 23])
+        self.assertNotIn('job_id.running_since', selector)
+
+    def test_legacy_lock_contention_preserves_processed_v2_count(self):
+        sweep = _source(CORE_MODELS / 'shopify_connector_stale_owner_sweep.py')
+        run_sweep = ast.get_source_segment(sweep, _method(sweep, 'run_sweep'))
+        self.assertIn('if not locked:\n            return v2_count', run_sweep)
 
     def test_c2_identity_is_canonicalized_from_locked_store(self):
         attempt = _source(

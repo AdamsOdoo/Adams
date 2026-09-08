@@ -28,6 +28,38 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
         return value if value > 0 else default
 
     @api.model
+    def _stale_v2_attempt_jobs(self, *, job_types, cutoff, limit):
+        """Return the oldest bounded jobs identified by durable V2 C2 rows.
+
+        Odoo 19 does not accept a dotted relational field in ``search``'s
+        ``order`` argument.  This narrow query joins the two tables owned by
+        core so the limit is still applied after ordering on the original
+        job's stale timestamp.  Values remain bound parameters; the table and
+        column identifiers are static connector schema.
+        """
+        Job = self.env['shopify.connector.job'].sudo()
+        Attempt = self.env['shopify.connector.mutation.attempt'].sudo()
+        Attempt.flush_model(['run_id', 'mutation_domain', 'job_id'])
+        Job.flush_model(['state', 'running_since'])
+        self.env.cr.execute(
+            'SELECT j.id '
+            'FROM shopify_connector_job AS j '
+            'WHERE j.state = %s '
+            'AND j.running_since IS NOT NULL '
+            'AND j.running_since <= %s '
+            'AND EXISTS ('
+            'SELECT 1 FROM shopify_connector_mutation_attempt AS a '
+            'WHERE a.job_id = j.id '
+            'AND a.run_id IS NOT NULL '
+            'AND a.mutation_domain = ANY(%s)'
+            ') '
+            'ORDER BY j.running_since, j.id '
+            'LIMIT %s',
+            ('running', cutoff, list(sorted(job_types)), limit),
+        )
+        return Job.browse([row[0] for row in self.env.cr.fetchall()])
+
+    @api.model
     def _sweep_v2_mutation_owners(self, *, job_types=None):
         """Recover stale V2 mutation owners without replaying transport.
 
@@ -58,13 +90,9 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
         # has lost its nullable run relation or current job type.  Include
         # those owners from the immutable attempt domain, then union the
         # ordinary pre-C2 V2 candidates that have no attempt yet.
-        attempt_candidates = Attempt.search([
-            ('run_id', '!=', False),
-            ('mutation_domain', 'in', tuple(sorted(types))),
-            ('job_id.state', '=', 'running'),
-            ('job_id.running_since', '!=', False),
-            ('job_id.running_since', '<=', cutoff),
-        ], order='job_id.running_since, id', limit=batch_size)
+        attempt_jobs = self._stale_v2_attempt_jobs(
+            job_types=types, cutoff=cutoff, limit=batch_size,
+        )
         c1_candidates = Job.search([
             ('run_id', '!=', False),
             ('job_type', 'in', tuple(sorted(types))),
@@ -73,7 +101,7 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
             ('running_since', '!=', False),
             ('running_since', '<=', cutoff),
         ], order='running_since, id', limit=batch_size)
-        candidates = (attempt_candidates.mapped('job_id') | c1_candidates).sorted(
+        candidates = (attempt_jobs | c1_candidates).sorted(
             key=lambda item: (item.running_since, item.id),
         )[:batch_size]
         locked = candidates.try_lock_for_update(limit=batch_size)
@@ -176,7 +204,7 @@ class ShopifyConnectorStaleOwnerSweep(models.AbstractModel):
             return v2_count
         locked = candidates.try_lock_for_update(limit=batch_size)
         if not locked:
-            return 0
+            return v2_count
         locked.invalidate_recordset()
         processed = 0
         Dispatch = self.env['shopify.connector.job.dispatch']
