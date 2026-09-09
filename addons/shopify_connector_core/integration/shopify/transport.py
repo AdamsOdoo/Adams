@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - exercised by the pure test runtime
     requests = None
 
 from ...domain.immutability import freeze_value, to_plain
+from ...tools.api_version import SHOPIFY_API_VERSION
 
 
 _REQUEST_EXCEPTION = (
@@ -37,11 +38,6 @@ CONNECT_TIMEOUT_SECONDS = 10
 READ_TIMEOUT_SECONDS = 20
 DEFAULT_TIMEOUT = (CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS)
 
-# Kept in the integration boundary because the dependency policy deliberately
-# prevents adapter code from reaching into legacy ``tools`` modules.  This is
-# the same pinned value used by ``models/...api_client.py``; a version bump is
-# a dedicated contract checkpoint, never a merchant setting.
-SHOPIFY_API_VERSION = "2026-07"
 API_VERSION_RESPONSE_HEADER = "X-Shopify-API-Version"
 
 # Shopify payloads are bounded at the transport boundary.  The existing

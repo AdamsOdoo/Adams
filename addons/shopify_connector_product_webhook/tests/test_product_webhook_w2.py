@@ -566,7 +566,8 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
         JobEnqueue = self.env['shopify.connector.job.enqueue'].sudo()
         Job = self.env['shopify.connector.job'].sudo()
         for state in ('skipped', 'cancelled', 'failed_final'):
-            store = self._store('generation-%s' % state)
+            suffix = 'generation-%s' % state.replace('_', '-')
+            store = self._store(suffix)
             store.sudo().write({'connection_generation': 1})
             old = JobEnqueue.enqueue(
                 store,
@@ -605,7 +606,7 @@ class TestShopifyConnectorProductWebhookW2(TransactionCase):
                 'state': 'connected',
             })
             delivery = self._delivery(
-                store, 'generation-%s' % state, gid,
+                store, suffix, gid,
                 fields.Datetime.to_datetime(
                     stamp.replace('T', ' ').replace('Z', ''),
                 ),

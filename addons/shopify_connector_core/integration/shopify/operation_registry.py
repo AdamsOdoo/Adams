@@ -15,6 +15,7 @@ from ...domain.identifiers import require_key
 from ...domain.immutability import freeze_value
 from ...domain.registry import DuplicateRegistryKey, Registry, RegistryFrozen
 from ...domain.states import OperationType
+from ...tools.api_version import SHOPIFY_API_VERSION
 
 
 _OPERATION_NAME = re.compile(r"^[_A-Za-z][_A-Za-z0-9]*$")
@@ -443,6 +444,7 @@ class ShopifyOperationRegistry(Registry[ShopifyOperationSpec]):
 __all__ = [
     "OperationIdentity",
     "ReadbackMetadata",
+    "SHOPIFY_API_VERSION",
     "ShopifyOperationRegistry",
     "ShopifyOperationSpec",
     "SideEffectMetadata",

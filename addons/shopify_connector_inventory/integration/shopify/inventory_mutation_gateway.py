@@ -31,6 +31,7 @@ from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts i
 )
 from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
+    SHOPIFY_API_VERSION,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,
     SideEffectMetadata,
@@ -40,7 +41,6 @@ from .inventory_documents import INVENTORY_PAIR_QUERY
 from ...domain.inventory_mutation import InventoryPairScope
 
 
-SHOPIFY_API_VERSION = "2026-07"
 INVENTORY_ACTIVATE_OPERATION = "inventory.activate"
 INVENTORY_SET_QUANTITIES_OPERATION = "inventory.set_quantities"
 INVENTORY_PAIR_READ_OPERATION = "inventory.pair.read"

@@ -158,6 +158,20 @@ class TestExportSourceGuards(TransactionCase):
         count is per file so a diff shows exactly where a new one appeared.
         """
         expected = {
+            # P13 pure application/domain contracts and P08 Shopify gateway
+            # adapters. These files contain no ORM elevation; exact zero
+            # entries keep a future sudo addition visible to this guard.
+            'product_export_commands.py': 0,
+            'product_export_payloads.py': 0,
+            '_support.py': 0,
+            'product_export_authority.py': 0,
+            'product_export_binding.py': 0,
+            'product_export_policy.py': 0,
+            'product_export_preview.py': 0,
+            'product_export_readback.py': 0,
+            'product_export_sequence.py': 0,
+            'product_export_mutation_gateway.py': 0,
+            'product_media_mutation_gateway.py': 0,
             # 20 -> 21 (2026-07-27): the apply handler now terminalises its
             # own job before handing off to the first step, because the
             # parent and the child compute a byte-identical

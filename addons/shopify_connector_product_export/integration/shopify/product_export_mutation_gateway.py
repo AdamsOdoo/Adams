@@ -29,13 +29,13 @@ from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts i
 )
 from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
+    SHOPIFY_API_VERSION,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,
     SideEffectMetadata,
 )
 
 
-SHOPIFY_API_VERSION = "2026-07"
 MAX_EXPORT_VARIANTS = 100
 BINDING_METAFIELD_KEY = "odoo_template_custom_id_v2"
 BINDING_METAFIELD_TYPE = "id"

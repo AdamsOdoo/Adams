@@ -18,6 +18,7 @@ import re
 from typing import Any, Generic, TypeVar
 
 from ...domain.immutability import freeze_value, to_plain
+from ...tools.api_version import SHOPIFY_API_VERSION
 from .read_money import MoneyDTO
 
 
@@ -30,7 +31,6 @@ _MYSHOPIFY_DOMAIN = re.compile(
 )
 _MAX_TEXT = 4096
 _MAX_CURSOR_LENGTH = 512
-SHOPIFY_API_VERSION = "2026-07"
 
 
 class ReadGatewayMode(str, Enum):

@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
+    SHOPIFY_API_VERSION,
+)
 
 from .fulfillment_documents import FULFILLMENT_NODE_QUERY, ORDER_FULFILLMENTS_QUERY
 
@@ -24,8 +27,6 @@ MAX_PAGES = 100
 MAX_BATCH = 50
 MAX_BATCH_ITEMS = 1000
 MAX_CURSOR_LENGTH = 512
-SHOPIFY_API_VERSION = "2026-07"
-
 FULFILLMENT_ORDERS_OPERATION = "fulfillment_orders_for_order"
 FULFILLMENT_ORDER_LINES_OPERATION = "fulfillment_order_lines"
 ORDER_FULFILLMENTS_OPERATION = "order_fulfillments"

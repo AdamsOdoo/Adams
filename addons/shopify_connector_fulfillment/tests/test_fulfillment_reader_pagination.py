@@ -62,10 +62,33 @@ class TestFulfillmentReaderPagination(TransactionCase):
             'api_version': '2026-07',
             'state': 'connected',
         })
+        cls.store._p15_set_activation('active')
         cls.env['shopify.connector.store.settings'].create({
             'store_id': cls.store.id,
             'fulfillment_domain_enabled': True,
         })
+        cls.reader = cls.env['res.users'].create({
+            'name': 'FUL pagination reader',
+            'login': 'ful-pagination-reader-%s' % uuid.uuid4().hex,
+            'group_ids': [(6, 0, [
+                cls.env.ref('base.group_user').id,
+                cls.env.ref(
+                    'shopify_connector_core.group_shopify_connector_operator'
+                ).id,
+            ])],
+        })
+        cls.read_job = cls.env['shopify.connector.job'].sudo().create({
+            'store_id': cls.store.id,
+            'job_source': 'scheduled_sync',
+            'job_type': 'fulfillment_reconciliation_check',
+            'state': 'running',
+            'res_model': 'shopify.connector.store',
+            'res_id': cls.store.id,
+            'payload_hash': uuid.uuid4().hex,
+        })
+        cls.ReaderService = cls.Service.with_user(cls.reader)
+        cls.reader_store = cls.store.with_user(cls.reader)
+        cls.reader_job = cls.read_job.with_user(cls.reader)
 
     def _paginate(self):
         return self.Service._paginate(
@@ -122,8 +145,9 @@ class TestFulfillmentReaderPagination(TransactionCase):
         with patch.object(
             type(self.Service), '_read_data', return_value=response,
         ) as read:
-            result = self.Service._read_order_fulfillments(
-                False, self.store, 'gid://shopify/Order/1',
+            result = self.ReaderService._read_order_fulfillments(
+                self.reader_job, self.reader_store,
+                'gid://shopify/Order/1',
             )
         self.assertEqual(result, response['order']['fulfillments'])
         self.assertEqual(read.call_count, 1)
@@ -141,8 +165,9 @@ class TestFulfillmentReaderPagination(TransactionCase):
             type(self.Service), '_read_data', return_value=response,
         ):
             with self.assertRaises(FulfillmentReadError) as caught:
-                self.Service._read_order_fulfillments(
-                    False, self.store, 'gid://shopify/Order/1',
+                self.ReaderService._read_order_fulfillments(
+                    self.reader_job, self.reader_store,
+                    'gid://shopify/Order/1',
                 )
         self.assertEqual(
             caught.exception.error_class, 'data_shape_schema_mismatch',

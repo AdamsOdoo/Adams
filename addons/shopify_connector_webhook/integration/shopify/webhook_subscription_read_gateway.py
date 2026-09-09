@@ -15,13 +15,14 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from odoo.addons.shopify_connector_core.domain.immutability import freeze_value, to_plain
+from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
+    SHOPIFY_API_VERSION,
+)
 
 
 MAX_PAGE_SIZE = 100
 MAX_PAGES = 20
 MAX_CURSOR_LENGTH = 512
-SHOPIFY_API_VERSION = "2026-07"
-
 SUBSCRIPTIONS_OPERATION = "webhook_subscriptions"
 READ_OPERATION_KEYS = frozenset((SUBSCRIPTIONS_OPERATION,))
 

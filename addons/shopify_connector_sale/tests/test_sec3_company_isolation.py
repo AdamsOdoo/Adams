@@ -93,6 +93,17 @@ class TestSec3SaleCompanyIsolation(TransactionCase):
         return self.env[model].with_user(user)
 
     def test_settings_service_derives_company_after_input_admission(self):
+        # Like SEC-2, reach the model boundary under a hypothetical create ACL.
+        # Shipped connector roles deliberately cannot create settings directly.
+        self.env['ir.model.access'].create({
+            'name': 'sec3_test_settings_create',
+            'model_id': self.env['ir.model']._get_id('shopify.connector.store.settings'),
+            'group_id': self.env.ref('%s.group_shopify_connector_admin' % CORE).id,
+            'perm_read': True,
+            'perm_write': True,
+            'perm_create': True,
+            'perm_unlink': False,
+        })
         self.user_b.write({
             'company_ids': [(6, 0, [self.company_a.id, self.company_b.id])],
         })

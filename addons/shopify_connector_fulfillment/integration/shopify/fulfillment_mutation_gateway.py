@@ -28,6 +28,7 @@ from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts i
 )
 from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
+    SHOPIFY_API_VERSION,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,
     SideEffectMetadata,
@@ -39,7 +40,6 @@ from .fulfillment_documents import (
 )
 
 
-SHOPIFY_API_VERSION = "2026-07"
 FULFILLMENT_CREATE_OPERATION = "fulfillment.create"
 FULFILLMENT_TRACKING_UPDATE_OPERATION = "fulfillment.tracking_update"
 FULFILLMENT_ORDER_FULFILLMENTS_READ_OPERATION = "fulfillment.order_fulfillments.read"

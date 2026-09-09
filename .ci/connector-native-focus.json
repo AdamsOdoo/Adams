@@ -84,6 +84,38 @@
     {
       "addon": "shopify_connector_sale",
       "class": "TestSec3SaleCompanyIsolation"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestExportSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_product_export",
+      "class": "TestProductContractRepair"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_webhook",
+      "class": "TestShopifyConnectorWebhookW1"
+    },
+    {
+      "addon": "shopify_connector_core",
+      "class": "TestUiSourceGuards"
+    },
+    {
+      "addon": "shopify_connector_fulfillment",
+      "class": "TestFulfillmentReaderPagination"
+    },
+    {
+      "addon": "shopify_connector_inventory_webhook",
+      "class": "TestShopifyConnectorInventoryWebhookW3"
+    },
+    {
+      "addon": "shopify_connector_product_webhook",
+      "class": "TestShopifyConnectorProductWebhookW2"
     }
   ]
 }

@@ -381,7 +381,7 @@ class TestUiSourceGuards(TransactionCase):
         self.assertNotIn(".write(", resolve)
 
     def test_no_out_of_scope_ui(self):
-        """No fulfillment-mode / setup / matching / export / mapping UI files."""
+        """Keep the shipped inventory exact and parked P16 views inactive."""
         views_dir = os.path.join(self.addon_root, 'views')
         allowed_views = {
             'shopify_connector_menus.xml',
@@ -408,11 +408,21 @@ class TestUiSourceGuards(TransactionCase):
             # controller, no new model. An accepted Store 360 deliverable,
             # so it joins the allowlist rather than dissolving it.
             'shopify_connector_job_analysis_views.xml',
+            # Existing V2 run/migration inspection, already manifest-wired.
+            'shopify_connector_runtime_views.xml',
+            # Preserved P16 proposal; inventory inclusion is not UI approval.
+            'shopify_connector_p16_admin_views.xml',
         }
         present = {f for f in os.listdir(views_dir) if f.endswith('.xml')}
         self.assertEqual(
             present, allowed_views,
             "Only the U0-allowlisted view files may exist; found %s" % (present - allowed_views),
+        )
+        manifest = ast.literal_eval(self._read('__manifest__.py'))
+        self.assertIn('views/shopify_connector_runtime_views.xml', manifest['data'])
+        self.assertNotIn(
+            'views/shopify_connector_p16_admin_views.xml', manifest['data'],
+            'The parked P16 proposal must not be activated without UI approval.',
         )
         forbidden_tokens = ('fulfillment', 'setup_wizard', 'matching', 'mapping', 'export_preview')
         # The setup views file IS the setup wizard, so the token check runs
@@ -431,6 +441,8 @@ class TestUiSourceGuards(TransactionCase):
         # every token stays enforced everywhere else.
         token_exemptions = {
             'shopify_connector_store_settings_views.xml': {'fulfillment'},
+            # Same core-owned domain flag in the inactive P16 fallback.
+            'shopify_connector_p16_admin_views.xml': {'fulfillment'},
         }
         for f in present - {'shopify_connector_setup_views.xml'}:
             text = open(os.path.join(views_dir, f), encoding='utf-8').read().lower()

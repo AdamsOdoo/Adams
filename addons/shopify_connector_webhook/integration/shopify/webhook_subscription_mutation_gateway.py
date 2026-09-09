@@ -29,6 +29,7 @@ from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts i
 )
 from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
+    SHOPIFY_API_VERSION,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,
     SideEffectMetadata,
@@ -37,7 +38,6 @@ from odoo.addons.shopify_connector_core.integration.shopify.operation_registry i
 from .webhook_subscription_read_gateway import SUBSCRIPTIONS_QUERY as WEBHOOK_SUBSCRIPTIONS_QUERY
 
 
-SHOPIFY_API_VERSION = "2026-07"
 WEBHOOK_SUBSCRIPTION_CREATE_OPERATION = "webhook.subscription.create"
 WEBHOOK_SUBSCRIPTION_DELETE_OPERATION = "webhook.subscription.delete"
 WEBHOOK_SUBSCRIPTIONS_READ_OPERATION = "webhook.subscriptions.read"

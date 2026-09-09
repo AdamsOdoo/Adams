@@ -38,6 +38,13 @@ class ShopifyConnectorRecoveryCancellation(models.AbstractModel):
         that same order and skips a job already owned by a worker; the durable
         run request still makes that worker settle at its normal boundary.
         """
+        # Raw SQL does not flush pending ORM writes or stored related fields.
+        # Select the current queued/company scope before freezing its job IDs;
+        # a later ORM count cannot repair an already-empty selection.
+        self.env['shopify.connector.job'].flush_model([
+            'run_id', 'store_id', 'company_id', 'state', 'superseded_by_job_id',
+        ])
+        self.env['shopify.connector.run'].flush_model(['store_id', 'company_id'])
         self.env.cr.execute(
             """
                 SELECT id

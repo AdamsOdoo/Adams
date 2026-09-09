@@ -39,13 +39,13 @@ from odoo.addons.shopify_connector_core.integration.shopify.mutation_contracts i
 )
 from odoo.addons.shopify_connector_core.integration.shopify.operation_registry import (
     ReadbackMetadata,
+    SHOPIFY_API_VERSION,
     ShopifyOperationRegistry,
     ShopifyOperationSpec,
     SideEffectMetadata,
 )
 
 
-SHOPIFY_API_VERSION = "2026-07"
 STAGED_RESOURCE = "PRODUCT_IMAGE"
 MEDIA_CONTENT_TYPE = "IMAGE"
 IMAGE_MIME_PNG = "image/png"
